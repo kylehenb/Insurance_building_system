@@ -1,0 +1,17 @@
+This is IRC Master — a job management platform for building insurance repair businesses.
+
+The full technical specification is in the file IRC_Master_Tech_Spec_v2_9.md in this project.
+Read that file at the start of every session before doing anything else.
+
+## Critical rules for every session:
+- Read the spec before writing any code
+- One session = one module only
+- Deliver complete files only — no partial patches, no diffs
+- Never modify files outside the current session's scope
+- TypeScript throughout — no any types
+- All database access through Supabase client only
+- Every table has tenant_id — always filter by it
+- Never expose SUPABASE_SERVICE_ROLE_KEY to the browser
+- Follow the App Router structure exactly as defined in the spec (Section 7)
+- Use shadcn/ui for all UI components
+- Tailwind only for styling — black (#1a1a1a) and beige (#f5f0e8) palette
