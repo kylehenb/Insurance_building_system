@@ -1,7 +1,7 @@
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { AppLayout } from "@/components/layout/app-layout";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -54,32 +54,16 @@ async function JobsListPage() {
 
   const { tenant_id } = userData;
 
-  // Fetch jobs for this tenant
-  const supabase = await createClient();
-  
-  // Use type assertion to work around Supabase type inference issues
-  const result = await (supabase as unknown as {
-    from: (table: string) => {
-      select: (columns: string) => {
-        eq: (column: string, value: string) => {
-          order: (column: string, options: { ascending: boolean }) => Promise<{
-            data: unknown[] | null;
-            error: { message: string } | null;
-          }>;
-        };
-      };
-    };
-  })
+  // Fetch jobs for this tenant using service role to bypass RLS
+  const serviceClient = createServiceClient();
+  const { data: jobs, error } = await serviceClient
     .from("jobs")
     .select("id, job_number, insured_name, property_address, insurer, status, created_at")
     .eq("tenant_id", tenant_id as string)
     .order("created_at", { ascending: false });
 
-  const { data: jobs, error } = result;
-
   if (error) {
     console.error("Error fetching jobs:", error);
-    notFound();
   }
 
   const typedJobs = (jobs as JobRow[]) || [];
