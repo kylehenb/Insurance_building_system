@@ -8,9 +8,21 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    if (!error && data?.user) {
+      // Check if user exists in public.users table
+      const { data: userRow, error: userError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", data.user.id)
+        .single();
+
+      // If user doesn't exist in public.users, redirect to new-user setup
+      if (userError || !userRow) {
+        return NextResponse.redirect(`${origin}/auth/new-user`);
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
 
