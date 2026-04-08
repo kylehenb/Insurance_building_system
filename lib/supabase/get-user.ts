@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { toUser, type UserSession } from "@/lib/types/user";
 import type { Database } from "./database.types";
 
@@ -23,8 +23,10 @@ export async function getUser(): Promise<UserSession | null> {
     return null;
   }
 
-  // Query the public users table for the full user row
-  const { data: userRow, error } = await supabase
+  // Use service role to query public.users so that RLS cannot block a user
+  // from reading their own profile row.
+  const serviceClient = createServiceClient();
+  const { data: userRow, error } = await serviceClient
     .from("users")
     .select("*")
     .eq("id", authUser.id)
