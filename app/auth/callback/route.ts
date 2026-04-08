@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -11,15 +12,19 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data?.user) {
-      // Check if user exists in public.users table
-      const { data: userRow, error: userError } = await supabase
+      // Use service role to bypass RLS for this existence check
+      const serviceClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { data: userRow } = await serviceClient
         .from("users")
         .select("id")
         .eq("id", data.user.id)
         .single();
 
-      // If user doesn't exist in public.users, redirect to new-user setup
-      if (userError || !userRow) {
+      if (!userRow) {
         return NextResponse.redirect(`${origin}/auth/new-user`);
       }
 
@@ -29,6 +34,5 @@ export async function GET(request: Request) {
     console.error("Auth callback error:", error);
   }
 
-  // Return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/login?error=auth-callback-failed`);
 }
