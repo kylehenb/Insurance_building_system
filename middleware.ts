@@ -1,30 +1,61 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
-
-const publicRoutes = ["/login", "/auth/callback", "/auth/new-user"];
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import type { Database } from "@/lib/supabase/database.types";
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user } = await updateSession(request);
+  let supabaseResponse = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+          supabaseResponse = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith("/auth/")
-  );
+  // Public routes that don't require authentication
+  const isPublicRoute =
+    pathname === "/login" ||
+    pathname === "/auth/callback" ||
+    pathname.startsWith("/auth/");
 
+  // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // If authenticated user hits /auth/new-user, send them to dashboard
-  if (user && pathname === "/auth/new-user") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
+  // Redirect authenticated users away from login
   if (user && pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const dashboardUrl = new URL("/dashboard", request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
   return supabaseResponse;
