@@ -274,12 +274,12 @@ export interface Database {
           job_id: string | null;
           client_id: string | null;
           order_ref: string | null;
-          status: string;
+          status: string | null;
           claim_number: string;
           insurer: string | null;
           adjuster: string | null;
           wo_type: string | null;
-          is_make_safe: boolean;
+          is_make_safe: boolean | null;
           property_address: string | null;
           insured_name: string | null;
           insured_phone: string | null;
@@ -293,9 +293,9 @@ export interface Database {
           excess_building: number | null;
           raw_email_link: string | null;
           parse_status: string | null;
-          entry_method: string;
+          entry_method: string | null;
           notes: string | null;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
@@ -303,12 +303,12 @@ export interface Database {
           job_id?: string | null;
           client_id?: string | null;
           order_ref?: string | null;
-          status?: string;
+          status?: string | null;
           claim_number: string;
           insurer?: string | null;
           adjuster?: string | null;
           wo_type?: string | null;
-          is_make_safe?: boolean;
+          is_make_safe?: boolean | null;
           property_address?: string | null;
           insured_name?: string | null;
           insured_phone?: string | null;
@@ -322,9 +322,9 @@ export interface Database {
           excess_building?: number | null;
           raw_email_link?: string | null;
           parse_status?: string | null;
-          entry_method?: string;
+          entry_method?: string | null;
           notes?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
@@ -332,12 +332,12 @@ export interface Database {
           job_id?: string | null;
           client_id?: string | null;
           order_ref?: string | null;
-          status?: string;
+          status?: string | null;
           claim_number?: string;
           insurer?: string | null;
           adjuster?: string | null;
           wo_type?: string | null;
-          is_make_safe?: boolean;
+          is_make_safe?: boolean | null;
           property_address?: string | null;
           insured_name?: string | null;
           insured_phone?: string | null;
@@ -351,9 +351,9 @@ export interface Database {
           excess_building?: number | null;
           raw_email_link?: string | null;
           parse_status?: string | null;
-          entry_method?: string;
+          entry_method?: string | null;
           notes?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
         Relationships: never[];
       };
