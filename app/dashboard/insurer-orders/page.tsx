@@ -116,32 +116,46 @@ export default function InsurerOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [panelOpen, setPanelOpen] = useState(false)
+  const [tenantId, setTenantId] = useState<string | null>(null)
 
   useEffect(() => {
-    async function load() {
+    async function bootstrap() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { router.push('/login'); return }
 
-      const { data: userData } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('tenant_id')
         .eq('id', user.id)
         .single()
 
-      if (!userData?.tenant_id) return
+      if (profileError || !profile) {
+        console.log('Profile error:', profileError)
+        router.push('/login')
+        return
+      }
 
+      setTenantId(profile.tenant_id)
+    }
+    bootstrap()
+  }, [router])
+
+  useEffect(() => {
+    if (!tenantId) return
+
+    async function fetchOrders() {
       const { data } = await supabase
         .from('insurer_orders')
         .select('*')
-        .eq('tenant_id', userData.tenant_id)
+        .eq('tenant_id', tenantId!)
         .order('created_at', { ascending: false })
         .limit(100)
 
       setOrders(data ?? [])
       setLoading(false)
     }
-    load()
-  }, [])
+    fetchOrders()
+  }, [tenantId])
 
   const filtered = filter === 'all'
     ? orders

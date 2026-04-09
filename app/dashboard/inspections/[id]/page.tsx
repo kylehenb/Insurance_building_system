@@ -2,7 +2,6 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
-import AppLayout from "@/components/layout/app-layout";
 import type { Database } from "@/lib/supabase/database.types";
 import { ArrowLeft, FileText } from "lucide-react";
 
@@ -149,8 +148,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
   const insp = data as unknown as InspectionWithRelations;
 
   return (
-    <AppLayout>
-      <div className="min-h-screen bg-[#f5f0e8]">
+    <div className="min-h-screen bg-[#f5f0e8]">
         {/* Header Strip */}
         <div className="bg-white border-b border-[#1a1a1a]/10">
           <div className="px-6 lg:px-8 py-6">
@@ -325,8 +323,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
             ))}
           </div>
         </div>
-      </div>
-    </AppLayout>
+    </div>
   );
 }
 
