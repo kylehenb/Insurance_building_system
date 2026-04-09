@@ -223,7 +223,6 @@ async function InspectionsListPage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }
