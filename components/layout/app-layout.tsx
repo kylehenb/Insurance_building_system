@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/supabase/get-user'
-import { Sidebar } from '@/components/layout/sidebar'
+import { DashboardShell } from '@/components/layout/dashboard-shell'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const userSession = await getUser()
@@ -24,14 +24,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : 'Inspector'
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f2ee', fontFamily: "'DM Sans', -apple-system, sans-serif" }}>
-      <Sidebar
-        user={{ name: user.name, role: roleLabel, initials }}
-        tenantId={user.tenant_id}
-      />
-      <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
-        {children}
-      </main>
-    </div>
+    <DashboardShell
+      user={{ name: user.name, role: roleLabel, initials }}
+      tenantId={user.tenant_id}
+    >
+      {children}
+    </DashboardShell>
   )
 }

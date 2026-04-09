@@ -27,9 +27,11 @@ interface User {
 interface SidebarProps {
   user: User
   tenantId: string
+  assistantVisible?: boolean
+  onToggleAssistant?: () => void
 }
 
-export function Sidebar({ user, tenantId }: SidebarProps) {
+export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssistant }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [query, setQuery] = useState('')
@@ -199,9 +201,13 @@ export function Sidebar({ user, tenantId }: SidebarProps) {
     <>
       <style>{`
         .sidebar { width: 220px; min-width: 220px; background: #1a1a1a; display: flex; flex-direction: column; overflow: hidden; height: 100vh; flex-shrink: 0; }
-        .sb-brand { padding: 22px 16px 18px; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; }
-        .sb-logo { display: block; width: 172px; height: 172px; margin: 0 auto 13px; object-fit: contain; }
+        .sb-brand { padding: 14px 16px 14px; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; }
+        .sb-logo { display: block; width: 138px; height: 138px; margin: 0 auto 10px; object-fit: contain; }
         .sb-wordmark { font-size: 10px; color: #6a6460; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 700; text-align: center; }
+        .sb-ai-toggle { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; letter-spacing: 0.1px; transition: color 0.15s; user-select: none; border: none; background: none; width: 100%; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; font-family: inherit; }
+        .sb-ai-toggle:hover { color: #bbb0a8; }
+        .sb-ai-toggle.active { color: #e8e0d5; }
+        .sb-ai-indicator { width: 6px; height: 6px; border-radius: 50%; margin-left: auto; flex-shrink: 0; transition: background 0.2s; }
         .sb-search { padding: 14px 14px 12px; flex-shrink: 0; border-bottom: 0.5px solid #2a2a2a; position: relative; }
         .sb-input { width: 100%; background: transparent; border: none; border-bottom: 0.5px solid #383838; padding: 7px 0; color: #e8e0d5; font-size: 13px; font-family: inherit; font-weight: 500; outline: none; transition: border-color 0.2s; }
         .sb-input::placeholder { color: #4a4540; }
@@ -247,6 +253,25 @@ export function Sidebar({ user, tenantId }: SidebarProps) {
           <img src="/logo.png" alt="Insurance Repair Co." className="sb-logo" />
           <div className="sb-wordmark">Insurance Repair Co.</div>
         </div>
+
+        {/* AI Assistant toggle */}
+        <button
+          className={`sb-ai-toggle${assistantVisible ? ' active' : ''}`}
+          onClick={onToggleAssistant}
+          title={assistantVisible ? 'Hide AI assistant' : 'Show AI assistant'}
+        >
+          <svg className="nav-icon" viewBox="0 0 16 16" strokeWidth="1.6" stroke="currentColor" fill="none">
+            <path d="M8 2a5 5 0 1 1 0 10A5 5 0 0 1 8 2z" />
+            <path d="M5.5 7.5c.5-1 1-1.5 2.5-1.5s2 .5 2.5 1.5" strokeLinecap="round" />
+            <circle cx="6" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+            <circle cx="10" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+          </svg>
+          IRC Assistant
+          <div
+            className="sb-ai-indicator"
+            style={{ background: assistantVisible ? '#c8b89a' : '#383838' }}
+          />
+        </button>
 
         {/* Search */}
         <div className="sb-search">

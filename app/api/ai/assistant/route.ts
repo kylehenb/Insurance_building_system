@@ -23,16 +23,20 @@ Key facts about IRC:
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json()
+    const { messages, context } = await req.json()
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
     }
 
+    const systemPrompt = context
+      ? `${SYSTEM_PROMPT}\n\nCurrent context injected from the user's active page:\n${context}`
+      : SYSTEM_PROMPT
+
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
