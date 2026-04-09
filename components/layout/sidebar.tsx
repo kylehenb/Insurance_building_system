@@ -200,7 +200,7 @@ export function Sidebar({ user, tenantId }: SidebarProps) {
       <style>{`
         .sidebar { width: 220px; min-width: 220px; background: #1a1a1a; display: flex; flex-direction: column; overflow: hidden; height: 100vh; flex-shrink: 0; }
         .sb-brand { padding: 22px 16px 18px; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; }
-        .sb-logo { display: block; width: 80px; height: 80px; margin: 0 auto 13px; }
+        .sb-logo { display: block; width: 172px; height: 172px; margin: 0 auto 13px; object-fit: contain; }
         .sb-wordmark { font-size: 10px; color: #6a6460; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 700; text-align: center; }
         .sb-search { padding: 14px 14px 12px; flex-shrink: 0; border-bottom: 0.5px solid #2a2a2a; position: relative; }
         .sb-input { width: 100%; background: transparent; border: none; border-bottom: 0.5px solid #383838; padding: 7px 0; color: #e8e0d5; font-size: 13px; font-family: inherit; font-weight: 500; outline: none; transition: border-color 0.2s; }
