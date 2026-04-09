@@ -1,37 +1,37 @@
-import { getUser } from "@/lib/supabase/get-user";
-import { redirect } from "next/navigation";
-import { Sidebar } from "./sidebar";
+import { redirect } from 'next/navigation'
+import { getUser } from '@/lib/supabase/get-user'
+import { Sidebar } from '@/components/layout/sidebar'
 
-interface AppLayoutProps {
-  children: React.ReactNode;
-}
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const userSession = await getUser()
+  if (!userSession?.session) redirect('/login')
+  if (!userSession.user) redirect('/auth/new-user')
 
-export async function AppLayout({ children }: AppLayoutProps) {
-  const userData = await getUser();
+  const { user } = userSession
 
-  // No session - redirect to login
-  if (!userData?.session) {
-    redirect("/login");
-  }
+  const initials = user.name
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
-  // Session exists but no user row in public.users - redirect to new-user setup
-  if (!userData.user) {
-    redirect("/auth/new-user");
-  }
-
-  const { user } = userData;
+  const roleLabel =
+    user.role === 'admin'
+      ? 'Owner · Inspector'
+      : user.role === 'office'
+      ? 'Office'
+      : 'Inspector'
 
   return (
-    <div className="flex min-h-screen bg-[#f5f0e8]">
-      {/* Sidebar */}
-      <Sidebar user={{ name: user.name, role: user.role }} />
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-auto">
-        <div className="min-h-screen">
-          {children}
-        </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f2ee', fontFamily: "'DM Sans', -apple-system, sans-serif" }}>
+      <Sidebar
+        user={{ name: user.name, role: roleLabel, initials }}
+        tenantId={user.tenant_id}
+      />
+      <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        {children}
       </main>
     </div>
-  );
+  )
 }

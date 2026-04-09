@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createClient } from "@/lib/supabase/server";
-import { AppLayout } from "@/components/layout/app-layout";
+import AppLayout from "@/components/layout/app-layout";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   ArrowLeft,

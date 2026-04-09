@@ -49,6 +49,7 @@ export interface Database {
           logo_storage_path?: string | null;
           created_at?: string;
         };
+        Relationships: never[];
       };
       users: {
         Row: {
@@ -99,6 +100,7 @@ export interface Database {
           can_view_financials?: boolean | null;
           created_at?: string;
         };
+        Relationships: never[];
       };
       inspections: {
         Row: {
@@ -185,6 +187,7 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
         };
+        Relationships: never[];
       };
       jobs: {
         Row: {
@@ -286,6 +289,118 @@ export interface Database {
           automation_overrides?: Json;
           created_at?: string;
         };
+        Relationships: never[];
+      };
+      insurer_orders: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          status: string;
+          created_at: string;
+          [key: string]: unknown;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          status?: string;
+          created_at?: string;
+          [key: string]: unknown;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          status?: string;
+          created_at?: string;
+          [key: string]: unknown;
+        };
+        Relationships: never[];
+      };
+      job_flags: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          job_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          job_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          job_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: {
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne?: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }[];
+      };
+      action_queue: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          job_id: string;
+          rule_key: string;
+          title: string;
+          description: string | null;
+          ai_draft: Json | null;
+          status: string;
+          priority: number;
+          snoozed_until: string | null;
+          confirmed_by: string | null;
+          confirmed_at: string | null;
+          error_log: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          job_id: string;
+          rule_key: string;
+          title: string;
+          description?: string | null;
+          ai_draft?: Json | null;
+          status?: string;
+          priority?: number;
+          snoozed_until?: string | null;
+          confirmed_by?: string | null;
+          confirmed_at?: string | null;
+          error_log?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          job_id?: string;
+          rule_key?: string;
+          title?: string;
+          description?: string | null;
+          ai_draft?: Json | null;
+          status?: string;
+          priority?: number;
+          snoozed_until?: string | null;
+          confirmed_by?: string | null;
+          confirmed_at?: string | null;
+          error_log?: string | null;
+          created_at?: string;
+        };
+        Relationships: {
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne?: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }[];
       };
     };
     Views: {

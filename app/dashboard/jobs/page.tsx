@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
-import { AppLayout } from "@/components/layout/app-layout";
+import AppLayout from "@/components/layout/app-layout";
 import type { Database } from "@/lib/supabase/database.types";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
