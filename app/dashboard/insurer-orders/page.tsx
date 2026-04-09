@@ -99,7 +99,7 @@ function F({ label, children, mono }: { label: string; children: React.ReactNode
 
 const inputStyle: React.CSSProperties = {
   width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 4,
-  padding: '6px 8px', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+  padding: '4px 7px', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
   color: '#1a1a1a', background: '#ffffff', boxSizing: 'border-box',
   outline: 'none', transition: 'border-color 0.15s',
 }
@@ -147,8 +147,8 @@ function FEditArea({ label, value, onSave }: { label: string; value: string | nu
         onChange={e => setDraft(e.target.value)}
         onBlur={() => onSave(draft)}
         onFocus={e => (e.target.style.borderColor = '#c8b89a')}
-        rows={3}
-        style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+        rows={2}
+        style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
       />
     </div>
   )
@@ -455,7 +455,7 @@ export default function InsurerOrdersPage() {
         </div>
 
         {/* Table */}
-        <div style={{ background: '#ffffff', border: '0.5px solid #e4dfd8', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '0.5px solid #e4dfd8', borderRadius: 8, overflow: 'clip' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
               <colgroup>
@@ -578,12 +578,12 @@ export default function InsurerOrdersPage() {
                               <div style={{
                                 background: isLinked ? '#fffbeb' : '#fdfcfb',
                                 borderTop: isLinked ? '2px solid #c8b89a' : '0.5px solid #f0ece6',
-                                padding: '24px 28px',
+                                padding: '14px 20px',
                               }}>
 
                                 {/* Linked banner */}
                                 {isLinked && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '10px 14px', background: '#fef3c7', border: '1px solid #d97706', borderRadius: 6 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, padding: '8px 12px', background: '#fef3c7', border: '1px solid #d97706', borderRadius: 6 }}>
                                     <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, border: '1px solid #d97706', whiteSpace: 'nowrap' }}>
                                       Already linked to {jobNum ?? order.job_id!.slice(-8)}
                                     </span>
@@ -597,10 +597,10 @@ export default function InsurerOrdersPage() {
                                 )}
 
                                 {/* Two-column editable grid */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '55% 45%', gap: 32, marginBottom: 24 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '55% 45%', gap: 16, marginBottom: 12 }}>
 
                                   {/* Left column */}
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
                                     <F label="Order Ref" mono>{order.order_ref ?? '—'}</F>
                                     <FEdit
                                       label="Insurer" value={order.insurer}
@@ -637,7 +637,7 @@ export default function InsurerOrdersPage() {
                                   </div>
 
                                   {/* Right column */}
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
                                     <FEdit
                                       label="Claim Number" value={order.claim_number} mono
                                       onSave={v => saveField(order.id, 'claim_number', v)}
@@ -668,7 +668,7 @@ export default function InsurerOrdersPage() {
                                 </div>
 
                                 {/* Full-width editable text sections */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
                                   <FEditArea
                                     label="Claim Description" value={order.claim_description}
                                     onSave={v => saveField(order.id, 'claim_description', v)}
@@ -684,7 +684,7 @@ export default function InsurerOrdersPage() {
                                 </div>
 
                                 {/* Action buttons */}
-                                <div style={{ marginTop: 20 }}>
+                                <div style={{ marginTop: 10 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                     {isLinked ? (
                                       order.status === 'rejected' ? (
@@ -727,7 +727,7 @@ export default function InsurerOrdersPage() {
                                       <textarea
                                         value={rejectReason}
                                         onChange={e => setRejectReason(e.target.value)}
-                                        rows={3}
+                                        rows={2}
                                         placeholder="Optional reason…"
                                         style={{
                                           width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 4,
