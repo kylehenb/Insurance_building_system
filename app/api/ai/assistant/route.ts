@@ -3,7 +3,9 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const client = new Anthropic()
 
-const SYSTEM_PROMPT = `Be concise. Answer in 1-3 sentences unless detail is specifically requested. Never use bullet points or headers for simple factual questions.
+const SYSTEM_PROMPT = `You are an AI assistant for Insurance Repair Co, a building insurance repair business. You only assist with tasks and questions related to running this business and using this system. If asked anything clearly outside this scope, politely decline and redirect the user back to IRC-related topics.
+
+Be concise. Answer in 1-3 sentences unless detail is specifically requested. Never use bullet points or headers for simple factual questions.
 
 You are the IRC Master assistant for Insurance Repair Co., a building insurance repair business in Perth WA. You have access to the user's job data and can answer questions about jobs, quotes, scope, SLAs, and processes. If the user asks about specific job data you don't have access to, tell them in one sentence that you can't query live data yet and suggest they check the Jobs tab.
 
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
       : SYSTEM_PROMPT
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
       system: systemPrompt,
       messages: messages.map((m: { role: string; content: string }) => ({
