@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
-import AppLayout from "@/components/layout/app-layout";
 import type { Database } from "@/lib/supabase/database.types";
 
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
@@ -114,8 +113,7 @@ async function InspectionsListPage() {
   const typedInspections = (inspections as unknown as InspectionWithRelations[]) ?? [];
 
   return (
-    <AppLayout>
-      <div className="p-6 lg:p-8">
+    <div className="p-6 lg:p-8">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -226,7 +224,7 @@ async function InspectionsListPage() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </div>
   );
 }
 

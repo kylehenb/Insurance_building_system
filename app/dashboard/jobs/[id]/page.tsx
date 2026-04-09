@@ -69,6 +69,7 @@ const tabs = [
   { id: "reports", label: "Reports" },
   { id: "quotes", label: "Quotes" },
   { id: "work-orders", label: "Work Orders" },
+  { id: "calendar", label: "Calendar" },
   { id: "comms", label: "Comms" },
   { id: "invoices", label: "Invoices" },
   { id: "photos", label: "Photos" },
