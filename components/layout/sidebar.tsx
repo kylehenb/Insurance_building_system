@@ -244,12 +244,7 @@ export function Sidebar({ user, tenantId }: SidebarProps) {
       <aside className="sidebar">
         {/* Brand */}
         <div className="sb-brand">
-          <svg className="sb-logo" viewBox="0 0 80 80" fill="none">
-            <circle cx="40" cy="40" r="35" stroke="#c8b89a" strokeWidth="3.5" />
-            <path d="M15 21 Q40 10 65 21" stroke="#c8b89a" strokeWidth="3.2" strokeLinecap="round" fill="none" />
-            <path d="M15 59 Q40 70 65 59" stroke="#c8b89a" strokeWidth="3.2" strokeLinecap="round" fill="none" />
-            <text x="40" y="50" textAnchor="middle" fontFamily="'DM Sans',sans-serif" fontSize="22" fontWeight="700" fill="#c8b89a" letterSpacing="2">IRC.</text>
-          </svg>
+          <img src="/logo.png" alt="Insurance Repair Co." className="sb-logo" />
           <div className="sb-wordmark">Insurance Repair Co.</div>
         </div>
 
