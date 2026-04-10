@@ -217,36 +217,17 @@ function JobDetailsAccordion({ job }: { job: JobDetails }) {
           gap: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em',
-              color: '#9e998f',
-              fontWeight: 500,
-              flexShrink: 0,
-            }}
-          >
-            Job Details
-          </span>
-          {job.insured_name && (
-            <span style={{ fontSize: 13, color: '#3a3530', fontWeight: 500 }}>{job.insured_name}</span>
-          )}
-          {job.property_address && (
-            <span
-              style={{
-                fontSize: 12,
-                color: '#9e998f',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {job.property_address}
-            </span>
-          )}
-        </div>
+        <span
+          style={{
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.07em',
+            color: '#9e998f',
+            fontWeight: 500,
+          }}
+        >
+          Job Details
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <span style={{ fontSize: 11, color: '#c8b89a' }}>{open ? 'Collapse' : 'Expand'}</span>
           <svg

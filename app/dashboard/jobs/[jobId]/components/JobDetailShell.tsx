@@ -240,6 +240,28 @@ export function JobDetailShell({
             </div>
           </div>
 
+          {/* Compact field strip */}
+          <div className="flex items-center flex-wrap gap-0 mb-4 text-[12px] text-[#9e998f]">
+            {[
+              { label: 'Insurer',      value: job.insurer },
+              { label: 'Claim #',      value: job.claim_number },
+              { label: 'Loss Type',    value: job.loss_type },
+              { label: 'Date of Loss', value: job.date_of_loss
+                  ? new Date(job.date_of_loss).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—' },
+              { label: 'Adjuster',     value: job.adjuster },
+            ].map((item, i, arr) => (
+              <span
+                key={item.label}
+                className="flex items-center pr-4 mr-4"
+                style={{ borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}
+              >
+                <span className="mr-1 text-[#b0a898]">{item.label}:</span>
+                <span className="text-[#3a3530]">{item.value || '—'}</span>
+              </span>
+            ))}
+          </div>
+
           {/* Tab bar */}
           <nav className="-mb-px flex gap-0 overflow-x-auto">
             {TABS.map(tab => {
