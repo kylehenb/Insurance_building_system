@@ -13,6 +13,7 @@ import {
   Mail,
   FileText,
 } from "lucide-react";
+import { ReportsTab } from "@/components/reports/ReportsTab";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
@@ -89,6 +90,8 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   }
 
   const { tenant_id } = userData;
+  const currentUserId = userData.session.user.id;
+  const currentUserRole = userData.user?.role ?? 'inspector';
 
   // Fetch the specific job
   const supabase = await createClient();
@@ -389,9 +392,22 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
             </div>
 
-            {/* Coming Soon placeholders for other tabs */}
+            {/* Other tab sections */}
             <div className="mt-12 space-y-8">
-              {tabs.slice(1).map((tab) => (
+              {/* Reports tab */}
+              <section id="reports" className="scroll-mt-8">
+                <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-6 shadow-sm">
+                  <ReportsTab
+                    jobId={id}
+                    tenantId={tenant_id!}
+                    currentUserId={currentUserId}
+                    currentUserRole={currentUserRole}
+                  />
+                </div>
+              </section>
+
+              {/* Coming soon placeholders for remaining tabs */}
+              {tabs.slice(2).map((tab) => (
                 <section key={tab.id} id={tab.id} className="scroll-mt-8">
                   <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-12 shadow-sm">
                     <div className="text-center">
