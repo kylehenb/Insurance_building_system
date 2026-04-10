@@ -554,6 +554,9 @@ export interface Database {
           type_specific_fields: Json;
           doc_storage_path: string | null;
           pdf_storage_path: string | null;
+          deleted_at: string | null;
+          deleted_by: string | null;
+          delete_reason: string | null;
           created_at: string;
         };
         Insert: {
@@ -590,6 +593,9 @@ export interface Database {
           type_specific_fields?: Json;
           doc_storage_path?: string | null;
           pdf_storage_path?: string | null;
+          deleted_at?: string | null;
+          deleted_by?: string | null;
+          delete_reason?: string | null;
           created_at?: string;
         };
         Update: {
@@ -626,6 +632,9 @@ export interface Database {
           type_specific_fields?: Json;
           doc_storage_path?: string | null;
           pdf_storage_path?: string | null;
+          deleted_at?: string | null;
+          deleted_by?: string | null;
+          delete_reason?: string | null;
           created_at?: string;
         };
         Relationships: never[];
