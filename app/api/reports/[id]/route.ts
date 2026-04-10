@@ -6,17 +6,16 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServiceClient()
+  const { id: reportId } = await params
   const body = await req.json()
   const { action, userId, tenantId } = body
 
   if (!action || !userId || !tenantId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
-
-  const reportId = params.id
 
   const { data: report, error: fetchError } = await supabase
     .from('reports')
@@ -64,9 +63,10 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServiceClient()
+  const { id: reportId } = await params
   const body = await req.json()
   const { userId, tenantId, reason } = body
 
@@ -81,7 +81,7 @@ export async function DELETE(
       deleted_by: userId,
       delete_reason: reason ?? null,
     })
-    .eq('id', params.id)
+    .eq('id', reportId)
     .eq('tenant_id', tenantId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -90,9 +90,10 @@ export async function DELETE(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServiceClient()
+  const { id: reportId } = await params
   const body = await req.json()
   const { userId, tenantId } = body
 
@@ -103,7 +104,7 @@ export async function POST(
   const { data: source, error: fetchError } = await supabase
     .from('reports')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', reportId)
     .eq('tenant_id', tenantId)
     .single()
 
