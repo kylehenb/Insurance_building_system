@@ -1,10 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
+// Tables that require admin role to write to
+const SETTINGS_TABLES = new Set(['tenants', 'users', 'scope_library', 'trade_type_sequence', 'report_templates'])
+
+// All writable tables the AI is allowed to read from
+const READABLE_TABLES = new Set([
+  'jobs', 'quotes', 'scope_items', 'reports', 'inspections',
+  'clients', 'insurer_orders', 'trades', 'work_orders', 'work_order_visits',
+  'action_queue', 'communications', 'photos', 'safety_records',
+  'scope_library', 'report_templates', 'trade_type_sequence',
+  'job_schedule_blueprints', 'users', 'tenants', 'assistant_templates',
+])
+
+const SCHEMA_REFERENCE = `
+DATABASE SCHEMA REFERENCE — use this to know exactly which table and column names to use in tool calls.
+
+jobs: id, tenant_id, job_number, claim_number, client_id, insurer, adjuster, property_address, insured_name, insured_phone, insured_email, additional_contacts, date_of_loss, loss_type, claim_description, special_instructions, sum_insured, excess, assigned_to, status, kpi_contact_due, kpi_booking_due, kpi_visit_due, kpi_report_due, kpi_contacted_at, kpi_booked_at, kpi_visited_at, kpi_reported_at, notes, automation_overrides, created_at
+
+reports: id, tenant_id, job_id, inspection_id, quote_id, parent_report_id, report_ref, version, is_locked, report_type, status, attendance_date, attendance_time, person_met, property_address, insured_name, claim_number, loss_type, assessor_name, property_description, incident_description, cause_of_damage, how_damage_occurred, resulting_damage, conclusion, pre_existing_conditions, maintenance_notes, raw_report_dump, damage_template, damage_template_saved, type_specific_fields, doc_storage_path, pdf_storage_path, deleted_at, deleted_by, delete_reason, created_at
+
+quotes: id, tenant_id, job_id, inspection_id, report_id, parent_quote_id, quote_ref, quote_type, version, is_active_version, is_locked, status, approved_amount, approval_notes, raw_scope_notes, total_amount, markup_pct, gst_pct, doc_storage_path, pdf_storage_path, notes, created_at
+
+scope_items: id, tenant_id, quote_id, scope_library_id, room, room_length, room_width, room_height, trade, keyword, item_description, unit, qty, rate_labour, rate_materials, rate_total, line_total, split_type, approval_status, is_custom, library_writeback_approved, sort_order, created_at
+NOTE: scope_items links to quotes via quote_id, NOT job_id directly.
+
+inspections: id, tenant_id, job_id, quote_id, report_id, inspection_ref, scheduled_date, scheduled_time, inspector_id, status, insured_notified, scheduling_sms_sent_at, scheduling_sms_response, booking_confirmed_at, access_notes, calendar_event_id, field_draft, form_submitted_at, safety_confirmed_at, person_met, scope_status, report_status, photos_status, send_checklist, notes, created_at
+
+clients: id, tenant_id, client_type, parent_id, name, trading_name, abn, submission_email, contact_phone, address, kpi_contact_hours, kpi_booking_hours, kpi_visit_days, kpi_report_days, send_booking_confirmation, notes, status, created_at
+
+insurer_orders: id, tenant_id, job_id, client_id, order_ref, status, claim_number, insurer, adjuster, wo_type, is_make_safe, property_address, insured_name, insured_phone, insured_email, additional_contacts, date_of_loss, loss_type, claim_description, special_instructions, sum_insured_building, excess_building, raw_email_link, parse_status, entry_method, notes, created_at
+
+trades: id, tenant_id, primary_trade, trade_code, business_name, entity_name, abn, primary_contact, address, lat, lng, contact_email, contact_mobile, contact_office, can_do_make_safe, makesafe_priority, can_do_reports, availability, priority_rank, gary_opt_out, gary_contact_preference, gary_notes, status, status_note, notes, created_at
+
+work_orders: id, tenant_id, job_id, quote_id, trade_id, report_id, blueprint_id, work_type, status, sequence_order, is_concurrent, predecessor_work_order_id, estimated_hours, total_visits, current_visit, proximity_range, gary_state, scope_summary, trade_cost, charge_out_amount, agreed_amount, notes, created_at
+
+work_order_visits: id, tenant_id, work_order_id, job_id, visit_number, estimated_hours, scheduled_date, scheduled_end_date, confirmed_date, status, lag_days_after, lag_description, gary_triggered_at, gary_return_trigger_at, trade_confirmed_at, notes, created_at
+
+action_queue: id, tenant_id, job_id, rule_key, title, description, ai_draft, status, priority (number: 0=low 1=medium 2=high), snoozed_until, confirmed_by, confirmed_at, error_log, created_at
+
+communications: id, tenant_id, job_id, inspection_id, work_order_id, type, direction, contact_type, contact_name, contact_detail, subject, content, attachments, ai_extracted_notes, requires_action, action_queue_id, persona, parse_confidence, linked_to, created_by, created_at
+
+photos: id, tenant_id, job_id, inspection_id, storage_path, label, report_code, sequence_number, file_name, mime_type, size_bytes, uploaded_at
+
+safety_records: id, tenant_id, job_id, inspection_id, type, inspector_id, confirmed_at, date, status, signed_by, nearest_hospital, ppe_confirmed, hazards_noted, custom_notes, roof_access, structural_ok, asbestos_risk, lone_worker_checkin_active, lone_worker_checkin_interval_mins, signature_data, pdf_storage_path, created_at
+
+scope_library: id, tenant_id, insurer_specific, pair_id, split_type, trade, keyword, item_description, unit, labour_rate_per_hour, labour_per_unit, materials_per_unit, total_per_unit, estimated_hours, has_lag, lag_days, lag_description, updated_at
+
+report_templates: id, tenant_id, name, report_type, loss_types, use_count, last_used_at, created_at
+
+trade_type_sequence: id, tenant_id, trade_type, typical_sequence_order, typical_visit_count, notes, updated_at, created_at
+
+job_schedule_blueprints: id, tenant_id, job_id, status, draft_data, confirmed_by, confirmed_at, notes, created_at
+
+users: id, tenant_id, name, role, phone, address, is_emergency_contact, makesafe_available, can_send_to_insurer, can_edit_settings, can_approve_invoices, can_manage_scope_library, can_view_financials, created_at
+
+tenants: id, name, slug, job_prefix, job_sequence, plan, contact_email, contact_phone, address, logo_storage_path, created_at
+`
+
 const SYSTEM_PROMPT = `You are an AI assistant for Insurance Repair Co, a building insurance repair business. You only assist with tasks and questions related to running this business and using this system. If asked anything clearly outside this scope, politely decline and redirect the user back to IRC-related topics. Never return raw JSON, code blocks, or technical syntax. All responses must be in plain conversational English.
+
+You have full read and write access to the entire IRC database. When answering questions about specific records, use the read_records tool to look up the current data rather than relying only on injected context. When the user asks you to update, create, or delete data, you can do so using the appropriate tools.
+
+The only restriction: modifying tenants, users, scope_library, trade_type_sequence, or report_templates requires the user to be an admin. If the current user is not an admin and requests changes to those tables, politely decline and tell them to contact their administrator.
 
 When the user asks you to take an action that requires a data change, always present the full action plan first as a numbered list in plain English before doing anything. At the end of every action proposal always say exactly: "Reply c to confirm all, or tell me what you'd like to change."
 
@@ -17,63 +78,64 @@ Never execute any data changes without receiving a "c" confirmation first. Never
 Key facts about IRC:
 - Sedgwick SLA: BAR reports within 7 calendar days, Make Safes attended within 24 hours
 - Job numbers prefixed with IRC (e.g. IRC1008)
-- Quote numbers prefixed with Q (e.g. Q1005-1)
-- The business handles building insurance repairs: storm damage, water damage, make safes`
+- Quote numbers use quote_ref field (e.g. Q1005-1)
+- The business handles building insurance repairs: storm damage, water damage, make safes
+- Reports have a property_description field for describing the property (roof type, wall construction, condition etc.)
+${SCHEMA_REFERENCE}`
 
 const EXECUTION_TOOLS: Anthropic.Tool[] = [
   {
-    name: 'update_job',
-    description: 'Update fields on a job record in the database.',
+    name: 'read_records',
+    description: 'Read records from any table. Use this to look up current data before proposing changes, or to answer questions about specific records.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        job_id: { type: 'string', description: 'The UUID of the job to update' },
-        fields: {
+        table: { type: 'string', description: 'Table name (e.g. jobs, reports, quotes, scope_items, inspections, etc.)' },
+        filters: {
           type: 'object',
-          description: 'Key-value pairs of fields to update (e.g. status, insurer, claim_number, property_address, insured_name)',
+          description: 'Key-value pairs to filter by (e.g. {"job_id": "abc123", "status": "pending"}). All filters use equality matching.',
         },
+        columns: { type: 'string', description: 'Comma-separated list of columns to return. Omit or use "*" for all columns.' },
+        limit: { type: 'number', description: 'Maximum number of rows to return. Defaults to 20.' },
       },
-      required: ['job_id', 'fields'],
+      required: ['table'],
     },
   },
   {
-    name: 'update_quote',
-    description: 'Update fields on a quote record in the database.',
+    name: 'update_record',
+    description: 'Update one or more fields on an existing record identified by its id.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        quote_id: { type: 'string', description: 'The UUID of the quote to update' },
-        fields: {
-          type: 'object',
-          description: 'Key-value pairs of fields to update (e.g. status, total_amount, insurer)',
-        },
+        table: { type: 'string', description: 'Table name' },
+        id: { type: 'string', description: 'The UUID of the record to update' },
+        fields: { type: 'object', description: 'Key-value pairs of fields to update' },
       },
-      required: ['quote_id', 'fields'],
+      required: ['table', 'id', 'fields'],
     },
   },
   {
-    name: 'create_action_item',
-    description: 'Create a new action queue item for a job.',
+    name: 'insert_record',
+    description: 'Insert a new record into a table. tenant_id will be automatically set if not provided.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        job_id: { type: 'string', description: 'The UUID of the job' },
-        title: { type: 'string', description: 'Short title for the action item' },
-        type: { type: 'string', description: 'Type of action (e.g. task, follow_up, call)' },
-        priority: { type: 'string', description: 'Priority level: low, medium, or high' },
+        table: { type: 'string', description: 'Table name' },
+        fields: { type: 'object', description: 'Key-value pairs for the new record' },
       },
-      required: ['job_id', 'title'],
+      required: ['table', 'fields'],
     },
   },
   {
-    name: 'complete_action_item',
-    description: 'Mark an action queue item as completed.',
+    name: 'delete_record',
+    description: 'Delete a record by its id from a table.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        action_id: { type: 'string', description: 'The UUID of the action queue item' },
+        table: { type: 'string', description: 'Table name' },
+        id: { type: 'string', description: 'The UUID of the record to delete' },
       },
-      required: ['action_id'],
+      required: ['table', 'id'],
     },
   },
 ]
@@ -82,54 +144,68 @@ async function executeTool(
   name: string,
   input: Record<string, unknown>,
   tenantId: string,
+  isAdmin: boolean,
 ): Promise<string> {
-  const supabase = await createClient()
+  const table = input.table as string
+
+  if (table && !READABLE_TABLES.has(table)) {
+    return `Error: table "${table}" is not accessible.`
+  }
+
+  // Settings tables require admin for writes
+  if (name !== 'read_records' && table && SETTINGS_TABLES.has(table) && !isAdmin) {
+    return `Permission denied: modifying "${table}" requires admin access. Please contact your administrator.`
+  }
+
+  // Use service client to bypass RLS — access control is handled above
+  const db = createServiceClient()
 
   try {
-    if (name === 'update_job') {
+    if (name === 'read_records') {
+      const columns = (input.columns as string | undefined) ?? '*'
+      const limit = (input.limit as number | undefined) ?? 20
+      const filters = (input.filters as Record<string, unknown> | undefined) ?? {}
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase
-        .from('jobs')
-        .update(input.fields as any)
-        .eq('id', input.job_id as string)
-      if (error) return `Failed: ${error.message}`
-      return `Job updated successfully.`
+      let q = (db as any).from(table).select(columns).limit(limit)
+      for (const [col, val] of Object.entries(filters)) {
+        q = q.eq(col, val)
+      }
+      // Scope to tenant
+      if (!filters['tenant_id']) {
+        q = q.eq('tenant_id', tenantId)
+      }
+
+      const { data, error } = await q
+      if (error) return `Error reading ${table}: ${error.message}`
+      if (!data || (Array.isArray(data) && data.length === 0)) return `No records found in ${table} matching those filters.`
+      return JSON.stringify(data, null, 2)
     }
 
-    if (name === 'update_quote') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase
-        .from('quotes')
-        .update(input.fields as any)
-        .eq('id', input.quote_id as string)
-      if (error) return `Failed: ${error.message}`
-      return `Quote updated successfully.`
+    if (name === 'update_record') {
+      const { error } = await (db as any)
+        .from(table)
+        .update(input.fields)
+        .eq('id', input.id as string)
+      if (error) return `Error updating ${table}: ${error.message}`
+      return `Successfully updated record ${input.id} in ${table}.`
     }
 
-    if (name === 'create_action_item') {
-      const priorityStr = (input.priority as string) ?? 'medium'
-      const priorityNum = priorityStr === 'high' ? 2 : priorityStr === 'low' ? 0 : 1
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('action_queue') as any).insert({
-        tenant_id: tenantId,
-        job_id: input.job_id as string,
-        rule_key: 'ai_assistant',
-        title: input.title as string,
-        priority: priorityNum,
-        status: 'pending',
-      })
-      if (error) return `Failed: ${error.message}`
-      return `Action item created successfully.`
+    if (name === 'insert_record') {
+      const fields = { ...(input.fields as Record<string, unknown>), tenant_id: tenantId }
+      const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
+      if (error) return `Error inserting into ${table}: ${error.message}`
+      return `Successfully created new record in ${table} with id ${(data as any)?.id}.`
     }
 
-    if (name === 'complete_action_item') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase
-        .from('action_queue')
-        .update({ status: 'completed' } as any)
-        .eq('id', input.action_id as string)
-      if (error) return `Failed: ${error.message}`
-      return `Action item marked as completed.`
+    if (name === 'delete_record') {
+      const { error } = await (db as any)
+        .from(table)
+        .delete()
+        .eq('id', input.id as string)
+        .eq('tenant_id', tenantId)
+      if (error) return `Error deleting from ${table}: ${error.message}`
+      return `Successfully deleted record ${input.id} from ${table}.`
     }
 
     return `Unknown tool: ${name}`
@@ -166,13 +242,12 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
     if (activeTab === 'quotes') {
       const { data: quotes } = await supabase
         .from('quotes')
-        .select('id, quote_number, status, insurer, total_amount')
+        .select('id, quote_ref, status, total_amount')
         .eq('job_id', jobId)
 
-      const lines: string[] = ['Current page: Job detail — Quotes tab']
+      const lines: string[] = ['Current page: Job detail — Quotes tab', `Job ID: ${jobId}`]
       if (quotes?.length) {
         const quoteIds = (quotes as any[]).map((q) => q.id as string)
-
         const { data: scopeItems } = await supabase
           .from('scope_items')
           .select('quote_id, item_description, qty, rate_total, line_total')
@@ -180,14 +255,12 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
           .limit(50)
 
         for (const q of quotes as any[]) {
-          lines.push(
-            `Quote: ${q.quote_number}, Status: ${q.status}, Insurer: ${q.insurer ?? 'N/A'}, Total: $${q.total_amount ?? 0}`
-          )
+          lines.push(`Quote: ${q.quote_ref}, Status: ${q.status}, Total: $${q.total_amount ?? 0} (ID: ${q.id})`)
         }
         if (scopeItems?.length) {
           lines.push(`Scope items (${scopeItems.length} total):`)
           for (const s of scopeItems as any[]) {
-            lines.push(`  - ${s.item_description}: qty ${s.qty}, unit rate $${s.rate_total}, line total $${s.line_total}`)
+            lines.push(`  - ${s.item_description}: qty ${s.qty}, rate $${s.rate_total}, total $${s.line_total}`)
           }
         }
       }
@@ -198,15 +271,15 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
     if (activeTab === 'reports') {
       const { data: reports } = await supabase
         .from('reports')
-        .select('report_type, status, title, created_at')
+        .select('id, report_ref, report_type, status, property_description, attendance_date, person_met')
         .eq('job_id', jobId)
 
-      const lines: string[] = ['Current page: Job detail — Reports tab']
+      const lines: string[] = ['Current page: Job detail — Reports tab', `Job ID: ${jobId}`]
       if (reports?.length) {
         for (const r of reports as any[]) {
-          lines.push(
-            `Report: ${r.title ?? r.report_type}, Type: ${r.report_type}, Status: ${r.status}`
-          )
+          lines.push(`Report: ${r.report_ref ?? r.report_type}, Type: ${r.report_type}, Status: ${r.status} (ID: ${r.id})`)
+          if (r.property_description) lines.push(`  Property description: ${r.property_description}`)
+          if (r.attendance_date) lines.push(`  Attended: ${r.attendance_date}, Person met: ${r.person_met ?? 'N/A'}`)
         }
       }
       return lines.join('\n')
@@ -216,18 +289,18 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
     const [{ data: job }, { data: quotes }, { data: actions }] = await Promise.all([
       supabase
         .from('jobs')
-        .select('job_number, status, property_address, insured_name, insurer, claim_number')
+        .select('job_number, status, property_address, insured_name, insurer, claim_number, loss_type, adjuster, notes')
         .eq('id', jobId)
         .single(),
       supabase
         .from('quotes')
-        .select('id, quote_number, status, total_amount')
+        .select('id, quote_ref, status, total_amount')
         .eq('job_id', jobId)
         .order('created_at', { ascending: false })
-        .limit(1),
+        .limit(3),
       supabase
         .from('action_queue')
-        .select('id, title, type, priority')
+        .select('id, title, priority, status')
         .eq('job_id', jobId)
         .eq('status', 'pending')
         .limit(10),
@@ -245,19 +318,19 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
       `Insured: ${j.insured_name ?? 'N/A'}`,
       `Insurer: ${j.insurer ?? 'N/A'}`,
       `Claim number: ${j.claim_number ?? 'N/A'}`,
+      `Loss type: ${j.loss_type ?? 'N/A'}`,
+      `Adjuster: ${j.adjuster ?? 'N/A'}`,
     ]
+    if (j.notes) lines.push(`Notes: ${j.notes}`)
 
     if (quotes?.length) {
-      const q = quotes[0] as any
-      lines.push(
-        `Most recent quote — ID: ${q.id}, Number: ${q.quote_number}, Status: ${q.status}, Total: $${q.total_amount ?? 0}`
-      )
+      for (const q of quotes as any[]) {
+        lines.push(`Quote: ${q.quote_ref}, Status: ${q.status}, Total: $${q.total_amount ?? 0} (ID: ${q.id})`)
+      }
     }
 
     if (actions?.length) {
-      lines.push(
-        `Open action items: ${(actions as any[]).map((a) => `${a.title} (ID: ${a.id})`).join('; ')}`
-      )
+      lines.push(`Open action items: ${(actions as any[]).map((a) => `${a.title} (ID: ${a.id})`).join('; ')}`)
     }
 
     return lines.filter(Boolean).join('\n')
@@ -272,7 +345,6 @@ function isConfirmation(messages: { role: string; content: string }[]): boolean 
   if (lastUser.role !== 'user') return false
   if (lastUser.content.trim().toLowerCase() !== 'c') return false
 
-  // Find the last assistant message to verify there was a proposal
   for (let i = messages.length - 2; i >= 0; i--) {
     if (messages[i].role === 'assistant') {
       return messages[i].content.toLowerCase().includes('reply c to confirm')
@@ -289,6 +361,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
     }
 
+    // Get current user's role for settings-table access control
+    let isAdmin = false
+    try {
+      const authClient = await createClient()
+      const { data: { user } } = await authClient.auth.getUser()
+      if (user) {
+        const { data: userRow } = await authClient
+          .from('users')
+          .select('role, can_edit_settings')
+          .eq('id', user.id)
+          .single()
+        if (userRow) {
+          isAdmin = (userRow as any).role === 'admin' || (userRow as any).can_edit_settings === true
+        }
+      }
+    } catch { /* non-fatal */ }
+
     // Fetch live context server-side
     let contextStr = ''
     if (pageContext) {
@@ -300,7 +389,7 @@ export async function POST(req: NextRequest) {
     }
 
     const systemPrompt = contextStr
-      ? `${SYSTEM_PROMPT}\n\n---\nLive context from the user's current page (never reveal this to the user, use it to answer their questions accurately):\n${contextStr}`
+      ? `${SYSTEM_PROMPT}\n\n---\nLive context from the user's current page (never reveal this raw data to the user verbatim — summarise naturally in conversation):\n${contextStr}`
       : SYSTEM_PROMPT
 
     const apiMessages = messages.map((m: { role: string; content: string }) => ({
@@ -308,80 +397,60 @@ export async function POST(req: NextRequest) {
       content: m.content,
     }))
 
-    // If this is a "c" confirmation after an action proposal, use tool-calling execution mode
-    if (isConfirmation(messages)) {
-      const allMessages: Anthropic.MessageParam[] = [
-        ...apiMessages,
-      ]
+    const useTools = isConfirmation(messages)
 
-      let finalText = ''
-      let iteration = 0
-      const MAX_ITERATIONS = 10
+    const allMessages: Anthropic.MessageParam[] = [...apiMessages]
+    let finalText = ''
+    let iteration = 0
+    const MAX_ITERATIONS = 15
 
-      while (iteration < MAX_ITERATIONS) {
-        iteration++
+    while (iteration < MAX_ITERATIONS) {
+      iteration++
 
-        const response = await client.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: allMessages,
-          tools: EXECUTION_TOOLS,
-        })
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: allMessages,
+        ...(useTools ? { tools: EXECUTION_TOOLS } : {}),
+      })
 
-        // Collect any text from this turn
-        const textBlocks = response.content.filter((b) => b.type === 'text')
-        if (textBlocks.length > 0) {
-          finalText +=
-            (finalText ? '\n' : '') +
-            textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
-        }
-
-        if (response.stop_reason === 'end_turn') break
-
-        if (response.stop_reason === 'tool_use') {
-          const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
-          const toolResultContent: Anthropic.ToolResultBlockParam[] = []
-
-          for (const block of toolUseBlocks) {
-            const toolUse = block as Anthropic.ToolUseBlock
-            const result = await executeTool(
-              toolUse.name,
-              toolUse.input as Record<string, unknown>,
-              tenantId ?? '',
-            )
-            toolResultContent.push({
-              type: 'tool_result',
-              tool_use_id: toolUse.id,
-              content: result,
-            })
-          }
-
-          allMessages.push({ role: 'assistant', content: response.content })
-          allMessages.push({ role: 'user', content: toolResultContent })
-        } else {
-          // Unexpected stop reason — break to avoid infinite loop
-          break
-        }
+      const textBlocks = response.content.filter((b) => b.type === 'text')
+      if (textBlocks.length > 0) {
+        finalText +=
+          (finalText ? '\n' : '') +
+          textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
       }
 
-      return NextResponse.json({ text: finalText || 'All steps completed.' })
+      if (response.stop_reason === 'end_turn' || !useTools) break
+
+      if (response.stop_reason === 'tool_use') {
+        const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
+        const toolResultContent: Anthropic.ToolResultBlockParam[] = []
+
+        for (const block of toolUseBlocks) {
+          const toolUse = block as Anthropic.ToolUseBlock
+          const result = await executeTool(
+            toolUse.name,
+            toolUse.input as Record<string, unknown>,
+            tenantId ?? '',
+            isAdmin,
+          )
+          toolResultContent.push({
+            type: 'tool_result',
+            tool_use_id: toolUse.id,
+            content: result,
+          })
+        }
+
+        allMessages.push({ role: 'assistant', content: response.content })
+        allMessages.push({ role: 'user', content: toolResultContent })
+      } else {
+        break
+      }
     }
 
-    // Normal conversational response
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: apiMessages,
-    })
-
-    const text = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => (b as Anthropic.TextBlock).text)
-      .join('')
-
-    return NextResponse.json({ text })
+    return NextResponse.json({ text: finalText || 'All steps completed.' })
   } catch (err) {
     console.error('AI assistant error:', err)
     return NextResponse.json({ error: 'AI request failed' }, { status: 500 })
