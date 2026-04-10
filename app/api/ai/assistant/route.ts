@@ -86,18 +86,20 @@ async function executeTool(
 
   try {
     if (name === 'update_job') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase
         .from('jobs')
-        .update(input.fields as Record<string, unknown>)
+        .update(input.fields as any)
         .eq('id', input.job_id as string)
       if (error) return `Failed: ${error.message}`
       return `Job updated successfully.`
     }
 
     if (name === 'update_quote') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase
         .from('quotes')
-        .update(input.fields as Record<string, unknown>)
+        .update(input.fields as any)
         .eq('id', input.quote_id as string)
       if (error) return `Failed: ${error.message}`
       return `Quote updated successfully.`
