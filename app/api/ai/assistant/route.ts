@@ -164,30 +164,31 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
   try {
     // Quotes tab
     if (activeTab === 'quotes') {
-      const [{ data: quotes }, { data: scopeItems }] = await Promise.all([
-        supabase
-          .from('quotes')
-          .select('quote_number, status, insurer, total_amount')
-          .eq('job_id', jobId),
-        supabase
-          .from('scope_items')
-          .select('description, quantity, unit_price, total')
-          .eq('job_id', jobId)
-          .limit(50),
-      ])
+      const { data: quotes } = await supabase
+        .from('quotes')
+        .select('id, quote_number, status, insurer, total_amount')
+        .eq('job_id', jobId)
 
       const lines: string[] = ['Current page: Job detail — Quotes tab']
       if (quotes?.length) {
+        const quoteIds = (quotes as any[]).map((q) => q.id as string)
+
+        const { data: scopeItems } = await supabase
+          .from('scope_items')
+          .select('quote_id, item_description, qty, rate_total, line_total')
+          .in('quote_id', quoteIds)
+          .limit(50)
+
         for (const q of quotes as any[]) {
           lines.push(
             `Quote: ${q.quote_number}, Status: ${q.status}, Insurer: ${q.insurer ?? 'N/A'}, Total: $${q.total_amount ?? 0}`
           )
         }
-      }
-      if (scopeItems?.length) {
-        lines.push(`Scope items (${scopeItems.length} total):`)
-        for (const s of scopeItems as any[]) {
-          lines.push(`  - ${s.description}: qty ${s.quantity}, unit $${s.unit_price}, total $${s.total}`)
+        if (scopeItems?.length) {
+          lines.push(`Scope items (${scopeItems.length} total):`)
+          for (const s of scopeItems as any[]) {
+            lines.push(`  - ${s.item_description}: qty ${s.qty}, unit rate $${s.rate_total}, line total $${s.line_total}`)
+          }
         }
       }
       return lines.join('\n')
