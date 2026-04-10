@@ -115,8 +115,12 @@ function commInitial(type: string) {
 const OVERVIEW_CSS = `
   .ov-detail-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #f0ece6; }
   .ov-detail-row:last-child { border-bottom: none; }
-  .ov-detail-label { width: 120px; flex-shrink: 0; font-size: 12px; color: #9e998f; }
+  .ov-detail-label { width: 120px; flex-shrink: 0; font-size: 12px; color: #9e998f; padding-top: 3px; }
   .ov-detail-value { font-size: 13px; color: #3a3530; }
+  .ov-edit-input { font-size: 13px; color: #1a1a1a; border: 0.5px solid #e4dfd8; border-radius: 5px; padding: 3px 8px; background: #fdfcfb; font-family: inherit; outline: none; flex: 1; transition: border-color 0.15s; }
+  .ov-edit-input:focus { border-color: #c8b89a; background: #fff; }
+  .ov-edit-textarea { font-size: 12px; color: #1a1a1a; border: 0.5px solid #e4dfd8; border-radius: 5px; padding: 6px 8px; background: #fdfcfb; font-family: inherit; outline: none; width: 100%; resize: vertical; line-height: 1.6; min-height: 68px; transition: border-color 0.15s; }
+  .ov-edit-textarea:focus { border-color: #c8b89a; background: #fff; }
 
   .aq-list { display: flex; flex-direction: column; gap: 10px; }
   .aq-card { background: #fff; border: 0.5px solid #e4dfd8; border-radius: 8px; overflow: hidden; transition: border-color 0.2s, opacity 0.35s, max-height 0.5s; }
@@ -188,8 +192,121 @@ const OVERVIEW_CSS = `
 
 // ── Job Details Accordion ──────────────────────────────────────────────────
 
-function JobDetailsAccordion({ job }: { job: JobDetails }) {
+type EditFields = {
+  insurer: string
+  claim_number: string
+  loss_type: string
+  date_of_loss: string
+  adjuster: string
+  sum_insured: string
+  excess: string
+  assigned_to: string
+  claim_description: string
+  special_instructions: string
+  insured_name: string
+  insured_phone: string
+  insured_email: string
+  property_address: string
+  additional_contacts: string
+  notes: string
+}
+
+function jobToEditFields(job: JobDetails): EditFields {
+  return {
+    insurer: job.insurer ?? '',
+    claim_number: job.claim_number ?? '',
+    loss_type: job.loss_type ?? '',
+    date_of_loss: job.date_of_loss ?? '',
+    adjuster: job.adjuster ?? '',
+    sum_insured: job.sum_insured != null ? String(job.sum_insured) : '',
+    excess: job.excess != null ? String(job.excess) : '',
+    assigned_to: job.assigned_to ?? '',
+    claim_description: job.claim_description ?? '',
+    special_instructions: job.special_instructions ?? '',
+    insured_name: job.insured_name ?? '',
+    insured_phone: job.insured_phone ?? '',
+    insured_email: job.insured_email ?? '',
+    property_address: job.property_address ?? '',
+    additional_contacts: job.additional_contacts ?? '',
+    notes: job.notes ?? '',
+  }
+}
+
+function JobDetailsAccordion({
+  job,
+  jobId,
+  tenantId,
+}: {
+  job: JobDetails
+  jobId: string
+  tenantId: string
+}) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [vals, setVals] = useState<EditFields>(() => jobToEditFields(job))
+  const [saved, setSaved] = useState<JobDetails>(job)
+
+  function set(field: keyof EditFields, value: string) {
+    setVals(prev => ({ ...prev, [field]: value }))
+  }
+
+  function cancelEdit() {
+    setVals(jobToEditFields(saved))
+    setEditing(false)
+  }
+
+  async function saveEdit() {
+    setSaving(true)
+    const patch = {
+      insurer: vals.insurer || null,
+      claim_number: vals.claim_number || null,
+      loss_type: vals.loss_type || null,
+      date_of_loss: vals.date_of_loss || null,
+      adjuster: vals.adjuster || null,
+      sum_insured: vals.sum_insured !== '' ? parseFloat(vals.sum_insured) : null,
+      excess: vals.excess !== '' ? parseFloat(vals.excess) : null,
+      assigned_to: vals.assigned_to || null,
+      claim_description: vals.claim_description || null,
+      special_instructions: vals.special_instructions || null,
+      insured_name: vals.insured_name || null,
+      insured_phone: vals.insured_phone || null,
+      insured_email: vals.insured_email || null,
+      property_address: vals.property_address || null,
+      additional_contacts: vals.additional_contacts || null,
+      notes: vals.notes || null,
+    }
+    await supabase.from('jobs').update(patch).eq('id', jobId).eq('tenant_id', tenantId)
+    setSaved(prev => ({ ...prev, ...patch }))
+    setEditing(false)
+    setSaving(false)
+  }
+
+  // Shared sub-section label style
+  const subLabel = (extra?: React.CSSProperties): React.CSSProperties => ({
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: '#9e998f',
+    fontWeight: 600,
+    marginBottom: 10,
+    ...extra,
+  })
+
+  const accentLabel = (extra?: React.CSSProperties): React.CSSProperties => ({
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: '#c8b89a',
+    fontWeight: 500,
+    marginBottom: 6,
+    ...extra,
+  })
 
   return (
     <div
@@ -201,52 +318,136 @@ function JobDetailsAccordion({ job }: { job: JobDetails }) {
         fontFamily: 'DM Sans, sans-serif',
       }}
     >
-      <button
-        onClick={() => setOpen(!open)}
+      {/* Header row */}
+      <div
         style={{
-          width: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '13px 16px',
           background: open ? '#faf9f7' : '#fff',
-          border: 'none',
           borderBottom: open ? '0.5px solid #e4dfd8' : 'none',
-          cursor: 'pointer',
           transition: 'background 0.15s',
           gap: 12,
         }}
       >
-        <span
+        {/* Clickable left side — toggles open */}
+        <button
+          onClick={() => { if (!editing) setOpen(!open) }}
           style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: editing ? 'default' : 'pointer',
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
             color: '#9e998f',
             fontWeight: 500,
+            fontFamily: 'inherit',
           }}
         >
           Job Details
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 11, color: '#c8b89a' }}>{open ? 'Collapse' : 'Expand'}</span>
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="#9e998f"
-            strokeWidth="1.8"
-            style={{
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s',
-            }}
-          >
-            <path d="M2 5l5 5 5-5" />
-          </svg>
-        </div>
-      </button>
+        </button>
 
+        {/* Right side controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {open && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              style={{
+                fontSize: 11,
+                color: '#7a6a58',
+                background: 'transparent',
+                border: '1px solid #d4cfc8',
+                borderRadius: 20,
+                padding: '3px 12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 600,
+                transition: 'all 0.15s',
+              }}
+            >
+              Edit
+            </button>
+          )}
+          {open && editing && (
+            <>
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                style={{
+                  fontSize: 11,
+                  color: '#fff',
+                  background: '#2a6b50',
+                  border: '1px solid #2a6b50',
+                  borderRadius: 20,
+                  padding: '3px 14px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  opacity: saving ? 0.7 : 1,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                style={{
+                  fontSize: 11,
+                  color: '#9a9088',
+                  background: 'transparent',
+                  border: '1px solid #e8e3dc',
+                  borderRadius: 20,
+                  padding: '3px 12px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  transition: 'all 0.15s',
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
+          {/* Expand/collapse — hidden in edit mode to prevent accidental collapse */}
+          {!editing && (
+            <button
+              onClick={() => setOpen(!open)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                color: '#c8b89a',
+                fontSize: 11,
+                fontFamily: 'inherit',
+              }}
+            >
+              {open ? 'Collapse' : 'Expand'}
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="#9e998f"
+                strokeWidth="1.8"
+                style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+              >
+                <path d="M2 5l5 5 5-5" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded body */}
       {open && (
         <div
           style={{
@@ -254,169 +455,180 @@ function JobDetailsAccordion({ job }: { job: JobDetails }) {
             gridTemplateColumns: '1fr 1fr',
             gap: '0 40px',
             padding: '16px 20px 20px',
+            background: editing ? '#fdfcfb' : '#fff',
+            transition: 'background 0.2s',
           }}
         >
           {/* Left: Job information */}
           <div>
-            <div
-              style={{
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.07em',
-                color: '#9e998f',
-                fontWeight: 600,
-                marginBottom: 10,
-              }}
-            >
-              Job Information
-            </div>
-            {[
-              { label: 'Insurer', value: job.insurer },
-              { label: 'Claim #', value: job.claim_number },
-              { label: 'Loss Type', value: job.loss_type },
-              { label: 'Date of Loss', value: formatDate(job.date_of_loss) },
-              { label: 'Adjuster', value: job.adjuster },
-              { label: 'Sum Insured', value: formatCurrency(job.sum_insured) },
-              { label: 'Excess', value: formatCurrency(job.excess) },
-              { label: 'Assigned To', value: job.assigned_to },
-              { label: 'Order Received', value: formatDate(job.created_at) },
-            ].map(item => (
-              <div key={item.label} className="ov-detail-row">
-                <span className="ov-detail-label">{item.label}</span>
-                <span className="ov-detail-value">{item.value || '—'}</span>
+            <div style={subLabel()}>Job Information</div>
+
+            {/* Text fields */}
+            {(
+              [
+                { label: 'Insurer', field: 'insurer' },
+                { label: 'Claim #', field: 'claim_number' },
+                { label: 'Loss Type', field: 'loss_type' },
+                { label: 'Adjuster', field: 'adjuster' },
+                { label: 'Assigned To', field: 'assigned_to' },
+              ] as { label: string; field: keyof EditFields }[]
+            ).map(({ label, field }) => (
+              <div key={label} className="ov-detail-row">
+                <span className="ov-detail-label">{label}</span>
+                {editing ? (
+                  <input
+                    className="ov-edit-input"
+                    value={vals[field]}
+                    onChange={e => set(field, e.target.value)}
+                  />
+                ) : (
+                  <span className="ov-detail-value">{(saved[field as keyof JobDetails] as string) || '—'}</span>
+                )}
               </div>
             ))}
 
-            {job.claim_description && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    color: '#9e998f',
-                    fontWeight: 600,
-                    marginTop: 16,
-                    marginBottom: 8,
-                  }}
-                >
-                  Claim Description
-                </div>
-                <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
-                  {job.claim_description}
-                </p>
-              </>
+            {/* Date of Loss */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Date of Loss</span>
+              {editing ? (
+                <input
+                  type="date"
+                  className="ov-edit-input"
+                  value={vals.date_of_loss}
+                  onChange={e => set('date_of_loss', e.target.value)}
+                />
+              ) : (
+                <span className="ov-detail-value">{formatDate(saved.date_of_loss)}</span>
+              )}
+            </div>
+
+            {/* Sum Insured */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Sum Insured</span>
+              {editing ? (
+                <input
+                  type="number"
+                  className="ov-edit-input"
+                  value={vals.sum_insured}
+                  onChange={e => set('sum_insured', e.target.value)}
+                  placeholder="0.00"
+                />
+              ) : (
+                <span className="ov-detail-value">{formatCurrency(saved.sum_insured)}</span>
+              )}
+            </div>
+
+            {/* Excess */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Excess</span>
+              {editing ? (
+                <input
+                  type="number"
+                  className="ov-edit-input"
+                  value={vals.excess}
+                  onChange={e => set('excess', e.target.value)}
+                  placeholder="0.00"
+                />
+              ) : (
+                <span className="ov-detail-value">{formatCurrency(saved.excess)}</span>
+              )}
+            </div>
+
+            {/* Order Received — read-only always */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Order Received</span>
+              <span className="ov-detail-value">{formatDate(saved.created_at)}</span>
+            </div>
+
+            {/* Claim Description */}
+            <div style={subLabel({ marginTop: 16 })}>Claim Description</div>
+            {editing ? (
+              <textarea
+                className="ov-edit-textarea"
+                value={vals.claim_description}
+                onChange={e => set('claim_description', e.target.value)}
+                placeholder="Enter claim description…"
+              />
+            ) : (
+              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+                {saved.claim_description || '—'}
+              </p>
             )}
 
-            {job.special_instructions && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    color: '#9e998f',
-                    fontWeight: 600,
-                    marginTop: 16,
-                    marginBottom: 8,
-                  }}
-                >
-                  Special Instructions
-                </div>
-                <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
-                  {job.special_instructions}
-                </p>
-              </>
+            {/* Special Instructions */}
+            <div style={subLabel({ marginTop: 16 })}>Special Instructions</div>
+            {editing ? (
+              <textarea
+                className="ov-edit-textarea"
+                value={vals.special_instructions}
+                onChange={e => set('special_instructions', e.target.value)}
+                placeholder="Enter special instructions…"
+              />
+            ) : (
+              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+                {saved.special_instructions || '—'}
+              </p>
             )}
           </div>
 
           {/* Right: Contacts */}
           <div>
-            <div
-              style={{
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.07em',
-                color: '#9e998f',
-                fontWeight: 600,
-                marginBottom: 10,
-              }}
-            >
-              Contacts
-            </div>
+            <div style={subLabel()}>Contacts</div>
+            <div style={accentLabel()}>Insured</div>
 
-            <div
-              style={{
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: '#c8b89a',
-                fontWeight: 500,
-                marginBottom: 6,
-              }}
-            >
-              Insured
-            </div>
-            {[
-              { label: 'Name', value: job.insured_name },
-              { label: 'Phone', value: job.insured_phone },
-              { label: 'Email', value: job.insured_email },
-              { label: 'Address', value: job.property_address },
-            ].map(item => (
-              <div key={item.label} className="ov-detail-row">
-                <span className="ov-detail-label">{item.label}</span>
-                <span className="ov-detail-value">{item.value || '—'}</span>
+            {(
+              [
+                { label: 'Name', field: 'insured_name' },
+                { label: 'Phone', field: 'insured_phone' },
+                { label: 'Email', field: 'insured_email' },
+                { label: 'Address', field: 'property_address' },
+              ] as { label: string; field: keyof EditFields }[]
+            ).map(({ label, field }) => (
+              <div key={label} className="ov-detail-row">
+                <span className="ov-detail-label">{label}</span>
+                {editing ? (
+                  <input
+                    className="ov-edit-input"
+                    type={field === 'insured_email' ? 'email' : 'text'}
+                    value={vals[field]}
+                    onChange={e => set(field, e.target.value)}
+                  />
+                ) : (
+                  <span className="ov-detail-value">
+                    {(saved[field as keyof JobDetails] as string) || '—'}
+                  </span>
+                )}
               </div>
             ))}
 
-            {job.additional_contacts && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: '#c8b89a',
-                    fontWeight: 500,
-                    marginTop: 14,
-                    marginBottom: 6,
-                  }}
-                >
-                  Additional Contacts
-                </div>
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: '#3a3530',
-                    lineHeight: 1.65,
-                    whiteSpace: 'pre-wrap',
-                    margin: 0,
-                  }}
-                >
-                  {job.additional_contacts}
-                </p>
-              </>
+            {/* Additional Contacts */}
+            <div style={accentLabel({ marginTop: 14 })}>Additional Contacts</div>
+            {editing ? (
+              <textarea
+                className="ov-edit-textarea"
+                value={vals.additional_contacts}
+                onChange={e => set('additional_contacts', e.target.value)}
+                placeholder="Enter additional contacts…"
+              />
+            ) : (
+              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, whiteSpace: 'pre-wrap', margin: 0 }}>
+                {saved.additional_contacts || '—'}
+              </p>
             )}
 
-            {job.notes && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    color: '#9e998f',
-                    fontWeight: 600,
-                    marginTop: 16,
-                    marginBottom: 8,
-                  }}
-                >
-                  Notes
-                </div>
-                <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
-                  {job.notes}
-                </p>
-              </>
+            {/* Notes */}
+            <div style={subLabel({ marginTop: 16 })}>Notes</div>
+            {editing ? (
+              <textarea
+                className="ov-edit-textarea"
+                value={vals.notes}
+                onChange={e => set('notes', e.target.value)}
+                placeholder="Enter notes…"
+              />
+            ) : (
+              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+                {saved.notes || '—'}
+              </p>
             )}
           </div>
         </div>
@@ -1237,7 +1449,7 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* 1. Job Details accordion — full width */}
-        <JobDetailsAccordion job={job} />
+        <JobDetailsAccordion job={job} jobId={jobId} tenantId={tenantId} />
 
         {/* 2. Action Cards — full width */}
         <div>
