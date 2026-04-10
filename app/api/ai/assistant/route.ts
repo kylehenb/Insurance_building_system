@@ -355,7 +355,34 @@ function isConfirmation(messages: { role: string; content: string }[]): boolean 
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, pageContext, activeTab, tenantId, fileAttachment } = await req.json()
+    // Support both multipart/form-data (binary file uploads) and JSON
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let messages: any[], pageContext: string | undefined, activeTab: string | undefined, tenantId: string, fileAttachment: any = null
+
+    const contentType = req.headers.get('content-type') ?? ''
+    if (contentType.includes('multipart/form-data')) {
+      const fd = await req.formData()
+      messages = JSON.parse(fd.get('messages') as string)
+      pageContext = (fd.get('pageContext') as string) || undefined
+      activeTab = (fd.get('activeTab') as string) || undefined
+      tenantId = fd.get('tenantId') as string
+      const file = fd.get('file') as File | null
+      const fileType = fd.get('fileType') as string | null
+      if (file && fileType) {
+        const ab = await file.arrayBuffer()
+        const base64 = Buffer.from(ab).toString('base64')
+        fileAttachment = fileType === 'image'
+          ? { type: 'image', name: file.name, data: base64, mediaType: file.type }
+          : { type: 'document', name: file.name, data: base64, mediaType: 'application/pdf' }
+      }
+    } else {
+      const body = await req.json()
+      messages = body.messages
+      pageContext = body.pageContext
+      activeTab = body.activeTab
+      tenantId = body.tenantId
+      fileAttachment = body.fileAttachment ?? null
+    }
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
@@ -451,8 +478,8 @@ export async function POST(req: NextRequest) {
       iteration++
 
       const response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        model: fileAttachment ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+        max_tokens: fileAttachment ? 4096 : 1024,
         system: systemPrompt,
         messages: allMessages,
         ...(useTools ? { tools: EXECUTION_TOOLS } : {}),

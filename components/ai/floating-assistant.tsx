@@ -315,35 +315,51 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
-    // Process file attachment before clearing
-    let fileAttachment: { type: string; name: string; data: string; mediaType?: string } | null = null
-    if (attachedFile) {
-      const isImage = /^image\/(jpeg|png|webp|gif)$/.test(attachedFile.type)
-      const isPDF = attachedFile.type === 'application/pdf'
-      if (isImage) {
-        fileAttachment = { type: 'image', name: attachedFile.name, data: await fileToBase64(attachedFile), mediaType: attachedFile.type }
-      } else if (isPDF) {
-        fileAttachment = { type: 'document', name: attachedFile.name, data: await fileToBase64(attachedFile), mediaType: 'application/pdf' }
-      } else {
-        fileAttachment = { type: 'text', name: attachedFile.name, data: await fileToText(attachedFile) }
-      }
-      removeAttachment()
+    // Capture file before clearing attachment state
+    const fileToSend = attachedFile
+    const isBinaryFile = fileToSend
+      ? /^image\/(jpeg|png|webp|gif)$/.test(fileToSend.type) || fileToSend.type === 'application/pdf'
+      : false
+
+    // For non-binary files (CSV, Excel, Word, etc.) read as text on client
+    let textFileContent: string | null = null
+    if (fileToSend && !isBinaryFile) {
+      textFileContent = await fileToText(fileToSend)
     }
 
+    removeAttachment()
     setLoading(true)
 
     try {
-      const res = await fetch('/api/ai/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-          pageContext: pathname,
-          activeTab,
-          tenantId,
-          ...(fileAttachment ? { fileAttachment } : {}),
-        }),
-      })
+      let res: Response
+
+      if (fileToSend && isBinaryFile) {
+        // Use FormData for images and PDFs — avoids base64-in-JSON body size limits
+        const fd = new FormData()
+        fd.append('messages', JSON.stringify(newMessages.map((m) => ({ role: m.role, content: m.content }))))
+        fd.append('pageContext', pathname || '')
+        if (activeTab) fd.append('activeTab', activeTab)
+        fd.append('tenantId', tenantId)
+        fd.append('file', fileToSend)
+        fd.append('fileType', fileToSend.type === 'application/pdf' ? 'document' : 'image')
+        res = await fetch('/api/ai/assistant', { method: 'POST', body: fd })
+      } else {
+        const fileAttachment = fileToSend && textFileContent !== null
+          ? { type: 'text', name: fileToSend.name, data: textFileContent }
+          : null
+        res = await fetch('/api/ai/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+            pageContext: pathname,
+            activeTab,
+            tenantId,
+            ...(fileAttachment ? { fileAttachment } : {}),
+          }),
+        })
+      }
+
       const data = await res.json()
       const text: string = data.text ?? 'Sorry, I encountered an error.'
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
