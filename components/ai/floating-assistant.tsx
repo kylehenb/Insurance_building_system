@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
 const supabase = createBrowserClient(
@@ -17,8 +17,12 @@ const DEFAULT_H = 480
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
-  actionProposal?: { steps: { n: number; description: string }[] } | null
-  confirmed?: boolean
+}
+
+interface Template {
+  id: string
+  title: string
+  body: string
 }
 
 interface Props {
@@ -27,37 +31,10 @@ interface Props {
   tenantId: string
 }
 
-function parseActionProposal(text: string) {
-  try {
-    const match = text.match(/\{[\s\S]*?"type"\s*:\s*"action_proposal"[\s\S]*?\}/)
-    if (!match) return null
-    const parsed = JSON.parse(match[0])
-    if (parsed.type === 'action_proposal' && Array.isArray(parsed.steps)) {
-      return parsed as { type: string; steps: { n: number; description: string }[] }
-    }
-  } catch {}
-  return null
-}
-
-function stripActionJson(text: string) {
-  return text.replace(/\{[\s\S]*?"type"\s*:\s*"action_proposal"[\s\S]*?\}/, '').trim()
-}
-
-function getPageName(pathname: string): string {
-  if (pathname === '/dashboard') return 'Dashboard'
-  if (pathname.startsWith('/dashboard/jobs')) return 'Jobs'
-  if (pathname.startsWith('/dashboard/calendar')) return 'Calendar'
-  if (pathname.startsWith('/dashboard/insurer-orders')) return 'Insurer Orders'
-  if (pathname.startsWith('/dashboard/clients')) return 'Clients'
-  if (pathname.startsWith('/dashboard/scope-library')) return 'Scope Library'
-  if (pathname.startsWith('/dashboard/trades')) return 'Trades'
-  if (pathname.startsWith('/dashboard/finance')) return 'Finance'
-  if (pathname.startsWith('/dashboard/settings')) return 'Settings'
-  return pathname.split('/').filter(Boolean).pop() ?? 'Unknown page'
-}
-
 export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const activeTab = searchParams.get('tab') ?? undefined
 
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [size, setSize] = useState({ w: DEFAULT_W, h: DEFAULT_H })
@@ -67,14 +44,29 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Templates panel state
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [formTitle, setFormTitle] = useState('')
+  const [formBody, setFormBody] = useState('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+  // Slash-trigger popover state
+  const [showSlashPopover, setShowSlashPopover] = useState(false)
+  const [slashQuery, setSlashQuery] = useState('')
+  const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([])
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const slashPopoverRef = useRef<HTMLDivElement>(null)
 
-  // Drag state stored in ref to avoid stale closure in mousemove
+  // Drag/resize state in refs to avoid stale closures
   const dragState = useRef({ active: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 })
-  // Resize state
   const resizeState = useRef({ active: false, startX: 0, startY: 0, startW: 0, startH: 0 })
-  // Live pos/size refs for mouse handlers
   const posRef = useRef(pos)
   const sizeRef = useRef(size)
   posRef.current = pos
@@ -148,6 +140,105 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Load templates when panel opens
+  useEffect(() => {
+    if (showTemplates) loadTemplates()
+  }, [showTemplates])
+
+  // Update slash popover filter
+  useEffect(() => {
+    if (!showSlashPopover) return
+    const q = slashQuery.toLowerCase()
+    setFilteredTemplates(
+      q ? templates.filter((t) => t.title.toLowerCase().includes(q)) : templates
+    )
+    setSlashSelectedIdx(0)
+  }, [slashQuery, templates, showSlashPopover])
+
+  async function loadTemplates() {
+    setTemplatesLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('assistant_templates')
+        .select('id, title, body')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      setTemplates((data as Template[]) ?? [])
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }
+
+  async function saveTemplate() {
+    if (!formTitle.trim() || !formBody.trim()) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    if (editingTemplate) {
+      await supabase
+        .from('assistant_templates')
+        .update({ title: formTitle.trim(), body: formBody.trim(), updated_at: new Date().toISOString() })
+        .eq('id', editingTemplate.id)
+    } else {
+      await supabase
+        .from('assistant_templates')
+        .insert({ title: formTitle.trim(), body: formBody.trim(), tenant_id: tenantId, user_id: user.id })
+    }
+
+    setEditingTemplate(null)
+    setIsCreating(false)
+    setFormTitle('')
+    setFormBody('')
+    await loadTemplates()
+  }
+
+  async function deleteTemplate(id: string) {
+    await supabase.from('assistant_templates').delete().eq('id', id)
+    setDeleteConfirmId(null)
+    await loadTemplates()
+  }
+
+  function startEdit(t: Template) {
+    setEditingTemplate(t)
+    setIsCreating(false)
+    setFormTitle(t.title)
+    setFormBody(t.body)
+  }
+
+  function startCreate() {
+    setIsCreating(true)
+    setEditingTemplate(null)
+    setFormTitle('')
+    setFormBody('')
+  }
+
+  function cancelForm() {
+    setIsCreating(false)
+    setEditingTemplate(null)
+    setFormTitle('')
+    setFormBody('')
+  }
+
+  function openTemplates() {
+    setShowTemplates(true)
+  }
+
+  function closeTemplates() {
+    setShowTemplates(false)
+    setIsCreating(false)
+    setEditingTemplate(null)
+    setDeleteConfirmId(null)
+  }
+
+  function insertTemplate(t: Template) {
+    setInput(t.body)
+    setShowSlashPopover(false)
+    setSlashQuery('')
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
   function handleDragStart(e: React.MouseEvent) {
     e.preventDefault()
     dragState.current = {
@@ -171,118 +262,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     }
   }
 
-  // Build context string from current route
-  async function buildContext(): Promise<string> {
-    // Match /dashboard/jobs/[jobId]
-    const jobMatch = pathname.match(/\/dashboard\/jobs\/([^/]+)/)
-    if (!jobMatch) {
-      return `Current page: ${getPageName(pathname)}`
-    }
-
-    const jobId = jobMatch[1]
-
-    // Match /quotes/[quoteId]
-    const quoteMatch = pathname.match(/\/quotes\/([^/]+)/)
-    // Match /reports/[reportId]
-    const reportMatch = pathname.match(/\/reports\/([^/]+)/)
-
-    try {
-      if (quoteMatch) {
-        const quoteId = quoteMatch[1]
-        const { data: quote } = await supabase
-          .from('quotes')
-          .select('quote_number, status, insurer, total_amount, line_items')
-          .eq('id', quoteId)
-          .single()
-
-        if (!quote) return `Current page: Quote detail (ID: ${quoteId})`
-
-        return [
-          `Current page: Quote detail`,
-          `Quote number: ${(quote as any).quote_number}`,
-          `Status: ${(quote as any).status}`,
-          `Insurer: ${(quote as any).insurer ?? 'N/A'}`,
-          `Total: $${(quote as any).total_amount ?? 0}`,
-          (quote as any).line_items
-            ? `Line items: ${JSON.stringify((quote as any).line_items).slice(0, 400)}`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n')
-      }
-
-      if (reportMatch) {
-        const reportId = reportMatch[1]
-        const { data: report } = await supabase
-          .from('reports')
-          .select('report_type, status, title, created_at')
-          .eq('id', reportId)
-          .single()
-
-        if (!report) return `Current page: Report detail (ID: ${reportId})`
-
-        return [
-          `Current page: Report detail`,
-          `Type: ${(report as any).report_type}`,
-          `Status: ${(report as any).status}`,
-          `Title: ${(report as any).title ?? 'N/A'}`,
-        ]
-          .filter(Boolean)
-          .join('\n')
-      }
-
-      // Job detail page
-      const [{ data: job }, { data: quotes }, { data: actions }] = await Promise.all([
-        supabase
-          .from('jobs')
-          .select('job_number, status, property_address, insured_name, insurer, claim_number, description')
-          .eq('id', jobId)
-          .single(),
-        supabase
-          .from('quotes')
-          .select('quote_number, status, total_amount')
-          .eq('job_id', jobId)
-          .limit(5),
-        supabase
-          .from('action_queue')
-          .select('title, type, priority')
-          .eq('job_id', jobId)
-          .eq('status', 'pending')
-          .limit(10),
-      ])
-
-      if (!job) return `Current page: Job detail (ID: ${jobId})`
-
-      const j = job as any
-      const lines = [
-        `Current page: Job detail`,
-        `Job number: ${j.job_number}`,
-        `Status: ${j.status}`,
-        `Address: ${j.property_address ?? 'N/A'}`,
-        `Insured: ${j.insured_name ?? 'N/A'}`,
-        `Insurer: ${j.insurer ?? 'N/A'}`,
-        `Claim number: ${j.claim_number ?? 'N/A'}`,
-        j.description ? `Description: ${j.description}` : '',
-      ]
-
-      if (quotes && quotes.length > 0) {
-        lines.push(
-          `Active quotes: ${(quotes as any[]).map((q) => `${q.quote_number} (${q.status}, $${q.total_amount})`).join(', ')}`
-        )
-      }
-
-      if (actions && actions.length > 0) {
-        lines.push(
-          `Open action items: ${(actions as any[]).map((a) => a.title).join('; ')}`
-        )
-      }
-
-      return lines.filter(Boolean).join('\n')
-    } catch {
-      return `Current page: ${getPageName(pathname)}`
-    }
-  }
-
   async function sendMessage() {
     const val = input.trim()
     if (!val || loading) return
@@ -295,23 +274,18 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setLoading(true)
 
     try {
-      const context = await buildContext()
       const res = await fetch('/api/ai/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-          context,
+          pageContext: pathname,
+          activeTab,
         }),
       })
       const data = await res.json()
-      const rawText: string = data.text ?? 'Sorry, I encountered an error.'
-      const proposal = parseActionProposal(rawText)
-      const displayText = proposal ? stripActionJson(rawText) : rawText
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: displayText, actionProposal: proposal ?? null },
-      ])
+      const text: string = data.text ?? 'Sorry, I encountered an error.'
+      setMessages((prev) => [...prev, { role: 'assistant', content: text }])
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -323,6 +297,31 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showSlashPopover) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSlashSelectedIdx((i) => Math.min(i + 1, filteredTemplates.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSlashSelectedIdx((i) => Math.max(i - 1, 0))
+        return
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        if (filteredTemplates[slashSelectedIdx]) {
+          insertTemplate(filteredTemplates[slashSelectedIdx])
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        setShowSlashPopover(false)
+        setSlashQuery('')
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
@@ -330,24 +329,28 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   }
 
   function handleTextareaInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setInput(e.target.value)
+    const val = e.target.value
+    setInput(val)
     e.target.style.height = 'auto'
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-  }
 
-  function confirmAction(msgIdx: number) {
-    setMessages((prev) =>
-      prev.map((m, i) => (i === msgIdx ? { ...m, confirmed: true } : m))
-    )
-  }
-
-  function dismissProposal(msgIdx: number) {
-    setMessages((prev) =>
-      prev.map((m, i) => (i === msgIdx ? { ...m, actionProposal: null } : m))
-    )
+    // Detect slash trigger
+    const slashIdx = val.lastIndexOf('/')
+    if (slashIdx !== -1 && (slashIdx === 0 || val[slashIdx - 1] === ' ' || val[slashIdx - 1] === '\n')) {
+      const afterSlash = val.slice(slashIdx + 1)
+      if (!afterSlash.includes(' ') && !afterSlash.includes('\n')) {
+        setSlashQuery(afterSlash)
+        setShowSlashPopover(true)
+        return
+      }
+    }
+    setShowSlashPopover(false)
+    setSlashQuery('')
   }
 
   if (!mounted || !visible) return null
+
+  const isFormOpen = isCreating || editingTemplate !== null
 
   return (
     <>
@@ -388,6 +391,23 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-drag-dot { width: 2.5px; height: 2.5px; border-radius: 50%; background: #9a9088; }
         .fai-pip { width: 6px; height: 6px; border-radius: 50%; background: #c8b89a; flex-shrink: 0; }
         .fai-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #c8b89a; font-weight: 700; flex: 1; }
+        .fai-header-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #c8b89a;
+          padding: 3px 4px;
+          line-height: 1;
+          font-size: 16px;
+          border-radius: 4px;
+          transition: color 0.15s, background 0.15s;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .fai-header-btn:hover { color: #7a6a58; background: #f5f0e8; }
+        .fai-header-btn.active { color: #9a7a50; background: #f5f0e8; }
         .fai-close-btn {
           background: none;
           border: none;
@@ -447,6 +467,8 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           font-size: 13px;
           line-height: 1.65;
           font-weight: 400;
+          white-space: pre-wrap;
+          word-break: break-word;
         }
         .fai-bubble.user .fai-bubble-text {
           background: #1a1a1a; color: #e8e0d5;
@@ -458,27 +480,12 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           border: 0.5px solid #e8e3dc;
         }
 
-        .fai-action-panel { background: #fdf9f4; border: 0.5px solid #e8ddd0; border-radius: 8px; padding: 12px 14px; }
-        .fai-action-panel.confirmed { background: #f0fbf5; border-color: #b8e0c8; }
-        .fai-action-title { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #c8b89a; font-weight: 700; margin-bottom: 9px; }
-        .fai-action-step { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 0.5px solid #f0ece6; }
-        .fai-action-step:last-of-type { border-bottom: none; }
-        .fai-step-n { width: 15px; height: 15px; border-radius: 50%; background: #f0ece6; color: #9a8070; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-        .fai-step-text { font-size: 12px; color: #5a534a; line-height: 1.45; font-weight: 300; }
-        .fai-action-btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
-        .fai-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; line-height: 1.4; }
-        .fai-btn-confirm { background: #2a6b50; color: #fff; border-color: #2a6b50; }
-        .fai-btn-confirm:hover { background: #235a42; }
-        .fai-btn-edit { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
-        .fai-btn-edit:hover { border-color: #9a7a50; color: #9a7a50; }
-        .fai-btn-dismiss { background: transparent; border: none; color: #c8c0b8; font-size: 15px; padding: 2px 4px; cursor: pointer; line-height: 1; }
-        .fai-btn-dismiss:hover { color: #a0524a; }
-
         .fai-input-wrap {
           padding: 12px 14px 14px;
           border-top: 0.5px solid #f0ece6;
           background: #fdfdfc;
           flex-shrink: 0;
+          position: relative;
         }
         .fai-input-row {
           display: flex; align-items: flex-end; gap: 0;
@@ -511,6 +518,117 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         }
         .fai-resize-icon { opacity: 0.3; }
         .fai-resize-handle:hover .fai-resize-icon { opacity: 0.6; }
+
+        /* Templates panel */
+        .fai-templates-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          background: #fff;
+        }
+        .fai-templates-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px 10px;
+          border-bottom: 0.5px solid #f0ece6;
+          flex-shrink: 0;
+        }
+        .fai-templates-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #9a9088; font-weight: 700; }
+        .fai-new-btn {
+          font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer;
+          font-family: inherit; font-weight: 600; border: 1px solid #c8b89a;
+          background: transparent; color: #7a6a58; transition: all 0.15s;
+        }
+        .fai-new-btn:hover { background: #f5f0e8; }
+
+        .fai-templates-list {
+          flex: 1; overflow-y: auto; padding: 8px 0; min-height: 0;
+        }
+        .fai-templates-list::-webkit-scrollbar { width: 3px; }
+        .fai-templates-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+
+        .fai-template-item {
+          display: flex; align-items: flex-start; gap: 8px;
+          padding: 10px 16px; border-bottom: 0.5px solid #f5f2ee;
+          cursor: pointer; transition: background 0.12s;
+        }
+        .fai-template-item:hover { background: #faf8f5; }
+        .fai-template-item:last-child { border-bottom: none; }
+        .fai-template-text { flex: 1; min-width: 0; }
+        .fai-template-title { font-size: 13px; font-weight: 600; color: #2a2520; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-template-preview { font-size: 11px; color: #9a9088; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-template-actions { display: flex; gap: 2px; flex-shrink: 0; margin-top: 1px; }
+        .fai-tpl-icon-btn {
+          background: none; border: none; cursor: pointer; color: #c8b89a;
+          padding: 3px; border-radius: 4px; line-height: 1; transition: color 0.15s, background 0.15s;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .fai-tpl-icon-btn:hover { color: #7a6a58; background: #f0ece6; }
+        .fai-tpl-icon-btn.danger:hover { color: #a0524a; background: #fdf0ee; }
+
+        .fai-delete-confirm {
+          display: flex; align-items: center; gap: 8px;
+          padding: 6px 16px 10px; font-size: 11px; color: #7a6a58;
+          border-bottom: 0.5px solid #f5f2ee; background: #fdf9f4;
+        }
+        .fai-delete-confirm-btn {
+          font-size: 11px; padding: 3px 10px; border-radius: 12px; cursor: pointer;
+          font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s;
+        }
+        .fai-delete-confirm-btn.confirm { background: #a0524a; color: #fff; border-color: #a0524a; }
+        .fai-delete-confirm-btn.confirm:hover { background: #8a4440; }
+        .fai-delete-confirm-btn.cancel { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
+        .fai-delete-confirm-btn.cancel:hover { border-color: #9a9088; }
+
+        .fai-templates-empty { padding: 32px 16px; text-align: center; color: #b8b0a8; font-size: 12px; line-height: 1.6; }
+
+        /* Inline template form */
+        .fai-template-form { padding: 14px 16px; border-bottom: 0.5px solid #f0ece6; background: #faf8f5; flex-shrink: 0; }
+        .fai-form-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 5px; display: block; }
+        .fai-form-input {
+          width: 100%; box-sizing: border-box; background: #fff; border: 0.5px solid #e4dfd8;
+          border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
+          color: #1a1a1a; outline: none; transition: border-color 0.2s; margin-bottom: 10px;
+        }
+        .fai-form-input:focus { border-color: #c8b89a; }
+        .fai-form-textarea {
+          width: 100%; box-sizing: border-box; background: #fff; border: 0.5px solid #e4dfd8;
+          border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
+          color: #1a1a1a; outline: none; transition: border-color 0.2s; resize: vertical;
+          min-height: 80px; line-height: 1.5; margin-bottom: 10px;
+        }
+        .fai-form-textarea:focus { border-color: #c8b89a; }
+        .fai-form-btns { display: flex; gap: 6px; }
+        .fai-form-btn {
+          font-size: 11px; padding: 4px 14px; border-radius: 20px; cursor: pointer;
+          font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s;
+        }
+        .fai-form-btn.primary { background: #2a6b50; color: #fff; border-color: #2a6b50; }
+        .fai-form-btn.primary:hover { background: #235a42; }
+        .fai-form-btn.secondary { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
+        .fai-form-btn.secondary:hover { border-color: #9a9088; }
+
+        /* Slash popover */
+        .fai-slash-popover {
+          position: absolute; bottom: calc(100% + 6px); left: 14px; right: 14px;
+          background: #fff; border: 0.5px solid #e4dfd8; border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 10; overflow: hidden;
+          max-height: 200px; display: flex; flex-direction: column;
+        }
+        .fai-slash-list { overflow-y: auto; }
+        .fai-slash-list::-webkit-scrollbar { width: 3px; }
+        .fai-slash-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+        .fai-slash-item {
+          padding: 8px 12px; cursor: pointer; transition: background 0.1s;
+          border-bottom: 0.5px solid #f5f2ee;
+        }
+        .fai-slash-item:last-child { border-bottom: none; }
+        .fai-slash-item:hover, .fai-slash-item.selected { background: #f5f0e8; }
+        .fai-slash-item-title { font-size: 12px; font-weight: 600; color: #2a2520; }
+        .fai-slash-item-preview { font-size: 11px; color: #9a9088; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-slash-empty { padding: 12px; font-size: 12px; color: #b8b0a8; text-align: center; }
       `}</style>
 
       <div
@@ -537,6 +655,19 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           </div>
           <div className="fai-pip" />
           <span className="fai-label">IRC Assistant</span>
+          {/* Templates toggle button */}
+          <button
+            className={`fai-header-btn${showTemplates ? ' active' : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={showTemplates ? closeTemplates : openTemplates}
+            title={showTemplates ? 'Back to chat' : 'Prompt templates'}
+          >
+            {/* List/bookmark icon */}
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="12" height="12" rx="2" />
+              <path d="M5 6h6M5 9h4" />
+            </svg>
+          </button>
           <button
             className="fai-close-btn"
             onMouseDown={(e) => e.stopPropagation()}
@@ -547,87 +678,178 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="fai-messages">
-          {messages.length === 0 && (
-            <div className="fai-empty">
-              <div className="fai-empty-icon">⬡</div>
-              <div className="fai-empty-text">What do you need help with?</div>
-              <div className="fai-empty-sub">
-                Ask about jobs, quotes, scope — or ask me to take action on your behalf.
-              </div>
+        {/* Templates panel */}
+        {showTemplates && (
+          <div className="fai-templates-panel">
+            <div className="fai-templates-header">
+              <span className="fai-templates-title">Prompt Templates</span>
+              {!isFormOpen && (
+                <button className="fai-new-btn" onClick={startCreate}>
+                  + New Template
+                </button>
+              )}
             </div>
-          )}
 
-          {messages.map((msg, i) => (
-            <div key={i} className={`fai-bubble ${msg.role}`}>
-              <div className={`fai-avatar ${msg.role}`}>
-                {msg.role === 'user' ? 'Me' : '⬡'}
-              </div>
-              <div className="fai-bubble-inner">
-                {msg.content && (
-                  <div className="fai-bubble-text">{msg.content}</div>
-                )}
-                {msg.actionProposal && !msg.confirmed && (
-                  <div className="fai-action-panel">
-                    <div className="fai-action-title">Proposed actions</div>
-                    {msg.actionProposal.steps.map((step) => (
-                      <div key={step.n} className="fai-action-step">
-                        <div className="fai-step-n">{step.n}</div>
-                        <div className="fai-step-text">{step.description}</div>
-                      </div>
-                    ))}
-                    <div className="fai-action-btns">
-                      <button className="fai-btn fai-btn-confirm" onClick={() => confirmAction(i)}>
-                        Confirm &amp; execute
-                      </button>
-                      <button className="fai-btn fai-btn-edit">Edit steps</button>
-                      <button className="fai-btn-dismiss" onClick={() => dismissProposal(i)}>
-                        &#x2715;
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {msg.actionProposal && msg.confirmed && (
-                  <div className="fai-action-panel confirmed">
-                    <div className="fai-action-title">Proposed actions</div>
-                    {msg.actionProposal.steps.map((step) => (
-                      <div key={step.n} className="fai-action-step">
-                        <div className="fai-step-n">{step.n}</div>
-                        <div className="fai-step-text">{step.description}</div>
-                      </div>
-                    ))}
-                    <div className="fai-action-btns">
-                      <span style={{ fontSize: 11, color: '#2a6b50', fontWeight: 600 }}>
-                        ✓ Done — actions executed
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="fai-bubble assistant">
-              <div className="fai-avatar assistant">⬡</div>
-              <div className="fai-bubble-inner">
-                <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>
-                  Thinking…
+            {isFormOpen && (
+              <div className="fai-template-form">
+                <label className="fai-form-label">Title</label>
+                <input
+                  className="fai-form-input"
+                  placeholder="Short display name"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                />
+                <label className="fai-form-label">Body</label>
+                <textarea
+                  className="fai-form-textarea"
+                  placeholder="Full template text"
+                  value={formBody}
+                  onChange={(e) => setFormBody(e.target.value)}
+                />
+                <div className="fai-form-btns">
+                  <button className="fai-form-btn primary" onClick={saveTemplate}>
+                    Save
+                  </button>
+                  <button className="fai-form-btn secondary" onClick={cancelForm}>
+                    Cancel
+                  </button>
                 </div>
               </div>
+            )}
+
+            <div className="fai-templates-list">
+              {templatesLoading ? (
+                <div className="fai-templates-empty">Loading…</div>
+              ) : templates.length === 0 ? (
+                <div className="fai-templates-empty">
+                  No templates yet. Create one to get started.
+                  <br />
+                  Type <strong>/</strong> in the chat to use templates quickly.
+                </div>
+              ) : (
+                templates.map((t) => (
+                  <div key={t.id}>
+                    <div className="fai-template-item">
+                      <div className="fai-template-text">
+                        <div className="fai-template-title">{t.title}</div>
+                        <div className="fai-template-preview">{t.body.slice(0, 80)}{t.body.length > 80 ? '…' : ''}</div>
+                      </div>
+                      <div className="fai-template-actions">
+                        <button
+                          className="fai-tpl-icon-btn"
+                          title="Edit"
+                          onClick={() => startEdit(t)}
+                        >
+                          {/* Pencil icon */}
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 2l3 3-9 9H2v-3L11 2z" />
+                          </svg>
+                        </button>
+                        <button
+                          className="fai-tpl-icon-btn danger"
+                          title="Delete"
+                          onClick={() => setDeleteConfirmId(t.id)}
+                        >
+                          {/* Trash icon */}
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    {deleteConfirmId === t.id && (
+                      <div className="fai-delete-confirm">
+                        <span>Delete this template?</span>
+                        <button
+                          className="fai-delete-confirm-btn confirm"
+                          onClick={() => deleteTemplate(t.id)}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="fai-delete-confirm-btn cancel"
+                          onClick={() => setDeleteConfirmId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+
+        {/* Messages (hidden when templates panel is open) */}
+        {!showTemplates && (
+          <div className="fai-messages">
+            {messages.length === 0 && (
+              <div className="fai-empty">
+                <div className="fai-empty-icon">⬡</div>
+                <div className="fai-empty-text">What do you need help with?</div>
+                <div className="fai-empty-sub">
+                  Ask about jobs, quotes, scope — or ask me to take action on your behalf.
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, i) => (
+              <div key={i} className={`fai-bubble ${msg.role}`}>
+                <div className={`fai-avatar ${msg.role}`}>
+                  {msg.role === 'user' ? 'Me' : '⬡'}
+                </div>
+                <div className="fai-bubble-inner">
+                  {msg.content && (
+                    <div className="fai-bubble-text">{msg.content}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="fai-bubble assistant">
+                <div className="fai-avatar assistant">⬡</div>
+                <div className="fai-bubble-inner">
+                  <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>
+                    Thinking…
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
 
         {/* Input */}
         <div className="fai-input-wrap">
+          {/* Slash popover */}
+          {showSlashPopover && (
+            <div className="fai-slash-popover" ref={slashPopoverRef}>
+              <div className="fai-slash-list">
+                {filteredTemplates.length === 0 ? (
+                  <div className="fai-slash-empty">No templates match</div>
+                ) : (
+                  filteredTemplates.map((t, idx) => (
+                    <div
+                      key={t.id}
+                      className={`fai-slash-item${idx === slashSelectedIdx ? ' selected' : ''}`}
+                      onMouseDown={(e) => { e.preventDefault(); insertTemplate(t) }}
+                    >
+                      <div className="fai-slash-item-title">{t.title}</div>
+                      <div className="fai-slash-item-preview">{t.body.slice(0, 60)}{t.body.length > 60 ? '…' : ''}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="fai-input-row">
             <textarea
               ref={textareaRef}
               className="fai-textarea"
-              placeholder="Ask anything or say what you'd like to do…"
+              placeholder="Ask anything or say what you'd like to do… (type / for templates)"
               rows={1}
               value={input}
               onChange={handleTextareaInput}
