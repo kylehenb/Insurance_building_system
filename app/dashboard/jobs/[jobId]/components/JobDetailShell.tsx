@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { OverviewTab } from './OverviewTab'
 import { InspectionsTab } from './InspectionsTab'
@@ -30,6 +30,12 @@ interface JobHeader {
   sum_insured: number | null
   assigned_to: string | null
   created_at: string
+  insured_phone: string | null
+  insured_email: string | null
+  additional_contacts: string | null
+  claim_description: string | null
+  special_instructions: string | null
+  notes: string | null
 }
 
 interface JobDetailShellProps {
@@ -57,21 +63,6 @@ const TABS = [
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
-
-// — Helpers ————————————————————————————————————————————————————————
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-AU', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatCurrency(v: number | null) {
-  if (v === null) return '—'
-  return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
-}
 
 // — Status badge ——————————————————————————————————————————————————
 function StatusBadge({ status }: { status: string }) {
@@ -112,12 +103,7 @@ function TabPanel({
         <OverviewTab
           jobId={jobId}
           tenantId={tenantId}
-          job={{
-            sum_insured: job.sum_insured,
-            assigned_to: job.assigned_to,
-            created_at: job.created_at,
-            excess: job.excess,
-          }}
+          job={job}
         />
       )
     case 'inspections':
@@ -166,8 +152,14 @@ export function JobDetailShell({
   const searchParams = useSearchParams()
 
   const activeTab = (searchParams.get('tab') ?? 'overview') as TabId
+  const [pendingTab, setPendingTab] = useState<TabId | null>(null)
+
+  useEffect(() => {
+    setPendingTab(null)
+  }, [activeTab])
 
   function setTab(tabId: TabId) {
+    setPendingTab(tabId)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tabId)
     router.push(`${pathname}?${params.toString()}`)
@@ -175,6 +167,47 @@ export function JobDetailShell({
 
   return (
     <div className="min-h-screen" style={{ background: '#f5f2ee', fontFamily: 'DM Sans, sans-serif' }}>
+      <style>{`
+        .jds-tab {
+          position: relative;
+          white-space: nowrap;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 500;
+          border: none;
+          border-bottom: 2px solid transparent;
+          background: transparent;
+          cursor: pointer;
+          transition: color 0.15s, background 0.15s;
+          font-family: inherit;
+        }
+        .jds-tab:hover {
+          background: #f5f2ee;
+          color: #1a1a1a;
+        }
+        .jds-tab.active {
+          color: #1a1a1a;
+          border-bottom-color: #1a1a1a;
+        }
+        .jds-tab.inactive {
+          color: #9e998f;
+        }
+        .jds-tab.pending:not(.active)::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: #c8b89a;
+          animation: tab-pulse 0.8s ease-in-out infinite alternate;
+        }
+        @keyframes tab-pulse {
+          from { opacity: 0.4; }
+          to { opacity: 1; }
+        }
+      `}</style>
+
       {/* ── Job header ─────────────────────────────────────────── */}
       <div className="bg-white border-b border-[#e0dbd4]">
         <div className="px-6 lg:px-8 pt-6 pb-0">
@@ -207,46 +240,32 @@ export function JobDetailShell({
             </div>
           </div>
 
-          {/* Compact field strip */}
-          <div
-            className="flex items-center flex-wrap gap-0 mb-4 text-[12px] text-[#9e998f]"
-          >
-            {[
-              { label: 'Insurer', value: job.insurer },
-              { label: 'Claim #', value: job.claim_number },
-              { label: 'Loss Type', value: job.loss_type },
-              { label: 'Date of Loss', value: formatDate(job.date_of_loss) },
-              { label: 'Adjuster', value: job.adjuster },
-              { label: 'Excess', value: formatCurrency(job.excess) },
-            ].map((item, i, arr) => (
-              <span
-                key={item.label}
-                className="flex items-center pr-4 mr-4"
-                style={{
-                  borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none',
-                }}
-              >
-                <span className="mr-1 text-[#b0a898]">{item.label}:</span>
-                <span className="text-[#3a3530]">{item.value || '—'}</span>
-              </span>
-            ))}
-          </div>
-
           {/* Tab bar */}
           <nav className="-mb-px flex gap-0 overflow-x-auto">
             {TABS.map(tab => {
               const isActive = activeTab === tab.id
+              const isPending = pendingTab === tab.id && !isActive
               return (
                 <button
                   key={tab.id}
                   onClick={() => setTab(tab.id)}
-                  className="whitespace-nowrap px-4 py-3 text-[13px] font-medium transition-colors border-b-2"
-                  style={{
-                    borderBottomColor: isActive ? '#1a1a1a' : 'transparent',
-                    color: isActive ? '#1a1a1a' : '#9e998f',
-                  }}
+                  className={`jds-tab${isActive ? ' active' : ' inactive'}${isPending ? ' pending' : ''}`}
                 >
                   {tab.label}
+                  {isPending && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 4,
+                        height: 4,
+                        borderRadius: '50%',
+                        background: '#c8b89a',
+                        marginLeft: 5,
+                        verticalAlign: 'middle',
+                        animation: 'tab-pulse 0.8s ease-in-out infinite alternate',
+                      }}
+                    />
+                  )}
                 </button>
               )
             })}
