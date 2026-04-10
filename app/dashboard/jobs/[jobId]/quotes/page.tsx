@@ -78,7 +78,7 @@ export default async function QuotesPage({ params }: Props) {
 
       {/* Content */}
       <div style={{ padding: '20px 24px', maxWidth: 1200 }}>
-        <QuotesList jobId={jobId} tenantId={tenantId} insurer={job.insurer} />
+        <QuotesList jobId={jobId} tenantId={tenantId} insurer={job.insurer} job={job} />
       </div>
     </div>
   )

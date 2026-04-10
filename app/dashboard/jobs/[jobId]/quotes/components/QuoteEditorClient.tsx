@@ -20,9 +20,10 @@ interface QuoteEditorClientProps {
   quoteId: string
   tenantId: string
   job: JobInfo
+  inline?: boolean
 }
 
-export function QuoteEditorClient({ jobId, quoteId, tenantId, job }: QuoteEditorClientProps) {
+export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: QuoteEditorClientProps) {
   const {
     quote,
     rooms,
@@ -134,36 +135,38 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job }: QuoteEditor
         fontFamily: 'DM Sans, sans-serif',
       }}
     >
-      {/* Top nav bar */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderBottom: '1px solid #e0dbd4',
-          padding: '8px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        <Link
-          href={`/dashboard/jobs/${jobId}?tab=quotes`}
+      {/* Top nav bar — hidden in inline accordion mode */}
+      {!inline && (
+        <div
           style={{
-            fontFamily: 'DM Sans, sans-serif',
-            fontSize: 12,
-            color: '#9e998f',
-            textDecoration: 'none',
+            background: '#ffffff',
+            borderBottom: '1px solid #e0dbd4',
+            padding: '8px 20px',
             display: 'flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 12,
           }}
         >
-          ← {job.job_number}
-        </Link>
-        <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
-        <span style={{ fontSize: 12, color: '#3a3530' }}>
-          {quote.quote_ref ?? 'Quote'}
-        </span>
-      </div>
+          <Link
+            href={`/dashboard/jobs/${jobId}?tab=quotes`}
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: 12,
+              color: '#9e998f',
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            ← {job.job_number}
+          </Link>
+          <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
+          <span style={{ fontSize: 12, color: '#3a3530' }}>
+            {quote.quote_ref ?? 'Quote'}
+          </span>
+        </div>
+      )}
 
       {/* Quote header */}
       <QuoteHeader quote={quote} total={total} insurer={job.insurer} />

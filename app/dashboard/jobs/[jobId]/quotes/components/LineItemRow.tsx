@@ -69,12 +69,14 @@ function NumericCell({
         fontFamily: 'DM Mono, monospace',
         fontSize: 12,
         color: '#3a3530',
-        background: 'transparent',
-        border: 'none',
+        background: disabled ? '#f5f2ee' : '#ffffff',
+        border: '1px solid #d8d0c8',
+        borderRadius: 4,
         outline: 'none',
         textAlign: 'right',
-        padding: 0,
+        padding: '3px 6px',
         cursor: disabled ? 'default' : 'text',
+        boxSizing: 'border-box',
       }}
     />
   )
@@ -148,7 +150,7 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 60px 88px 88px 120px 64px 88px 48px',
+          gridTemplateColumns: '1fr 60px 110px 120px 130px 75px 100px 40px',
           minHeight: 40,
         }}
       >
@@ -204,10 +206,13 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
               fontFamily: 'DM Sans, sans-serif',
               fontSize: 12,
               color: '#3a3530',
-              background: 'transparent',
-              border: 'none',
+              background: isLocked ? '#f5f2ee' : '#ffffff',
+              border: '1px solid #d8d0c8',
+              borderRadius: 4,
               outline: 'none',
+              padding: '3px 6px',
               cursor: isLocked ? 'default' : 'text',
+              boxSizing: 'border-box',
             }}
           />
         </div>
@@ -263,12 +268,19 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: hasLineTotal ? '#9e998f' : '#c8b89a',
-                fontSize: hasLineTotal ? 17 : 16,
+                color: hasLineTotal ? '#b0a89e' : '#c8b89a',
+                fontSize: hasLineTotal ? 18 : 16,
                 lineHeight: 1,
-                padding: '2px 5px',
+                padding: '2px 4px',
                 borderRadius: 3,
                 fontFamily: 'monospace',
+                transition: 'color 0.1s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = hasLineTotal ? '#c5221f' : '#9e998f'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = hasLineTotal ? '#b0a89e' : '#c8b89a'
               }}
             >
               {hasLineTotal ? '×' : '−'}

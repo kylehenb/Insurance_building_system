@@ -172,9 +172,9 @@ export function RoomSection({
               autoFocus
               style={{
                 fontFamily: 'DM Sans, sans-serif',
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 700,
-                letterSpacing: '0.08em',
+                letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: '#3a3530',
                 background: 'transparent',
@@ -190,9 +190,9 @@ export function RoomSection({
               onDoubleClick={startEditName}
               style={{
                 fontFamily: 'DM Sans, sans-serif',
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 700,
-                letterSpacing: '0.08em',
+                letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: '#3a3530',
                 cursor: isLocked ? 'default' : 'text',
@@ -287,7 +287,7 @@ export function RoomSection({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 60px 88px 88px 120px 64px 88px 48px',
+              gridTemplateColumns: '1fr 60px 110px 120px 130px 75px 100px 40px',
               background: '#fafaf8',
               borderBottom: '1px solid #e8e4e0',
             }}
@@ -298,11 +298,11 @@ export function RoomSection({
                 style={{
                   padding: '5px 10px',
                   fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: '0.08em',
+                  fontSize: 9,
+                  fontWeight: 400,
+                  letterSpacing: '0.12em',
                   textTransform: 'uppercase',
-                  color: '#9e998f',
+                  color: '#b0a89e',
                   textAlign: i > 0 && i < 7 ? 'right' : 'left',
                   borderRight: i < 7 ? '1px solid #f0ece6' : 'none',
                 }}

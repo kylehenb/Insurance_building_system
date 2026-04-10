@@ -1,7 +1,14 @@
 'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { QuoteEditorClient } from './QuoteEditorClient'
+
+interface JobInfo {
+  job_number: string
+  insurer: string | null
+  insured_name: string | null
+  property_address: string | null
+}
 
 interface RoomSummary {
   count: number
@@ -38,10 +45,10 @@ interface QuotesListProps {
   jobId: string
   tenantId: string
   insurer: string | null
+  job: JobInfo
 }
 
-export function QuotesList({ jobId, tenantId, insurer }: QuotesListProps) {
-  const router = useRouter()
+export function QuotesList({ jobId, tenantId, insurer, job }: QuotesListProps) {
   const [quotes, setQuotes] = useState<QuoteListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -74,13 +81,17 @@ export function QuotesList({ jobId, tenantId, insurer }: QuotesListProps) {
       })
       if (!res.ok) throw new Error('Failed')
       const q: QuoteListItem = await res.json()
-      router.push(`/dashboard/jobs/${jobId}/quotes/${q.id}`)
+      setQuotes(prev => [
+        ...prev,
+        { ...q, room_summary: q.room_summary ?? {}, item_count: q.item_count ?? 0 },
+      ])
+      setExpandedId(q.id)
     } catch {
       alert('Failed to create quote. Please try again.')
     } finally {
       setCreating(false)
     }
-  }, [jobId, tenantId, router])
+  }, [jobId, tenantId])
 
   const handleDelete = useCallback(
     async (quoteId: string, quoteRef: string | null) => {
@@ -183,11 +194,7 @@ export function QuotesList({ jobId, tenantId, insurer }: QuotesListProps) {
         {quotes.map(q => {
           const s = STATUS_STYLES[q.status.toLowerCase()] ?? STATUS_STYLES.draft
           const isExpanded = expandedId === q.id
-          const subtotal = q.total_amount ?? 0
-          // We display total_amount as the "inc GST" figure from DB, or recalc
           const displayTotal = q.total_amount
-
-          const roomEntries = Object.entries(q.room_summary ?? {})
 
           return (
             <div
@@ -207,24 +214,24 @@ export function QuotesList({ jobId, tenantId, insurer }: QuotesListProps) {
                   padding: '12px 16px',
                   gap: 12,
                   cursor: 'pointer',
+                  background: isExpanded ? '#fafaf8' : '#ffffff',
+                  borderBottom: isExpanded ? '1px solid #e0dbd4' : 'none',
                 }}
                 onClick={() => setExpandedId(isExpanded ? null : q.id)}
               >
                 {/* Quote ref */}
-                <a
-                  href={`/dashboard/jobs/${jobId}/quotes/${q.id}`}
-                  onClick={e => e.stopPropagation()}
+                <span
                   style={{
                     fontFamily: 'DM Mono, monospace',
                     fontSize: 13,
                     fontWeight: 600,
                     color: '#c8b89a',
-                    textDecoration: 'none',
                     minWidth: 120,
+                    userSelect: 'none',
                   }}
                 >
                   {q.quote_ref ?? '—'}
-                </a>
+                </span>
 
                 {/* Amount */}
                 <span style={{ fontSize: 13, color: '#3a3530', fontWeight: 500 }}>
@@ -337,96 +344,15 @@ export function QuotesList({ jobId, tenantId, insurer }: QuotesListProps) {
                 </span>
               </div>
 
-              {/* Expanded room summary */}
+              {/* Inline editor expansion */}
               {isExpanded && (
-                <div
-                  style={{
-                    borderTop: '1px solid #f0ece6',
-                    background: '#fafaf8',
-                    padding: '10px 16px 12px',
-                  }}
-                >
-                  {roomEntries.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#9e998f', margin: 0 }}>No items yet</p>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr>
-                          {['Room', 'Items', 'Subtotal'].map((h, i) => (
-                            <th
-                              key={h}
-                              style={{
-                                fontFamily: 'DM Sans, sans-serif',
-                                fontSize: 10,
-                                fontWeight: 600,
-                                letterSpacing: '0.07em',
-                                textTransform: 'uppercase',
-                                color: '#9e998f',
-                                textAlign: i === 0 ? 'left' : 'right',
-                                padding: '0 0 6px',
-                              }}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {roomEntries.map(([room, data]) => (
-                          <tr key={room}>
-                            <td
-                              style={{
-                                fontFamily: 'DM Sans, sans-serif',
-                                fontSize: 12,
-                                color: '#3a3530',
-                                padding: '3px 0',
-                                textTransform: 'capitalize',
-                              }}
-                            >
-                              {room}
-                            </td>
-                            <td
-                              style={{
-                                fontFamily: 'DM Sans, sans-serif',
-                                fontSize: 12,
-                                color: '#9e998f',
-                                textAlign: 'right',
-                                padding: '3px 0',
-                              }}
-                            >
-                              {data.count}
-                            </td>
-                            <td
-                              style={{
-                                fontFamily: 'DM Mono, monospace',
-                                fontSize: 12,
-                                color: '#3a3530',
-                                textAlign: 'right',
-                                padding: '3px 0',
-                              }}
-                            >
-                              {fmt(data.subtotal)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  <div style={{ marginTop: 10 }}>
-                    <a
-                      href={`/dashboard/jobs/${jobId}/quotes/${q.id}`}
-                      style={{
-                        fontFamily: 'DM Sans, sans-serif',
-                        fontSize: 12,
-                        color: '#c8b89a',
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Open editor →
-                    </a>
-                  </div>
-                </div>
+                <QuoteEditorClient
+                  inline
+                  jobId={jobId}
+                  quoteId={q.id}
+                  tenantId={tenantId}
+                  job={job}
+                />
               )}
             </div>
           )
