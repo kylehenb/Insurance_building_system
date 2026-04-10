@@ -3,7 +3,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { LibraryItem } from '../hooks/useScopeLibrary'
 import type { ScopeItem } from '../hooks/useQuote'
+import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
+
+const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const
 
 interface LineItemRowProps {
   item: ScopeItem
@@ -12,6 +15,7 @@ interface LineItemRowProps {
   search: (q: string) => LibraryItem[]
   isLocked: boolean
   insurer: string | null
+  trades: Trade[]
 }
 
 function fmt(v: number) {
@@ -33,7 +37,6 @@ function NumericCell({
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
 
-  // Sync when prop changes from outside (e.g. library select)
   const prevValueRef = useRef(value)
   useEffect(() => {
     if (prevValueRef.current !== value) {
@@ -82,9 +85,28 @@ function NumericCell({
   )
 }
 
-export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insurer }: LineItemRowProps) {
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  fontFamily: 'DM Sans, sans-serif',
+  fontSize: 12,
+  color: '#3a3530',
+  border: '1px solid #d8d0c8',
+  borderRadius: 4,
+  outline: 'none',
+  padding: '3px 4px',
+  cursor: 'pointer',
+  boxSizing: 'border-box',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 4px center',
+  backgroundSize: '8px',
+  paddingRight: 16,
+}
+
+export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insurer, trades }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
-  const [showWriteback, setShowWriteback] = useState(false)
+  const [showTemplate, setShowTemplate] = useState(false)
 
   const hasLineTotal = (item.line_total ?? 0) > 0
 
@@ -102,7 +124,7 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
         library_writeback_approved: false,
       }
       setEstHours(lib.estimated_hours)
-      setShowWriteback(false)
+      setShowTemplate(false)
       onUpdate(item.id, changes)
     },
     [item.id, onUpdate]
@@ -111,7 +133,6 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
   const handleDescriptionChange = useCallback(
     (desc: string) => {
       setEstHours(null)
-      setShowWriteback(false)
       onUpdate(item.id, {
         item_description: desc,
         scope_library_id: null,
@@ -121,16 +142,6 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
     [item.id, onUpdate]
   )
 
-  const handleDescriptionBlur = useCallback(() => {
-    if (
-      item.is_custom &&
-      (item.rate_labour != null || item.rate_materials != null) &&
-      item.item_description?.trim()
-    ) {
-      setShowWriteback(true)
-    }
-  }, [item.is_custom, item.rate_labour, item.rate_materials, item.item_description])
-
   const confirmDelete = useCallback(() => {
     if (hasLineTotal) {
       if (!window.confirm('Delete this item?')) return
@@ -139,31 +150,43 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
   }, [hasLineTotal, onDelete, item.id])
 
   const col: React.CSSProperties = {
-    padding: '8px 10px',
+    padding: '6px 8px',
     borderRight: '1px solid #f0ece6',
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   }
+
+  const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M1 2.5l3 3 3-3' stroke='%239e998f' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`
 
   return (
     <div style={{ borderBottom: '1px solid #f0ece6' }}>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 60px 110px 120px 130px 75px 100px 40px',
+          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
         }}
       >
         {/* Description */}
-        <div style={{ ...col, alignItems: 'flex-start' }}>
-          <DescriptionSearch
-            value={item.item_description ?? ''}
-            onChange={handleDescriptionChange}
-            onSelect={handleLibrarySelect}
-            onBlur={handleDescriptionBlur}
-            search={search}
-            disabled={isLocked}
-          />
+        <div style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}>
+          <div
+            style={{
+              background: isLocked ? '#f5f2ee' : '#ffffff',
+              border: '1px solid #d8d0c8',
+              borderRadius: 4,
+              width: '100%',
+              padding: '2px 5px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <DescriptionSearch
+              value={item.item_description ?? ''}
+              onChange={handleDescriptionChange}
+              onSelect={handleLibrarySelect}
+              search={search}
+              disabled={isLocked}
+            />
+          </div>
         </div>
 
         {/* QTY */}
@@ -173,6 +196,26 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
             onChange={v => onUpdate(item.id, { qty: v })}
             disabled={isLocked}
           />
+        </div>
+
+        {/* Unit */}
+        <div style={col}>
+          <select
+            value={item.unit ?? ''}
+            onChange={e => onUpdate(item.id, { unit: e.target.value })}
+            disabled={isLocked}
+            style={{
+              ...selectStyle,
+              background: isLocked
+                ? '#f5f2ee'
+                : `#ffffff ${chevronBg}`,
+            }}
+          >
+            <option value="">—</option>
+            {UNITS.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
         </div>
 
         {/* Labour/Unit */}
@@ -195,50 +238,38 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
 
         {/* Trade */}
         <div style={col}>
-          <input
-            type="text"
+          <select
             value={item.trade ?? ''}
             onChange={e => onUpdate(item.id, { trade: e.target.value })}
             disabled={isLocked}
-            placeholder="Trade"
             style={{
-              width: '100%',
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 12,
-              color: '#3a3530',
-              background: isLocked ? '#f5f2ee' : '#ffffff',
-              border: '1px solid #d8d0c8',
-              borderRadius: 4,
-              outline: 'none',
-              padding: '3px 6px',
-              cursor: isLocked ? 'default' : 'text',
-              boxSizing: 'border-box',
+              ...selectStyle,
+              background: isLocked
+                ? '#f5f2ee'
+                : `#ffffff ${chevronBg}`,
             }}
-          />
+          >
+            <option value="">—</option>
+            {trades.map(t => (
+              <option key={t.id} value={t.primary_trade}>
+                {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Est. Hours */}
         <div
-          style={{
-            ...col,
-            justifyContent: 'flex-end',
-            cursor: 'help',
-          }}
+          style={{ ...col, justifyContent: 'flex-end', cursor: 'help' }}
           title="Labour hours per unit — used for scheduling"
         >
-          <span
-            style={{
-              fontFamily: 'DM Mono, monospace',
-              fontSize: 12,
-              color: '#9e998f',
-            }}
-          >
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#9e998f' }}>
             {estHours != null ? estHours : '—'}
           </span>
         </div>
 
         {/* Line Total */}
-        <div style={{ ...col, justifyContent: 'flex-end' }}>
+        <div style={{ ...col, justifyContent: 'flex-end', borderRight: 'none' }}>
           <span
             style={{
               fontFamily: 'DM Mono, monospace',
@@ -251,50 +282,73 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
           </span>
         </div>
 
-        {/* Actions */}
+        {/* Actions: T + × */}
         <div
           style={{
-            padding: '6px 8px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 2,
+            padding: '0 6px',
           }}
         >
           {!isLocked && (
-            <button
-              onClick={confirmDelete}
-              title={hasLineTotal ? 'Delete item' : 'Remove row'}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: hasLineTotal ? '#b0a89e' : '#c8b89a',
-                fontSize: hasLineTotal ? 18 : 16,
-                lineHeight: 1,
-                padding: '2px 4px',
-                borderRadius: 3,
-                fontFamily: 'monospace',
-                transition: 'color 0.1s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = hasLineTotal ? '#c5221f' : '#9e998f'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = hasLineTotal ? '#b0a89e' : '#c8b89a'
-              }}
-            >
-              {hasLineTotal ? '×' : '−'}
-            </button>
+            <>
+              <button
+                onClick={() => setShowTemplate(s => !s)}
+                title="Save as template"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: showTemplate ? '#c8b89a' : '#c0bab3',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: 'DM Sans, sans-serif',
+                  lineHeight: 1,
+                  padding: '2px 3px',
+                  borderRadius: 3,
+                  transition: 'color 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#c8b89a')}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = showTemplate ? '#c8b89a' : '#c0bab3'
+                }}
+              >
+                T
+              </button>
+              <button
+                onClick={confirmDelete}
+                title="Delete item"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#b0a89e',
+                  fontSize: 16,
+                  lineHeight: 1,
+                  padding: '2px 3px',
+                  borderRadius: 3,
+                  fontFamily: 'monospace',
+                  transition: 'color 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#b0a89e')}
+              >
+                ×
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Library writeback opt-in */}
-      {showWriteback && item.is_custom && !item.scope_library_id && !isLocked && (
+      {/* Library writeback / template panel */}
+      {showTemplate && item.is_custom && !item.scope_library_id && !isLocked && (
         <div
           style={{
-            padding: '4px 10px 6px 10px',
+            padding: '5px 12px 7px',
             background: '#fafaf8',
+            borderTop: '1px solid #f0ece6',
             display: 'flex',
             alignItems: 'center',
             gap: 6,

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ScopeItem } from '../hooks/useQuote'
 import type { LibraryItem } from '../hooks/useScopeLibrary'
+import type { Trade } from '../hooks/useTrades'
 import { LineItemRow } from './LineItemRow'
 
 interface RoomSectionProps {
@@ -24,6 +25,8 @@ interface RoomSectionProps {
   search: (q: string) => LibraryItem[]
   isLocked: boolean
   insurer: string | null
+  trades: Trade[]
+  autoFocusName?: boolean
 }
 
 function DimInput({
@@ -39,16 +42,18 @@ function DimInput({
 
   return (
     <>
-      <span
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: 10,
-          color: '#9e998f',
-          userSelect: 'none',
-        }}
-      >
-        {label}
-      </span>
+      {label ? (
+        <span
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 10,
+            color: '#9e998f',
+            userSelect: 'none',
+          }}
+        >
+          {label}
+        </span>
+      ) : null}
       <input
         type="text"
         inputMode="decimal"
@@ -87,9 +92,130 @@ function DimInput({
   )
 }
 
+function CalcIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 13 13"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'block' }}
+    >
+      <rect x="0.5" y="0.5" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1" />
+      <rect x="2.5" y="2.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+      <rect x="7" y="2.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+      <rect x="2.5" y="5.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+      <rect x="7" y="5.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+      <rect x="2.5" y="8.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+      <rect x="7" y="8.5" width="3.5" height="2" rx="0.5" fill="currentColor" />
+    </svg>
+  )
+}
+
+function CalcPanel({
+  l,
+  w,
+  h,
+}: {
+  l: number | null
+  w: number | null
+  h: number | null
+}) {
+  const hasLH = l != null && h != null
+  const hasWH = w != null && h != null
+  const hasLW = l != null && w != null
+  const hasL = l != null
+  const hasW = w != null
+
+  const wall1 = hasLH ? l! * h! : null
+  const wall2 = hasWH ? w! * h! : null
+  const allWalls = hasLH && hasWH ? 2 * l! * h! + 2 * w! * h! : null
+  const ceilingFloor = hasLW ? l! * w! : null
+  const perimeter = hasL && hasW ? 2 * l! + 2 * w! : null
+
+  const fmtM = (v: number | null, unit: string) =>
+    v != null ? `${v.toFixed(2)} ${unit}` : '—'
+
+  const rows: { label: string; value: string }[] = [
+    { label: 'Wall 1 (L×H)', value: fmtM(wall1, 'm²') },
+    { label: 'Wall 2 (W×H)', value: fmtM(wall2, 'm²') },
+    { label: 'All walls', value: fmtM(allWalls, 'm²') },
+    { label: 'Ceiling / Floor', value: fmtM(ceilingFloor, 'm²') },
+    { label: 'Perimeter', value: fmtM(perimeter, 'lm') },
+  ]
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 6px)',
+        left: 0,
+        zIndex: 200,
+        background: '#ffffff',
+        border: '1px solid #d8d0c8',
+        borderRadius: 6,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+        padding: '10px 14px',
+        minWidth: 210,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 500,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: '#b0a89e',
+          fontFamily: 'DM Sans, sans-serif',
+          marginBottom: 8,
+        }}
+      >
+        Room Calculations
+      </div>
+      {rows.map(r => (
+        <div
+          key={r.label}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            gap: 16,
+            marginBottom: 5,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              color: '#9e998f',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            {r.label}
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: '#3a3530',
+              fontFamily: 'DM Mono, monospace',
+              fontWeight: 500,
+            }}
+          >
+            {r.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Grid: Description | QTY | Unit | Labour/Unit | Materials/Unit | Trade | Est.Hrs | Line Total | Actions
+const GRID = '1fr 60px 70px 110px 120px 130px 75px 100px 60px'
+
 const COL_HEADERS = [
   'DESCRIPTION',
   'QTY',
+  'UNIT',
   'LABOUR/UNIT',
   'MATERIALS/UNIT',
   'TRADE',
@@ -110,13 +236,40 @@ export function RoomSection({
   search,
   isLocked,
   insurer,
+  trades,
+  autoFocusName,
 }: RoomSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState(name)
+  const [showCalc, setShowCalc] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const calcRef = useRef<HTMLDivElement>(null)
 
   const firstItem = items[0] ?? null
+
+  // Autofocus name on mount for new blank rooms
+  useEffect(() => {
+    if (autoFocusName && !isLocked) {
+      setEditingName(true)
+      setNameVal('')
+      setTimeout(() => {
+        nameInputRef.current?.focus()
+      }, 30)
+    }
+  }, [autoFocusName, isLocked])
+
+  // Close calc panel on outside click
+  useEffect(() => {
+    if (!showCalc) return
+    function handler(e: MouseEvent) {
+      if (!calcRef.current?.contains(e.target as Node)) {
+        setShowCalc(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showCalc])
 
   const handleDeleteRoom = useCallback(() => {
     if (items.length > 0) {
@@ -136,10 +289,14 @@ export function RoomSection({
     setEditingName(false)
     if (nameVal.trim() && nameVal.trim() !== name) {
       onRenameRoom(name, nameVal.trim())
-    } else {
+    } else if (!nameVal.trim()) {
       setNameVal(name)
     }
   }, [nameVal, name, onRenameRoom])
+
+  const l = firstItem?.room_length ?? null
+  const w = firstItem?.room_width ?? null
+  const h = firstItem?.room_height ?? null
 
   return (
     <div style={{ marginBottom: 0 }}>
@@ -170,6 +327,7 @@ export function RoomSection({
                 }
               }}
               autoFocus
+              placeholder="Room name…"
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
@@ -182,7 +340,7 @@ export function RoomSection({
                 borderBottom: '1px solid #c8b89a',
                 outline: 'none',
                 minWidth: 80,
-                maxWidth: 200,
+                maxWidth: 220,
               }}
             />
           ) : (
@@ -207,23 +365,19 @@ export function RoomSection({
           {/* Dimensions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <DimInput
-              value={firstItem?.room_length ?? null}
+              value={l}
               label="L"
               onChange={v => onUpdateDimensions(name, { room_length: v })}
             />
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>
-              ×
-            </span>
+            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
             <DimInput
-              value={firstItem?.room_width ?? null}
+              value={w}
               label=""
               onChange={v => onUpdateDimensions(name, { room_width: v })}
             />
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>
-              ×
-            </span>
+            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
             <DimInput
-              value={firstItem?.room_height ?? null}
+              value={h}
               label=""
               onChange={v => onUpdateDimensions(name, { room_height: v })}
             />
@@ -237,6 +391,33 @@ export function RoomSection({
             >
               m
             </span>
+
+            {/* Calculator button */}
+            <div ref={calcRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowCalc(s => !s)}
+                title="Room calculations"
+                style={{
+                  background: showCalc ? 'rgba(200,184,154,0.18)' : 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: showCalc ? '#c8b89a' : '#b0a89e',
+                  padding: '2px 4px',
+                  borderRadius: 3,
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'color 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#c8b89a')}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = showCalc ? '#c8b89a' : '#b0a89e'
+                }}
+              >
+                <CalcIcon />
+              </button>
+              {showCalc && <CalcPanel l={l} w={w} h={h} />}
+            </div>
           </div>
         </div>
 
@@ -251,13 +432,17 @@ export function RoomSection({
                 border: 'none',
                 cursor: 'pointer',
                 color: '#b0a89e',
-                fontSize: 13,
+                fontSize: 16,
                 padding: '2px 5px',
                 borderRadius: 3,
                 lineHeight: 1,
+                fontFamily: 'monospace',
+                transition: 'color 0.1s',
               }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#b0a89e')}
             >
-              🗑
+              ×
             </button>
           )}
           <button
@@ -287,7 +472,7 @@ export function RoomSection({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 60px 110px 120px 130px 75px 100px 40px',
+              gridTemplateColumns: GRID,
               background: '#fafaf8',
               borderBottom: '1px solid #e8e4e0',
             }}
@@ -296,15 +481,15 @@ export function RoomSection({
               <div
                 key={i}
                 style={{
-                  padding: '5px 10px',
+                  padding: '5px 8px',
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 9,
                   fontWeight: 400,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   color: '#b0a89e',
-                  textAlign: i > 0 && i < 7 ? 'right' : 'left',
-                  borderRight: i < 7 ? '1px solid #f0ece6' : 'none',
+                  textAlign: i > 0 && i < 8 ? 'right' : 'left',
+                  borderRight: i < 8 ? '1px solid #f0ece6' : 'none',
                 }}
               >
                 {h}
@@ -322,6 +507,7 @@ export function RoomSection({
               search={search}
               isLocked={isLocked}
               insurer={insurer}
+              trades={trades}
             />
           ))}
 

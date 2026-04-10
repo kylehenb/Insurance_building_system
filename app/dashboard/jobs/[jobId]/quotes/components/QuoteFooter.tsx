@@ -28,23 +28,21 @@ export function QuoteFooter({
   isLocked,
   saveStatus,
 }: QuoteFooterProps) {
-  const [editingMarkup, setEditingMarkup] = useState(false)
-  const [markupLocal, setMarkupLocal] = useState((quote.markup_pct * 100).toFixed(0))
+  const [markupLocal, setMarkupLocal] = useState(
+    quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20'
+  )
 
   // Sync when quote changes from outside
   React.useEffect(() => {
-    if (!editingMarkup) {
-      setMarkupLocal((quote.markup_pct * 100).toFixed(0))
-    }
-  }, [quote.markup_pct, editingMarkup])
+    setMarkupLocal(quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20')
+  }, [quote.markup_pct])
 
   const commitMarkup = () => {
-    setEditingMarkup(false)
     const pct = parseFloat(markupLocal)
     if (!isNaN(pct) && pct >= 0 && pct <= 100) {
       onUpdateMarkup(pct / 100)
     } else {
-      setMarkupLocal((quote.markup_pct * 100).toFixed(0))
+      setMarkupLocal(quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20')
     }
   }
 
@@ -91,48 +89,32 @@ export function QuoteFooter({
 
           {/* Builder's Margin */}
           <div style={row}>
-            <span style={{ fontSize: 13, color: '#9e998f' }}>
+            <span style={{ fontSize: 13, color: '#9e998f', display: 'flex', alignItems: 'center', gap: 2 }}>
               Builder&apos;s Margin (
-              {editingMarkup && !isLocked ? (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={markupLocal}
-                  onChange={e => setMarkupLocal(e.target.value)}
-                  onBlur={commitMarkup}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') commitMarkup()
-                    if (e.key === 'Escape') {
-                      setEditingMarkup(false)
-                      setMarkupLocal((quote.markup_pct * 100).toFixed(0))
-                    }
-                  }}
-                  autoFocus
-                  style={{
-                    width: 32,
-                    fontFamily: 'DM Mono, monospace',
-                    fontSize: 13,
-                    color: '#3a3530',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid #c8b89a',
-                    outline: 'none',
-                    textAlign: 'center',
-                    padding: 0,
-                  }}
-                />
-              ) : (
-                <span
-                  onClick={() => !isLocked && setEditingMarkup(true)}
-                  style={{
-                    cursor: isLocked ? 'default' : 'pointer',
-                    borderBottom: isLocked ? 'none' : '1px dashed #c8b89a',
-                    padding: '0 1px',
-                  }}
-                >
-                  {(quote.markup_pct * 100).toFixed(0)}
-                </span>
-              )}
+              <input
+                type="text"
+                inputMode="decimal"
+                value={markupLocal}
+                onChange={e => setMarkupLocal(e.target.value)}
+                onBlur={commitMarkup}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                }}
+                disabled={isLocked}
+                style={{
+                  width: 36,
+                  fontFamily: 'DM Mono, monospace',
+                  fontSize: 12,
+                  color: '#3a3530',
+                  background: isLocked ? 'transparent' : '#ffffff',
+                  border: isLocked ? 'none' : '1px solid #d8d0c8',
+                  borderRadius: 3,
+                  outline: 'none',
+                  textAlign: 'center',
+                  padding: '1px 4px',
+                  cursor: isLocked ? 'default' : 'text',
+                }}
+              />
               %)
             </span>
             <span

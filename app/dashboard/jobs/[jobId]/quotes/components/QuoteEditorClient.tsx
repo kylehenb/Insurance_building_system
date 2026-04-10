@@ -7,6 +7,7 @@ import { useScopeLibrary } from '../hooks/useScopeLibrary'
 import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
+import { useTrades } from '../hooks/useTrades'
 
 interface JobInfo {
   job_number: string
@@ -43,16 +44,17 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
   } = useQuote({ quoteId, tenantId })
 
   const { search } = useScopeLibrary({ tenantId, insurer: job.insurer })
+  const trades = useTrades(tenantId)
 
   // Local-only rooms (added but no items yet)
-  const [pendingRooms, setPendingRooms] = useState<string[]>([])
+  // Each entry: { name, autoFocus }
+  const [pendingRooms, setPendingRooms] = useState<Array<{ name: string; autoFocus: boolean }>>([])
 
   const handleAddItem = useCallback(
     async (room: string) => {
       const item = await addItem(room)
       if (item) {
-        // Remove from pendingRooms if it was there
-        setPendingRooms(prev => prev.filter(r => r !== room))
+        setPendingRooms(prev => prev.filter(r => r.name !== room))
       }
     },
     [addItem]
@@ -67,20 +69,21 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
 
   const handleDeleteRoom = useCallback(
     (room: string) => {
-      // If pending room (no items), just remove from local state
-      setPendingRooms(prev => prev.filter(r => r !== room))
+      setPendingRooms(prev => prev.filter(r => r.name !== room))
     },
     []
   )
 
   const handleAddRoom = useCallback(() => {
-    const name = `Room ${rooms.length + pendingRooms.length + 1}`
-    setPendingRooms(prev => [...prev, name])
-  }, [rooms.length, pendingRooms.length])
+    // Add with blank name and autoFocus so the user types the name immediately
+    setPendingRooms(prev => [...prev, { name: '', autoFocus: true }])
+  }, [])
 
   const handleRenamePendingRoom = useCallback((oldName: string, newName: string) => {
     if (!newName.trim() || newName === oldName) return
-    setPendingRooms(prev => prev.map(r => (r === oldName ? newName.trim() : r)))
+    setPendingRooms(prev =>
+      prev.map(r => (r.name === oldName ? { name: newName.trim(), autoFocus: false } : r)
+    ))
   }, [])
 
   const isLocked = quote?.is_locked ?? false
@@ -191,24 +194,27 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
             search={search}
             isLocked={isLocked}
             insurer={job.insurer}
+            trades={trades}
           />
         ))}
 
         {/* Pending rooms (added locally, no items yet) */}
-        {pendingRooms.map(roomName => (
+        {pendingRooms.map((pr, idx) => (
           <RoomSection
-            key={`pending-${roomName}`}
-            name={roomName}
+            key={`pending-${idx}-${pr.name}`}
+            name={pr.name}
             items={[]}
             onUpdateItem={updateItemLocal}
             onDeleteItem={handleDeleteItem}
             onAddItem={handleAddItem}
             onUpdateDimensions={() => {}}
             onRenameRoom={handleRenamePendingRoom}
-            onDeleteRoom={() => handleDeleteRoom(roomName)}
+            onDeleteRoom={() => handleDeleteRoom(pr.name)}
             search={search}
             isLocked={isLocked}
             insurer={job.insurer}
+            trades={trades}
+            autoFocusName={pr.autoFocus}
           />
         ))}
 
