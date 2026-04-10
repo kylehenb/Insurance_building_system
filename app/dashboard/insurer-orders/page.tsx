@@ -576,20 +576,20 @@ export default function InsurerOrdersPage() {
                           <tr>
                             <td colSpan={10} style={{ padding: 0, borderBottom: '0.5px solid #e4dfd8' }}>
                               <div style={{
-                                background: isLinked ? '#fffbeb' : '#fdfcfb',
-                                borderTop: isLinked ? '2px solid #c8b89a' : '0.5px solid #f0ece6',
+                                background: isLinked ? '#f0fbf5' : '#fdfcfb',
+                                borderTop: isLinked ? '2px solid #b8e0c8' : '0.5px solid #f0ece6',
                                 padding: '14px 20px',
                               }}>
 
                                 {/* Linked banner */}
                                 {isLinked && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, padding: '8px 12px', background: '#fef3c7', border: '1px solid #d97706', borderRadius: 6 }}>
-                                    <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, border: '1px solid #d97706', whiteSpace: 'nowrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, padding: '8px 12px', background: '#e6f4ed', border: '1px solid #6aad8a', borderRadius: 6 }}>
+                                    <span style={{ background: '#e6f4ed', color: '#1e5e3c', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, border: '1px solid #6aad8a', whiteSpace: 'nowrap' }}>
                                       Already linked to {jobNum ?? order.job_id!.slice(-8)}
                                     </span>
                                     <button
                                       onClick={() => router.push(`/dashboard/jobs/${order.job_id}`)}
-                                      style={{ ...ghostBtn, border: '1px solid #d97706', color: '#92400e' }}
+                                      style={{ ...ghostBtn, border: '1px solid #6aad8a', color: '#1e5e3c' }}
                                     >
                                       Open Job →
                                     </button>
