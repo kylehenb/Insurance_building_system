@@ -81,6 +81,7 @@ const EXECUTION_TOOLS: Anthropic.Tool[] = [
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
+  tenantId: string,
 ): Promise<string> {
   const supabase = await createClient()
 
@@ -106,11 +107,15 @@ async function executeTool(
     }
 
     if (name === 'create_action_item') {
-      const { error } = await supabase.from('action_queue').insert({
+      const priorityStr = (input.priority as string) ?? 'medium'
+      const priorityNum = priorityStr === 'high' ? 2 : priorityStr === 'low' ? 0 : 1
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('action_queue') as any).insert({
+        tenant_id: tenantId,
         job_id: input.job_id as string,
+        rule_key: 'ai_assistant',
         title: input.title as string,
-        type: (input.type as string) ?? 'task',
-        priority: (input.priority as string) ?? 'medium',
+        priority: priorityNum,
         status: 'pending',
       })
       if (error) return `Failed: ${error.message}`
@@ -118,9 +123,10 @@ async function executeTool(
     }
 
     if (name === 'complete_action_item') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase
         .from('action_queue')
-        .update({ status: 'completed' })
+        .update({ status: 'completed' } as any)
         .eq('id', input.action_id as string)
       if (error) return `Failed: ${error.message}`
       return `Action item marked as completed.`
@@ -276,7 +282,7 @@ function isConfirmation(messages: { role: string; content: string }[]): boolean 
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, pageContext, activeTab } = await req.json()
+    const { messages, pageContext, activeTab, tenantId } = await req.json()
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
@@ -340,7 +346,8 @@ export async function POST(req: NextRequest) {
             const toolUse = block as Anthropic.ToolUseBlock
             const result = await executeTool(
               toolUse.name,
-              toolUse.input as Record<string, unknown>
+              toolUse.input as Record<string, unknown>,
+              tenantId ?? '',
             )
             toolResultContent.push({
               type: 'tool_result',

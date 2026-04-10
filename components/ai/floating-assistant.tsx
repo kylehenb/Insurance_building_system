@@ -281,6 +281,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
           pageContext: pathname,
           activeTab,
+          tenantId,
         }),
       })
       const data = await res.json()
