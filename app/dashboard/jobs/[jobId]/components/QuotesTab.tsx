@@ -10,7 +10,7 @@ interface QuotesTabProps {
 }
 
 export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
-  const [insurer, setInsurer] = useState<string | null>(null)
+  const [job, setJob] = useState<{ job_number: string; insurer: string | null; insured_name: string | null; property_address: string | null } | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -20,17 +20,17 @@ export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
     )
     void supabase
       .from('jobs')
-      .select('insurer')
+      .select('job_number, insurer, insured_name, property_address')
       .eq('id', jobId)
       .eq('tenant_id', tenantId)
       .single()
       .then(({ data }) => {
-        setInsurer(data?.insurer ?? null)
+        setJob(data ?? { job_number: '', insurer: null, insured_name: null, property_address: null })
         setReady(true)
       })
   }, [jobId, tenantId])
 
-  if (!ready) {
+  if (!ready || !job) {
     return (
       <div
         style={{
@@ -46,5 +46,5 @@ export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
     )
   }
 
-  return <QuotesList jobId={jobId} tenantId={tenantId} insurer={insurer} />
+  return <QuotesList jobId={jobId} tenantId={tenantId} insurer={job.insurer} job={job} />
 }
