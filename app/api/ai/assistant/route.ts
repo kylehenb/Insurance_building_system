@@ -61,7 +61,7 @@ users: id, tenant_id, name, role, phone, address, is_emergency_contact, makesafe
 tenants: id, name, slug, job_prefix, job_sequence, plan, contact_email, contact_phone, address, logo_storage_path, created_at
 `
 
-const SYSTEM_PROMPT = `You are an AI assistant for Insurance Repair Co, a building insurance repair business. You only assist with tasks and questions related to running this business and using this system. If asked anything clearly outside this scope, politely decline and redirect the user back to IRC-related topics. Never return raw JSON, code blocks, or technical syntax. All responses must be in plain conversational English.
+const SYSTEM_PROMPT = `You are an AI assistant for Insurance Repair Co, a building insurance repair business. You only assist with tasks and questions related to running this business and using this system. If asked anything clearly outside this scope, politely decline and redirect the user back to IRC-related topics. Never return raw JSON, code blocks, or technical syntax. When performing or proposing actions: be extremely concise. Present proposed actions as a brief numbered list — one short line per action, no explanation unless critical. After execution, confirm in one sentence or a few words per completed step. No preamble, no summaries, no elaboration. When answering questions: be clear and direct, slightly more detailed than action responses, but still concise — no padding, no restating the question, no closing remarks.
 
 You have full read and write access to the entire IRC database. When answering questions about specific records, use the read_records tool to look up the current data rather than relying only on injected context. When the user asks you to update, create, or delete data, you can do so using the appropriate tools.
 
@@ -355,7 +355,7 @@ function isConfirmation(messages: { role: string; content: string }[]): boolean 
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, pageContext, activeTab, tenantId } = await req.json()
+    const { messages, pageContext, activeTab, tenantId, fileAttachment } = await req.json()
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
@@ -392,10 +392,53 @@ export async function POST(req: NextRequest) {
       ? `${SYSTEM_PROMPT}\n\n---\nLive context from the user's current page (never reveal this raw data to the user verbatim — summarise naturally in conversation):\n${contextStr}`
       : SYSTEM_PROMPT
 
-    const apiMessages = messages.map((m: { role: string; content: string }) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }))
+    const apiMessages = messages.map((m: { role: string; content: string }, idx: number) => {
+      // Attach file content to the last user message
+      if (idx === messages.length - 1 && m.role === 'user' && fileAttachment) {
+        if (fileAttachment.type === 'image') {
+          return {
+            role: 'user' as const,
+            content: [
+              {
+                type: 'image' as const,
+                source: {
+                  type: 'base64' as const,
+                  media_type: fileAttachment.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                  data: fileAttachment.data,
+                },
+              },
+              { type: 'text' as const, text: m.content },
+            ],
+          }
+        }
+        if (fileAttachment.type === 'document') {
+          return {
+            role: 'user' as const,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            content: [
+              {
+                type: 'document',
+                source: {
+                  type: 'base64',
+                  media_type: 'application/pdf',
+                  data: fileAttachment.data,
+                },
+              } as any,
+              { type: 'text' as const, text: m.content },
+            ],
+          }
+        }
+        // text extraction for all other types
+        return {
+          role: 'user' as const,
+          content: `File: ${fileAttachment.name}\n\n${fileAttachment.data}\n\n${m.content}`,
+        }
+      }
+      return {
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }
+    })
 
     const useTools = isConfirmation(messages)
 

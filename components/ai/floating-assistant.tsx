@@ -14,9 +14,12 @@ const MIN_H = 300
 const DEFAULT_W = 380
 const DEFAULT_H = 480
 
+const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.cmd', '.sh', '.ps1', '.msi', '.dll', '.vbs', '.js', '.jar', '.scr', '.com'])
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  fileName?: string
 }
 
 interface Template {
@@ -60,9 +63,13 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([])
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0)
 
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPopoverRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Drag/resize state in refs to avoid stale closures
   const dragState = useRef({ active: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 })
@@ -262,15 +269,67 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     }
   }
 
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  function fileToText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsText(file)
+    })
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase()
+    if (BLOCKED_EXTENSIONS.has(ext)) return
+    if (attachedPreviewUrl) URL.revokeObjectURL(attachedPreviewUrl)
+    setAttachedFile(file)
+    const isImage = /^image\/(jpeg|png|webp|gif)$/.test(file.type)
+    setAttachedPreviewUrl(isImage ? URL.createObjectURL(file) : null)
+  }
+
+  function removeAttachment() {
+    if (attachedPreviewUrl) URL.revokeObjectURL(attachedPreviewUrl)
+    setAttachedFile(null)
+    setAttachedPreviewUrl(null)
+  }
+
   async function sendMessage() {
     const val = input.trim()
     if (!val || loading) return
 
-    const userMsg: ChatMessage = { role: 'user', content: val }
+    const userMsg: ChatMessage = { role: 'user', content: val, fileName: attachedFile?.name }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
+    // Process file attachment before clearing
+    let fileAttachment: { type: string; name: string; data: string; mediaType?: string } | null = null
+    if (attachedFile) {
+      const isImage = /^image\/(jpeg|png|webp|gif)$/.test(attachedFile.type)
+      const isPDF = attachedFile.type === 'application/pdf'
+      if (isImage) {
+        fileAttachment = { type: 'image', name: attachedFile.name, data: await fileToBase64(attachedFile), mediaType: attachedFile.type }
+      } else if (isPDF) {
+        fileAttachment = { type: 'document', name: attachedFile.name, data: await fileToBase64(attachedFile), mediaType: 'application/pdf' }
+      } else {
+        fileAttachment = { type: 'text', name: attachedFile.name, data: await fileToText(attachedFile) }
+      }
+      removeAttachment()
+    }
+
     setLoading(true)
 
     try {
@@ -282,6 +341,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           pageContext: pathname,
           activeTab,
           tenantId,
+          ...(fileAttachment ? { fileAttachment } : {}),
         }),
       })
       const data = await res.json()
@@ -630,6 +690,43 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-slash-item-title { font-size: 12px; font-weight: 600; color: #2a2520; }
         .fai-slash-item-preview { font-size: 11px; color: #9a9088; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .fai-slash-empty { padding: 12px; font-size: 12px; color: #b8b0a8; text-align: center; }
+
+        /* File attachment */
+        .fai-file-preview {
+          display: flex; align-items: center; gap: 6px;
+          margin-bottom: 7px;
+        }
+        .fai-file-thumb {
+          width: 40px; height: 40px; border-radius: 6px; object-fit: cover;
+          border: 0.5px solid #e4dfd8; flex-shrink: 0;
+        }
+        .fai-file-pill {
+          display: flex; align-items: center; gap: 6px;
+          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 20px;
+          padding: 4px 10px; font-size: 11px; color: #7a6a58; font-weight: 500;
+          max-width: calc(100% - 28px); overflow: hidden;
+        }
+        .fai-file-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fai-file-remove {
+          background: none; border: none; cursor: pointer; color: #b8b0a8;
+          padding: 0; line-height: 1; font-size: 13px; flex-shrink: 0;
+          transition: color 0.15s;
+        }
+        .fai-file-remove:hover { color: #7a6a58; }
+        .fai-attach-btn {
+          background: none; border: none; cursor: pointer; color: #c8b89a;
+          padding: 0 6px 0 10px; align-self: flex-end; height: 46px;
+          display: flex; align-items: center; justify-content: center;
+          transition: color 0.15s; flex-shrink: 0;
+        }
+        .fai-attach-btn:hover { color: #7a6a58; }
+        .fai-file-bubble-pill {
+          display: inline-flex; align-items: center; gap: 4px;
+          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 12px;
+          padding: 2px 8px; font-size: 11px; color: #7a6a58; font-weight: 500;
+          margin-top: 4px; max-width: 180px; overflow: hidden;
+        }
+        .fai-file-bubble-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       `}</style>
 
       <div
@@ -801,6 +898,14 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                   {msg.role === 'user' ? 'Me' : '⬡'}
                 </div>
                 <div className="fai-bubble-inner">
+                  {msg.fileName && (
+                    <div className="fai-file-bubble-pill">
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" />
+                      </svg>
+                      <span className="fai-file-bubble-name">{msg.fileName}</span>
+                    </div>
+                  )}
                   {msg.content && (
                     <div className="fai-bubble-text">{msg.content}</div>
                   )}
@@ -824,6 +929,29 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
         {/* Input */}
         <div className="fai-input-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            onChange={handleFileSelect}
+          />
+          {/* File preview */}
+          {attachedFile && (
+            <div className="fai-file-preview">
+              {attachedPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={attachedPreviewUrl} alt={attachedFile.name} className="fai-file-thumb" />
+              ) : (
+                <div className="fai-file-pill">
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" />
+                  </svg>
+                  <span className="fai-file-pill-name">{attachedFile.name}</span>
+                </div>
+              )}
+              <button className="fai-file-remove" onClick={removeAttachment} title="Remove file">&#x2715;</button>
+            </div>
+          )}
           {/* Slash popover */}
           {showSlashPopover && (
             <div className="fai-slash-popover" ref={slashPopoverRef}>
@@ -847,6 +975,16 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           )}
 
           <div className="fai-input-row">
+            <button
+              className="fai-attach-btn"
+              title="Attach file"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </button>
             <textarea
               ref={textareaRef}
               className="fai-textarea"
