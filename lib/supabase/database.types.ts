@@ -639,6 +639,33 @@ export interface Database {
         };
         Relationships: never[];
       };
+      quote_note_templates: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          title: string;
+          content: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          title: string;
+          content: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          title?: string;
+          content?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: never[];
+      };
       quotes: {
         Row: {
           id: string;
@@ -662,6 +689,7 @@ export interface Database {
           doc_storage_path: string | null;
           pdf_storage_path: string | null;
           notes: string | null;
+          permit_block_dismissed: boolean;
           created_at: string;
         };
         Insert: {
@@ -686,6 +714,7 @@ export interface Database {
           doc_storage_path?: string | null;
           pdf_storage_path?: string | null;
           notes?: string | null;
+          permit_block_dismissed?: boolean;
           created_at?: string;
         };
         Update: {
@@ -710,6 +739,7 @@ export interface Database {
           doc_storage_path?: string | null;
           pdf_storage_path?: string | null;
           notes?: string | null;
+          permit_block_dismissed?: boolean;
           created_at?: string;
         };
         Relationships: never[];
@@ -734,6 +764,7 @@ export interface Database {
           rate_total: number | null;
           line_total: number | null;
           split_type: string | null;
+          item_type: string | null;
           approval_status: string;
           is_custom: boolean;
           library_writeback_approved: boolean;
@@ -759,6 +790,7 @@ export interface Database {
           rate_total?: number | null;
           line_total?: number | null;
           split_type?: string | null;
+          item_type?: string | null;
           approval_status?: string;
           is_custom?: boolean;
           library_writeback_approved?: boolean;
@@ -784,6 +816,7 @@ export interface Database {
           rate_total?: number | null;
           line_total?: number | null;
           split_type?: string | null;
+          item_type?: string | null;
           approval_status?: string;
           is_custom?: boolean;
           library_writeback_approved?: boolean;

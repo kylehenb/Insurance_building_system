@@ -35,6 +35,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   approved:           { bg: '#e8f5e9', text: '#2e7d32' },
   partially_approved: { bg: '#e8f5e9', text: '#2e7d32' },
   rejected:           { bg: '#fce8e6', text: '#c5221f' },
+  ready:              { bg: '#e8f5e9', text: '#2e7d32' },
 }
 
 function fmt(v: number) {

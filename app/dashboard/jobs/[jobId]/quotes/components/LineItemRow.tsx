@@ -1,12 +1,20 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { DraggableAttributes } from '@dnd-kit/core'
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities'
 import type { LibraryItem } from '../hooks/useScopeLibrary'
-import type { ScopeItem } from '../hooks/useQuote'
+import type { ScopeItem, ItemType } from '../hooks/useQuote'
 import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
 
 const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const
+
+const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, { label: string; pill: string; color: string; border: string }> = {
+  provisional_sum: { label: 'Provisional Sum', pill: 'PS', color: '#b45309', border: '#f59e0b' },
+  prime_cost:      { label: 'Prime Cost',      pill: 'PC', color: '#1a73e8', border: '#60a5fa' },
+  cash_settlement: { label: 'Cash Settlement', pill: 'CS', color: '#64748b', border: '#94a3b8' },
+}
 
 interface LineItemRowProps {
   item: ScopeItem
@@ -16,6 +24,12 @@ interface LineItemRowProps {
   isLocked: boolean
   insurer: string | null
   trades: Trade[]
+  onNavigateNext?: () => void
+  descRef?: React.RefObject<HTMLTextAreaElement | null>
+  /** dnd-kit drag listeners and attributes for the row wrapper */
+  dragListeners?: SyntheticListenerMap
+  dragAttributes?: DraggableAttributes
+  isDragging?: boolean
 }
 
 function fmt(v: number) {
@@ -30,10 +44,12 @@ function NumericCell({
   value,
   onChange,
   disabled,
+  onNavigateNext,
 }: {
   value: number | null
   onChange: (v: number | null) => void
   disabled?: boolean
+  onNavigateNext?: () => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
 
@@ -53,6 +69,13 @@ function NumericCell({
       disabled={disabled}
       onChange={e => setLocal(e.target.value)}
       onFocus={e => e.currentTarget.select()}
+      onKeyDown={e => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          ;(e.target as HTMLInputElement).blur()
+          onNavigateNext?.()
+        }
+      }}
       onBlur={() => {
         const trimmed = local.trim()
         if (trimmed === '') {
@@ -67,6 +90,8 @@ function NumericCell({
           }
         }
       }}
+      // Prevent drag from activating when clicking into the input
+      onPointerDown={e => e.stopPropagation()}
       style={{
         width: '100%',
         fontFamily: 'DM Mono, monospace',
@@ -85,7 +110,10 @@ function NumericCell({
   )
 }
 
-const selectStyle: React.CSSProperties = {
+// Chevron SVG data URI — exactly one, positioned right
+const CHEVRON_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M1 2.5l3 3 3-3' stroke='%239e998f' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`
+
+const selectBaseStyle: React.CSSProperties = {
   width: '100%',
   fontFamily: 'DM Sans, sans-serif',
   fontSize: 12,
@@ -93,22 +121,163 @@ const selectStyle: React.CSSProperties = {
   border: '1px solid #d8d0c8',
   borderRadius: 4,
   outline: 'none',
-  padding: '3px 4px',
+  padding: '3px 20px 3px 4px',
   cursor: 'pointer',
   boxSizing: 'border-box',
+  // Remove all native chrome
   appearance: 'none',
   WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  // Background properties as longhands so the SVG chevron applies correctly
   backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 4px center',
-  backgroundSize: '8px',
-  paddingRight: 16,
+  backgroundPosition: 'right 5px center',
+  backgroundSize: '8px 8px',
 }
 
-export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insurer, trades }: LineItemRowProps) {
+function makeSelectStyle(isLocked: boolean): React.CSSProperties {
+  return {
+    ...selectBaseStyle,
+    backgroundColor: isLocked ? '#f5f2ee' : '#ffffff',
+    backgroundImage: isLocked ? 'none' : CHEVRON_BG,
+    cursor: isLocked ? 'default' : 'pointer',
+  }
+}
+
+// ••• popover menu
+function ItemTypeMenu({
+  item,
+  onUpdate,
+  onClose,
+}: {
+  item: ScopeItem
+  onUpdate: (itemId: string, changes: Record<string, unknown>) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const setType = (type: ItemType) => {
+    onUpdate(item.id, { item_type: type })
+    onClose()
+  }
+
+  const types: Array<{ type: NonNullable<ItemType>; label: string }> = [
+    { type: 'provisional_sum', label: 'Provisional Sum' },
+    { type: 'prime_cost',      label: 'Prime Cost' },
+    { type: 'cash_settlement', label: 'Cash Settlement' },
+  ]
+
+  const menuItemStyle = (active: boolean): React.CSSProperties => ({
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    padding: '6px 12px',
+    fontSize: 12,
+    fontFamily: 'DM Sans, sans-serif',
+    color: active ? '#3a3530' : '#6b6560',
+    fontWeight: active ? 600 : 400,
+    background: active ? '#f5f2ee' : 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: 3,
+  })
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        right: 0,
+        zIndex: 300,
+        background: '#ffffff',
+        border: '1px solid #e0dbd4',
+        borderRadius: 6,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        minWidth: 180,
+        padding: '4px',
+        marginTop: 2,
+      }}
+      // Prevent drag activation from menu
+      onPointerDown={e => e.stopPropagation()}
+    >
+      {/* Save to scope library */}
+      {item.is_custom && !item.scope_library_id && (
+        <>
+          <button
+            onClick={() => { onUpdate(item.id, { library_writeback_approved: true }); onClose() }}
+            style={menuItemStyle(item.library_writeback_approved)}
+          >
+            Save to scope library
+          </button>
+          <div style={{ height: 1, background: '#f0ece6', margin: '3px 0' }} />
+        </>
+      )}
+
+      {/* Type section label */}
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 500,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: '#b0a89e',
+          fontFamily: 'DM Sans, sans-serif',
+          padding: '4px 12px 2px',
+        }}
+      >
+        Line item type
+      </div>
+
+      {types.map(({ type, label }) => (
+        <button
+          key={type}
+          onClick={() => setType(item.item_type === type ? null : type)}
+          style={menuItemStyle(item.item_type === type)}
+        >
+          {label}
+        </button>
+      ))}
+
+      <button onClick={() => setType(null)} style={menuItemStyle(item.item_type === null)}>
+        None
+      </button>
+    </div>
+  )
+}
+
+export function LineItemRow({
+  item,
+  onUpdate,
+  onDelete,
+  search,
+  isLocked,
+  insurer,
+  trades,
+  onNavigateNext,
+  descRef,
+  dragListeners,
+  dragAttributes,
+  isDragging,
+}: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
-  const [showTemplate, setShowTemplate] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuAnchorRef = useRef<HTMLDivElement>(null)
 
   const hasLineTotal = (item.line_total ?? 0) > 0
+  const typeInfo = item.item_type ? ITEM_TYPE_LABELS[item.item_type] : null
+
+  // Left-border colour based on item type
+  const leftBorderColor = typeInfo?.border ?? 'transparent'
 
   const handleLibrarySelect = useCallback(
     (lib: LibraryItem) => {
@@ -124,7 +293,7 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
         library_writeback_approved: false,
       }
       setEstHours(lib.estimated_hours)
-      setShowTemplate(false)
+      setShowMenu(false)
       onUpdate(item.id, changes)
     },
     [item.id, onUpdate]
@@ -149,6 +318,8 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
     onDelete(item.id)
   }, [hasLineTotal, onDelete, item.id])
 
+  const selectStyle = makeSelectStyle(isLocked)
+
   const col: React.CSSProperties = {
     padding: '6px 8px',
     borderRight: '1px solid #f0ece6',
@@ -156,19 +327,35 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
     alignItems: 'center',
   }
 
-  const chevronBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M1 2.5l3 3 3-3' stroke='%239e998f' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`
+  // ••• icon colour tint based on active type
+  const menuIconColor = typeInfo ? typeInfo.color : '#c0bab3'
 
   return (
-    <div style={{ borderBottom: '1px solid #f0ece6' }}>
+    <div
+      style={{
+        borderBottom: '1px solid #f0ece6',
+        borderLeft: `3px solid ${leftBorderColor}`,
+        opacity: isDragging ? 0.4 : 1,
+        transition: 'opacity 0.15s',
+      }}
+    >
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
+          cursor: dragListeners ? 'grab' : 'default',
         }}
+        // Spread drag listeners/attributes on the whole row
+        {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
+        {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
       >
         {/* Description */}
-        <div style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}>
+        <div
+          style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}
+          // Prevent drag when interacting with description area
+          onPointerDown={e => e.stopPropagation()}
+        >
           <div
             style={{
               background: isLocked ? '#f5f2ee' : '#ffffff',
@@ -185,6 +372,8 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
               onSelect={handleLibrarySelect}
               search={search}
               disabled={isLocked}
+              onNavigateNext={onNavigateNext}
+              inputRef={descRef}
             />
           </div>
         </div>
@@ -195,21 +384,20 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
             value={item.qty}
             onChange={v => onUpdate(item.id, { qty: v })}
             disabled={isLocked}
+            onNavigateNext={onNavigateNext}
           />
         </div>
 
         {/* Unit */}
-        <div style={col}>
+        <div style={col} onPointerDown={e => e.stopPropagation()}>
           <select
             value={item.unit ?? ''}
             onChange={e => onUpdate(item.id, { unit: e.target.value })}
-            disabled={isLocked}
-            style={{
-              ...selectStyle,
-              background: isLocked
-                ? '#f5f2ee'
-                : `#ffffff ${chevronBg}`,
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); onNavigateNext?.() }
             }}
+            disabled={isLocked}
+            style={selectStyle}
           >
             <option value="">—</option>
             {UNITS.map(u => (
@@ -224,6 +412,7 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
             value={item.rate_labour}
             onChange={v => onUpdate(item.id, { rate_labour: v })}
             disabled={isLocked}
+            onNavigateNext={onNavigateNext}
           />
         </div>
 
@@ -233,21 +422,27 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
             value={item.rate_materials}
             onChange={v => onUpdate(item.id, { rate_materials: v })}
             disabled={isLocked}
+            onNavigateNext={onNavigateNext}
           />
         </div>
 
         {/* Trade */}
-        <div style={col}>
+        <div style={col} onPointerDown={e => e.stopPropagation()}>
           <select
             value={item.trade ?? ''}
             onChange={e => onUpdate(item.id, { trade: e.target.value })}
             disabled={isLocked}
-            style={{
-              ...selectStyle,
-              background: isLocked
-                ? '#f5f2ee'
-                : `#ffffff ${chevronBg}`,
+            onKeyDown={e => {
+              if (e.key === 'Tab') {
+                // Tab out of last interactive field → navigate to next row
+                e.preventDefault()
+                onNavigateNext?.()
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                onNavigateNext?.()
+              }
             }}
+            style={selectStyle}
           >
             <option value="">—</option>
             {trades.map(t => (
@@ -270,6 +465,22 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
 
         {/* Line Total */}
         <div style={{ ...col, justifyContent: 'flex-end', borderRight: 'none' }}>
+          {typeInfo && (
+            <span
+              style={{
+                marginRight: 4,
+                padding: '1px 5px',
+                borderRadius: 4,
+                fontSize: 9,
+                fontWeight: 700,
+                fontFamily: 'DM Sans, sans-serif',
+                background: `${leftBorderColor}22`,
+                color: typeInfo.color,
+              }}
+            >
+              {typeInfo.pill}
+            </span>
+          )}
           <span
             style={{
               fontFamily: 'DM Mono, monospace',
@@ -282,7 +493,7 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
           </span>
         </div>
 
-        {/* Actions: T + × */}
+        {/* Actions: ••• + × */}
         <div
           style={{
             display: 'flex',
@@ -291,32 +502,44 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
             gap: 2,
             padding: '0 6px',
           }}
+          onPointerDown={e => e.stopPropagation()}
         >
           {!isLocked && (
             <>
-              <button
-                onClick={() => setShowTemplate(s => !s)}
-                title="Save as template"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: showTemplate ? '#c8b89a' : '#c0bab3',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  fontFamily: 'DM Sans, sans-serif',
-                  lineHeight: 1,
-                  padding: '2px 3px',
-                  borderRadius: 3,
-                  transition: 'color 0.1s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#c8b89a')}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = showTemplate ? '#c8b89a' : '#c0bab3'
-                }}
-              >
-                T
-              </button>
+              {/* ••• menu button */}
+              <div ref={menuAnchorRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowMenu(s => !s)}
+                  title="Item options"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: menuIconColor,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: 'DM Sans, sans-serif',
+                    lineHeight: 1,
+                    padding: '2px 3px',
+                    borderRadius: 3,
+                    letterSpacing: '0.05em',
+                    transition: 'color 0.1s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+                  onMouseLeave={e => (e.currentTarget.style.color = menuIconColor)}
+                >
+                  •••
+                </button>
+                {showMenu && (
+                  <ItemTypeMenu
+                    item={item}
+                    onUpdate={onUpdate}
+                    onClose={() => setShowMenu(false)}
+                  />
+                )}
+              </div>
+
+              {/* × delete */}
               <button
                 onClick={confirmDelete}
                 title="Delete item"
@@ -341,39 +564,6 @@ export function LineItemRow({ item, onUpdate, onDelete, search, isLocked, insure
           )}
         </div>
       </div>
-
-      {/* Library writeback / template panel */}
-      {showTemplate && item.is_custom && !item.scope_library_id && !isLocked && (
-        <div
-          style={{
-            padding: '5px 12px 7px',
-            background: '#fafaf8',
-            borderTop: '1px solid #f0ece6',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <input
-            type="checkbox"
-            id={`writeback-${item.id}`}
-            checked={item.library_writeback_approved}
-            onChange={e => onUpdate(item.id, { library_writeback_approved: e.target.checked })}
-            style={{ accentColor: '#c8b89a', cursor: 'pointer' }}
-          />
-          <label
-            htmlFor={`writeback-${item.id}`}
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 11,
-              color: '#9e998f',
-              cursor: 'pointer',
-            }}
-          >
-            Save to scope library as {insurer ?? 'default'} template
-          </label>
-        </div>
-      )}
     </div>
   )
 }

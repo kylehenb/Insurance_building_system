@@ -8,8 +8,10 @@ interface DescriptionSearchProps {
   onChange: (value: string) => void
   onSelect: (item: LibraryItem) => void
   onBlur?: () => void
+  onNavigateNext?: () => void
   search: (q: string) => LibraryItem[]
   disabled?: boolean
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
 export function DescriptionSearch({
@@ -17,22 +19,24 @@ export function DescriptionSearch({
   onChange,
   onSelect,
   onBlur,
+  onNavigateNext,
   search,
   disabled,
+  inputRef,
 }: DescriptionSearchProps) {
   const [results, setResults] = useState<LibraryItem[]>([])
   const [open, setOpen] = useState(false)
   const [noMatch, setNoMatch] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const internalRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = inputRef ?? internalRef
   const [matchedLibraryId, setMatchedLibraryId] = useState<string | null>(null)
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const v = e.target.value
       onChange(v)
-      // Clear matched state on manual edit
       setMatchedLibraryId(null)
 
       if (v.length >= 2) {
@@ -64,27 +68,41 @@ export function DescriptionSearch({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!open) return
-      if (e.key === 'ArrowDown') {
+      if (open) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setActiveIdx(i => Math.min(i + 1, results.length - 1))
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setActiveIdx(i => Math.max(i - 1, 0))
+          return
+        }
+        if (e.key === 'Enter' && activeIdx >= 0) {
+          e.preventDefault()
+          handleSelect(results[activeIdx])
+          return
+        }
+        if (e.key === 'Escape') {
+          setOpen(false)
+          setActiveIdx(-1)
+          return
+        }
+        // Fall through for Enter with no active suggestion → navigate next
+      }
+
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
-        setActiveIdx(i => Math.min(i + 1, results.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setActiveIdx(i => Math.max(i - 1, 0))
-      } else if (e.key === 'Enter' && activeIdx >= 0) {
-        e.preventDefault()
-        handleSelect(results[activeIdx])
-      } else if (e.key === 'Escape') {
         setOpen(false)
-        setActiveIdx(-1)
+        onNavigateNext?.()
       }
     },
-    [open, results, activeIdx, handleSelect]
+    [open, results, activeIdx, handleSelect, onNavigateNext]
   )
 
   const handleBlur = useCallback(
-    (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      // Delay to allow mousedown on dropdown items to fire first
+    (_e: React.FocusEvent<HTMLTextAreaElement>) => {
       setTimeout(() => {
         if (!containerRef.current?.contains(document.activeElement)) {
           setOpen(false)
@@ -110,10 +128,13 @@ export function DescriptionSearch({
   // Auto-resize textarea
   const rows = Math.max(2, Math.ceil((value?.length ?? 0) / 52))
 
+  // Suppress unused var warning — matchedLibraryId used for future badge
+  void matchedLibraryId
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <textarea
-        ref={textareaRef}
+        ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
         value={value ?? ''}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useQuote } from '../hooks/useQuote'
+import type { ScopeItem } from '../hooks/useQuote'
 import { useScopeLibrary } from '../hooks/useScopeLibrary'
 import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
@@ -24,6 +25,154 @@ interface QuoteEditorClientProps {
   inline?: boolean
 }
 
+// ── 20k Permit Alert ────────────────────────────────────────────────────────
+
+function PermitAlert({
+  contractValueExGst,
+  onAddPreliminaries,
+  onDismiss,
+}: {
+  contractValueExGst: number
+  onAddPreliminaries: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      style={{
+        margin: '0 0 0 0',
+        background: '#fffbeb',
+        border: '1px solid #f59e0b',
+        borderLeft: '4px solid #f59e0b',
+        borderRadius: 6,
+        padding: '14px 18px',
+        fontFamily: 'DM Sans, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: '#92400e',
+          marginBottom: 8,
+        }}
+      >
+        Building Permit threshold reached — review required
+      </div>
+      <ul
+        style={{
+          margin: '0 0 10px 0',
+          paddingLeft: 18,
+          fontSize: 12,
+          color: '#b45309',
+          lineHeight: 1.7,
+        }}
+      >
+        <li>Contract value exceeds $20k — statutory levies apply</li>
+        <li>Building permit required unless exempt (owner-builder, Class 10, etc.)</li>
+        <li>HII required if builder supplies labour + materials over $20k</li>
+      </ul>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={onAddPreliminaries}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#ffffff',
+            background: '#b45309',
+            border: 'none',
+            borderRadius: 5,
+            padding: '6px 14px',
+            cursor: 'pointer',
+          }}
+        >
+          Add Preliminaries Items
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            color: '#92400e',
+            background: 'transparent',
+            border: '1px solid #f59e0b',
+            borderRadius: 5,
+            padding: '6px 14px',
+            cursor: 'pointer',
+          }}
+        >
+          Not Required
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Calculations for permit fees ─────────────────────────────────────────────
+
+function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { room: string }> {
+  const hiiRate = Math.max(700, contractExGst * 0.012)
+  const ctfRate = contractExGst * 0.002
+  const bslRate = contractExGst <= 45000 ? 61.65 : contractExGst * 0.00137
+  const councilRate = Math.max(110, contractExGst * 0.0019)
+  const cdcRate = Math.max(1050, contractExGst * 0.00165)
+
+  return [
+    {
+      room: 'Preliminaries',
+      trade: 'Preliminaries',
+      item_description: `Home Warranty Insurance (HII) — 1.2% of contract value`,
+      qty: 1,
+      rate_labour: 0,
+      rate_materials: Math.round(hiiRate * 100) / 100,
+      unit: 'item',
+      is_custom: true,
+    },
+    {
+      room: 'Preliminaries',
+      trade: 'Preliminaries',
+      item_description: `Construction Training Fund Levy (CTF) — 0.2% of contract value`,
+      qty: 1,
+      rate_labour: 0,
+      rate_materials: Math.round(ctfRate * 100) / 100,
+      unit: 'item',
+      is_custom: true,
+    },
+    {
+      room: 'Preliminaries',
+      trade: 'Preliminaries',
+      item_description: `Building Services Levy (BSL)`,
+      qty: 1,
+      rate_labour: 0,
+      rate_materials: Math.round(bslRate * 100) / 100,
+      unit: 'item',
+      is_custom: true,
+    },
+    {
+      room: 'Preliminaries',
+      trade: 'Preliminaries',
+      item_description: `Council Building Permit Fee — 0.19% of contract value`,
+      qty: 1,
+      rate_labour: 0,
+      rate_materials: Math.round(councilRate * 100) / 100,
+      unit: 'item',
+      is_custom: true,
+    },
+    {
+      room: 'Preliminaries',
+      trade: 'Preliminaries',
+      item_description: `Private Certifier Fees (CDC) — 0.165% of contract value`,
+      qty: 1,
+      rate_labour: 0,
+      rate_materials: Math.round(cdcRate * 100) / 100,
+      unit: 'item',
+      is_custom: true,
+    },
+  ]
+}
+
+// ── Main editor ──────────────────────────────────────────────────────────────
+
 export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: QuoteEditorClientProps) {
   const {
     quote,
@@ -35,27 +184,42 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
     markup,
     gst,
     total,
+    items,
     updateItemLocal,
     addItem,
     deleteItem,
     updateRoomDimensions,
     renameRoom,
     updateQuoteMeta,
+    reorderItems,
+    setAllItemTypes,
   } = useQuote({ quoteId, tenantId })
 
   const { search } = useScopeLibrary({ tenantId, insurer: job.insurer })
   const trades = useTrades(tenantId)
 
-  // Local-only rooms (added but no items yet)
-  // Each entry: { name, autoFocus }
+  // Local-only rooms (added locally, no items yet)
   const [pendingRooms, setPendingRooms] = useState<Array<{ name: string; autoFocus: boolean }>>([])
 
+  // Permit alert: dismissed in session (before persisting to DB)
+  const [sessionPermitDismissed, setSessionPermitDismissed] = useState(false)
+
+  const isLocked = quote?.is_locked ?? false
+  const hasPrelimRoom = rooms.some(r => r.name.toLowerCase() === 'preliminaries')
+
+  // Show permit alert when subtotal > 20k, no prelim room, and not dismissed
+  const showPermitAlert =
+    !isLocked &&
+    subtotal > 20000 &&
+    !hasPrelimRoom &&
+    !sessionPermitDismissed &&
+    !(quote?.permit_block_dismissed ?? false)
+
   const handleAddItem = useCallback(
-    async (room: string) => {
-      const item = await addItem(room)
-      if (item) {
-        setPendingRooms(prev => prev.filter(r => r.name !== room))
-      }
+    (room: string): ScopeItem => {
+      const item = addItem(room)
+      setPendingRooms(prev => prev.filter(r => r.name !== room))
+      return item
     },
     [addItem]
   )
@@ -75,18 +239,49 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
   )
 
   const handleAddRoom = useCallback(() => {
-    // Add with blank name and autoFocus so the user types the name immediately
     setPendingRooms(prev => [...prev, { name: '', autoFocus: true }])
   }, [])
 
   const handleRenamePendingRoom = useCallback((oldName: string, newName: string) => {
     if (!newName.trim() || newName === oldName) return
     setPendingRooms(prev =>
-      prev.map(r => (r.name === oldName ? { name: newName.trim(), autoFocus: false } : r)
-    ))
+      prev.map(r => (r.name === oldName ? { name: newName.trim(), autoFocus: false } : r))
+    )
   }, [])
 
-  const isLocked = quote?.is_locked ?? false
+  // Permit alert handlers
+  const handlePermitDismiss = useCallback(async () => {
+    setSessionPermitDismissed(true)
+    await updateQuoteMeta({ permit_block_dismissed: true })
+  }, [updateQuoteMeta])
+
+  const handleAddPreliminaries = useCallback(() => {
+    setSessionPermitDismissed(true)
+    const permitItems = calcPermitItems(subtotal)
+    for (const data of permitItems) {
+      const { room: itemRoom, ...rest } = data
+      addItem(itemRoom, rest as Partial<ScopeItem>)
+    }
+  }, [subtotal, addItem])
+
+  // Cash settlement toggle: set all items to cash_settlement or clear
+  const cashSettlementActive = items.length > 0 && items.every(i => i.item_type === 'cash_settlement')
+
+  const handleCashSettlementToggle = useCallback(async () => {
+    if (cashSettlementActive) {
+      if (!window.confirm('Remove cash settlement from all items?')) return
+      await setAllItemTypes(null)
+    } else {
+      await setAllItemTypes('cash_settlement')
+    }
+  }, [cashSettlementActive, setAllItemTypes])
+
+  // Sync permitDismissed from quote when loaded
+  useEffect(() => {
+    if (quote?.permit_block_dismissed) {
+      setSessionPermitDismissed(true)
+    }
+  }, [quote?.permit_block_dismissed])
 
   if (loading) {
     return (
@@ -171,8 +366,18 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
         </div>
       )}
 
-      {/* Quote header */}
-      <QuoteHeader quote={quote} total={total} insurer={job.insurer} />
+      {/* Quote header — only shown on dedicated page, not in accordion inline view
+          (the accordion summary row already shows ref/total/status/insurer/delete/chevron) */}
+      {!inline && (
+        <QuoteHeader
+          quote={quote}
+          total={total}
+          insurer={job.insurer}
+          cashSettlementActive={cashSettlementActive}
+          onCashSettlementToggle={handleCashSettlementToggle}
+          isLocked={isLocked}
+        />
+      )}
 
       {/* Content */}
       <div style={{ background: '#f5f2ee' }}>
@@ -191,6 +396,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
               if (!window.confirm(`Delete room "${room.name}" and all items?`)) return
               room.items.forEach(i => deleteItem(i.id))
             }}
+            onReorderItems={reorderItems}
             search={search}
             isLocked={isLocked}
             insurer={job.insurer}
@@ -210,6 +416,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
             onUpdateDimensions={() => {}}
             onRenameRoom={handleRenamePendingRoom}
             onDeleteRoom={() => handleDeleteRoom(pr.name)}
+            onReorderItems={() => {}}
             search={search}
             isLocked={isLocked}
             insurer={job.insurer}
@@ -247,6 +454,17 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
             </button>
           </div>
         )}
+
+        {/* 20k Building Permit Alert */}
+        {showPermitAlert && (
+          <div style={{ padding: '0 16px 14px' }}>
+            <PermitAlert
+              contractValueExGst={subtotal}
+              onAddPreliminaries={handleAddPreliminaries}
+              onDismiss={handlePermitDismiss}
+            />
+          </div>
+        )}
       </div>
 
       {/* Footer totals */}
@@ -256,9 +474,16 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
         markup={markup}
         gst={gst}
         total={total}
+        items={items}
         onUpdateMarkup={pct => updateQuoteMeta({ markup_pct: pct })}
+        onUpdateNotes={notes => updateQuoteMeta({ notes })}
+        onMarkReady={() => updateQuoteMeta({ status: 'ready', is_locked: true })}
+        onUnlockEdit={() => updateQuoteMeta({ status: 'draft', is_locked: false })}
         isLocked={isLocked}
         saveStatus={saveStatus}
+        tenantId={tenantId}
+        cashSettlementActive={cashSettlementActive}
+        onCashSettlementToggle={handleCashSettlementToggle}
       />
     </div>
   )

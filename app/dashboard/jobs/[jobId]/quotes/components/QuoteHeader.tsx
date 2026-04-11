@@ -7,6 +7,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   approved:           { bg: '#e8f5e9', text: '#2e7d32' },
   partially_approved: { bg: '#e8f5e9', text: '#2e7d32' },
   rejected:           { bg: '#fce8e6', text: '#c5221f' },
+  ready:              { bg: '#e8f5e9', text: '#2e7d32' },
 }
 
 function fmt(v: number) {
@@ -17,9 +18,19 @@ interface QuoteHeaderProps {
   quote: QuoteData
   total: number
   insurer: string | null
+  cashSettlementActive?: boolean
+  onCashSettlementToggle?: () => void
+  isLocked?: boolean
 }
 
-export function QuoteHeader({ quote, total, insurer }: QuoteHeaderProps) {
+export function QuoteHeader({
+  quote,
+  total,
+  insurer,
+  cashSettlementActive,
+  onCashSettlementToggle,
+  isLocked,
+}: QuoteHeaderProps) {
   const s = STATUS_STYLES[quote.status.toLowerCase()] ?? STATUS_STYLES.draft
 
   return (
@@ -52,6 +63,7 @@ export function QuoteHeader({ quote, total, insurer }: QuoteHeaderProps) {
         <span style={{ fontWeight: 400, color: '#9e998f', fontSize: 12 }}>inc GST</span>
       </span>
 
+      {/* Status badge — shows "Ready" in green when ready */}
       <span
         style={{
           display: 'inline-flex',
@@ -110,7 +122,23 @@ export function QuoteHeader({ quote, total, insurer }: QuoteHeaderProps) {
         </span>
       )}
 
-      {quote.is_locked && (
+      {/* Cash Settlement badge (shown on dedicated page) */}
+      {cashSettlementActive && (
+        <span
+          style={{
+            padding: '2px 10px',
+            borderRadius: 20,
+            fontSize: 11,
+            fontWeight: 500,
+            background: '#f1f5f9',
+            color: '#475569',
+          }}
+        >
+          Cash Settlement
+        </span>
+      )}
+
+      {quote.is_locked && quote.status !== 'ready' && (
         <span
           style={{
             padding: '2px 10px',
@@ -123,6 +151,28 @@ export function QuoteHeader({ quote, total, insurer }: QuoteHeaderProps) {
         >
           Locked — sent
         </span>
+      )}
+
+      {/* Cash Settlement toggle (only on dedicated page, not locked) */}
+      {onCashSettlementToggle && !isLocked && (
+        <button
+          onClick={onCashSettlementToggle}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 11,
+            fontWeight: 500,
+            color: cashSettlementActive ? '#475569' : '#9e998f',
+            background: cashSettlementActive ? '#f1f5f9' : 'transparent',
+            border: '1px solid ' + (cashSettlementActive ? '#94a3b8' : '#d8d0c8'),
+            borderRadius: 20,
+            padding: '2px 10px',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+          title={cashSettlementActive ? 'Remove cash settlement from all items' : 'Mark entire quote as Cash Settlement'}
+        >
+          {cashSettlementActive ? '✕ Cash Settlement' : 'Cash Settlement — Entire Quote'}
+        </button>
       )}
     </div>
   )

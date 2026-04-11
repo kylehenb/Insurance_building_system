@@ -49,6 +49,7 @@ export async function PATCH(
     'notes',
     'is_locked',
     'total_amount',
+    'permit_block_dismissed',
   ]
   const safeUpdates: QuoteUpdate = {}
   for (const key of allowed) {

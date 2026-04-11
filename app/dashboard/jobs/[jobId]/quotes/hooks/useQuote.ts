@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+export type ItemType = 'provisional_sum' | 'prime_cost' | 'cash_settlement' | null
+
 export interface ScopeItem {
   id: string
   tenant_id: string
@@ -21,6 +23,7 @@ export interface ScopeItem {
   rate_total: number | null
   line_total: number | null
   split_type: string | null
+  item_type: ItemType
   approval_status: string
   is_custom: boolean
   library_writeback_approved: boolean
@@ -42,6 +45,7 @@ export interface QuoteData {
   markup_pct: number
   gst_pct: number
   notes: string | null
+  permit_block_dismissed: boolean
   created_at: string
 }
 
@@ -65,6 +69,42 @@ function calcLineTotal(
   if (qty == null) return null
   if (rateLabour == null && rateMaterials == null) return null
   return qty * ((rateLabour ?? 0) + (rateMaterials ?? 0))
+}
+
+function makeTempItem(
+  quoteId: string,
+  tenantId: string,
+  room: string,
+  overrides: Partial<ScopeItem> = {},
+  sortHint = 0
+): ScopeItem {
+  return {
+    id: `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    tenant_id: tenantId,
+    quote_id: quoteId,
+    scope_library_id: null,
+    room,
+    room_length: null,
+    room_width: null,
+    room_height: null,
+    trade: null,
+    keyword: null,
+    item_description: null,
+    unit: null,
+    qty: null,
+    rate_labour: null,
+    rate_materials: null,
+    rate_total: null,
+    line_total: null,
+    split_type: null,
+    item_type: null,
+    approval_status: 'pending',
+    is_custom: true,
+    library_writeback_approved: false,
+    sort_order: sortHint,
+    created_at: new Date().toISOString(),
+    ...overrides,
+  }
 }
 
 export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
@@ -117,6 +157,9 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       if (!changes || Object.keys(changes).length === 0) return
       pendingChanges.current.delete(itemId)
 
+      // Don't flush temp items — they haven't been persisted yet
+      if (itemId.startsWith('temp-')) return
+
       try {
         const res = await fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
           method: 'PATCH',
@@ -129,7 +172,6 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
         setSaveStatusTimed('saved')
       } catch {
         setSaveStatusTimed('error')
-        // Reload to recover
         load()
       }
     },
@@ -138,6 +180,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
   const scheduleItemSave = useCallback(
     (itemId: string, changes: Record<string, unknown>) => {
+      if (itemId.startsWith('temp-')) return
       const existing = pendingChanges.current.get(itemId) ?? {}
       pendingChanges.current.set(itemId, { ...existing, ...changes })
 
@@ -174,19 +217,38 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     [scheduleItemSave]
   )
 
+  // Optimistic add: insert temp row immediately, persist in background
   const addItem = useCallback(
-    async (room: string, data: Partial<ScopeItem> = {}) => {
-      const res = await fetch(`/api/quotes/${quoteId}/items`, {
+    (room: string, data: Partial<ScopeItem> = {}): ScopeItem => {
+      // Calculate sort order hint from current items in this room
+      const roomItems = items.filter(i => i.room === room)
+      const maxSort = roomItems.reduce((m, i) => Math.max(m, i.sort_order), 0)
+      const tempItem = makeTempItem(quoteId, tenantId, room, data, maxSort + 1)
+
+      setItems(prev => [...prev, tempItem])
+
+      // Persist in background; replace temp row with real row on success
+      const { id: tempId, room: _r, ...postData } = tempItem
+      void fetch(`/api/quotes/${quoteId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, room, ...data }),
+        body: JSON.stringify({ tenantId, room, ...postData }),
       })
-      if (!res.ok) return null
-      const newItem: ScopeItem = await res.json()
-      setItems(prev => [...prev, newItem])
-      return newItem
+        .then(res => {
+          if (!res.ok) throw new Error('Failed')
+          return res.json() as Promise<ScopeItem>
+        })
+        .then(newItem => {
+          setItems(prev => prev.map(i => (i.id === tempId ? newItem : i)))
+        })
+        .catch(() => {
+          // Remove temp row on failure
+          setItems(prev => prev.filter(i => i.id !== tempId))
+        })
+
+      return tempItem
     },
-    [quoteId, tenantId]
+    [quoteId, tenantId, items]
   )
 
   const deleteItem = useCallback(
@@ -198,6 +260,8 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
       // Optimistic
       setItems(prev => prev.filter(i => i.id !== itemId))
+
+      if (itemId.startsWith('temp-')) return
 
       const res = await fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
         method: 'DELETE',
@@ -234,7 +298,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       const trimmed = newName.trim()
       if (!trimmed || trimmed === oldName) return
       setItems(prev => prev.map(item => (item.room === oldName ? { ...item, room: trimmed } : item)))
-      const roomItems = items.filter(i => i.room === oldName)
+      const roomItems = items.filter(i => i.room === oldName && !i.id.startsWith('temp-'))
       await Promise.all(
         roomItems.map(item =>
           fetch(`/api/quotes/${quoteId}/items/${item.id}`, {
@@ -250,7 +314,12 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
   const updateQuoteMeta = useCallback(
     async (
-      changes: Partial<Pick<QuoteData, 'markup_pct' | 'gst_pct' | 'status' | 'notes'>>
+      changes: Partial<
+        Pick<
+          QuoteData,
+          'markup_pct' | 'gst_pct' | 'status' | 'notes' | 'is_locked' | 'permit_block_dismissed'
+        >
+      >
     ) => {
       setQuote(prev => (prev ? { ...prev, ...changes } : null))
       const res = await fetch(`/api/quotes/${quoteId}`, {
@@ -263,7 +332,51 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     [quoteId, tenantId, load]
   )
 
-  // Group items by room, preserving insertion order
+  // Reorder items within a room — optimistic, then persist
+  const reorderItems = useCallback(
+    (room: string, orderedIds: string[]) => {
+      setItems(prev => {
+        const withoutRoom = prev.filter(i => i.room !== room)
+        const reordered = orderedIds
+          .map((id, idx) => {
+            const item = prev.find(i => i.id === id)
+            return item ? { ...item, sort_order: idx } : null
+          })
+          .filter((i): i is ScopeItem => i !== null)
+        return [...withoutRoom, ...reordered]
+      })
+
+      const realIds = orderedIds.filter(id => !id.startsWith('temp-'))
+      if (realIds.length === 0) return
+
+      void fetch(`/api/quotes/${quoteId}/items/reorder`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, orderedIds: realIds }),
+      }).catch(() => load())
+    },
+    [quoteId, tenantId, load]
+  )
+
+  // Set item_type on all items in the quote (for Cash Settlement toggle)
+  const setAllItemTypes = useCallback(
+    async (type: ItemType) => {
+      setItems(prev => prev.map(i => ({ ...i, item_type: type })))
+      const realItems = items.filter(i => !i.id.startsWith('temp-'))
+      await Promise.all(
+        realItems.map(item =>
+          fetch(`/api/quotes/${quoteId}/items/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, item_type: type }),
+          })
+        )
+      )
+    },
+    [items, quoteId, tenantId]
+  )
+
+  // Group items by room, preserving insertion order; sort by sort_order within room
   const rooms: RoomGroup[] = (() => {
     const map = new Map<string, ScopeItem[]>()
     for (const item of items) {
@@ -271,7 +384,10 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       if (!map.has(room)) map.set(room, [])
       map.get(room)!.push(item)
     }
-    return Array.from(map.entries()).map(([name, roomItems]) => ({ name, items: roomItems }))
+    return Array.from(map.entries()).map(([name, roomItems]) => ({
+      name,
+      items: [...roomItems].sort((a, b) => a.sort_order - b.sort_order),
+    }))
   })()
 
   const subtotal = items.reduce((sum, i) => sum + (i.line_total ?? 0), 0)
@@ -296,6 +412,8 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     updateRoomDimensions,
     renameRoom,
     updateQuoteMeta,
+    reorderItems,
+    setAllItemTypes,
     reload: load,
   }
 }

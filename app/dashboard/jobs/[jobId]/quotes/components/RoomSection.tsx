@@ -1,6 +1,23 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { ScopeItem } from '../hooks/useQuote'
 import type { LibraryItem } from '../hooks/useScopeLibrary'
 import type { Trade } from '../hooks/useTrades'
@@ -11,7 +28,7 @@ interface RoomSectionProps {
   items: ScopeItem[]
   onUpdateItem: (itemId: string, changes: Record<string, unknown>) => void
   onDeleteItem: (itemId: string) => void
-  onAddItem: (room: string) => void
+  onAddItem: (room: string) => ScopeItem
   onUpdateDimensions: (
     room: string,
     dims: {
@@ -22,12 +39,17 @@ interface RoomSectionProps {
   ) => void
   onRenameRoom: (oldName: string, newName: string) => void
   onDeleteRoom: (room: string) => void
+  onReorderItems: (room: string, orderedIds: string[]) => void
   search: (q: string) => LibraryItem[]
   isLocked: boolean
   insurer: string | null
   trades: Trade[]
   autoFocusName?: boolean
 }
+
+// ──────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────
 
 function DimInput({
   value,
@@ -61,6 +83,7 @@ function DimInput({
         placeholder="0.0"
         onChange={e => setLocal(e.target.value)}
         onFocus={e => e.currentTarget.select()}
+        onPointerDown={e => e.stopPropagation()}
         onBlur={() => {
           const trimmed = local.trim()
           if (trimmed === '') {
@@ -113,15 +136,7 @@ function CalcIcon() {
   )
 }
 
-function CalcPanel({
-  l,
-  w,
-  h,
-}: {
-  l: number | null
-  w: number | null
-  h: number | null
-}) {
+function CalcPanel({ l, w, h }: { l: number | null; w: number | null; h: number | null }) {
   const hasLH = l != null && h != null
   const hasWH = w != null && h != null
   const hasLW = l != null && w != null
@@ -184,22 +199,11 @@ function CalcPanel({
             marginBottom: 5,
           }}
         >
-          <span
-            style={{
-              fontSize: 11,
-              color: '#9e998f',
-              fontFamily: 'DM Sans, sans-serif',
-            }}
-          >
+          <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Sans, sans-serif' }}>
             {r.label}
           </span>
           <span
-            style={{
-              fontSize: 11,
-              color: '#3a3530',
-              fontFamily: 'DM Mono, monospace',
-              fontWeight: 500,
-            }}
+            style={{ fontSize: 11, color: '#3a3530', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}
           >
             {r.value}
           </span>
@@ -209,7 +213,86 @@ function CalcPanel({
   )
 }
 
-// Grid: Description | QTY | Unit | Labour/Unit | Materials/Unit | Trade | Est.Hrs | Line Total | Actions
+// Sortable wrapper for a single line item
+function SortableLineItemRow({
+  item,
+  onUpdate,
+  onDelete,
+  search,
+  isLocked,
+  insurer,
+  trades,
+  onNavigateNext,
+  descRef,
+  activeId,
+}: {
+  item: ScopeItem
+  onUpdate: (itemId: string, changes: Record<string, unknown>) => void
+  onDelete: (itemId: string) => void
+  search: (q: string) => LibraryItem[]
+  isLocked: boolean
+  insurer: string | null
+  trades: Trade[]
+  onNavigateNext: () => void
+  descRef: React.RefObject<HTMLTextAreaElement | null>
+  activeId: string | null
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled: isLocked })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: 'relative',
+    zIndex: isDragging ? 2 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {/* Drop indicator line above this row when something is dragged over */}
+      {activeId && activeId !== item.id && isDragging === false && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -1,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: '#c8b89a',
+            borderRadius: 1,
+            pointerEvents: 'none',
+            zIndex: 10,
+            opacity: 0.7,
+          }}
+        />
+      )}
+      <LineItemRow
+        item={item}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        search={search}
+        isLocked={isLocked}
+        insurer={insurer}
+        trades={trades}
+        onNavigateNext={onNavigateNext}
+        descRef={descRef}
+        dragListeners={listeners}
+        dragAttributes={attributes}
+        isDragging={isDragging}
+      />
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Grid / column constants
+// ──────────────────────────────────────────────
 const GRID = '1fr 60px 70px 110px 120px 130px 75px 100px 60px'
 
 const COL_HEADERS = [
@@ -224,6 +307,9 @@ const COL_HEADERS = [
   '',
 ]
 
+// ──────────────────────────────────────────────
+// Main RoomSection
+// ──────────────────────────────────────────────
 export function RoomSection({
   name,
   items,
@@ -233,6 +319,7 @@ export function RoomSection({
   onUpdateDimensions,
   onRenameRoom,
   onDeleteRoom,
+  onReorderItems,
   search,
   isLocked,
   insurer,
@@ -243,19 +330,40 @@ export function RoomSection({
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState(name)
   const [showCalc, setShowCalc] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [localItems, setLocalItems] = useState(items)
+
   const nameInputRef = useRef<HTMLInputElement>(null)
   const calcRef = useRef<HTMLDivElement>(null)
 
-  const firstItem = items[0] ?? null
+  // Desc refs: keyed by item id
+  const descRefs = useRef<Map<string, React.RefObject<HTMLTextAreaElement | null>>>(new Map())
+  const pendingFocusId = useRef<string | null>(null)
+
+  // Keep localItems in sync with prop, but don't clobber during an active drag
+  useEffect(() => {
+    if (!activeId) {
+      setLocalItems(items)
+    }
+  }, [items, activeId])
+
+  // Focus pending description field after render
+  useEffect(() => {
+    if (pendingFocusId.current) {
+      const ref = descRefs.current.get(pendingFocusId.current)
+      if (ref?.current) {
+        ref.current.focus()
+        pendingFocusId.current = null
+      }
+    }
+  })
 
   // Autofocus name on mount for new blank rooms
   useEffect(() => {
     if (autoFocusName && !isLocked) {
       setEditingName(true)
       setNameVal('')
-      setTimeout(() => {
-        nameInputRef.current?.focus()
-      }, 30)
+      setTimeout(() => nameInputRef.current?.focus(), 30)
     }
   }, [autoFocusName, isLocked])
 
@@ -294,9 +402,57 @@ export function RoomSection({
     }
   }, [nameVal, name, onRenameRoom])
 
+  // Keyboard navigation between rows
+  const handleNavigateNext = useCallback(
+    (currentIndex: number) => {
+      if (currentIndex < localItems.length - 1) {
+        // Focus next row's description
+        const nextItem = localItems[currentIndex + 1]
+        const ref = descRefs.current.get(nextItem.id)
+        if (ref?.current) {
+          ref.current.focus()
+        }
+      } else {
+        // Add a new row and focus its description
+        if (!isLocked) {
+          const newItem = onAddItem(name)
+          pendingFocusId.current = newItem.id
+        }
+      }
+    },
+    [localItems, isLocked, onAddItem, name]
+  )
+
+  // dnd-kit setup
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }, [])
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      setActiveId(null)
+      if (!over || active.id === over.id) return
+
+      const oldIndex = localItems.findIndex(i => i.id === active.id)
+      const newIndex = localItems.findIndex(i => i.id === over.id)
+      const reordered = arrayMove(localItems, oldIndex, newIndex)
+      setLocalItems(reordered)
+      onReorderItems(name, reordered.map(i => i.id))
+    },
+    [localItems, name, onReorderItems]
+  )
+
+  const firstItem = items[0] ?? null
   const l = firstItem?.room_length ?? null
   const w = firstItem?.room_width ?? null
   const h = firstItem?.room_height ?? null
+
+  const activeItem = activeId ? localItems.find(i => i.id === activeId) ?? null : null
 
   return (
     <div style={{ marginBottom: 0 }}>
@@ -364,31 +520,12 @@ export function RoomSection({
 
           {/* Dimensions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <DimInput
-              value={l}
-              label="L"
-              onChange={v => onUpdateDimensions(name, { room_length: v })}
-            />
+            <DimInput value={l} label="L" onChange={v => onUpdateDimensions(name, { room_length: v })} />
             <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
-            <DimInput
-              value={w}
-              label=""
-              onChange={v => onUpdateDimensions(name, { room_width: v })}
-            />
+            <DimInput value={w} label="" onChange={v => onUpdateDimensions(name, { room_width: v })} />
             <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
-            <DimInput
-              value={h}
-              label=""
-              onChange={v => onUpdateDimensions(name, { room_height: v })}
-            />
-            <span
-              style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: 10,
-                color: '#9e998f',
-                userSelect: 'none',
-              }}
-            >
+            <DimInput value={h} label="" onChange={v => onUpdateDimensions(name, { room_height: v })} />
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: '#9e998f', userSelect: 'none' }}>
               m
             </span>
 
@@ -410,9 +547,7 @@ export function RoomSection({
                   transition: 'color 0.1s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#c8b89a')}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = showCalc ? '#c8b89a' : '#b0a89e'
-                }}
+                onMouseLeave={e => { e.currentTarget.style.color = showCalc ? '#c8b89a' : '#b0a89e' }}
               >
                 <CalcIcon />
               </button>
@@ -468,7 +603,7 @@ export function RoomSection({
 
       {!collapsed && (
         <div>
-          {/* Column headers */}
+          {/* Column headers — single row, always visible when expanded */}
           <div
             style={{
               display: 'grid',
@@ -497,25 +632,80 @@ export function RoomSection({
             ))}
           </div>
 
-          {/* Line items */}
-          {items.map(item => (
-            <LineItemRow
-              key={item.id}
-              item={item}
-              onUpdate={onUpdateItem}
-              onDelete={onDeleteItem}
-              search={search}
-              isLocked={isLocked}
-              insurer={insurer}
-              trades={trades}
-            />
-          ))}
+          {/* Line items with drag-to-reorder */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localItems.map(i => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localItems.map((item, idx) => {
+                // Ensure each item has a stable ref
+                if (!descRefs.current.has(item.id)) {
+                  descRefs.current.set(
+                    item.id,
+                    { current: null } as React.RefObject<HTMLTextAreaElement | null>
+                  )
+                }
+                const dRef = descRefs.current.get(item.id)!
+
+                return (
+                  <SortableLineItemRow
+                    key={item.id}
+                    item={item}
+                    onUpdate={onUpdateItem}
+                    onDelete={onDeleteItem}
+                    search={search}
+                    isLocked={isLocked}
+                    insurer={insurer}
+                    trades={trades}
+                    onNavigateNext={() => handleNavigateNext(idx)}
+                    descRef={dRef}
+                    activeId={activeId}
+                  />
+                )
+              })}
+            </SortableContext>
+
+            {/* DragOverlay: ghost of the dragged row */}
+            <DragOverlay>
+              {activeItem ? (
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #c8b89a',
+                    borderRadius: 4,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    opacity: 0.9,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <LineItemRow
+                    item={activeItem}
+                    onUpdate={() => {}}
+                    onDelete={() => {}}
+                    search={search}
+                    isLocked
+                    insurer={insurer}
+                    trades={trades}
+                  />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
 
           {/* Add item button */}
           {!isLocked && (
             <div style={{ padding: '8px 12px' }}>
               <button
-                onClick={() => onAddItem(name)}
+                onClick={() => {
+                  const newItem = onAddItem(name)
+                  pendingFocusId.current = newItem.id
+                }}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 12,
