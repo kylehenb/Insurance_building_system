@@ -167,22 +167,22 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
           body: JSON.stringify({ tenantId, ...changes }),
         })
         if (!res.ok) throw new Error('Save failed')
-        const updated: ScopeItem = await res.json()
-        setItems(prev => prev.map(i => (i.id === itemId ? updated : i)))
+        // Local state is already correct — do not replace with server response
         setSaveStatusTimed('saved')
       } catch {
         setSaveStatusTimed('error')
-        load()
       }
     },
-    [quoteId, tenantId, load, setSaveStatusTimed]
+    [quoteId, tenantId, setSaveStatusTimed]
   )
 
   const scheduleItemSave = useCallback(
     (itemId: string, changes: Record<string, unknown>) => {
-      if (itemId.startsWith('temp-')) return
       const existing = pendingChanges.current.get(itemId) ?? {}
       pendingChanges.current.set(itemId, { ...existing, ...changes })
+
+      // Temp items: accumulate changes but defer flush until real ID is confirmed
+      if (itemId.startsWith('temp-')) return
 
       const existingTimer = debounceTimers.current.get(itemId)
       if (existingTimer) clearTimeout(existingTimer)
@@ -227,7 +227,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
       setItems(prev => [...prev, tempItem])
 
-      // Persist in background; replace temp row with real row on success
+      // Persist in background; swap temp ID with real ID on success
       const { id: tempId, room: _r, ...postData } = tempItem
       void fetch(`/api/quotes/${quoteId}/items`, {
         method: 'POST',
@@ -239,16 +239,29 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
           return res.json() as Promise<ScopeItem>
         })
         .then(newItem => {
-          setItems(prev => prev.map(i => (i.id === tempId ? newItem : i)))
+          // Preserve all local edits — only update the ID and server-generated fields
+          setItems(prev =>
+            prev.map(i =>
+              i.id === tempId
+                ? { ...i, id: newItem.id, sort_order: newItem.sort_order, created_at: newItem.created_at }
+                : i
+            )
+          )
+          // Transfer any edits made while item was temp, then flush to server
+          const tempPending = pendingChanges.current.get(tempId)
+          pendingChanges.current.delete(tempId)
+          if (tempPending && Object.keys(tempPending).length > 0) {
+            scheduleItemSave(newItem.id, tempPending)
+          }
         })
         .catch(() => {
-          // Remove temp row on failure
+          pendingChanges.current.delete(tempId)
           setItems(prev => prev.filter(i => i.id !== tempId))
         })
 
       return tempItem
     },
-    [quoteId, tenantId, items]
+    [quoteId, tenantId, items, scheduleItemSave]
   )
 
   const deleteItem = useCallback(
@@ -258,8 +271,12 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       debounceTimers.current.delete(itemId)
       pendingChanges.current.delete(itemId)
 
-      // Optimistic
-      setItems(prev => prev.filter(i => i.id !== itemId))
+      // Capture item before removing so we can re-insert on failure
+      let deletedItem: ScopeItem | undefined
+      setItems(prev => {
+        deletedItem = prev.find(i => i.id === itemId)
+        return prev.filter(i => i.id !== itemId)
+      })
 
       if (itemId.startsWith('temp-')) return
 
@@ -268,11 +285,13 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId }),
       })
-      if (!res.ok) {
-        load()
+      if (!res.ok && deletedItem) {
+        const item = deletedItem
+        setItems(prev => [...prev, item].sort((a, b) => a.sort_order - b.sort_order))
+        setSaveStatusTimed('error')
       }
     },
-    [quoteId, tenantId, load]
+    [quoteId, tenantId, setSaveStatusTimed]
   )
 
   const updateRoomDimensions = useCallback(
@@ -327,15 +346,17 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId, ...changes }),
       })
-      if (!res.ok) load()
+      if (!res.ok) setSaveStatusTimed('error')
     },
-    [quoteId, tenantId, load]
+    [quoteId, tenantId, setSaveStatusTimed]
   )
 
   // Reorder items within a room — optimistic, then persist
   const reorderItems = useCallback(
     (room: string, orderedIds: string[]) => {
+      let prevRoomItems: ScopeItem[] = []
       setItems(prev => {
+        prevRoomItems = prev.filter(i => i.room === room)
         const withoutRoom = prev.filter(i => i.room !== room)
         const reordered = orderedIds
           .map((id, idx) => {
@@ -353,9 +374,16 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId, orderedIds: realIds }),
-      }).catch(() => load())
+      }).catch(() => {
+        const snapshot = prevRoomItems
+        setItems(prev => {
+          const withoutRoom = prev.filter(i => i.room !== room)
+          return [...withoutRoom, ...snapshot]
+        })
+        setSaveStatusTimed('error')
+      })
     },
-    [quoteId, tenantId, load]
+    [quoteId, tenantId, setSaveStatusTimed]
   )
 
   // Set item_type on all items in the quote (for Cash Settlement toggle)
