@@ -6,6 +6,9 @@ export type ItemType = 'provisional_sum' | 'prime_cost' | 'cash_settlement' | nu
 
 export interface ScopeItem {
   id: string
+  /** Client-only stable key — set to the original temp ID and preserved through the temp→real ID swap.
+   *  Undefined for items loaded from the server that were never temp. */
+  _key?: string
   tenant_id: string
   quote_id: string
   scope_library_id: string | null
@@ -78,8 +81,10 @@ function makeTempItem(
   overrides: Partial<ScopeItem> = {},
   sortHint = 0
 ): ScopeItem {
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
   return {
-    id: `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: tempId,
+    _key: tempId,
     tenant_id: tenantId,
     quote_id: quoteId,
     scope_library_id: null,
@@ -228,7 +233,8 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       setItems(prev => [...prev, tempItem])
 
       // Persist in background; swap temp ID with real ID on success
-      const { id: tempId, room: _r, ...postData } = tempItem
+      // Strip client-only fields (_key) before sending to the server
+      const { id: tempId, room: _r, _key: _k, ...postData } = tempItem
       void fetch(`/api/quotes/${quoteId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -247,11 +253,13 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
                 : i
             )
           )
-          // Transfer any edits made while item was temp, then flush to server
+          // Transfer any edits made while item was temp, then flush immediately
+          // (don't re-debounce — we've already been waiting for the POST)
           const tempPending = pendingChanges.current.get(tempId)
           pendingChanges.current.delete(tempId)
           if (tempPending && Object.keys(tempPending).length > 0) {
-            scheduleItemSave(newItem.id, tempPending)
+            pendingChanges.current.set(newItem.id, tempPending)
+            void flushItem(newItem.id)
           }
         })
         .catch(() => {
@@ -261,7 +269,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
       return tempItem
     },
-    [quoteId, tenantId, items, scheduleItemSave]
+    [quoteId, tenantId, items, scheduleItemSave, flushItem]
   )
 
   const deleteItem = useCallback(

@@ -408,7 +408,8 @@ export function RoomSection({
       if (currentIndex < localItems.length - 1) {
         // Focus next row's description
         const nextItem = localItems[currentIndex + 1]
-        const ref = descRefs.current.get(nextItem.id)
+        const stableKey = nextItem._key ?? nextItem.id
+        const ref = descRefs.current.get(stableKey)
         if (ref?.current) {
           ref.current.focus()
         }
@@ -416,7 +417,8 @@ export function RoomSection({
         // Add a new row and focus its description
         if (!isLocked) {
           const newItem = onAddItem(name)
-          pendingFocusId.current = newItem.id
+          // _key is set to the temp ID in makeTempItem and equals .id for new items
+          pendingFocusId.current = newItem._key ?? newItem.id
         }
       }
     },
@@ -644,18 +646,20 @@ export function RoomSection({
               strategy={verticalListSortingStrategy}
             >
               {localItems.map((item, idx) => {
-                // Ensure each item has a stable ref
-                if (!descRefs.current.has(item.id)) {
+                // Use stable key so that the temp→real ID swap doesn't cause unmount/remount
+                const stableKey = item._key ?? item.id
+                // Ensure each item has a stable ref keyed by the stable key
+                if (!descRefs.current.has(stableKey)) {
                   descRefs.current.set(
-                    item.id,
+                    stableKey,
                     { current: null } as React.RefObject<HTMLTextAreaElement | null>
                   )
                 }
-                const dRef = descRefs.current.get(item.id)!
+                const dRef = descRefs.current.get(stableKey)!
 
                 return (
                   <SortableLineItemRow
-                    key={item.id}
+                    key={stableKey}
                     item={item}
                     onUpdate={onUpdateItem}
                     onDelete={onDeleteItem}
@@ -704,7 +708,7 @@ export function RoomSection({
               <button
                 onClick={() => {
                   const newItem = onAddItem(name)
-                  pendingFocusId.current = newItem.id
+                  pendingFocusId.current = newItem._key ?? newItem.id
                 }}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
