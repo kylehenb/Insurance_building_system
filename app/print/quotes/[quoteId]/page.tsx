@@ -132,87 +132,101 @@ export default async function QuotePrintPage({
       <PrintButton />
 
       {/* Document container */}
-      <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
+      <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
         {/* Header */}
-        <div className="border-b-2 border-[#1a1a1a] pb-6 mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2">{tenant.name}</h1>
-              {tenant.address && <p className="text-sm text-[#666]">{tenant.address}</p>}
-              {tenant.contact_email && <p className="text-sm text-[#666]">{tenant.contact_email}</p>}
-              {tenant.contact_phone && <p className="text-sm text-[#666]">{tenant.contact_phone}</p>}
+        <div className="bg-[#f5f0e8] p-6 flex items-center justify-between">
+          {/* Logo on left */}
+          <div className="flex items-center">
+            <img src="/logo.png" alt="Logo" className="h-16 w-auto" />
+          </div>
+          
+          {/* Job details in center and right */}
+          <div className="flex-1 flex justify-end gap-12 text-sm">
+            <div className="text-right">
+              <p className="font-bold text-[#1a1a1a]">Quote Reference</p>
+              <p className="text-[#1a1a1a]">{quote.quote_ref || '-'}</p>
             </div>
             <div className="text-right">
-              <h2 className="text-2xl font-bold text-[#1a1a1a]">QUOTE</h2>
-              {quote.quote_ref && <p className="text-lg text-[#666]">{quote.quote_ref}</p>}
-              <p className="text-sm text-[#666] mt-2">Date: {formatDate(quote.created_at)}</p>
+              <p className="font-bold text-[#1a1a1a]">Date</p>
+              <p className="text-[#1a1a1a]">{formatDate(quote.created_at)}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-[#1a1a1a]">Job Number</p>
+              <p className="text-[#1a1a1a]">{job.job_number}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-[#1a1a1a]">Claim Number</p>
+              <p className="text-[#1a1a1a]">{job.claim_number || '-'}</p>
             </div>
           </div>
         </div>
 
-        {/* Job Details */}
-        <div className="mb-8 p-4 bg-[#f5f0e8] print:bg-gray-50 rounded">
-          <h3 className="text-lg font-bold text-[#1a1a1a] mb-4 border-b border-[#1a1a1a] pb-2">Job Details</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-semibold text-[#666]">Insured Name:</span>
-              <span className="ml-2 text-[#1a1a1a]">{job.insured_name || '-'}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#666]">Property Address:</span>
-              <span className="ml-2 text-[#1a1a1a]">{job.property_address || '-'}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#666]">Claim Number:</span>
-              <span className="ml-2 text-[#1a1a1a]">{job.claim_number || '-'}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#666]">Insurer:</span>
-              <span className="ml-2 text-[#1a1a1a]">{job.insurer || '-'}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#666]">Date of Loss:</span>
-              <span className="ml-2 text-[#1a1a1a]">{formatDate(job.date_of_loss)}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-[#666]">Job Number:</span>
-              <span className="ml-2 text-[#1a1a1a]">{job.job_number}</span>
-            </div>
-          </div>
+        {/* Title */}
+        <div className="py-3 bg-[#f5f0e8]">
+          <h2 className="text-xl font-bold text-[#1a1a1a] text-center">Estimate - Scope of Works</h2>
         </div>
 
-        {/* Scope Items by Room */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-[#1a1a1a] mb-4 border-b border-[#1a1a1a] pb-2">Scope of Works</h3>
-          
+        {/* Scope of Works */}
+        <div className="p-6">
+          {/* Insured Details */}
+          <div className="mb-6 p-4 bg-[#f5f0e8] print:bg-gray-50">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-semibold text-[#666]">Insured Name:</span>
+                <span className="ml-2 text-[#1a1a1a]">{job.insured_name || '-'}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#666]">Property Address:</span>
+                <span className="ml-2 text-[#1a1a1a]">{job.property_address || '-'}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#666]">Claim Number:</span>
+                <span className="ml-2 text-[#1a1a1a]">{job.claim_number || '-'}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#666]">Insurer:</span>
+                <span className="ml-2 text-[#1a1a1a]">{job.insurer || '-'}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#666]">Date of Loss:</span>
+                <span className="ml-2 text-[#1a1a1a]">{formatDate(job.date_of_loss)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Scope Items by Room */}
           {Object.entries(groupedByRoom).map(([room, roomItems]) => (
             <div key={room} className="mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold text-[#1a1a1a]">{room}</h4>
-                <span className="font-mono text-sm text-[#1a1a1a]">{fmt(roomSubtotals[room])}</span>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-8 w-1 bg-[#1a1a1a]"></div>
+                <h4 className="font-bold text-lg text-[#1a1a1a]">{room}</h4>
               </div>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-[#ccc]">
+                  <tr className="border-b-2 border-[#1a1a1a]">
                     <th className="text-left py-2 font-semibold text-[#1a1a1a]">Description</th>
                     <th className="text-center py-2 font-semibold text-[#1a1a1a] w-16">QTY</th>
                     <th className="text-center py-2 font-semibold text-[#1a1a1a] w-16">Unit</th>
-                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Labour/Unit</th>
-                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Materials/Unit</th>
-                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Line Total</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Labour</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Materials</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {roomItems.map((item) => (
-                    <tr key={item.id} className="border-b border-[#eee]">
+                    <tr key={item.id} className="border-b border-[#ddd]">
                       <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
                       <td className="py-2 text-center text-[#1a1a1a]">{item.qty || '-'}</td>
                       <td className="py-2 text-center text-[#1a1a1a]">{item.unit || '-'}</td>
                       <td className="py-2 text-right text-[#1a1a1a]">{fmt(item.rate_labour)}</td>
                       <td className="py-2 text-right text-[#1a1a1a]">{fmt(item.rate_materials)}</td>
-                      <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
+                      <td className="py-2 text-right font-mono font-semibold text-[#1a1a1a]">{fmt(item.line_total)}</td>
                     </tr>
                   ))}
+                  <tr className="border-b-2 border-[#1a1a1a] bg-[#f5f0e8] print:bg-gray-50">
+                    <td colSpan={5} className="py-2 text-right font-bold text-[#1a1a1a]">{room} Subtotal</td>
+                    <td className="py-2 text-right font-mono font-bold text-[#1a1a1a]">{fmt(roomSubtotals[room])}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -221,12 +235,15 @@ export default async function QuotePrintPage({
 
         {/* Special Item Types */}
         {provisionalSumItems.length > 0 && (
-          <div className="mb-6 p-4 bg-[#fff8e1] print:bg-gray-50 rounded border border-[#ffd54f]">
-            <h4 className="font-bold text-[#1a1a1a] mb-2">Provisional Sum Items</h4>
-            <table className="w-full text-sm">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-8 w-1 bg-[#1a1a1a]"></div>
+              <h4 className="font-bold text-lg text-[#1a1a1a]">Provisional Sum Items</h4>
+            </div>
+            <table className="w-full text-sm border-collapse">
               <tbody>
                 {provisionalSumItems.map((item) => (
-                  <tr key={item.id} className="border-b border-[#eee]">
+                  <tr key={item.id} className="border-b border-[#ddd]">
                     <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
                     <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
                   </tr>
@@ -237,12 +254,15 @@ export default async function QuotePrintPage({
         )}
 
         {primeCostItems.length > 0 && (
-          <div className="mb-6 p-4 bg-[#e8f5e9] print:bg-gray-50 rounded border border-[#81c784]">
-            <h4 className="font-bold text-[#1a1a1a] mb-2">Prime Cost Items</h4>
-            <table className="w-full text-sm">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-8 w-1 bg-[#1a1a1a]"></div>
+              <h4 className="font-bold text-lg text-[#1a1a1a]">Prime Cost Items</h4>
+            </div>
+            <table className="w-full text-sm border-collapse">
               <tbody>
                 {primeCostItems.map((item) => (
-                  <tr key={item.id} className="border-b border-[#eee]">
+                  <tr key={item.id} className="border-b border-[#ddd]">
                     <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
                     <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
                   </tr>
@@ -253,12 +273,15 @@ export default async function QuotePrintPage({
         )}
 
         {cashSettlementItems.length > 0 && (
-          <div className="mb-6 p-4 bg-[#ffebee] print:bg-gray-50 rounded border border-[#e57373]">
-            <h4 className="font-bold text-[#1a1a1a] mb-2">Cash Settlement Items</h4>
-            <table className="w-full text-sm">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-8 w-1 bg-[#1a1a1a]"></div>
+              <h4 className="font-bold text-lg text-[#1a1a1a]">Cash Settlement Items</h4>
+            </div>
+            <table className="w-full text-sm border-collapse">
               <tbody>
                 {cashSettlementItems.map((item) => (
-                  <tr key={item.id} className="border-b border-[#eee]">
+                  <tr key={item.id} className="border-b border-[#ddd]">
                     <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
                     <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
                   </tr>
@@ -270,39 +293,59 @@ export default async function QuotePrintPage({
 
         {/* Quote Notes */}
         {quote.notes && (
-          <div className="mb-8 p-4 bg-[#f5f0e8] print:bg-gray-50 rounded">
-            <h3 className="text-lg font-bold text-[#1a1a1a] mb-2 border-b border-[#1a1a1a] pb-2">Notes</h3>
+          <div className="mb-6 p-4 bg-[#f5f0e8] print:bg-gray-50">
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-2">Notes</h3>
             <p className="text-sm text-[#1a1a1a] whitespace-pre-wrap">{quote.notes}</p>
           </div>
         )}
 
         {/* Totals Block */}
-        <div className="mt-8 pt-6 border-t-2 border-[#1a1a1a]">
+        <div className="mb-8 p-6 bg-[#f5f0e8] print:bg-gray-50">
           <div className="flex justify-end">
-            <div className="w-64">
+            <div className="w-72">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#666]">Subtotal</span>
+                <span className="text-sm text-[#1a1a1a]">Subtotal</span>
                 <span className="font-mono text-sm text-[#1a1a1a]">{fmt(subtotal)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#666]">Builder's Margin ({(quote.markup_pct * 100).toFixed(0)}%)</span>
+                <span className="text-sm text-[#1a1a1a]">Builder's Margin ({(quote.markup_pct * 100).toFixed(0)}%)</span>
                 <span className="font-mono text-sm text-[#1a1a1a]">{fmt(markup)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#666]">GST ({(quote.gst_pct * 100).toFixed(0)}%)</span>
+                <span className="text-sm text-[#1a1a1a]">GST ({(quote.gst_pct * 100).toFixed(0)}%)</span>
                 <span className="font-mono text-sm text-[#1a1a1a]">{fmt(gst)}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-[#1a1a1a]">
-                <span className="text-base font-bold text-[#1a1a1a]">Total inc GST</span>
-                <span className="font-mono text-xl font-bold text-[#1a1a1a]">{fmt(total)}</span>
+              <div className="flex justify-between pt-3 border-t-2 border-[#1a1a1a]">
+                <span className="text-lg font-bold text-[#1a1a1a]">Total inc GST</span>
+                <span className="font-mono text-2xl font-bold text-[#1a1a1a]">{fmt(total)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-12 pt-6 border-t border-[#ccc] text-center text-xs text-[#666]">
-          <p>This quote is prepared by {tenant.name}</p>
+        {/* Terms and Conditions */}
+        <div className="mb-6 text-xs text-[#666]">
+          <p className="mb-1">• This quote is valid for 30 days from date of issue.</p>
+          <p className="mb-1">• All works are subject to site inspection and confirmation.</p>
+          <p>• Prices include GST where applicable.</p>
+        </div>
+      </div>
+
+      {/* Black Footer */}
+      <div className="bg-[#1a1a1a] text-white p-6">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto brightness-0 invert" />
+            <div>
+              <p className="font-bold text-lg">IRC Master</p>
+              <p className="text-sm text-gray-300">Insurance Repair Management</p>
+            </div>
+          </div>
+          <div className="text-right text-sm">
+            <p className="mb-1">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
+            <p className="mb-1">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
+            <p>{tenant.address || 'Australia'}</p>
+          </div>
         </div>
       </div>
     </div>
