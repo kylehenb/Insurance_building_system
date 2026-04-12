@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { PrintButton } from './PrintButton'
-import { DraftWatermark } from './DraftWatermark'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
@@ -128,12 +127,9 @@ export default async function QuotePrintPage({
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
   }
 
-  const isDraft = quote.status === 'draft'
-
   return (
     <div className="min-h-screen bg-[#f5f0e8] print:bg-white">
       <PrintButton />
-      <DraftWatermark show={isDraft} />
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">

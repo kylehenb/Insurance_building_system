@@ -128,3 +128,27 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+  }
+  @page {
+    margin: 1cm;
+  }
+  .print\\:hidden {
+    display: none !important;
+  }
+  .print\\:bg-white {
+    background-color: white !important;
+  }
+  .print\\:shadow-none {
+    box-shadow: none !important;
+  }
+  .print\\:min-h-0 {
+    min-height: 0 !important;
+  }
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+}
