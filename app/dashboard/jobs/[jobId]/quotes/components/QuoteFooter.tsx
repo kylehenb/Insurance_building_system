@@ -27,6 +27,7 @@ interface QuoteFooterProps {
   tenantId: string
   cashSettlementActive: boolean
   onCashSettlementToggle: () => void
+  quoteId: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -329,6 +330,7 @@ export function QuoteFooter({
   tenantId,
   cashSettlementActive,
   onCashSettlementToggle,
+  quoteId,
 }: QuoteFooterProps) {
   const [markupLocal, setMarkupLocal] = useState(
     quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20'
@@ -611,7 +613,32 @@ export function QuoteFooter({
           )}
 
           {/* Mark as Ready / Unlock & Edit */}
-          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button
+              onClick={() => window.open(`/print/quotes/${quoteId}`, '_blank')}
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#3a3530',
+                background: '#ffffff',
+                border: '1px solid #d8d0c8',
+                borderRadius: 6,
+                padding: '8px 20px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#c8b89a'
+                e.currentTarget.style.background = '#f5f2ee'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#d8d0c8'
+                e.currentTarget.style.background = '#ffffff'
+              }}
+            >
+              Preview Quote
+            </button>
             {canMarkReady && (
               <button
                 onClick={onMarkReady}

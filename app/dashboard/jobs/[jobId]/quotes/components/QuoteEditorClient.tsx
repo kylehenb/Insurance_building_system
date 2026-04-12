@@ -599,6 +599,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         tenantId={tenantId}
         cashSettlementActive={cashSettlementActive}
         onCashSettlementToggle={handleCashSettlementToggle}
+        quoteId={quoteId}
       />
     </div>
   )
