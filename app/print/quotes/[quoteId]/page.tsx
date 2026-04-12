@@ -156,26 +156,51 @@ export default async function QuotePrintPage({
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        {/* Header - Lighter beige banner with circular logo and key info */}
-        <div className="flex items-center px-6 py-5 bg-[#f0ebe3]">
-          {/* Left: Circular logo */}
-          <div className="flex items-center justify-center w-20 h-20 rounded-full border-2 border-[#1a1a1a] bg-white mr-6">
-            <span className="text-[#1a1a1a] font-bold text-lg tracking-tight">IRC.</span>
+        {/* Header - Single color banner with logo and job details */}
+        <div className="flex bg-[#f0ebe3]">
+          {/* Left: Logo and company name */}
+          <div className="p-4 flex items-center justify-center" style={{ width: '180px', minWidth: '180px' }}>
+            <div className="text-center">
+              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2.5" style={{ width: '138px', height: '138px', objectFit: 'contain' }} />
+              <div className="text-[#6a6460]" style={{ fontSize: '10px', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>Insurance Repair Co.</div>
+            </div>
           </div>
 
-          {/* Right: Key info */}
-          <div className="flex-1 text-right">
-            <div className="text-[15px] font-semibold text-[#1a1a1a] mb-1" style={{ fontFamily: 'DM Mono, monospace' }}>
-              {quote.quote_ref || job.job_number}
+          {/* Right: Job details */}
+          <div className="flex-1 px-6 py-4">
+            {/* Title row */}
+            <div className="flex items-start gap-3 mb-1">
+              <h1 className="text-[22px] font-semibold text-[#1a1a1a]" style={{ fontFamily: 'DM Mono, monospace' }}>
+                {quote.quote_ref || job.job_number}
+              </h1>
             </div>
-            <div className="text-[13px] text-[#3a3530] mb-0.5">
-              Date: {formatDate(quote.created_at)}
-            </div>
-            {job.claim_number && (
-              <div className="text-[13px] text-[#3a3530]">
-                Claim: {job.claim_number}
-              </div>
+            {job.insured_name && (
+              <p className="text-[14px] font-medium text-[#3a3530] mb-0.5">{job.insured_name}</p>
             )}
+            {job.property_address && (
+              <p className="text-[13px] text-[#9e998f] mb-2">{job.property_address}</p>
+            )}
+
+            {/* Compact field strip */}
+            <div className="flex items-center flex-wrap gap-0 text-[12px] text-[#9e998f]">
+              {[
+                { label: 'Insurer',      value: job.insurer },
+                { label: 'Claim #',      value: job.claim_number },
+                { label: 'Loss Type',    value: job.loss_type },
+                { label: 'Date of Loss', value: job.date_of_loss ? formatDate(job.date_of_loss) : '—' },
+                { label: 'Adjuster',     value: job.adjuster },
+                { label: 'Quote Date',   value: formatDate(quote.created_at) },
+              ].filter(item => item.value || item.label === 'Quote Date').map((item, i, arr) => (
+                <span
+                  key={item.label}
+                  className="flex items-center pr-4 mr-4"
+                  style={{ borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}
+                >
+                  <span className="mr-1 text-[#b0a898]">{item.label}:</span>
+                  <span className="text-[#3a3530]">{item.value || '—'}</span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
