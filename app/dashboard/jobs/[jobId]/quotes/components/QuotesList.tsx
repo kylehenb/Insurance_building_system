@@ -328,7 +328,7 @@ export function QuotesList({ jobId, tenantId, insurer, job }: QuotesListProps) {
                   onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#c0bab3')}
                 >
-                  🗑
+                  ✕
                 </button>
 
                 {/* Expand chevron */}

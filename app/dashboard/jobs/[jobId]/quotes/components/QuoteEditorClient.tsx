@@ -110,13 +110,24 @@ function PermitAlert({
 
 // ── Calculations for permit fees ─────────────────────────────────────────────
 
-function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { room: string }> {
-  const hiiRate = Math.max(700, contractExGst * 0.012)
-  const ctfRate = contractExGst * 0.002
-  const bslRate = contractExGst <= 45000 ? 61.65 : contractExGst * 0.00137
-  const councilRate = Math.max(110, contractExGst * 0.0019)
-  const cdcRate = Math.max(1050, contractExGst * 0.00165)
+function calcPreliminaryAmount(formula: string, contractExGst: number): number {
+  switch (formula) {
+    case 'hii':
+      return Math.max(700, contractExGst * 0.012)
+    case 'ctf':
+      return contractExGst * 0.002
+    case 'bsl':
+      return contractExGst <= 45000 ? 61.65 : contractExGst * 0.00137
+    case 'council':
+      return Math.max(110, contractExGst * 0.0019)
+    case 'cdc':
+      return Math.max(1050, contractExGst * 0.00165)
+    default:
+      return 0
+  }
+}
 
+function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { room: string }> {
   return [
     {
       room: 'Preliminaries',
@@ -124,9 +135,10 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
       item_description: `Home Warranty Insurance (HII) — 1.2% of contract value`,
       qty: 1,
       rate_labour: 0,
-      rate_materials: Math.round(hiiRate * 100) / 100,
+      rate_materials: calcPreliminaryAmount('hii', contractExGst),
       unit: 'item',
       is_custom: true,
+      preliminary_formula: 'hii',
     },
     {
       room: 'Preliminaries',
@@ -134,9 +146,10 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
       item_description: `Construction Training Fund Levy (CTF) — 0.2% of contract value`,
       qty: 1,
       rate_labour: 0,
-      rate_materials: Math.round(ctfRate * 100) / 100,
+      rate_materials: calcPreliminaryAmount('ctf', contractExGst),
       unit: 'item',
       is_custom: true,
+      preliminary_formula: 'ctf',
     },
     {
       room: 'Preliminaries',
@@ -144,9 +157,10 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
       item_description: `Building Services Levy (BSL)`,
       qty: 1,
       rate_labour: 0,
-      rate_materials: Math.round(bslRate * 100) / 100,
+      rate_materials: calcPreliminaryAmount('bsl', contractExGst),
       unit: 'item',
       is_custom: true,
+      preliminary_formula: 'bsl',
     },
     {
       room: 'Preliminaries',
@@ -154,9 +168,10 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
       item_description: `Council Building Permit Fee — 0.19% of contract value`,
       qty: 1,
       rate_labour: 0,
-      rate_materials: Math.round(councilRate * 100) / 100,
+      rate_materials: calcPreliminaryAmount('council', contractExGst),
       unit: 'item',
       is_custom: true,
+      preliminary_formula: 'council',
     },
     {
       room: 'Preliminaries',
@@ -164,9 +179,10 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
       item_description: `Private Certifier Fees (CDC) — 0.165% of contract value`,
       qty: 1,
       rate_labour: 0,
-      rate_materials: Math.round(cdcRate * 100) / 100,
+      rate_materials: calcPreliminaryAmount('cdc', contractExGst),
       unit: 'item',
       is_custom: true,
+      preliminary_formula: 'cdc',
     },
   ]
 }

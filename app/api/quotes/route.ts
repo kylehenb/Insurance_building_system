@@ -40,7 +40,18 @@ export async function GET(req: NextRequest) {
         roomSummary[room].subtotal += item.line_total ?? 0
       }
 
-      return { ...quote, item_count: itemCount, room_summary: roomSummary }
+      // Calculate total from room subtotals
+      const calculatedSubtotal = Object.values(roomSummary).reduce((sum, room) => sum + room.subtotal, 0)
+      const calculatedMarkup = calculatedSubtotal * (quote.markup_pct ?? 0.19)
+      const calculatedGst = (calculatedSubtotal + calculatedMarkup) * (quote.gst_pct ?? 0.10)
+      const calculatedTotal = calculatedSubtotal + calculatedMarkup + calculatedGst
+
+      return {
+        ...quote,
+        item_count: itemCount,
+        room_summary: roomSummary,
+        total_amount: calculatedTotal,
+      }
     })
   )
 

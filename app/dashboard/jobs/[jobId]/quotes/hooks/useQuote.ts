@@ -30,6 +30,7 @@ export interface ScopeItem {
   approval_status: string
   is_custom: boolean
   library_writeback_approved: boolean
+  preliminary_formula: string | null
   sort_order: number
   created_at: string
 }
@@ -106,6 +107,7 @@ function makeTempItem(
     approval_status: 'pending',
     is_custom: true,
     library_writeback_approved: false,
+    preliminary_formula: null,
     sort_order: sortHint,
     created_at: new Date().toISOString(),
     ...overrides,
@@ -199,6 +201,72 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     },
     [flushItem]
   )
+
+  // Recalculate preliminary items when subtotal changes
+  useEffect(() => {
+    if (!quote || items.length === 0) return
+
+    // Calculate subtotal excluding preliminary items to avoid circular dependency
+    const nonPrelimItems = items.filter(i => !i.preliminary_formula || i.room !== 'Preliminaries')
+    const subtotal = nonPrelimItems.reduce((sum, i) => sum + (i.line_total ?? 0), 0)
+    const prelimItems = items.filter(i => i.preliminary_formula && i.room === 'Preliminaries')
+
+    if (prelimItems.length === 0) return
+
+    // Calculate new amounts for each preliminary item based on its formula
+    const updatedItems = items.map(item => {
+      if (!item.preliminary_formula || item.room !== 'Preliminaries') return item
+
+      let newRate = 0
+      switch (item.preliminary_formula) {
+        case 'hii':
+          newRate = Math.max(700, subtotal * 0.012)
+          break
+        case 'ctf':
+          newRate = subtotal * 0.002
+          break
+        case 'bsl':
+          newRate = subtotal <= 45000 ? 61.65 : subtotal * 0.00137
+          break
+        case 'council':
+          newRate = Math.max(110, subtotal * 0.0019)
+          break
+        case 'cdc':
+          newRate = Math.max(1050, subtotal * 0.00165)
+          break
+        default:
+          return item
+      }
+
+      newRate = Math.round(newRate * 100) / 100
+      const newLineTotal = item.qty ? item.qty * newRate : newRate
+
+      return {
+        ...item,
+        rate_materials: newRate,
+        line_total: newLineTotal,
+      }
+    })
+
+    // Only update if values actually changed
+    const hasChanges = updatedItems.some(
+      (updated, idx) => updated.rate_materials !== items[idx].rate_materials
+    )
+
+    if (hasChanges) {
+      setItems(updatedItems)
+
+      // Persist the changes to the server
+      updatedItems.forEach(item => {
+        if (item.preliminary_formula && !item.id.startsWith('temp-')) {
+          scheduleItemSave(item.id, {
+            rate_materials: item.rate_materials,
+            line_total: item.line_total,
+          })
+        }
+      })
+    }
+  }, [items, quote, scheduleItemSave])
 
   const updateItemLocal = useCallback(
     (itemId: string, changes: Record<string, unknown>) => {
