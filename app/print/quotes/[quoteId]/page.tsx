@@ -333,16 +333,18 @@ export default async function QuotePrintPage({
         </div>
       </div>
 
-      <style jsx global>{`
-        @media print {
-          body {
-            background: white !important;
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            body {
+              background: white !important;
+            }
+            @page {
+              margin: 1cm;
+            }
           }
-          @page {
-            margin: 1cm;
-          }
-        }
-      `}</style>
+        `
+      }} />
     </div>
   )
 }
