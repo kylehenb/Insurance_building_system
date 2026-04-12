@@ -91,6 +91,29 @@ export default async function QuotePrintPage({
     })
   }
 
+  const items = (scopeItems || []).sort((a, b) => a.sort_order - b.sort_order)
+
+  // Group items by room
+  const groupedByRoom = items.reduce((acc, item) => {
+    const room = item.room || 'Unassigned'
+    if (!acc[room]) {
+      acc[room] = []
+    }
+    acc[room].push(item)
+    return acc
+  }, {} as Record<string, ScopeItem[]>)
+
+  // Calculate room subtotals
+  const roomSubtotals = Object.entries(groupedByRoom).reduce((acc, [room, roomItems]) => {
+    acc[room] = roomItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+    return acc
+  }, {} as Record<string, number>)
+
+  const fmt = (v: number | null | undefined) => {
+    if (v == null) return '$0.00'
+    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
+  }
+
   return (
     <div className="min-h-screen bg-[#f5f0e8] print:bg-white">
       {/* Document container */}
@@ -143,7 +166,45 @@ export default async function QuotePrintPage({
           </div>
         </div>
 
-        <p>Job details rendering works. Now adding scope items...</p>
+        {/* Scope Items by Room */}
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-[#1a1a1a] mb-4 border-b border-[#1a1a1a] pb-2">Scope of Works</h3>
+          
+          {Object.entries(groupedByRoom).map(([room, roomItems]) => (
+            <div key={room} className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-semibold text-[#1a1a1a]">{room}</h4>
+                <span className="font-mono text-sm text-[#1a1a1a]">{fmt(roomSubtotals[room])}</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#ccc]">
+                    <th className="text-left py-2 font-semibold text-[#1a1a1a]">Description</th>
+                    <th className="text-center py-2 font-semibold text-[#1a1a1a] w-16">QTY</th>
+                    <th className="text-center py-2 font-semibold text-[#1a1a1a] w-16">Unit</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Labour/Unit</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Materials/Unit</th>
+                    <th className="text-right py-2 font-semibold text-[#1a1a1a] w-24">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roomItems.map((item) => (
+                    <tr key={item.id} className="border-b border-[#eee]">
+                      <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
+                      <td className="py-2 text-center text-[#1a1a1a]">{item.qty || '-'}</td>
+                      <td className="py-2 text-center text-[#1a1a1a]">{item.unit || '-'}</td>
+                      <td className="py-2 text-right text-[#1a1a1a]">{fmt(item.rate_labour)}</td>
+                      <td className="py-2 text-right text-[#1a1a1a]">{fmt(item.rate_materials)}</td>
+                      <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        <p>Scope items rendering works. Now adding totals...</p>
       </div>
     </div>
   )
