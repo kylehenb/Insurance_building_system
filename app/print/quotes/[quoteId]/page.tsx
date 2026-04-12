@@ -141,66 +141,66 @@ export default async function QuotePrintPage({
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        {/* Header - Black background like sidebar */}
-        <div className="bg-[#1a1a1a] p-6">
-          <div className="flex justify-between items-start">
-            {/* Logo and company name on left */}
-            <div className="flex items-center gap-4">
-              <img src="/logo.png" alt="IRC Logo" className="h-16 w-auto brightness-0 invert" />
-              <div>
-                <p className="text-white font-bold text-sm tracking-widest uppercase">Insurance Repair Co.</p>
-              </div>
-            </div>
-            
-            {/* Quote details on right - external facing only */}
-            <div className="text-right text-sm">
-              <div className="mb-2">
-                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Quote Reference</p>
-                <p className="text-white font-mono font-semibold">{quote.quote_ref || '-'}</p>
-              </div>
-              <div className="mb-2">
-                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Date</p>
-                <p className="text-white">{formatDate(quote.created_at)}</p>
-              </div>
-              <div className="mb-2">
-                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Job Number</p>
-                <p className="text-white font-mono">{job.job_number}</p>
-              </div>
-              <div className="mb-2">
-                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Claim Number</p>
-                <p className="text-white">{job.claim_number || '-'}</p>
-              </div>
-              <div className="mb-2">
-                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Insurer</p>
-                <p className="text-white">{job.insurer || '-'}</p>
-              </div>
+        {/* Header - Split layout: black left with logo, white right with job details */}
+        <div className="flex">
+          {/* Left: Black background with logo and company name */}
+          <div className="bg-[#1a1a1a] p-4 flex items-center justify-center" style={{ width: '180px', minWidth: '180px' }}>
+            <div className="text-center">
+              <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto brightness-0 invert mx-auto mb-2" />
+              <p className="text-white font-bold text-[10px] tracking-widest uppercase leading-tight">Insurance Repair Co.</p>
             </div>
           </div>
-        </div>
 
-        {/* Insured Section */}
-        <div className="p-6 bg-[#f5f2ee] mb-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Insured</p>
-              <p className="text-[#3a3530] font-medium">{job.insured_name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Property Address</p>
-              <p className="text-[#3a3530]">{job.property_address || '-'}</p>
-            </div>
-            {job.date_of_loss && (
+          {/* Right: White background with all job details */}
+          <div className="flex-1 bg-white p-4">
+            <div className="grid grid-cols-4 gap-x-6 gap-y-2 text-sm">
               <div>
-                <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Date of Loss</p>
-                <p className="text-[#3a3530]">{formatDate(job.date_of_loss)}</p>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Quote Reference</p>
+                <p className="text-[#3a3530] font-mono font-semibold">{quote.quote_ref || '-'}</p>
               </div>
-            )}
-            {job.loss_type && (
               <div>
-                <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Loss Type</p>
-                <p className="text-[#3a3530]">{job.loss_type}</p>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Date</p>
+                <p className="text-[#3a3530]">{formatDate(quote.created_at)}</p>
               </div>
-            )}
+              <div>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Job Number</p>
+                <p className="text-[#3a3530] font-mono">{job.job_number}</p>
+              </div>
+              <div>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Claim Number</p>
+                <p className="text-[#3a3530]">{job.claim_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Insured</p>
+                <p className="text-[#3a3530] font-medium">{job.insured_name || '-'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Property Address</p>
+                <p className="text-[#3a3530]">{job.property_address || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Insurer</p>
+                <p className="text-[#3a3530]">{job.insurer || '-'}</p>
+              </div>
+              {job.date_of_loss && (
+                <div>
+                  <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Date of Loss</p>
+                  <p className="text-[#3a3530]">{formatDate(job.date_of_loss)}</p>
+                </div>
+              )}
+              {job.loss_type && (
+                <div>
+                  <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Loss Type</p>
+                  <p className="text-[#3a3530]">{job.loss_type}</p>
+                </div>
+              )}
+              {job.adjuster && (
+                <div>
+                  <p className="text-[#9e998f] text-[10px] uppercase tracking-wider mb-0.5">Adjuster</p>
+                  <p className="text-[#3a3530]">{job.adjuster}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
