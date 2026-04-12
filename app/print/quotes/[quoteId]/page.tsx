@@ -159,17 +159,17 @@ export default async function QuotePrintPage({
         {/* Header - Split layout: black left with logo, white right with job details */}
         <div className="flex">
           {/* Left: Black background with logo and company name - exactly as sidebar */}
-          <div className="bg-[#1a1a1a] p-6 flex items-center justify-center" style={{ width: '180px', minWidth: '180px' }}>
+          <div className="bg-[#1a1a1a] p-4 flex items-center justify-center" style={{ width: '160px', minWidth: '160px' }}>
             <div className="text-center">
-              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2.5" style={{ width: '138px', height: '138px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
-              <div className="text-[#6a6460]" style={{ fontSize: '10px', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center' }}>Insurance Repair Co.</div>
+              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2" style={{ width: '90px', height: '90px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+              <div className="text-[#6a6460]" style={{ fontSize: '10px', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>Insurance Repair Co.</div>
             </div>
           </div>
 
           {/* Right: White background with job details - matching job detail shell layout */}
-          <div className="flex-1 bg-white px-6 py-5">
+          <div className="flex-1 bg-white px-6 py-4">
             {/* Title row */}
-            <div className="flex items-start gap-3 mb-2">
+            <div className="flex items-start gap-3 mb-1">
               <h1 className="text-[22px] font-semibold text-[#1a1a1a]" style={{ fontFamily: 'DM Mono, monospace' }}>
                 {quote.quote_ref || job.job_number}
               </h1>
@@ -178,7 +178,7 @@ export default async function QuotePrintPage({
               <p className="text-[14px] font-medium text-[#3a3530] mb-0.5">{job.insured_name}</p>
             )}
             {job.property_address && (
-              <p className="text-[13px] text-[#9e998f] mb-3">{job.property_address}</p>
+              <p className="text-[13px] text-[#9e998f] mb-2">{job.property_address}</p>
             )}
 
             {/* Compact field strip */}
@@ -204,6 +204,11 @@ export default async function QuotePrintPage({
           </div>
         </div>
 
+        {/* Title */}
+        <div className="px-6 py-2 bg-white">
+          <h2 className="text-base font-semibold text-[#1a1a1a]">Estimate - Scope of Works</h2>
+        </div>
+
         {/* Scope Items by Room */}
         <div className="px-6 pb-6">
           {sortedRooms.map((room) => {
@@ -221,22 +226,24 @@ export default async function QuotePrintPage({
             return (
               <div key={room} className="mb-6">
                 {/* Room header with dimensions */}
-                <div className="bg-[#e8e0d5] p-3 border-t-2 border-[#d0c8bc] flex justify-between items-center">
-                  <h4 className="font-semibold text-[#3a3530] text-sm">{room}</h4>
-                  {hasDimensions && (
-                    <span className="text-xs text-[#9e998f] font-mono">{roomSizeStr}</span>
-                  )}
+                <div className="bg-[#e8e0d5] p-3 border-t-2 border-[#d0c8bc]">
+                  <h4 className="font-semibold text-[#3a3530] text-sm">
+                    {room}
+                    {hasDimensions && (
+                      <span className="text-xs text-[#9e998f] font-mono ml-2">{roomSizeStr}</span>
+                    )}
+                  </h4>
                 </div>
                 
                 {/* Table */}
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                      <th className="text-left py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%' }}>Description</th>
-                      <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-16">Qty</th>
-                      <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-16">Unit</th>
-                      <th className="text-left py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider">Trade</th>
-                      <th className="text-right py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-24">Line Total</th>
+                      <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%' }}>Description</th>
+                      <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Qty</th>
+                      <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Unit</th>
+                      <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider">Trade</th>
+                      <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-28">Line Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -251,16 +258,16 @@ export default async function QuotePrintPage({
                           className="border-b border-[#f0ece6]"
                           style={{ borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent' }}
                         >
-                          <td className="py-2 px-3 text-[#3a3530]">
+                          <td className="py-2 px-2 text-[#3a3530]">
                             {item.item_description || '-'}
                           </td>
-                          <td className="py-2 px-3 text-center text-[#3a3530]">{item.qty || '-'}</td>
-                          <td className="py-2 px-3 text-center text-[#3a3530]">{item.unit || '-'}</td>
-                          <td className="py-2 px-3 text-left text-[#3a3530]">{item.trade || '-'}</td>
-                          <td className="py-2 px-3 text-right text-[#3a3530] font-mono">
+                          <td className="py-2 px-2 text-center text-[#3a3530]">{item.qty || '-'}</td>
+                          <td className="py-2 px-2 text-center text-[#3a3530]">{item.unit || '-'}</td>
+                          <td className="py-2 px-2 text-left text-[#3a3530]">{item.trade || '-'}</td>
+                          <td className="py-2 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap">
                             {typeInfo && (
                               <span
-                                className="inline-block mr-1 px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                className="inline-block mr-1 px-1 py-0.5 rounded text-[8px] font-bold"
                                 style={{ 
                                   background: `${leftBorderColor}22`, 
                                   color: typeInfo.color 
