@@ -8,6 +8,14 @@ type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
+type ItemType = 'provisional_sum' | 'prime_cost' | 'cash_settlement' | null
+
+const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, { label: string; pill: string; color: string; border: string }> = {
+  provisional_sum: { label: 'Provisional Sum', pill: 'PS', color: '#b45309', border: '#f59e0b' },
+  prime_cost:      { label: 'Prime Cost',      pill: 'PC', color: '#1a73e8', border: '#60a5fa' },
+  cash_settlement: { label: 'Cash Settlement', pill: 'CS', color: '#64748b', border: '#94a3b8' },
+}
+
 export default async function QuotePrintPage({
   params,
 }: {
@@ -128,104 +136,191 @@ export default async function QuotePrintPage({
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] print:bg-white">
+    <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       <PrintButton />
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        {/* Header - Beige banner with black logo */}
-        <div className="bg-[#f5f0e8] p-6">
-          <div className="flex justify-between items-center">
-            {/* Logo on left */}
-            <img src="/logo.png" alt="IRC Logo" className="h-16 w-auto" />
+        {/* Header - Black background like sidebar */}
+        <div className="bg-[#1a1a1a] p-6">
+          <div className="flex justify-between items-start">
+            {/* Logo and company name on left */}
+            <div className="flex items-center gap-4">
+              <img src="/logo.png" alt="IRC Logo" className="h-16 w-auto brightness-0 invert" />
+              <div>
+                <p className="text-white font-bold text-sm tracking-widest uppercase">Insurance Repair Co.</p>
+              </div>
+            </div>
             
-            {/* Job details in center and right */}
-            <div className="flex-1 flex justify-end gap-8 text-sm">
-              <div className="text-center">
-                <p className="font-bold text-[#1a1a1a]">Quote Reference</p>
-                <p className="text-[#1a1a1a]">{quote.quote_ref || '-'}</p>
+            {/* Quote details on right - external facing only */}
+            <div className="text-right text-sm">
+              <div className="mb-2">
+                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Quote Reference</p>
+                <p className="text-white font-mono font-semibold">{quote.quote_ref || '-'}</p>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-[#1a1a1a]">Date</p>
-                <p className="text-[#1a1a1a]">{formatDate(quote.created_at)}</p>
+              <div className="mb-2">
+                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Date</p>
+                <p className="text-white">{formatDate(quote.created_at)}</p>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-[#1a1a1a]">Job Number</p>
-                <p className="text-[#1a1a1a]">{job.job_number}</p>
+              <div className="mb-2">
+                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Job Number</p>
+                <p className="text-white font-mono">{job.job_number}</p>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-[#1a1a1a]">Claim Number</p>
-                <p className="text-[#1a1a1a]">{job.claim_number || '-'}</p>
+              <div className="mb-2">
+                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Claim Number</p>
+                <p className="text-white">{job.claim_number || '-'}</p>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-[#1a1a1a]">Insurer</p>
-                <p className="text-[#1a1a1a]">{job.insurer || '-'}</p>
+              <div className="mb-2">
+                <p className="text-[#6a6460] text-xs uppercase tracking-wider">Insurer</p>
+                <p className="text-white">{job.insurer || '-'}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Title */}
-        <div className="py-2 bg-white">
-          <h2 className="text-lg font-bold text-[#1a1a1a] text-center">Estimate - Scope of Works</h2>
-        </div>
-
         {/* Insured Section */}
-        <div className="p-6 bg-[#f5f0e8] mb-4">
-          <h3 className="font-bold text-[#1a1a1a] mb-2">Insured</h3>
-          <p className="text-[#1a1a1a]">{job.insured_name || '-'}</p>
-          <p className="text-[#1a1a1a]">{job.property_address || '-'}</p>
+        <div className="p-6 bg-[#f5f2ee] mb-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Insured</p>
+              <p className="text-[#3a3530] font-medium">{job.insured_name || '-'}</p>
+            </div>
+            <div>
+              <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Property Address</p>
+              <p className="text-[#3a3530]">{job.property_address || '-'}</p>
+            </div>
+            {job.date_of_loss && (
+              <div>
+                <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Date of Loss</p>
+                <p className="text-[#3a3530]">{formatDate(job.date_of_loss)}</p>
+              </div>
+            )}
+            {job.loss_type && (
+              <div>
+                <p className="text-[#9e998f] text-xs uppercase tracking-wider mb-1">Loss Type</p>
+                <p className="text-[#3a3530]">{job.loss_type}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Scope Items by Room */}
         <div className="px-6 pb-6">
           {Object.entries(groupedByRoom).map(([room, roomItems]) => (
             <div key={room} className="mb-6">
-              <div className="bg-[#f5f0e8] p-4">
-                <h4 className="font-bold text-[#1a1a1a] mb-3">{room}</h4>
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#1a1a1a]">
-                      <th className="text-left py-2 font-bold text-[#1a1a1a]">DESCRIPTION</th>
-                      <th className="text-center py-2 font-bold text-[#1a1a1a] w-16">QTY</th>
-                      <th className="text-center py-2 font-bold text-[#1a1a1a] w-16">UNIT</th>
-                      <th className="text-right py-2 font-bold text-[#1a1a1a] w-32">LABOUR, MATERIALS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {roomItems.map((item) => (
-                      <tr key={item.id} className="border-b border-[#ccc]">
-                        <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
-                        <td className="py-2 text-center text-[#1a1a1a]">{item.qty || '-'}</td>
-                        <td className="py-2 text-center text-[#1a1a1a]">{item.unit || '-'}</td>
-                        <td className="py-2 text-right text-[#1a1a1a]">{fmt(item.line_total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Room header */}
+              <div className="bg-[#e8e0d5] p-3 border-t-2 border-[#d0c8bc]">
+                <h4 className="font-semibold text-[#3a3530] text-sm">{room}</h4>
               </div>
+              
+              {/* Table */}
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
+                    <th className="text-left py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider">Description</th>
+                    <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-16">Qty</th>
+                    <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-16">Unit</th>
+                    <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-24">Labour/Unit</th>
+                    <th className="text-center py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-24">Materials/Unit</th>
+                    <th className="text-left py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-28">Trade</th>
+                    <th className="text-right py-2 px-3 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-20">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roomItems.map((item) => {
+                    const itemType = item.item_type as ItemType
+                    const typeInfo = itemType ? ITEM_TYPE_LABELS[itemType] : null
+                    const leftBorderColor = typeInfo?.border ?? 'transparent'
+                    
+                    return (
+                      <tr 
+                        key={item.id} 
+                        className="border-b border-[#f0ece6]"
+                        style={{ borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent' }}
+                      >
+                        <td className="py-2 px-3 text-[#3a3530]">
+                          {item.item_description || '-'}
+                        </td>
+                        <td className="py-2 px-3 text-center text-[#3a3530]">{item.qty || '-'}</td>
+                        <td className="py-2 px-3 text-center text-[#3a3530]">{item.unit || '-'}</td>
+                        <td className="py-2 px-3 text-right text-[#3a3530] font-mono">{fmt(item.rate_labour)}</td>
+                        <td className="py-2 px-3 text-right text-[#3a3530] font-mono">{fmt(item.rate_materials)}</td>
+                        <td className="py-2 px-3 text-left text-[#3a3530]">{item.trade || '-'}</td>
+                        <td className="py-2 px-3 text-right text-[#3a3530] font-mono">
+                          {typeInfo && (
+                            <span
+                              className="inline-block mr-1 px-1.5 py-0.5 rounded text-[9px] font-bold"
+                              style={{ 
+                                background: `${leftBorderColor}22`, 
+                                color: typeInfo.color 
+                              }}
+                            >
+                              {typeInfo.pill}
+                            </span>
+                          )}
+                          {fmt(item.line_total)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           ))}
         </div>
 
-        {/* Totals Section */}
-        <div className="px-6 pb-6">
-          <div className="bg-[#f5f0e8] p-4">
-            <div className="flex justify-end">
-              <div className="w-64">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm text-[#1a1a1a]">SUBTOTAL</span>
-                  <span className="font-mono text-sm text-[#1a1a1a]">{fmt(subtotal)}</span>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm text-[#1a1a1a]">GST</span>
-                  <span className="font-mono text-sm text-[#1a1a1a]">{fmt(gst)}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-[#1a1a1a]">
-                  <span className="text-base font-bold text-[#1a1a1a]">TOTAL</span>
-                  <span className="font-mono text-lg font-bold text-[#1a1a1a]">{fmt(total)}</span>
-                </div>
+        {/* Footer Section - Notes left, Totals right */}
+        <div className="px-6 pb-6 border-t border-[#e0dbd4] bg-white">
+          <div className="flex gap-6">
+            {/* Notes - Left column */}
+            <div className="flex-1">
+              <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2">Notes</p>
+              <div className="text-sm text-[#3a3530] whitespace-pre-wrap">{quote.notes || ''}</div>
+            </div>
+
+            {/* Totals - Right column */}
+            <div className="w-72">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#9e998f]">Subtotal</span>
+                <span className="font-mono text-sm text-[#3a3530]">{fmt(subtotal)}</span>
               </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#9e998f]">Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
+                <span className="font-mono text-sm text-[#3a3530]">{fmt(markup)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#9e998f]">GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
+                <span className="font-mono text-sm text-[#3a3530]">{fmt(gst)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
+                <span className="text-base font-semibold text-[#3a3530]">Total inc GST</span>
+                <span className="font-mono text-lg font-bold text-[#3a3530]">{fmt(total)}</span>
+              </div>
+
+              {/* Informational breakdown for special item types */}
+              {(provisionalSumItems.length > 0 || primeCostItems.length > 0 || cashSettlementItems.length > 0) && (
+                <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
+                  <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
+                  {provisionalSumItems.length > 0 && (
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#9e998f]">Provisional Sum Items</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    </div>
+                  )}
+                  {primeCostItems.length > 0 && (
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#9e998f]">Prime Cost Items</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    </div>
+                  )}
+                  {cashSettlementItems.length > 0 && (
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#9e998f]">Cash Settlement Items</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -237,13 +332,13 @@ export default async function QuotePrintPage({
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto brightness-0 invert" />
             <div>
-              <p className="font-bold text-lg">{quote.quote_ref || 'IRC'}</p>
-              <p className="text-sm text-gray-300">{tenant.name}</p>
+              <p className="font-bold text-sm tracking-widest uppercase">{tenant.name}</p>
+              <p className="text-xs text-[#6a6460]">Insurance Repair Co.</p>
             </div>
           </div>
           <div className="text-right text-sm">
-            <p className="mb-1">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
-            <p>EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
+            <p className="text-[#6a6460]">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
+            <p className="text-[#6a6460]">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
           </div>
         </div>
       </div>
