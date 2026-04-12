@@ -103,19 +103,50 @@ export default async function QuotePrintPage({
     return acc
   }, {} as Record<string, ScopeItem[]>)
 
+  // Calculate totals
+  const subtotal = items.reduce((sum, item) => sum + (item.line_total || 0), 0)
+  const markup = subtotal * (quote.markup_pct || 0.2)
+  const subtotalAfterMarkup = subtotal + markup
+  const gst = subtotalAfterMarkup * (quote.gst_pct || 0.1)
+  const total = subtotalAfterMarkup + gst
+
   // Calculate room subtotals
   const roomSubtotals = Object.entries(groupedByRoom).reduce((acc, [room, roomItems]) => {
     acc[room] = roomItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
     return acc
   }, {} as Record<string, number>)
 
+  // Group special item types
+  const provisionalSumItems = items.filter(i => i.item_type === 'provisional_sum')
+  const primeCostItems = items.filter(i => i.item_type === 'prime_cost')
+  const cashSettlementItems = items.filter(i => i.item_type === 'cash_settlement')
+
   const fmt = (v: number | null | undefined) => {
     if (v == null) return '$0.00'
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
   }
 
+  const isDraft = quote.status === 'draft'
+
   return (
     <div className="min-h-screen bg-[#f5f0e8] print:bg-white">
+      {/* Floating print button - hidden on print */}
+      <button
+        onClick={() => window.print()}
+        className="fixed top-4 right-4 z-50 bg-[#1a1a1a] text-[#f5f0e8] px-4 py-2 rounded-lg font-medium hover:bg-[#333] transition-colors print:hidden"
+      >
+        Print / Save as PDF
+      </button>
+
+      {/* DRAFT watermark */}
+      {isDraft && (
+        <div className="fixed inset-0 pointer-events-none flex items-center justify-center print:hidden z-40">
+          <div className="text-[#d0d0d0] text-9xl font-bold opacity-20 rotate-[-45deg] whitespace-nowrap">
+            DRAFT
+          </div>
+        </div>
+      )}
+
       {/* Document container */}
       <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
         {/* Header */}
@@ -204,8 +235,105 @@ export default async function QuotePrintPage({
           ))}
         </div>
 
-        <p>Scope items rendering works. Now adding totals...</p>
+        {/* Special Item Types */}
+        {provisionalSumItems.length > 0 && (
+          <div className="mb-6 p-4 bg-[#fff8e1] print:bg-gray-50 rounded border border-[#ffd54f]">
+            <h4 className="font-bold text-[#1a1a1a] mb-2">Provisional Sum Items</h4>
+            <table className="w-full text-sm">
+              <tbody>
+                {provisionalSumItems.map((item) => (
+                  <tr key={item.id} className="border-b border-[#eee]">
+                    <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
+                    <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {primeCostItems.length > 0 && (
+          <div className="mb-6 p-4 bg-[#e8f5e9] print:bg-gray-50 rounded border border-[#81c784]">
+            <h4 className="font-bold text-[#1a1a1a] mb-2">Prime Cost Items</h4>
+            <table className="w-full text-sm">
+              <tbody>
+                {primeCostItems.map((item) => (
+                  <tr key={item.id} className="border-b border-[#eee]">
+                    <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
+                    <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {cashSettlementItems.length > 0 && (
+          <div className="mb-6 p-4 bg-[#ffebee] print:bg-gray-50 rounded border border-[#e57373]">
+            <h4 className="font-bold text-[#1a1a1a] mb-2">Cash Settlement Items</h4>
+            <table className="w-full text-sm">
+              <tbody>
+                {cashSettlementItems.map((item) => (
+                  <tr key={item.id} className="border-b border-[#eee]">
+                    <td className="py-2 text-[#1a1a1a]">{item.item_description || '-'}</td>
+                    <td className="py-2 text-right font-mono text-[#1a1a1a]">{fmt(item.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Quote Notes */}
+        {quote.notes && (
+          <div className="mb-8 p-4 bg-[#f5f0e8] print:bg-gray-50 rounded">
+            <h3 className="text-lg font-bold text-[#1a1a1a] mb-2 border-b border-[#1a1a1a] pb-2">Notes</h3>
+            <p className="text-sm text-[#1a1a1a] whitespace-pre-wrap">{quote.notes}</p>
+          </div>
+        )}
+
+        {/* Totals Block */}
+        <div className="mt-8 pt-6 border-t-2 border-[#1a1a1a]">
+          <div className="flex justify-end">
+            <div className="w-64">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#666]">Subtotal</span>
+                <span className="font-mono text-sm text-[#1a1a1a]">{fmt(subtotal)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#666]">Builder's Margin ({(quote.markup_pct * 100).toFixed(0)}%)</span>
+                <span className="font-mono text-sm text-[#1a1a1a]">{fmt(markup)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[#666]">GST ({(quote.gst_pct * 100).toFixed(0)}%)</span>
+                <span className="font-mono text-sm text-[#1a1a1a]">{fmt(gst)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-[#1a1a1a]">
+                <span className="text-base font-bold text-[#1a1a1a]">Total inc GST</span>
+                <span className="font-mono text-xl font-bold text-[#1a1a1a]">{fmt(total)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 pt-6 border-t border-[#ccc] text-center text-xs text-[#666]">
+          <p>This quote is prepared by {tenant.name}</p>
+        </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            body {
+              background: white !important;
+            }
+            @page {
+              margin: 1cm;
+            }
+          }
+        `
+      }} />
     </div>
   )
 }
