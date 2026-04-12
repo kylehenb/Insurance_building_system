@@ -9,6 +9,22 @@ import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
 import { useTrades } from '../hooks/useTrades'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface JobInfo {
   job_number: string
@@ -23,6 +39,7 @@ interface QuoteEditorClientProps {
   tenantId: string
   job: JobInfo
   inline?: boolean
+  onQuoteUpdated?: () => void
 }
 
 // ── 20k Permit Alert ────────────────────────────────────────────────────────
@@ -189,7 +206,7 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
 
 // ── Main editor ──────────────────────────────────────────────────────────────
 
-export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: QuoteEditorClientProps) {
+export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuoteUpdated }: QuoteEditorClientProps) {
   const {
     quote,
     rooms,
@@ -208,6 +225,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
     renameRoom,
     updateQuoteMeta,
     reorderItems,
+    reorderRooms,
     setAllItemTypes,
   } = useQuote({ quoteId, tenantId })
 
@@ -216,6 +234,10 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
 
   // Local-only rooms (added locally, no items yet)
   const [pendingRooms, setPendingRooms] = useState<Array<{ name: string; autoFocus: boolean }>>([])
+
+  // Room drag-and-drop state
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
+  const [dragRoomOrder, setDragRoomOrder] = useState<string[]>([])
 
   // Permit alert: dismissed in session (before persisting to DB)
   const [sessionPermitDismissed, setSessionPermitDismissed] = useState(false)
@@ -269,7 +291,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
   const handlePermitDismiss = useCallback(async () => {
     setSessionPermitDismissed(true)
     await updateQuoteMeta({ permit_block_dismissed: true })
-  }, [updateQuoteMeta])
+    onQuoteUpdated?.()
+  }, [updateQuoteMeta, onQuoteUpdated])
 
   const handleAddPreliminaries = useCallback(() => {
     setSessionPermitDismissed(true)
@@ -291,6 +314,88 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
       await setAllItemTypes('cash_settlement')
     }
   }, [cashSettlementActive, setAllItemTypes])
+
+  // Wrap updateQuoteMeta to call onQuoteUpdated when status changes
+  const handleUpdateQuoteMeta = useCallback(
+    async (changes: Parameters<typeof updateQuoteMeta>[0]) => {
+      await updateQuoteMeta(changes)
+      if ('status' in changes) {
+        onQuoteUpdated?.()
+      }
+    },
+    [updateQuoteMeta, onQuoteUpdated]
+  )
+
+  // Room drag-and-drop handlers
+  const roomSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  const handleRoomDragStart = useCallback((event: DragStartEvent) => {
+    setActiveRoomId(String(event.active.id))
+    setDragRoomOrder(rooms.map(r => r.name))
+  }, [rooms])
+
+  const handleRoomDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      setActiveRoomId(null)
+      if (!over || active.id === over.id) return
+
+      const oldIndex = dragRoomOrder.findIndex(r => r === active.id)
+      const newIndex = dragRoomOrder.findIndex(r => r === over.id)
+      const reordered = arrayMove(dragRoomOrder, oldIndex, newIndex)
+      reorderRooms(reordered)
+    },
+    [dragRoomOrder, reorderRooms]
+  )
+
+  // Draggable room wrapper component
+  function SortableRoomSection({
+    room,
+  }: {
+    room: { name: string; items: ScopeItem[] }
+  }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: room.name, disabled: isLocked })
+
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style}>
+        <RoomSection
+          name={room.name}
+          items={room.items}
+          onUpdateItem={updateItemLocal}
+          onDeleteItem={handleDeleteItem}
+          onAddItem={handleAddItem}
+          onUpdateDimensions={updateRoomDimensions}
+          onRenameRoom={renameRoom}
+          onDeleteRoom={() => {
+            if (!window.confirm(`Delete room "${room.name}" and all items?`)) return
+            room.items.forEach(i => deleteItem(i.id))
+          }}
+          onReorderItems={reorderItems}
+          search={search}
+          isLocked={isLocked}
+          insurer={job.insurer}
+          trades={trades}
+          dragListeners={listeners}
+          dragAttributes={attributes}
+        />
+      </div>
+    )
+  }
 
   // Sync permitDismissed from quote when loaded
   useEffect(() => {
@@ -398,27 +503,21 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
       {/* Content */}
       <div style={{ background: '#f5f2ee' }}>
         {/* Rooms with items */}
-        {rooms.map(room => (
-          <RoomSection
-            key={room.name}
-            name={room.name}
-            items={room.items}
-            onUpdateItem={updateItemLocal}
-            onDeleteItem={handleDeleteItem}
-            onAddItem={handleAddItem}
-            onUpdateDimensions={updateRoomDimensions}
-            onRenameRoom={renameRoom}
-            onDeleteRoom={() => {
-              if (!window.confirm(`Delete room "${room.name}" and all items?`)) return
-              room.items.forEach(i => deleteItem(i.id))
-            }}
-            onReorderItems={reorderItems}
-            search={search}
-            isLocked={isLocked}
-            insurer={job.insurer}
-            trades={trades}
-          />
-        ))}
+        <DndContext
+          sensors={roomSensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleRoomDragStart}
+          onDragEnd={handleRoomDragEnd}
+        >
+          <SortableContext
+            items={rooms.map(r => r.name)}
+            strategy={verticalListSortingStrategy}
+          >
+            {rooms.map(room => (
+              <SortableRoomSection key={room.name} room={room} />
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {/* Pending rooms (added locally, no items yet) */}
         {pendingRooms.map((pr, idx) => (
@@ -491,10 +590,10 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline }: Quo
         gst={gst}
         total={total}
         items={items}
-        onUpdateMarkup={pct => updateQuoteMeta({ markup_pct: pct })}
-        onUpdateNotes={notes => updateQuoteMeta({ notes })}
-        onMarkReady={() => updateQuoteMeta({ status: 'ready', is_locked: true })}
-        onUnlockEdit={() => updateQuoteMeta({ status: 'draft', is_locked: false })}
+        onUpdateMarkup={pct => handleUpdateQuoteMeta({ markup_pct: pct })}
+        onUpdateNotes={notes => handleUpdateQuoteMeta({ notes })}
+        onMarkReady={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
+        onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
         isLocked={isLocked}
         saveStatus={saveStatus}
         tenantId={tenantId}

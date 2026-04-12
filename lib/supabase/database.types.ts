@@ -690,6 +690,7 @@ export interface Database {
           pdf_storage_path: string | null;
           notes: string | null;
           permit_block_dismissed: boolean;
+          room_order: string[] | null;
           created_at: string;
         };
         Insert: {
@@ -715,6 +716,7 @@ export interface Database {
           pdf_storage_path?: string | null;
           notes?: string | null;
           permit_block_dismissed?: boolean;
+          room_order?: string[] | null;
           created_at?: string;
         };
         Update: {
@@ -740,6 +742,7 @@ export interface Database {
           pdf_storage_path?: string | null;
           notes?: string | null;
           permit_block_dismissed?: boolean;
+          room_order?: string[] | null;
           created_at?: string;
         };
         Relationships: never[];

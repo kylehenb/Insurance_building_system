@@ -50,6 +50,7 @@ export interface QuoteData {
   gst_pct: number
   notes: string | null
   permit_block_dismissed: boolean
+  room_order: string[] | null
   created_at: string
 }
 
@@ -480,7 +481,25 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     [items, quoteId, tenantId]
   )
 
-  // Group items by room, preserving insertion order; sort by sort_order within room
+  // Reorder rooms - optimistic, then persist
+  const reorderRooms = useCallback(
+    async (orderedRoomNames: string[]) => {
+      setQuote(prev => (prev ? { ...prev, room_order: orderedRoomNames } : null))
+      const res = await fetch(`/api/quotes/${quoteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, room_order: orderedRoomNames }),
+      })
+      if (!res.ok) {
+        setSaveStatusTimed('error')
+        // Revert on error
+        setQuote(prev => (prev ? { ...prev, room_order: prev.room_order } : null))
+      }
+    },
+    [quoteId, tenantId, setSaveStatusTimed]
+  )
+
+  // Group items by room, respecting room_order if available; sort by sort_order within room
   const rooms: RoomGroup[] = (() => {
     const map = new Map<string, ScopeItem[]>()
     for (const item of items) {
@@ -488,10 +507,22 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       if (!map.has(room)) map.set(room, [])
       map.get(room)!.push(item)
     }
-    return Array.from(map.entries()).map(([name, roomItems]) => ({
+    const allRooms = Array.from(map.entries()).map(([name, roomItems]) => ({
       name,
       items: [...roomItems].sort((a, b) => a.sort_order - b.sort_order),
     }))
+
+    // If room_order is set, use it to sort rooms
+    if (quote?.room_order && quote.room_order.length > 0) {
+      const orderMap = new Map(quote.room_order.map((r, i) => [r, i]))
+      return allRooms.sort((a, b) => {
+        const aIdx = orderMap.get(a.name) ?? 999
+        const bIdx = orderMap.get(b.name) ?? 999
+        return aIdx - bIdx
+      })
+    }
+
+    return allRooms
   })()
 
   const subtotal = items.reduce((sum, i) => sum + (i.line_total ?? 0), 0)
@@ -517,6 +548,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     renameRoom,
     updateQuoteMeta,
     reorderItems,
+    reorderRooms,
     setAllItemTypes,
     reload: load,
   }

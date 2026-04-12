@@ -47,9 +47,10 @@ interface QuotesListProps {
   tenantId: string
   insurer: string | null
   job: JobInfo
+  onQuoteUpdated?: () => void
 }
 
-export function QuotesList({ jobId, tenantId, insurer, job }: QuotesListProps) {
+export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: QuotesListProps) {
   const [quotes, setQuotes] = useState<QuoteListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -215,7 +216,7 @@ export function QuotesList({ jobId, tenantId, insurer, job }: QuotesListProps) {
                   padding: '12px 16px',
                   gap: 12,
                   cursor: 'pointer',
-                  background: isExpanded ? '#fafaf8' : '#ffffff',
+                  background: q.status === 'ready' ? '#e8f5e9' : (isExpanded ? '#fafaf8' : '#ffffff'),
                   borderBottom: isExpanded ? '1px solid #e0dbd4' : 'none',
                 }}
                 onClick={() => setExpandedId(isExpanded ? null : q.id)}
@@ -353,6 +354,7 @@ export function QuotesList({ jobId, tenantId, insurer, job }: QuotesListProps) {
                   quoteId={q.id}
                   tenantId={tenantId}
                   job={job}
+                  onQuoteUpdated={load}
                 />
               )}
             </div>

@@ -45,6 +45,8 @@ interface RoomSectionProps {
   insurer: string | null
   trades: Trade[]
   autoFocusName?: boolean
+  dragListeners?: any
+  dragAttributes?: any
 }
 
 // ──────────────────────────────────────────────
@@ -83,7 +85,11 @@ function DimInput({
         placeholder="0.0"
         onChange={e => setLocal(e.target.value)}
         onFocus={e => e.currentTarget.select()}
-        onPointerDown={e => e.stopPropagation()}
+        onPointerDown={e => {
+          e.stopPropagation()
+          // Prevent drag from triggering when clicking on input
+          ;(e.currentTarget as HTMLElement).dataset.noDrag = 'true'
+        }}
         onBlur={() => {
           const trimmed = local.trim()
           if (trimmed === '') {
@@ -325,6 +331,8 @@ export function RoomSection({
   insurer,
   trades,
   autoFocusName,
+  dragListeners,
+  dragAttributes,
 }: RoomSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -458,6 +466,8 @@ export function RoomSection({
     <div style={{ marginBottom: 0 }}>
       {/* Room header bar */}
       <div
+        {...dragAttributes}
+        {...dragListeners}
         style={{
           background: '#e8e0d5',
           display: 'flex',
@@ -465,6 +475,7 @@ export function RoomSection({
           padding: '7px 14px',
           borderTop: '2px solid #d0c8bc',
           gap: 12,
+          cursor: dragListeners ? 'move' : 'default',
         }}
       >
         {/* Name */}
@@ -478,43 +489,38 @@ export function RoomSection({
               onKeyDown={e => {
                 if (e.key === 'Enter') commitName()
                 if (e.key === 'Escape') {
-                  setEditingName(false)
                   setNameVal(name)
+                  setEditingName(false)
                 }
               }}
-              autoFocus
-              placeholder="Room name…"
+              onPointerDown={e => {
+                e.stopPropagation()
+                ;(e.currentTarget as HTMLElement).dataset.noDrag = 'true'
+              }}
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                fontWeight: 600,
                 color: '#3a3530',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid #c8b89a',
+                background: '#ffffff',
+                border: '1px solid #c8b89a',
+                borderRadius: 4,
+                padding: '3px 6px',
                 outline: 'none',
-                minWidth: 80,
-                maxWidth: 220,
               }}
             />
           ) : (
             <span
-              onDoubleClick={startEditName}
+              onClick={() => !isLocked && setEditingName(true)}
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                fontWeight: 600,
                 color: '#3a3530',
-                cursor: isLocked ? 'default' : 'text',
-                userSelect: 'none',
+                cursor: isLocked ? 'default' : 'pointer',
               }}
-              title={isLocked ? undefined : 'Double-click to rename'}
             >
-              {name || 'Unnamed Room'}
+              {name}
             </span>
           )}
 

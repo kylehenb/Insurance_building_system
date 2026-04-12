@@ -50,6 +50,7 @@ export async function PATCH(
     'is_locked',
     'total_amount',
     'permit_block_dismissed',
+    'room_order',
   ]
   const safeUpdates: QuoteUpdate = {}
   for (const key of allowed) {
