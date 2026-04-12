@@ -112,7 +112,38 @@ export default async function QuotePrintPage({
           </div>
         </div>
 
-        <p>Header rendering works. Now adding more sections...</p>
+        {/* Job Details */}
+        <div className="mb-8 p-4 bg-[#f5f0e8] print:bg-gray-50 rounded">
+          <h3 className="text-lg font-bold text-[#1a1a1a] mb-4 border-b border-[#1a1a1a] pb-2">Job Details</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-semibold text-[#666]">Insured Name:</span>
+              <span className="ml-2 text-[#1a1a1a]">{job.insured_name || '-'}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-[#666]">Property Address:</span>
+              <span className="ml-2 text-[#1a1a1a]">{job.property_address || '-'}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-[#666]">Claim Number:</span>
+              <span className="ml-2 text-[#1a1a1a]">{job.claim_number || '-'}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-[#666]">Insurer:</span>
+              <span className="ml-2 text-[#1a1a1a]">{job.insurer || '-'}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-[#666]">Date of Loss:</span>
+              <span className="ml-2 text-[#1a1a1a]">{formatDate(job.date_of_loss)}</span>
+            </div>
+            <div>
+              <span className="font-semibold text-[#666]">Job Number:</span>
+              <span className="ml-2 text-[#1a1a1a]">{job.job_number}</span>
+            </div>
+          </div>
+        </div>
+
+        <p>Job details rendering works. Now adding scope items...</p>
       </div>
     </div>
   )
