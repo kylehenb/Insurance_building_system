@@ -331,7 +331,10 @@ export function RoomSection({
   const [nameVal, setNameVal] = useState(name)
   const [showCalc, setShowCalc] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [localItems, setLocalItems] = useState(items)
+  // dragOrderItems holds a snapshot of item order only while a drag is in progress.
+  // All other rendering uses the `items` prop directly, so there is no sync lag.
+  const [dragOrderItems, setDragOrderItems] = useState<ScopeItem[]>([])
+  const displayItems = activeId ? dragOrderItems : items
 
   const nameInputRef = useRef<HTMLInputElement>(null)
   const calcRef = useRef<HTMLDivElement>(null)
@@ -339,13 +342,6 @@ export function RoomSection({
   // Desc refs: keyed by item id
   const descRefs = useRef<Map<string, React.RefObject<HTMLTextAreaElement | null>>>(new Map())
   const pendingFocusId = useRef<string | null>(null)
-
-  // Keep localItems in sync with prop, but don't clobber during an active drag
-  useEffect(() => {
-    if (!activeId) {
-      setLocalItems(items)
-    }
-  }, [items, activeId])
 
   // Focus pending description field after render
   useEffect(() => {
@@ -405,9 +401,9 @@ export function RoomSection({
   // Keyboard navigation between rows
   const handleNavigateNext = useCallback(
     (currentIndex: number) => {
-      if (currentIndex < localItems.length - 1) {
+      if (currentIndex < items.length - 1) {
         // Focus next row's description
-        const nextItem = localItems[currentIndex + 1]
+        const nextItem = items[currentIndex + 1]
         const stableKey = nextItem._key ?? nextItem.id
         const ref = descRefs.current.get(stableKey)
         if (ref?.current) {
@@ -422,7 +418,7 @@ export function RoomSection({
         }
       }
     },
-    [localItems, isLocked, onAddItem, name]
+    [items, isLocked, onAddItem, name]
   )
 
   // dnd-kit setup
@@ -432,21 +428,23 @@ export function RoomSection({
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(String(event.active.id))
-  }, [])
+    setDragOrderItems(items) // snapshot current order at drag start
+  }, [items])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
-      setActiveId(null)
+      setActiveId(null) // switches displayItems back to items prop
       if (!over || active.id === over.id) return
 
-      const oldIndex = localItems.findIndex(i => i.id === active.id)
-      const newIndex = localItems.findIndex(i => i.id === over.id)
-      const reordered = arrayMove(localItems, oldIndex, newIndex)
-      setLocalItems(reordered)
+      const oldIndex = dragOrderItems.findIndex(i => i.id === active.id)
+      const newIndex = dragOrderItems.findIndex(i => i.id === over.id)
+      const reordered = arrayMove(dragOrderItems, oldIndex, newIndex)
+      // onReorderItems calls setItems in useQuote — batched with setActiveId(null)
+      // so items prop is already in the new order when displayItems switches back
       onReorderItems(name, reordered.map(i => i.id))
     },
-    [localItems, name, onReorderItems]
+    [dragOrderItems, name, onReorderItems]
   )
 
   const firstItem = items[0] ?? null
@@ -454,7 +452,7 @@ export function RoomSection({
   const w = firstItem?.room_width ?? null
   const h = firstItem?.room_height ?? null
 
-  const activeItem = activeId ? localItems.find(i => i.id === activeId) ?? null : null
+  const activeItem = activeId ? dragOrderItems.find(i => i.id === activeId) ?? null : null
 
   return (
     <div style={{ marginBottom: 0 }}>
@@ -642,10 +640,10 @@ export function RoomSection({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={localItems.map(i => i.id)}
+              items={displayItems.map(i => i.id)}
               strategy={verticalListSortingStrategy}
             >
-              {localItems.map((item, idx) => {
+              {displayItems.map((item, idx) => {
                 // Use stable key so that the temp→real ID swap doesn't cause unmount/remount
                 const stableKey = item._key ?? item.id
                 // Ensure each item has a stable ref keyed by the stable key
