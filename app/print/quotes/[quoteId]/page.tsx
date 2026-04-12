@@ -159,9 +159,9 @@ export default async function QuotePrintPage({
         {/* Header - Split layout: black left with logo, white right with job details */}
         <div className="flex">
           {/* Left: Black background with logo and company name - exactly as sidebar */}
-          <div className="bg-[#1a1a1a] p-4 flex items-center justify-center" style={{ width: '160px', minWidth: '160px' }}>
+          <div className="bg-[#1a1a1a] p-4 flex items-center justify-center" style={{ width: '180px', minWidth: '180px' }}>
             <div className="text-center">
-              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2" style={{ width: '90px', height: '90px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2.5" style={{ width: '138px', height: '138px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
               <div className="text-[#6a6460]" style={{ fontSize: '10px', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>Insurance Repair Co.</div>
             </div>
           </div>
@@ -204,9 +204,12 @@ export default async function QuotePrintPage({
           </div>
         </div>
 
+        {/* Beige line break */}
+        <div className="h-px bg-[#e8e0d5]"></div>
+
         {/* Title */}
-        <div className="px-6 py-2 bg-white">
-          <h2 className="text-base font-semibold text-[#1a1a1a]">Estimate - Scope of Works</h2>
+        <div className="px-6 py-3 bg-white">
+          <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide">Estimate - Scope of Works</h2>
         </div>
 
         {/* Scope Items by Room */}
@@ -256,26 +259,31 @@ export default async function QuotePrintPage({
                         <tr 
                           key={item.id} 
                           className="border-b border-[#f0ece6]"
-                          style={{ borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent' }}
+                          style={{ 
+                            borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent',
+                            borderRight: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent'
+                          }}
                         >
                           <td className="py-2 px-2 text-[#3a3530]">
+                            {typeInfo && (
+                              <div className="mb-1">
+                                <span
+                                  className="inline-block px-1 py-0.5 rounded text-[8px] font-bold"
+                                  style={{ 
+                                    background: `${leftBorderColor}22`, 
+                                    color: typeInfo.color 
+                                  }}
+                                >
+                                  {typeInfo.label}
+                                </span>
+                              </div>
+                            )}
                             {item.item_description || '-'}
                           </td>
                           <td className="py-2 px-2 text-center text-[#3a3530]">{item.qty || '-'}</td>
                           <td className="py-2 px-2 text-center text-[#3a3530]">{item.unit || '-'}</td>
                           <td className="py-2 px-2 text-left text-[#3a3530]">{item.trade || '-'}</td>
                           <td className="py-2 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap">
-                            {typeInfo && (
-                              <span
-                                className="inline-block mr-1 px-1 py-0.5 rounded text-[8px] font-bold"
-                                style={{ 
-                                  background: `${leftBorderColor}22`, 
-                                  color: typeInfo.color 
-                                }}
-                              >
-                                {typeInfo.label}
-                              </span>
-                            )}
                             {fmt(item.line_total)}
                           </td>
                         </tr>
@@ -300,15 +308,15 @@ export default async function QuotePrintPage({
             {/* Totals - Right column */}
             <div className="w-72">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#9e998f]">Subtotal</span>
+                <span className="text-sm text-[#3a3530]">Subtotal</span>
                 <span className="font-mono text-sm text-[#3a3530]">{fmt(subtotal)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#9e998f]">Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
+                <span className="text-sm text-[#3a3530]">Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
                 <span className="font-mono text-sm text-[#3a3530]">{fmt(markup)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#9e998f]">GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
+                <span className="text-sm text-[#3a3530]">GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
                 <span className="font-mono text-sm text-[#3a3530]">{fmt(gst)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
@@ -322,19 +330,19 @@ export default async function QuotePrintPage({
                   <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
                   {provisionalSumItems.length > 0 && (
                     <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#9e998f]">Provisional Sum Items</span>
+                      <span className="text-xs text-[#3a3530]">Provisional Sum Items</span>
                       <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
                     </div>
                   )}
                   {primeCostItems.length > 0 && (
                     <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#9e998f]">Prime Cost Items</span>
+                      <span className="text-xs text-[#3a3530]">Prime Cost Items</span>
                       <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
                     </div>
                   )}
                   {cashSettlementItems.length > 0 && (
                     <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#9e998f]">Cash Settlement Items</span>
+                      <span className="text-xs text-[#3a3530]">Cash Settlement Items</span>
                       <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
                     </div>
                   )}
