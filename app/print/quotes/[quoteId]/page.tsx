@@ -159,10 +159,10 @@ export default async function QuotePrintPage({
         {/* Header - Single color banner with logo and job details */}
         <div className="flex bg-[#f0ebe3]">
           {/* Left: Logo and company name */}
-          <div className="p-4 flex items-center justify-center" style={{ width: '180px', minWidth: '180px' }}>
+          <div className="p-4 flex items-center justify-center" style={{ width: '140px', minWidth: '140px' }}>
             <div className="text-center">
-              <img src="/logo.png" alt="IRC Logo" className="block mx-auto mb-2.5" style={{ width: '138px', height: '138px', objectFit: 'contain' }} />
-              <div className="text-[#6a6460]" style={{ fontSize: '10px', letterSpacing: '2.5px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>Insurance Repair Co.</div>
+              <img src="/logo-alt.png" alt="IRC Logo" className="block mx-auto mb-1" style={{ width: '90px', height: '90px', objectFit: 'contain' }} />
+              <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
             </div>
           </div>
 
