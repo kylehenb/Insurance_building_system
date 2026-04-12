@@ -7,91 +7,85 @@ type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
-interface QuoteWithItems extends Quote {
-  items: ScopeItem[]
-}
-
-interface JobWithQuote extends Job {
-  quote: QuoteWithItems
-}
-
-interface TenantWithJob extends Tenant {
-  job: JobWithQuote
-}
-
 export default async function QuotePrintPage({
   params,
 }: {
   params: Promise<{ quoteId: string }>
 }) {
-  const { quoteId } = await params
-  const supabase = await createClient()
+  try {
+    const { quoteId } = await params
+    const supabase = await createClient()
 
-  // Check authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    redirect('/login')
-  }
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      redirect('/login')
+    }
 
-  // Get user's tenant_id
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
+    // Get user's tenant_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
 
-  if (userError || !userData) {
-    redirect('/login')
-  }
+    if (userError || !userData) {
+      console.error('User data error:', userError)
+      redirect('/login')
+    }
 
-  const tenantId = userData.tenant_id
+    const tenantId = userData.tenant_id
 
-  // Fetch quote
-  const { data: quote, error: quoteError } = await supabase
-    .from('quotes')
-    .select('*')
-    .eq('id', quoteId)
-    .eq('tenant_id', tenantId)
-    .single()
+    // Fetch quote
+    const { data: quote, error: quoteError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', quoteId)
+      .eq('tenant_id', tenantId)
+      .single()
 
-  if (quoteError || !quote) {
-    return <div>Quote not found</div>
-  }
+    if (quoteError || !quote) {
+      console.error('Quote error:', quoteError)
+      return <div>Quote not found</div>
+    }
 
-  // Fetch scope items
-  const { data: scopeItems, error: itemsError } = await supabase
-    .from('scope_items')
-    .select('*')
-    .eq('quote_id', quoteId)
-    .eq('tenant_id', tenantId)
-    .order('sort_order', { ascending: true })
+    // Fetch scope items
+    const { data: scopeItems, error: itemsError } = await supabase
+      .from('scope_items')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
 
-  if (itemsError) {
-    return <div>Error fetching scope items</div>
-  }
+    if (itemsError) {
+      console.error('Scope items error:', itemsError)
+      return <div>Error fetching scope items</div>
+    }
 
-  // Fetch job details
-  const { data: job, error: jobError } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('id', quote.job_id)
-    .eq('tenant_id', tenantId)
-    .single()
+    // Fetch job details
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', quote.job_id)
+      .eq('tenant_id', tenantId)
+      .single()
 
-  if (jobError || !job) {
-    return <div>Job not found</div>
-  }
+    if (jobError || !job) {
+      console.error('Job error:', jobError)
+      return <div>Job not found</div>
+    }
 
-  // Fetch tenant details for header
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .select('*')
-    .eq('id', tenantId)
-    .single()
+    // Fetch tenant details for header
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', tenantId)
+      .single()
 
-  if (tenantError || !tenant) {
-    return <div>Tenant not found</div>
-  }
+    if (tenantError || !tenant) {
+      console.error('Tenant error:', tenantError)
+      return <div>Tenant not found</div>
+    }
 
   const items = (scopeItems || []).sort((a, b) => a.sort_order - b.sort_order)
 
@@ -347,4 +341,8 @@ export default async function QuotePrintPage({
       }} />
     </div>
   )
+  } catch (error) {
+    console.error('Quote print page error:', error)
+    return <div>Error loading quote. Please try again.</div>
+  }
 }
