@@ -130,23 +130,6 @@ export default async function QuotePrintPage({
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] print:bg-white">
-      {/* Floating print button - hidden on print */}
-      <button
-        onClick={() => window.print()}
-        className="fixed top-4 right-4 z-50 bg-[#1a1a1a] text-[#f5f0e8] px-4 py-2 rounded-lg font-medium hover:bg-[#333] transition-colors print:hidden"
-      >
-        Print / Save as PDF
-      </button>
-
-      {/* DRAFT watermark */}
-      {isDraft && (
-        <div className="fixed inset-0 pointer-events-none flex items-center justify-center print:hidden z-40">
-          <div className="text-[#d0d0d0] text-9xl font-bold opacity-20 rotate-[-45deg] whitespace-nowrap">
-            DRAFT
-          </div>
-        </div>
-      )}
-
       {/* Document container */}
       <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
         {/* Header */}
@@ -321,19 +304,6 @@ export default async function QuotePrintPage({
           <p>This quote is prepared by {tenant.name}</p>
         </div>
       </div>
-
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @media print {
-            body {
-              background: white !important;
-            }
-            @page {
-              margin: 1cm;
-            }
-          }
-        `
-      }} />
     </div>
   )
 }
