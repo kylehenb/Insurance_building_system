@@ -20,7 +20,6 @@ interface LineItemRowProps {
   onDelete: (itemId: string) => void
   search: (q: string) => LibraryItem[]
   isLocked: boolean
-  insurer: string | null
   trades: Trade[]
   onNavigateNext?: () => void
   descRef?: React.RefObject<HTMLTextAreaElement | null>
@@ -262,7 +261,6 @@ export function LineItemRow({
   onDelete,
   search,
   isLocked,
-  insurer,
   trades,
   onNavigateNext,
   descRef,
@@ -359,7 +357,7 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
+          gridTemplateColumns: '1fr 50px 55px 100px 100px 100px 65px 100px 60px',
           minHeight: 40,
         }}
       >

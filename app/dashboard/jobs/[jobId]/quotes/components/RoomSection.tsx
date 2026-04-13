@@ -42,11 +42,8 @@ interface RoomSectionProps {
   onReorderItems: (room: string, orderedIds: string[]) => void
   search: (q: string) => LibraryItem[]
   isLocked: boolean
-  insurer: string | null
   trades: Trade[]
   autoFocusName?: boolean
-  dragListeners?: any
-  dragAttributes?: any
 }
 
 // ──────────────────────────────────────────────
@@ -240,7 +237,6 @@ function SortableLineItemRow({
   onDelete,
   search,
   isLocked,
-  insurer,
   trades,
   onNavigateNext,
   descRef,
@@ -251,7 +247,6 @@ function SortableLineItemRow({
   onDelete: (itemId: string) => void
   search: (q: string) => LibraryItem[]
   isLocked: boolean
-  insurer: string | null
   trades: Trade[]
   onNavigateNext: () => void
   descRef: React.RefObject<HTMLTextAreaElement | null>
@@ -305,7 +300,6 @@ function SortableLineItemRow({
         onDelete={onDelete}
         search={search}
         isLocked={isLocked}
-        insurer={insurer}
         trades={trades}
         onNavigateNext={onNavigateNext}
         descRef={descRef}
@@ -318,7 +312,7 @@ function SortableLineItemRow({
 // ──────────────────────────────────────────────
 // Grid / column constants
 // ──────────────────────────────────────────────
-const GRID = '1fr 60px 70px 110px 120px 130px 75px 100px 60px'
+const GRID = '1fr 50px 55px 100px 100px 100px 65px 100px 60px'
 
 const COL_HEADERS = [
   'DESCRIPTION',
@@ -347,7 +341,6 @@ export function RoomSection({
   onReorderItems,
   search,
   isLocked,
-  insurer,
   trades,
   autoFocusName,
 }: RoomSectionProps) {
@@ -452,10 +445,7 @@ export function RoomSection({
   // dnd-kit setup
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        delay: 500,
-        tolerance: 5,
-      },
+      activationConstraint: { distance: 5 },
     })
   )
 
@@ -704,7 +694,6 @@ export function RoomSection({
                     onDelete={onDeleteItem}
                     search={search}
                     isLocked={isLocked}
-                    insurer={insurer}
                     trades={trades}
                     onNavigateNext={() => handleNavigateNext(idx)}
                     descRef={dRef}
@@ -733,7 +722,6 @@ export function RoomSection({
                     onDelete={() => {}}
                     search={search}
                     isLocked
-                    insurer={insurer}
                     trades={trades}
                   />
                 </div>
