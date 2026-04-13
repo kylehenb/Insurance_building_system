@@ -212,7 +212,7 @@ export default async function QuotePrintPage({
 
         {/* Table Header */}
         <div className="px-6 pb-0">
-          <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
                 <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%' }}>Description</th>
@@ -252,7 +252,7 @@ export default async function QuotePrintPage({
                 </div>
                 
                 {/* Table */}
-                <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+                <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
                   <tbody>
                     {roomItems.map((item) => {
                       const itemType = item.item_type as ItemType
