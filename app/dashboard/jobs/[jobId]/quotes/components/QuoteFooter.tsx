@@ -36,10 +36,10 @@ function fmt(v: number) {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
 }
 
-const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, string> = {
-  provisional_sum: 'Provisional Sum Items',
-  prime_cost: 'Prime Cost Items',
-  cash_settlement: 'Cash Settlement Items',
+const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, { label: string; color: string; border: string }> = {
+  provisional_sum: { label: 'Provisional Sum Items', color: '#b45309', border: '#f59e0b' },
+  prime_cost: { label: 'Prime Cost Items', color: '#1a73e8', border: '#60a5fa' },
+  cash_settlement: { label: 'Cash Settlement Items', color: '#64748b', border: '#94a3b8' },
 }
 
 // ── Notes area ────────────────────────────────────────────────────────────────
@@ -593,10 +593,14 @@ export function QuoteFooter({
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       marginBottom: 4,
+                      paddingLeft: 8,
+                      paddingRight: 8,
+                      borderLeft: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
+                      borderRight: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
                     }}
                   >
                     <span style={{ fontSize: 12, color: '#9e998f' }}>
-                      {ITEM_TYPE_LABELS[type]}
+                      {ITEM_TYPE_LABELS[type].label} incl GST
                     </span>
                     <span
                       style={{
@@ -605,7 +609,7 @@ export function QuoteFooter({
                         fontFamily: 'DM Mono, monospace',
                       }}
                     >
-                      {fmt(typeSubtotals[type]!)}
+                      {fmt(typeSubtotals[type]! * 1.1)}
                     </span>
                   </div>
                 ))}

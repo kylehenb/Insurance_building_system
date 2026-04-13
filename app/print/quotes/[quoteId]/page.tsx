@@ -156,10 +156,10 @@ export default async function QuotePrintPage({
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        {/* Header - Single color banner with logo and job details */}
-        <div className="flex bg-[#f0ebe3]">
+        {/* Header - White background with logo and job details */}
+        <div className="flex bg-white">
           {/* Left: Logo and company name */}
-          <div className="p-4 flex items-center justify-center" style={{ width: '140px', minWidth: '140px' }}>
+          <div className="pl-8 pr-4 py-4 flex items-center justify-center" style={{ width: '140px', minWidth: '140px' }}>
             <div className="text-center">
               <img src="/logo-alt.png" alt="IRC Logo" className="block mx-auto mb-1" style={{ width: '90px', height: '90px', objectFit: 'contain' }} />
               <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
@@ -212,6 +212,21 @@ export default async function QuotePrintPage({
           <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide">Estimate - Scope of Works</h2>
         </div>
 
+        {/* Table Header */}
+        <div className="px-6 pb-0">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%' }}>Description</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Qty</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Unit</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider">Trade</th>
+                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-28">Line Total</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+
         {/* Scope Items by Room */}
         <div className="px-6 pb-6">
           {sortedRooms.map((room) => {
@@ -229,7 +244,7 @@ export default async function QuotePrintPage({
             return (
               <div key={room} className="mb-6">
                 {/* Room header with dimensions */}
-                <div className="bg-[#e8e0d5] p-3 border-t-2 border-[#d0c8bc]">
+                <div className="bg-[#e8e0d5] py-2 px-3 border-t-2 border-[#d0c8bc]">
                   <h4 className="font-semibold text-[#3a3530] text-sm">
                     {room}
                     {hasDimensions && (
@@ -240,15 +255,6 @@ export default async function QuotePrintPage({
                 
                 {/* Table */}
                 <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                      <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%' }}>Description</th>
-                      <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Qty</th>
-                      <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-14">Unit</th>
-                      <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider">Trade</th>
-                      <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider w-28">Line Total</th>
-                    </tr>
-                  </thead>
                   <tbody>
                     {roomItems.map((item) => {
                       const itemType = item.item_type as ItemType
@@ -329,21 +335,39 @@ export default async function QuotePrintPage({
                 <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
                   <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
                   {provisionalSumItems.length > 0 && (
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#3a3530]">Provisional Sum Items</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    <div 
+                      className="flex justify-between mb-1 px-2"
+                      style={{ 
+                        borderLeft: '3px solid #f59e0b',
+                        borderRight: '3px solid #f59e0b'
+                      }}
+                    >
+                      <span className="text-xs text-[#3a3530]">Provisional Sum Items incl GST</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                     </div>
                   )}
                   {primeCostItems.length > 0 && (
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#3a3530]">Prime Cost Items</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    <div 
+                      className="flex justify-between mb-1 px-2"
+                      style={{ 
+                        borderLeft: '3px solid #60a5fa',
+                        borderRight: '3px solid #60a5fa'
+                      }}
+                    >
+                      <span className="text-xs text-[#3a3530]">Prime Cost Items incl GST</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                     </div>
                   )}
                   {cashSettlementItems.length > 0 && (
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs text-[#3a3530]">Cash Settlement Items</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0))}</span>
+                    <div 
+                      className="flex justify-between mb-1 px-2"
+                      style={{ 
+                        borderLeft: '3px solid #94a3b8',
+                        borderRight: '3px solid #94a3b8'
+                      }}
+                    >
+                      <span className="text-xs text-[#3a3530]">Cash Settlement Items incl GST</span>
+                      <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                     </div>
                   )}
                 </div>
