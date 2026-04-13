@@ -215,11 +215,11 @@ export default async function QuotePrintPage({
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
-                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
+                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
               </tr>
             </thead>
           </table>
@@ -234,16 +234,16 @@ export default async function QuotePrintPage({
             const roomLength = firstItem?.room_length
             const roomWidth = firstItem?.room_width
             const roomHeight = firstItem?.room_height
-            const hasDimensions = roomLength || roomWidth || roomHeight
+            const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
             const roomSizeStr = hasDimensions 
-              ? `${roomLength || '—'} × ${roomWidth || '—'} × ${roomHeight || '—'} m` 
+              ? `${roomLength != null ? roomLength : '—'} × ${roomWidth != null ? roomWidth : '—'} × ${roomHeight != null ? roomHeight : '—'} m` 
               : ''
 
             return (
               <div key={room} className="mb-4">
                 {/* Room header with dimensions - light beige background */}
                 <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
-                  <h4 className="font-semibold text-[#3a3530] text-sm uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
+                  <h4 className="font-bold text-[#3a3530] text-xs uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
                     {room}
                     {hasDimensions && (
                       <span className="text-xs text-[#9e998f] font-mono ml-2" style={{ fontFamily: 'var(--font-dm-mono)' }}>{roomSizeStr}</span>
