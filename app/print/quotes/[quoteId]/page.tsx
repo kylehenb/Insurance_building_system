@@ -191,7 +191,7 @@ export default async function QuotePrintPage({
               ].filter(item => item.value || item.label === 'Quote Date').map((item, i, arr) => (
                 <span
                   key={item.label}
-                  className="flex items-center pr-4 mr-4"
+                  className="flex items-center pr-2 mr-2"
                   style={{ borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}
                 >
                   <span className="mr-1 text-[#b0a898]">{item.label}:</span>
