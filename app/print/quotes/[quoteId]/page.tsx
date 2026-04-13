@@ -159,7 +159,7 @@ export default async function QuotePrintPage({
         {/* Header - White background with logo and job details */}
         <div className="flex bg-white">
           {/* Left: Logo and company name - aligned with left page border */}
-          <div className="pl-6 pr-4 py-4 flex flex-col justify-start" style={{ width: '140px', minWidth: '140px' }}>
+          <div className="pl-6 pr-4 pt-0 pb-4 flex flex-col justify-start" style={{ width: '140px', minWidth: '140px' }}>
             <img src="/logo-alt.png" alt="IRC Logo" className="block mb-1" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
             <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
           </div>
@@ -301,7 +301,7 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Footer Section - Notes left, Totals right - in light beige box with rounded corners */}
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-20">
           <div className="bg-[#f5f2ee] rounded-lg p-6">
             <div className="flex gap-6">
               {/* Notes - Left column */}
@@ -378,16 +378,16 @@ export default async function QuotePrintPage({
       </div>
 
       {/* Black Footer */}
-      <div className="bg-[#1a1a1a] text-white p-6 print:fixed print:bottom-0 print:left-0 print:right-0 print:z-50">
+      <div className="bg-[#1a1a1a] text-white py-2 px-6 print:fixed print:bottom-0 print:left-0 print:right-0 print:z-50">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto" />
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="IRC Logo" className="h-8 w-auto" />
             <div>
-              <p className="font-bold text-sm tracking-widest uppercase text-[#f5f2ee]">{tenant.name}</p>
-              <p className="text-xs text-[#f5f2ee]">Insurance Repair Co.</p>
+              <p className="font-bold text-xs tracking-widest uppercase text-[#f5f2ee]">{tenant.name}</p>
+              <p className="text-[10px] text-[#f5f2ee]">Insurance Repair Co.</p>
             </div>
           </div>
-          <div className="text-right text-sm">
+          <div className="text-right text-xs">
             <p className="text-[#f5f2ee]">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
             <p className="text-[#f5f2ee]">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
           </div>

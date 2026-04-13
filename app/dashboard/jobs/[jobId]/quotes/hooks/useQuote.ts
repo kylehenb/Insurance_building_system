@@ -125,6 +125,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingChanges = useRef<Map<string, Record<string, unknown>>>(new Map())
   const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevSubtotalRef = useRef<number>(0)
 
   const setSaveStatusTimed = useCallback((status: SaveStatus) => {
     if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current)
@@ -213,6 +214,10 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     const prelimItems = items.filter(i => i.preliminary_formula && i.room === 'Preliminaries')
 
     if (prelimItems.length === 0) return
+
+    // Only recalculate if subtotal has changed significantly (more than 0.01)
+    if (Math.abs(subtotal - prevSubtotalRef.current) < 0.01) return
+    prevSubtotalRef.current = subtotal
 
     // Calculate new amounts for each preliminary item based on its formula
     const updatedItems = items.map(item => {

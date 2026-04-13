@@ -342,28 +342,14 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '30px 1fr 60px 70px 110px 120px 130px 75px 100px 60px',
+          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
+          cursor: dragListeners ? 'grab' : 'default',
         }}
+        // Spread drag listeners/attributes on the whole row
+        {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
+        {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
       >
-        {/* Drag handle */}
-        {dragListeners && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'grab',
-              color: '#c0bab3',
-              userSelect: 'none',
-            }}
-            {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
-            {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
-          >
-            ⋮⋮
-          </div>
-        )}
-        {!dragListeners && <div style={{ width: '30px' }} />}
         {/* Description */}
         <div
           style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}

@@ -466,6 +466,8 @@ export function RoomSection({
     <div style={{ marginBottom: 0 }}>
       {/* Room header bar */}
       <div
+        {...dragAttributes}
+        {...dragListeners}
         style={{
           background: '#e8e0d5',
           display: 'flex',
@@ -473,24 +475,9 @@ export function RoomSection({
           padding: '7px 14px',
           borderTop: '2px solid #d0c8bc',
           gap: 12,
+          cursor: dragListeners ? 'move' : 'default',
         }}
       >
-        {/* Drag handle */}
-        {dragListeners && (
-          <div
-            {...dragAttributes}
-            {...dragListeners}
-            style={{
-              cursor: 'move',
-              color: '#c0bab3',
-              userSelect: 'none',
-              padding: '2px 4px',
-            }}
-          >
-            ⋮⋮
-          </div>
-        )}
-        {!dragListeners && <div style={{ width: '24px' }} />}
         {/* Name */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
           {editingName ? (
