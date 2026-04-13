@@ -212,7 +212,7 @@ export default async function QuotePrintPage({
 
         {/* Table Header */}
         <div className="px-6 pb-0">
-          <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
                 <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
@@ -227,16 +227,18 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Scope Items by Room */}
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-2">
           {(() => {
             let globalCounter = 0
             return sortedRooms.map((room) => {
               const roomItems = groupedByRoom[room]
-              // Get room dimensions from first item in the room
-              const firstItem = roomItems[0]
-              const roomLength = firstItem?.room_length
-              const roomWidth = firstItem?.room_width
-              const roomHeight = firstItem?.room_height
+              // Get room dimensions from first item in the room that has dimensions
+              const itemWithDimensions = roomItems.find(
+                item => item.room_length != null || item.room_width != null || item.room_height != null
+              )
+              const roomLength = itemWithDimensions?.room_length
+              const roomWidth = itemWithDimensions?.room_width
+              const roomHeight = itemWithDimensions?.room_height
               const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
               const roomSizeStr = hasDimensions 
                 ? `${roomLength != null ? roomLength : '—'} × ${roomWidth != null ? roomWidth : '—'} × ${roomHeight != null ? roomHeight : '—'} m` 
@@ -255,7 +257,7 @@ export default async function QuotePrintPage({
                   </div>
                   
                   {/* Table */}
-                  <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
+                  <table className="w-full text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
                     <tbody>
                       {roomItems.map((item) => {
                         globalCounter++
@@ -308,37 +310,37 @@ export default async function QuotePrintPage({
 
         {/* Footer Section - Notes left, Totals right - in light beige box with rounded corners */}
         <div className="px-6 pb-20">
-          <div className="bg-[#f5f2ee] rounded-lg p-6">
+          <div className="bg-[#f5f2ee] rounded-lg p-3">
             <div className="flex gap-6">
               {/* Notes - Left column */}
               <div className="flex-1">
-                <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'var(--font-dm-sans)' }}>Notes</p>
-                <div className="text-sm text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-dm-sans)' }}>{quote.notes || ''}</div>
+                <p className="text-[#b0a89e] text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'var(--font-dm-sans)' }}>Notes</p>
+                <div className="text-xs text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-dm-sans)' }}>{quote.notes || ''}</div>
               </div>
 
               {/* Totals - Right column */}
               <div className="w-72">
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>Subtotal</span>
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(subtotal)}</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>Subtotal</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(subtotal)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(markup)}</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(markup)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(gst)}</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-sans)' }}>GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
+                  <span className="text-xs text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(gst)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
-                  <span className="text-base font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Total inc GST</span>
-                  <span className="text-lg font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(total)}</span>
+                  <span className="text-sm font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Total inc GST</span>
+                  <span className="text-base font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(total)}</span>
                 </div>
 
                 {/* Informational breakdown for special item types */}
                 {(provisionalSumItems.length > 0 || primeCostItems.length > 0 || cashSettlementItems.length > 0) && (
                   <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
-                    <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
+                    <p className="text-[#b0a89e] text-[7px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
                     {provisionalSumItems.length > 0 && (
                       <div 
                         className="flex justify-between mb-1 px-2"
@@ -347,8 +349,8 @@ export default async function QuotePrintPage({
                           borderRight: '3px solid #f59e0b'
                         }}
                       >
-                        <span className="text-xs text-[#3a3530]">Provisional Sum Items incl GST</span>
-                        <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="text-[10px] text-[#3a3530]">Provisional Sum Items incl GST</span>
+                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                       </div>
                     )}
                     {primeCostItems.length > 0 && (
@@ -359,8 +361,8 @@ export default async function QuotePrintPage({
                           borderRight: '3px solid #60a5fa'
                         }}
                       >
-                        <span className="text-xs text-[#3a3530]">Prime Cost Items incl GST</span>
-                        <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="text-[10px] text-[#3a3530]">Prime Cost Items incl GST</span>
+                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                       </div>
                     )}
                     {cashSettlementItems.length > 0 && (
@@ -371,8 +373,8 @@ export default async function QuotePrintPage({
                           borderRight: '3px solid #94a3b8'
                         }}
                       >
-                        <span className="text-xs text-[#3a3530]">Cash Settlement Items incl GST</span>
-                        <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="text-[10px] text-[#3a3530]">Cash Settlement Items incl GST</span>
+                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
                       </div>
                     )}
                   </div>
@@ -390,7 +392,7 @@ export default async function QuotePrintPage({
           <div className="flex items-center gap-3 flex-shrink-0">
             <img src="/logo.png" alt="IRC Logo" className="h-8 w-auto" />
             <div className="flex flex-col">
-              <p className="font-bold text-[10px] tracking-wider uppercase text-[#f5f2ee] leading-tight">INSURANCE REPAIR CO PTY LTD</p>
+              <p className="font-bold text-[8px] tracking-wider uppercase text-[#f5f2ee] leading-tight">INSURANCE REPAIR CO PTY LTD</p>
               <p className="text-[9px] text-[#c8b89a] leading-tight">Building and Restoration</p>
             </div>
           </div>
