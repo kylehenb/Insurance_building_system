@@ -63,6 +63,15 @@ function DimInput({
   onChange: (v: number | null) => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
+  const isFocusedRef = useRef(false)
+
+  // Only sync local state with value when not focused
+  // This prevents focus loss during typing
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setLocal(value != null ? String(value) : '')
+    }
+  }, [value])
 
   return (
     <>
@@ -84,13 +93,17 @@ function DimInput({
         value={local}
         placeholder="0.0"
         onChange={e => setLocal(e.target.value)}
-        onFocus={e => e.currentTarget.select()}
+        onFocus={e => {
+          isFocusedRef.current = true
+          e.currentTarget.select()
+        }}
         onPointerDown={e => {
           e.stopPropagation()
           // Prevent drag from triggering when clicking on input
           ;(e.currentTarget as HTMLElement).dataset.noDrag = 'true'
         }}
         onBlur={() => {
+          isFocusedRef.current = false
           const trimmed = local.trim()
           if (trimmed === '') {
             onChange(null)
@@ -431,10 +444,20 @@ export function RoomSection({
 
   // dnd-kit setup
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    })
   )
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    // Prevent drag if the active element is an input or textarea
+    const activeElement = document.activeElement
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
+      return
+    }
     setActiveId(String(event.active.id))
     setDragOrderItems(items) // snapshot current order at drag start
   }, [items])
@@ -466,8 +489,6 @@ export function RoomSection({
     <div style={{ marginBottom: 0 }}>
       {/* Room header bar */}
       <div
-        {...dragAttributes}
-        {...dragListeners}
         style={{
           background: '#e8e0d5',
           display: 'flex',
@@ -475,9 +496,24 @@ export function RoomSection({
           padding: '7px 14px',
           borderTop: '2px solid #d0c8bc',
           gap: 12,
-          cursor: dragListeners ? 'move' : 'default',
         }}
       >
+        {/* Drag handle */}
+        {dragListeners && (
+          <div
+            {...dragAttributes}
+            {...dragListeners}
+            style={{
+              cursor: 'move',
+              color: '#c0bab3',
+              userSelect: 'none',
+              padding: '2px 4px',
+            }}
+          >
+            ⋮⋮
+          </div>
+        )}
+        {!dragListeners && <div style={{ width: '24px' }} />}
         {/* Name */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
           {editingName ? (

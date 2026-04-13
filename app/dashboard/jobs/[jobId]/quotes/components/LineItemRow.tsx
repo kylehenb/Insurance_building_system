@@ -52,12 +52,13 @@ function NumericCell({
   onNavigateNext?: () => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
+  const isFocusedRef = useRef(false)
 
-  const prevValueRef = useRef(value)
+  // Only sync local state with value when not focused
+  // This prevents focus loss during typing
   useEffect(() => {
-    if (prevValueRef.current !== value) {
+    if (!isFocusedRef.current) {
       setLocal(value != null ? String(value) : '')
-      prevValueRef.current = value
     }
   }, [value])
 
@@ -68,7 +69,10 @@ function NumericCell({
       value={local}
       disabled={disabled}
       onChange={e => setLocal(e.target.value)}
-      onFocus={e => e.currentTarget.select()}
+      onFocus={e => {
+        isFocusedRef.current = true
+        e.currentTarget.select()
+      }}
       onKeyDown={e => {
         if (e.key === 'Enter') {
           e.preventDefault()
@@ -77,6 +81,7 @@ function NumericCell({
         }
       }}
       onBlur={() => {
+        isFocusedRef.current = false
         const trimmed = local.trim()
         if (trimmed === '') {
           onChange(null)
@@ -255,7 +260,7 @@ function ItemTypeMenu({
   )
 }
 
-export function LineItemRow({
+export const LineItemRow = React.memo(function LineItemRow({
   item,
   onUpdate,
   onDelete,
@@ -342,14 +347,28 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
+          gridTemplateColumns: '30px 1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
-          cursor: dragListeners ? 'grab' : 'default',
         }}
-        // Spread drag listeners/attributes on the whole row
-        {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
-        {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
       >
+        {/* Drag handle */}
+        {dragListeners && (
+          <div
+            {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
+            {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'grab',
+              color: '#c0bab3',
+              userSelect: 'none',
+            }}
+          >
+            ⋮⋮
+          </div>
+        )}
+        {!dragListeners && <div style={{ width: '30px' }} />}
         {/* Description */}
         <div
           style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}
@@ -566,4 +585,18 @@ export function LineItemRow({
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent re-renders when only the item reference changed but values are the same
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.item_description === nextProps.item.item_description &&
+    prevProps.item.qty === nextProps.item.qty &&
+    prevProps.item.unit === nextProps.item.unit &&
+    prevProps.item.rate_labour === nextProps.item.rate_labour &&
+    prevProps.item.rate_materials === nextProps.item.rate_materials &&
+    prevProps.item.trade === nextProps.item.trade &&
+    prevProps.item.item_type === nextProps.item.item_type &&
+    prevProps.isLocked === nextProps.isLocked &&
+    prevProps.isDragging === nextProps.isDragging
+  )
+})

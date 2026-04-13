@@ -332,6 +332,11 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   )
 
   const handleRoomDragStart = useCallback((event: DragStartEvent) => {
+    // Prevent drag if the active element is an input or textarea
+    const activeElement = document.activeElement
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
+      return
+    }
     setActiveRoomId(String(event.active.id))
     setDragRoomOrder(rooms.map(r => r.name))
   }, [rooms])
