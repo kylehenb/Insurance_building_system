@@ -158,12 +158,10 @@ export default async function QuotePrintPage({
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
         {/* Header - White background with logo and job details */}
         <div className="flex bg-white">
-          {/* Left: Logo and company name */}
-          <div className="pl-8 pr-4 py-4 flex items-center justify-center" style={{ width: '140px', minWidth: '140px' }}>
-            <div className="text-center">
-              <img src="/logo-alt.png" alt="IRC Logo" className="block mx-auto mb-1" style={{ width: '90px', height: '90px', objectFit: 'contain' }} />
-              <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
-            </div>
+          {/* Left: Logo and company name - aligned with left page border */}
+          <div className="pl-6 pr-4 py-4 flex flex-col justify-start" style={{ width: '140px', minWidth: '140px' }}>
+            <img src="/logo-alt.png" alt="IRC Logo" className="block mb-2" style={{ width: '90px', height: '90px', objectFit: 'contain' }} />
+            <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Right: Job details */}
@@ -243,8 +241,8 @@ export default async function QuotePrintPage({
 
             return (
               <div key={room} className="mb-6">
-                {/* Room header with dimensions */}
-                <div className="bg-[#e8e0d5] py-2 px-3 border-t-2 border-[#d0c8bc]">
+                {/* Room header with dimensions - no background */}
+                <div className="py-2 px-3 border-b border-[#e0dbd4]">
                   <h4 className="font-semibold text-[#3a3530] text-sm">
                     {room}
                     {hasDimensions && (
@@ -302,76 +300,78 @@ export default async function QuotePrintPage({
           })}
         </div>
 
-        {/* Footer Section - Notes left, Totals right */}
-        <div className="px-6 pb-6 border-t border-[#e0dbd4] bg-white">
-          <div className="flex gap-6">
-            {/* Notes - Left column */}
-            <div className="flex-1">
-              <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2">Notes</p>
-              <div className="text-sm text-[#3a3530] whitespace-pre-wrap">{quote.notes || ''}</div>
-            </div>
-
-            {/* Totals - Right column */}
-            <div className="w-72">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#3a3530]">Subtotal</span>
-                <span className="font-mono text-sm text-[#3a3530]">{fmt(subtotal)}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#3a3530]">Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
-                <span className="font-mono text-sm text-[#3a3530]">{fmt(markup)}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-[#3a3530]">GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
-                <span className="font-mono text-sm text-[#3a3530]">{fmt(gst)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
-                <span className="text-base font-semibold text-[#3a3530]">Total inc GST</span>
-                <span className="font-mono text-lg font-bold text-[#3a3530]">{fmt(total)}</span>
+        {/* Footer Section - Notes left, Totals right - in light beige box with rounded corners */}
+        <div className="px-6 pb-6">
+          <div className="bg-[#f5f2ee] rounded-lg p-6">
+            <div className="flex gap-6">
+              {/* Notes - Left column */}
+              <div className="flex-1">
+                <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2">Notes</p>
+                <div className="text-sm text-[#3a3530] whitespace-pre-wrap">{quote.notes || ''}</div>
               </div>
 
-              {/* Informational breakdown for special item types */}
-              {(provisionalSumItems.length > 0 || primeCostItems.length > 0 || cashSettlementItems.length > 0) && (
-                <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
-                  <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
-                  {provisionalSumItems.length > 0 && (
-                    <div 
-                      className="flex justify-between mb-1 px-2"
-                      style={{ 
-                        borderLeft: '3px solid #f59e0b',
-                        borderRight: '3px solid #f59e0b'
-                      }}
-                    >
-                      <span className="text-xs text-[#3a3530]">Provisional Sum Items incl GST</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
-                    </div>
-                  )}
-                  {primeCostItems.length > 0 && (
-                    <div 
-                      className="flex justify-between mb-1 px-2"
-                      style={{ 
-                        borderLeft: '3px solid #60a5fa',
-                        borderRight: '3px solid #60a5fa'
-                      }}
-                    >
-                      <span className="text-xs text-[#3a3530]">Prime Cost Items incl GST</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
-                    </div>
-                  )}
-                  {cashSettlementItems.length > 0 && (
-                    <div 
-                      className="flex justify-between mb-1 px-2"
-                      style={{ 
-                        borderLeft: '3px solid #94a3b8',
-                        borderRight: '3px solid #94a3b8'
-                      }}
-                    >
-                      <span className="text-xs text-[#3a3530]">Cash Settlement Items incl GST</span>
-                      <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
-                    </div>
-                  )}
+              {/* Totals - Right column */}
+              <div className="w-72">
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-[#3a3530]">Subtotal</span>
+                  <span className="font-mono text-sm text-[#3a3530]">{fmt(subtotal)}</span>
                 </div>
-              )}
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-[#3a3530]">Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
+                  <span className="font-mono text-sm text-[#3a3530]">{fmt(markup)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-[#3a3530]">GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
+                  <span className="font-mono text-sm text-[#3a3530]">{fmt(gst)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
+                  <span className="text-base font-semibold text-[#3a3530]">Total inc GST</span>
+                  <span className="font-mono text-lg font-bold text-[#3a3530]">{fmt(total)}</span>
+                </div>
+
+                {/* Informational breakdown for special item types */}
+                {(provisionalSumItems.length > 0 || primeCostItems.length > 0 || cashSettlementItems.length > 0) && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
+                    <p className="text-[#b0a89e] text-[9px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
+                    {provisionalSumItems.length > 0 && (
+                      <div 
+                        className="flex justify-between mb-1 px-2"
+                        style={{ 
+                          borderLeft: '3px solid #f59e0b',
+                          borderRight: '3px solid #f59e0b'
+                        }}
+                      >
+                        <span className="text-xs text-[#3a3530]">Provisional Sum Items incl GST</span>
+                        <span className="font-mono text-xs text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                      </div>
+                    )}
+                    {primeCostItems.length > 0 && (
+                      <div 
+                        className="flex justify-between mb-1 px-2"
+                        style={{ 
+                          borderLeft: '3px solid #60a5fa',
+                          borderRight: '3px solid #60a5fa'
+                        }}
+                      >
+                        <span className="text-xs text-[#3a3530]">Prime Cost Items incl GST</span>
+                        <span className="font-mono text-xs text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                      </div>
+                    )}
+                    {cashSettlementItems.length > 0 && (
+                      <div 
+                        className="flex justify-between mb-1 px-2"
+                        style={{ 
+                          borderLeft: '3px solid #94a3b8',
+                          borderRight: '3px solid #94a3b8'
+                        }}
+                      >
+                        <span className="text-xs text-[#3a3530]">Cash Settlement Items incl GST</span>
+                        <span className="font-mono text-xs text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -381,15 +381,15 @@ export default async function QuotePrintPage({
       <div className="bg-[#1a1a1a] text-white p-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto brightness-0 invert" />
+            <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto" />
             <div>
-              <p className="font-bold text-sm tracking-widest uppercase">{tenant.name}</p>
-              <p className="text-xs text-[#6a6460]">Insurance Repair Co.</p>
+              <p className="font-bold text-sm tracking-widest uppercase text-[#f5f2ee]">{tenant.name}</p>
+              <p className="text-xs text-[#f5f2ee]">Insurance Repair Co.</p>
             </div>
           </div>
           <div className="text-right text-sm">
-            <p className="text-[#6a6460]">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
-            <p className="text-[#6a6460]">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
+            <p className="text-[#f5f2ee]">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
+            <p className="text-[#f5f2ee]">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
           </div>
         </div>
       </div>
