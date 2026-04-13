@@ -24,6 +24,7 @@ export function DescriptionSearch({
   disabled,
   inputRef,
 }: DescriptionSearchProps) {
+  const [local, setLocal] = useState(value ?? '')
   const [results, setResults] = useState<LibraryItem[]>([])
   const [open, setOpen] = useState(false)
   const [noMatch, setNoMatch] = useState(false)
@@ -32,11 +33,12 @@ export function DescriptionSearch({
   const internalRef = useRef<HTMLTextAreaElement>(null)
   const textareaRef = inputRef ?? internalRef
   const [matchedLibraryId, setMatchedLibraryId] = useState<string | null>(null)
+  const isFocusedRef = useRef(false)
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const v = e.target.value
-      onChange(v)
+      setLocal(v)
       setMatchedLibraryId(null)
 
       if (v.length >= 2) {
@@ -51,7 +53,7 @@ export function DescriptionSearch({
       }
       setActiveIdx(-1)
     },
-    [onChange, search]
+    [search]
   )
 
   const handleSelect = useCallback(
@@ -103,15 +105,17 @@ export function DescriptionSearch({
 
   const handleBlur = useCallback(
     (_e: React.FocusEvent<HTMLTextAreaElement>) => {
+      isFocusedRef.current = false
       setTimeout(() => {
         if (!containerRef.current?.contains(document.activeElement)) {
           setOpen(false)
           setActiveIdx(-1)
+          onChange(local)
           onBlur?.()
         }
       }, 160)
     },
-    [onBlur]
+    [local, onChange, onBlur]
   )
 
   useEffect(() => {
@@ -125,6 +129,13 @@ export function DescriptionSearch({
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
+  // Sync local state with value prop only on mount
+  // Local state is the source of truth throughout the component's lifecycle
+  useEffect(() => {
+    setLocal(value ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-resize textarea
   const rows = Math.max(2, Math.ceil((value?.length ?? 0) / 52))
 
@@ -135,8 +146,9 @@ export function DescriptionSearch({
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <textarea
         ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
-        value={value ?? ''}
+        value={local}
         onChange={handleChange}
+        onFocus={() => { isFocusedRef.current = true }}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         disabled={disabled}

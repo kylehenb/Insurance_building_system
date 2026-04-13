@@ -52,28 +52,26 @@ function NumericCell({
   onNavigateNext?: () => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
-  const [isFocused, setIsFocused] = useState(false)
-  const prevValueRef = useRef(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isFocusedRef = useRef(false)
 
-  // Sync local state with value prop only when value changes from external source
-  // and input is not focused. This prevents focus loss during typing.
+  // Sync local state with value prop only on mount
+  // Local state is the source of truth throughout the component's lifecycle
   useEffect(() => {
-    if (prevValueRef.current !== value && !isFocused) {
-      setLocal(value != null ? String(value) : '')
-    }
-    prevValueRef.current = value
+    setLocal(value != null ? String(value) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
+  }, [])
 
   return (
     <input
+      ref={inputRef}
       type="text"
       inputMode="decimal"
       value={local}
       disabled={disabled}
       onChange={e => setLocal(e.target.value)}
       onFocus={e => {
-        setIsFocused(true)
+        isFocusedRef.current = true
         e.currentTarget.select()
       }}
       onKeyDown={e => {
@@ -84,7 +82,7 @@ function NumericCell({
         }
       }}
       onBlur={() => {
-        setIsFocused(false)
+        isFocusedRef.current = false
         const trimmed = local.trim()
         if (trimmed === '') {
           onChange(null)
@@ -263,7 +261,7 @@ function ItemTypeMenu({
   )
 }
 
-export const LineItemRow = React.memo(function LineItemRow({
+export function LineItemRow({
   item,
   onUpdate,
   onDelete,
@@ -279,7 +277,25 @@ export const LineItemRow = React.memo(function LineItemRow({
 }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
   const [showMenu, setShowMenu] = useState(false)
+  const [localUnit, setLocalUnit] = useState(item.unit ?? '')
+  const [localTrade, setLocalTrade] = useState(item.trade ?? '')
   const menuAnchorRef = useRef<HTMLDivElement>(null)
+
+  // Sync local state with item props only on mount
+  // Local state is the source of truth throughout the component's lifecycle
+  const unitSelectRef = useRef<HTMLSelectElement>(null)
+  const tradeSelectRef = useRef<HTMLSelectElement>(null)
+  const unitFocusedRef = useRef(false)
+  const tradeFocusedRef = useRef(false)
+
+  useEffect(() => {
+    setLocalUnit(item.unit ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    setLocalTrade(item.trade ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const hasLineTotal = (item.line_total ?? 0) > 0
   const typeInfo = item.item_type ? ITEM_TYPE_LABELS[item.item_type] : null
@@ -413,8 +429,14 @@ export const LineItemRow = React.memo(function LineItemRow({
         {/* Unit */}
         <div style={col} onPointerDown={e => e.stopPropagation()}>
           <select
-            value={item.unit ?? ''}
-            onChange={e => onUpdate(item.id, { unit: e.target.value })}
+            ref={unitSelectRef}
+            value={localUnit}
+            onChange={e => setLocalUnit(e.target.value)}
+            onFocus={() => { unitFocusedRef.current = true }}
+            onBlur={() => {
+              unitFocusedRef.current = false
+              onUpdate(item.id, { unit: localUnit })
+            }}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); onNavigateNext?.() }
             }}
@@ -451,8 +473,14 @@ export const LineItemRow = React.memo(function LineItemRow({
         {/* Trade */}
         <div style={col} onPointerDown={e => e.stopPropagation()}>
           <select
-            value={item.trade ?? ''}
-            onChange={e => onUpdate(item.id, { trade: e.target.value })}
+            ref={tradeSelectRef}
+            value={localTrade}
+            onChange={e => setLocalTrade(e.target.value)}
+            onFocus={() => { tradeFocusedRef.current = true }}
+            onBlur={() => {
+              tradeFocusedRef.current = false
+              onUpdate(item.id, { trade: localTrade })
+            }}
             disabled={isLocked}
             onKeyDown={e => {
               if (e.key === 'Tab') {
@@ -588,18 +616,4 @@ export const LineItemRow = React.memo(function LineItemRow({
       </div>
     </div>
   )
-}, (prevProps, nextProps) => {
-  // Custom comparison to prevent re-renders when only the item reference changed but values are the same
-  return (
-    prevProps.item.id === nextProps.item.id &&
-    prevProps.item.item_description === nextProps.item.item_description &&
-    prevProps.item.qty === nextProps.item.qty &&
-    prevProps.item.unit === nextProps.item.unit &&
-    prevProps.item.rate_labour === nextProps.item.rate_labour &&
-    prevProps.item.rate_materials === nextProps.item.rate_materials &&
-    prevProps.item.trade === nextProps.item.trade &&
-    prevProps.item.item_type === nextProps.item.item_type &&
-    prevProps.isLocked === nextProps.isLocked &&
-    prevProps.isDragging === nextProps.isDragging
-  )
-})
+}

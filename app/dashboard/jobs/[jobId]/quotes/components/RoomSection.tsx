@@ -63,18 +63,15 @@ function DimInput({
   onChange: (v: number | null) => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
-  const [isFocused, setIsFocused] = useState(false)
-  const prevValueRef = useRef(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isFocusedRef = useRef(false)
 
-  // Sync local state with value prop only when value changes from external source
-  // and input is not focused. This prevents focus loss during typing.
+  // Sync local state with value prop only on mount
+  // Local state is the source of truth throughout the component's lifecycle
   useEffect(() => {
-    if (prevValueRef.current !== value && !isFocused) {
-      setLocal(value != null ? String(value) : '')
-    }
-    prevValueRef.current = value
+    setLocal(value != null ? String(value) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
+  }, [])
 
   return (
     <>
@@ -91,13 +88,14 @@ function DimInput({
         </span>
       ) : null}
       <input
+        ref={inputRef}
         type="text"
         inputMode="decimal"
         value={local}
         placeholder="0.0"
         onChange={e => setLocal(e.target.value)}
         onFocus={e => {
-          setIsFocused(true)
+          isFocusedRef.current = true
           e.currentTarget.select()
         }}
         onPointerDown={e => {
@@ -106,7 +104,7 @@ function DimInput({
           ;(e.currentTarget as HTMLElement).dataset.noDrag = 'true'
         }}
         onBlur={() => {
-          setIsFocused(false)
+          isFocusedRef.current = false
           const trimmed = local.trim()
           if (trimmed === '') {
             onChange(null)
@@ -259,6 +257,8 @@ function SortableLineItemRow({
   descRef: React.RefObject<HTMLTextAreaElement | null>
   activeId: string | null
 }) {
+  // Use the stable key (_key if available, otherwise id) for dnd-kit to prevent remounts
+  const sortableId = item._key ?? item.id
   const {
     attributes,
     listeners,
@@ -266,7 +266,7 @@ function SortableLineItemRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: isLocked })
+  } = useSortable({ id: sortableId, disabled: isLocked })
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -278,7 +278,7 @@ function SortableLineItemRow({
   return (
     <div ref={setNodeRef} style={style}>
       {/* Drop indicator line above this row when something is dragged over */}
-      {activeId && activeId !== item.id && isDragging === false && (
+      {activeId && activeId !== (item._key ?? item.id) && isDragging === false && (
         <div
           style={{
             position: 'absolute',
@@ -365,6 +365,8 @@ export function RoomSection({
 
   // Desc refs: keyed by item id
   const descRefs = useRef<Map<string, React.RefObject<HTMLTextAreaElement | null>>>(new Map())
+  // Track stable keys to prevent remounts during item reference changes
+  const stableKeysRef = useRef<Map<string, string>>(new Map())
   const pendingFocusId = useRef<string | null>(null)
 
   // Focus pending description field after render
@@ -376,7 +378,7 @@ export function RoomSection({
         pendingFocusId.current = null
       }
     }
-  })
+  }, [displayItems])
 
   // Autofocus name on mount for new blank rooms
   useEffect(() => {
@@ -437,8 +439,9 @@ export function RoomSection({
         // Add a new row and focus its description
         if (!isLocked) {
           const newItem = onAddItem(name)
-          // _key is set to the temp ID in makeTempItem and equals .id for new items
-          pendingFocusId.current = newItem._key ?? newItem.id
+          // Use the stable key from stableKeysRef for focus
+          const stableKey = stableKeysRef.current.get(newItem.id) ?? (newItem._key ?? newItem.id)
+          pendingFocusId.current = stableKey
         }
       }
     },
@@ -449,7 +452,7 @@ export function RoomSection({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 250,
+        delay: 500,
         tolerance: 5,
       },
     })
@@ -461,8 +464,12 @@ export function RoomSection({
     if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
       return
     }
-    setActiveId(String(event.active.id))
-    setDragOrderItems(items) // snapshot current order at drag start
+    // Find the item by stable key to get the correct item
+    const item = items.find(i => (i._key ?? i.id) === event.active.id)
+    if (item) {
+      setActiveId(String(item._key ?? item.id))
+      setDragOrderItems(items) // snapshot current order at drag start
+    }
   }, [items])
 
   const handleDragEnd = useCallback(
@@ -471,8 +478,8 @@ export function RoomSection({
       setActiveId(null) // switches displayItems back to items prop
       if (!over || active.id === over.id) return
 
-      const oldIndex = dragOrderItems.findIndex(i => i.id === active.id)
-      const newIndex = dragOrderItems.findIndex(i => i.id === over.id)
+      const oldIndex = dragOrderItems.findIndex(i => (i._key ?? i.id) === active.id)
+      const newIndex = dragOrderItems.findIndex(i => (i._key ?? i.id) === over.id)
       const reordered = arrayMove(dragOrderItems, oldIndex, newIndex)
       // onReorderItems calls setItems in useQuote — batched with setActiveId(null)
       // so items prop is already in the new order when displayItems switches back
@@ -685,12 +692,16 @@ export function RoomSection({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={displayItems.map(i => i.id)}
+              items={displayItems.map(i => i._key ?? i.id)}
               strategy={verticalListSortingStrategy}
             >
               {displayItems.map((item, idx) => {
-                // Use stable key so that the temp→real ID swap doesn't cause unmount/remount
-                const stableKey = item._key ?? item.id
+                // Use a stable key that persists across item reference changes
+                // Initialize with _key if available (for temp→real ID swaps), otherwise use id
+                if (!stableKeysRef.current.has(item.id)) {
+                  stableKeysRef.current.set(item.id, item._key ?? item.id)
+                }
+                const stableKey = stableKeysRef.current.get(item.id)!
                 // Ensure each item has a stable ref keyed by the stable key
                 if (!descRefs.current.has(stableKey)) {
                   descRefs.current.set(
@@ -751,7 +762,9 @@ export function RoomSection({
               <button
                 onClick={() => {
                   const newItem = onAddItem(name)
-                  pendingFocusId.current = newItem._key ?? newItem.id
+                  // Use the stable key from stableKeysRef for focus
+                  const stableKey = stableKeysRef.current.get(newItem.id) ?? (newItem._key ?? newItem.id)
+                  pendingFocusId.current = stableKey
                 }}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',

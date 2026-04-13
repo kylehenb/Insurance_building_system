@@ -205,8 +205,13 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
   )
 
   // Recalculate preliminary items when subtotal changes
+  const prevItemsRef = useRef<ScopeItem[]>([])
   useEffect(() => {
     if (!quote || items.length === 0) return
+
+    // Skip if items reference hasn't changed (shallow comparison)
+    if (prevItemsRef.current === items) return
+    prevItemsRef.current = items
 
     // Calculate subtotal excluding preliminary items to avoid circular dependency
     const nonPrelimItems = items.filter(i => !i.preliminary_formula || i.room !== 'Preliminaries')
