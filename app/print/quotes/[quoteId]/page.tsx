@@ -207,7 +207,7 @@ export default async function QuotePrintPage({
 
         {/* Title */}
         <div className="px-6 py-3 bg-white">
-          <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide">Estimate - Scope of Works</h2>
+          <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide" style={{ fontFamily: 'DM Sans, sans-serif' }}>Estimate - Scope of Works</h2>
         </div>
 
         {/* Table Header */}
@@ -243,7 +243,7 @@ export default async function QuotePrintPage({
               <div key={room} className="mb-4">
                 {/* Room header with dimensions - light beige background */}
                 <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
-                  <h4 className="font-semibold text-[#3a3530] text-sm">
+                  <h4 className="font-semibold text-[#3a3530] text-sm" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                     {room}
                     {hasDimensions && (
                       <span className="text-xs text-[#9e998f] font-mono ml-2">{roomSizeStr}</span>
@@ -268,7 +268,7 @@ export default async function QuotePrintPage({
                             borderRight: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent'
                           }}
                         >
-                          <td className="py-1.5 px-2 text-[#3a3530]" style={{ width: '60%', fontFamily: 'DM Mono, monospace' }}>
+                          <td className="py-1.5 px-2 text-[#3a3530]" style={{ width: '60%', fontFamily: 'DM Sans, sans-serif' }}>
                             {typeInfo && (
                               <div className="mb-0.5">
                                 <span
@@ -284,9 +284,9 @@ export default async function QuotePrintPage({
                             )}
                             {item.item_description || '-'}
                           </td>
-                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '5%', fontFamily: 'DM Mono, monospace' }}>{item.qty || '-'}</td>
-                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '5%', fontFamily: 'DM Mono, monospace' }}>{item.unit || '-'}</td>
-                          <td className="py-1.5 px-2 text-left text-[#3a3530]" style={{ width: '15%', fontFamily: 'DM Mono, monospace' }}>{item.trade || '-'}</td>
+                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '5%', fontFamily: 'DM Sans, sans-serif' }}>{item.qty || '-'}</td>
+                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '5%', fontFamily: 'DM Sans, sans-serif' }}>{item.unit || '-'}</td>
+                          <td className="py-1.5 px-2 text-left text-[#3a3530]" style={{ width: '15%', fontFamily: 'DM Sans, sans-serif' }}>{item.trade || '-'}</td>
                           <td className="py-1.5 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap" style={{ width: '15%' }}>
                             {fmt(item.line_total)}
                           </td>
@@ -306,26 +306,26 @@ export default async function QuotePrintPage({
             <div className="flex gap-6">
               {/* Notes - Left column */}
               <div className="flex-1">
-                <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'DM Mono, monospace' }}>Notes</p>
-                <div className="text-sm text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'DM Mono, monospace' }}>{quote.notes || ''}</div>
+                <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>Notes</p>
+                <div className="text-sm text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'DM Sans, sans-serif' }}>{quote.notes || ''}</div>
               </div>
 
               {/* Totals - Right column */}
               <div className="w-72">
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>Subtotal</span>
+                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Sans, sans-serif' }}>Subtotal</span>
                   <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>{fmt(subtotal)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
+                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Sans, sans-serif' }}>Builder's Margin ({((quote.markup_pct || 0.2) * 100).toFixed(0)}%)</span>
                   <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>{fmt(markup)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
+                  <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Sans, sans-serif' }}>GST ({((quote.gst_pct || 0.1) * 100).toFixed(0)}%)</span>
                   <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>{fmt(gst)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
-                  <span className="text-base font-semibold text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>Total inc GST</span>
+                  <span className="text-base font-semibold text-[#3a3530]" style={{ fontFamily: 'DM Sans, sans-serif' }}>Total inc GST</span>
                   <span className="text-lg font-bold text-[#3a3530]" style={{ fontFamily: 'DM Mono, monospace' }}>{fmt(total)}</span>
                 </div>
 
@@ -387,14 +387,14 @@ export default async function QuotePrintPage({
             </div>
           </div>
           <div className="flex-1 flex justify-center">
-            <span className="inline-block px-4 py-1 rounded-full text-xs font-semibold bg-[#f5f2ee] text-[#1a1a1a]">
+            <span className="inline-block px-4 py-1 rounded-full text-xs font-semibold bg-[#f5f2ee] text-[#1a1a1a]" style={{ fontFamily: 'DM Sans, sans-serif' }}>
               Quote Questions?
             </span>
           </div>
           <div className="text-left text-xs">
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Mono, monospace' }}>Assessor: Kyle</p>
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Mono, monospace' }}>📱 0431132077</p>
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Mono, monospace' }}>✉️ kyle@insurancerepairco.com.au</p>
+            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Sans, sans-serif' }}>Assessor: Kyle</p>
+            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Sans, sans-serif' }}>📱 0431132077</p>
+            <p className="text-[#f5f2ee]" style={{ fontFamily: 'DM Sans, sans-serif' }}>✉️ kyle@insurancerepairco.com.au</p>
           </div>
         </div>
       </div>
