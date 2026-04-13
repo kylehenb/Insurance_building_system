@@ -227,6 +227,7 @@ interface SortableRoomSectionProps {
   onReorderItems: (room: string, orderedIds: string[]) => void
   search: (q: string) => LibraryItem[]
   trades: Trade[]
+  startingIndex: number
 }
 
 function SortableRoomSection({
@@ -241,6 +242,7 @@ function SortableRoomSection({
   onReorderItems,
   search,
   trades,
+  startingIndex,
 }: SortableRoomSectionProps) {
   const {
     attributes,
@@ -277,6 +279,7 @@ function SortableRoomSection({
         search={search}
         isLocked={isLocked}
         trades={trades}
+        startingIndex={startingIndex}
       />
     </div>
   )
@@ -549,47 +552,61 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
             items={rooms.map(r => r.name)}
             strategy={verticalListSortingStrategy}
           >
-            {rooms.map(room => (
-              <SortableRoomSection
-                key={room.name}
-                room={room}
-                isLocked={isLocked}
-                onUpdateItem={updateItemLocal}
-                onDeleteItem={handleDeleteItem}
-                onAddItem={handleAddItem}
-                onUpdateDimensions={updateRoomDimensions}
-                onRenameRoom={renameRoom}
-                onDeleteRoom={(roomName) => {
-                  if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
-                  room.items.forEach(i => deleteItem(i.id))
-                }}
-                onReorderItems={reorderItems}
-                search={search}
-                trades={trades}
-              />
-            ))}
+            {(() => {
+              let counter = 0
+              return rooms.map(room => {
+                const startIndex = counter + 1
+                counter += room.items.length
+                return (
+                  <SortableRoomSection
+                    key={room.name}
+                    room={room}
+                    isLocked={isLocked}
+                    onUpdateItem={updateItemLocal}
+                    onDeleteItem={handleDeleteItem}
+                    onAddItem={handleAddItem}
+                    onUpdateDimensions={updateRoomDimensions}
+                    onRenameRoom={renameRoom}
+                    onDeleteRoom={(roomName) => {
+                      if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
+                      room.items.forEach(i => deleteItem(i.id))
+                    }}
+                    onReorderItems={reorderItems}
+                    search={search}
+                    trades={trades}
+                    startingIndex={startIndex}
+                  />
+                )
+              })
+            })()}
           </SortableContext>
         </DndContext>
 
         {/* Pending rooms (added locally, no items yet) */}
-        {pendingRooms.map((pr, idx) => (
-          <RoomSection
-            key={`pending-${idx}-${pr.name}`}
-            name={pr.name}
-            items={[]}
-            onUpdateItem={updateItemLocal}
-            onDeleteItem={handleDeleteItem}
-            onAddItem={handleAddItem}
-            onUpdateDimensions={() => {}}
-            onRenameRoom={handleRenamePendingRoom}
-            onDeleteRoom={() => handleDeleteRoom(pr.name)}
-            onReorderItems={() => {}}
-            search={search}
-            isLocked={isLocked}
-            trades={trades}
-            autoFocusName={pr.autoFocus}
-          />
-        ))}
+        {(() => {
+          const totalItemsInRooms = rooms.reduce((sum, room) => sum + room.items.length, 0)
+          return pendingRooms.map((pr, idx) => (
+            <RoomSection
+              key={`pending-${idx}-${pr.name}`}
+              name={pr.name}
+              items={[]}
+              onUpdateItem={updateItemLocal}
+              onDeleteItem={handleDeleteItem}
+              onAddItem={handleAddItem}
+              onUpdateDimensions={updateRoomDimensions}
+              onRenameRoom={renameRoom}
+              onDeleteRoom={(roomName) => {
+                if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
+              }}
+              onReorderItems={reorderItems}
+              search={search}
+              isLocked={isLocked}
+              trades={trades}
+              autoFocusName={true}
+              startingIndex={totalItemsInRooms + 1}
+            />
+          ))
+        })()}
 
         {/* Add room */}
         {!isLocked && (

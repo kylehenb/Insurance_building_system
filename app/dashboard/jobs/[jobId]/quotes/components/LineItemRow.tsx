@@ -16,6 +16,7 @@ const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, { label: string; pill: str
 
 interface LineItemRowProps {
   item: ScopeItem
+  itemIndex: number
   onUpdate: (itemId: string, changes: Record<string, unknown>) => void
   onDelete: (itemId: string) => void
   search: (q: string) => LibraryItem[]
@@ -257,6 +258,7 @@ function ItemTypeMenu({
 
 export function LineItemRow({
   item,
+  itemIndex,
   onUpdate,
   onDelete,
   search,
@@ -357,10 +359,17 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
+          gridTemplateColumns: '4px 1fr 60px 70px 110px 120px 126px 75px 100px 60px',
           minHeight: 40,
         }}
       >
+        {/* Number */}
+        <div
+          style={{ ...col, justifyContent: 'center', padding: '6px 2px' }}
+        >
+          <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>{itemIndex}</span>
+        </div>
+
         {/* Description */}
         <div
           style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}

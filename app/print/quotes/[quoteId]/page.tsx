@@ -215,10 +215,11 @@ export default async function QuotePrintPage({
           <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
+                <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
                 <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '11%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
                 <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
               </tr>
             </thead>
@@ -227,48 +228,52 @@ export default async function QuotePrintPage({
 
         {/* Scope Items by Room */}
         <div className="px-6 pb-6">
-          {sortedRooms.map((room) => {
-            const roomItems = groupedByRoom[room]
-            // Get room dimensions from first item in the room
-            const firstItem = roomItems[0]
-            const roomLength = firstItem?.room_length
-            const roomWidth = firstItem?.room_width
-            const roomHeight = firstItem?.room_height
-            const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
-            const roomSizeStr = hasDimensions 
-              ? `${roomLength != null ? roomLength : '—'} × ${roomWidth != null ? roomWidth : '—'} × ${roomHeight != null ? roomHeight : '—'} m` 
-              : ''
+          {(() => {
+            let globalCounter = 0
+            return sortedRooms.map((room) => {
+              const roomItems = groupedByRoom[room]
+              // Get room dimensions from first item in the room
+              const firstItem = roomItems[0]
+              const roomLength = firstItem?.room_length
+              const roomWidth = firstItem?.room_width
+              const roomHeight = firstItem?.room_height
+              const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
+              const roomSizeStr = hasDimensions 
+                ? `${roomLength != null ? roomLength : '—'} × ${roomWidth != null ? roomWidth : '—'} × ${roomHeight != null ? roomHeight : '—'} m` 
+                : ''
 
-            return (
-              <div key={room} className="mb-4">
-                {/* Room header with dimensions - light beige background */}
-                <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
-                  <h4 className="font-bold text-[#3a3530] text-xs uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
-                    {room}
-                    {hasDimensions && (
-                      <span className="text-xs text-[#9e998f] font-mono ml-2" style={{ fontFamily: 'var(--font-dm-mono)' }}>{roomSizeStr}</span>
-                    )}
-                  </h4>
-                </div>
-                
-                {/* Table */}
-                <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
-                  <tbody>
-                    {roomItems.map((item) => {
-                      const itemType = item.item_type as ItemType
-                      const typeInfo = itemType ? ITEM_TYPE_LABELS[itemType] : null
-                      const leftBorderColor = typeInfo?.border ?? 'transparent'
-                      
-                      return (
-                        <tr 
-                          key={item.id} 
-                          className="border-b border-[#f0ece6]"
-                          style={{ 
-                            borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent',
-                            borderRight: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent'
-                          }}
-                        >
-                          <td className="py-1.5 px-2 text-[#3a3530]" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>
+              return (
+                <div key={room} className="mb-4">
+                  {/* Room header with dimensions - light beige background */}
+                  <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
+                    <h4 className="font-bold text-[#3a3530] text-xs uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
+                      {room}
+                      {hasDimensions && (
+                        <span className="text-xs text-[#9e998f] font-mono ml-2" style={{ fontFamily: 'var(--font-dm-mono)' }}>{roomSizeStr}</span>
+                      )}
+                    </h4>
+                  </div>
+                  
+                  {/* Table */}
+                  <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <tbody>
+                      {roomItems.map((item) => {
+                        globalCounter++
+                        const itemType = item.item_type as ItemType
+                        const typeInfo = itemType ? ITEM_TYPE_LABELS[itemType] : null
+                        const leftBorderColor = typeInfo?.border ?? 'transparent'
+                        
+                        return (
+                          <tr 
+                            key={item.id} 
+                            className="border-b border-[#f0ece6]"
+                            style={{ 
+                              borderLeft: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent',
+                              borderRight: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent'
+                            }}
+                          >
+                            <td className="py-1.5 px-1 text-center text-[#3a3530]" style={{ width: '4%', fontFamily: 'var(--font-dm-mono)', fontSize: '10px' }}>{globalCounter}</td>
+                            <td className="py-1.5 px-2 text-[#3a3530]" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>
                             {typeInfo && (
                               <div className="mb-0.5">
                                 <span
@@ -297,7 +302,8 @@ export default async function QuotePrintPage({
                 </table>
               </div>
             )
-          })}
+          })
+          })()}
         </div>
 
         {/* Footer Section - Notes left, Totals right - in light beige box with rounded corners */}
@@ -379,22 +385,34 @@ export default async function QuotePrintPage({
 
       {/* Black Footer */}
       <div className="bg-[#1a1a1a] text-white py-2 px-6 print:fixed print:bottom-0 print:left-0 print:right-0 print:z-50">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-6">
+          {/* Column 1: Logo + company info */}
+          <div className="flex items-center gap-3 flex-shrink-0">
             <img src="/logo.png" alt="IRC Logo" className="h-8 w-auto" />
-            <div>
-              <p className="font-bold text-xs tracking-widest uppercase text-[#f5f2ee]">{tenant.name}</p>
+            <div className="flex flex-col">
+              <p className="font-bold text-[10px] tracking-wider uppercase text-[#f5f2ee] leading-tight">INSURANCE REPAIR CO PTY LTD</p>
+              <p className="text-[9px] text-[#c8b89a] leading-tight">Building and Restoration</p>
             </div>
           </div>
+
+          {/* Column 2: License info */}
+          <div className="flex flex-col flex-shrink-0">
+            <p className="text-[9px] text-[#f5f2ee] leading-tight">BC105884</p>
+            <p className="text-[9px] text-[#c8b89a] leading-tight">IICRC Certified</p>
+          </div>
+
+          {/* Column 3: Quote Questions pill */}
           <div className="flex-1 flex justify-center">
-            <span className="inline-block px-4 py-1 rounded-full text-sm font-semibold bg-[#f5f2ee] text-[#1a1a1a] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
+            <span className="inline-block px-3 py-1 rounded-full text-[10px] font-semibold bg-[#f5f2ee] text-[#1a1a1a] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
               Quote Questions?
             </span>
           </div>
-          <div className="text-left text-xs">
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'var(--font-dm-sans)' }}>Assessor: Kyle</p>
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'var(--font-dm-mono)' }}>📱 0431132077</p>
-            <p className="text-[#f5f2ee]" style={{ fontFamily: 'var(--font-dm-mono)' }}>✉️ kyle@insurancerepairco.com.au</p>
+
+          {/* Column 4: Contact info */}
+          <div className="text-left flex-shrink-0">
+            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-sans)' }}>Assessor - Kyle</p>
+            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-mono)' }}>✉️ kyle@insurancerepairco.com.au</p>
+            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-mono)' }}>📱 0431132077</p>
           </div>
         </div>
       </div>

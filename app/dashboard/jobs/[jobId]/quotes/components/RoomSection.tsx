@@ -233,6 +233,7 @@ function CalcPanel({ l, w, h }: { l: number | null; w: number | null; h: number 
 // Sortable wrapper for a single line item
 function SortableLineItemRow({
   item,
+  itemIndex,
   onUpdate,
   onDelete,
   search,
@@ -243,6 +244,7 @@ function SortableLineItemRow({
   activeId,
 }: {
   item: ScopeItem
+  itemIndex: number
   onUpdate: (itemId: string, changes: Record<string, unknown>) => void
   onDelete: (itemId: string) => void
   search: (q: string) => LibraryItem[]
@@ -296,6 +298,7 @@ function SortableLineItemRow({
       )}
       <LineItemRow
         item={item}
+        itemIndex={itemIndex}
         onUpdate={onUpdate}
         onDelete={onDelete}
         search={search}
@@ -312,9 +315,10 @@ function SortableLineItemRow({
 // ──────────────────────────────────────────────
 // Grid / column constants
 // ──────────────────────────────────────────────
-const GRID = '1fr 60px 70px 110px 120px 130px 75px 100px 60px'
+const GRID = '4px 1fr 60px 70px 110px 120px 126px 75px 100px 60px'
 
 const COL_HEADERS = [
+  '#',
   'DESCRIPTION',
   'QTY',
   'UNIT',
@@ -343,7 +347,8 @@ export function RoomSection({
   isLocked,
   trades,
   autoFocusName,
-}: RoomSectionProps) {
+  startingIndex, // New prop for sequential numbering
+}: RoomSectionProps & { startingIndex: number }) {
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState(name)
@@ -643,8 +648,8 @@ export function RoomSection({
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   color: '#b0a89e',
-                  textAlign: i > 0 && i < 8 ? 'right' : 'left',
-                  borderRight: i < 8 ? '1px solid #f0ece6' : 'none',
+                  textAlign: i === 0 ? 'center' : i > 0 && i < 9 ? 'right' : 'left',
+                  borderRight: i < 9 ? '1px solid #f0ece6' : 'none',
                 }}
               >
                 {h}
@@ -683,6 +688,7 @@ export function RoomSection({
                   <SortableLineItemRow
                     key={stableKey}
                     item={item}
+                    itemIndex={startingIndex + idx}
                     onUpdate={onUpdateItem}
                     onDelete={onDeleteItem}
                     search={search}
@@ -711,6 +717,7 @@ export function RoomSection({
                 >
                   <LineItemRow
                     item={activeItem}
+                    itemIndex={0}
                     onUpdate={() => {}}
                     onDelete={() => {}}
                     search={search}
