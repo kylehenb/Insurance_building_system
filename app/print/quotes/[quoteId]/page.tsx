@@ -165,7 +165,7 @@ export default async function QuotePrintPage({
           </div>
 
           {/* Right: Job details */}
-          <div className="flex-1 pl-[28px] pr-6 pb-4 pt-0">
+          <div className="flex-1 pl-[44px] pr-6 pb-4 pt-0">
             {/* Title row */}
             <div className="flex items-start gap-3 mb-1">
               <h1 className="text-[22px] font-semibold text-[#1a1a1a]" style={{ fontFamily: 'DM Mono, monospace' }}>
