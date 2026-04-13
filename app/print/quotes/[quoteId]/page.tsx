@@ -160,7 +160,7 @@ export default async function QuotePrintPage({
         <div className="flex bg-white">
           {/* Left: Logo and company name - aligned with left page border */}
           <div className="pl-6 pr-4 py-4 flex flex-col justify-start" style={{ width: '140px', minWidth: '140px' }}>
-            <img src="/logo-alt.png" alt="IRC Logo" className="block mb-1" style={{ width: '110px', height: '110px', objectFit: 'contain' }} />
+            <img src="/logo-alt.png" alt="IRC Logo" className="block mb-1" style={{ width: '180px', height: '180px', objectFit: 'contain' }} />
             <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1.2' }}>INSURANCE REPAIR CO</div>
           </div>
 
@@ -215,11 +215,11 @@ export default async function QuotePrintPage({
           <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '55%' }}>Description</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '50%' }}>Description</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '10%' }}>Qty</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '10%' }}>Unit</th>
                 <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '15%' }}>Trade</th>
-                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider" style={{ width: '10%' }}>Line Total</th>
+                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-xs uppercase tracking-wider whitespace-nowrap" style={{ width: '15%' }}>Line Total</th>
               </tr>
             </thead>
           </table>
@@ -268,7 +268,7 @@ export default async function QuotePrintPage({
                             borderRight: itemType ? `3px solid ${leftBorderColor}` : '3px solid transparent'
                           }}
                         >
-                          <td className="py-1.5 px-2 text-[#3a3530]">
+                          <td className="py-1.5 px-2 text-[#3a3530]" style={{ width: '50%' }}>
                             {typeInfo && (
                               <div className="mb-0.5">
                                 <span
@@ -284,10 +284,10 @@ export default async function QuotePrintPage({
                             )}
                             {item.item_description || '-'}
                           </td>
-                          <td className="py-1.5 px-2 text-center text-[#3a3530]">{item.qty || '-'}</td>
-                          <td className="py-1.5 px-2 text-center text-[#3a3530]">{item.unit || '-'}</td>
-                          <td className="py-1.5 px-2 text-left text-[#3a3530]">{item.trade || '-'}</td>
-                          <td className="py-1.5 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap">
+                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '10%' }}>{item.qty || '-'}</td>
+                          <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '10%' }}>{item.unit || '-'}</td>
+                          <td className="py-1.5 px-2 text-left text-[#3a3530]" style={{ width: '15%' }}>{item.trade || '-'}</td>
+                          <td className="py-1.5 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap" style={{ width: '15%' }}>
                             {fmt(item.line_total)}
                           </td>
                         </tr>
@@ -378,7 +378,7 @@ export default async function QuotePrintPage({
       </div>
 
       {/* Black Footer */}
-      <div className="bg-[#1a1a1a] text-white p-6">
+      <div className="bg-[#1a1a1a] text-white p-6 print:fixed print:bottom-0 print:left-0 print:right-0 print:z-50">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="IRC Logo" className="h-12 w-auto" />
