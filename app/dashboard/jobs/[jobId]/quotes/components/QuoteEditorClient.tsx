@@ -226,7 +226,6 @@ interface SortableRoomSectionProps {
   onDeleteRoom: (roomName: string) => void
   onReorderItems: (room: string, orderedIds: string[]) => void
   search: (q: string) => LibraryItem[]
-  insurer: string | null
   trades: Trade[]
 }
 
@@ -241,7 +240,6 @@ function SortableRoomSection({
   onDeleteRoom,
   onReorderItems,
   search,
-  insurer,
   trades,
 }: SortableRoomSectionProps) {
   const {
@@ -278,7 +276,6 @@ function SortableRoomSection({
         onReorderItems={onReorderItems}
         search={search}
         isLocked={isLocked}
-        insurer={insurer}
         trades={trades}
       />
     </div>
@@ -568,7 +565,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
                 }}
                 onReorderItems={reorderItems}
                 search={search}
-                insurer={job.insurer}
                 trades={trades}
               />
             ))}
@@ -590,7 +586,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
             onReorderItems={() => {}}
             search={search}
             isLocked={isLocked}
-            insurer={job.insurer}
             trades={trades}
             autoFocusName={pr.autoFocus}
           />
