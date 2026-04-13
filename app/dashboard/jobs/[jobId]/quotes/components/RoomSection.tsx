@@ -276,7 +276,12 @@ function SortableLineItemRow({
   }
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={{ ...style, cursor: isLocked ? 'default' : 'grab' }}
+      {...attributes}
+      {...(listeners as React.DOMAttributes<HTMLDivElement>)}
+    >
       {/* Drop indicator line above this row when something is dragged over */}
       {activeId && activeId !== (item._key ?? item.id) && isDragging === false && (
         <div
@@ -304,8 +309,6 @@ function SortableLineItemRow({
         trades={trades}
         onNavigateNext={onNavigateNext}
         descRef={descRef}
-        dragListeners={listeners}
-        dragAttributes={attributes}
         isDragging={isDragging}
       />
     </div>
@@ -347,8 +350,6 @@ export function RoomSection({
   insurer,
   trades,
   autoFocusName,
-  dragListeners,
-  dragAttributes,
 }: RoomSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -508,22 +509,6 @@ export function RoomSection({
           gap: 12,
         }}
       >
-        {/* Drag handle */}
-        {dragListeners && (
-          <div
-            {...dragAttributes}
-            {...dragListeners}
-            style={{
-              cursor: 'move',
-              color: '#c0bab3',
-              userSelect: 'none',
-              padding: '2px 4px',
-            }}
-          >
-            ⋮⋮
-          </div>
-        )}
-        {!dragListeners && <div style={{ width: '24px' }} />}
         {/* Name */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
           {editingName ? (

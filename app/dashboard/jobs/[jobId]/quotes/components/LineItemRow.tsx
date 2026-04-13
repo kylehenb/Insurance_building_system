@@ -1,8 +1,6 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { DraggableAttributes } from '@dnd-kit/core'
-import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities'
 import type { LibraryItem } from '../hooks/useScopeLibrary'
 import type { ScopeItem, ItemType } from '../hooks/useQuote'
 import type { Trade } from '../hooks/useTrades'
@@ -26,9 +24,6 @@ interface LineItemRowProps {
   trades: Trade[]
   onNavigateNext?: () => void
   descRef?: React.RefObject<HTMLTextAreaElement | null>
-  /** dnd-kit drag listeners and attributes for the row wrapper */
-  dragListeners?: SyntheticListenerMap
-  dragAttributes?: DraggableAttributes
   isDragging?: boolean
 }
 
@@ -271,8 +266,6 @@ export function LineItemRow({
   trades,
   onNavigateNext,
   descRef,
-  dragListeners,
-  dragAttributes,
   isDragging,
 }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
@@ -366,28 +359,10 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '30px 1fr 60px 70px 110px 120px 130px 75px 100px 60px',
+          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
         }}
       >
-        {/* Drag handle */}
-        {dragListeners && (
-          <div
-            {...(dragListeners as React.DOMAttributes<HTMLDivElement>)}
-            {...(dragAttributes as React.HTMLAttributes<HTMLDivElement>)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'grab',
-              color: '#c0bab3',
-              userSelect: 'none',
-            }}
-          >
-            ⋮⋮
-          </div>
-        )}
-        {!dragListeners && <div style={{ width: '30px' }} />}
         {/* Description */}
         <div
           style={{ ...col, alignItems: 'flex-start', padding: '6px 8px' }}
