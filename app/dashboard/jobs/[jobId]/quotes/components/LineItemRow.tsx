@@ -357,7 +357,7 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 50px 55px 100px 100px 100px 65px 100px 60px',
+          gridTemplateColumns: '1fr 60px 70px 110px 120px 130px 75px 100px 60px',
           minHeight: 40,
         }}
       >

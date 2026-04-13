@@ -312,7 +312,7 @@ function SortableLineItemRow({
 // ──────────────────────────────────────────────
 // Grid / column constants
 // ──────────────────────────────────────────────
-const GRID = '1fr 50px 55px 100px 100px 100px 65px 100px 60px'
+const GRID = '1fr 60px 70px 110px 120px 130px 75px 100px 60px'
 
 const COL_HEADERS = [
   'DESCRIPTION',
@@ -401,13 +401,6 @@ export function RoomSection({
     }
     onDeleteRoom(name)
   }, [items.length, name, onDeleteRoom])
-
-  const startEditName = useCallback(() => {
-    if (isLocked) return
-    setEditingName(true)
-    setNameVal(name)
-    setTimeout(() => nameInputRef.current?.select(), 10)
-  }, [isLocked, name])
 
   const commitName = useCallback(() => {
     setEditingName(false)
