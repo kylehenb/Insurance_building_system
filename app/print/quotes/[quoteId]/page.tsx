@@ -241,8 +241,8 @@ export default async function QuotePrintPage({
 
             return (
               <div key={room} className="mb-4">
-                {/* Room header with dimensions - no background */}
-                <div className="py-1.5 px-3 border-b border-[#e0dbd4]">
+                {/* Room header with dimensions - light beige background */}
+                <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
                   <h4 className="font-semibold text-[#3a3530] text-sm">
                     {room}
                     {hasDimensions && (
@@ -384,12 +384,16 @@ export default async function QuotePrintPage({
             <img src="/logo.png" alt="IRC Logo" className="h-8 w-auto" />
             <div>
               <p className="font-bold text-xs tracking-widest uppercase text-[#f5f2ee]">{tenant.name}</p>
-              <p className="text-[10px] text-[#f5f2ee]">Insurance Repair Co.</p>
             </div>
           </div>
+          <div className="flex-1 flex justify-center">
+            <span className="inline-block px-4 py-1 rounded-full text-xs font-semibold bg-[#f5f2ee] text-[#1a1a1a]">
+              Quote Questions?
+            </span>
+          </div>
           <div className="text-right text-xs">
-            <p className="text-[#f5f2ee]">PHONE: {tenant.contact_phone || '1800-009-0061'}</p>
-            <p className="text-[#f5f2ee]">EMAIL: {tenant.contact_email || 'info@ircmaster.com.au'}</p>
+            <p className="text-[#f5f2ee]">PHONE: 0431132077</p>
+            <p className="text-[#f5f2ee]">EMAIL: kyle@insurancerepairco.com.au</p>
           </div>
         </div>
       </div>
