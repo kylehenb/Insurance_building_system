@@ -63,14 +63,17 @@ function DimInput({
   onChange: (v: number | null) => void
 }) {
   const [local, setLocal] = useState(value != null ? String(value) : '')
-  const isFocusedRef = useRef(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const prevValueRef = useRef(value)
 
-  // Only sync local state with value when not focused
-  // This prevents focus loss during typing
+  // Sync local state with value prop only when value changes from external source
+  // and input is not focused. This prevents focus loss during typing.
   useEffect(() => {
-    if (!isFocusedRef.current) {
+    if (prevValueRef.current !== value && !isFocused) {
       setLocal(value != null ? String(value) : '')
     }
+    prevValueRef.current = value
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
   return (
@@ -94,7 +97,7 @@ function DimInput({
         placeholder="0.0"
         onChange={e => setLocal(e.target.value)}
         onFocus={e => {
-          isFocusedRef.current = true
+          setIsFocused(true)
           e.currentTarget.select()
         }}
         onPointerDown={e => {
@@ -103,7 +106,7 @@ function DimInput({
           ;(e.currentTarget as HTMLElement).dataset.noDrag = 'true'
         }}
         onBlur={() => {
-          isFocusedRef.current = false
+          setIsFocused(false)
           const trimmed = local.trim()
           if (trimmed === '') {
             onChange(null)
