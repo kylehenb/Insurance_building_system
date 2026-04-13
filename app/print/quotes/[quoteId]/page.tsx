@@ -161,11 +161,11 @@ export default async function QuotePrintPage({
           {/* Left: Logo and company name - aligned with left page border */}
           <div className="pl-6 pr-4 py-0 flex flex-col" style={{ width: '140px', minWidth: '140px' }}>
             <img src="/logo-alt.png" alt="IRC Logo" className="block" style={{ width: '100%', height: 'auto', margin: '0px' }} />
-            <div className="text-[#6a6460] whitespace-nowrap mt-4" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1', paddingTop: '0px' }}>INSURANCE REPAIR CO</div>
+            <div className="text-[#6a6460] whitespace-nowrap mt-3" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1', paddingTop: '0px' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Right: Job details */}
-          <div className="flex-1 px-6 pb-4 pt-0">
+          <div className="flex-1 pl-[28px] pr-6 pb-4 pt-0">
             {/* Title row */}
             <div className="flex items-start gap-3 mb-1">
               <h1 className="text-[22px] font-semibold text-[#1a1a1a]" style={{ fontFamily: 'DM Mono, monospace' }}>
