@@ -159,9 +159,9 @@ export default async function QuotePrintPage({
         {/* Header - White background with logo and job details */}
         <div className="flex bg-white items-stretch">
           {/* Left: Logo and company name - aligned with left page border */}
-          <div className="pl-6 pr-4 py-0 flex flex-col justify-between" style={{ width: '140px', minWidth: '140px' }}>
+          <div className="pl-6 pr-4 py-0 flex flex-col" style={{ width: '140px', minWidth: '140px' }}>
             <img src="/logo-alt.png" alt="IRC Logo" className="block" style={{ width: '100%', height: 'auto', margin: '0px' }} />
-            <div className="text-[#6a6460] whitespace-nowrap" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1', marginTop: '0px', paddingTop: '0px' }}>INSURANCE REPAIR CO</div>
+            <div className="text-[#6a6460] whitespace-nowrap mt-4" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1', paddingTop: '0px' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Right: Job details */}
