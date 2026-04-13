@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useQuote } from '../hooks/useQuote'
 import type { ScopeItem } from '../hooks/useQuote'
 import { useScopeLibrary } from '../hooks/useScopeLibrary'
+import type { LibraryItem } from '../hooks/useScopeLibrary'
 import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
 import { useTrades } from '../hooks/useTrades'
+import type { Trade } from '../hooks/useTrades'
 import {
   DndContext,
   closestCenter,
@@ -204,6 +206,82 @@ function calcPermitItems(contractExGst: number): Array<Partial<ScopeItem> & { ro
   ]
 }
 
+// ── Draggable room wrapper ────────────────────────────────────────────────────
+// IMPORTANT: must be defined at module scope, not inside QuoteEditorClient.
+// Defining a component inside a render function creates a new type reference on
+// every render, causing React to unmount+remount the whole subtree and destroying
+// all local input state (focus, typed values) after every keystroke.
+
+interface SortableRoomSectionProps {
+  room: { name: string; items: ScopeItem[] }
+  isLocked: boolean
+  onUpdateItem: (itemId: string, changes: Record<string, unknown>) => void
+  onDeleteItem: (itemId: string) => Promise<void>
+  onAddItem: (room: string) => ScopeItem
+  onUpdateDimensions: (
+    room: string,
+    dims: { room_length?: number | null; room_width?: number | null; room_height?: number | null }
+  ) => void
+  onRenameRoom: (oldName: string, newName: string) => void
+  onDeleteRoom: (roomName: string) => void
+  onReorderItems: (room: string, orderedIds: string[]) => void
+  search: (q: string) => LibraryItem[]
+  insurer: string | null
+  trades: Trade[]
+}
+
+function SortableRoomSection({
+  room,
+  isLocked,
+  onUpdateItem,
+  onDeleteItem,
+  onAddItem,
+  onUpdateDimensions,
+  onRenameRoom,
+  onDeleteRoom,
+  onReorderItems,
+  search,
+  insurer,
+  trades,
+}: SortableRoomSectionProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: room.name, disabled: isLocked })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <RoomSection
+        name={room.name}
+        items={room.items}
+        onUpdateItem={onUpdateItem}
+        onDeleteItem={onDeleteItem}
+        onAddItem={onAddItem}
+        onUpdateDimensions={onUpdateDimensions}
+        onRenameRoom={onRenameRoom}
+        onDeleteRoom={onDeleteRoom}
+        onReorderItems={onReorderItems}
+        search={search}
+        isLocked={isLocked}
+        insurer={insurer}
+        trades={trades}
+        dragListeners={listeners}
+        dragAttributes={attributes}
+      />
+    </div>
+  )
+}
+
 // ── Main editor ──────────────────────────────────────────────────────────────
 
 export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuoteUpdated }: QuoteEditorClientProps) {
@@ -355,53 +433,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
     [dragRoomOrder, reorderRooms]
   )
 
-  // Draggable room wrapper component
-  function SortableRoomSection({
-    room,
-  }: {
-    room: { name: string; items: ScopeItem[] }
-  }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: room.name, disabled: isLocked })
-
-    const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    }
-
-    return (
-      <div ref={setNodeRef} style={style}>
-        <RoomSection
-          name={room.name}
-          items={room.items}
-          onUpdateItem={updateItemLocal}
-          onDeleteItem={handleDeleteItem}
-          onAddItem={handleAddItem}
-          onUpdateDimensions={updateRoomDimensions}
-          onRenameRoom={renameRoom}
-          onDeleteRoom={() => {
-            if (!window.confirm(`Delete room "${room.name}" and all items?`)) return
-            room.items.forEach(i => deleteItem(i.id))
-          }}
-          onReorderItems={reorderItems}
-          search={search}
-          isLocked={isLocked}
-          insurer={job.insurer}
-          trades={trades}
-          dragListeners={listeners}
-          dragAttributes={attributes}
-        />
-      </div>
-    )
-  }
-
   // Sync permitDismissed from quote when loaded
   useEffect(() => {
     if (quote?.permit_block_dismissed) {
@@ -519,7 +550,24 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
             strategy={verticalListSortingStrategy}
           >
             {rooms.map(room => (
-              <SortableRoomSection key={room.name} room={room} />
+              <SortableRoomSection
+                key={room.name}
+                room={room}
+                isLocked={isLocked}
+                onUpdateItem={updateItemLocal}
+                onDeleteItem={handleDeleteItem}
+                onAddItem={handleAddItem}
+                onUpdateDimensions={updateRoomDimensions}
+                onRenameRoom={renameRoom}
+                onDeleteRoom={(roomName) => {
+                  if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
+                  room.items.forEach(i => deleteItem(i.id))
+                }}
+                onReorderItems={reorderItems}
+                search={search}
+                insurer={job.insurer}
+                trades={trades}
+              />
             ))}
           </SortableContext>
         </DndContext>
