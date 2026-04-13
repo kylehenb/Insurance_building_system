@@ -207,7 +207,7 @@ export default async function QuotePrintPage({
 
         {/* Title */}
         <div className="px-6 py-3 bg-white">
-          <h2 className="text-lg font-semibold text-[#1a1a1a] uppercase tracking-wide" style={{ fontFamily: 'var(--font-dm-sans)' }}>Estimate - Scope of Works</h2>
+          <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide" style={{ fontFamily: 'var(--font-dm-sans)' }}>Estimate - Scope of Works</h2>
         </div>
 
         {/* Table Header */}
@@ -243,7 +243,7 @@ export default async function QuotePrintPage({
               <div key={room} className="mb-4">
                 {/* Room header with dimensions - light beige background */}
                 <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
-                  <h4 className="font-semibold text-[#3a3530] text-base uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
+                  <h4 className="font-semibold text-[#3a3530] text-sm uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
                     {room}
                     {hasDimensions && (
                       <span className="text-xs text-[#9e998f] font-mono ml-2" style={{ fontFamily: 'var(--font-dm-mono)' }}>{roomSizeStr}</span>
@@ -306,7 +306,7 @@ export default async function QuotePrintPage({
             <div className="flex gap-6">
               {/* Notes - Left column */}
               <div className="flex-1">
-                <p className="text-[#b0a89e] text-sm uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'var(--font-dm-sans)' }}>Notes</p>
+                <p className="text-[#b0a89e] text-xs uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'var(--font-dm-sans)' }}>Notes</p>
                 <div className="text-sm text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-dm-sans)' }}>{quote.notes || ''}</div>
               </div>
 
@@ -325,7 +325,7 @@ export default async function QuotePrintPage({
                   <span className="text-sm text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(gst)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#e0dbd4]">
-                  <span className="text-lg font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Total inc GST</span>
+                  <span className="text-base font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Total inc GST</span>
                   <span className="text-lg font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(total)}</span>
                 </div>
 
