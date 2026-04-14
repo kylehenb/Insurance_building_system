@@ -207,8 +207,10 @@ async function executeTool(
     }
 
     if (name === 'insert_record') {
-      // Spread input.fields but ensure tenant_id is always set correctly (don't let AI-passed null override)
-      const { tenant_id: _, ...fieldsWithoutTenantId } = input.fields as Record<string, unknown>
+      // Handle both formats: AI might pass fields directly or nested under 'fields' key
+      const inputFields = (input.fields as Record<string, unknown>) || input
+      // Remove 'table' and 'fields' keys if present, then ensure tenant_id is set correctly
+      const { table: _, fields: __, tenant_id, ...fieldsWithoutTenantId } = inputFields as Record<string, unknown>
       const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
       
       const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
