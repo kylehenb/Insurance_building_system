@@ -152,7 +152,7 @@ export default async function QuotePrintPage({
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
-      <PrintButton />
+      <PrintButton quoteRef={quote.quote_ref} jobNumber={job.job_number} />
 
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">

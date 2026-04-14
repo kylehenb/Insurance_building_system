@@ -485,14 +485,14 @@ export async function POST(req: NextRequest) {
         ...(useTools ? { tools: EXECUTION_TOOLS } : {}),
       })
 
-      const textBlocks = response.content.filter((b) => b.type === 'text')
-      if (textBlocks.length > 0) {
-        finalText +=
-          (finalText ? '\n' : '') +
-          textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
+      if (response.stop_reason === 'end_turn' || !useTools) {
+        // Only capture text on the final response
+        const textBlocks = response.content.filter((b) => b.type === 'text')
+        if (textBlocks.length > 0) {
+          finalText = textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
+        }
+        break
       }
-
-      if (response.stop_reason === 'end_turn' || !useTools) break
 
       if (response.stop_reason === 'tool_use') {
         const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
@@ -500,12 +500,19 @@ export async function POST(req: NextRequest) {
 
         for (const block of toolUseBlocks) {
           const toolUse = block as Anthropic.ToolUseBlock
+          console.log(`[AI Assistant] Executing tool: ${toolUse.name}`, toolUse.input)
           const result = await executeTool(
             toolUse.name,
             toolUse.input as Record<string, unknown>,
             tenantId ?? '',
             isAdmin,
           )
+          console.log(`[AI Assistant] Tool result: ${result}`)
+          // If tool execution failed, include error in final response
+          if (result.startsWith('Error') || result.startsWith('Permission denied')) {
+            finalText = result
+            return NextResponse.json({ text: finalText })
+          }
           toolResultContent.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,
