@@ -412,6 +412,9 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       text = text.trim()
       
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
+      
+      // Dispatch custom event to trigger page refreshes
+      window.dispatchEvent(new CustomEvent('ai-action-complete', { detail: { success: true } }))
     } catch {
       setMessages((prev) => [
         ...prev,

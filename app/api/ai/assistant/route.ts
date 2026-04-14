@@ -487,6 +487,34 @@ function normalizeFields(fields: Record<string, unknown>): Record<string, unknow
   return normalized
 }
 
+function translateErrorToPlain(error: string): string {
+  // Translate common technical errors to plain English
+  if (error.includes('date/time field value out of range')) {
+    return 'The date format is incorrect. Please use a format like DD/MM/YYYY (e.g., 25/03/2026) or YYYY-MM-DD.'
+  }
+  if (error.includes('claim_number is required')) {
+    return 'A claim number is required but was not provided. Please include the claim number from the insurer.'
+  }
+  if (error.includes('duplicate key')) {
+    return 'This record already exists. A record with these details may have been created already.'
+  }
+  if (error.includes('Permission denied')) {
+    return 'You do not have permission to perform this action. Please contact your administrator.'
+  }
+  if (error.includes('null value in column')) {
+    const match = error.match(/null value in column "([^"]+)"/)
+    if (match) {
+      return `The field "${match[1]}" is required but was not provided.`
+    }
+  }
+  if (error.includes('foreign key constraint')) {
+    return 'This action references another record that does not exist. Please ensure the related record exists first.'
+  }
+  
+  // Return original error if no translation found
+  return error
+}
+
 export async function POST(req: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   
@@ -665,9 +693,16 @@ export async function POST(req: NextRequest) {
           const result = await executeTool(functionName, functionArgs, tenantId ?? '', isAdmin)
           console.log(`[AI Assistant] Tool result: ${result}`)
 
-          // If tool execution failed, include error in final response
+          // Stop on error and present helpful message
           if (result.startsWith('Error') || result.startsWith('Permission denied')) {
-            return NextResponse.json({ text: result })
+            // Translate technical errors to plain English
+            const plainError = translateErrorToPlain(result)
+            let helpfulMessage = `${plainError}\n\nWould you like to:\n`
+            helpfulMessage += `- Provide corrected information and retry\n`
+            helpfulMessage += `- Skip this step and continue (if possible)\n`
+            helpfulMessage += `- Cancel the entire action\n\n`
+            helpfulMessage += `Please let me know how you'd like to proceed.`
+            return NextResponse.json({ text: helpfulMessage })
           }
 
           // Add tool result to messages

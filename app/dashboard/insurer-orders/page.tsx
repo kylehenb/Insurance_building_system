@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -279,6 +280,29 @@ export default function InsurerOrdersPage() {
       }
     }
     fetchOrders()
+  }, [tenantId])
+
+  // Auto-refresh when AI actions complete
+  useAIActionRefresh(async () => {
+    if (!tenantId) return
+    const { data } = await supabase
+      .from('insurer_orders').select('*')
+      .eq('tenant_id', tenantId!)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    const rows = data ?? []
+    setOrders(rows)
+    setLoading(false)
+
+    const jobIds = [...new Set(rows.filter(o => o.job_id).map(o => o.job_id as string))]
+    if (jobIds.length > 0) {
+      const { data: jobs } = await supabase.from('jobs').select('id, job_number').in('id', jobIds)
+      if (jobs) {
+        const map: Record<string, string> = {}
+        jobs.forEach((j: { id: string; job_number: string }) => { map[j.id] = j.job_number })
+        setJobNumbers(map)
+      }
+    }
   }, [tenantId])
 
   // Debounced link-job search
@@ -706,7 +730,11 @@ export default function InsurerOrdersPage() {
 
                                   {/* Left column */}
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-                                    <F label="Order Ref" mono>{order.order_ref ?? '—'}</F>
+                                    <FEdit
+                                      label="Order Ref" value={order.order_ref}
+                                      mono
+                                      onSave={v => saveField(order.id, 'order_ref', v)}
+                                    />
                                     <FEdit
                                       label="Insurer" value={order.insurer}
                                       onSave={v => saveField(order.id, 'insurer', v)}

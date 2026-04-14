@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
+import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
@@ -65,6 +66,17 @@ export default function JobsListPage() {
       setLoading(false);
     }
     fetchJobs();
+  }, [tenantId, supabase]);
+
+  // Auto-refresh when AI actions complete
+  useAIActionRefresh(async () => {
+    if (!tenantId) return;
+    const { data } = await supabase
+      .from('jobs')
+      .select('id, job_number, insured_name, property_address, insurer, status, created_at')
+      .eq('tenant_id', tenantId!)
+      .order('created_at', { ascending: false });
+    setJobs((data as JobRow[]) ?? []);
   }, [tenantId, supabase]);
 
   return (
