@@ -182,6 +182,11 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
         }
       }
 
+      // Default room to "General" if not provided
+      if (!item.room) {
+        item.room = 'General'
+      }
+
       // Calculate line_total if we have qty and rate_labour/rate_materials
       if (item.qty) {
         const labourRate = item.rate_labour ?? 0
@@ -201,17 +206,17 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
   }
 
   const handleImport = () => {
-    // Filter out items that have no room at all (can't import without a room)
-    const validItems = previewItems.filter(item => item.room)
+    // All items should have a room now (default to "General" if not provided)
+    const validItems = previewItems
 
     if (validItems.length === 0) {
-      setError('No items with valid room data to import')
+      setError('No items to import')
       return
     }
 
     // Warn about items with missing data but still import them
     const itemsMissingData = previewItems.filter(item => {
-      return !item.room || !item.trade || !item.item_description || item.qty === null || item.rate_labour === null || item.rate_materials === null
+      return !item.trade || !item.item_description || item.qty === null || item.rate_labour === null || item.rate_materials === null
     })
 
     if (itemsMissingData.length > 0) {
