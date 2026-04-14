@@ -207,12 +207,9 @@ async function executeTool(
     }
 
     if (name === 'insert_record') {
-      const fields = { ...(input.fields as Record<string, unknown>), tenant_id: tenantId }
-      
-      // Validate required fields for specific tables
-      if (table === 'insurer_orders' && !(fields as Record<string, unknown>).claim_number) {
-        return `Error: claim_number is required when creating an insurer order. Please provide the claim number from the insurer.`
-      }
+      // Spread input.fields but ensure tenant_id is always set correctly (don't let AI-passed null override)
+      const { tenant_id: _, ...fieldsWithoutTenantId } = input.fields as Record<string, unknown>
+      const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
       
       const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
       if (error) return `Error inserting into ${table}: ${error.message}`
