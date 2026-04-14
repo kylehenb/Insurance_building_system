@@ -372,10 +372,6 @@ export default function InsurerOrdersPage() {
 
   async function handleCreateOrder() {
     if (!tenantId) return
-    if (!newOrderForm.claim_number.trim()) {
-      setCreateError('Claim number is required')
-      return
-    }
 
     setCreatingOrder(true)
     setCreateError(null)
@@ -385,7 +381,7 @@ export default function InsurerOrdersPage() {
         .from('insurer_orders')
         .insert({
           tenant_id: tenantId,
-          claim_number: newOrderForm.claim_number.trim(),
+          claim_number: (newOrderForm.claim_number.trim() || null) as string | null,
           insurer: newOrderForm.insurer.trim() || null,
           wo_type: newOrderForm.wo_type || null,
           property_address: newOrderForm.property_address.trim() || null,
@@ -926,14 +922,14 @@ export default function InsurerOrdersPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                  Claim Number *
+                  Claim Number
                 </div>
                 <input
                   type="text"
                   value={newOrderForm.claim_number}
                   onChange={e => setNewOrderForm(f => ({ ...f, claim_number: e.target.value }))}
-                  placeholder="Required"
-                  style={{ ...inputStyle, borderColor: !newOrderForm.claim_number.trim() && createError ? '#b91c1c' : undefined }}
+                  placeholder="Optional"
+                  style={{ ...inputStyle }}
                 />
               </div>
 
@@ -1083,12 +1079,12 @@ export default function InsurerOrdersPage() {
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                 <button
                   onClick={handleCreateOrder}
-                  disabled={creatingOrder || !newOrderForm.claim_number.trim()}
+                  disabled={creatingOrder}
                   style={{
                     flex: 1,
                     background: '#1a1a1a', color: '#f5f2ee', border: 'none', borderRadius: 8,
                     padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: "'DM Sans', sans-serif", opacity: (creatingOrder || !newOrderForm.claim_number.trim()) ? 0.5 : 1,
+                    fontFamily: "'DM Sans', sans-serif", opacity: creatingOrder ? 0.5 : 1,
                   }}
                 >
                   {creatingOrder ? 'Creating…' : 'Create Order'}

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
-const anthropic = new Anthropic()
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // Tables that require admin role to write to
@@ -69,13 +67,15 @@ You have full read and write access to the entire IRC database. When answering q
 
 The only restriction: modifying tenants, users, scope_library, trade_type_sequence, or report_templates requires the user to be an admin. If the current user is not an admin and requests changes to those tables, politely decline and tell them to contact their administrator.
 
-When the user asks you to take an action that requires a data change, always present the full action plan first as a numbered list in plain English before doing anything. At the end of every action proposal always say exactly: "Reply c to confirm all, or tell me what you'd like to change."
+When the user asks you to take an action that requires a data change, always present the full action plan first as a numbered list in plain English before doing anything. At the end of every action proposal always say exactly: "Reply yes to confirm all, or tell me what you'd like to change."
 
-If the user replies with exactly "c" (case insensitive), execute all steps sequentially using the available tools. After each step completes, report back in plain English that it is done before moving to the next. If a step fails, report the failure clearly and stop — do not continue to subsequent steps.
+If the user confirms (e.g., "yes", "go ahead", "sure", "ok", etc.), execute all steps sequentially using the available tools. After each step completes, report back in plain English that it is done before moving to the next. If a step fails, report the failure clearly and stop — do not continue to subsequent steps.
 
-If the user replies with anything other than "c" after a proposal, treat the entire reply as feedback. Regenerate the full updated action plan in plain English incorporating the requested changes. End the updated plan again with "Reply c to confirm all, or tell me what you'd like to change." Loop until the user replies c or abandons.
+If the user replies with modifications (e.g., "yes but change step 2 to..."), regenerate the full updated action plan in plain English incorporating the requested changes. End the updated plan again with "Reply yes to confirm all, or tell me what you'd like to change." Loop until the user confirms or abandons.
 
-Never execute any data changes without receiving a "c" confirmation first. Never partially execute a plan.
+If the user declines or asks for clarification, respond accordingly.
+
+Never execute any data changes without receiving confirmation first. Never partially execute a plan.
 
 Key facts about IRC:
 - Sedgwick SLA: BAR reports within 7 calendar days, Make Safes attended within 24 hours
@@ -85,62 +85,6 @@ Key facts about IRC:
 - Reports have a property_description field for describing the property (roof type, wall construction, condition etc.)
 ${SCHEMA_REFERENCE}`
 
-const EXECUTION_TOOLS: Anthropic.Tool[] = [
-  {
-    name: 'read_records',
-    description: 'Read records from any table. Use this to look up current data before proposing changes, or to answer questions about specific records.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        table: { type: 'string', description: 'Table name (e.g. jobs, reports, quotes, scope_items, inspections, etc.)' },
-        filters: {
-          type: 'object',
-          description: 'Key-value pairs to filter by (e.g. {"job_id": "abc123", "status": "pending"}). All filters use equality matching.',
-        },
-        columns: { type: 'string', description: 'Comma-separated list of columns to return. Omit or use "*" for all columns.' },
-        limit: { type: 'number', description: 'Maximum number of rows to return. Defaults to 20.' },
-      },
-      required: ['table'],
-    },
-  },
-  {
-    name: 'update_record',
-    description: 'Update one or more fields on an existing record identified by its id.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        table: { type: 'string', description: 'Table name' },
-        id: { type: 'string', description: 'The UUID of the record to update' },
-        fields: { type: 'object', description: 'Key-value pairs of fields to update' },
-      },
-      required: ['table', 'id', 'fields'],
-    },
-  },
-  {
-    name: 'insert_record',
-    description: 'Insert a new record into a table. tenant_id will be automatically set if not provided.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        table: { type: 'string', description: 'Table name' },
-        fields: { type: 'object', description: 'Key-value pairs for the new record' },
-      },
-      required: ['table', 'fields'],
-    },
-  },
-  {
-    name: 'delete_record',
-    description: 'Delete a record by its id from a table.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        table: { type: 'string', description: 'Table name' },
-        id: { type: 'string', description: 'The UUID of the record to delete' },
-      },
-      required: ['table', 'id'],
-    },
-  },
-]
 
 const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -416,32 +360,72 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
   }
 }
 
-function isConfirmation(messages: { role: string; content: string }[]): boolean {
-  console.log('[AI Assistant] isConfirmation called with', messages.length, 'messages')
-  if (messages.length < 2) {
-    console.log('[AI Assistant] isConfirmation: less than 2 messages')
-    return false
-  }
-  const lastUser = messages[messages.length - 1]
-  console.log('[AI Assistant] isConfirmation: last message role:', lastUser.role, 'content:', lastUser.content)
-  if (lastUser.role !== 'user') {
-    console.log('[AI Assistant] isConfirmation: last message not from user')
-    return false
-  }
-  if (lastUser.content.trim().toLowerCase() !== 'c') {
-    console.log('[AI Assistant] isConfirmation: last message not "c"')
-    return false
-  }
+interface IntentResult {
+  isConfirmation: boolean
+  hasModifications: boolean
+  modifications: string
+  isDecline: boolean
+}
 
-  for (let i = messages.length - 2; i >= 0; i--) {
-    if (messages[i].role === 'assistant') {
-      const hasConfirmPhrase = messages[i].content.toLowerCase().includes('reply c to confirm')
-      console.log('[AI Assistant] isConfirmation: assistant message has confirm phrase:', hasConfirmPhrase)
-      return hasConfirmPhrase
-    }
+async function detectIntent(
+  lastUserMessage: string,
+  lastAssistantMessage: string
+): Promise<IntentResult> {
+  console.log('[AI Assistant] Detecting intent for user message:', lastUserMessage)
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an intent classifier. Analyze the user's response to an action proposal and determine:
+
+1. Is the user confirming they want to proceed? (yes, go ahead, sure, ok, do it, etc.)
+2. Does the user have modifications/feedback? (yes but change step 2, change X to Y, etc.)
+3. Is the user declining? (no, don't do it, cancel, etc.)
+
+Respond with JSON only:
+{
+  "isConfirmation": boolean,
+  "hasModifications": boolean,
+  "modifications": string (extracted feedback, empty if none),
+  "isDecline": boolean
+}
+
+Examples:
+- "yes" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
+- "yes go ahead" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
+- "sure" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
+- "yes but change step 2 to only update the status" -> {"isConfirmation": true, "hasModifications": true, "modifications": "change step 2 to only update the status", "isDecline": false}
+- "no" -> {"isConfirmation": false, "hasModifications": false, "modifications": "", "isDecline": true}
+- "change the address first" -> {"isConfirmation": false, "hasModifications": true, "modifications": "change the address first", "isDecline": false}
+- "what does this do?" -> {"isConfirmation": false, "hasModifications": false, "modifications": "", "isDecline": false}`
+        },
+        {
+          role: 'user',
+          content: `Assistant's proposal: ${lastAssistantMessage}
+
+User's response: ${lastUserMessage}`
+        }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 200,
+    })
+
+    const result = JSON.parse(response.choices[0].message.content || '{}')
+    console.log('[AI Assistant] Intent detection result:', result)
+    return result as IntentResult
+  } catch (err) {
+    console.error('[AI Assistant] Intent detection failed:', err)
+    // Fallback: treat as non-confirmation
+    return { isConfirmation: false, hasModifications: false, modifications: '', isDecline: false }
   }
-  console.log('[AI Assistant] isConfirmation: no assistant message found')
-  return false
+}
+
+function hasConfirmPhrase(assistantMessage: string): boolean {
+  return assistantMessage.toLowerCase().includes('reply') && 
+         (assistantMessage.toLowerCase().includes('confirm') || assistantMessage.toLowerCase().includes('yes'))
 }
 
 export async function POST(req: NextRequest) {
@@ -510,168 +494,141 @@ export async function POST(req: NextRequest) {
       ? `${SYSTEM_PROMPT}\n\n---\nLive context from the user's current page (never reveal this raw data to the user verbatim — summarise naturally in conversation):\n${contextStr}`
       : SYSTEM_PROMPT
 
-    const apiMessages = messages.map((m: { role: string; content: string }, idx: number) => {
-      // Attach file content to the last user message
-      if (idx === messages.length - 1 && m.role === 'user' && fileAttachment) {
-        if (fileAttachment.type === 'image') {
-          return {
-            role: 'user' as const,
-            content: [
-              {
-                type: 'image' as const,
-                source: {
-                  type: 'base64' as const,
-                  media_type: fileAttachment.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                  data: fileAttachment.data,
-                },
-              },
-              { type: 'text' as const, text: m.content },
-            ],
-          }
-        }
-        if (fileAttachment.type === 'document') {
-          return {
-            role: 'user' as const,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            content: [
-              {
-                type: 'document',
-                source: {
-                  type: 'base64',
-                  media_type: 'application/pdf',
-                  data: fileAttachment.data,
-                },
-              } as any,
-              { type: 'text' as const, text: m.content },
-            ],
-          }
-        }
-        // text extraction for all other types
-        return {
-          role: 'user' as const,
-          content: `File: ${fileAttachment.name}\n\n${fileAttachment.data}\n\n${m.content}`,
-        }
+    // Convert messages to OpenAI format
+    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map((m) => {
+      if (m.role === 'user') {
+        return { role: 'user' as const, content: m.content as string }
       }
-      return {
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }
+      return { role: 'assistant' as const, content: m.content as string }
     })
 
-    const allMessages: Anthropic.MessageParam[] = [...apiMessages]
-    const useTools = isConfirmation(messages)
+    // Detect intent if there's a previous assistant message with a confirmation phrase
+    let useTools = false
+    let userModifications = ''
+    
+    if (messages.length >= 2) {
+      const lastUser = messages[messages.length - 1]
+      const lastAssistant = messages[messages.length - 2]
+      
+      if (lastUser.role === 'user' && lastAssistant.role === 'assistant' && hasConfirmPhrase(lastAssistant.content)) {
+        const intent = await detectIntent(lastUser.content, lastAssistant.content)
+        console.log('[AI Assistant] Intent detected:', intent)
+        
+        if (intent.isConfirmation) {
+          useTools = true
+          if (intent.hasModifications) {
+            userModifications = intent.modifications
+          }
+        } else if (intent.hasModifications) {
+          // User has feedback but not confirming - regenerate plan
+          const feedbackResponse = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...openaiMessages.slice(0, -1),
+              {
+                role: 'user',
+                content: `The user provided feedback: ${intent.modifications}. Please regenerate the action plan incorporating these changes. End with "Reply yes to confirm all, or tell me what you'd like to change."`
+              },
+            ],
+            max_tokens: 4096,
+          })
+          const text = feedbackResponse.choices[0].message.content || ''
+          return NextResponse.json({ text })
+        } else if (intent.isDecline) {
+          return NextResponse.json({ text: 'Understood. The action has been cancelled.' })
+        }
+      }
+    }
+
     console.log('[AI Assistant] useTools:', useTools, 'messages length:', messages.length)
 
-    // Use OpenAI for tool execution (cheaper), Anthropic for everything else
-    if (useTools) {
-      // Convert Anthropic message format to OpenAI format
-      const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = allMessages.map((m) => {
-        if (m.role === 'user') {
-          if (Array.isArray(m.content)) {
-            // Handle image/document attachments
-            const textContent = m.content.find((c: any) => c.type === 'text')
-            return {
-              role: 'user' as const,
-              content: textContent ? (textContent as any).text : '',
-            }
-          }
-          return { role: 'user' as const, content: m.content as string }
-        }
-        if (m.role === 'assistant') {
-          if (Array.isArray(m.content)) {
-            // Handle tool results from previous iterations
-            const toolResults = m.content.filter((c: any) => c.type === 'tool_result')
-            if (toolResults.length > 0) {
-              return {
-                role: 'user' as const,
-                content: toolResults.map((tr: any) => `${tr.content}`).join('\n'),
-              }
-            }
-          }
-          return { role: 'assistant' as const, content: m.content as string }
-        }
-        return { role: 'user' as const, content: '' }
+    // If no confirmation needed, just respond with chat
+    if (!useTools) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...openaiMessages,
+        ],
+        max_tokens: 4096,
+      })
+      const text = response.choices[0].message.content || ''
+      return NextResponse.json({ text })
+    }
+
+    // User confirmed - execute tools with or without modifications
+    let messagesForExecution = [...openaiMessages]
+    
+    if (userModifications) {
+      // Add user modifications as a message before execution
+      messagesForExecution.push({
+        role: 'user',
+        content: `The user confirmed with these modifications: ${userModifications}. Please incorporate these changes into the execution.`
+      })
+    }
+
+    let iteration = 0
+    const MAX_ITERATIONS = 15
+
+    while (iteration < MAX_ITERATIONS) {
+      iteration++
+
+      console.log('[AI Assistant] OpenAI iteration:', iteration)
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messagesForExecution,
+        ],
+        tools: OPENAI_TOOLS,
+        tool_choice: 'auto',
+        max_tokens: 16384,
       })
 
-      let iteration = 0
-      const MAX_ITERATIONS = 15
+      console.log('[AI Assistant] OpenAI response finish_reason:', response.choices[0].finish_reason)
 
-      while (iteration < MAX_ITERATIONS) {
-        iteration++
+      const message = response.choices[0].message
+      const text = message.content || ''
 
-        console.log('[AI Assistant] OpenAI iteration:', iteration)
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...openaiMessages,
-          ],
-          tools: OPENAI_TOOLS,
-          tool_choice: 'auto',
-          max_tokens: 16384,
-        })
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        console.log('[AI Assistant] OpenAI tool calls:', message.tool_calls.length)
 
-        console.log('[AI Assistant] OpenAI response finish_reason:', response.choices[0].finish_reason)
+        // Execute each tool call
+        for (const toolCall of message.tool_calls) {
+          if (toolCall.type !== 'function') continue
+          const functionName = toolCall.function.name
+          const functionArgs = JSON.parse(toolCall.function.arguments)
 
-        const message = response.choices[0].message
-        const text = message.content || ''
+          console.log(`[AI Assistant] Executing tool: ${functionName}`, functionArgs)
+          const result = await executeTool(functionName, functionArgs, tenantId ?? '', isAdmin)
+          console.log(`[AI Assistant] Tool result: ${result}`)
 
-        if (message.tool_calls && message.tool_calls.length > 0) {
-          console.log('[AI Assistant] OpenAI tool calls:', message.tool_calls.length)
-
-          // Execute each tool call
-          for (const toolCall of message.tool_calls) {
-            if (toolCall.type !== 'function') continue
-            const functionName = toolCall.function.name
-            const functionArgs = JSON.parse(toolCall.function.arguments)
-
-            console.log(`[AI Assistant] Executing tool: ${functionName}`, functionArgs)
-            const result = await executeTool(functionName, functionArgs, tenantId ?? '', isAdmin)
-            console.log(`[AI Assistant] Tool result: ${result}`)
-
-            // If tool execution failed, include error in final response
-            if (result.startsWith('Error') || result.startsWith('Permission denied')) {
-              return NextResponse.json({ text: result })
-            }
-
-            // Add tool result to messages
-            openaiMessages.push({
-              role: 'assistant',
-              content: text,
-              tool_calls: message.tool_calls,
-            })
-            openaiMessages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: result,
-            })
+          // If tool execution failed, include error in final response
+          if (result.startsWith('Error') || result.startsWith('Permission denied')) {
+            return NextResponse.json({ text: result })
           }
-        } else {
-          // No tool calls, this is the final response
-          console.log('[AI Assistant] OpenAI final text length:', text.length)
-          return NextResponse.json({ text: text || 'All steps completed.' })
+
+          // Add tool result to messages
+          messagesForExecution.push({
+            role: 'assistant',
+            content: text,
+            tool_calls: message.tool_calls,
+          })
+          messagesForExecution.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result,
+          })
         }
+      } else {
+        // No tool calls, this is the final response
+        console.log('[AI Assistant] OpenAI final text length:', text.length)
+        return NextResponse.json({ text: text || 'All steps completed.' })
       }
-
-      return NextResponse.json({ text: 'All steps completed.' })
     }
 
-    // Use Anthropic for non-tool requests (chat, file attachments)
-    let finalText = ''
-
-    const response = await anthropic.messages.create({
-      model: fileAttachment ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
-      max_tokens: fileAttachment ? 4096 : 1024,
-      system: systemPrompt,
-      messages: allMessages,
-    })
-
-    const textBlocks = response.content.filter((b: any) => b.type === 'text')
-    if (textBlocks.length > 0) {
-      finalText = textBlocks.map((b: any) => b.text).join('')
-    }
-
-    return NextResponse.json({ text: finalText || 'All steps completed.' })
+    return NextResponse.json({ text: 'All steps completed.' })
   } catch (err) {
     console.error('AI assistant error:', err)
     return NextResponse.json({ error: 'AI request failed' }, { status: 500 })

@@ -1,34 +1,23 @@
-import { redirect } from "next/navigation";
+'use client';
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUser } from "@/lib/supabase/get-user";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
 function StatusBadge({ status }: { status: string }) {
-  const styles = {
-    active: "bg-green-100 text-green-800",
-    on_hold: "bg-yellow-100 text-yellow-800",
-    complete: "bg-gray-100 text-gray-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
-
-  const labels = {
-    active: "Active",
-    on_hold: "On Hold",
-    complete: "Complete",
-    cancelled: "Cancelled",
-  };
-
-  const style = styles[status as keyof typeof styles] || "bg-gray-100 text-gray-800";
-  const label = labels[status as keyof typeof labels] || status;
-
-  return (
-    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>
-      {label}
-    </span>
-  );
+  if (status === 'active')
+    return <span style={{ background: '#eaf3f0', color: '#2a6b50', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Active</span>
+  if (status === 'on_hold')
+    return <span style={{ background: '#fdf5e8', color: '#8a6020', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>On Hold</span>
+  if (status === 'complete')
+    return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Complete</span>
+  if (status === 'cancelled')
+    return <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Cancelled</span>
+  return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{status}</span>
 }
 
 function formatDate(dateString: string | null): string {
@@ -40,32 +29,43 @@ function formatDate(dateString: string | null): string {
   });
 }
 
-async function JobsListPage() {
-  const userData = await getUser();
+export default function JobsListPage() {
+  const router = useRouter();
+  const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
-  if (!userData?.session) {
-    redirect("/login");
-  }
+  const supabase = createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  if (!userData.user) {
-    redirect("/auth/new-user");
-  }
+  // Auth bootstrap
+  useEffect(() => {
+    async function bootstrap() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/login'); return }
+      const { data: profile, error } = await supabase
+        .from('users').select('tenant_id').eq('id', user.id).single();
+      if (error || !profile) { router.push('/login'); return }
+      setTenantId(profile.tenant_id);
+    }
+    bootstrap();
+  }, [router, supabase]);
 
-  const { tenant_id } = userData;
-
-  // Fetch jobs for this tenant using service role to bypass RLS
-  const serviceClient = createServiceClient();
-  const { data: jobs, error } = await serviceClient
-    .from("jobs")
-    .select("id, job_number, insured_name, property_address, insurer, status, created_at")
-    .eq("tenant_id", tenant_id as string)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error fetching jobs:", error);
-  }
-
-  const typedJobs = (jobs as JobRow[]) || [];
+  useEffect(() => {
+    if (!tenantId) return;
+    async function fetchJobs() {
+      const { data } = await supabase
+        .from('jobs')
+        .select('id, job_number, insured_name, property_address, insurer, status, created_at')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
+      setJobs((data as JobRow[]) ?? []);
+      setLoading(false);
+    }
+    fetchJobs();
+  }, [tenantId, supabase]);
 
   return (
     <div className="p-6 lg:p-8">
@@ -87,8 +87,12 @@ async function JobsListPage() {
           </div>
 
           {/* Jobs Table */}
-          <div className="mt-8 rounded-lg border border-[#1a1a1a]/10 bg-white shadow-sm overflow-hidden">
-            {typedJobs.length === 0 ? (
+          <div className="mt-8 rounded-lg border border-[#e4dfd8] bg-white shadow-sm overflow-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-sm text-[#b0a898]">Loading...</div>
+              </div>
+            ) : jobs.length === 0 ? (
               /* Empty State */
               <div className="flex flex-col items-center justify-center py-16 px-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f5f0e8]">
@@ -121,81 +125,79 @@ async function JobsListPage() {
             ) : (
               /* Table */
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#1a1a1a]/10">
-                  <thead className="bg-[#f5f0e8]/50">
+                <table className="min-w-full divide-y divide-[#f0ece6]">
+                  <thead className="bg-[#fdfdfc]">
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Job Number
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Insured Name
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Property Address
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Insurer
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Status
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
                         Created
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1a1a1a]/10 bg-white">
-                    {typedJobs.map((job) => (
+                  <tbody className="divide-y divide-[#f0ece6] bg-white">
+                    {jobs.map((job: JobRow) => (
                       <tr
                         key={job.id}
-                        className="hover:bg-[#f5f0e8]/30 transition-colors"
+                        onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                        className="hover:bg-[#faf9f7] transition-colors cursor-pointer"
                       >
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <Link
-                            href={`/dashboard/jobs/${job.id}`}
-                            className="text-sm font-medium text-[#1a1a1a] hover:underline"
-                          >
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <span className="text-xs font-medium text-[#c8b89a]">
                             {job.job_number}
-                          </Link>
+                          </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]">
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-[#1a1a1a]">
                             {job.insured_name || "-"}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/70 max-w-xs truncate block">
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-[#1a1a1a]/70 max-w-xs truncate block">
                             {job.property_address || "-"}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/70">
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <span className="text-xs text-[#1a1a1a]/70">
                             {job.insurer || "-"}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4">
+                        <td className="whitespace-nowrap px-3 py-3">
                           <StatusBadge status={job.status} />
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/60">
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <span className="text-xs text-[#b0a898]">
                             {formatDate(job.created_at)}
                           </span>
                         </td>
@@ -208,10 +210,10 @@ async function JobsListPage() {
           </div>
 
           {/* Summary */}
-          {typedJobs.length > 0 && (
+          {jobs.length > 0 && (
             <div className="mt-4 flex items-center justify-between text-sm text-[#1a1a1a]/60">
               <span>
-                Showing {typedJobs.length} job{typedJobs.length === 1 ? "" : "s"}
+                Showing {jobs.length} job{jobs.length === 1 ? "" : "s"}
               </span>
             </div>
           )}
@@ -219,5 +221,3 @@ async function JobsListPage() {
     </div>
   );
 }
-
-export default JobsListPage;
