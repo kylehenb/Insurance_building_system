@@ -224,6 +224,23 @@ export default function InsurerOrdersPage() {
   const [linkSearch, setLinkSearch] = useState('')
   const [linkResults, setLinkResults] = useState<JobHit[]>([])
 
+  // New order form state
+  const [newOrderForm, setNewOrderForm] = useState({
+    claim_number: '',
+    insurer: '',
+    wo_type: '',
+    property_address: '',
+    insured_name: '',
+    insured_phone: '',
+    insured_email: '',
+    date_of_loss: '',
+    loss_type: '',
+    claim_description: '',
+    special_instructions: '',
+  })
+  const [creatingOrder, setCreatingOrder] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auth bootstrap
@@ -350,6 +367,63 @@ export default function InsurerOrdersPage() {
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, job_id: job.id, status: 'lodged' } : o))
       setJobNumbers(prev => ({ ...prev, [job.id]: job.job_number }))
       setLinkOpen(false); setLinkSearch(''); setLinkResults([])
+    }
+  }
+
+  async function handleCreateOrder() {
+    if (!tenantId) return
+    if (!newOrderForm.claim_number.trim()) {
+      setCreateError('Claim number is required')
+      return
+    }
+
+    setCreatingOrder(true)
+    setCreateError(null)
+
+    try {
+      const { data: newOrder, error } = await supabase
+        .from('insurer_orders')
+        .insert({
+          tenant_id: tenantId,
+          claim_number: newOrderForm.claim_number.trim(),
+          insurer: newOrderForm.insurer.trim() || null,
+          wo_type: newOrderForm.wo_type || null,
+          property_address: newOrderForm.property_address.trim() || null,
+          insured_name: newOrderForm.insured_name.trim() || null,
+          insured_phone: newOrderForm.insured_phone.trim() || null,
+          insured_email: newOrderForm.insured_email.trim() || null,
+          date_of_loss: newOrderForm.date_of_loss || null,
+          loss_type: newOrderForm.loss_type.trim() || null,
+          claim_description: newOrderForm.claim_description.trim() || null,
+          special_instructions: newOrderForm.special_instructions.trim() || null,
+          entry_method: 'manual',
+          parse_status: 'manual_entry',
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setOrders(prev => [newOrder, ...prev])
+      setNewOrderOpen(false)
+      setNewOrderForm({
+        claim_number: '',
+        insurer: '',
+        wo_type: '',
+        property_address: '',
+        insured_name: '',
+        insured_phone: '',
+        insured_email: '',
+        date_of_loss: '',
+        loss_type: '',
+        claim_description: '',
+        special_instructions: '',
+      })
+    } catch (err: any) {
+      setCreateError(err.message || 'Failed to create order')
+    } finally {
+      setCreatingOrder(false)
     }
   }
 
@@ -833,7 +907,7 @@ export default function InsurerOrdersPage() {
         </div>
       </div>
 
-      {/* New Order stub panel */}
+      {/* New Order panel */}
       {newOrderOpen && (
         <>
           <div
@@ -841,20 +915,208 @@ export default function InsurerOrdersPage() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 40 }}
           />
           <div style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 420,
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
             background: '#ffffff', borderLeft: '1px solid #e4dfd8', zIndex: 50,
             padding: '36px 32px', fontFamily: "'DM Sans', sans-serif",
-            boxShadow: '-4px 0 24px rgba(0,0,0,0.08)',
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.08)', overflowY: 'auto',
           }}>
             <div style={{ fontSize: 12, color: '#b0a898', marginBottom: 8 }}>New Order</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', marginBottom: 16 }}>Create Insurer Order</div>
-            <div style={{ fontSize: 13, color: '#b0a898' }}>Coming soon — order creation panel.</div>
-            <button
-              onClick={() => setNewOrderOpen(false)}
-              style={{ marginTop: 24, background: '#1a1a1a', color: '#f5f2ee', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Close
-            </button>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', marginBottom: 24 }}>Create Insurer Order</div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Claim Number *
+                </div>
+                <input
+                  type="text"
+                  value={newOrderForm.claim_number}
+                  onChange={e => setNewOrderForm(f => ({ ...f, claim_number: e.target.value }))}
+                  placeholder="Required"
+                  style={{ ...inputStyle, borderColor: !newOrderForm.claim_number.trim() && createError ? '#b91c1c' : undefined }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Insurer
+                </div>
+                <input
+                  type="text"
+                  value={newOrderForm.insurer}
+                  onChange={e => setNewOrderForm(f => ({ ...f, insurer: e.target.value }))}
+                  placeholder="e.g. Allianz, Suncorp"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Work Order Type
+                </div>
+                <select
+                  value={newOrderForm.wo_type}
+                  onChange={e => setNewOrderForm(f => ({ ...f, wo_type: e.target.value }))}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="">— Select —</option>
+                  <option value="BAR">BAR</option>
+                  <option value="make_safe">Make Safe</option>
+                  <option value="roof_report">Roof Report</option>
+                  <option value="specialist">Specialist</option>
+                  <option value="variation">Variation</option>
+                  <option value="quote_only">Quote Only</option>
+                </select>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Property Address
+                </div>
+                <input
+                  type="text"
+                  value={newOrderForm.property_address}
+                  onChange={e => setNewOrderForm(f => ({ ...f, property_address: e.target.value }))}
+                  placeholder="Street address"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Insured Name
+                </div>
+                <input
+                  type="text"
+                  value={newOrderForm.insured_name}
+                  onChange={e => setNewOrderForm(f => ({ ...f, insured_name: e.target.value }))}
+                  placeholder="Full name"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                    Phone
+                  </div>
+                  <input
+                    type="tel"
+                    value={newOrderForm.insured_phone}
+                    onChange={e => setNewOrderForm(f => ({ ...f, insured_phone: e.target.value }))}
+                    placeholder="04xx xxx xxx"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                    Email
+                  </div>
+                  <input
+                    type="email"
+                    value={newOrderForm.insured_email}
+                    onChange={e => setNewOrderForm(f => ({ ...f, insured_email: e.target.value }))}
+                    placeholder="email@example.com"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                    Date of Loss
+                  </div>
+                  <input
+                    type="date"
+                    value={newOrderForm.date_of_loss}
+                    onChange={e => setNewOrderForm(f => ({ ...f, date_of_loss: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                    Loss Type
+                  </div>
+                  <input
+                    type="text"
+                    value={newOrderForm.loss_type}
+                    onChange={e => setNewOrderForm(f => ({ ...f, loss_type: e.target.value }))}
+                    placeholder="e.g. Storm, Fire, Water"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Claim Description
+                </div>
+                <textarea
+                  value={newOrderForm.claim_description}
+                  onChange={e => setNewOrderForm(f => ({ ...f, claim_description: e.target.value }))}
+                  rows={3}
+                  placeholder="Brief description of the claim..."
+                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  Special Instructions
+                </div>
+                <textarea
+                  value={newOrderForm.special_instructions}
+                  onChange={e => setNewOrderForm(f => ({ ...f, special_instructions: e.target.value }))}
+                  rows={2}
+                  placeholder="Any special instructions..."
+                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+                />
+              </div>
+
+              {createError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', padding: '8px 12px', background: '#fdecea', borderRadius: 4 }}>
+                  {createError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <button
+                  onClick={handleCreateOrder}
+                  disabled={creatingOrder || !newOrderForm.claim_number.trim()}
+                  style={{
+                    flex: 1,
+                    background: '#1a1a1a', color: '#f5f2ee', border: 'none', borderRadius: 8,
+                    padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: "'DM Sans', sans-serif", opacity: (creatingOrder || !newOrderForm.claim_number.trim()) ? 0.5 : 1,
+                  }}
+                >
+                  {creatingOrder ? 'Creating…' : 'Create Order'}
+                </button>
+                <button
+                  onClick={() => {
+                    setNewOrderOpen(false)
+                    setNewOrderForm({
+                      claim_number: '',
+                      insurer: '',
+                      wo_type: '',
+                      property_address: '',
+                      insured_name: '',
+                      insured_phone: '',
+                      insured_email: '',
+                      date_of_loss: '',
+                      loss_type: '',
+                      claim_description: '',
+                      special_instructions: '',
+                    })
+                    setCreateError(null)
+                  }}
+                  style={{ ...ghostBtn, flex: 1 }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </>
       )}
