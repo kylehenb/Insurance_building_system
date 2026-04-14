@@ -275,6 +275,18 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('button') || target.closest('input') || target.closest('textarea')) {
       return
     }
+
+    // Don't drag if user is selecting text in message bubbles
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) {
+      return
+    }
+
+    // Don't drag if clicking on selectable text in message bubbles
+    if (target.closest('.fai-bubble-text')) {
+      return
+    }
+
     e.preventDefault()
     dragState.current = {
       active: true,

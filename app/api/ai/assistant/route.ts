@@ -264,6 +264,12 @@ async function executeTool(
 
     if (name === 'insert_record') {
       const fields = { ...(input.fields as Record<string, unknown>), tenant_id: tenantId }
+      
+      // Validate required fields for specific tables
+      if (table === 'insurer_orders' && !(fields as Record<string, unknown>).claim_number) {
+        return `Error: claim_number is required when creating an insurer order. Please provide the claim number from the insurer.`
+      }
+      
       const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
       if (error) return `Error inserting into ${table}: ${error.message}`
       return `Successfully created new record in ${table} with id ${(data as any)?.id}.`
