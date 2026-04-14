@@ -110,6 +110,21 @@ const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'insert_record',
+      description: 'Insert a new record into a table. Pass all field values as direct properties (e.g., {"table": "jobs", "claim_number": "ABC123", "insurer": "XYZ"}). tenant_id is automatically added.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name (e.g. jobs, insurer_orders, quotes, etc.)' },
+        },
+        required: ['table'],
+        additionalProperties: { type: 'string', description: 'Any additional fields for the record' },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_record',
       description: 'Update one or more fields on an existing record identified by its id.',
       parameters: {
@@ -120,21 +135,6 @@ const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           fields: { type: 'object', description: 'Key-value pairs of fields to update' },
         },
         required: ['table', 'id', 'fields'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'insert_record',
-      description: 'Insert a new record into a table. tenant_id will be automatically set if not provided.',
-      parameters: {
-        type: 'object',
-        properties: {
-          table: { type: 'string', description: 'Table name' },
-          fields: { type: 'object', description: 'Key-value pairs for the new record' },
-        },
-        required: ['table', 'fields'],
       },
     },
   },
@@ -208,11 +208,10 @@ async function executeTool(
 
     if (name === 'insert_record') {
       console.log('[AI Assistant] insert_record input:', JSON.stringify(input))
-      // Handle both formats: AI might pass fields directly or nested under 'fields' key
-      const inputFields = (input.fields as Record<string, unknown>) || input
-      console.log('[AI Assistant] inputFields:', JSON.stringify(inputFields))
-      // Remove 'table' and 'fields' keys if present, then ensure tenant_id is set correctly
-      const { table: _, fields: __, tenant_id, ...fieldsWithoutTenantId } = inputFields as Record<string, unknown>
+      // New format: fields are passed directly as properties (except 'table')
+      const { table: _table, ...fieldsWithoutTable } = input as Record<string, unknown>
+      // Remove tenant_id if AI passed it, then add the correct one
+      const { tenant_id: _tenantId, ...fieldsWithoutTenantId } = fieldsWithoutTable as Record<string, unknown>
       const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
       console.log('[AI Assistant] final fields:', JSON.stringify(fields))
       
