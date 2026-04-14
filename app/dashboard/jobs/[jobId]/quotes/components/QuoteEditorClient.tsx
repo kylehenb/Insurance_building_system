@@ -11,6 +11,7 @@ import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
 import { useTrades } from '../hooks/useTrades'
 import type { Trade } from '../hooks/useTrades'
+import { CsvImportDialog } from './CsvImportDialog'
 import {
   DndContext,
   closestCenter,
@@ -320,6 +321,9 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
   const [dragRoomOrder, setDragRoomOrder] = useState<string[]>([])
 
+  // CSV import dialog state
+  const [showCsvImport, setShowCsvImport] = useState(false)
+
   // Permit alert: dismissed in session (before persisting to DB)
   const [sessionPermitDismissed, setSessionPermitDismissed] = useState(false)
 
@@ -360,6 +364,15 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   const handleAddRoom = useCallback(() => {
     setPendingRooms(prev => [...prev, { name: '', autoFocus: true }])
   }, [])
+
+  const handleCsvImport = useCallback((importItems: Partial<ScopeItem>[]) => {
+    // Import items by adding them to each room
+    for (const itemData of importItems) {
+      if (itemData.room) {
+        addItem(itemData.room, itemData)
+      }
+    }
+  }, [addItem])
 
   const handleRenamePendingRoom = useCallback((oldName: string, newName: string) => {
     if (!newName.trim() || newName === oldName) return
@@ -610,7 +623,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
 
         {/* Add room */}
         {!isLocked && (
-          <div style={{ padding: '14px 16px' }}>
+          <div style={{ padding: '14px 16px', display: 'flex', gap: 8 }}>
             <button
               onClick={handleAddRoom}
               style={{
@@ -634,6 +647,30 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               }}
             >
               + Add New Room
+            </button>
+            <button
+              onClick={() => setShowCsvImport(true)}
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: 13,
+                color: '#9e998f',
+                background: '#ffffff',
+                border: '1px solid #e0dbd4',
+                borderRadius: 6,
+                padding: '8px 18px',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#c8b89a'
+                e.currentTarget.style.color = '#3a3530'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e0dbd4'
+                e.currentTarget.style.color = '#9e998f'
+              }}
+            >
+              Import CSV
             </button>
           </div>
         )}
@@ -668,6 +705,15 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         cashSettlementActive={cashSettlementActive}
         onCashSettlementToggle={handleCashSettlementToggle}
         quoteId={quoteId}
+      />
+
+      {/* CSV Import Dialog */}
+      <CsvImportDialog
+        isOpen={showCsvImport}
+        onClose={() => setShowCsvImport(false)}
+        onImport={handleCsvImport}
+        quoteId={quoteId}
+        tenantId={tenantId}
       />
     </div>
   )
