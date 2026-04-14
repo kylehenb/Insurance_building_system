@@ -66,6 +66,10 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null)
 
+  // Action checklist state
+  const [actionChecklist, setActionChecklist] = useState<{ id: string; text: string; completed: boolean }[]>([])
+  const [thinkingText, setThinkingText] = useState('Thinking')
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPopoverRef = useRef<HTMLDivElement>(null)
@@ -146,6 +150,25 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Animated "Thinking...and doing" text
+  useEffect(() => {
+    if (!loading) {
+      setThinkingText('Thinking')
+      setActionChecklist([])
+      return
+    }
+
+    const texts = ['Thinking', 'Thinking..', 'Thinking...', 'Thinking...and doing', 'Thinking...and doing.', 'Thinking...and doing..']
+    let index = 0
+
+    const interval = setInterval(() => {
+      index = (index + 1) % texts.length
+      setThinkingText(texts[index])
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [loading])
 
   // Load templates when panel opens
   useEffect(() => {
@@ -247,6 +270,11 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   }
 
   function handleDragStart(e: React.MouseEvent) {
+    // Only allow drag from non-interactive elements
+    const target = e.target as HTMLElement
+    if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('button') || target.closest('input') || target.closest('textarea')) {
+      return
+    }
     e.preventDefault()
     dragState.current = {
       active: true,
@@ -361,7 +389,16 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       }
 
       const data = await res.json()
-      const text: string = data.text ?? 'Sorry, I encountered an error.'
+      let text: string = data.text ?? 'Sorry, I encountered an error.'
+      
+      // Filter out tool calls from the response
+      text = text.replace(/\n?\n?\s*\{"name":\s*"[^"]+",\s*"parameters":\s*\{[^}]*\}\}\s*\n?/g, '')
+      text = text.replace(/\n?\n?\s*\[\]\s*\n?/g, '')
+      text = text.replace(/\n?\n?\s*Let me read[^\n]*\n?/g, '')
+      text = text.replace(/\n?\n?\s*Let me check[^\n]*\n?/g, '')
+      text = text.replace(/\n?\n?\s*Let me get[^\n]*\n?/g, '')
+      text = text.trim()
+      
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
     } catch {
       setMessages((prev) => [
@@ -747,6 +784,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
       <div
         className="fai-widget"
+        onMouseDown={handleDragStart}
         style={{
           left: pos.x,
           top: pos.y,
@@ -755,7 +793,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         }}
       >
         {/* Header / drag handle */}
-        <div className="fai-header" onMouseDown={handleDragStart}>
+        <div className="fai-header">
           <div className="fai-drag-dots">
             <div className="fai-drag-row">
               <div className="fai-drag-dot" /><div className="fai-drag-dot" />
@@ -934,8 +972,22 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                 <div className="fai-avatar assistant">⬡</div>
                 <div className="fai-bubble-inner">
                   <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>
-                    Thinking…
+                    {thinkingText}
                   </div>
+                  {actionChecklist.length > 0 && (
+                    <div style={{ marginTop: '8px', padding: '8px 0' }}>
+                      {actionChecklist.map((item) => (
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7a6a58', marginBottom: '4px' }}>
+                          <span style={{ color: item.completed ? '#2a6b50' : '#c8b89a' }}>
+                            {item.completed ? '✓' : '○'}
+                          </span>
+                          <span style={{ textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.6 : 1 }}>
+                            {item.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

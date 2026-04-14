@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
-const client = new Anthropic()
+const anthropic = new Anthropic()
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // Tables that require admin role to write to
 const SETTINGS_TABLES = new Set(['tenants', 'users', 'scope_library', 'trade_type_sequence', 'report_templates'])
@@ -136,6 +138,75 @@ const EXECUTION_TOOLS: Anthropic.Tool[] = [
         id: { type: 'string', description: 'The UUID of the record to delete' },
       },
       required: ['table', 'id'],
+    },
+  },
+]
+
+const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'read_records',
+      description: 'Read records from any table. Use this to look up current data before proposing changes, or to answer questions about specific records.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name (e.g. jobs, reports, quotes, scope_items, inspections, etc.)' },
+          filters: {
+            type: 'object',
+            description: 'Key-value pairs to filter by (e.g. {"job_id": "abc123", "status": "pending"}). All filters use equality matching.',
+          },
+          columns: { type: 'string', description: 'Comma-separated list of columns to return. Omit or use "*" for all columns.' },
+          limit: { type: 'number', description: 'Maximum number of rows to return. Defaults to 20.' },
+        },
+        required: ['table'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_record',
+      description: 'Update one or more fields on an existing record identified by its id.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name' },
+          id: { type: 'string', description: 'The UUID of the record to update' },
+          fields: { type: 'object', description: 'Key-value pairs of fields to update' },
+        },
+        required: ['table', 'id', 'fields'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'insert_record',
+      description: 'Insert a new record into a table. tenant_id will be automatically set if not provided.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name' },
+          fields: { type: 'object', description: 'Key-value pairs for the new record' },
+        },
+        required: ['table', 'fields'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_record',
+      description: 'Delete a record by its id from a table.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name' },
+          id: { type: 'string', description: 'The UUID of the record to delete' },
+        },
+        required: ['table', 'id'],
+      },
     },
   },
 ]
@@ -481,70 +552,117 @@ export async function POST(req: NextRequest) {
       }
     })
 
+    const allMessages: Anthropic.MessageParam[] = [...apiMessages]
     const useTools = isConfirmation(messages)
     console.log('[AI Assistant] useTools:', useTools, 'messages length:', messages.length)
 
-    const allMessages: Anthropic.MessageParam[] = [...apiMessages]
-    let finalText = ''
-    let iteration = 0
-    const MAX_ITERATIONS = 15
-
-    while (iteration < MAX_ITERATIONS) {
-      iteration++
-
-      const response = await client.messages.create({
-        model: fileAttachment ? 'claude-sonnet-4-6' : (useTools ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'),
-        max_tokens: fileAttachment ? 4096 : (useTools ? 8192 : 1024),
-        system: systemPrompt,
-        messages: allMessages,
-        ...(useTools ? { tools: EXECUTION_TOOLS } : {}),
+    // Use OpenAI for tool execution (cheaper), Anthropic for everything else
+    if (useTools) {
+      // Convert Anthropic message format to OpenAI format
+      const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = allMessages.map((m) => {
+        if (m.role === 'user') {
+          if (Array.isArray(m.content)) {
+            // Handle image/document attachments
+            const textContent = m.content.find((c: any) => c.type === 'text')
+            return {
+              role: 'user' as const,
+              content: textContent ? (textContent as any).text : '',
+            }
+          }
+          return { role: 'user' as const, content: m.content as string }
+        }
+        if (m.role === 'assistant') {
+          if (Array.isArray(m.content)) {
+            // Handle tool results from previous iterations
+            const toolResults = m.content.filter((c: any) => c.type === 'tool_result')
+            if (toolResults.length > 0) {
+              return {
+                role: 'user' as const,
+                content: toolResults.map((tr: any) => `${tr.content}`).join('\n'),
+              }
+            }
+          }
+          return { role: 'assistant' as const, content: m.content as string }
+        }
+        return { role: 'user' as const, content: '' }
       })
 
-      console.log('[AI Assistant] Response stop_reason:', response.stop_reason, 'content blocks:', response.content.length)
+      let iteration = 0
+      const MAX_ITERATIONS = 15
 
-      if (response.stop_reason === 'end_turn' || !useTools) {
-        // Only capture text on the final response
-        const textBlocks = response.content.filter((b) => b.type === 'text')
-        if (textBlocks.length > 0) {
-          finalText = textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
-        }
-        console.log('[AI Assistant] Final text captured, length:', finalText.length)
-        break
-      }
+      while (iteration < MAX_ITERATIONS) {
+        iteration++
 
-      if (response.stop_reason === 'tool_use') {
-        const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
-        console.log('[AI Assistant] Tool use blocks found:', toolUseBlocks.length)
-        const toolResultContent: Anthropic.ToolResultBlockParam[] = []
+        console.log('[AI Assistant] OpenAI iteration:', iteration)
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...openaiMessages,
+          ],
+          tools: OPENAI_TOOLS,
+          tool_choice: 'auto',
+          max_tokens: 16384,
+        })
 
-        for (const block of toolUseBlocks) {
-          const toolUse = block as Anthropic.ToolUseBlock
-          console.log(`[AI Assistant] Executing tool: ${toolUse.name}`, toolUse.input)
-          const result = await executeTool(
-            toolUse.name,
-            toolUse.input as Record<string, unknown>,
-            tenantId ?? '',
-            isAdmin,
-          )
-          console.log(`[AI Assistant] Tool result: ${result}`)
-          // If tool execution failed, include error in final response
-          if (result.startsWith('Error') || result.startsWith('Permission denied')) {
-            finalText = result
-            return NextResponse.json({ text: finalText })
+        console.log('[AI Assistant] OpenAI response finish_reason:', response.choices[0].finish_reason)
+
+        const message = response.choices[0].message
+        const text = message.content || ''
+
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          console.log('[AI Assistant] OpenAI tool calls:', message.tool_calls.length)
+
+          // Execute each tool call
+          for (const toolCall of message.tool_calls) {
+            if (toolCall.type !== 'function') continue
+            const functionName = toolCall.function.name
+            const functionArgs = JSON.parse(toolCall.function.arguments)
+
+            console.log(`[AI Assistant] Executing tool: ${functionName}`, functionArgs)
+            const result = await executeTool(functionName, functionArgs, tenantId ?? '', isAdmin)
+            console.log(`[AI Assistant] Tool result: ${result}`)
+
+            // If tool execution failed, include error in final response
+            if (result.startsWith('Error') || result.startsWith('Permission denied')) {
+              return NextResponse.json({ text: result })
+            }
+
+            // Add tool result to messages
+            openaiMessages.push({
+              role: 'assistant',
+              content: text,
+              tool_calls: message.tool_calls,
+            })
+            openaiMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: result,
+            })
           }
-          toolResultContent.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: result,
-          })
+        } else {
+          // No tool calls, this is the final response
+          console.log('[AI Assistant] OpenAI final text length:', text.length)
+          return NextResponse.json({ text: text || 'All steps completed.' })
         }
-
-        allMessages.push({ role: 'assistant', content: response.content })
-        allMessages.push({ role: 'user', content: toolResultContent })
-      } else {
-        console.log('[AI Assistant] Unexpected stop_reason:', response.stop_reason)
-        break
       }
+
+      return NextResponse.json({ text: 'All steps completed.' })
+    }
+
+    // Use Anthropic for non-tool requests (chat, file attachments)
+    let finalText = ''
+
+    const response = await anthropic.messages.create({
+      model: fileAttachment ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+      max_tokens: fileAttachment ? 4096 : 1024,
+      system: systemPrompt,
+      messages: allMessages,
+    })
+
+    const textBlocks = response.content.filter((b: any) => b.type === 'text')
+    if (textBlocks.length > 0) {
+      finalText = textBlocks.map((b: any) => b.text).join('')
     }
 
     return NextResponse.json({ text: finalText || 'All steps completed.' })
