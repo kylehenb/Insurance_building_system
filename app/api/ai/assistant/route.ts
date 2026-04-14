@@ -207,11 +207,14 @@ async function executeTool(
     }
 
     if (name === 'insert_record') {
+      console.log('[AI Assistant] insert_record input:', JSON.stringify(input))
       // Handle both formats: AI might pass fields directly or nested under 'fields' key
       const inputFields = (input.fields as Record<string, unknown>) || input
+      console.log('[AI Assistant] inputFields:', JSON.stringify(inputFields))
       // Remove 'table' and 'fields' keys if present, then ensure tenant_id is set correctly
       const { table: _, fields: __, tenant_id, ...fieldsWithoutTenantId } = inputFields as Record<string, unknown>
       const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
+      console.log('[AI Assistant] final fields:', JSON.stringify(fields))
       
       const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
       if (error) return `Error inserting into ${table}: ${error.message}`
