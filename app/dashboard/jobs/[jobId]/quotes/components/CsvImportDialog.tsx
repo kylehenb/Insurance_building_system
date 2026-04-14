@@ -161,17 +161,23 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
       }
 
       for (const map of mapping) {
-        if (map.scopeField && row[map.csvColumn]) {
-          const value = row[map.csvColumn]
+        if (map.scopeField) {
+          const value = row[map.csvColumn] || ''
           
           // Convert numeric fields
-          if (['qty', 'rate_total', 'rate_labour', 'rate_materials', 'room_length', 'room_width', 'room_height'].includes(map.scopeField)) {
-            const numValue = parseFloat(value)
-            if (!isNaN(numValue)) {
-              (item as any)[map.scopeField] = numValue
+          if (['qty', 'rate_labour', 'rate_materials', 'room_length', 'room_width', 'room_height'].includes(map.scopeField)) {
+            const trimmedValue = value.trim()
+            if (trimmedValue !== '') {
+              const numValue = parseFloat(trimmedValue)
+              if (!isNaN(numValue)) {
+                (item as any)[map.scopeField] = numValue
+              }
             }
           } else {
-            (item as any)[map.scopeField] = value
+            const trimmedValue = value.trim()
+            if (trimmedValue !== '') {
+              (item as any)[map.scopeField] = trimmedValue
+            }
           }
         }
       }
