@@ -493,8 +493,8 @@ export async function POST(req: NextRequest) {
       iteration++
 
       const response = await client.messages.create({
-        model: fileAttachment ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
-        max_tokens: fileAttachment ? 4096 : 1024,
+        model: fileAttachment ? 'claude-sonnet-4-6' : (useTools ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'),
+        max_tokens: fileAttachment ? 4096 : (useTools ? 8192 : 1024),
         system: systemPrompt,
         messages: allMessages,
         ...(useTools ? { tools: EXECUTION_TOOLS } : {}),

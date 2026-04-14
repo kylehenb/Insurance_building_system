@@ -149,7 +149,7 @@ CREATE TABLE insurer_orders (
   claim_number TEXT NOT NULL,          -- universal job key — always present
   insurer TEXT,                        -- denormalised for speed/display
   adjuster TEXT,                       -- denormalised for speed/display
-  wo_type TEXT,                        -- 'BAR' | 'make_safe' | 'roof_report' | 'specialist' | 'variation'
+  wo_type TEXT,                        -- 'BAR' | 'make_safe' | 'roof_report' | 'specialist' | 'variation' | 'quote_only'
   is_make_safe BOOLEAN DEFAULT false,  -- explicit flag for fast-track routing
   property_address TEXT,
   insured_name TEXT,

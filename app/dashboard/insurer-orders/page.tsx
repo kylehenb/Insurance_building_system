@@ -52,6 +52,8 @@ function WoTypeBadge({ type }: { type: string | null }) {
     return <span style={{ background: '#e8f0fe', color: '#1a56db', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>BAR</span>
   if (lower === 'roof report')
     return <span style={{ background: '#f0eef8', color: '#4a42a0', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Roof Report</span>
+  if (lower === 'quote only')
+    return <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Quote Only</span>
   return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{type ?? 'Other'}</span>
 }
 
@@ -150,6 +152,39 @@ function FEditArea({ label, value, onSave }: { label: string; value: string | nu
         rows={2}
         style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
       />
+    </div>
+  )
+}
+
+// Editable select dropdown for wo_type
+function WoTypeSelect({ label, value, onSave }: { label: string; value: string | null; onSave: (val: string) => void }) {
+  const [draft, setDraft] = useState(value ?? '')
+  useEffect(() => { setDraft(value ?? '') }, [value])
+  
+  const options = [
+    { value: 'BAR', label: 'BAR' },
+    { value: 'make_safe', label: 'Make Safe' },
+    { value: 'roof_report', label: 'Roof Report' },
+    { value: 'specialist', label: 'Specialist' },
+    { value: 'variation', label: 'Variation' },
+    { value: 'quote_only', label: 'Quote Only' },
+  ]
+  
+  return (
+    <div>
+      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+        {label}
+      </div>
+      <select
+        value={draft}
+        onChange={e => { setDraft(e.target.value); onSave(e.target.value) }}
+        style={{ ...inputStyle, cursor: 'pointer' }}
+      >
+        <option value="">— Select —</option>
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   )
 }
@@ -606,7 +641,7 @@ export default function InsurerOrdersPage() {
                                       label="Insurer" value={order.insurer}
                                       onSave={v => saveField(order.id, 'insurer', v)}
                                     />
-                                    <FEdit
+                                    <WoTypeSelect
                                       label="WO Type" value={order.wo_type}
                                       onSave={v => saveField(order.id, 'wo_type', v)}
                                     />
