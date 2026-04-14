@@ -166,9 +166,9 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
           
           // Convert numeric fields
           if (['qty', 'rate_labour', 'rate_materials', 'room_length', 'room_width', 'room_height'].includes(map.scopeField)) {
-            const trimmedValue = value.trim()
-            if (trimmedValue !== '') {
-              const numValue = parseFloat(trimmedValue)
+            const cleanedValue = value.replace(/[^0-9.-]+/g, '').trim() // Remove non-numeric characters except '.' and '-'
+            if (cleanedValue !== '') {
+              const numValue = parseFloat(cleanedValue)
               if (!isNaN(numValue)) {
                 (item as any)[map.scopeField] = numValue
               }
