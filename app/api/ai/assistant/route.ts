@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+export const dynamic = 'force-dynamic'
 
 // Tables that require admin role to write to
 const SETTINGS_TABLES = new Set(['tenants', 'users', 'scope_library', 'trade_type_sequence', 'report_templates'])
@@ -369,7 +369,8 @@ interface IntentResult {
 
 async function detectIntent(
   lastUserMessage: string,
-  lastAssistantMessage: string
+  lastAssistantMessage: string,
+  openai: OpenAI
 ): Promise<IntentResult> {
   console.log('[AI Assistant] Detecting intent for user message:', lastUserMessage)
   
@@ -429,6 +430,8 @@ function hasConfirmPhrase(assistantMessage: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  
   try {
     // Support both multipart/form-data (binary file uploads) and JSON
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -511,7 +514,7 @@ export async function POST(req: NextRequest) {
       const lastAssistant = messages[messages.length - 2]
       
       if (lastUser.role === 'user' && lastAssistant.role === 'assistant' && hasConfirmPhrase(lastAssistant.content)) {
-        const intent = await detectIntent(lastUser.content, lastAssistant.content)
+        const intent = await detectIntent(lastUser.content, lastAssistant.content, openai)
         console.log('[AI Assistant] Intent detected:', intent)
         
         if (intent.isConfirmation) {

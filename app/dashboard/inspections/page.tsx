@@ -200,13 +200,13 @@ async function InspectionsListPage() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <StatusBadge status={insp.status} />
+                          <StatusBadge status={insp.status ?? 'unscheduled'} />
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <SubStatusBadge status={insp.scope_status} />
+                          <SubStatusBadge status={insp.scope_status ?? 'pending'} />
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <SubStatusBadge status={insp.report_status} />
+                          <SubStatusBadge status={insp.report_status ?? 'pending'} />
                         </td>
                       </tr>
                     ))}

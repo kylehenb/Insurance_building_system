@@ -100,7 +100,7 @@ export default async function QuotePrintPage({
     })
   }
 
-  const items = (scopeItems || []).sort((a, b) => a.sort_order - b.sort_order)
+  const items = (scopeItems || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   // Group items by room
   const groupedByRoom = items.reduce((acc, item) => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import type { Database } from '@/lib/supabase/database.types'
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,6 +45,77 @@ export async function POST(req: NextRequest) {
     }
 
     const prefix = tenant.job_prefix
+
+    // Step 4a: Check for existing job with same claim number
+    console.log('[lodge] checking for existing job with claim_number:', order.claim_number)
+    if (!order.claim_number) {
+      return NextResponse.json({ error: 'Claim number is required' }, { status: 400 })
+    }
+    const { data: existingJobByClaim, error: claimCheckError } = await supabase
+      .from('jobs')
+      .select('id, job_number, claim_number, property_address')
+      .eq('tenant_id', tenantId)
+      .eq('claim_number', order.claim_number)
+      .single()
+
+    if (claimCheckError && claimCheckError.code !== 'PGRST116') {
+      console.error('[lodge] claim number check error:', claimCheckError)
+      return NextResponse.json({ error: 'Failed to check for existing job' }, { status: 500 })
+    }
+
+    // If job with same claim number exists, attach order to it
+    if (existingJobByClaim) {
+      console.log('[lodge] found existing job with same claim_number:', existingJobByClaim.job_number)
+      
+      // Update insurer_order to link to existing job
+      const { error: linkError } = await supabase
+        .from('insurer_orders')
+        .update({ job_id: existingJobByClaim.id, status: 'linked' })
+        .eq('id', orderId)
+
+      if (linkError) {
+        console.error('[lodge] link error:', linkError)
+        return NextResponse.json({ error: 'Failed to link to existing job' }, { status: 500 })
+      }
+
+      console.log('[lodge] order linked to existing job')
+      return NextResponse.json({ 
+        jobNumber: existingJobByClaim.job_number, 
+        jobId: existingJobByClaim.id,
+        linkedToExisting: true,
+        message: 'Order linked to existing job with same claim number'
+      })
+    }
+
+    // Step 4b: Check for existing jobs with same address (different claim number)
+    if (order.property_address) {
+      console.log('[lodge] checking for existing jobs with same address')
+      const { data: jobsByAddress, error: addressCheckError } = await supabase
+        .from('jobs')
+        .select('id, job_number, claim_number, property_address')
+        .eq('tenant_id', tenantId)
+        .eq('property_address', order.property_address)
+        .neq('claim_number', order.claim_number)
+
+      if (addressCheckError) {
+        console.error('[lodge] address check error:', addressCheckError)
+        return NextResponse.json({ error: 'Failed to check for address duplicates' }, { status: 500 })
+      }
+
+      if (jobsByAddress && jobsByAddress.length > 0) {
+        console.log('[lodge] found existing jobs with same address:', jobsByAddress.length)
+        const matchingJobs = jobsByAddress.map(j => ({
+          jobNumber: j.job_number,
+          claimNumber: j.claim_number
+        }))
+        return NextResponse.json({ 
+          error: 'Address already exists in system',
+          warning: true,
+          matchingJobs,
+          message: `Found ${jobsByAddress.length} existing job(s) with same property address but different claim number. Please review before proceeding.`
+        }, { status: 409 })
+      }
+    }
 
     // Step 4 cont: Compute next job number
     console.log('[lodge] finding max job number for tenant', tenantId)
@@ -99,84 +171,103 @@ export async function POST(req: NextRequest) {
     const jobId = newJob.id
     console.log('[lodge] job created:', jobId)
 
-    // Step 6: Create inspection
-    console.log('[lodge] creating inspection')
-    const { data: newInspection, error: inspError } = await supabase
-      .from('inspections')
-      .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        status: 'unscheduled',
-        created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+    // Step 6: Conditionally create inspection based on wo_type
+    let inspectionId: string | null = null
+    const wo_type = order.wo_type
 
-    if (inspError || !newInspection) {
-      console.error('[lodge] inspection create error:', inspError)
-      return NextResponse.json({ error: 'Failed to create inspection' }, { status: 500 })
+    if (wo_type === 'BAR') {
+      console.log('[lodge] creating inspection for wo_type:', wo_type)
+      const { data: newInspection, error: inspError } = await supabase
+        .from('inspections')
+        .insert({
+          tenant_id: tenantId,
+          job_id: jobId,
+          status: 'unscheduled',
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (inspError || !newInspection) {
+        console.error('[lodge] inspection create error:', inspError)
+        return NextResponse.json({ error: 'Failed to create inspection' }, { status: 500 })
+      }
+
+      inspectionId = newInspection.id
+      console.log('[lodge] inspection created:', inspectionId)
+    } else {
+      console.log('[lodge] skipping inspection creation for wo_type:', wo_type)
     }
 
-    const inspectionId = newInspection.id
-    console.log('[lodge] inspection created:', inspectionId)
+    // Step 7: Conditionally create report based on wo_type
+    let reportId: string | null = null
 
-    // Step 7: Create report
-    console.log('[lodge] creating report')
-    const reportType = order.wo_type ?? 'BAR'
-    const { data: newReport, error: reportError } = await supabase
-      .from('reports')
-      .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        inspection_id: inspectionId,
-        report_type: reportType,
-        report_ref: `${jobNumber}-R01`,
-        version: 1,
-        is_locked: false,
-        status: 'draft',
-        property_address: order.property_address,
-        insured_name: order.insured_name,
-        claim_number: order.claim_number,
-        loss_type: order.loss_type,
-        created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+    if (wo_type === 'BAR' || wo_type === 'make_safe' || wo_type === 'roof_report' || wo_type === 'specialist') {
+      console.log('[lodge] creating report for wo_type:', wo_type)
+      const { data: newReport, error: reportError } = await supabase
+        .from('reports')
+        .insert({
+          tenant_id: tenantId,
+          job_id: jobId,
+          inspection_id: wo_type === 'BAR' ? inspectionId : null,
+          report_type: wo_type,
+          report_ref: `${jobNumber}-R01`,
+          version: 1,
+          is_locked: false,
+          status: 'draft',
+          property_address: order.property_address,
+          insured_name: order.insured_name,
+          claim_number: order.claim_number,
+          loss_type: order.loss_type,
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
 
-    if (reportError || !newReport) {
-      console.error('[lodge] report create error:', reportError)
-      return NextResponse.json({ error: 'Failed to create report' }, { status: 500 })
+      if (reportError || !newReport) {
+        console.error('[lodge] report create error:', reportError)
+        return NextResponse.json({ error: 'Failed to create report' }, { status: 500 })
+      }
+
+      reportId = newReport.id
+      console.log('[lodge] report created:', reportId)
+    } else {
+      console.log('[lodge] skipping report creation for wo_type:', wo_type)
     }
 
-    const reportId = newReport.id
-    console.log('[lodge] report created:', reportId)
+    // Step 8: Conditionally create quote based on wo_type
+    let quoteId: string | null = null
 
-    // Step 8: Create quote
-    console.log('[lodge] creating quote')
-    const { data: newQuote, error: quoteError } = await supabase
-      .from('quotes')
-      .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        inspection_id: inspectionId,
-        report_id: reportId,
-        quote_ref: `${jobNumber}-Q01`,
-        quote_type: 'inspection',
-        version: 1,
-        is_active_version: true,
-        is_locked: false,
-        status: 'draft',
-        created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+    if (wo_type === 'BAR' || wo_type === 'quote_only') {
+      console.log('[lodge] creating quote for wo_type:', wo_type)
+      const { data: newQuote, error: quoteError } = await supabase
+        .from('quotes')
+        .insert({
+          tenant_id: tenantId,
+          job_id: jobId,
+          inspection_id: wo_type === 'BAR' ? inspectionId : null,
+          report_id: wo_type === 'BAR' ? reportId : null,
+          quote_ref: `${jobNumber}-Q01`,
+          quote_type: 'inspection',
+          version: 1,
+          is_active_version: true,
+          is_locked: false,
+          status: 'draft',
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
 
-    if (quoteError || !newQuote) {
-      console.error('[lodge] quote create error:', quoteError)
-      return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 })
+      if (quoteError || !newQuote) {
+        console.error('[lodge] quote create error:', quoteError)
+        return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 })
+      }
+
+      quoteId = newQuote.id
+      console.log('[lodge] quote created:', quoteId)
+    } else {
+      console.log('[lodge] skipping quote creation for wo_type:', wo_type)
     }
-
-    console.log('[lodge] quote created:', newQuote.id)
 
     // Step 9: Update insurer_order
     console.log('[lodge] updating insurer_order')

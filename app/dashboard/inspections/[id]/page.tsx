@@ -168,7 +168,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                   <h1 className="text-2xl font-bold text-[#1a1a1a]">
                     {insp.inspection_ref ?? "Inspection"}
                   </h1>
-                  <StatusBadge status={insp.status} />
+                  <StatusBadge status={insp.status ?? 'unscheduled'} />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#1a1a1a]/70">
                   {insp.jobs && (
@@ -229,7 +229,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                     <Field label="Inspector" value={insp.users?.name ?? "-"} />
                     <Field
                       label="Status"
-                      value={<StatusBadge status={insp.status} />}
+                      value={<StatusBadge status={insp.status ?? 'unscheduled'} />}
                     />
                     <Field
                       label="Booking Confirmed"
@@ -247,7 +247,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                       label="SMS Response"
                       value={insp.scheduling_sms_response}
                     />
-                    <Field label="Access Notes" value={insp.access_notes} />
+                    <Field label="Access Notes" value={insp.access_notes ?? "-"} />
                   </dl>
                 </div>
 
@@ -263,7 +263,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                       label="Form Submitted"
                       value={formatDateTime(insp.form_submitted_at)}
                     />
-                    <Field label="Person Met" value={insp.person_met} />
+                    <Field label="Person Met" value={insp.person_met ?? "-"} />
                   </dl>
                 </div>
 
@@ -275,15 +275,15 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                   <dl className="space-y-4">
                     <Field
                       label="Scope Status"
-                      value={<SubStatusBadge status={insp.scope_status} />}
+                      value={<SubStatusBadge status={insp.scope_status ?? 'pending'} />}
                     />
                     <Field
                       label="Report Status"
-                      value={<SubStatusBadge status={insp.report_status} />}
+                      value={<SubStatusBadge status={insp.report_status ?? 'pending'} />}
                     />
                     <Field
                       label="Photos Status"
-                      value={<SubStatusBadge status={insp.photos_status} />}
+                      value={<SubStatusBadge status={insp.photos_status ?? 'pending'} />}
                     />
                   </dl>
                 </div>

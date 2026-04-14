@@ -59,7 +59,7 @@ export default function JobsListPage() {
       const { data } = await supabase
         .from('jobs')
         .select('id, job_number, insured_name, property_address, insurer, status, created_at')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenantId!)
         .order('created_at', { ascending: false });
       setJobs((data as JobRow[]) ?? []);
       setLoading(false);
@@ -194,7 +194,7 @@ export default function JobsListPage() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <StatusBadge status={job.status} />
+                          <StatusBadge status={job.status ?? 'active'} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
                           <span className="text-xs text-[#b0a898]">
