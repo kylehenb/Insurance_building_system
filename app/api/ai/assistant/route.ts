@@ -340,16 +340,30 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
 }
 
 function isConfirmation(messages: { role: string; content: string }[]): boolean {
-  if (messages.length < 2) return false
+  console.log('[AI Assistant] isConfirmation called with', messages.length, 'messages')
+  if (messages.length < 2) {
+    console.log('[AI Assistant] isConfirmation: less than 2 messages')
+    return false
+  }
   const lastUser = messages[messages.length - 1]
-  if (lastUser.role !== 'user') return false
-  if (lastUser.content.trim().toLowerCase() !== 'c') return false
+  console.log('[AI Assistant] isConfirmation: last message role:', lastUser.role, 'content:', lastUser.content)
+  if (lastUser.role !== 'user') {
+    console.log('[AI Assistant] isConfirmation: last message not from user')
+    return false
+  }
+  if (lastUser.content.trim().toLowerCase() !== 'c') {
+    console.log('[AI Assistant] isConfirmation: last message not "c"')
+    return false
+  }
 
   for (let i = messages.length - 2; i >= 0; i--) {
     if (messages[i].role === 'assistant') {
-      return messages[i].content.toLowerCase().includes('reply c to confirm')
+      const hasConfirmPhrase = messages[i].content.toLowerCase().includes('reply c to confirm')
+      console.log('[AI Assistant] isConfirmation: assistant message has confirm phrase:', hasConfirmPhrase)
+      return hasConfirmPhrase
     }
   }
+  console.log('[AI Assistant] isConfirmation: no assistant message found')
   return false
 }
 
