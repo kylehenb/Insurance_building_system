@@ -213,9 +213,11 @@ async function executeTool(
       // Remove tenant_id if AI passed it, then add the correct one
       const { tenant_id: _tenantId, ...fieldsWithoutTenantId } = fieldsWithoutTable as Record<string, unknown>
       const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
-      console.log('[AI Assistant] final fields:', JSON.stringify(fields))
+      // Normalize date formats (e.g., DD/MM/YY -> YYYY-MM-DD)
+      const normalizedFields = normalizeFields(fields)
+      console.log('[AI Assistant] final fields:', JSON.stringify(normalizedFields))
       
-      const { data, error } = await (db as any).from(table).insert(fields).select('id').single()
+      const { data, error } = await (db as any).from(table).insert(normalizedFields).select('id').single()
       if (error) return `Error inserting into ${table}: ${error.message}`
       return `Successfully created new record in ${table} with id ${(data as any)?.id}.`
     }
@@ -428,6 +430,61 @@ User's response: ${lastUserMessage}`
 function hasConfirmPhrase(assistantMessage: string): boolean {
   return assistantMessage.toLowerCase().includes('reply') && 
          (assistantMessage.toLowerCase().includes('confirm') || assistantMessage.toLowerCase().includes('yes'))
+}
+
+function normalizeDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  
+  // Check if it looks like a date (contains slashes or dashes)
+  const dateStr = value.trim()
+  
+  // Try DD/MM/YY or DD/MM/YYYY format
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    if (parts.length === 3) {
+      const [day, month, year] = parts
+      // Handle YY format (26 -> 2026)
+      const fullYear = year.length === 2 ? `20${year}` : year
+      return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+  }
+  
+  // Try DD-MM-YY or DD-MM-YYYY format
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-')
+    if (parts.length === 3) {
+      // Check if it's already in ISO format (YYYY-MM-DD)
+      if (parts[0].length === 4) {
+        return dateStr
+      }
+      // Otherwise assume DD-MM-YY or DD-MM-YYYY
+      const [day, month, year] = parts
+      const fullYear = year.length === 2 ? `20${year}` : year
+      return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+  }
+  
+  return null
+}
+
+function normalizeFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {}
+  
+  for (const [key, value] of Object.entries(fields)) {
+    // Normalize date fields
+    if (key.includes('date') || key.includes('_at') || key === 'created_at' || key === 'updated_at') {
+      const normalizedDate = normalizeDate(value)
+      if (normalizedDate) {
+        normalized[key] = normalizedDate
+      } else {
+        normalized[key] = value
+      }
+    } else {
+      normalized[key] = value
+    }
+  }
+  
+  return normalized
 }
 
 export async function POST(req: NextRequest) {
