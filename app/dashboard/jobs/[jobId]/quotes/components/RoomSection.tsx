@@ -315,7 +315,7 @@ function SortableLineItemRow({
 // ──────────────────────────────────────────────
 // Grid / column constants
 // ──────────────────────────────────────────────
-const GRID = '6px 1fr 60px 70px 110px 120px 126px 73px 100px 60px'
+const GRID = '1% 43.4% 5% 5.8% 8% 8% 10.5% 5% 8.3% 5%'
 
 const COL_HEADERS = [
   '#',

@@ -184,8 +184,6 @@ export default async function QuotePrintPage({
               {[
                 { label: 'Insurer',      value: job.insurer },
                 { label: 'Claim #',      value: job.claim_number },
-                { label: 'Loss Type',    value: job.loss_type },
-                { label: 'Date of Loss', value: job.date_of_loss ? formatDate(job.date_of_loss) : '—' },
                 { label: 'Adjuster',     value: job.adjuster },
                 { label: 'Quote Date',   value: formatDate(quote.created_at) },
               ].filter(item => item.value || item.label === 'Quote Date').map((item, i, arr) => (
@@ -210,9 +208,10 @@ export default async function QuotePrintPage({
           <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide" style={{ fontFamily: 'var(--font-dm-sans)' }}>Estimate - Scope of Works</h2>
         </div>
 
-        {/* Table Header */}
-        <div className="px-6 pb-0">
-          <table className="w-full text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
+        {/* Scope Items by Room */}
+        <div className="px-6 pb-2">
+          {/* Table Header */}
+          <table className="w-full text-[10px] border-collapse mb-0" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
                 <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
@@ -224,10 +223,6 @@ export default async function QuotePrintPage({
               </tr>
             </thead>
           </table>
-        </div>
-
-        {/* Scope Items by Room */}
-        <div className="px-6 pb-2">
           {(() => {
             let globalCounter = 0
             return sortedRooms.map((room) => {
@@ -315,7 +310,7 @@ export default async function QuotePrintPage({
               {/* Notes - Left column */}
               <div className="flex-1">
                 <p className="text-[#b0a89e] text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ fontFamily: 'var(--font-dm-sans)' }}>Notes</p>
-                <div className="text-xs text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-dm-sans)' }}>{quote.notes || ''}</div>
+                <div className="text-[10px] text-[#3a3530] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-dm-sans)' }}>{quote.notes || ''}</div>
               </div>
 
               {/* Totals - Right column */}
@@ -402,6 +397,9 @@ export default async function QuotePrintPage({
             <p className="text-[9px] text-[#f5f2ee] leading-tight">BC105884</p>
             <p className="text-[9px] text-[#c8b89a] leading-tight">IICRC Certified</p>
           </div>
+
+          {/* Beige vertical line */}
+          <div className="w-px h-8 bg-[#f5f2ee]"></div>
 
           {/* Column 3: Quote Questions pill */}
           <div className="flex-1 flex justify-center">
