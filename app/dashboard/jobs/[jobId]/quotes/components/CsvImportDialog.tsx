@@ -9,10 +9,9 @@ const SCOPE_FIELDS = [
   { key: 'trade', label: 'Trade', required: true },
   { key: 'item_description', label: 'Description', required: true },
   { key: 'qty', label: 'Quantity', required: true },
-  { key: 'rate_total', label: 'Rate Total', required: true },
+  { key: 'rate_labour', label: 'Rate Labour', required: true },
+  { key: 'rate_materials', label: 'Rate Materials', required: true },
   { key: 'unit', label: 'Unit', required: false },
-  { key: 'rate_labour', label: 'Rate Labour', required: false },
-  { key: 'rate_materials', label: 'Rate Materials', required: false },
   { key: 'room_length', label: 'Room Length', required: false },
   { key: 'room_width', label: 'Room Width', required: false },
   { key: 'room_height', label: 'Room Height', required: false },
@@ -26,10 +25,9 @@ const FIELD_ALIASES: Record<string, string[]> = {
   trade: ['trade', 'category', 'type'],
   item_description: ['item_description', 'description', 'desc', 'item', 'name'],
   qty: ['qty', 'quantity', 'qty', 'amount'],
-  rate_total: ['rate_total', 'rate', 'price', 'cost', 'total_rate'],
+  rate_labour: ['rate_labour', 'labour_rate', 'labor_rate', 'labour', 'labor'],
+  rate_materials: ['rate_materials', 'materials_rate', 'material_rate', 'materials', 'material'],
   unit: ['unit', 'uom', 'measure'],
-  rate_labour: ['rate_labour', 'labour_rate', 'labor_rate'],
-  rate_materials: ['rate_materials', 'materials_rate', 'material_rate'],
   room_length: ['room_length', 'length', 'l'],
   room_width: ['room_width', 'width', 'w'],
   room_height: ['room_height', 'height', 'h'],
@@ -178,9 +176,11 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
         }
       }
 
-      // Calculate line_total if we have qty and rate_total
-      if (item.qty && item.rate_total) {
-        item.line_total = item.qty * item.rate_total
+      // Calculate line_total if we have qty and rate_labour/rate_materials
+      if (item.qty) {
+        const labourRate = item.rate_labour ?? 0
+        const materialsRate = item.rate_materials ?? 0
+        item.line_total = item.qty * (labourRate + materialsRate)
       }
 
       items.push(item)
@@ -205,7 +205,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
 
     // Warn about items with missing data but still import them
     const itemsMissingData = previewItems.filter(item => {
-      return !item.room || !item.trade || !item.item_description || item.qty === null || item.rate_total === null
+      return !item.room || !item.trade || !item.item_description || item.qty === null || item.rate_labour === null || item.rate_materials === null
     })
 
     if (itemsMissingData.length > 0) {
@@ -435,7 +435,8 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                     <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Trade</th>
                     <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Description</th>
                     <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Qty</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Rate</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Labour</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Materials</th>
                     <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Total</th>
                   </tr>
                 </thead>
@@ -446,13 +447,14 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                       <td style={{ padding: 8, color: '#3a3530' }}>{item.trade || '-'}</td>
                       <td style={{ padding: 8, color: '#3a3530' }}>{item.item_description || '-'}</td>
                       <td style={{ padding: 8, color: '#3a3530' }}>{item.qty || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.rate_total || '-'}</td>
+                      <td style={{ padding: 8, color: '#3a3530' }}>{item.rate_labour || '-'}</td>
+                      <td style={{ padding: 8, color: '#3a3530' }}>{item.rate_materials || '-'}</td>
                       <td style={{ padding: 8, color: '#3a3530' }}>{item.line_total || '-'}</td>
                     </tr>
                   ))}
                   {previewItems.length > 20 && (
                     <tr>
-                      <td colSpan={6} style={{ padding: 8, textAlign: 'center', color: '#9e998f' }}>
+                      <td colSpan={7} style={{ padding: 8, textAlign: 'center', color: '#9e998f' }}>
                         ... and {previewItems.length - 20} more items
                       </td>
                     </tr>
