@@ -468,6 +468,7 @@ export async function POST(req: NextRequest) {
     })
 
     const useTools = isConfirmation(messages)
+    console.log('[AI Assistant] useTools:', useTools, 'messages length:', messages.length)
 
     const allMessages: Anthropic.MessageParam[] = [...apiMessages]
     let finalText = ''
@@ -485,17 +486,21 @@ export async function POST(req: NextRequest) {
         ...(useTools ? { tools: EXECUTION_TOOLS } : {}),
       })
 
+      console.log('[AI Assistant] Response stop_reason:', response.stop_reason, 'content blocks:', response.content.length)
+
       if (response.stop_reason === 'end_turn' || !useTools) {
         // Only capture text on the final response
         const textBlocks = response.content.filter((b) => b.type === 'text')
         if (textBlocks.length > 0) {
           finalText = textBlocks.map((b) => (b as Anthropic.TextBlock).text).join('')
         }
+        console.log('[AI Assistant] Final text captured, length:', finalText.length)
         break
       }
 
       if (response.stop_reason === 'tool_use') {
         const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
+        console.log('[AI Assistant] Tool use blocks found:', toolUseBlocks.length)
         const toolResultContent: Anthropic.ToolResultBlockParam[] = []
 
         for (const block of toolUseBlocks) {
@@ -523,6 +528,7 @@ export async function POST(req: NextRequest) {
         allMessages.push({ role: 'assistant', content: response.content })
         allMessages.push({ role: 'user', content: toolResultContent })
       } else {
+        console.log('[AI Assistant] Unexpected stop_reason:', response.stop_reason)
         break
       }
     }
