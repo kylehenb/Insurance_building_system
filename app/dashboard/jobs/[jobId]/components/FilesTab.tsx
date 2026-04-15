@@ -30,6 +30,8 @@ export function FilesTab({ jobId }: FilesTabProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadDescription, setUploadDescription] = useState('')
   const [showUploadForm, setShowUploadForm] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [previewFile, setPreviewFile] = useState<FileRecord | null>(null)
 
   useEffect(() => {
     loadFiles()
@@ -72,8 +74,7 @@ export function FilesTab({ jobId }: FilesTabProps) {
     }
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  async function handleFileUpload(file: File) {
     if (!file) return
 
     setUploading(true)
@@ -105,6 +106,31 @@ export function FilesTab({ jobId }: FilesTabProps) {
       alert('Failed to upload file')
     } finally {
       setUploading(false)
+    }
+  }
+
+  function handleFileUploadChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      handleFileUpload(file)
     }
   }
 
@@ -154,6 +180,25 @@ export function FilesTab({ jobId }: FilesTabProps) {
     }
   }
 
+  async function handleViewFile(file: FileRecord) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('job-files')
+        .createSignedUrl(file.storage_path, 60)
+
+      if (error) {
+        console.error('Error creating signed URL:', error)
+        alert('Failed to open file')
+        return
+      }
+
+      window.open(data.signedUrl, '_blank')
+    } catch (error) {
+      console.error('Error opening file:', error)
+      alert('Failed to open file')
+    }
+  }
+
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -161,10 +206,15 @@ export function FilesTab({ jobId }: FilesTabProps) {
   }
 
   function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('en-AU', {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-AU', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
+    }) + ' ' + date.toLocaleTimeString('en-AU', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
     })
   }
 
@@ -196,11 +246,23 @@ export function FilesTab({ jobId }: FilesTabProps) {
                 disabled={uploading}
               />
             </div>
-            <div className="mb-3">
-              <label className="block text-[12px] text-[#9e998f] mb-1">File</label>
+            <div
+              className={`mb-3 border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragging
+                  ? 'border-[#c8b89a] bg-[#faf9f7]'
+                  : 'border-[#e0dbd4] hover:border-[#c8b89a]'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <Upload className="h-8 w-8 mx-auto mb-2 text-[#9e998f]" />
+              <p className="text-[13px] text-[#9e998f] mb-2">
+                Drag and drop a file here, or click to browse
+              </p>
               <input
                 type="file"
-                onChange={handleFileUpload}
+                onChange={handleFileUploadChange}
                 className="w-full text-[13px]"
                 disabled={uploading}
               />
@@ -267,8 +329,14 @@ export function FilesTab({ jobId }: FilesTabProps) {
                   <td className="px-4 py-3 text-[13px] text-[#3a3530]">
                     {file.description || '—'}
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-[#3a3530]">
-                    {file.file_name}
+                  <td className="px-4 py-3 text-[13px]">
+                    <button
+                      onClick={() => handleViewFile(file)}
+                      className="text-blue-600 underline hover:text-blue-800 hover:no-underline transition-all"
+                      title="Click to view file"
+                    >
+                      {file.file_name}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-[13px] text-[#9e998f]">
                     {file.file_kind}
