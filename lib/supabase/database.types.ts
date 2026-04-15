@@ -870,6 +870,80 @@ export type Database = {
           },
         ]
       }
+      job_files: {
+        Row: {
+          added_by: string | null
+          created_at: string | null
+          description: string | null
+          file_kind: string
+          file_name: string
+          id: string
+          is_system_generated: boolean | null
+          job_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          tenant_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_kind: string
+          file_name: string
+          id?: string
+          is_system_generated?: boolean | null
+          job_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          tenant_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_kind?: string
+          file_name?: string
+          id?: string
+          is_system_generated?: boolean | null
+          job_id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_files_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_margin_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_flags: {
         Row: {
           created_at: string | null
