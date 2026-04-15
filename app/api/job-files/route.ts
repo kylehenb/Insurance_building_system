@@ -169,7 +169,9 @@ export async function POST(req: NextRequest) {
     const fileKind = getFileKind(file.type)
 
     // Upload to Supabase Storage
-    const fileName = `${Date.now()}-${file.name}`
+    // Sanitize filename: replace spaces and special chars that Supabase Storage rejects
+    const sanitizedName = file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._\-]/g, '_')
+    const fileName = `${Date.now()}-${sanitizedName}`
     const storagePath = `tenants/${tenantId}/jobs/${jobId}/docs/${fileName}`
 
     const { error: uploadError } = await supabase.storage
