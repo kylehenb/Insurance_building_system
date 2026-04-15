@@ -201,7 +201,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'calendar',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 4 ───────────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'inspections',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 5 ───────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'trade-work-orders',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 6 ───────────────────────────────────────────────────────────────
@@ -256,7 +256,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'reports',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 7 ───────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'reports',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 8 ───────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'quotes',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 9 ───────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'inspections',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 10 ──────────────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'comms',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 11 ──────────────────────────────────────────────────────────────
@@ -366,7 +366,7 @@ export const playbookSteps: PlaybookStep[] = [
         action: { label: 'Go to Quotes', type: 'navigate', target: 'quotes' },
       },
     ],
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 12 ──────────────────────────────────────────────────────────────
@@ -427,7 +427,7 @@ export const playbookSteps: PlaybookStep[] = [
         action: { label: 'Compose email', type: 'compose', target: 'building_contract' },
       },
     ],
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 14 ──────────────────────────────────────────────────────────────
@@ -443,7 +443,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'files',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 15 ──────────────────────────────────────────────────────────────
@@ -460,7 +460,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'trade-work-orders',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 16 ──────────────────────────────────────────────────────────────
@@ -478,7 +478,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'trade-work-orders',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 17 ──────────────────────────────────────────────────────────────
@@ -496,7 +496,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'trade-work-orders',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 18 ──────────────────────────────────────────────────────────────
@@ -514,7 +514,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'invoices',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 19 ──────────────────────────────────────────────────────────────
@@ -532,7 +532,7 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'navigate',
       target: 'invoices',
     },
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 20 ──────────────────────────────────────────────────────────────
@@ -546,7 +546,7 @@ export const playbookSteps: PlaybookStep[] = [
       ctx.invoices.outbound.every(inv => inv.status === 'paid'),
     isVisible: () => true,
     // Read-only from Xero — no action button
-    skipAllowed: false,
+    skipAllowed: true,
   },
 
   // ── STEP 21 ──────────────────────────────────────────────────────────────
@@ -562,6 +562,6 @@ export const playbookSteps: PlaybookStep[] = [
       type: 'inline',
       target: 'close_job',
     },
-    skipAllowed: false,
+    skipAllowed: false, // Cannot skip the final step
   },
 ]
