@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { PlaybookRail } from '@/components/playbook/PlaybookRail'
+import type { JobPlaybookContext } from '@/lib/playbook/steps'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1440,6 +1442,158 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
   )
 }
 
+// ── Playbook Section ───────────────────────────────────────────────────────
+//
+// Self-contained: fetches all data required to build JobPlaybookContext,
+// then renders the PlaybookRail. Adding new playbook steps never requires
+// changes outside this component and lib/playbook/steps.ts.
+
+function PlaybookSection({ jobId, tenantId, job }: { jobId: string; tenantId: string; job: JobDetails }) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  const [ctx, setCtx] = useState<JobPlaybookContext | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      // Fetch in parallel — all reads, no writes
+      const [
+        jobExtended,
+        inspectionsRes,
+        reportsRes,
+        quotesRes,
+        workOrdersRes,
+        invoicesRes,
+      ] = await Promise.all([
+        // Extended job fields added by playbook migration
+        supabase
+          .from('jobs')
+          .select('id,status,kpi_contacted_at,scope_sent_at,building_contract_sent_at,building_permit_required,building_permit_obtained_at')
+          .eq('id', jobId)
+          .eq('tenant_id', tenantId)
+          .single(),
+
+        // Inspections
+        supabase
+          .from('inspections')
+          .select('id,status,report_status,scope_status')
+          .eq('job_id', jobId)
+          .eq('tenant_id', tenantId),
+
+        // Reports
+        supabase
+          .from('reports')
+          .select('id,report_type,status')
+          .eq('job_id', jobId)
+          .eq('tenant_id', tenantId)
+          .is('deleted_at', null),
+
+        // Quotes
+        supabase
+          .from('quotes')
+          .select('id,status,total_amount,quote_type,approval_notes')
+          .eq('job_id', jobId)
+          .eq('tenant_id', tenantId),
+
+        // Work orders
+        supabase
+          .from('work_orders')
+          .select('id,status,work_type')
+          .eq('job_id', jobId)
+          .eq('tenant_id', tenantId),
+
+        // Invoices (inbound + outbound in one query, split by direction)
+        supabase
+          .from('invoices')
+          .select('id,status,direction')
+          .eq('job_id', jobId)
+          .eq('tenant_id', tenantId),
+      ])
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const jx = (jobExtended.data ?? {}) as any
+      const inspections = (inspectionsRes.data ?? []) as Array<{
+        id: string; status: string | null; report_status: string | null; scope_status: string | null
+      }>
+      const reports = (reportsRes.data ?? []) as Array<{
+        id: string; report_type: string; status: string | null
+      }>
+      const quotes = (quotesRes.data ?? []) as Array<{
+        id: string; status: string | null; total_amount: number | null;
+        quote_type: string | null; approval_notes: string | null
+      }>
+      const workOrders = (workOrdersRes.data ?? []) as Array<{
+        id: string; status: string | null; work_type: string | null
+      }>
+      const allInvoices = (invoicesRes.data ?? []) as Array<{
+        id: string; status: string | null; direction: string
+      }>
+
+      const hasMakeSafe = workOrders.some(wo => wo.work_type === 'make_safe')
+
+      const approvedQuote = quotes.find(
+        q => q.quote_type === 'inspection' && q.status === 'approved'
+      )
+      const approvedQuoteTotal = approvedQuote?.total_amount ?? null
+
+      const builtCtx: JobPlaybookContext = {
+        job: {
+          id: jobId,
+          status: jx.status ?? job.status ?? 'active',
+          kpi_contacted_at: jx.kpi_contacted_at ?? null,
+          kpi_reported_at: null, // not used by any playbook step currently
+          scope_sent_at: jx.scope_sent_at ?? null,
+          building_contract_sent_at: jx.building_contract_sent_at ?? null,
+          building_permit_required: jx.building_permit_required ?? false,
+          building_permit_obtained_at: jx.building_permit_obtained_at ?? null,
+        },
+        inspections,
+        reports,
+        quotes,
+        workOrders,
+        // work_order_visits table not yet in schema — default to empty
+        // Steps that depend on this (works_complete) won't resolve until table is added
+        workOrderVisits: [],
+        invoices: {
+          inbound: allInvoices.filter(i => i.direction === 'inbound'),
+          outbound: allInvoices.filter(i => i.direction === 'outbound'),
+        },
+        // blueprint table not yet in schema — defaults to not-exists
+        // Steps gated on blueprint.exists will be hidden until blueprint is implemented
+        blueprint: { exists: false, status: null },
+        hasMakeSafe,
+        hasRoofReport: reports.some(r => r.report_type === 'roof'),
+        hasSpecialistReport: reports.some(r => r.report_type === 'specialist'),
+        buildingPermitRequired: jx.building_permit_required ?? false,
+        approvedQuoteTotal,
+      }
+
+      setCtx(builtCtx)
+    }
+
+    load()
+  }, [jobId, tenantId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!ctx) {
+    // Loading skeleton — thin placeholder so layout doesn't jump
+    return (
+      <div
+        style={{
+          background: '#fff',
+          border: '0.5px solid #e4dfd8',
+          borderRadius: 8,
+          height: 60,
+          opacity: 0.5,
+        }}
+      />
+    )
+  }
+
+  return <PlaybookRail ctx={ctx} />
+}
+
 // ── OverviewTab ────────────────────────────────────────────────────────────
 
 export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
@@ -1451,12 +1605,15 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
         {/* 1. Job Details accordion — full width */}
         <JobDetailsAccordion job={job} jobId={jobId} tenantId={tenantId} />
 
-        {/* 2. Action Cards — full width */}
+        {/* 2. Playbook rail — guided step-by-step workflow */}
+        <PlaybookSection jobId={jobId} tenantId={tenantId} job={job} />
+
+        {/* 3. Action Cards — async event-driven tasks (To Do) */}
         <div>
           <ActionCardsSection jobId={jobId} tenantId={tenantId} />
         </div>
 
-        {/* 3. Two equal columns: Communications + Calendar */}
+        {/* 4. Two equal columns: Communications + Calendar */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <CommunicationsCard jobId={jobId} tenantId={tenantId} />
           <CalendarCard jobId={jobId} tenantId={tenantId} />
