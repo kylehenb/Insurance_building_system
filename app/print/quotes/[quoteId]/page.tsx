@@ -158,23 +158,23 @@ export default async function QuotePrintPage({
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
-          {/* Column 1: Logo (140px fixed) */}
-          <div style={{ width: '140px', minWidth: '140px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
+          {/* Column 1: Logo (148px fixed) */}
+          <div style={{ width: '148px', minWidth: '148px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
             <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Column 2: Job details (flex: 1) */}
           <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e0dbd4' }}>
-            <div style={{ fontSize: '9.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
             {job.insured_name && (
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
             )}
             {job.property_address && (
-              <div style={{ fontSize: '11px', color: '#9e998f', marginBottom: '10px' }}>{job.property_address}</div>
+              <div style={{ fontSize: '13px', color: '#9e998f', marginBottom: '10px' }}>{job.property_address}</div>
             )}
             {/* Field strip */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '10px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px' }}>
               {[
                 { label: 'Insurer',    value: job.insurer },
                 { label: 'Claim #',    value: job.claim_number },
@@ -191,22 +191,22 @@ export default async function QuotePrintPage({
 
           {/* Column 3: Contact (184px fixed) */}
           <div style={{ width: '184px', minWidth: '184px', padding: '14px 20px 14px 16px' }}>
-            <div style={{ fontSize: '9.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
-            <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
-            <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
+            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
+            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
             {/* Badge row */}
             <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
               {['BC105884', 'IICRC Certified'].map(badge => (
-                <span key={badge} style={{ fontSize: '7.5px', background: '#f5f2ee', color: '#6a6460', border: '1px solid #e0dbd4', borderRadius: '3px', padding: '2px 6px', fontWeight: '700' }}>{badge}</span>
+                <span key={badge} style={{ fontSize: '9.5px', background: '#f5f2ee', color: '#6a6460', border: '1px solid #e0dbd4', borderRadius: '3px', padding: '2px 6px', fontWeight: '700' }}>{badge}</span>
               ))}
             </div>
           </div>
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 20px 9px', display: 'flex', alignItems: 'baseline' }}>
-          <div style={{ width: '140px', minWidth: '140px', flexShrink: 0, padding: '14px 8px 14px 20px' }}>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 20px 4px', display: 'flex', alignItems: 'baseline' }}>
+          <div style={{ width: '148px', minWidth: '148px', flexShrink: 0, padding: '4px 8px 4px 20px' }}>
             <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
           </div>
           <div style={{ flex: 1 }}></div>
@@ -221,12 +221,12 @@ export default async function QuotePrintPage({
           <table className="w-full text-[10px] border-collapse mb-0" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
-                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
+                <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
+                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
               </tr>
             </thead>
           </table>
@@ -391,7 +391,7 @@ export default async function QuotePrintPage({
       <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* Small logo circle */}
         <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <img src="/logo.png" alt="IRC" style={{ height: '16px' }} />
+          <img src="/logo.png?v=1" alt="IRC" style={{ height: '16px' }} />
         </div>
         {/* Company name block */}
         <div>
