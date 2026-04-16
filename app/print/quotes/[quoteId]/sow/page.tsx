@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { SowPrintButton } from './SowPrintButton'
+import { SendForSignatureButton } from './SendForSignatureButton'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
@@ -130,6 +131,7 @@ export default async function SowPrintPage({
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0">
         <SowPrintButton jobNumber={job.job_number} />
+        <SendForSignatureButton quoteId={quoteId} insuredEmail={job.insured_email ?? null} />
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
