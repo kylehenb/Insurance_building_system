@@ -638,35 +638,6 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   {q.item_count} {q.item_count === 1 ? 'item' : 'items'}
                 </span>
 
-                {/* ── INSURER (moved before status) ── */}
-                {insurer && (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '2px 9px',
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      background: '#f5f2ee',
-                      color: '#9e998f',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: '50%',
-                        background: '#c8b89a',
-                        flexShrink: 0,
-                      }}
-                    />
-                    {insurer}
-                  </span>
-                )}
-
                 {/* ── STATUS badge with dropdown chevron on LHS ── */}
                 <div
                   data-status-dropdown="true"
