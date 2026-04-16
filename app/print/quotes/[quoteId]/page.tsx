@@ -158,8 +158,8 @@ export default async function QuotePrintPage({
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
-          {/* Column 1: Logo (124px fixed) */}
-          <div style={{ width: '124px', minWidth: '124px', padding: '14px 8px 14px 14px', borderRight: '1px solid #e0dbd4' }}>
+          {/* Column 1: Logo (132px fixed) */}
+          <div style={{ width: '132px', minWidth: '132px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
             <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
@@ -189,8 +189,8 @@ export default async function QuotePrintPage({
             </div>
           </div>
 
-          {/* Column 3: Contact (200px fixed) */}
-          <div style={{ width: '200px', minWidth: '200px', padding: '14px 16px' }}>
+          {/* Column 3: Contact (192px fixed) */}
+          <div style={{ width: '192px', minWidth: '192px', padding: '14px 20px 14px 16px' }}>
             <div style={{ fontSize: '7.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
             <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
@@ -205,15 +205,18 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 16px 9px', display: 'flex', alignItems: 'baseline' }}>
-          <span style={{ fontSize: '17px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 20px 9px', display: 'flex', alignItems: 'baseline' }}>
+          <div style={{ width: '132px', minWidth: '132px', flexShrink: 0 }}></div>
           <div style={{ flex: 1 }}></div>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
           <div style={{ flex: 1 }}></div>
+          <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          <div style={{ flex: 1 }}></div>
+          <div style={{ width: '192px', minWidth: '192px', flexShrink: 0 }}></div>
         </div>
 
         {/* Scope Items by Room */}
-        <div className="px-6 pb-2">
+        <div style={{ paddingLeft: '20px', paddingRight: '20px', paddingBottom: '8px' }}>
           {/* Table Header */}
           <table className="w-full text-[10px] border-collapse mb-0" style={{ tableLayout: 'fixed' }}>
             <thead>
@@ -222,7 +225,7 @@ export default async function QuotePrintPage({
                 <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
                 <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '11%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
                 <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
               </tr>
             </thead>
@@ -246,7 +249,7 @@ export default async function QuotePrintPage({
               return (
                 <div key={room} className="mb-4">
                   {/* Room header with dimensions - light beige background */}
-                  <div className="py-1.5 px-3 border-b border-[#e0dbd4] bg-[#f5f2ee]">
+                  <div style={{ paddingTop: '4px', paddingBottom: '4px', paddingLeft: '12px', paddingRight: '12px', borderBottom: '1px solid #e0dbd4', backgroundColor: '#f5f2ee' }}>
                     <h4 className="font-bold text-[#3a3530] text-xs uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
                       {room}
                       {hasDimensions && (
@@ -299,16 +302,16 @@ export default async function QuotePrintPage({
                         </tr>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
-            )
-          })
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })
           })()}
         </div>
 
         {/* Footer Section - Notes left, Totals right - in light beige box with rounded corners */}
-        <div className="px-6 pb-20">
+        <div style={{ paddingLeft: '20px', paddingRight: '20px', paddingBottom: '80px' }}>
           <div className="bg-[#f5f2ee] rounded-lg p-3">
             <div className="flex gap-6">
               {/* Notes - Left column */}
