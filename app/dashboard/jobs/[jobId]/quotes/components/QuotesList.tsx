@@ -959,8 +959,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                             e.stopPropagation()
                             setSowLoading(q.id)
                             setStatusDropdownId(null)
-                            // Open in new tab
-                            window.open(`/dashboard/quotes/${q.id}/sow`, '_blank')
+                            // Open print version in new tab (without sidebar)
+                            window.open(`/print/quotes/${q.id}/sow`, '_blank')
                             // Clear loading state after a short delay
                             setTimeout(() => setSowLoading(null), 500)
                           }}
