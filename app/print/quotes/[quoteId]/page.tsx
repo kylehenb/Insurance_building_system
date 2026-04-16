@@ -205,9 +205,11 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 20px 4px', position: 'relative', textAlign: 'center' }}>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 0 4px', position: 'relative', width: '100%' }}>
           <span style={{ position: 'absolute', left: '20px', top: '4px', fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
-          <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          <div style={{ textAlign: 'center' }}>
+            <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          </div>
         </div>
 
         {/* Scope Items by Room */}
