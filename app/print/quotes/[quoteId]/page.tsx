@@ -152,60 +152,62 @@ export default async function QuotePrintPage({
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
-      <PrintButton quoteRef={quote.quote_ref} jobNumber={job.job_number} />
-
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        {/* Header - White background with logo and job details */}
-        <div className="flex bg-white items-stretch">
-          {/* Left: Logo and company name - aligned with left page border */}
-          <div className="pl-6 pr-4 py-0 flex flex-col" style={{ width: '140px', minWidth: '140px' }}>
-            <img src="/logo-alt.png" alt="IRC Logo" className="block" style={{ width: '100%', height: 'auto', margin: '0px' }} />
-            <div className="text-[#6a6460] whitespace-nowrap mt-3" style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '700', lineHeight: '1', paddingTop: '0px' }}>INSURANCE REPAIR CO</div>
+        <PrintButton quoteRef={quote.quote_ref} jobNumber={job.job_number} />
+
+        {/* Header - 3-column grid */}
+        <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
+          {/* Column 1: Logo (120px fixed) */}
+          <div style={{ width: '120px', minWidth: '120px', padding: '14px 8px 14px 14px', borderRight: '1px solid #e0dbd4' }}>
+            <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
+            <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
-          {/* Right: Job details */}
-          <div className="flex-1 pl-[44px] pr-6 pb-4 pt-0">
-            {/* Title row */}
-            <div className="flex items-start gap-3 mb-1">
-              <h1 className="text-[22px] font-semibold text-[#1a1a1a]" style={{ fontFamily: 'DM Mono, monospace' }}>
-                {quote.quote_ref || job.job_number}
-              </h1>
-            </div>
+          {/* Column 2: Job details (flex: 1) */}
+          <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e0dbd4' }}>
+            <div style={{ fontSize: '7.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
             {job.insured_name && (
-              <p className="text-[14px] font-medium text-[#3a3530] mb-0.5">{job.insured_name}</p>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
             )}
             {job.property_address && (
-              <p className="text-[13px] text-[#9e998f] mb-2">{job.property_address}</p>
+              <div style={{ fontSize: '11px', color: '#9e998f', marginBottom: '10px' }}>{job.property_address}</div>
             )}
-
-            {/* Compact field strip */}
-            <div className="flex items-center flex-wrap gap-0 text-[12px] text-[#9e998f]">
+            {/* Field strip */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '10px' }}>
               {[
-                { label: 'Insurer',      value: job.insurer },
-                { label: 'Claim #',      value: job.claim_number },
-                { label: 'Adjuster',     value: job.adjuster },
-                { label: 'Quote Date',   value: formatDate(quote.created_at) },
-              ].filter(item => item.value || item.label === 'Quote Date').map((item, i, arr) => (
-                <span
-                  key={item.label}
-                  className="flex items-center pr-2 mr-2"
-                  style={{ borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}
-                >
-                  <span className="mr-1 text-[#b0a898]">{item.label}:</span>
-                  <span className="text-[#3a3530]">{item.value || '—'}</span>
+                { label: 'Insurer',    value: job.insurer },
+                { label: 'Claim #',    value: job.claim_number },
+                { label: 'Adjuster',   value: job.adjuster },
+                { label: 'Quote date', value: formatDate(quote.created_at) },
+              ].map((field, i, arr) => (
+                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
+                  <span style={{ color: '#b0a89e' }}>{field.label}: </span>
+                  <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
                 </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Column 3: Contact (200px fixed) */}
+          <div style={{ width: '200px', minWidth: '200px', padding: '14px 16px' }}>
+            <div style={{ fontSize: '7.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
+            <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
+            <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
+            {/* Badge row */}
+            <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
+              {['BC105884', 'IICRC Certified'].map(badge => (
+                <span key={badge} style={{ fontSize: '7.5px', background: '#f5f2ee', color: '#6a6460', border: '1px solid #e0dbd4', borderRadius: '3px', padding: '2px 6px', fontWeight: '700' }}>{badge}</span>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Beige line break */}
-        <div className="h-px bg-[#e0dbd4]"></div>
-
-        {/* Title */}
-        <div className="px-6 py-3 bg-white">
-          <h2 className="text-base font-semibold text-[#1a1a1a] uppercase tracking-wide" style={{ fontFamily: 'var(--font-dm-sans)' }}>Estimate - Scope of Works</h2>
+        {/* Form band */}
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 16px 9px', display: 'flex', alignItems: 'baseline', gap: '14px' }}>
+          <span style={{ fontSize: '17px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
         </div>
 
         {/* Scope Items by Room */}
@@ -380,41 +382,24 @@ export default async function QuotePrintPage({
         </div>
       </div>
 
-      {/* Black Footer */}
-      <div className="bg-[#1a1a1a] text-white py-2 px-6 print:fixed print:bottom-0 print:left-0 print:right-0 print:z-50">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-6">
-          {/* Column 1: Logo + company info */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <img src="/logo.png" alt="IRC Logo" className="h-8 w-auto" />
-            <div className="flex flex-col">
-              <p className="font-bold text-[8px] tracking-wider uppercase text-[#f5f2ee] leading-tight">INSURANCE REPAIR CO PTY LTD</p>
-              <p className="text-[9px] text-[#c8b89a] leading-tight">Building and Restoration</p>
-            </div>
-          </div>
-
-          {/* Column 2: License info */}
-          <div className="flex flex-col flex-shrink-0">
-            <p className="text-[9px] text-[#f5f2ee] leading-tight">BC105884</p>
-            <p className="text-[9px] text-[#c8b89a] leading-tight">IICRC Certified</p>
-          </div>
-
-          {/* Beige vertical line */}
-          <div className="w-px h-8 bg-[#f5f2ee]"></div>
-
-          {/* Column 3: Quote Questions pill */}
-          <div className="flex-1 flex justify-center">
-            <span className="inline-block px-3 py-1 rounded-full text-[10px] font-semibold bg-[#f5f2ee] text-[#1a1a1a] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>
-              Quote Questions?
-            </span>
-          </div>
-
-          {/* Column 4: Contact info */}
-          <div className="text-left flex-shrink-0">
-            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-sans)' }}>Assessor - Kyle</p>
-            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-mono)' }}>✉️ kyle@insurancerepairco.com.au</p>
-            <p className="text-[9px] text-[#f5f2ee] leading-tight" style={{ fontFamily: 'var(--font-dm-mono)' }}>📱 0431132077</p>
-          </div>
+      {/* Footer */}
+      <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Small logo circle */}
+        <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <img src="/logo.png" alt="IRC" style={{ height: '16px' }} />
         </div>
+        {/* Company name block */}
+        <div>
+          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>INSURANCE REPAIR CO PTY LTD</div>
+          <div style={{ fontSize: '8px', color: '#c8b89a' }}>Building &amp; Restoration</div>
+        </div>
+        {/* Vertical divider */}
+        <div style={{ width: '1px', height: '22px', background: '#333', margin: '0 4px', flexShrink: 0 }}></div>
+        {/* License text */}
+        <span style={{ fontSize: '8px', color: '#6a6460' }}>BC105884 · IICRC Certified</span>
+        {/* Spacer */}
+        <div style={{ flex: 1 }}></div>
+        {/* Right side reserved for future per-form content */}
       </div>
     </div>
   )
