@@ -158,8 +158,8 @@ export default async function QuotePrintPage({
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
-          {/* Column 1: Logo (120px fixed) */}
-          <div style={{ width: '120px', minWidth: '120px', padding: '14px 8px 14px 14px', borderRight: '1px solid #e0dbd4' }}>
+          {/* Column 1: Logo (124px fixed) */}
+          <div style={{ width: '124px', minWidth: '124px', padding: '14px 8px 14px 14px', borderRight: '1px solid #e0dbd4' }}>
             <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
@@ -205,9 +205,11 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 16px 9px', display: 'flex', alignItems: 'baseline', gap: '14px' }}>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 16px 9px', display: 'flex', alignItems: 'baseline' }}>
           <span style={{ fontSize: '17px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
-          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          <div style={{ flex: 1 }}></div>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          <div style={{ flex: 1 }}></div>
         </div>
 
         {/* Scope Items by Room */}
@@ -390,13 +392,13 @@ export default async function QuotePrintPage({
         </div>
         {/* Company name block */}
         <div>
-          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>INSURANCE REPAIR CO PTY LTD</div>
-          <div style={{ fontSize: '8px', color: '#c8b89a' }}>Building &amp; Restoration</div>
+          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee', textAlign: 'center' }}>INSURANCE REPAIR CO PTY LTD</div>
+          <div style={{ fontSize: '10px', color: '#c8b89a', textAlign: 'center' }}>Building &amp; Restoration</div>
         </div>
         {/* Vertical divider */}
-        <div style={{ width: '1px', height: '22px', background: '#333', margin: '0 4px', flexShrink: 0 }}></div>
+        <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
         {/* License text */}
-        <span style={{ fontSize: '8px', color: '#6a6460' }}>BC105884 · IICRC Certified</span>
+        <span style={{ fontSize: '12px', color: '#c8b89a' }}>BC105884 · IICRC Certified</span>
         {/* Spacer */}
         <div style={{ flex: 1 }}></div>
         {/* Right side reserved for future per-form content */}
