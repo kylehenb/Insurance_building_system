@@ -156,6 +156,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [hoveredStatus, setHoveredStatus] = useState<string | null>(null)
   const [notBuiltVisible, setNotBuiltVisible]   = useState(false)
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
+  const [sowLoading, setSowLoading]       = useState<string | null>(null)
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -790,6 +791,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                                     minWidth: 180,
                                     zIndex: 501,
                                   }}
+                                  onMouseEnter={() => setHoveredStatus(statusKey)}
+                                  onMouseLeave={() => setHoveredStatus(null)}
                                 >
                                   <button
                                     onClick={e => {
@@ -905,6 +908,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                                     minWidth: 180,
                                     zIndex: 501,
                                   }}
+                                  onMouseEnter={() => setHoveredStatus(statusKey)}
+                                  onMouseLeave={() => setHoveredStatus(null)}
                                 >
                                   <button
                                     onClick={e => {
@@ -952,8 +957,14 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         <button
                           onClick={e => {
                             e.stopPropagation()
-                            router.push(`/dashboard/quotes/${q.id}/sow`)
+                            setSowLoading(q.id)
+                            setStatusDropdownId(null)
+                            // Open in new tab
+                            window.open(`/dashboard/quotes/${q.id}/sow`, '_blank')
+                            // Clear loading state after a short delay
+                            setTimeout(() => setSowLoading(null), 500)
                           }}
+                          disabled={sowLoading === q.id}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -962,23 +973,29 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                             textAlign: 'left',
                             padding: '7px 14px',
                             fontSize: 12,
-                            color: '#3a3530',
+                            color: sowLoading === q.id ? '#9e998f' : '#3a3530',
                             background: 'transparent',
                             border: 'none',
-                            cursor: 'pointer',
+                            cursor: sowLoading === q.id ? 'default' : 'pointer',
                             fontWeight: 400,
                             fontFamily: 'DM Sans, sans-serif',
                             transition: 'background 0.1s',
+                            opacity: sowLoading === q.id ? 0.7 : 1,
                           }}
                           onMouseEnter={e => {
-                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                            if (sowLoading !== q.id)
+                              (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
                           }}
                           onMouseLeave={e => {
                             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
                           }}
                         >
-                          <span style={{ fontSize: 10, color: '#c8b89a' }}>📄</span>
-                          <span>Scope of Works Authorisation</span>
+                          <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                            {sowLoading === q.id ? '⏳' : '📄'}
+                          </span>
+                          <span>
+                            {sowLoading === q.id ? 'Opening...' : 'Scope of Works Authorisation'}
+                          </span>
                         </button>
                       </div>
                     </div>
