@@ -606,7 +606,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               onDeleteItem={handleDeleteItem}
               onAddItem={handleAddItem}
               onUpdateDimensions={updateRoomDimensions}
-              onRenameRoom={renameRoom}
+              onRenameRoom={handleRenamePendingRoom}
               onDeleteRoom={(roomName) => {
                 if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
               }}

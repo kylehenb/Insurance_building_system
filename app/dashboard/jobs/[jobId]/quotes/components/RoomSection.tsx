@@ -379,6 +379,13 @@ export function RoomSection({
     }
   }, [displayItems])
 
+  // Sync nameVal with name prop when it changes (e.g., after rename)
+  useEffect(() => {
+    if (!editingName) {
+      setNameVal(name)
+    }
+  }, [name, editingName])
+
   // Autofocus name on mount for new blank rooms
   useEffect(() => {
     if (autoFocusName && !isLocked) {
