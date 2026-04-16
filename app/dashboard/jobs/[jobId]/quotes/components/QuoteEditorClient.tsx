@@ -545,7 +545,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         <QuoteHeader
           quote={quote}
           total={total}
-          insurer={job.insurer}
           cashSettlementActive={cashSettlementActive}
           onCashSettlementToggle={handleCashSettlementToggle}
           isLocked={isLocked}

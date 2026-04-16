@@ -17,7 +17,6 @@ function fmt(v: number) {
 interface QuoteHeaderProps {
   quote: QuoteData
   total: number
-  insurer: string | null
   cashSettlementActive?: boolean
   onCashSettlementToggle?: () => void
   isLocked?: boolean
@@ -26,7 +25,6 @@ interface QuoteHeaderProps {
 export function QuoteHeader({
   quote,
   total,
-  insurer,
   cashSettlementActive,
   onCashSettlementToggle,
   isLocked,
@@ -79,33 +77,6 @@ export function QuoteHeader({
       >
         {quote.status.replace(/_/g, ' ')}
       </span>
-
-      {insurer && (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '2px 10px',
-            borderRadius: 20,
-            fontSize: 11,
-            fontWeight: 500,
-            background: '#f5f2ee',
-            color: '#9e998f',
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: '#c8b89a',
-              flexShrink: 0,
-            }}
-          />
-          {insurer}
-        </span>
-      )}
 
       {quote.version > 1 && (
         <span
