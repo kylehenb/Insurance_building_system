@@ -84,10 +84,11 @@ export async function POST(req: NextRequest) {
   })
 
   if (!docusealRes.ok) {
-    const err = await docusealRes.text()
-    console.error('DocuSeal error:', err)
+    const errText = await docusealRes.text()
+    console.error('DocuSeal status:', docusealRes.status)
+    console.error('DocuSeal error body:', errText)
     return NextResponse.json(
-      { error: 'Failed to send for signing. Please try again.' },
+      { error: `DocuSeal error ${docusealRes.status}: ${errText}` },
       { status: 500 }
     )
   }

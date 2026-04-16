@@ -2,6 +2,13 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/lib/supabase/database.types'
+
+const supabase = createBrowserClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 import { OverviewTab } from './OverviewTab'
 import { InspectionsTab } from './InspectionsTab'
 import { ReportsTabWrapper } from './ReportsTabWrapper'
@@ -45,6 +52,7 @@ interface JobDetailShellProps {
   currentUserId: string
   currentUserRole: string
   pendingActionCount: number
+  isFlagged: boolean
 }
 
 // — Tab definitions ———————————————————————————————————————————————
@@ -78,6 +86,36 @@ function StatusBadge({ status }: { status: string }) {
     >
       {status === 'active' ? 'Active' : status === 'complete' ? 'Closed' : status}
     </span>
+  )
+}
+
+// — Flag button ———————————————————————————————————————————————————
+function FlagButton({
+  isFlagged,
+  onToggle,
+  disabled,
+}: {
+  isFlagged: boolean
+  onToggle: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-200 hover:bg-[#f5f2ee] disabled:opacity-50 disabled:cursor-not-allowed"
+      title={isFlagged ? 'Remove flag' : 'Flag this job'}
+    >
+      <span
+        className="text-[16px]"
+        style={{
+          color: isFlagged ? '#e24b4a' : '#c8b89a',
+          opacity: isFlagged ? 1 : 0.6,
+        }}
+      >
+        {isFlagged ? '🚩' : '🏁'}
+      </span>
+    </button>
   )
 }
 
@@ -146,6 +184,7 @@ export function JobDetailShell({
   currentUserId,
   currentUserRole,
   pendingActionCount,
+  isFlagged,
 }: JobDetailShellProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -153,10 +192,44 @@ export function JobDetailShell({
 
   const activeTab = (searchParams.get('tab') ?? 'overview') as TabId
   const [pendingTab, setPendingTab] = useState<TabId | null>(null)
+  const [flagged, setFlagged] = useState(isFlagged)
+  const [togglingFlag, setTogglingFlag] = useState(false)
 
   useEffect(() => {
     setPendingTab(null)
   }, [activeTab])
+
+  async function toggleFlag() {
+    if (togglingFlag) return
+    setTogglingFlag(true)
+
+    try {
+      if (flagged) {
+        // Remove flag
+        await supabase
+          .from('job_flags')
+          .delete()
+          .eq('job_id', jobId)
+          .eq('user_id', currentUserId)
+          .eq('tenant_id', tenantId)
+        setFlagged(false)
+      } else {
+        // Add flag
+        await supabase
+          .from('job_flags')
+          .insert({
+            job_id: jobId,
+            user_id: currentUserId,
+            tenant_id: tenantId,
+          })
+        setFlagged(true)
+      }
+    } catch (error) {
+      console.error('Failed to toggle flag:', error)
+    } finally {
+      setTogglingFlag(false)
+    }
+  }
 
   function setTab(tabId: TabId) {
     setPendingTab(tabId)
@@ -222,6 +295,11 @@ export function JobDetailShell({
                   {job.job_number}
                 </h1>
                 <StatusBadge status={job.status} />
+                <FlagButton
+                  isFlagged={flagged}
+                  onToggle={toggleFlag}
+                  disabled={togglingFlag}
+                />
                 {pendingActionCount > 0 && (
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-amber-400" />

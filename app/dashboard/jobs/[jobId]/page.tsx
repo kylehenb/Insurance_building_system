@@ -54,6 +54,17 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
     .eq('tenant_id', tenant_id!)
     .eq('status', 'pending')
 
+  // Fetch flag status for current user
+  const { data: flagData } = await supabase
+    .from('job_flags')
+    .select('id')
+    .eq('job_id', jobId)
+    .eq('user_id', currentUserId)
+    .eq('tenant_id', tenant_id!)
+    .single()
+
+  const isFlagged = !!flagData
+
   return (
     <Suspense>
       <JobDetailShell
@@ -84,6 +95,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
         pendingActionCount={pendingCount ?? 0}
+        isFlagged={isFlagged}
       />
     </Suspense>
   )
