@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -152,7 +153,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [expandedId, setExpandedId]       = useState<string | null>(null)
   const [creating, setCreating]           = useState(false)
   const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null)
+  const [hoveredStatus, setHoveredStatus] = useState<string | null>(null)
   const [notBuiltVisible, setNotBuiltVisible]   = useState(false)
+  const [fileUploadVisible, setFileUploadVisible] = useState(false)
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -255,6 +258,69 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       setStatusDropdownId(null)
     },
     [tenantId, onQuoteUpdated]
+  )
+
+  // ── File upload handler ───────────────────────────────────────────────────────
+
+  const handleFileUpload = useCallback(
+    async (files: File[]) => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        for (const file of files) {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+          const filePath = `tenants/${tenantId}/jobs/${jobId}/docs/${fileName}`
+
+          // Upload file to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file)
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert(`Failed to upload ${file.name}`)
+            continue
+          }
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('documents')
+            .getPublicUrl(filePath)
+
+          // Insert into communications table as a file record
+          // Note: This is a simplified approach - you may need to adjust based on your actual file storage schema
+          const { error: insertError } = await supabase
+            .from('communications')
+            .insert({
+              tenant_id: tenantId,
+              job_id: jobId,
+              type: 'note',
+              content: `Signed Contracts uploaded: ${file.name}`,
+              attachments: JSON.stringify([{
+                name: file.name,
+                url: publicUrl,
+                label: 'Signed Contracts'
+              }]),
+              created_by: (await supabase.auth.getUser()).data.user?.id,
+            })
+
+          if (insertError) {
+            console.error('Insert error:', insertError)
+          }
+        }
+
+        setFileUploadVisible(false)
+        alert('Files uploaded successfully')
+      } catch (error) {
+        console.error('Upload error:', error)
+        alert('Failed to upload files')
+      }
+    },
+    [jobId, tenantId]
   )
 
   // ── Action button handler ─────────────────────────────────────────────────
@@ -364,6 +430,94 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* File upload modal for signed contracts */}
+      {fileUploadVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setFileUploadVisible(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 480,
+              width: '90%',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Upload Signed Contracts
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              Drag and drop files here or click to browse your computer.
+            </p>
+
+            {/* Drop zone */}
+            <div
+              style={{
+                border: '2px dashed #d8d0c8',
+                borderRadius: 8,
+                padding: '40px 20px',
+                textAlign: 'center',
+                marginBottom: 20,
+                cursor: 'pointer',
+                transition: 'border-color 0.2s, background 0.2s',
+              }}
+              onClick={() => {
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.multiple = true
+                input.onchange = e => {
+                  const files = (e.target as HTMLInputElement).files
+                  if (files && files.length > 0) {
+                    handleFileUpload(Array.from(files))
+                  }
+                }
+                input.click()
+              }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
+              <div style={{ fontSize: 13, color: '#3a3530', marginBottom: 4 }}>
+                Drop files here or click to browse
+              </div>
+              <div style={{ fontSize: 11, color: '#9e998f' }}>
+                PDF, DOC, DOCX, JPG, PNG
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setFileUploadVisible(false)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -565,95 +719,272 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         borderRadius: 8,
                         boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
                         padding: '4px 0',
-                        minWidth: 230,
+                        minWidth: 280,
                       }}
                     >
-                      {STATUS_ORDER.map(statusKey => {
-                        const isCurrent  = normalized === statusKey
-                        const keyIdx     = STATUS_ORDER.indexOf(statusKey)
-                        const curIdx     = STATUS_ORDER.indexOf(normalized)
-                        const isBackward = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
-                        const itemStyle  = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft
+                      {/* Section 1: All statuses except declined */}
+                      <div>
+                        {STATUS_ORDER.filter(statusKey => !statusKey.startsWith('declined')).map(statusKey => {
+                          const isCurrent  = normalized === statusKey
+                          const keyIdx     = STATUS_ORDER.indexOf(statusKey)
+                          const curIdx     = STATUS_ORDER.indexOf(normalized)
+                          const isBackward = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
+                          const isPrior    = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
+                          const itemStyle  = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft
+                          const actionCfg  = STATUS_ACTIONS[statusKey]
 
-                        return (
-                          <button
-                            key={statusKey}
-                            onClick={e => {
-                              e.stopPropagation()
-                              if (!isCurrent) handleStatusChange(q.id, statusKey, normalized)
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              width: '100%',
-                              textAlign: 'left',
-                              padding: '7px 14px',
-                              fontSize: 12,
-                              color: isCurrent
-                                ? itemStyle.text
-                                : isBackward
-                                ? '#b0aaa3'
-                                : '#3a3530',
-                              background: isCurrent ? itemStyle.bg : 'transparent',
-                              border: 'none',
-                              cursor: isCurrent ? 'default' : 'pointer',
-                              fontWeight: isCurrent ? 600 : 400,
-                              fontFamily: 'DM Sans, sans-serif',
-                              transition: 'background 0.1s',
-                            }}
-                            onMouseEnter={e => {
-                              if (!isCurrent)
-                                (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
-                            }}
-                            onMouseLeave={e => {
-                              if (!isCurrent)
-                                (e.currentTarget as HTMLButtonElement).style.background = isCurrent
-                                  ? itemStyle.bg
-                                  : 'transparent'
-                            }}
-                          >
-                            <span style={{ fontSize: 9, width: 10, flexShrink: 0 }}>
-                              {isCurrent ? '✓' : ''}
-                            </span>
-                            <span>{STATUS_LABELS[statusKey]}</span>
-                            {isBackward && !isCurrent && (
-                              <span style={{ marginLeft: 'auto', fontSize: 10, color: '#c8b89a' }}>
-                                ←
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
+                          return (
+                            <div key={statusKey} style={{ position: 'relative' }}>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  if (!isCurrent) handleStatusChange(q.id, statusKey, normalized)
+                                }}
+                                onMouseEnter={() => setHoveredStatus(statusKey)}
+                                onMouseLeave={() => setHoveredStatus(null)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: '7px 14px',
+                                  fontSize: 12,
+                                  color: isCurrent
+                                    ? itemStyle.text
+                                    : isBackward
+                                    ? '#b0aaa3'
+                                    : '#3a3530',
+                                  background: isCurrent ? itemStyle.bg : 'transparent',
+                                  border: 'none',
+                                  cursor: isCurrent ? 'default' : 'pointer',
+                                  fontWeight: isCurrent ? 600 : 400,
+                                  fontFamily: 'DM Sans, sans-serif',
+                                  transition: 'background 0.1s',
+                                }}
+                              >
+                                <span style={{ fontSize: 9, width: 10, flexShrink: 0 }}>
+                                  {isPrior || isCurrent ? '✓' : ''}
+                                </span>
+                                <span>{STATUS_LABELS[statusKey]}</span>
+                                {isBackward && !isCurrent && (
+                                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#c8b89a' }}>
+                                    ←
+                                  </span>
+                                )}
+                              </button>
+
+                              {/* Sub-menu action on hover */}
+                              {hoveredStatus === statusKey && actionCfg && !actionCfg.inactive && !isCurrent && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: '100%',
+                                    top: 0,
+                                    marginLeft: 4,
+                                    background: '#ffffff',
+                                    border: '1px solid #e0dbd4',
+                                    borderRadius: 6,
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
+                                    padding: '4px 0',
+                                    minWidth: 180,
+                                    zIndex: 501,
+                                  }}
+                                >
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      if (actionCfg.action === 'file_upload') {
+                                        setFileUploadVisible(true)
+                                        setStatusDropdownId(null)
+                                      } else {
+                                        handleAction(q, actionCfg)
+                                      }
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 8,
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      padding: '7px 14px',
+                                      fontSize: 12,
+                                      color: '#3a3530',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontWeight: 400,
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      transition: 'background 0.1s',
+                                    }}
+                                    onMouseEnter={e => {
+                                      (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                                    }}
+                                    onMouseLeave={e => {
+                                      (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 10, color: '#c8b89a' }}>→</span>
+                                    <span>{actionCfg.label}</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Beige horizontal line */}
+                      <div style={{ height: 1, background: '#e0dbd4', margin: '4px 0' }} />
+
+                      {/* Section 2: Declined statuses */}
+                      <div>
+                        {STATUS_ORDER.filter(statusKey => statusKey.startsWith('declined')).map(statusKey => {
+                          const isCurrent  = normalized === statusKey
+                          const keyIdx     = STATUS_ORDER.indexOf(statusKey)
+                          const curIdx     = STATUS_ORDER.indexOf(normalized)
+                          const isBackward = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
+                          const isPrior    = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
+                          const itemStyle  = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft
+                          const actionCfg  = STATUS_ACTIONS[statusKey]
+
+                          return (
+                            <div key={statusKey} style={{ position: 'relative' }}>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  if (!isCurrent) handleStatusChange(q.id, statusKey, normalized)
+                                }}
+                                onMouseEnter={() => setHoveredStatus(statusKey)}
+                                onMouseLeave={() => setHoveredStatus(null)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: '7px 14px',
+                                  fontSize: 12,
+                                  color: isCurrent
+                                    ? itemStyle.text
+                                    : isBackward
+                                    ? '#b0aaa3'
+                                    : '#3a3530',
+                                  background: isCurrent ? itemStyle.bg : 'transparent',
+                                  border: 'none',
+                                  cursor: isCurrent ? 'default' : 'pointer',
+                                  fontWeight: isCurrent ? 600 : 400,
+                                  fontFamily: 'DM Sans, sans-serif',
+                                  transition: 'background 0.1s',
+                                }}
+                              >
+                                <span style={{ fontSize: 9, width: 10, flexShrink: 0 }}>
+                                  {isPrior || isCurrent ? '✓' : ''}
+                                </span>
+                                <span>{STATUS_LABELS[statusKey]}</span>
+                                {isBackward && !isCurrent && (
+                                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#c8b89a' }}>
+                                    ←
+                                  </span>
+                                )}
+                              </button>
+
+                              {/* Sub-menu action on hover */}
+                              {hoveredStatus === statusKey && actionCfg && !actionCfg.inactive && !isCurrent && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: '100%',
+                                    top: 0,
+                                    marginLeft: 4,
+                                    background: '#ffffff',
+                                    border: '1px solid #e0dbd4',
+                                    borderRadius: 6,
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
+                                    padding: '4px 0',
+                                    minWidth: 180,
+                                    zIndex: 501,
+                                  }}
+                                >
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      handleAction(q, actionCfg)
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 8,
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      padding: '7px 14px',
+                                      fontSize: 12,
+                                      color: '#3a3530',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontWeight: 400,
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      transition: 'background 0.1s',
+                                    }}
+                                    onMouseEnter={e => {
+                                      (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                                    }}
+                                    onMouseLeave={e => {
+                                      (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 10, color: '#c8b89a' }}>→</span>
+                                    <span>{actionCfg.label}</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Beige horizontal line */}
+                      <div style={{ height: 1, background: '#e0dbd4', margin: '4px 0' }} />
+
+                      {/* Section 3: Manual create files */}
+                      <div>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            router.push(`/dashboard/quotes/${q.id}/sow`)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '7px 14px',
+                            fontSize: 12,
+                            color: '#3a3530',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontWeight: 400,
+                            fontFamily: 'DM Sans, sans-serif',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                          }}
+                        >
+                          <span style={{ fontSize: 10, color: '#c8b89a' }}>📄</span>
+                          <span>Scope of Works Authorisation</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Arrow + action button */}
-                <span style={{ color: '#c8b89a', fontSize: 14, flexShrink: 0 }}>→</span>
-                <button
-                  onClick={e => {
-                    e.stopPropagation()
-                    handleAction(q, actionCfg)
-                  }}
-                  disabled={actionCfg.inactive}
-                  title={actionCfg.inactive ? undefined : actionCfg.label}
-                  style={{
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: actionCfg.inactive ? '#b0aaa3' : '#3a3530',
-                    background: actionCfg.inactive ? '#f5f2ee' : '#ffffff',
-                    border: `1px solid ${actionCfg.inactive ? '#e0dbd4' : '#c8b89a'}`,
-                    borderRadius: 5,
-                    padding: '3px 10px',
-                    cursor: actionCfg.inactive ? 'default' : 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  {actionCfg.label}
-                </button>
 
                 {/* Version badge */}
                 {q.version > 1 && (
