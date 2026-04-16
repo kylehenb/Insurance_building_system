@@ -209,9 +209,9 @@ export default async function QuotePrintPage({
           <div style={{ width: '148px', minWidth: '148px', flexShrink: 0, padding: '4px 8px 4px 20px' }}>
             <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
           </div>
-          <div style={{ flex: 1 }}></div>
-          <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
-          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
+          </div>
           <div style={{ width: '184px', minWidth: '184px', flexShrink: 0 }}></div>
         </div>
 
