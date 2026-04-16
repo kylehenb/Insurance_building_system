@@ -158,15 +158,15 @@ export default async function QuotePrintPage({
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
-          {/* Column 1: Logo (132px fixed) */}
-          <div style={{ width: '132px', minWidth: '132px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
+          {/* Column 1: Logo (140px fixed) */}
+          <div style={{ width: '140px', minWidth: '140px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
             <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Column 2: Job details (flex: 1) */}
           <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e0dbd4' }}>
-            <div style={{ fontSize: '7.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
             {job.insured_name && (
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
             )}
@@ -189,9 +189,9 @@ export default async function QuotePrintPage({
             </div>
           </div>
 
-          {/* Column 3: Contact (192px fixed) */}
-          <div style={{ width: '192px', minWidth: '192px', padding: '14px 20px 14px 16px' }}>
-            <div style={{ fontSize: '7.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
+          {/* Column 3: Contact (184px fixed) */}
+          <div style={{ width: '184px', minWidth: '184px', padding: '14px 20px 14px 16px' }}>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
             <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
             <div style={{ fontSize: '10px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
@@ -206,13 +206,13 @@ export default async function QuotePrintPage({
 
         {/* Form band */}
         <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '10px 20px 9px', display: 'flex', alignItems: 'baseline' }}>
-          <div style={{ width: '132px', minWidth: '132px', flexShrink: 0 }}></div>
-          <div style={{ flex: 1 }}></div>
-          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
+          <div style={{ width: '140px', minWidth: '140px', flexShrink: 0, padding: '14px 8px 14px 20px' }}>
+            <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
+          </div>
           <div style={{ flex: 1 }}></div>
           <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
           <div style={{ flex: 1 }}></div>
-          <div style={{ width: '192px', minWidth: '192px', flexShrink: 0 }}></div>
+          <div style={{ width: '184px', minWidth: '184px', flexShrink: 0 }}></div>
         </div>
 
         {/* Scope Items by Room */}
@@ -221,12 +221,12 @@ export default async function QuotePrintPage({
           <table className="w-full text-[10px] border-collapse mb-0" style={{ tableLayout: 'fixed' }}>
             <thead>
               <tr className="bg-[#fafaf8] border-b border-[#e8e4e0]">
-                <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
-                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
-                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
-                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
+                <th className="text-center py-2 px-1 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '4%', fontFamily: 'var(--font-dm-sans)' }}>#</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '60%', fontFamily: 'var(--font-dm-sans)' }}>Description</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Qty</th>
+                <th className="text-center py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>Unit</th>
+                <th className="text-left py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Trade</th>
+                <th className="text-right py-2 px-2 font-semibold text-[#b0a89e] text-[10px] uppercase tracking-wider whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>Line Total</th>
               </tr>
             </thead>
           </table>
