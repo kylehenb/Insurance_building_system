@@ -44,6 +44,7 @@ interface RoomSectionProps {
   isLocked: boolean
   trades: Trade[]
   autoFocusName?: boolean
+  tenantId: string
 }
 
 // ──────────────────────────────────────────────
@@ -242,6 +243,7 @@ function SortableLineItemRow({
   onNavigateNext,
   descRef,
   activeId,
+  tenantId,
 }: {
   item: ScopeItem
   itemIndex: number
@@ -253,6 +255,7 @@ function SortableLineItemRow({
   onNavigateNext: () => void
   descRef: React.RefObject<HTMLTextAreaElement | null>
   activeId: string | null
+  tenantId: string
 }) {
   // Use the stable key (_key if available, otherwise id) for dnd-kit to prevent remounts
   const sortableId = item._key ?? item.id
@@ -306,6 +309,7 @@ function SortableLineItemRow({
         trades={trades}
         onNavigateNext={onNavigateNext}
         descRef={descRef}
+        tenantId={tenantId}
         isDragging={isDragging}
       />
     </div>
@@ -347,6 +351,7 @@ export function RoomSection({
   isLocked,
   trades,
   autoFocusName,
+  tenantId,
   startingIndex, // New prop for sequential numbering
 }: RoomSectionProps & { startingIndex: number }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -704,6 +709,7 @@ export function RoomSection({
                     onNavigateNext={() => handleNavigateNext(idx)}
                     descRef={dRef}
                     activeId={activeId}
+                    tenantId={tenantId}
                   />
                 )
               })}
@@ -730,6 +736,7 @@ export function RoomSection({
                     search={search}
                     isLocked
                     trades={trades}
+                    tenantId={tenantId}
                   />
                 </div>
               ) : null}

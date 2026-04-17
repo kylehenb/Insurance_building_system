@@ -25,8 +25,11 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query.order('item_description')
 
+  // Filter to only approved items (approval_status field not in types yet)
+  const filteredData = (data ?? []).filter((item: any) => item.approval_status === 'approved')
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [], {
+  return NextResponse.json(filteredData, {
     headers: { 'Cache-Control': 'private, max-age=300' },
   })
 }

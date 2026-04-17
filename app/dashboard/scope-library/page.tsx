@@ -13,7 +13,11 @@ type ScopeLibraryExtended = ScopeLibraryInsert & {
   has_lag?: boolean;
   lag_days?: number | null;
   lag_description?: string | null;
+  approval_status?: 'pending' | 'approved';
 };
+
+// Units from quote editor
+const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const;
 
 // Local type for scope_library_history since it may not be fully in database.types
 type ScopeLibraryHistoryInsert = {
@@ -76,7 +80,11 @@ export default function ScopeLibraryPage() {
     lag_description: null,
     split_type: null,
     pair_id: null,
+    approval_status: 'pending',
   });
+
+  // Trades from API
+  const [trades, setTrades] = useState<Array<{ id: string; primary_trade: string; trade_code: string | null }>>([]);
 
   // Sort state
   const [sortColumn, setSortColumn] = useState<string>('trade');
@@ -115,8 +123,19 @@ export default function ScopeLibraryPage() {
     fetchItems();
   }, [tenantId, supabase]);
 
+  // Fetch trades
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/trades?tenantId=${encodeURIComponent(tenantId)}`)
+      .then(r => r.json())
+      .then((data: Array<{ id: string; primary_trade: string; trade_code: string | null }>) => {
+        setTrades(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
+  }, [tenantId]);
+
   // Get unique trades from items
-  const trades = Array.from(
+  const uniqueTrades = Array.from(
     new Set(items.map(item => item.trade).filter((t): t is string => Boolean(t)))
   ).sort();
 
@@ -207,6 +226,7 @@ export default function ScopeLibraryPage() {
       lag_description: null,
       split_type: null,
       pair_id: null,
+      approval_status: 'pending',
     });
     setShowModal(true);
   };
@@ -229,6 +249,7 @@ export default function ScopeLibraryPage() {
       lag_description: (item as any).lag_description || null,
       split_type: item.split_type,
       pair_id: item.pair_id,
+      approval_status: (item as any).approval_status || 'approved',
     });
     setShowModal(true);
   };
@@ -311,6 +332,44 @@ export default function ScopeLibraryPage() {
     setShowModal(false);
   };
 
+  // Inline edit handlers
+  const handleInlineEdit = async (itemId: string, field: string, value: any) => {
+    if (!tenantId || !userId) return;
+
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Write to history first
+    const historyRecord: ScopeLibraryHistoryInsert = {
+      tenant_id: tenantId,
+      scope_library_id: itemId,
+      snapshot: item,
+      changed_by: userId,
+      changed_at: new Date().toISOString(),
+    };
+
+    await supabase.from('scope_library_history').insert(historyRecord);
+
+    // Update the item
+    await supabase
+      .from('scope_library')
+      .update({ [field]: value, updated_at: new Date().toISOString() } as ScopeLibraryInsert)
+      .eq('id', itemId);
+
+    // Refresh
+    const { data } = await supabase
+      .from('scope_library')
+      .select('*')
+      .eq('tenant_id', tenantId);
+    setItems((data as ScopeLibraryRow[]) ?? []);
+  };
+
+  // Approve/Unapprove handler
+  const handleToggleApproval = async (itemId: string, currentStatus: string | null) => {
+    const newStatus = currentStatus === 'approved' ? 'pending' : 'approved';
+    await handleInlineEdit(itemId, 'approval_status', newStatus);
+  };
+
   // Auto-calculate total_per_unit when labour_per_unit or materials_per_unit changes
   useEffect(() => {
     if (formData.labour_per_unit !== null || formData.materials_per_unit !== null) {
@@ -352,7 +411,7 @@ export default function ScopeLibraryPage() {
               className="rounded-md border border-[#e0dbd4] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
             >
               <option value="All">All Trades</option>
-              {trades.map(trade => (
+              {uniqueTrades.map(trade => (
                 <option key={trade} value={trade}>{trade}</option>
               ))}
             </select>
@@ -491,6 +550,12 @@ export default function ScopeLibraryPage() {
                       scope="col"
                       className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                     >
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                    >
                       Actions
                     </th>
                   </tr>
@@ -499,9 +564,18 @@ export default function ScopeLibraryPage() {
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
                       <td className="whitespace-nowrap px-3 py-3">
-                        <span className="text-xs text-[#1a1a1a]">
-                          {item.trade || '-'}
-                        </span>
+                        <select
+                          value={item.trade || ''}
+                          onChange={(e) => handleInlineEdit(item.id, 'trade', e.target.value || null)}
+                          className="rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        >
+                          <option value="">—</option>
+                          {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
+                            <option key={t.id} value={t.primary_trade}>
+                              {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
                         <span className="text-xs text-[#1a1a1a]/70">
@@ -514,21 +588,25 @@ export default function ScopeLibraryPage() {
                         </span>
                       </td>
                       <td className="px-3 py-3 max-w-xs">
-                        <span
-                          className="text-xs text-[#1a1a1a]/70 truncate block"
-                          title={item.item_description || ''}
-                        >
-                          {item.item_description
-                            ? item.item_description.length > 80
-                              ? item.item_description.substring(0, 80) + '...'
-                              : item.item_description
-                            : '-'}
-                        </span>
+                        <input
+                          type="text"
+                          defaultValue={item.item_description || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'item_description', e.target.value || null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}
+                        />
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
-                        <span className="text-xs text-[#1a1a1a]/70">
-                          {item.unit || '-'}
-                        </span>
+                        <select
+                          value={item.unit || ''}
+                          onChange={(e) => handleInlineEdit(item.id, 'unit', e.target.value || null)}
+                          className="rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        >
+                          <option value="">—</option>
+                          {UNITS.map(u => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right">
                         <span className="text-xs font-mono text-[#1a1a1a]/70">
@@ -551,16 +629,19 @@ export default function ScopeLibraryPage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right">
+                        <button
+                          onClick={() => handleToggleApproval(item.id, (item as any).approval_status)}
+                          className={`text-xs px-2 py-1 rounded ${
+                            (item as any).approval_status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}
+                        >
+                          {(item as any).approval_status === 'approved' ? 'Approved' : 'Pending'}
+                        </button>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors"
-                            title="Edit"
-                          >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
                           <button
                             onClick={() => handleDelete(item)}
                             className="text-[#1a1a1a]/60 hover:text-red-600 transition-colors"
@@ -637,18 +718,18 @@ export default function ScopeLibraryPage() {
                 <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">
                   Trade
                 </label>
-                <input
-                  type="text"
-                  list="trades-list"
+                <select
                   value={formData.trade || ''}
                   onChange={(e) => setFormData({ ...formData, trade: e.target.value })}
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                />
-                <datalist id="trades-list">
-                  {trades.map(trade => (
-                    <option key={trade} value={trade} />
+                >
+                  <option value="">—</option>
+                  {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
+                    <option key={t.id} value={t.primary_trade}>
+                      {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               <div>
@@ -682,12 +763,16 @@ export default function ScopeLibraryPage() {
                 <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">
                   Unit
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.unit || ''}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                />
+                >
+                  <option value="">—</option>
+                  {UNITS.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -772,6 +857,20 @@ export default function ScopeLibraryPage() {
                   })}
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">
+                  Approval Status
+                </label>
+                <select
+                  value={formData.approval_status || 'pending'}
+                  onChange={(e) => setFormData({ ...formData, approval_status: e.target.value as 'pending' | 'approved' })}
+                  className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                </select>
               </div>
 
               <div>

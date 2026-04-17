@@ -229,6 +229,7 @@ interface SortableRoomSectionProps {
   search: (q: string) => LibraryItem[]
   trades: Trade[]
   startingIndex: number
+  tenantId: string
 }
 
 function SortableRoomSection({
@@ -244,6 +245,7 @@ function SortableRoomSection({
   search,
   trades,
   startingIndex,
+  tenantId,
 }: SortableRoomSectionProps) {
   const {
     attributes,
@@ -281,6 +283,7 @@ function SortableRoomSection({
         isLocked={isLocked}
         trades={trades}
         startingIndex={startingIndex}
+        tenantId={tenantId}
       />
     </div>
   )
@@ -587,6 +590,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
                     search={search}
                     trades={trades}
                     startingIndex={startIndex}
+                    tenantId={tenantId}
                   />
                 )
               })
@@ -616,6 +620,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               trades={trades}
               autoFocusName={true}
               startingIndex={totalItemsInRooms + 1}
+              tenantId={tenantId}
             />
           ))
         })()}

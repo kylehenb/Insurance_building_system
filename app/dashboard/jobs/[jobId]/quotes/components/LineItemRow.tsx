@@ -25,6 +25,7 @@ interface LineItemRowProps {
   onNavigateNext?: () => void
   descRef?: React.RefObject<HTMLTextAreaElement | null>
   isDragging?: boolean
+  tenantId: string
 }
 
 function fmt(v: number) {
@@ -149,12 +150,15 @@ function ItemTypeMenu({
   item,
   onUpdate,
   onClose,
+  tenantId,
 }: {
   item: ScopeItem
   onUpdate: (itemId: string, changes: Record<string, unknown>) => void
   onClose: () => void
+  tenantId: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -169,6 +173,39 @@ function ItemTypeMenu({
   const setType = (type: ItemType) => {
     onUpdate(item.id, { item_type: type })
     onClose()
+  }
+
+  const handleSaveToScopeLibrary = async () => {
+    if (!tenantId) return
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/scope-library/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          item: {
+            trade: item.trade,
+            keyword: item.keyword,
+            item_description: item.item_description,
+            unit: item.unit,
+            rate_labour: item.rate_labour,
+            rate_materials: item.rate_materials,
+          },
+        }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        onUpdate(item.id, { scope_library_id: data.id, library_writeback_approved: true })
+        onClose()
+      } else {
+        alert(data.error || 'Failed to save to scope library')
+      }
+    } catch (error) {
+      alert('Failed to save to scope library')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const types: Array<{ type: NonNullable<ItemType>; label: string }> = [
@@ -215,10 +252,11 @@ function ItemTypeMenu({
       {item.is_custom && !item.scope_library_id && (
         <>
           <button
-            onClick={() => { onUpdate(item.id, { library_writeback_approved: true }); onClose() }}
-            style={menuItemStyle(item.library_writeback_approved)}
+            onClick={handleSaveToScopeLibrary}
+            disabled={isSaving}
+            style={menuItemStyle(false)}
           >
-            Save to scope library
+            {isSaving ? 'Saving...' : 'Save to scope library'}
           </button>
           <div style={{ height: 1, background: '#f0ece6', margin: '3px 0' }} />
         </>
@@ -267,6 +305,7 @@ export function LineItemRow({
   onNavigateNext,
   descRef,
   isDragging,
+  tenantId,
 }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -567,6 +606,7 @@ export function LineItemRow({
                     item={item}
                     onUpdate={onUpdate}
                     onClose={() => setShowMenu(false)}
+                    tenantId={tenantId}
                   />
                 )}
               </div>

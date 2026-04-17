@@ -62,6 +62,30 @@ export async function POST(req: NextRequest) {
 
   const html = generateSowHtml({ quote, job, scopeItems: scopeItems || [] })
 
+  const puppeteerRes = await fetch(`${process.env.PDF_SERVICE_URL}/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-secret': process.env.PDF_SERVICE_SECRET!,
+    },
+    body: JSON.stringify({
+      html,
+      filename: `${job.job_number}-SOW.pdf`,
+    }),
+  })
+
+  if (!puppeteerRes.ok) {
+    const err = await puppeteerRes.text()
+    console.error('Puppeteer error:', err)
+    return NextResponse.json(
+      { error: 'Failed to generate PDF. Please try again.' },
+      { status: 500 }
+    )
+  }
+
+  const pdfBuffer = await puppeteerRes.arrayBuffer()
+  const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
+
   const docusealRes = await fetch('https://api.docuseal.com/submissions', {
     method: 'POST',
     headers: {
@@ -69,17 +93,24 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      template_html: html,
       send_email: true,
-      submitters: [{
-        role: 'Owner / Insured',
-        email: job.insured_email,
-        name: job.insured_name || '',
-      }],
+      submitters: [
+        {
+          role: 'Owner / Insured',
+          email: job.insured_email,
+          name: job.insured_name || '',
+        }
+      ],
       message: {
         subject: `Please sign your Scope of Works — ${job.job_number}`,
         body: `Hi ${job.insured_name || 'there'},\n\nPlease review and sign the attached Scope of Works for your insurance repair at ${job.property_address}.\n\nThis document authorises Insurance Repair Co to proceed with your approved repairs. You can sign directly from this email on your phone or computer — no account needed.\n\nKind regards,\nKyle Bindon\nInsurance Repair Co\n0431 132 077`,
       },
+      documents: [
+        {
+          name: `${job.job_number}-SOW`,
+          file: pdfBase64,
+        }
+      ],
     }),
   })
 
