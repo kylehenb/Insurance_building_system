@@ -157,6 +157,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
   const [sowLoading, setSowLoading]       = useState<string | null>(null)
 
+  // New workflow state
+  const [sendDialogQuoteId, setSendDialogQuoteId] = useState<string | null>(null)
+  const [declineDialogQuoteId, setDeclineDialogQuoteId] = useState<string | null>(null)
+  const [declineOption, setDeclineOption] = useState<string | null>(null)
+
   // ── Data loading ─────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -345,6 +350,29 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         }
       } catch (error) {
         console.error('Error updating quote status:', error)
+      }
+    },
+    [tenantId, load]
+  )
+
+  // ── Job stage change handler ───────────────────────────────────────────────
+
+  const handleJobStageChange = useCallback(
+    async (jobId: string, stage: string) => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}/stage`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            stage,
+          }),
+        })
+        if (res.ok) {
+          load()
+        }
+      } catch (error) {
+        console.error('Error updating job stage:', error)
       }
     },
     [tenantId, load]
@@ -568,6 +596,254 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         </div>
       )}
 
+      {/* Send it dialog */}
+      {sendDialogQuoteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setSendDialogQuoteId(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 380,
+              textAlign: 'center',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 34, marginBottom: 12 }}>📧</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Send Quote
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              This function is not yet built - please send manually. The quote will be marked as sent and locked.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => setSendDialogQuoteId(null)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (sendDialogQuoteId) {
+                    await handleStatusChange(sendDialogQuoteId, 'sent_to_insurer', true)
+                    await handleJobStageChange(jobId, 'sent_awaiting_approval')
+                    setSendDialogQuoteId(null)
+                  }
+                }}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#1a73e8',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decline dialog */}
+      {declineDialogQuoteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => {
+            setDeclineDialogQuoteId(null)
+            setDeclineOption(null)
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 480,
+              width: '90%',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Decline Quote
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              Please select a reason for declining this quote:
+            </p>
+
+            {!declineOption ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button
+                  onClick={() => setDeclineOption('claim_denied')}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#ffffff',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 6,
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                >
+                  Claim denied by insurer
+                </button>
+                <button
+                  onClick={() => setDeclineOption('claim_cancelled')}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#ffffff',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 6,
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                >
+                  Claim cancelled
+                </button>
+                <button
+                  onClick={() => setDeclineOption('new_quote_required')}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#ffffff',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 6,
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                >
+                  New quote required
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 20 }}>
+                  {declineOption === 'claim_denied' && 'This will decline the quote and mark the job as declined.'}
+                  {declineOption === 'claim_cancelled' && 'This will decline the quote and mark the job as declined.'}
+                  {declineOption === 'new_quote_required' && 'This will create a new quote by cloning the current one, and mark the current quote as Superseded.'}
+                </p>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setDeclineOption(null)}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#3a3530',
+                      background: '#f5f2ee',
+                      border: '1px solid #d8d0c8',
+                      borderRadius: 6,
+                      padding: '8px 20px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (declineDialogQuoteId) {
+                        if (declineOption === 'new_quote_required') {
+                          // Clone quote and mark current as superseded
+                          try {
+                            const res = await fetch(`/api/quotes/${declineDialogQuoteId}/clone`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ tenantId }),
+                            })
+                            if (res.ok) {
+                              await handleStatusChange(declineDialogQuoteId, 'declined_superseded', true)
+                              load()
+                            }
+                          } catch (error) {
+                            console.error('Error cloning quote:', error)
+                          }
+                        } else {
+                          // Decline quote and mark job as declined
+                          await handleStatusChange(declineDialogQuoteId, 'declined_claim_declined', true)
+                          await handleJobStageChange(jobId, 'declined_close_out')
+                        }
+                        setDeclineDialogQuoteId(null)
+                        setDeclineOption(null)
+                      }
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#ffffff',
+                      background: '#c5221f',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '8px 20px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Quote rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {quotes.map(q => {
@@ -649,7 +925,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 {/* Spacer */}
                 <div style={{ flex: 1 }} />
 
-                {/* Status-dependent buttons */}
+                {/* Status-dependent buttons - New workflow */}
+                {/* Draft: Mark as Ready */}
                 {(!q.is_locked && q.status === 'draft') && (
                   <button
                     onClick={e => {
@@ -676,37 +953,12 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </button>
                 )}
 
-                {q.is_locked && q.status === 'ready' && (
+                {/* Ready: Send it */}
+                {(q.is_locked && q.status === 'ready') && (
                   <button
                     onClick={e => {
                       e.stopPropagation()
-                      handleStatusChange(q.id, 'draft', false)
-                    }}
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: '#3a3530',
-                      background: '#f5f2ee',
-                      border: '1px solid #d8d0c8',
-                      borderRadius: 6,
-                      padding: '6px 16px',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s',
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
-                  >
-                    Unlock and Edit
-                  </button>
-                )}
-
-                {q.is_locked && q.status === 'ready' && (
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      handleStatusChange(q.id, 'sent_to_insurer', true)
+                      setSendDialogQuoteId(q.id)
                     }}
                     style={{
                       fontFamily: 'DM Sans, sans-serif',
@@ -728,7 +980,77 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </button>
                 )}
 
-                {q.is_locked && q.status !== 'ready' && q.status !== 'draft' && (
+                {/* Sent: Accept and Decline buttons */}
+                {q.status === 'sent_to_insurer' && (
+                  <>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                        handleStatusChange(q.id, 'approved_contracts_pending', true)
+                      }}
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: '#ffffff',
+                        background: '#2e7d32',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '6px 16px',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        setDeclineDialogQuoteId(q.id)
+                      }}
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: '#ffffff',
+                        background: '#c5221f',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '6px 16px',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#a81815')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#c5221f')}
+                    >
+                      Decline
+                    </button>
+                  </>
+                )}
+
+                {/* Superseded: Show Superseded text */}
+                {q.status === 'declined_superseded' && (
+                  <span
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#9e998f',
+                      fontStyle: 'italic',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Superseded
+                  </span>
+                )}
+
+                {/* Sent and Locked with date */}
+                {(q.is_locked && q.status !== 'ready' && q.status !== 'draft' && q.status !== 'sent_to_insurer' && q.status !== 'declined_superseded') && (
                   <button
                     onClick={e => {
                       e.stopPropagation()
@@ -751,7 +1073,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
                     onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
                   >
-                    Locked
+                    Sent and Locked {new Date(q.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </button>
                 )}
 

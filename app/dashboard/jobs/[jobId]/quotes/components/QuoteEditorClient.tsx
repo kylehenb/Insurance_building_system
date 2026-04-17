@@ -514,39 +514,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         fontFamily: 'DM Sans, sans-serif',
       }}
     >
-      {/* Inline header (breadcrumb) — only shown in accordion view */}
-      {inline && (
-        <div
-          style={{
-            padding: '10px 20px',
-            background: '#ffffff',
-            borderBottom: '1px solid #e0dbd4',
-            fontFamily: 'DM Sans, sans-serif',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <Link
-            href={`/dashboard/jobs/${jobId}?tab=quotes`}
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 12,
-              color: '#9e998f',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            ← {job.job_number}
-          </Link>
-          <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
-          <span style={{ fontSize: 12, color: '#3a3530' }}>
-            {quote.quote_ref ?? 'Quote'}
-          </span>
-        </div>
-      )}
 
       {/* Quote header — only shown on dedicated page, not in accordion inline view
           (the accordion summary row already shows ref/total/status/insurer/delete/chevron) */}
