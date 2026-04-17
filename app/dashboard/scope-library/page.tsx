@@ -157,8 +157,14 @@ export default function ScopeLibraryPage() {
   };
 
   // Column resize handler
-  const handleResizeStart = (column: string, startX: number, startWidth: number) => {
+  const handleResizeStart = (column: string, startX: number, startWidth: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setResizingColumn(column);
+
+    // Prevent text selection during drag
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
 
     const handleMouseMove = (e: MouseEvent) => {
       const diff = e.clientX - startX;
@@ -173,6 +179,9 @@ export default function ScopeLibraryPage() {
       setResizingColumn(null);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      // Restore cursor and selection
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
       // Save the final widths
       setColumnWidths(prev => {
         saveColumnWidths(prev);
@@ -573,7 +582,7 @@ export default function ScopeLibraryPage() {
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('trade', e.clientX, columnWidths.trade)}
+                        onMouseDown={(e) => handleResizeStart('trade', e.clientX, columnWidths.trade, e)}
                       />
                     </th>
                     <th
@@ -584,7 +593,7 @@ export default function ScopeLibraryPage() {
                       Insurer
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('insurer', e.clientX, columnWidths.insurer)}
+                        onMouseDown={(e) => handleResizeStart('insurer', e.clientX, columnWidths.insurer, e)}
                       />
                     </th>
                     <th
@@ -595,7 +604,7 @@ export default function ScopeLibraryPage() {
                       Keyword
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('keyword', e.clientX, columnWidths.keyword)}
+                        onMouseDown={(e) => handleResizeStart('keyword', e.clientX, columnWidths.keyword, e)}
                       />
                     </th>
                     <th
@@ -606,7 +615,7 @@ export default function ScopeLibraryPage() {
                       Description
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('description', e.clientX, columnWidths.description)}
+                        onMouseDown={(e) => handleResizeStart('description', e.clientX, columnWidths.description, e)}
                       />
                     </th>
                     <th
@@ -617,7 +626,7 @@ export default function ScopeLibraryPage() {
                       Unit
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('unit', e.clientX, columnWidths.unit)}
+                        onMouseDown={(e) => handleResizeStart('unit', e.clientX, columnWidths.unit, e)}
                       />
                     </th>
                     <th
@@ -628,7 +637,7 @@ export default function ScopeLibraryPage() {
                       Labour/Unit
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('labour_per_unit', e.clientX, columnWidths.labour_per_unit)}
+                        onMouseDown={(e) => handleResizeStart('labour_per_unit', e.clientX, columnWidths.labour_per_unit, e)}
                       />
                     </th>
                     <th
@@ -639,7 +648,7 @@ export default function ScopeLibraryPage() {
                       Materials/Unit
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('materials_per_unit', e.clientX, columnWidths.materials_per_unit)}
+                        onMouseDown={(e) => handleResizeStart('materials_per_unit', e.clientX, columnWidths.materials_per_unit, e)}
                       />
                     </th>
                     <th
@@ -651,7 +660,7 @@ export default function ScopeLibraryPage() {
                       Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('total_per_unit', e.clientX, columnWidths.total_per_unit)}
+                        onMouseDown={(e) => handleResizeStart('total_per_unit', e.clientX, columnWidths.total_per_unit, e)}
                       />
                     </th>
                     <th
@@ -663,7 +672,7 @@ export default function ScopeLibraryPage() {
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('estimated_hours', e.clientX, columnWidths.estimated_hours)}
+                        onMouseDown={(e) => handleResizeStart('estimated_hours', e.clientX, columnWidths.estimated_hours, e)}
                       />
                     </th>
                     <th
@@ -674,7 +683,7 @@ export default function ScopeLibraryPage() {
                       Status
                       <div
                         className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('status', e.clientX, columnWidths.status)}
+                        onMouseDown={(e) => handleResizeStart('status', e.clientX, columnWidths.status, e)}
                       />
                     </th>
                     <th
