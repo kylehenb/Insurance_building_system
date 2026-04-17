@@ -59,8 +59,8 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
   return (
     <div
       style={{
-        width: 331.875,
-        minWidth: 331.875,
+        width: 365.0625,
+        minWidth: 365.0625,
         borderLeft: `3px solid ${borderColor}`,
         backgroundColor: '#f5f0e8',
         display: 'flex',
@@ -78,7 +78,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
         {/* Section label */}
         <div
           style={{
-            fontSize: 9,
+            fontSize: 11,
             fontWeight: 600,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
@@ -107,7 +107,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
           >
             <div
               style={{
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: 500,
                 color: stageNameColor,
                 marginBottom: 4,
@@ -118,7 +118,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 12,
                 color: stageDescriptionColor,
                 lineHeight: 1.3,
               }}
@@ -137,7 +137,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 border: '1px solid #c9a96e',
                 borderRadius: 4,
                 padding: '6px 12px',
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -169,7 +169,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
               />
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: 12,
                   color: '#9e8060',
                   fontWeight: 500,
                 }}
@@ -186,7 +186,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 border: 'none',
                 borderRadius: 4,
                 padding: '6px 12px',
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -205,7 +205,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
         <div
           style={{
             padding: '10px 16px 14px',
-            fontSize: 11,
+            fontSize: 13,
             color: '#b0a898',
             fontStyle: 'italic',
           }}
@@ -230,7 +230,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
@@ -245,7 +245,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 color: stage.openLoops.length > 0 ? 'white' : '#9e8060',
                 borderRadius: 10,
                 padding: '1px 6px',
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 600,
               }}
             >
@@ -257,7 +257,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
           {stage.openLoops.length === 0 ? (
             <div
               style={{
-                fontSize: 11,
+                fontSize: 13,
                 color: '#b0a890',
                 fontStyle: 'italic',
               }}
@@ -299,7 +299,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                     />
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 13,
                         color: isUrgent ? '#7f1d1d' : '#4a3820',
                         fontWeight: 500,
                         flex: 1,
@@ -310,7 +310,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                     {isUrgent && (
                       <div
                         style={{
-                          fontSize: 9,
+                          fontSize: 13,
                           color: '#ef4444',
                           fontWeight: 600,
                           textTransform: 'uppercase',
@@ -326,7 +326,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
               {stage.openLoops.length > 3 && (
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 13,
                     color: '#9e8060',
                     padding: '4px 2px',
                   }}
