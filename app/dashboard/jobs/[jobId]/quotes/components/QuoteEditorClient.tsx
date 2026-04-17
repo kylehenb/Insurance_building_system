@@ -334,6 +334,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [showLockedDialog, setShowLockedDialog] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
 
   const isLocked = quote?.is_locked ?? false
   const hasPrelimRoom = rooms.some(r => r.name.toLowerCase() === 'preliminaries')
@@ -514,55 +515,247 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         fontFamily: 'DM Sans, sans-serif',
       }}
     >
-      {/* Top nav bar — hidden in inline accordion mode */}
-      {!inline && (
+      {/* Inline header (breadcrumb) — only shown in accordion view */}
+      {inline && (
         <div
           style={{
+            padding: '10px 20px',
             background: '#ffffff',
             borderBottom: '1px solid #e0dbd4',
-            padding: '8px 20px',
+            fontFamily: 'DM Sans, sans-serif',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
+            justifyContent: 'space-between',
           }}
         >
-          <Link
-            href={`/dashboard/jobs/${jobId}?tab=quotes`}
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 12,
-              color: '#9e998f',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            ← {job.job_number}
-          </Link>
-          <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
-          <span style={{ fontSize: 12, color: '#3a3530' }}>
-            {quote.quote_ref ?? 'Quote'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link
+              href={`/dashboard/jobs/${jobId}?tab=quotes`}
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: 12,
+                color: '#9e998f',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              ← {job.job_number}
+            </Link>
+            <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
+            <span style={{ fontSize: 12, color: '#3a3530' }}>
+              {quote.quote_ref ?? 'Quote'}
+            </span>
+          </div>
+
+          {/* Status-dependent buttons for inline view */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(!isLocked && quote.status === 'draft') && (
+              <button
+                onClick={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#2e7d32',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+              >
+                Mark as Ready
+              </button>
+            )}
+
+            {isLocked && quote.status === 'ready' && (
+              <button
+                onClick={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+              >
+                Unlock and Edit
+              </button>
+            )}
+
+            {isLocked && quote.status === 'ready' && (
+              <button
+                onClick={() => setShowSendDialog(true)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#1a73e8',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+              >
+                Send it
+              </button>
+            )}
+
+            {isLocked && quote.status !== 'ready' && quote.status !== 'draft' && (
+              <button
+                onClick={() => setShowLockedDialog(true)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#9e998f',
+                  background: '#f5f2ee',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+              >
+                Locked
+              </button>
+            )}
+
+            {/* 3-dot menu with Preview Quote */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#9e998f',
+                  fontSize: 16,
+                  padding: '4px 6px',
+                  borderRadius: 4,
+                  lineHeight: 1,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+              >
+                •••
+              </button>
+
+              {showMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    zIndex: 500,
+                    background: '#ffffff',
+                    border: '1px solid #e0dbd4',
+                    borderRadius: 8,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
+                    padding: '4px 0',
+                    minWidth: 180,
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setShowMenu(false)
+                      window.open(`/print/quotes/${quoteId}`, '_blank')
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '7px 14px',
+                      fontSize: 12,
+                      color: '#3a3530',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 400,
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+                  >
+                    <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
+                    <span>Preview Quote</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Quote header — only shown on dedicated page, not in accordion inline view
           (the accordion summary row already shows ref/total/status/insurer/delete/chevron) */}
       {!inline && (
-        <QuoteHeader
-          quote={quote}
-          total={total}
-          cashSettlementActive={cashSettlementActive}
-          onCashSettlementToggle={handleCashSettlementToggle}
-          isLocked={isLocked}
-          quoteId={quoteId}
-          tenantId={tenantId}
-          onMarkReady={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
-          onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
-          onSend={() => setShowSendDialog(true)}
-          onShowLocked={() => setShowLockedDialog(true)}
-        />
+        <>
+          <div
+            style={{
+              background: '#ffffff',
+              borderBottom: '1px solid #e0dbd4',
+              padding: '8px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <Link
+              href={`/dashboard/jobs/${jobId}?tab=quotes`}
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: 12,
+                color: '#9e998f',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              ← {job.job_number}
+            </Link>
+            <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
+            <span style={{ fontSize: 12, color: '#3a3530' }}>
+              {quote.quote_ref ?? 'Quote'}
+            </span>
+          </div>
+
+          <QuoteHeader
+            quote={quote}
+            total={total}
+            cashSettlementActive={cashSettlementActive}
+            onCashSettlementToggle={handleCashSettlementToggle}
+            isLocked={isLocked}
+            quoteId={quoteId}
+            tenantId={tenantId}
+            onMarkReady={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
+            onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
+            onSend={() => setShowSendDialog(true)}
+            onShowLocked={() => setShowLockedDialog(true)}
+          />
+        </>
       )}
 
       {/* Content */}
