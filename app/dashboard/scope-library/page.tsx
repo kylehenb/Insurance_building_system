@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/lib/supabase/database.types';
+import { ScopeLibraryCsvImportDialog, type ScopeLibraryImportRow } from './ScopeLibraryCsvImportDialog';
 
 type ScopeLibraryRow = Database['public']['Tables']['scope_library']['Row'];
 type ScopeLibraryInsert = Database['public']['Tables']['scope_library']['Insert'];
@@ -62,6 +63,7 @@ export default function ScopeLibraryPage() {
   const [editingItem, setEditingItem] = useState<ScopeLibraryRow | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ScopeLibraryRow | null>(null);
+  const [showCsvImport, setShowCsvImport] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<Partial<ScopeLibraryExtended>>({
@@ -156,33 +158,30 @@ export default function ScopeLibraryPage() {
       });
   };
 
-  // Column resize handler
-  const handleResizeStart = (column: string, startX: number, startWidth: number, e: React.MouseEvent) => {
+  // Column resize handler - uses closure to track initial position reliably
+  const handleResizeStart = (column: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setResizingColumn(column);
 
-    // Prevent text selection during drag
+    const startX = e.clientX;
+    const startWidth = columnWidths[column];
+
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
+    setResizingColumn(column);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const diff = e.clientX - startX;
-      const newWidth = Math.max(50, startWidth + diff); // Minimum width of 50px
-      setColumnWidths(prev => ({
-        ...prev,
-        [column]: newWidth,
-      }));
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const diff = moveEvent.clientX - startX;
+      const newWidth = Math.max(50, startWidth + diff);
+      setColumnWidths(prev => ({ ...prev, [column]: newWidth }));
     };
 
     const handleMouseUp = () => {
-      setResizingColumn(null);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      // Restore cursor and selection
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
-      // Save the final widths
+      setResizingColumn(null);
       setColumnWidths(prev => {
         saveColumnWidths(prev);
         return prev;
@@ -191,17 +190,6 @@ export default function ScopeLibraryPage() {
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  // Handle th mouse down to check if near right edge for resize
-  const handleThMouseDown = (column: string, e: React.MouseEvent<HTMLTableCellElement>) => {
-    const th = e.currentTarget;
-    const rect = th.getBoundingClientRect();
-    const isNearRightEdge = e.clientX >= rect.right - 8 && e.clientX <= rect.right + 4;
-
-    if (isNearRightEdge) {
-      handleResizeStart(column, e.clientX, columnWidths[column], e);
-    }
   };
 
   useEffect(() => {
@@ -427,6 +415,27 @@ export default function ScopeLibraryPage() {
     setShowModal(false);
   };
 
+  // CSV import handler
+  const handleCsvImport = async (importedItems: ScopeLibraryImportRow[]) => {
+    if (!tenantId) return;
+
+    const records = importedItems.map(item => ({
+      ...item,
+      tenant_id: tenantId,
+      updated_at: new Date().toISOString(),
+    } as ScopeLibraryInsert));
+
+    await supabase.from('scope_library').insert(records);
+
+    // Refresh
+    const { data } = await supabase
+      .from('scope_library')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('trade', { ascending: true });
+    setItems((data as ScopeLibraryRow[]) ?? []);
+  };
+
   // Inline edit handlers
   const handleInlineEdit = async (itemId: string, field: string, value: any) => {
     if (!tenantId || !userId) return;
@@ -488,12 +497,20 @@ export default function ScopeLibraryPage() {
               Manage your standard scope items and pricing
             </p>
           </div>
-          <button
-            onClick={handleAdd}
-            className="inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
-          >
-            Add Item
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCsvImport(true)}
+              className="inline-flex items-center justify-center rounded-lg border border-[#e0dbd4] bg-white px-4 py-2 text-sm font-medium text-[#3a3530] hover:bg-[#f5f0e8] transition-colors"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={handleAdd}
+              className="inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
         </div>
 
         {/* Filter Bar */}
@@ -581,95 +598,125 @@ export default function ScopeLibraryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#f0ece6]">
+              <table className="w-full divide-y divide-[#f0ece6]" style={{ tableLayout: 'fixed' }}>
                 <thead className="bg-[#fdfdfc]">
                   <tr>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
-                      style={{ width: columnWidths.trade }}
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ position: 'relative', width: columnWidths.trade }}
                       onClick={() => handleSort('trade')}
-                      onMouseDown={(e) => handleThMouseDown('trade', e)}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('trade', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.insurer }}
-                      onMouseDown={(e) => handleThMouseDown('insurer', e)}
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.insurer }}
                     >
                       Insurer
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('insurer', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.keyword }}
-                      onMouseDown={(e) => handleThMouseDown('keyword', e)}
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.keyword }}
                     >
                       Keyword
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('keyword', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.description }}
-                      onMouseDown={(e) => handleThMouseDown('description', e)}
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.description }}
                     >
                       Description
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('description', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.unit }}
-                      onMouseDown={(e) => handleThMouseDown('unit', e)}
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.unit }}
                     >
                       Unit
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('unit', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.labour_per_unit }}
-                      onMouseDown={(e) => handleThMouseDown('labour_per_unit', e)}
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.labour_per_unit }}
                     >
                       Labour/Unit
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('labour_per_unit', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.materials_per_unit }}
-                      onMouseDown={(e) => handleThMouseDown('materials_per_unit', e)}
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.materials_per_unit }}
                     >
                       Materials/Unit
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('materials_per_unit', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
-                      style={{ width: columnWidths.total_per_unit }}
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ position: 'relative', width: columnWidths.total_per_unit }}
                       onClick={() => handleSort('total_per_unit')}
-                      onMouseDown={(e) => handleThMouseDown('total_per_unit', e)}
                     >
                       Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('total_per_unit', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
-                      style={{ width: columnWidths.estimated_hours }}
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ position: 'relative', width: columnWidths.estimated_hours }}
                       onClick={() => handleSort('estimated_hours')}
-                      onMouseDown={(e) => handleThMouseDown('estimated_hours', e)}
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('estimated_hours', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ width: columnWidths.status }}
-                      onMouseDown={(e) => handleThMouseDown('status', e)}
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ position: 'relative', width: columnWidths.status }}
                     >
                       Status
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        onMouseDown={(e) => handleResizeStart('status', e)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.actions }}
                     >
                       Actions
@@ -1104,6 +1151,13 @@ export default function ScopeLibraryPage() {
           </div>
         </div>
       )}
+
+      {/* CSV Import Dialog */}
+      <ScopeLibraryCsvImportDialog
+        isOpen={showCsvImport}
+        onClose={() => setShowCsvImport(false)}
+        onImport={handleCsvImport}
+      />
     </div>
   );
 }
