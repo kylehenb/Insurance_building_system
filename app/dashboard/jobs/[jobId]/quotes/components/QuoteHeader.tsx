@@ -150,47 +150,25 @@ export function QuoteHeader({
       </span>
 
       {quote.version > 1 && (
-        <span
-          style={{
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: 11,
-            fontWeight: 600,
-            background: '#e8f0fe',
-            color: '#1a73e8',
-          }}
-        >
-          V{quote.version}
-        </span>
-      )}
-
-      {/* Version history button */}
-      {quote.version > 1 && (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setShowVersions(!showVersions)}
             style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 11,
-              fontWeight: 500,
-              color: '#9e998f',
-              background: 'transparent',
-              border: '1px solid #d8d0c8',
-              borderRadius: 4,
               padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              background: '#e8f0fe',
+              color: '#1a73e8',
+              border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.15s',
+              transition: 'background 0.15s',
+              fontFamily: 'DM Sans, sans-serif',
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = '#c8b89a'
-              e.currentTarget.style.color = '#3a3530'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = '#d8d0c8'
-              e.currentTarget.style.color = '#9e998f'
-            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#d2e3fc')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#e8f0fe')}
           >
-            History ▾
+            V{quote.version} ▾
           </button>
 
           {showVersions && (
