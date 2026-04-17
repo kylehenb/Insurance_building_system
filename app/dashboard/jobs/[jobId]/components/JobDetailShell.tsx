@@ -379,7 +379,7 @@ export function JobDetailShell({
 
       {/* ── Tab content ───────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-6">
-        <div className="mx-auto" style={{ maxWidth: '108rem' }}>
+        <div className="mx-auto max-w-6xl">
           <TabPanel
             activeTab={activeTab}
             jobId={jobId}

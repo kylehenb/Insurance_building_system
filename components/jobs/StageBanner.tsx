@@ -59,8 +59,8 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
   return (
     <div
       style={{
-        width: 442.5,
-        minWidth: 442.5,
+        width: 331.875,
+        minWidth: 331.875,
         borderLeft: `3px solid ${borderColor}`,
         backgroundColor: '#f5f0e8',
         display: 'flex',
