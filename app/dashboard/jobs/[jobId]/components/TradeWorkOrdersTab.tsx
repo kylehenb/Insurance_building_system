@@ -198,6 +198,20 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
     fetchData()
   }, [jobId, supabase])
 
+  const handleCreateWorkOrders = async () => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/work-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error('Failed to create work orders')
+      // Refresh work orders
+      window.location.reload()
+    } catch (error) {
+      alert('Failed to create work orders. Please try again.')
+    }
+  }
+
   return (
     <AccordionList title="Trade Work Orders">
       {loading ? (
@@ -237,9 +251,15 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
           className="px-4 py-12 text-center"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
-          <p className="text-[13px] text-[#9e998f]">
-            No work orders yet. Work orders will be created automatically when the quote is approved.
+          <p className="text-[13px] text-[#9e998f] mb-4">
+            No work orders yet for this job.
           </p>
+          <button
+            onClick={handleCreateWorkOrders}
+            className="inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+          >
+            Create Work Orders from Quote
+          </button>
         </div>
       ) : (
         <div className="divide-y divide-[#f0ece6]">
