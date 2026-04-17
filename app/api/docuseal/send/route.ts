@@ -90,6 +90,60 @@ export async function POST(req: NextRequest) {
     console.log('PDF buffer size:', pdfBuffer.byteLength)
     const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
 
+    const templateRes = await fetch('https://api.docuseal.com/templates/pdf', {
+      method: 'POST',
+      headers: {
+        'X-Auth-Token': process.env.DOCUSEAL_API_KEY!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: `${job.job_number} — Scope of Works`,
+        documents: [
+          {
+            name: `${job.job_number}-SOW`,
+            file: pdfBase64,
+          }
+        ],
+        submitters: [
+          { name: 'Owner / Insured' }
+        ],
+        fields: [
+          {
+            name: 'Signature',
+            type: 'signature',
+            submitter_index: 0,
+            required: true,
+          },
+          {
+            name: 'Full name',
+            type: 'text',
+            submitter_index: 0,
+            required: true,
+          },
+          {
+            name: 'Date',
+            type: 'date',
+            submitter_index: 0,
+            required: true,
+          }
+        ],
+      }),
+    })
+
+    const templateBody = await templateRes.text()
+    console.log('DocuSeal template response status:', templateRes.status)
+    console.log('DocuSeal template response body:', templateBody)
+
+    if (!templateRes.ok) {
+      return NextResponse.json(
+        { error: `DocuSeal template error ${templateRes.status}: ${templateBody}` },
+        { status: 500 }
+      )
+    }
+
+    const templateData = JSON.parse(templateBody)
+    const templateId = templateData.id
+
     const docusealRes = await fetch('https://api.docuseal.com/submissions', {
       method: 'POST',
       headers: {
@@ -97,6 +151,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        template_id: templateId,
         send_email: true,
         submitters: [
           {
@@ -109,18 +164,12 @@ export async function POST(req: NextRequest) {
           subject: `Please sign your Scope of Works — ${job.job_number}`,
           body: `Hi ${job.insured_name || 'there'},\n\nPlease review and sign the attached Scope of Works for your insurance repair at ${job.property_address}.\n\nThis document authorises Insurance Repair Co to proceed with your approved repairs. You can sign directly from this email on your phone or computer — no account needed.\n\nKind regards,\nKyle Bindon\nInsurance Repair Co\n0431 132 077`,
         },
-        documents: [
-          {
-            name: `${job.job_number}-SOW`,
-            file: pdfBase64,
-          }
-        ],
       }),
     })
 
-    console.log('DocuSeal response status:', docusealRes.status)
     const docusealBody = await docusealRes.text()
-    console.log('DocuSeal response body:', docusealBody)
+    console.log('DocuSeal submission response status:', docusealRes.status)
+    console.log('DocuSeal submission response body:', docusealBody)
 
     if (!docusealRes.ok) {
       return NextResponse.json(

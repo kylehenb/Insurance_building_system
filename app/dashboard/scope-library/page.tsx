@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/lib/supabase/database.types';
@@ -191,6 +191,17 @@ export default function ScopeLibraryPage() {
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Handle th mouse down to check if near right edge for resize
+  const handleThMouseDown = (column: string, e: React.MouseEvent<HTMLTableCellElement>) => {
+    const th = e.currentTarget;
+    const rect = th.getBoundingClientRect();
+    const isNearRightEdge = e.clientX >= rect.right - 8 && e.clientX <= rect.right + 4;
+
+    if (isNearRightEdge) {
+      handleResizeStart(column, e.clientX, columnWidths[column], e);
+    }
   };
 
   useEffect(() => {
@@ -578,113 +589,83 @@ export default function ScopeLibraryPage() {
                       className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
                       style={{ width: columnWidths.trade }}
                       onClick={() => handleSort('trade')}
+                      onMouseDown={(e) => handleThMouseDown('trade', e)}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('trade', e.clientX, columnWidths.trade, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.insurer }}
+                      onMouseDown={(e) => handleThMouseDown('insurer', e)}
                     >
                       Insurer
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('insurer', e.clientX, columnWidths.insurer, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.keyword }}
+                      onMouseDown={(e) => handleThMouseDown('keyword', e)}
                     >
                       Keyword
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('keyword', e.clientX, columnWidths.keyword, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.description }}
+                      onMouseDown={(e) => handleThMouseDown('description', e)}
                     >
                       Description
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('description', e.clientX, columnWidths.description, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.unit }}
+                      onMouseDown={(e) => handleThMouseDown('unit', e)}
                     >
                       Unit
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('unit', e.clientX, columnWidths.unit, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.labour_per_unit }}
+                      onMouseDown={(e) => handleThMouseDown('labour_per_unit', e)}
                     >
                       Labour/Unit
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('labour_per_unit', e.clientX, columnWidths.labour_per_unit, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.materials_per_unit }}
+                      onMouseDown={(e) => handleThMouseDown('materials_per_unit', e)}
                     >
                       Materials/Unit
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('materials_per_unit', e.clientX, columnWidths.materials_per_unit, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
                       style={{ width: columnWidths.total_per_unit }}
                       onClick={() => handleSort('total_per_unit')}
+                      onMouseDown={(e) => handleThMouseDown('total_per_unit', e)}
                     >
                       Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('total_per_unit', e.clientX, columnWidths.total_per_unit, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
                       style={{ width: columnWidths.estimated_hours }}
                       onClick={() => handleSort('estimated_hours')}
+                      onMouseDown={(e) => handleThMouseDown('estimated_hours', e)}
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('estimated_hours', e.clientX, columnWidths.estimated_hours, e)}
-                      />
                     </th>
                     <th
                       scope="col"
                       className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.status }}
+                      onMouseDown={(e) => handleThMouseDown('status', e)}
                     >
                       Status
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
-                        onMouseDown={(e) => handleResizeStart('status', e.clientX, columnWidths.status, e)}
-                      />
                     </th>
                     <th
                       scope="col"
