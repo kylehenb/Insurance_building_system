@@ -53,6 +53,7 @@ interface JobDetailShellProps {
   currentUserRole: string
   pendingActionCount: number
   isFlagged: boolean
+  stageBanner?: React.ReactNode
 }
 
 // — Tab definitions ———————————————————————————————————————————————
@@ -185,6 +186,7 @@ export function JobDetailShell({
   currentUserRole,
   pendingActionCount,
   isFlagged,
+  stageBanner,
 }: JobDetailShellProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -372,6 +374,9 @@ export function JobDetailShell({
           </nav>
         </div>
       </div>
+
+      {/* ── Stage banner ──────────────────────────────────────── */}
+      {stageBanner}
 
       {/* ── Tab content ───────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-6">

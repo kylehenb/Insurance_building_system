@@ -4,6 +4,7 @@ import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { JobDetailShell } from './components/JobDetailShell'
+import StageBanner from '@/components/jobs/StageBanner'
 
 type JobRow = Database['public']['Tables']['jobs']['Row']
 
@@ -68,6 +69,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <Suspense>
       <JobDetailShell
+        stageBanner={<StageBanner jobId={jobId} />}
         job={{
           id: job.id,
           job_number: job.job_number,
