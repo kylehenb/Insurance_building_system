@@ -6,33 +6,38 @@ import type { OpenLoop } from '@/lib/jobs/openLoops'
 
 // Border colour is driven by stage state — custom hex values require inline styles
 function getBorderColor(stage: JobStage): string {
-  if (stage.key === 'on_hold' || stage.key === 'cancelled') return '#9e998f'
-  if (stage.isWaiting) return '#e0dbd4'
-  if (stage.isBranch) return '#f59e0b'
+  if (stage.key === 'on_hold') return '#f59e0b'
+  if (stage.key === 'cancelled') return '#9e998f'
   return '#c9a96e'
 }
 
-type LoopChipProps = { loop: OpenLoop }
+function getSectionLabelColor(stage: JobStage): string {
+  if (stage.key === 'on_hold') return '#b45309'
+  if (stage.key === 'cancelled') return '#9e998f'
+  return '#a07840'
+}
 
-function LoopChip({ loop }: LoopChipProps) {
-  const isUrgent = loop.urgency === 'urgent'
-  return (
-    // TODO: wire onClick when extracted to a client component — console.log('open loop clicked:', loop.type)
-    <button
-      type="button"
-      style={{
-        backgroundColor: isUrgent ? '#fee2e2' : '#fef9ee',
-        color: isUrgent ? '#991b1b' : '#92400e',
-        border: `1px solid ${isUrgent ? '#fca5a5' : '#f59e0b'}`,
-        fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif',
-        fontSize: 11,
-        fontWeight: 500,
-      }}
-      className="rounded-full px-2 py-0.5 whitespace-nowrap"
-    >
-      {loop.label}
-    </button>
-  )
+function getStageNameColor(stage: JobStage): string {
+  if (stage.key === 'on_hold') return '#92400e'
+  if (stage.key === 'cancelled') return '#6a6460'
+  return '#1a1a1a'
+}
+
+function getStageDescriptionColor(stage: JobStage): string {
+  if (stage.key === 'on_hold') return '#a07840'
+  if (stage.key === 'cancelled') return '#9e998f'
+  return '#9e8060'
+}
+
+function getSectionBorderBottom(stage: JobStage): string {
+  if (stage.key === 'on_hold') return '#f0d58c'
+  if (stage.key === 'cancelled') return '#e0dbd4'
+  return '#e8dfc8'
+}
+
+function getLoopLabelColor(stage: JobStage): string {
+  if (stage.key === 'on_hold') return '#b45309'
+  return '#a07840'
 }
 
 type StageBannerProps = { jobId: string }
@@ -43,85 +48,300 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
   const stage = getJobStage(context)
 
   const borderColor = getBorderColor(stage)
-  const isTerminal = stage.key === 'on_hold' || stage.key === 'cancelled'
-  const labelColor = stage.isWaiting ? '#9e998f' : '#1a1a1a'
-  const labelPrefix = stage.isWaiting ? 'Waiting — ' : ''
+  const sectionLabelColor = getSectionLabelColor(stage)
+  const stageNameColor = getStageNameColor(stage)
+  const stageDescriptionColor = getStageDescriptionColor(stage)
+  const sectionBorderBottom = getSectionBorderBottom(stage)
+  const loopLabelColor = getLoopLabelColor(stage)
+  const isOnHold = stage.key === 'on_hold'
+  const isCancelled = stage.key === 'cancelled'
 
   return (
     <div
       style={{
-        borderLeft: `4px solid ${borderColor}`,
-        fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif',
+        width: 295,
+        minWidth: 295,
+        borderLeft: `3px solid ${borderColor}`,
+        backgroundColor: '#f5f0e8',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'inherit',
       }}
-      className="w-full bg-white flex items-center gap-3 px-5 py-3"
     >
-      {/* Stage label */}
-      <span
+      {/* Section 1 — Stage */}
+      <div
         style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: labelColor,
+          padding: '13px 16px 11px',
+          borderBottom: `1px solid ${sectionBorderBottom}`,
         }}
       >
-        {labelPrefix}{stage.label}
-      </span>
-
-      {/* Separator + description */}
-      <span
-        style={{
-          fontSize: 12,
-          color: '#9e998f',
-        }}
-      >
-        · {stage.description}
-      </span>
-
-      {/* Contextual warning chip */}
-      {stage.contextualWarning && (
-        <span
+        {/* Section label */}
+        <div
           style={{
-            backgroundColor: '#fef3c7',
-            color: '#92400e',
-            border: '1px solid #f59e0b',
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: sectionLabelColor,
+            marginBottom: 5,
+          }}
+        >
+          Current Stage
+        </div>
+
+        {/* Stage name and action button row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          {/* Stage name */}
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 500,
+              color: stageNameColor,
+              marginBottom: 1,
+              letterSpacing: '-0.2px',
+            }}
+          >
+            {stage.label}
+          </div>
+
+          {/* Action button or waiting pill */}
+          {isOnHold && stage.primaryAction ? (
+            <button
+              type="button"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#c9a96e',
+                border: '1px solid #c9a96e',
+                borderRadius: 4,
+                padding: '6px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                fontFamily: 'inherit',
+              }}
+            >
+              Resume Job
+            </button>
+          ) : stage.isWaiting ? (
+            <div
+              style={{
+                backgroundColor: '#ece6d8',
+                borderRadius: 4,
+                padding: '4px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  backgroundColor: '#c9b898',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: '#9e8060',
+                  fontWeight: 500,
+                }}
+              >
+                Waiting
+              </span>
+            </div>
+          ) : stage.primaryAction && !isCancelled ? (
+            <button
+              type="button"
+              style={{
+                backgroundColor: '#1a1a1a',
+                color: '#c9a96e',
+                border: 'none',
+                borderRadius: 4,
+                padding: '6px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                fontFamily: 'inherit',
+              }}
+            >
+              {stage.primaryAction.label}
+            </button>
+          ) : null}
+        </div>
+
+        {/* Stage description */}
+        <div
+          style={{
+            fontSize: 10,
+            color: stageDescriptionColor,
+            lineHeight: 1.3,
+          }}
+        >
+          {stage.description}
+        </div>
+      </div>
+
+      {/* Section 2 — Open Loops */}
+      {isCancelled ? (
+        <div
+          style={{
+            padding: '10px 16px 14px',
             fontSize: 11,
-            fontWeight: 500,
-            fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif',
-            marginLeft: 4,
+            color: '#b0a898',
+            fontStyle: 'italic',
           }}
-          className="rounded-full px-2 py-0.5 whitespace-nowrap"
         >
-          ⚠ {stage.contextualWarning.message}
-        </span>
-      )}
-
-      {/* Open loop chips */}
-      {!isTerminal && stage.openLoops.length > 0 && (
-        <>
-          {stage.openLoops.map((loop) => (
-            <LoopChip key={loop.type} loop={loop} />
-          ))}
-        </>
-      )}
-
-      {/* Push primary action to the right */}
-      {!isTerminal && <span className="flex-1" />}
-
-      {/* Primary action button */}
-      {!isTerminal && stage.primaryAction && (
-        // TODO: wire onClick when extracted to a client component — console.log('primary action:', stage.primaryAction.actionKey)
-        <button
-          type="button"
+          Job cancelled
+        </div>
+      ) : (
+        <div
           style={{
-            backgroundColor: '#1a1a1a',
-            color: 'white',
-            fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif',
-            fontSize: 13,
-            fontWeight: 500,
+            padding: '10px 16px 14px',
+            flex: 1,
           }}
-          className="px-4 py-2 rounded-md hover:bg-[#3a3530] transition-colors whitespace-nowrap"
         >
-          {stage.primaryAction.label}
-        </button>
+          {/* Section header */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              marginBottom: 7,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: loopLabelColor,
+              }}
+            >
+              Open Loops
+            </div>
+            <div
+              style={{
+                backgroundColor: stage.openLoops.length > 0 ? '#ef4444' : '#e0d8c8',
+                color: stage.openLoops.length > 0 ? 'white' : '#9e8060',
+                borderRadius: 10,
+                padding: '1px 6px',
+                fontSize: 9,
+                fontWeight: 600,
+              }}
+            >
+              {stage.openLoops.length}
+            </div>
+          </div>
+
+          {/* Loop rows */}
+          {stage.openLoops.length === 0 ? (
+            <div
+              style={{
+                fontSize: 11,
+                color: '#b0a890',
+                fontStyle: 'italic',
+              }}
+            >
+              No open items
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              {stage.openLoops.slice(0, 3).map((loop) => {
+                const isUrgent = loop.urgency === 'urgent'
+                return (
+                  <div
+                    key={loop.type}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 9px',
+                      backgroundColor: 'white',
+                      borderRadius: 4,
+                      border: isUrgent ? '0.5px solid #fca5a5' : '0.5px solid #e8dfc8',
+                      borderLeft: isUrgent ? '2px solid #ef4444' : '2px solid #c9a96e',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: '50%',
+                        backgroundColor: isUrgent ? '#ef4444' : '#c9a96e',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: isUrgent ? '#7f1d1d' : '#4a3820',
+                        fontWeight: 500,
+                        flex: 1,
+                      }}
+                    >
+                      {loop.label}
+                    </div>
+                    {isUrgent && (
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Urgent
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {stage.openLoops.length > 3 && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#9e8060',
+                    padding: '4px 2px',
+                  }}
+                >
+                  + {stage.openLoops.length - 3} more{' '}
+                  <span
+                    style={{
+                      color: '#6a5a40',
+                      fontWeight: 500,
+                      borderBottom: '1px solid #c9a96e4a',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => console.log('view all loops')}
+                  >
+                    view all
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
