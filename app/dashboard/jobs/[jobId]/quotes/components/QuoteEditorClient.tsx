@@ -709,6 +709,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         cashSettlementActive={cashSettlementActive}
         onCashSettlementToggle={handleCashSettlementToggle}
         quoteId={quoteId}
+        jobId={jobId}
+        onQuoteUpdated={onQuoteUpdated}
       />
 
       {/* CSV Import Dialog */}
