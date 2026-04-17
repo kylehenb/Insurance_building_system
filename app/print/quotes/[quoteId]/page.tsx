@@ -205,11 +205,14 @@ export default async function QuotePrintPage({
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 0 4px', position: 'relative', width: '100%' }}>
-          <span style={{ position: 'absolute', left: '20px', top: '4px', fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>{quote.quote_ref}</span>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>Estimate — Scope of Works</span>
-          </div>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 20px', display: 'flex', alignItems: 'baseline', gap: '16px' }}>
+          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>
+            {quote.quote_ref}
+          </span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>
+            Estimate — Scope of Works
+          </span>
         </div>
 
         {/* Scope Items by Room */}
