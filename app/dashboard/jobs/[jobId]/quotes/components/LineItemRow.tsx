@@ -223,6 +223,14 @@ function BidirectionalNumericCell({
     boxSizing: 'border-box' as const,
   }
 
+  const labelStyle: React.CSSProperties = {
+    fontFamily: 'DM Sans, sans-serif',
+    fontSize: 9,
+    color: '#9e998f',
+    marginLeft: 4,
+    whiteSpace: 'nowrap',
+  }
+
   return (
     <div
       style={{
@@ -233,54 +241,60 @@ function BidirectionalNumericCell({
       }}
       onPointerDown={e => e.stopPropagation()}
     >
-      <input
-        ref={unitRateRef}
-        type="text"
-        inputMode="decimal"
-        placeholder={label}
-        value={localUnitRate}
-        disabled={disabled}
-        onChange={e => setLocalUnitRate(e.target.value)}
-        onFocus={e => {
-          unitRateFocusedRef.current = true
-          e.currentTarget.select()
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            ;(e.target as HTMLInputElement).blur()
-            onNavigateNext?.()
-          }
-        }}
-        onBlur={handleUnitRateBlur}
-        style={inputStyle}
-      />
-      <input
-        ref={totalRef}
-        type="text"
-        inputMode="decimal"
-        placeholder="Total"
-        value={localTotal}
-        disabled={disabled}
-        onChange={e => setLocalTotal(e.target.value)}
-        onFocus={e => {
-          totalFocusedRef.current = true
-          e.currentTarget.select()
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            ;(e.target as HTMLInputElement).blur()
-            onNavigateNext?.()
-          }
-        }}
-        onBlur={handleTotalBlur}
-        style={{
-          ...inputStyle,
-          fontSize: 10,
-          color: '#6b6560',
-        }}
-      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <input
+          ref={unitRateRef}
+          type="text"
+          inputMode="decimal"
+          placeholder={label}
+          value={localUnitRate}
+          disabled={disabled}
+          onChange={e => setLocalUnitRate(e.target.value)}
+          onFocus={e => {
+            unitRateFocusedRef.current = true
+            e.currentTarget.select()
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              ;(e.target as HTMLInputElement).blur()
+              onNavigateNext?.()
+            }
+          }}
+          onBlur={handleUnitRateBlur}
+          style={inputStyle}
+        />
+        <span style={labelStyle}>Unit</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <input
+          ref={totalRef}
+          type="text"
+          inputMode="decimal"
+          placeholder="Total"
+          value={localTotal}
+          disabled={disabled}
+          onChange={e => setLocalTotal(e.target.value)}
+          onFocus={e => {
+            totalFocusedRef.current = true
+            e.currentTarget.select()
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              ;(e.target as HTMLInputElement).blur()
+              onNavigateNext?.()
+            }
+          }}
+          onBlur={handleTotalBlur}
+          style={{
+            ...inputStyle,
+            fontSize: 10,
+            color: '#6b6560',
+          }}
+        />
+        <span style={labelStyle}>Total</span>
+      </div>
     </div>
   )
 }
