@@ -136,7 +136,13 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
       const latestQuote = quotesData?.[0]
       const normalizedStatus = latestQuote?.status?.toLowerCase()
       
+      console.log('TradeWorkOrdersTab - Latest quote status:', latestQuote?.status)
+      console.log('TradeWorkOrdersTab - Normalized status:', normalizedStatus)
+      console.log('TradeWorkOrdersTab - Approved statuses:', APPROVED_STATUSES)
+      
       const isApproved = normalizedStatus && APPROVED_STATUSES.includes(normalizedStatus)
+      console.log('TradeWorkOrdersTab - Is approved:', isApproved)
+      
       setHasApprovedQuote(!!isApproved)
       setQuoteStatus(latestQuote?.status || null)
 
@@ -150,6 +156,8 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
           `)
           .eq('job_id', jobId)
           .order('sequence_order', { ascending: true, nullsFirst: false })
+
+        console.log('TradeWorkOrdersTab - Work orders data:', woData)
 
         if (!woData) {
           setWorkOrders([])
