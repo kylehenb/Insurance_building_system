@@ -230,7 +230,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
           >
             <div
               style={{
-                fontSize: 11,
+                fontSize: 9,
                 fontWeight: 600,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
@@ -245,7 +245,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 color: stage.openLoops.length > 0 ? 'white' : '#9e8060',
                 borderRadius: 10,
                 padding: '1px 6px',
-                fontSize: 11,
+                fontSize: 9,
                 fontWeight: 600,
               }}
             >
@@ -257,7 +257,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
           {stage.openLoops.length === 0 ? (
             <div
               style={{
-                fontSize: 13,
+                fontSize: 11,
                 color: '#b0a890',
                 fontStyle: 'italic',
               }}
@@ -299,7 +299,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                     />
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 11,
                         color: isUrgent ? '#7f1d1d' : '#4a3820',
                         fontWeight: 500,
                         flex: 1,
@@ -310,7 +310,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                     {isUrgent && (
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: 11,
                           color: '#ef4444',
                           fontWeight: 600,
                           textTransform: 'uppercase',
@@ -326,7 +326,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
               {stage.openLoops.length > 3 && (
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 11,
                     color: '#9e8060',
                     padding: '4px 2px',
                   }}
