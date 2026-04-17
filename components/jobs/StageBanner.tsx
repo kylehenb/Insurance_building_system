@@ -95,7 +95,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'space-between',
-            gap: 8,
+            gap: 12,
           }}
         >
           {/* Stage name and description column */}
@@ -110,11 +110,20 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 fontSize: 15,
                 fontWeight: 500,
                 color: stageNameColor,
-                marginBottom: 1,
+                marginBottom: 4,
                 letterSpacing: '-0.2px',
               }}
             >
               {stage.label}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: stageDescriptionColor,
+                lineHeight: 1.3,
+              }}
+            >
+              {stage.description}
             </div>
           </div>
 
@@ -188,18 +197,6 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
               {stage.primaryAction.label}
             </button>
           ) : null}
-        </div>
-
-        {/* Stage description */}
-        <div
-          style={{
-            fontSize: 10,
-            color: stageDescriptionColor,
-            lineHeight: 1.3,
-            maxWidth: 'calc(100% - 80px)',
-          }}
-        >
-          {stage.description}
         </div>
       </div>
 
