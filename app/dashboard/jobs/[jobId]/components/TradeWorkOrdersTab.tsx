@@ -8,6 +8,7 @@ import { AccordionList } from './shared/AccordionList'
 type WorkOrderRow = Database['public']['Tables']['work_orders']['Row']
 type WorkOrderVisitRow = Database['public']['Tables']['work_order_visits']['Row']
 type TradeRow = Database['public']['Tables']['trades']['Row']
+type QuoteRow = Database['public']['Tables']['quotes']['Row']
 
 interface WorkOrderWithDetails extends WorkOrderRow {
   visits: WorkOrderVisitRow[]
@@ -17,6 +18,19 @@ interface WorkOrderWithDetails extends WorkOrderRow {
 interface TradeWorkOrdersTabProps {
   jobId: string
 }
+
+// Quote statuses that indicate the quote is approved and work orders can be created
+const APPROVED_STATUSES = [
+  'approved_contracts_pending',
+  'approved_contracts_sent',
+  'approved_contracts_signed',
+  'pre_repair',
+  'repairs_in_progress',
+  'repairs_complete_to_invoice',
+  'complete_and_invoiced',
+  'approved', // legacy
+  'partially_approved', // legacy
+]
 
 function WorkOrderStatusBadge({ status, garyState }: { status: string | null; garyState: string | null }) {
   const getStatusColor = () => {
@@ -99,6 +113,8 @@ function formatDate(dateString: string | null): string {
 export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
   const [workOrders, setWorkOrders] = useState<WorkOrderWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasApprovedQuote, setHasApprovedQuote] = useState(false)
+  const [quoteStatus, setQuoteStatus] = useState<string | null>(null)
 
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,49 +122,72 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
   )
 
   useEffect(() => {
-    async function fetchWorkOrders() {
-      const { data: woData } = await supabase
-        .from('work_orders')
-        .select(`
-          *,
-          trade:trades(business_name, primary_trade)
-        `)
+    async function fetchData() {
+      setLoading(true)
+      
+      // Fetch quotes to check approval status
+      const { data: quotesData } = await supabase
+        .from('quotes')
+        .select('status')
         .eq('job_id', jobId)
-        .order('sequence_order', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      if (!woData) {
+      const latestQuote = quotesData?.[0]
+      const normalizedStatus = latestQuote?.status?.toLowerCase()
+      
+      const isApproved = normalizedStatus && APPROVED_STATUSES.includes(normalizedStatus)
+      setHasApprovedQuote(!!isApproved)
+      setQuoteStatus(latestQuote?.status || null)
+
+      // Only fetch work orders if a quote is approved
+      if (isApproved) {
+        const { data: woData } = await supabase
+          .from('work_orders')
+          .select(`
+            *,
+            trade:trades(business_name, primary_trade)
+          `)
+          .eq('job_id', jobId)
+          .order('sequence_order', { ascending: true, nullsFirst: false })
+
+        if (!woData) {
+          setWorkOrders([])
+          setLoading(false)
+          return
+        }
+
+        const workOrderIds = woData.map(wo => wo.id)
+
+        const { data: visitsData } = await supabase
+          .from('work_order_visits')
+          .select('*')
+          .in('work_order_id', workOrderIds)
+          .order('visit_number', { ascending: true })
+
+        const visitsMap = new Map<string, WorkOrderVisitRow[]>()
+        visitsData?.forEach(visit => {
+          if (!visitsMap.has(visit.work_order_id)) {
+            visitsMap.set(visit.work_order_id, [])
+          }
+          visitsMap.get(visit.work_order_id)!.push(visit)
+        })
+
+        const formattedData = (woData as any[])?.map(wo => ({
+          ...wo,
+          visits: visitsMap.get(wo.id) || [],
+          trade: wo.trade,
+        })) || []
+
+        setWorkOrders(formattedData)
+      } else {
         setWorkOrders([])
-        setLoading(false)
-        return
       }
 
-      const workOrderIds = woData.map(wo => wo.id)
-
-      const { data: visitsData } = await supabase
-        .from('work_order_visits')
-        .select('*')
-        .in('work_order_id', workOrderIds)
-        .order('visit_number', { ascending: true })
-
-      const visitsMap = new Map<string, WorkOrderVisitRow[]>()
-      visitsData?.forEach(visit => {
-        if (!visitsMap.has(visit.work_order_id)) {
-          visitsMap.set(visit.work_order_id, [])
-        }
-        visitsMap.get(visit.work_order_id)!.push(visit)
-      })
-
-      const formattedData = (woData as any[])?.map(wo => ({
-        ...wo,
-        visits: visitsMap.get(wo.id) || [],
-        trade: wo.trade,
-      })) || []
-
-      setWorkOrders(formattedData)
       setLoading(false)
     }
 
-    fetchWorkOrders()
+    fetchData()
   }, [jobId, supabase])
 
   return (
@@ -157,13 +196,41 @@ export function TradeWorkOrdersTab({ jobId }: TradeWorkOrdersTabProps) {
         <div className="px-4 py-12 text-center">
           <p className="text-[13px] text-[#9e998f]">Loading work orders...</p>
         </div>
+      ) : !hasApprovedQuote ? (
+        <div
+          className="px-4 py-12 text-center"
+          style={{ fontFamily: 'DM Sans, sans-serif' }}
+        >
+          {!quoteStatus ? (
+            <div>
+              <p className="text-[13px] text-[#9e998f] mb-2">
+                No work orders yet.
+              </p>
+              <p className="text-[12px] text-[#9e998f]">
+                Work orders are created once a quote is approved. Create a quote in the Quotes tab first.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[13px] text-[#9e998f] mb-2">
+                No work orders yet.
+              </p>
+              <p className="text-[12px] text-[#9e998f]">
+                Work orders are created once a quote is approved. Current quote status: <span className="font-medium">{quoteStatus}</span>
+              </p>
+              <p className="text-[11px] text-[#9e998f] mt-2">
+                Change the quote status to an approved stage (e.g., Approved, Pre-Repair, Repairs in Progress) to enable work orders.
+              </p>
+            </div>
+          )}
+        </div>
       ) : workOrders.length === 0 ? (
         <div
           className="px-4 py-12 text-center"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
           <p className="text-[13px] text-[#9e998f]">
-            No work orders yet. Work orders are created once a quote is approved.
+            No work orders yet. Work orders will be created automatically when the quote is approved.
           </p>
         </div>
       ) : (
