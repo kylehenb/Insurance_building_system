@@ -93,22 +93,29 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: 8,
           }}
         >
-          {/* Stage name */}
+          {/* Stage name and description column */}
           <div
             style={{
-              fontSize: 15,
-              fontWeight: 500,
-              color: stageNameColor,
-              marginBottom: 1,
-              letterSpacing: '-0.2px',
+              flex: 1,
+              minWidth: 0,
             }}
           >
-            {stage.label}
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 500,
+                color: stageNameColor,
+                marginBottom: 1,
+                letterSpacing: '-0.2px',
+              }}
+            >
+              {stage.label}
+            </div>
           </div>
 
           {/* Action button or waiting pill */}
@@ -140,6 +147,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 5,
+                flexShrink: 0,
               }}
             >
               <div
@@ -188,6 +196,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
             fontSize: 10,
             color: stageDescriptionColor,
             lineHeight: 1.3,
+            maxWidth: 'calc(100% - 80px)',
           }}
         >
           {stage.description}

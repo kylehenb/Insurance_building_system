@@ -33,6 +33,10 @@ interface QuoteHeaderProps {
   isLocked?: boolean
   quoteId: string
   tenantId: string
+  onMarkReady?: () => void
+  onUnlockEdit?: () => void
+  onSend?: () => void
+  onShowLocked?: () => void
 }
 
 export function QuoteHeader({
@@ -43,6 +47,10 @@ export function QuoteHeader({
   isLocked,
   quoteId,
   tenantId,
+  onMarkReady,
+  onUnlockEdit,
+  onSend,
+  onShowLocked,
 }: QuoteHeaderProps) {
   const s = STATUS_STYLES[quote.status.toLowerCase()] ?? STATUS_STYLES.draft
 
@@ -52,6 +60,10 @@ export function QuoteHeader({
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [reverting, setReverting] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // 3-dot menu state
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Fetch versions when dropdown opens
   useEffect(() => {
@@ -77,6 +89,18 @@ export function QuoteHeader({
     return () => document.removeEventListener('mousedown', handler)
   }, [showVersions])
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu) return
+    function handler(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMenu])
+
   // Handle revert to previous version
   const handleRevert = async (versionId: string) => {
     setReverting(versionId)
@@ -101,6 +125,12 @@ export function QuoteHeader({
       setReverting(null)
     }
   }
+
+  // Determine button states based on quote status
+  const canMarkReady = !isLocked && quote.status === 'draft'
+  const canUnlock = isLocked && quote.status === 'ready'
+  const canSend = isLocked && quote.status === 'ready'
+  const isLockedStatus = isLocked && quote.status !== 'ready' && quote.status !== 'draft'
 
   return (
     <div
@@ -359,6 +389,169 @@ export function QuoteHeader({
           {cashSettlementActive ? '✕ Cash Settlement' : 'Cash Settlement — Entire Quote'}
         </button>
       )}
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Status-dependent buttons */}
+      {/* Draft status: Mark as Ready */}
+      {canMarkReady && onMarkReady && (
+        <button
+          onClick={onMarkReady}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#ffffff',
+            background: '#2e7d32',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 16px',
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+        >
+          Mark as Ready
+        </button>
+      )}
+
+      {/* Ready status: Unlock and Edit */}
+      {canUnlock && onUnlockEdit && (
+        <button
+          onClick={onUnlockEdit}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#3a3530',
+            background: '#f5f2ee',
+            border: '1px solid #d8d0c8',
+            borderRadius: 6,
+            padding: '6px 16px',
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+        >
+          Unlock and Edit
+        </button>
+      )}
+
+      {/* Ready status: Send it */}
+      {canSend && onSend && (
+        <button
+          onClick={onSend}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#ffffff',
+            background: '#1a73e8',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 16px',
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+        >
+          Send it
+        </button>
+      )}
+
+      {/* Sent to insurer and other locked statuses: Locked */}
+      {isLockedStatus && onShowLocked && (
+        <button
+          onClick={onShowLocked}
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#9e998f',
+            background: '#f5f2ee',
+            border: '1px solid #e0dbd4',
+            borderRadius: 6,
+            padding: '6px 16px',
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+        >
+          Locked
+        </button>
+      )}
+
+      {/* 3-dot menu with Preview Quote */}
+      <div ref={menuRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#9e998f',
+            fontSize: 16,
+            padding: '4px 6px',
+            borderRadius: 4,
+            lineHeight: 1,
+            fontFamily: 'DM Sans, sans-serif',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+        >
+          •••
+        </button>
+
+        {showMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              right: 0,
+              zIndex: 500,
+              background: '#ffffff',
+              border: '1px solid #e0dbd4',
+              borderRadius: 8,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
+              padding: '4px 0',
+              minWidth: 180,
+            }}
+          >
+            <button
+              onClick={() => {
+                setShowMenu(false)
+                window.open(`/print/quotes/${quoteId}`, '_blank')
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                textAlign: 'left',
+                padding: '7px 14px',
+                fontSize: 12,
+                color: '#3a3530',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 400,
+                fontFamily: 'DM Sans, sans-serif',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+            >
+              <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
+              <span>Preview Quote</span>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

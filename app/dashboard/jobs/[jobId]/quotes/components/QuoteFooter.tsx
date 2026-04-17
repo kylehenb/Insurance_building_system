@@ -20,8 +20,6 @@ interface QuoteFooterProps {
   items: ScopeItem[]
   onUpdateMarkup: (pct: number) => void
   onUpdateNotes: (notes: string) => void
-  onMarkReady: () => void
-  onUnlockEdit: () => void
   isLocked: boolean
   saveStatus: SaveStatus
   tenantId: string
@@ -30,6 +28,12 @@ interface QuoteFooterProps {
   quoteId: string
   jobId: string
   onQuoteUpdated?: () => void
+  showSendDialog?: boolean
+  onShowSendDialog?: (show: boolean) => void
+  showLockedDialog?: boolean
+  onShowLockedDialog?: (show: boolean) => void
+  isCloning?: boolean
+  onSetIsCloning?: (cloning: boolean) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -325,8 +329,6 @@ export function QuoteFooter({
   items,
   onUpdateMarkup,
   onUpdateNotes,
-  onMarkReady,
-  onUnlockEdit,
   isLocked,
   saveStatus,
   tenantId,
@@ -335,6 +337,12 @@ export function QuoteFooter({
   quoteId,
   jobId,
   onQuoteUpdated,
+  showSendDialog = false,
+  onShowSendDialog,
+  showLockedDialog = false,
+  onShowLockedDialog,
+  isCloning = false,
+  onSetIsCloning,
 }: QuoteFooterProps) {
   const [markupLocal, setMarkupLocal] = useState(
     quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20'
@@ -369,18 +377,6 @@ export function QuoteFooter({
     alignItems: 'center',
     marginBottom: 6,
   }
-
-  // Determine button states based on quote status
-  const canMarkReady = !isLocked && quote.status === 'draft'
-  const canUnlock = isLocked && quote.status === 'ready'
-  const canSend = isLocked && quote.status === 'ready'
-  const isLockedStatus = isLocked && quote.status !== 'ready' && quote.status !== 'draft'
-  // sent/approved quotes cannot be unlocked via this button
-
-  // Dialog states
-  const [showSendDialog, setShowSendDialog] = useState(false)
-  const [showLockedDialog, setShowLockedDialog] = useState(false)
-  const [isCloning, setIsCloning] = useState(false)
 
   return (
     <div
@@ -626,128 +622,6 @@ export function QuoteFooter({
                 ))}
             </div>
           )}
-
-          {/* Action buttons based on quote status */}
-          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            {/* Preview Quote - always shown */}
-            <button
-              onClick={() => window.open(`/print/quotes/${quoteId}`, '_blank')}
-              style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: 13,
-                fontWeight: 500,
-                color: '#3a3530',
-                background: '#ffffff',
-                border: '1px solid #d8d0c8',
-                borderRadius: 6,
-                padding: '8px 20px',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#c8b89a'
-                e.currentTarget.style.background = '#f5f2ee'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#d8d0c8'
-                e.currentTarget.style.background = '#ffffff'
-              }}
-            >
-              Preview Quote
-            </button>
-
-            {/* Draft status: Mark as Ready */}
-            {canMarkReady && (
-              <button
-                onClick={onMarkReady}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#2e7d32',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
-              >
-                Mark as Ready
-              </button>
-            )}
-
-            {/* Ready status: Unlock and Edit */}
-            {canUnlock && (
-              <button
-                onClick={onUnlockEdit}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
-              >
-                Unlock and Edit
-              </button>
-            )}
-
-            {/* Ready status: Send it */}
-            {canSend && (
-              <button
-                onClick={() => setShowSendDialog(true)}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a73e8',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
-              >
-                Send it
-              </button>
-            )}
-
-            {/* Sent to insurer and other locked statuses: Locked */}
-            {isLockedStatus && (
-              <button
-                onClick={() => setShowLockedDialog(true)}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#9e998f',
-                  background: '#f5f2ee',
-                  border: '1px solid #e0dbd4',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
-              >
-                Locked
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
@@ -766,7 +640,7 @@ export function QuoteFooter({
             justifyContent: 'center',
             zIndex: 1000,
           }}
-          onClick={() => setShowSendDialog(false)}
+          onClick={() => onShowSendDialog?.(false)}
         >
           <div
             style={{
@@ -803,7 +677,7 @@ export function QuoteFooter({
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setShowSendDialog(false)}
+                onClick={() => onShowSendDialog?.(false)}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
@@ -829,7 +703,7 @@ export function QuoteFooter({
               </button>
               <button
                 onClick={async () => {
-                  setShowSendDialog(false)
+                  onShowSendDialog?.(false)
                   await onUpdateNotes?.(quote.notes ?? '')
                   // Update status to sent_to_insurer
                   await fetch(`/api/quotes/${quoteId}`, {
@@ -879,7 +753,7 @@ export function QuoteFooter({
             justifyContent: 'center',
             zIndex: 1000,
           }}
-          onClick={() => setShowLockedDialog(false)}
+          onClick={() => onShowLockedDialog?.(false)}
         >
           <div
             style={{
@@ -916,7 +790,7 @@ export function QuoteFooter({
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setShowLockedDialog(false)}
+                onClick={() => onShowLockedDialog?.(false)}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
@@ -942,8 +816,8 @@ export function QuoteFooter({
               </button>
               <button
                 onClick={async () => {
-                  setShowLockedDialog(false)
-                  setIsCloning(true)
+                  onShowLockedDialog?.(false)
+                  onSetIsCloning?.(true)
                   try {
                     // Clone the quote
                     const response = await fetch(`/api/quotes/${quoteId}/clone`, {
@@ -954,14 +828,12 @@ export function QuoteFooter({
                     if (response.ok) {
                       const newQuote = await response.json()
                       // Navigate to the new quote
-                      window.location.href = `/dashboard/jobs/${jobId}/quotes/${newQuote.id}`
-                    } else {
-                      console.error('Failed to clone quote')
-                      setIsCloning(false)
+                      window.location.href = window.location.pathname.replace(quoteId, newQuote.id)
                     }
                   } catch (error) {
                     console.error('Error cloning quote:', error)
-                    setIsCloning(false)
+                  } finally {
+                    onSetIsCloning?.(false)
                   }
                 }}
                 disabled={isCloning}

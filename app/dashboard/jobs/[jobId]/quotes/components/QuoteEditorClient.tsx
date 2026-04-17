@@ -330,6 +330,11 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   // Permit alert: dismissed in session (before persisting to DB)
   const [sessionPermitDismissed, setSessionPermitDismissed] = useState(false)
 
+  // Dialog states for Send and Locked buttons
+  const [showSendDialog, setShowSendDialog] = useState(false)
+  const [showLockedDialog, setShowLockedDialog] = useState(false)
+  const [isCloning, setIsCloning] = useState(false)
+
   const isLocked = quote?.is_locked ?? false
   const hasPrelimRoom = rooms.some(r => r.name.toLowerCase() === 'preliminaries')
 
@@ -553,6 +558,10 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
           isLocked={isLocked}
           quoteId={quoteId}
           tenantId={tenantId}
+          onMarkReady={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
+          onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
+          onSend={() => setShowSendDialog(true)}
+          onShowLocked={() => setShowLockedDialog(true)}
         />
       )}
 
@@ -703,8 +712,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         items={items}
         onUpdateMarkup={pct => handleUpdateQuoteMeta({ markup_pct: pct })}
         onUpdateNotes={notes => handleUpdateQuoteMeta({ notes })}
-        onMarkReady={() => handleUpdateQuoteMeta({ status: 'ready', is_locked: true })}
-        onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
         isLocked={isLocked}
         saveStatus={saveStatus}
         tenantId={tenantId}
@@ -713,6 +720,12 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         quoteId={quoteId}
         jobId={jobId}
         onQuoteUpdated={onQuoteUpdated}
+        showSendDialog={showSendDialog}
+        onShowSendDialog={setShowSendDialog}
+        showLockedDialog={showLockedDialog}
+        onShowLockedDialog={setShowLockedDialog}
+        isCloning={isCloning}
+        onSetIsCloning={setIsCloning}
       />
 
       {/* CSV Import Dialog */}
