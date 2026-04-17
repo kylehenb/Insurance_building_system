@@ -491,7 +491,7 @@ export default function ScopeLibraryPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="w-32 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
                       onClick={() => handleSort('trade')}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -510,7 +510,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="w-[500px] px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                     >
                       Description
                     </th>
@@ -563,7 +563,7 @@ export default function ScopeLibraryPage() {
                 <tbody className="divide-y divide-[#f0ece6] bg-white">
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
-                      <td className="whitespace-nowrap px-3 py-3">
+                      <td className="w-32 whitespace-nowrap px-3 py-3">
                         <select
                           value={item.trade || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'trade', e.target.value || null)}
@@ -587,7 +587,7 @@ export default function ScopeLibraryPage() {
                           {item.keyword || '-'}
                         </span>
                       </td>
-                      <td className="px-3 py-3 max-w-xs">
+                      <td className="w-[500px] px-3 py-3">
                         <input
                           type="text"
                           defaultValue={item.item_description || ''}
