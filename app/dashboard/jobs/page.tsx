@@ -7,7 +7,9 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
 import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
 
-type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
+type JobRow = Omit<Database["public"]["Tables"]["jobs"]["Row"], 'status'> & {
+  override_stage: 'on_hold' | 'cancelled' | null
+};
 
 function StatusBadge({ override_stage }: { override_stage: 'on_hold' | 'cancelled' | null }) {
   if (override_stage === 'on_hold')
@@ -58,7 +60,7 @@ export default function JobsListPage() {
         .select('id, job_number, insured_name, property_address, insurer, override_stage, created_at')
         .eq('tenant_id', tenantId!)
         .order('created_at', { ascending: false });
-      setJobs((data as JobRow[]) ?? []);
+      setJobs((data as unknown as JobRow[]) ?? []);
       setLoading(false);
     }
     fetchJobs();
@@ -69,10 +71,10 @@ export default function JobsListPage() {
     if (!tenantId) return;
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_number, insured_name, property_address, insurer, status, created_at')
+      .select('id, job_number, insured_name, property_address, insurer, override_stage, created_at')
       .eq('tenant_id', tenantId!)
       .order('created_at', { ascending: false });
-    setJobs((data as JobRow[]) ?? []);
+    setJobs((data as unknown as JobRow[]) ?? []);
   }, [tenantId, supabase]);
 
   return (
