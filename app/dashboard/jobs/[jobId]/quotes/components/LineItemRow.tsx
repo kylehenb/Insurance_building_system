@@ -112,6 +112,179 @@ function NumericCell({
   )
 }
 
+// Bidirectional numeric cell with unit rate and total (qty x rate)
+function BidirectionalNumericCell({
+  unitRate,
+  total,
+  qty,
+  onUnitRateChange,
+  onTotalChange,
+  disabled,
+  onNavigateNext,
+  label,
+}: {
+  unitRate: number | null
+  total: number | null
+  qty: number | null
+  onUnitRateChange: (v: number | null) => void
+  onTotalChange: (v: number | null) => void
+  disabled?: boolean
+  onNavigateNext?: () => void
+  label: string
+}) {
+  const [localUnitRate, setLocalUnitRate] = useState(unitRate != null ? String(unitRate) : '')
+  const [localTotal, setLocalTotal] = useState(total != null ? String(total) : '')
+  const unitRateRef = useRef<HTMLInputElement>(null)
+  const totalRef = useRef<HTMLInputElement>(null)
+  const unitRateFocusedRef = useRef(false)
+  const totalFocusedRef = useRef(false)
+
+  // Sync local state with props only on mount
+  useEffect(() => {
+    setLocalUnitRate(unitRate != null ? String(unitRate) : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    setLocalTotal(total != null ? String(total) : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Calculate total from unit rate when qty changes
+  useEffect(() => {
+    if (qty != null && unitRate != null && !unitRateFocusedRef.current && !totalFocusedRef.current) {
+      const calculatedTotal = qty * unitRate
+      setLocalTotal(String(calculatedTotal))
+      onTotalChange(calculatedTotal)
+    }
+  }, [qty, unitRate, onTotalChange])
+
+  const handleUnitRateBlur = () => {
+    unitRateFocusedRef.current = false
+    const trimmed = localUnitRate.trim()
+    if (trimmed === '') {
+      onUnitRateChange(null)
+      if (qty != null) {
+        onTotalChange(0)
+        setLocalTotal('0')
+      }
+    } else {
+      const num = parseFloat(trimmed)
+      if (!isNaN(num)) {
+        onUnitRateChange(num)
+        setLocalUnitRate(String(num))
+        // Recalculate total
+        if (qty != null) {
+          const calculatedTotal = qty * num
+          setLocalTotal(String(calculatedTotal))
+          onTotalChange(calculatedTotal)
+        }
+      } else {
+        setLocalUnitRate(unitRate != null ? String(unitRate) : '')
+      }
+    }
+  }
+
+  const handleTotalBlur = () => {
+    totalFocusedRef.current = false
+    const trimmed = localTotal.trim()
+    if (trimmed === '') {
+      onTotalChange(null)
+      onUnitRateChange(null)
+      setLocalUnitRate('')
+    } else {
+      const num = parseFloat(trimmed)
+      if (!isNaN(num)) {
+        onTotalChange(num)
+        setLocalTotal(String(num))
+        // Recalculate unit rate
+        if (qty != null && qty > 0) {
+          const calculatedUnitRate = num / qty
+          setLocalUnitRate(String(calculatedUnitRate))
+          onUnitRateChange(calculatedUnitRate)
+        }
+      } else {
+        setLocalTotal(total != null ? String(total) : '')
+      }
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    fontFamily: 'DM Mono, monospace',
+    fontSize: 11,
+    color: '#3a3530',
+    background: disabled ? '#f5f2ee' : '#ffffff',
+    border: '1px solid #d8d0c8',
+    borderRadius: 3,
+    outline: 'none',
+    textAlign: 'right',
+    padding: '2px 4px',
+    cursor: disabled ? 'default' : 'text',
+    boxSizing: 'border-box' as const,
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        width: '100%',
+      }}
+      onPointerDown={e => e.stopPropagation()}
+    >
+      <input
+        ref={unitRateRef}
+        type="text"
+        inputMode="decimal"
+        placeholder={label}
+        value={localUnitRate}
+        disabled={disabled}
+        onChange={e => setLocalUnitRate(e.target.value)}
+        onFocus={e => {
+          unitRateFocusedRef.current = true
+          e.currentTarget.select()
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            ;(e.target as HTMLInputElement).blur()
+            onNavigateNext?.()
+          }
+        }}
+        onBlur={handleUnitRateBlur}
+        style={inputStyle}
+      />
+      <input
+        ref={totalRef}
+        type="text"
+        inputMode="decimal"
+        placeholder="Total"
+        value={localTotal}
+        disabled={disabled}
+        onChange={e => setLocalTotal(e.target.value)}
+        onFocus={e => {
+          totalFocusedRef.current = true
+          e.currentTarget.select()
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            ;(e.target as HTMLInputElement).blur()
+            onNavigateNext?.()
+          }
+        }}
+        onBlur={handleTotalBlur}
+        style={{
+          ...inputStyle,
+          fontSize: 10,
+          color: '#6b6560',
+        }}
+      />
+    </div>
+  )
+}
+
 // Chevron SVG data URI — exactly one, positioned right
 const CHEVRON_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M1 2.5l3 3 3-3' stroke='%239e998f' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`
 
@@ -398,8 +571,8 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1% 43.4% 5% 5.8% 8% 8% 10.5% 5% 8.3% 5%',
-          minHeight: 40,
+          gridTemplateColumns: '1% 43.4% 5% 5.8% 9% 9% 10.5% 5% 8.3% 5%',
+          minHeight: 60,
         }}
       >
         {/* Number */}
@@ -472,22 +645,30 @@ export function LineItemRow({
         </div>
 
         {/* Labour/Unit */}
-        <div style={{ ...col, justifyContent: 'flex-end' }}>
-          <NumericCell
-            value={item.rate_labour}
-            onChange={v => onUpdate(item.id, { rate_labour: v })}
+        <div style={{ ...col, justifyContent: 'flex-end', alignItems: 'flex-start', paddingTop: '4px' }}>
+          <BidirectionalNumericCell
+            unitRate={item.rate_labour}
+            total={item.labour_total ?? null}
+            qty={item.qty}
+            onUnitRateChange={v => onUpdate(item.id, { rate_labour: v })}
+            onTotalChange={v => onUpdate(item.id, { labour_total: v })}
             disabled={isLocked}
             onNavigateNext={onNavigateNext}
+            label="Labour/Unit"
           />
         </div>
 
         {/* Materials/Unit */}
-        <div style={{ ...col, justifyContent: 'flex-end' }}>
-          <NumericCell
-            value={item.rate_materials}
-            onChange={v => onUpdate(item.id, { rate_materials: v })}
+        <div style={{ ...col, justifyContent: 'flex-end', alignItems: 'flex-start', paddingTop: '4px' }}>
+          <BidirectionalNumericCell
+            unitRate={item.rate_materials}
+            total={item.materials_total ?? null}
+            qty={item.qty}
+            onUnitRateChange={v => onUpdate(item.id, { rate_materials: v })}
+            onTotalChange={v => onUpdate(item.id, { materials_total: v })}
             disabled={isLocked}
             onNavigateNext={onNavigateNext}
+            label="Mat/Unit"
           />
         </div>
 

@@ -25,6 +25,8 @@ export interface ScopeItem {
   rate_materials: number | null
   rate_total: number | null
   line_total: number | null
+  labour_total: number | null
+  materials_total: number | null
   split_type: string | null
   item_type: ItemType
   approval_status: string
@@ -103,6 +105,8 @@ function makeTempItem(
     rate_materials: null,
     rate_total: null,
     line_total: null,
+    labour_total: null,
+    materials_total: null,
     split_type: null,
     item_type: null,
     approval_status: 'pending',
