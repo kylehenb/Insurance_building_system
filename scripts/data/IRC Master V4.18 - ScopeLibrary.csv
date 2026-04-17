@@ -1,0 +1,221 @@
+
+
+Insurer Specific,Trade,Item Keyword/s,Item Description,Unit, Trade Labour Rate /H , Labour /Unit , Materials /Unit , Total /Unit ,Estimate Hours,Date last updated 
+,,,,,,,,,,
+Default,Builder,,Builder Hourly Rate,Hour, $ 80.00 ,,,,,
+,Builder,BuildersClean,Carry out final builders clean [{QTY} unit],Unit, $ 80.00 , $ 250.00 , $ -   , $ 250.00 ,3.125,
+Default,Cabinet Maker,,Cabinet Maker Hourly Rate,Hour, $ 80.00 ,,,,0,
+Default,Cabinet Maker,Cabinet Quote,Cabinet quote. [{QTY} Unit] NOTE: Quoted by ,Each, $ 80.00 , $ -   , $ -   , $ -   ,0,
+Default,Cabinet Maker,"vanityRemoveCheck
+Vanity check",Remove single vanity and check for damage including quote for resulting damage if required. [{QTY} unit],Each, $ 80.00 , $ 350.00 , $ -   , $ 350.00 ,4.375,
+Default,Cabinet Maker,,Internal - Remove double vanity and check for damage including quote for resulting damage if required. [{QTY} unit],Each, $ 80.00 , $ -   , $ 700.00 , $ 700.00 ,0,
+Default,Carpenter,,Carpenter Hourly Rate,Hour, $ 80.00 ,,,,0,
+Default,Carpenter,skirting,"Remove, dispose, supply and install skirting boards in a similar profile to existing ({Skirting material if known, Skirting profile if known, skirting size if known})",LM, $ 80.00 , $ 20.00 , $ 8.00 , $ 28.00 ,0.25,
+Midcity,Carpenter,skirting,"Remove, dispose, supply and install MDF skirting boards in a similar profile to existing. [{QTY} lm]",LM, $ 80.00 , $ 20.00 , $ 8.00 , $ 28.00 ,0.25,
+Default,Carpenter,towelrailrr,Remove/reinstall towel rail. [{QTY} unit],unit, $ 80.00 , $ 100.00 , $ -   , $ 100.00 ,1.25,
+Default,Carpenter,doorinternal,"Remove, dispose, supply and install internal door, hollow core. Re use existing hardware. [{QTY} unit]",Each, $ 80.00 , $ 200.00 , $ 50.00 , $ 250.00 ,2.5,
+Default,Carpenter,doorexternal,"Remove, dispose, supply and install internal door, solid (entersize) in a similar style to existing. [{QTY} unit]",Each, $ 80.00 , $ -   , $ 750.00 , $ 750.00 ,0,
+Default,Carpenter,shelving,"Remove, dispose, supply and install melamine shelving including timber rails. Re use hanging rod if applicable. [{QTY} lm]",Each, $ 80.00 , $ 100.00 , $ 50.00 , $ 150.00 ,1.25,
+Default,Carpenter,,Skirting- Note: once over 20LM = Price at $20 per LM,Each, $ 80.00 , $ -   , $ -   , $ -   ,0,
+,Carpenter,wardrobeDoorsBack,Reinstate wardrobe doors. [{QTY} unit],,,,,,#DIV/0!,
+,Carpenter,wardrobeShelvingBack,Reinstate wardrobe shelving including timber rails. [{QTY} unit],,,,,,#DIV/0!,
+,Carpet Layer,carpet,"Remove, dispose, supply and install carpet and underlay (see addenda). [{QTY}.0 sqm] NOTE: If carpet discontinued please arrange reselection by owner of carpet of similar quality to existing.",Each, $ 80.00 , $ 40.00 , $ 55.00 , $ 95.00 ,0.5,
+Default,Ceiling Fixer,,Ceiling fixer Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Ceiling Fixer,ceiling,Repair plasterboard ceiling ready for painting. [{QTY}.0m2],m2, $ 80.00 , $ 175.00 , $ 25.00 , $ 200.00 ,2.1875,
+,Ceiling Fixer,"ceiling patch
+ceiling {number of patches} patch {QTY}",Repair {number of patches} ceiling excavations. [{QTY}.0 units],Units, $ 80.00 , $ 180.00 , $ 20.00 , $ 200.00 ,2.25,
+,Ceiling Fixer,cornice patch,Repair plasterboard cornice in 1 x areas. [{QTY}.0 lm],each, $ 80.00 , $ 70.00 , $ 10.00 , $ 80.00 ,0.875,
+,Ceiling Fixer,replace cornice,"Remove, dispose, supply and install plasterboard cornice in {QTY} x areas.[{QTY}.0lm]",lm, $ 80.00 , $ 20.00 , $ 8.00 , $ 28.00 ,0.25,
+,Ceiling Fixer,insulation,"Remove, dispose, supply and install ceiling insulation batts R4.1. [{QTY}.0m2]",m2, $ 80.00 , $ 10.00 , $ 10.00 , $ 20.00 ,0.125,
+,Ceiling Fixer,"popped screws
+popped ceiling screws
+re screw ceiling","Re-screw, flush and sand plasterboard ceiling, leave ready for painting. [{QTY}.0m2]",Each, $ 80.00 , $ -   , $ -   , $ -   ,0,
+,Cleaner,,Cleaner Hourly Rate,Hour, $ 60.00 ,,,,0,
+,Cleaner,Efflorescenceclean,Clean the efflorescence residue from the tile grout lines. [{QTY} unit],Unit, $ 60.00 , $ 300.00 , $ 20.00 , $ 320.00 ,5,1/12/2025
+,Cleaner,cleanWhiteResidue,Clean white residue from Colorbond fence. [1 unit],,,,,,#DIV/0!,
+,Electrician,,Electrician Hourly Rate,Hour, $ 120.00 ,,,,0,
+,Electrician,lightBayonetSINGLE,Supply and install bayonet light fitting in a similar style to existing. [{QTY} unit],Each, $ 120.00 , $ 270.00 , $ 30.00 , $ 300.00 ,2.25,
+,Electrician,lightOysterSINGLE,Supply and install Oyster light fitting in a similar style to existing. [{QTY} unit],Each, $ 120.00 , $ 270.00 , $ 100.00 , $ 370.00 ,2.25,
+,Electrician,downlightSINGLE,Supply and install downlight in a similar style to existing. [{QTY} unit],Each, $ 120.00 , $ 270.00 , $ 30.00 , $ 300.00 ,2.25,
+,Electrician,downlightBULK,Supply and install downlight in a similar style to existing. [{QTY} unit],Each, $ 120.00 , $ 60.00 , $ 30.00 , $ 90.00 ,0.5,
+,Electrician,exhaustfanSINGLE,"Supply and install exhaust fan in a similar style to existing, [{QTY} unit]",Each, $ 120.00 , $ 270.00 , $ 100.00 , $ 370.00 ,2.25,
+,Electrician,downlightrrSINGLE,Disconnect / reconnect downlights to facilitate ceiling repairs. [{QTY} unit],Each, $ 120.00 , $ 360.00 , $ -   , $ 360.00 ,3,4/17/2026
+,Electrician,downlightrrBULK,Disconnect / reconnect downlights to facilitate ceiling repairs. [{QTY} unit],Each, $ 120.00 , $ 60.00 , $ -   , $ 60.00 ,0.5,4/17/2026
+,Electrician,exhaustfanrrSINGLE,Disconnect / reconnect exhaust fan to facilitate ceiling repairs. [{QTY} unit],Each, $ 120.00 , $ 360.00 , $ -   , $ 360.00 ,3,
+,Electrician,exhaustfanrrBULK,Disconnect / reconnect exhaust fan to facilitate ceiling repairs. [{QTY} unit],Each, $ 120.00 , $ 120.00 , $ -   , $ 120.00 ,1,
+,Electrician,GPOreconnect,Reconnect existing GPO. [{QTY} unit],Each, $ 120.00 , $ 180.00 , $ -   , $ 180.00 ,1.5,4/17/2026
+,Electrician,GPOrrSINGLE,Disconnect / reconnect GPO to facilitate repairs. [{QTY} unit],Each, $ 120.00 , $ 360.00 , $ -   , $ 360.00 ,3,4/17/2026
+,Electrician,GPOrrBULK,Disconnect / reconnect GPO to facilitate repairs. [{QTY} unit],Each, $ 120.00 , $ 120.00 , $ -   , $ 120.00 ,1,4/17/2026
+,Electrician,Ovenreconnect,Reconnect existing Oven. [{QTY} unit],Each, $ 120.00 , $ 280.00 , $ -   , $ 280.00 ,2.333333333,4/17/2026
+,Electrician,Ovenrr,Disconnect / reconnect Oven. [{QTY} unit],Each, $ 120.00 , $ 400.00 , $ -   , $ 400.00 ,3.333333333,4/17/2026
+,Fencer,,Fencer Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Fencer,,Dividing Fence - Hardiefence to Colorbond,,,,, $ -   ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 Hardiefence sheets. Supply and install Colorbond metal fencing to ****** elevation. [1.0 Linear m],LM,, $ 25.00 , $ 45.00 , $ 70.00 ,#DIV/0!,
+,Fencer,,Dividing Fence - Hardiefence to Colorbond 150mm Plinth,,,,, $ -   ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 Hardiefence sheets. Supply and install Colorbond metal fencing to ***** elevation with 150mm high plinth. [1.0 Linear m],LM,, $ 40.00 , $ 52.00 , $ 92.00 ,#DIV/0!,
+,Fencer,,Dividing Fence - Hardiefence to Colorbond 300mm Plinths,,,,, $ -   ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 Hardiefence sheets. Supply and install Colorbond metal fencing to ***** elevation with 300mm high plinth. [1.0 Linear m],LM,, $ 50.00 , $ 80.00 , $ 130.00 ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 linear meters of Colorbond fence. Supply and install Colorbond metal fencing to ***** elevation. [1.0 Linear m],LM,, $ 25.00 , $ 45.00 , $ 70.00 ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 asbestos fence sheets. Supply and install Colorbond metal fencing to ***** elevation. [1.0 Linear m],LM,, $ 40.00 , $ 55.00 , $ 95.00 ,#DIV/0!,
+,Fencer,,Dividing Fence - Asbestos to Colorbond 150mm Plinth,,,,, $ -   ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 asbestos sheets. Supply and install Colorbond metal fencing to ***** elevation with 150mm high plinth. [1.0 Linear m],LM,, $ 65.00 , $ 52.00 , $ 117.00 ,#DIV/0!,
+,Fencer,,Dividing Fence - Asbestos to Colorbond 300mm Plinth,,,,, $ -   ,#DIV/0!,
+,Fencer,,50% CASH SETTLEMENT - Remove and dispose of 1 asbestos sheets. Supply and install Colorbond metal fencing to ***** elevation with 300mm high plinth. [1.0 Linear m],LM,, $ 75.00 , $ 80.00 , $ 155.00 ,#DIV/0!,
+,Fencer,,Wholly Owned Fence - Asbestos to Colorbond,,,,, $ -   ,#DIV/0!,
+,Fencer,,Remove and dispose of 1 asbestos fence sheets. Supply and install Colorbond metal fencing to ***** elevation. [1.0 Linear m],LM,, $ 100.00 , $ 90.00 , $ 190.00 ,#DIV/0!,
+,Fencer,,Wholly Owned Fence - Hardiefence to Colorbond,,,,, $ -   ,#DIV/0!,
+,Fencer,,Remove and dispose of 1 Hardiefence sheets. Supply and install Colorbond metal fencing to ***** elevation. [1.0 Linear m],LM,, $ 10.00 , $ 130.00 , $ 140.00 ,#DIV/0!,
+,Fencer,,Wholly Owned Fence - Hardiefence to Colorbond 150mm Plinth,,,,, $ -   ,#DIV/0!,
+,Fencer,,Remove and dispose of 1 Hardiefence sheets. Supply and install Colorbond metal fencing and 150mm plinths to ***** elevation. [1.0 Linear m],LM,, $ 40.00 , $ 144.00 , $ 184.00 ,#DIV/0!,
+,Painter,,Prepare and paint MDF skirting boards in a similar colour and paint finish to the existing. [1.0 Linear m],LM,, $ 10.00 , $ 2.00 , $ 12.00 ,#DIV/0!,
+,Painter,,Prepare and paint door in a similar colour and paint finish to the existing. [1 Unit],Each,, $ 100.00 , $ 35.00 , $ 135.00 ,#DIV/0!,
+,Glazier,,Glazier Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Glazier,shower Screen RR,Remove / reinstate standard shower screen to facilitate tiling repairs. [1 Unit],Each, $ 80.00 , $ 450.00 , $ -   , $ 450.00 ,5.625,
+,Glazier,"shower screen back
+shower Screen Reinstate",Reinstate standard shower screen. [1 Unit],Each, $ 80.00 , $ 225.00 , $ -   , $ 225.00 ,2.8125,
+,Glazier,double shower Screen RR,Remove / reinstate double shower screen. [1 Unit],Each, $ 80.00 , $ -   , $ 550.00 , $ 550.00 ,0,
+,Glazier,"double shower screen back
+double shower Screen Reinstate",Reinstate double shower screen. [1 Unit],Each, $ 80.00 , $ -   , $ 275.00 , $ 275.00 ,0,
+,Glazier,mirrorRr,Remove / reinstate single size mirror. [1 Unit],Each, $ 80.00 , $ 300.00 , $ -   , $ 300.00 ,3.75,
+,Glazier,"mirror back
+reinstate mirror",Reinstate single size mirror. [1 Unit],Each, $ 80.00 , $ 150.00 , $ -   , $ 150.00 ,1.875,
+,Glazier,doublemirrorRr,Remove / reinstate double size mirror. [1 Unit],Each, $ 80.00 , $ 400.00 , $ -   , $ 400.00 ,5,
+,Glazier,"double mirror back
+double reinstate mirror",Reinstate double size mirror. [1 Unit],Each, $ 80.00 , $ 200.00 , $ -   , $ 200.00 ,2.5,
+,Painter,,Painter Hourly Rate,Hour, $ 68.00 ,,,,0,
+,Painter,painteaves,Prepare and paint eaves in a similar colour and finish to the existing [{QTY}.0 lm],Each, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+,Painter,touchUpCornice,Touch up paint to bottom side of cornice above excavation. [1 unit],,,,,,#DIV/0!,
+,Painter,paintCeiling,Prepare and paint ceiling and cornice in a similar colour and finish to existing. [{QTY}.0m2],Each, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+,Painter,paintCeilingFlowThrough,"Prepare and paint ceiling, cornice (flow through {rooms}) in a similar colour and finish to existing. [{QTY}.0m2]",Each, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+Midcity,Painter,"paintWalls
+paint1wall
+paint2walls
+paint3walls
+paint4walls
+paint5walls
+paint6walls
+paint7walls",Prepare and paint {QTY} x walls in a similar colour and finish to existing. [{QTY}.0m2],Each, $ 68.00 , $ 10.00 , $ 5.00 , $ 15.00 ,0.1470588235,
+Default,Painter,"paintWalls
+paint1wall
+paint2walls
+paint3walls
+paint4walls
+paint5walls
+paint6walls
+paint7walls",Prepare and paint {QTY} x walls in a similar colour and finish to existing.,Each, $ 68.00 , $ 10.00 , $ 5.00 , $ 15.00 ,0.1470588235,
+Default,Painter,"painttextureWalls
+TexturePaintedWalls
+painttexturedwall",Prepare and paint {QTY} x textured walls in a similar colour and finish to existing (custom texture/pattern),Each, $ 68.00 , $ 10.00 , $ 5.00 , $ 15.00 ,0.1470588235,
+,Painter,paintallWall,Prepare and paint all walls in a similar colour and finish to existing. [{QTY}.0m2],Each, $ 68.00 , $ 10.00 , $ 5.00 , $ 15.00 ,0.1470588235,
+,Painter,paintSkirting,Prepare and paint skirting boards in a similar colour and finish to existing. [{QTY}.0lm],lm, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+,Painter,paintshelfrails,Prepare and paint the shelf rails in a similar colour and finish to existing. [{QTY}.0 lm],lm, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+,Painter,paintarchitraves,Prepare and paint door architraves in a similar colour and finish to the existing. [{QTY}.0 lm],lm, $ 68.00 , $ 10.00 , $ 3.00 , $ 13.00 ,0.1470588235,
+,Painter,"paintdoor
+paintinternaldoor
+paintflushdoor",Prepare and paint internal flush door in a similar colour and finish to existing. [{QTY} Unit],Each, $ 68.00 , $ 120.00 , $ 20.00 , $ 140.00 ,1.764705882,
+,Painter,paintWardrobeCeiling,Prepare and paint wardrobe ceiling in a similar colour and finish to existing. [{QTY}.0m2],,,,,,#DIV/0!,
+,Plasterer,,Plasterer Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Plasterer,hardwall Excavation ,Hardwall plaster repair {QTY} x wall excavation ready for painting. [{QTY} unit],Each, $ 80.00 , $ 140.00 , $ 20.00 , $ 160.00 ,1.75,
+,Plasterer,plasterpatch,Hardwall (setting) plaster repair to scraped area. [{QTY}.0m2],Each, $ 80.00 , $ 70.00 , $ 20.00 , $ 90.00 ,0.875,
+,Plumber,,Plumber Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Plumber,toiletCisternBack,Reinstate toilet cistern. [{QTY} unit],,,,, $ -   ,#DIV/0!,
+,Plumber,toiletCisternRr,Disconnect / reconnect toilet cistern. [{QTY} unit],,,,, $ -   ,#DIV/0!,
+,Plumber,basinRr,Disconnect / reconnect basin to facilitate repairs. [{QTY} unit],,,,, $ -   ,#DIV/0!,
+,Plumber,showerFittingsBack,Reinstate plumbing fixtures to shower recess on completion of tiling repairs. [1 Unit],Each, $ 90.00 , $ 180.00 , $ -   , $ 180.00 ,2,
+,Plumber,"toilet rr
+toilet pan rr
+toilet pan and cistern rr",Disconnect / reconnect toilet (pan and cistern). [1 Unit],Each,, $ 450.00 , $ -   , $ 450.00 ,#DIV/0!,
+,Plumber,bathTapBack,Reinstate bath mixer and spout. [{QTY} unit],,,,,,#DIV/0!,
+,Removalist,,Removalist Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Removalist,furniture,Remove / reinstate furniture to facilitate repairs. [1 Unit],Each, $ 80.00 , $ 600.00 , $ -   , $ 600.00 ,7.5,
+,Restorer,,Restorer Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Restorer,carpetreinstall,"Reinstate, re-stretch, install smooth edge where required, and steam clean carpet. [1 Unit]",Each, $ 80.00 , $ 530.00 , $ -   , $ 530.00 ,6.625,
+,Restorer,resto,"Estimator restoration request -
+• Strip setting plaster approx. {QTY}.0m2
+• {QTY} lengths of skirting removed approx. {QTY}.0m
+• Carpet and smooth edge removal
+• Mould Remediation
+
+**Please note if equipment required maximum of 1 x Dehumidifier and 2 x Air movers per room for maximum of 7 days includes initial attendance, subsequent moisture check and final attendance (3 visits). [1 Unit]",Each, $ 80.00 , $ 800.00 ," $ 1,200.00 "," $ 2,000.00 ",10,
+,Restorer,,Reinstate and re-stretch carpet. Install smooth edge where required. [1 unit],Each,, $ 280.00 , $ 20.00 , $ 300.00 ,#DIV/0!,
+,Roof Plumber,,Roof Plumber Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Roof Plumber,,"Remove, dispose, supply and install Colorbond gutter in a similar colour and profile to the existing. [1.0 Linear m]",LM,, $ 19.50 , $ 25.50 , $ 45.00 ,#DIV/0!,
+,Roof Plumber,,"Remove, dispose, supply and install Colorbond fascia in a similar colour and profile to the existing. [1.0 Linear m]",LM,, $ 19.50 , $ 18.50 , $ 38.00 ,#DIV/0!,
+,Roof Plumber,,"Remove, dispose, supply and install Colorbond roof sheets in a similar colour and profile to the existing. [1.0 m2]",LM,, $ 39.00 , $ 25.00 , $ 64.00 ,#DIV/0!,
+,Roof Plumber,,"Remove, dispose, supply and install polycarbonate roof sheets in a similar colour and profile to the existing. [1.0 m2]",LM,, $ 39.00 , $ 25.00 , $ 64.00 ,#DIV/0!,
+,Roof Plumber,,"Remove, dispose, supply and install 90mm x 45mm Colorbond downpipe in a similar colour and profile to the existing. [1 Unit]",Each,, $ 130.00 , $ 45.00 , $ 175.00 ,#DIV/0!,
+,Roof Tiler,,"Remove, dispose, supply and install 1 terracotta roof tiles in a similar colour and profile to the existing. [1 Unit]",Each,, $ 15.00 , $ 8.00 , $ 23.00 ,#DIV/0!,
+,Roof Tiler,,"Remove, dispose, supply and install 1 terracotta ridge tiles in a similar colour and profile to the existing. [1 Units]",Each,, $ 25.00 , $ 15.00 , $ 40.00 ,#DIV/0!,
+,Roof Tiler,,Re-bed and re-point affected ridge capping. [1.0 Linear m],LM,, $ 25.00 , $ 15.00 , $ 40.00 ,#DIV/0!,
+,Roof Tiler,,Tiling - Floor,,,,, $ -   ,#DIV/0!,
+,Tiler,,Tiler Hourly Rate,Hour, $ 80.00 ,,,,0,
+,Tiler,,Tiling- Splashback,,,,, $ -   ,#DIV/0!,
+,Tiler,,"Remove, dispose, supply and install ceramic tiles to splashback of two walls [1000mm x 1000mm high] in a similar colour and profile to the existing. [1.0m²]",M2,, $ 300.00 , $ 60.00 , $ 360.00 ,#DIV/0!,
+,Tiler,,Remove and dispose of floor tiles. Supply and install floor tiles in a similar colour and profile to the existing. [1.0m²],M2,, $ 100.00 , $ 70.00 , $ 170.00 ,#DIV/0!,
+BGC,Tiler,"waterproofing
+shower waterproofing",Patch waterproofing (warranty void) to shower recess repair area. [1 Unit],Each,, $ 300.00 , $ 50.00 , $ 350.00 ,#DIV/0!,
+BGC,Tiler,kickboardTileReplace,"Remove, dispose, supply and install kickboard tiles, including grout and silicone where required (see addenda/tile selection). [{QTY} unit]",,,,,,#DIV/0!,
+,,,External - Repair sarking to roof area above (*Enter location). [1.0m2],Each,, $ -   , $ 350.00 , $ 350.00 ,#DIV/0!,
+BGC,Tiler,"Shower wall tiles - spares
+shower wall tiles owner supplied","Remove, dispose and install approx. {QTY} wall tiles (owner supplied) to shower recess. Includes grout and silicone where required. [{QTY} Units]",Unit,, $ 600.00 , $ 100.00 , $ 700.00 ,#DIV/0!,
+BGC,Tiler,Shower wall tiles - no spares,"Remove, dispose, supply and install approx. {QTY} wall tiles (see tile selection sheet and addenda) to shower recess. Includes grout and silicone where required. [{QTY} Units]",Unit,, $ 700.00 , $ 150.00 , $ 850.00 ,#DIV/0!,
+BGC,Tiler,"wall tiles - spares
+wall tiles - owner supplied","Remove, dispose and install approx. {QTY} wall tiles (owner supplied) to {LOCATION}. Includes grout and silicone where required. [{QTY} Units]",Each,, $ 600.00 , $ 100.00 , $ 700.00 ,#DIV/0!,
+BGC,Tiler,wall tiles - no spares,"Remove, dispose, supply and install approx. {QTY} wall tiles (see tile selection sheet and addenda) to {LOCATION}. Includes grout and silicone where required. [{QTY} Units]",Unit,, $ 700.00 , $ 150.00 , $ 850.00 ,#DIV/0!,
+,,,"Internal - Remove, dispose, supply and install all floor and wall tiles to shower recess in a similar style to existing including screed floor, puddle flange, floor wastes, waterproofing and silicone. [1 Unit]",Each,, $ -   ," $ 4,350.00 "," $ 4,350.00 ",#DIV/0!,
+,,,Internal - Tile batch confirmation scope - Contact owner/tenant to arrange a site visit or drop-off of a tile sample/s. - Order and collect tile sample/s from original supplier. - Deliver the sample tile to site for assessment. - Follow up with the owner for confirmation to proceed with tile / batch selection via email.,Each,, $ -   , $ 300.00 , $ 300.00 ,#DIV/0!,
+,,showerWallTile,Internal - Remove & dispose of ( x wall tiles) to facilitate plasterboard wall lining repairs to shower recess. [1 unit],Each,, $ -   , $ 350.00 , $ 350.00 ,#DIV/0!,
+,,,Internal - Supply and install ( x wall tiles) owner supplied to shower recess. [1 Unit],Each,, $ -   , $ 700.00 , $ 700.00 ,#DIV/0!,
+,,,Internal - Tiler - Minimum charge. [1 Unit],Each,, $ -   , $ 350.00 , $ 350.00 ,#DIV/0!,
+,,,"Price for re tiling 3 bathroom walls, floor to ceiling, includes stripping, patching render, waterproofing, supply and install(13.0m2)",,,,, $ -   ,#DIV/0!,16/6/25
+,,,External - Reinstate brick paving (*Enter location). [1.0m2],Each,, $ -   , $ 350.00 , $ 350.00 ,#DIV/0!,
+,,,External - Reinstate brick paving (*Enter location). [2.0m2],Each,, $ -   , $ 400.00 , $ 400.00 ,#DIV/0!,
+,,,"External - Remove, dispose, supply and install 2C face brick (*Enter brick from addenda). [1 Unit]",Each,, $ -   , $ 400.00 , $ 400.00 ,#DIV/0!,
+,,,"External - Remove, dispose, supply and install 2 x 2C face brick (*Enter brick from addenda). [1 Unit]",Each,, $ -   , $ 500.00 , $ 500.00 ,#DIV/0!,
+,,,Internal - Repair 1 x wall excavation with internal bricks ready for plastering. [1.0m2],Each,, $ 400.00 , $ 50.00 , $ 450.00 ,#DIV/0!,
+,,,Internal - Reinstate carpet to smooth edge. [1 Unit],Each,, $ -   , $ 300.00 , $ 300.00 ,#DIV/0!,
+,,,"Remove, dispose, supply and install plasterboard ceiling. [1.0m2]",m2,, $ 80.00 , $ 20.00 , $ 100.00 ,#DIV/0!,
+BGC,Ceiling Fixer,"Dry lining
+plasterboard wall lining excavation",Repair {QTY} x excavation to plasterboard wall lining (Dry lining) [{QTY} unit],Unit, $ 80.00 , $ 180.00 , $ 20.00 , $ 200.00 ,2.25,
+Default,Ceiling Fixer,Plasterboard wall repair (1m2),Repair plasterboard wall lining. [1.0m2],m2, $ 80.00 , $ 375.00 , $ 25.00 , $ 400.00 ,4.6875,
+Default,Ceiling Fixer,Plasterboard wall repair (2m2),Repair plasterboard wall lining. [2.0m2],m2, $ 80.00 , $ 200.00 , $ 25.00 , $ 225.00 ,2.5,
+Default,Ceiling Fixer,Plasterboard wall repair (3m2),Repair plasterboard wall lining. [3.0m2],m2, $ 80.00 , $ 150.00 , $ 25.00 , $ 175.00 ,1.875,
+Default,Ceiling Fixer,Plasterboard wall repair (More than 3.0m2),Repair plasterboard wall lining. [{QTY}.0m2],m2, $ 80.00 , $ 125.00 , $ 25.00 , $ 150.00 ,1.5625,
+,,,Repair 1 x excavation to wet area plasterboard wall lining. [1 unit],Each,, $ 175.00 , $ 25.00 , $ 200.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [1.0m2],Each,, $ -   , $ 450.00 , $ 450.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [2.0m2],Each,, $ -   , $ 550.00 , $ 550.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [3.0m2],Each,, $ 450.00 , $ 200.00 , $ 650.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [4.0m2],Each,, $ -   , $ 750.00 , $ 750.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [5.0m2],Each,, $ 650.00 , $ 200.00 , $ 850.00 ,#DIV/0!,
+,,,Internal - Hardwall plaster repair 1 x wall excavation and set scraped area ready for painting. [6.0m2],Each,, $ -   , $ 950.00 , $ 950.00 ,#DIV/0!,
+,,,Internal - Disconnect / reconnect (Single vanity mixer and waste to facilitate vanity removal). [1 Unit],Each,, $ 360.00 , $ 40.00 , $ 400.00 ,#DIV/0!,
+,,,Internal - Disconnect / reconnect (Double vanity mixer and waste to facilitate vanity removal). [1 Unit],Each,, $ 540.00 , $ 60.00 , $ 600.00 ,#DIV/0!,
+,,reinstateUndermountSink,Reinstall undermount sink / basin. [1 unit],Each,, $ -   , $ 350.00 , $ 350.00 ,#DIV/0!,
+,,,Internal - Disconnect / reconnect plumbing fixtures to shower recess to facilitate tiling repairs. [1 Unit],Each,, $ 360.00 , $ 40.00 , $ 400.00 ,#DIV/0!,
+,,,Internal - Remove / reinstate furniture on completion of flooring replacement (3 or more areas). [1 Unit],Each,, $ -   ," $ 1,200.00 "," $ 1,200.00 ",#DIV/0!,
+,,,External - 7 Acrylic Texture Coat repair (*Enter colour from addenda) to wall excavation to wall cut off points. [1.0m2] (Price $650 first m2 $100 per m2 thereafter),Each,, $ -   , $ 650.00 , $ 650.00 ,#DIV/0!,
+,,,Internal - Steam clean carpet. [1 Unit],Each,, $ -   , $ 180.00 , $ 180.00 ,#DIV/0!,
+,Ceiling Fixer,bulkheadCeilingRepair,Repair bulkhead ceiling ready for painting. [2 units],,,,,,#DIV/0!,
+,Plumber,basinMixersBack,Reinstate basin mixers. [2 units],,,,,,#DIV/0!,
+Default,Glazier,doubleMirrorReplace,"Remove, dispose, supply and install double size mirror in a similar style to the existing",,,,,,#DIV/0!,
+Default,Plumber,toiletSuiteReplace,"Remove, dispose, supply and install entire toilet suite in a similar style to existing.",,,,,,#DIV/0!,
+Default,Painter,"paintCeilingBulkhead
+paintbulkheadceiling",Prepare and paint bulkhead ceiling in a similar colour and finish to existing.,,,,,,#DIV/0!,
+Default,Floorer,solidTimberFlooring,"Remove, dispose, supply and install solid timber flooring ({fixing Type, width mm x depth mm, timber type, finish type if known})",,,,,,#DIV/0!,
+Default,Floorer,floorSanding,Sand and refinish floor in a similar coating to the existing.,,,,,,#DIV/0!,
+Default,Removalist,poolTableRr,Remove / reinstate pool table to facilitate repairs.,,,,,,#DIV/0!,
+Default,"Removalist, Floorer",dustMitigation,"Install dust mitigation measures to furniture, cabinetry, door openings, windows, window/door furnishings within the specific work area.",,,,,,#DIV/0!,
+Default,Carpenter,doorstopRr,Remove and reinstate doorstop.,,,,,,#DIV/0!,
+Default,Floorer,bambooFlooring,"Remove, dispose, supply and install bamboo flooring (127mm x 17mm bamboo, direct stick).",,,,,,#DIV/0!,
+,Plumber,dishwasherRr,Disconnect / reconnect dishwasher to facilitate repairs. [1 unit],,,,,,#DIV/0!,
+,Carpenter,floatingMdfShelves,"Remove, dispose, supply and install floating MDF shelves. [2.8 lm]",,,,,,#DIV/0!,
+,Restorer,stripPatchWalls,Strip and patch bottom of walls up to 600mm height ready for painting. [11 sqm],,,,,,#DIV/0!,
+,Restorer,stripPatchWalls,Strip and patch bottom of walls up to 600mm height ready for painting. [3.6 sqm],,,,,,#DIV/0!,
+,Restorer,stripPatchWalls,Strip and patch bottom of walls up to 600mm height ready for painting. [17 sqm],,,,,,#DIV/0!,
+,Plumber,metalTroughSupply,Supply and install a new metal off the shelf trough approx 555mm x 945mm. [1 unit],,,,,,#DIV/0!,
+,Plumber,troughWashingMachineReconnect,Reconnect trough and washing machine plumbing.,,,,,,#DIV/0!,
+,Tiler,splashbackTilesSupply,Remove and dispose of splashback tiles. Supply and install splash back tiles. Supply and install grout and silicone where required.,,,,,,#DIV/0!,
+,Floorer,vinylPlankFlooring,"Remove, dispose, supply and install vinyl plank flooring.",,,,,,#DIV/0!,
+,Removalist,washerDryerRr,Remove / reinstate washer and dryer to facilitate repairs.,,,,,,#DIV/0!,
+,Brick Layer,faceBrickSupply,Supply and install face bricks to wall - includes brick sample for matching (if required),,,,,,#DIV/0!,
+,Brick Paver,paversReinstate,Reinstate the existing pavers. Supply new sand where required.,,,,,,#DIV/0!,

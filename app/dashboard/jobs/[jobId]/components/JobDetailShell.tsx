@@ -113,7 +113,7 @@ function FlagButton({
           opacity: isFlagged ? 1 : 0.6,
         }}
       >
-        {isFlagged ? '🚩' : '🏁'}
+        {isFlagged ? '🚩' : '�️'}
       </span>
     </button>
   )
