@@ -318,31 +318,30 @@ export function JobDetailShell({
               {job.property_address && (
                 <p className="text-[13px] text-[#9e998f]">{job.property_address}</p>
               )}
+
+              {/* Compact field strip */}
+              <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-[12px] text-[#9e998f]">
+                {[
+                  { label: 'Insurer',      value: job.insurer },
+                  { label: 'Claim #',      value: job.claim_number },
+                  { label: 'Loss Type',    value: job.loss_type },
+                  { label: 'Date of Loss', value: job.date_of_loss
+                      ? new Date(job.date_of_loss).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : '—' },
+                  { label: 'Adjuster',     value: job.adjuster },
+                ].map((item) => (
+                  <span
+                    key={item.label}
+                    className="flex items-center"
+                  >
+                    <span className="mr-1 text-[#b0a898]">{item.label}:</span>
+                    <span className="text-[#3a3530]">{item.value || '—'}</span>
+                  </span>
+                ))}
+              </div>
             </div>
             {/* Stage banner panel */}
             {stageBanner}
-          </div>
-
-          {/* Compact field strip */}
-          <div className="flex items-center flex-wrap gap-0 mb-4 text-[12px] text-[#9e998f]">
-            {[
-              { label: 'Insurer',      value: job.insurer },
-              { label: 'Claim #',      value: job.claim_number },
-              { label: 'Loss Type',    value: job.loss_type },
-              { label: 'Date of Loss', value: job.date_of_loss
-                  ? new Date(job.date_of_loss).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : '—' },
-              { label: 'Adjuster',     value: job.adjuster },
-            ].map((item, i, arr) => (
-              <span
-                key={item.label}
-                className="flex items-center pr-4 mr-4"
-                style={{ borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}
-              >
-                <span className="mr-1 text-[#b0a898]">{item.label}:</span>
-                <span className="text-[#3a3530]">{item.value || '—'}</span>
-              </span>
-            ))}
           </div>
 
           {/* Tab bar */}
@@ -380,7 +379,7 @@ export function JobDetailShell({
 
       {/* ── Tab content ───────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto" style={{ maxWidth: '108rem' }}>
           <TabPanel
             activeTab={activeTab}
             jobId={jobId}
