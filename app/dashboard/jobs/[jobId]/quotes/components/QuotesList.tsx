@@ -326,6 +326,30 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     [router]
   )
 
+  // ── Status change handler ─────────────────────────────────────────────────
+
+  const handleStatusChange = useCallback(
+    async (quoteId: string, status: string, isLocked: boolean) => {
+      try {
+        const res = await fetch(`/api/quotes/${quoteId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            status,
+            is_locked: isLocked,
+          }),
+        })
+        if (res.ok) {
+          load()
+        }
+      } catch (error) {
+        console.error('Error updating quote status:', error)
+      }
+    },
+    [tenantId, load]
+  )
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   if (loading) {
@@ -625,6 +649,112 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 {/* Spacer */}
                 <div style={{ flex: 1 }} />
 
+                {/* Status-dependent buttons */}
+                {(!q.is_locked && q.status === 'draft') && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleStatusChange(q.id, 'ready', true)
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#ffffff',
+                      background: '#2e7d32',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                  >
+                    Mark as Ready
+                  </button>
+                )}
+
+                {q.is_locked && q.status === 'ready' && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleStatusChange(q.id, 'draft', false)
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#3a3530',
+                      background: '#f5f2ee',
+                      border: '1px solid #d8d0c8',
+                      borderRadius: 6,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                  >
+                    Unlock and Edit
+                  </button>
+                )}
+
+                {q.is_locked && q.status === 'ready' && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleStatusChange(q.id, 'sent_to_insurer', true)
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#ffffff',
+                      background: '#1a73e8',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+                  >
+                    Send it
+                  </button>
+                )}
+
+                {q.is_locked && q.status !== 'ready' && q.status !== 'draft' && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      // Show locked dialog
+                      alert('This quote is locked and cannot be edited')
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#9e998f',
+                      background: '#f5f2ee',
+                      border: '1px solid #e0dbd4',
+                      borderRadius: 6,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                  >
+                    Locked
+                  </button>
+                )}
+
                 {/* 3-dot menu */}
                 <div
                   data-menu-dropdown="true"
@@ -670,6 +800,34 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         minWidth: 220,
                       }}
                     >
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setMenuDropdownId(null)
+                          window.open(`/print/quotes/${q.id}`, '_blank')
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: '#3a3530',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+                      >
+                        <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
+                        <span>Preview Quote</span>
+                      </button>
                       <button
                         onClick={e => {
                           e.stopPropagation()
