@@ -152,8 +152,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [loading, setLoading]             = useState(true)
   const [expandedId, setExpandedId]       = useState<string | null>(null)
   const [creating, setCreating]           = useState(false)
-  const [statusDropdownId, setStatusDropdownId] = useState<string | null>(null)
-  const [hoveredStatus, setHoveredStatus] = useState<string | null>(null)
+  const [menuDropdownId, setMenuDropdownId] = useState<string | null>(null)
   const [notBuiltVisible, setNotBuiltVisible]   = useState(false)
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
   const [sowLoading, setSowLoading]       = useState<string | null>(null)
@@ -178,15 +177,15 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   // ── Close dropdown on outside click ──────────────────────────────────────
 
   useEffect(() => {
-    if (!statusDropdownId) return
+    if (!menuDropdownId) return
     const handler = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-status-dropdown]')) {
-        setStatusDropdownId(null)
+      if (!(e.target as HTMLElement).closest('[data-menu-dropdown]')) {
+        setMenuDropdownId(null)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [statusDropdownId])
+  }, [menuDropdownId])
 
   // ── Create / delete ───────────────────────────────────────────────────────
 
@@ -226,39 +225,6 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       }
     },
     [tenantId, expandedId]
-  )
-
-  // ── Status change (manual via dropdown) ──────────────────────────────────
-
-  const handleStatusChange = useCallback(
-    async (quoteId: string, newStatus: string, currentStatus: string) => {
-      const currentIdx = getStatusIndex(currentStatus)
-      const newIdx     = getStatusIndex(newStatus)
-      const isBackward = newIdx !== -1 && currentIdx !== -1 && newIdx < currentIdx
-
-      if (isBackward) {
-        const confirmed = window.confirm(
-          'Warning: Reverting to a prior status may cause issues with existing work orders, invoices, or contracts.\n\nAre you sure you want to proceed?'
-        )
-        if (!confirmed) {
-          setStatusDropdownId(null)
-          return
-        }
-      }
-
-      const res = await fetch(`/api/quotes/${quoteId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, status: newStatus }),
-      })
-
-      if (res.ok) {
-        setQuotes(prev => prev.map(q => (q.id === quoteId ? { ...q, status: newStatus } : q)))
-        if (onQuoteUpdated) onQuoteUpdated()
-      }
-      setStatusDropdownId(null)
-    },
-    [tenantId, onQuoteUpdated]
   )
 
   // ── File upload handler ───────────────────────────────────────────────────────
@@ -638,341 +604,6 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   {q.item_count} {q.item_count === 1 ? 'item' : 'items'}
                 </span>
 
-                {/* ── STATUS badge with dropdown chevron on LHS ── */}
-                <div
-                  data-status-dropdown="true"
-                  style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-                >
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      setStatusDropdownId(statusDropdownId === q.id ? null : q.id)
-                    }}
-                    title="Change status"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      padding: '3px 9px',
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      background: s.bg,
-                      color: s.text,
-                      border: 'none',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      fontFamily: 'DM Sans, sans-serif',
-                    }}
-                  >
-                    {/* Dropdown chevron on LHS */}
-                    <span
-                      style={{
-                        fontSize: 8,
-                        opacity: 0.7,
-                        marginRight: 1,
-                      }}
-                    >
-                      ▾
-                    </span>
-                    {label}
-                  </button>
-
-                  {/* Status dropdown menu */}
-                  {statusDropdownId === q.id && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 6px)',
-                        left: 0,
-                        zIndex: 500,
-                        background: '#ffffff',
-                        border: '1px solid #e0dbd4',
-                        borderRadius: 8,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
-                        padding: '4px 0',
-                        minWidth: 280,
-                      }}
-                    >
-                      {/* Section 1: All statuses except declined */}
-                      <div>
-                        {STATUS_ORDER.filter(statusKey => !statusKey.startsWith('declined')).map(statusKey => {
-                          const isCurrent  = normalized === statusKey
-                          const keyIdx     = STATUS_ORDER.indexOf(statusKey)
-                          const curIdx     = STATUS_ORDER.indexOf(normalized)
-                          const isBackward = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
-                          const isPrior    = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
-                          const itemStyle  = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft
-                          const actionCfg  = STATUS_ACTIONS[statusKey]
-
-                          return (
-                            <div key={statusKey} style={{ position: 'relative' }}>
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  if (!isCurrent) handleStatusChange(q.id, statusKey, normalized)
-                                }}
-                                onMouseEnter={() => setHoveredStatus(statusKey)}
-                                onMouseLeave={() => setHoveredStatus(null)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  width: '100%',
-                                  textAlign: 'left',
-                                  padding: '7px 14px',
-                                  fontSize: 12,
-                                  color: isCurrent
-                                    ? itemStyle.text
-                                    : isBackward
-                                    ? '#b0aaa3'
-                                    : '#3a3530',
-                                  background: isCurrent ? itemStyle.bg : 'transparent',
-                                  border: 'none',
-                                  cursor: isCurrent ? 'default' : 'pointer',
-                                  fontWeight: isCurrent ? 600 : 400,
-                                  fontFamily: 'DM Sans, sans-serif',
-                                  transition: 'background 0.1s',
-                                }}
-                              >
-                                <span style={{ fontSize: 9, width: 10, flexShrink: 0 }}>
-                                  {isPrior || isCurrent ? '✓' : ''}
-                                </span>
-                                <span>{STATUS_LABELS[statusKey]}</span>
-                                {isBackward && !isCurrent && (
-                                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#c8b89a' }}>
-                                    ←
-                                  </span>
-                                )}
-                              </button>
-
-                              {/* Sub-menu action on hover */}
-                              {hoveredStatus === statusKey && actionCfg && !actionCfg.inactive && !isCurrent && (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    left: '100%',
-                                    top: 0,
-                                    marginLeft: 4,
-                                    background: '#ffffff',
-                                    border: '1px solid #e0dbd4',
-                                    borderRadius: 6,
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
-                                    padding: '4px 0',
-                                    minWidth: 180,
-                                    zIndex: 501,
-                                  }}
-                                  onMouseEnter={() => setHoveredStatus(statusKey)}
-                                  onMouseLeave={() => setHoveredStatus(null)}
-                                >
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      if (actionCfg.action === 'file_upload') {
-                                        setFileUploadVisible(true)
-                                        setStatusDropdownId(null)
-                                      } else {
-                                        handleAction(q, actionCfg)
-                                      }
-                                    }}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 8,
-                                      width: '100%',
-                                      textAlign: 'left',
-                                      padding: '7px 14px',
-                                      fontSize: 12,
-                                      color: '#3a3530',
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      fontWeight: 400,
-                                      fontFamily: 'DM Sans, sans-serif',
-                                      transition: 'background 0.1s',
-                                    }}
-                                    onMouseEnter={e => {
-                                      (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
-                                    }}
-                                    onMouseLeave={e => {
-                                      (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                                    }}
-                                  >
-                                    <span style={{ fontSize: 10, color: '#c8b89a' }}>→</span>
-                                    <span>{actionCfg.label}</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Beige horizontal line */}
-                      <div style={{ height: 1, background: '#e0dbd4', margin: '4px 0' }} />
-
-                      {/* Section 2: Declined statuses */}
-                      <div>
-                        {STATUS_ORDER.filter(statusKey => statusKey.startsWith('declined')).map(statusKey => {
-                          const isCurrent  = normalized === statusKey
-                          const keyIdx     = STATUS_ORDER.indexOf(statusKey)
-                          const curIdx     = STATUS_ORDER.indexOf(normalized)
-                          const isBackward = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
-                          const isPrior    = curIdx !== -1 && keyIdx !== -1 && keyIdx < curIdx
-                          const itemStyle  = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft
-                          const actionCfg  = STATUS_ACTIONS[statusKey]
-
-                          return (
-                            <div key={statusKey} style={{ position: 'relative' }}>
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  if (!isCurrent) handleStatusChange(q.id, statusKey, normalized)
-                                }}
-                                onMouseEnter={() => setHoveredStatus(statusKey)}
-                                onMouseLeave={() => setHoveredStatus(null)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  width: '100%',
-                                  textAlign: 'left',
-                                  padding: '7px 14px',
-                                  fontSize: 12,
-                                  color: isCurrent
-                                    ? itemStyle.text
-                                    : isBackward
-                                    ? '#b0aaa3'
-                                    : '#3a3530',
-                                  background: isCurrent ? itemStyle.bg : 'transparent',
-                                  border: 'none',
-                                  cursor: isCurrent ? 'default' : 'pointer',
-                                  fontWeight: isCurrent ? 600 : 400,
-                                  fontFamily: 'DM Sans, sans-serif',
-                                  transition: 'background 0.1s',
-                                }}
-                              >
-                                <span style={{ fontSize: 9, width: 10, flexShrink: 0 }}>
-                                  {isPrior || isCurrent ? '✓' : ''}
-                                </span>
-                                <span>{STATUS_LABELS[statusKey]}</span>
-                                {isBackward && !isCurrent && (
-                                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#c8b89a' }}>
-                                    ←
-                                  </span>
-                                )}
-                              </button>
-
-                              {/* Sub-menu action on hover */}
-                              {hoveredStatus === statusKey && actionCfg && !actionCfg.inactive && !isCurrent && (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    left: '100%',
-                                    top: 0,
-                                    marginLeft: 4,
-                                    background: '#ffffff',
-                                    border: '1px solid #e0dbd4',
-                                    borderRadius: 6,
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
-                                    padding: '4px 0',
-                                    minWidth: 180,
-                                    zIndex: 501,
-                                  }}
-                                  onMouseEnter={() => setHoveredStatus(statusKey)}
-                                  onMouseLeave={() => setHoveredStatus(null)}
-                                >
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      handleAction(q, actionCfg)
-                                    }}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 8,
-                                      width: '100%',
-                                      textAlign: 'left',
-                                      padding: '7px 14px',
-                                      fontSize: 12,
-                                      color: '#3a3530',
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      fontWeight: 400,
-                                      fontFamily: 'DM Sans, sans-serif',
-                                      transition: 'background 0.1s',
-                                    }}
-                                    onMouseEnter={e => {
-                                      (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
-                                    }}
-                                    onMouseLeave={e => {
-                                      (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                                    }}
-                                  >
-                                    <span style={{ fontSize: 10, color: '#c8b89a' }}>→</span>
-                                    <span>{actionCfg.label}</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Beige horizontal line */}
-                      <div style={{ height: 1, background: '#e0dbd4', margin: '4px 0' }} />
-
-                      {/* Section 3: Manual create files */}
-                      <div>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            setSowLoading(q.id)
-                            setStatusDropdownId(null)
-                            // Open print version in new tab (without sidebar)
-                            window.open(`/print/quotes/${q.id}/sow`, '_blank')
-                            // Clear loading state after a short delay
-                            setTimeout(() => setSowLoading(null), 500)
-                          }}
-                          disabled={sowLoading === q.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '7px 14px',
-                            fontSize: 12,
-                            color: sowLoading === q.id ? '#9e998f' : '#3a3530',
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: sowLoading === q.id ? 'default' : 'pointer',
-                            fontWeight: 400,
-                            fontFamily: 'DM Sans, sans-serif',
-                            transition: 'background 0.1s',
-                            opacity: sowLoading === q.id ? 0.7 : 1,
-                          }}
-                          onMouseEnter={e => {
-                            if (sowLoading !== q.id)
-                              (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
-                          }}
-                          onMouseLeave={e => {
-                            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                          }}
-                        >
-                          <span style={{ fontSize: 10, color: '#c8b89a' }}>
-                            {sowLoading === q.id ? '⏳' : '📄'}
-                          </span>
-                          <span>
-                            {sowLoading === q.id ? 'Opening...' : 'Scope of Works Authorisation'}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
 
                 {/* Version badge */}
                 {q.version > 1 && (
@@ -993,6 +624,98 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
                 {/* Spacer */}
                 <div style={{ flex: 1 }} />
+
+                {/* 3-dot menu */}
+                <div
+                  data-menu-dropdown="true"
+                  style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                >
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      setMenuDropdownId(menuDropdownId === q.id ? null : q.id)
+                    }}
+                    title="More options"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9e998f',
+                      fontSize: 16,
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      fontFamily: 'DM Sans, sans-serif',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+                  >
+                    •••
+                  </button>
+
+                  {/* 3-dot menu dropdown */}
+                  {menuDropdownId === q.id && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        right: 0,
+                        zIndex: 500,
+                        background: '#ffffff',
+                        border: '1px solid #e0dbd4',
+                        borderRadius: 8,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
+                        padding: '4px 0',
+                        minWidth: 220,
+                      }}
+                    >
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setSowLoading(q.id)
+                          setMenuDropdownId(null)
+                          // Open print version in new tab (without sidebar)
+                          window.open(`/print/quotes/${q.id}/sow`, '_blank')
+                          // Clear loading state after a short delay
+                          setTimeout(() => setSowLoading(null), 500)
+                        }}
+                        disabled={sowLoading === q.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: sowLoading === q.id ? '#9e998f' : '#3a3530',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: sowLoading === q.id ? 'default' : 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                          opacity: sowLoading === q.id ? 0.7 : 1,
+                        }}
+                        onMouseEnter={e => {
+                          if (sowLoading !== q.id)
+                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                        }}
+                      >
+                        <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                          {sowLoading === q.id ? '⏳' : '📄'}
+                        </span>
+                        <span>
+                          {sowLoading === q.id ? 'Opening...' : 'Scope of Works Authorisation'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* Delete */}
                 <button

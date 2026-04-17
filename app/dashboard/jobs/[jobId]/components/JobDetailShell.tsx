@@ -319,6 +319,8 @@ export function JobDetailShell({
                 <p className="text-[13px] text-[#9e998f]">{job.property_address}</p>
               )}
             </div>
+            {/* Stage banner panel */}
+            {stageBanner}
           </div>
 
           {/* Compact field strip */}
@@ -375,9 +377,6 @@ export function JobDetailShell({
           </nav>
         </div>
       </div>
-
-      {/* ── Stage banner ──────────────────────────────────────── */}
-      {stageBanner}
 
       {/* ── Tab content ───────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-6">
