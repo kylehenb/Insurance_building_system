@@ -90,6 +90,22 @@ export default function ScopeLibraryPage() {
   const [sortColumn, setSortColumn] = useState<string>('trade');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // Column width state
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    trade: 128,
+    insurer: 100,
+    keyword: 120,
+    description: 500,
+    unit: 80,
+    labour_per_unit: 100,
+    materials_per_unit: 120,
+    total_per_unit: 100,
+    estimated_hours: 100,
+    status: 100,
+    actions: 80,
+  });
+  const [resizingColumn, setResizingColumn] = useState<string | null>(null);
+
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -108,6 +124,65 @@ export default function ScopeLibraryPage() {
     }
     bootstrap();
   }, [router, supabase]);
+
+  // Load column widths from database
+  useEffect(() => {
+    if (!tenantId || !userId) return;
+    async function loadColumnWidths() {
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('preference_value')
+        .eq('tenant_id', tenantId!)
+        .eq('user_id', userId!)
+        .eq('preference_key', 'scope_library_column_widths')
+        .single();
+      if (data?.preference_value) {
+        setColumnWidths(data.preference_value as Record<string, number>);
+      }
+    }
+    loadColumnWidths();
+  }, [tenantId, userId, supabase]);
+
+  // Save column widths to database
+  const saveColumnWidths = async (widths: Record<string, number>) => {
+    if (!tenantId || !userId) return;
+    await supabase
+      .from('user_preferences')
+      .upsert({
+        tenant_id: tenantId!,
+        user_id: userId!,
+        preference_key: 'scope_library_column_widths',
+        preference_value: widths,
+      });
+  };
+
+  // Column resize handler
+  const handleResizeStart = (column: string, startX: number, startWidth: number) => {
+    setResizingColumn(column);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(50, startWidth + diff); // Minimum width of 50px
+      setColumnWidths(prev => ({
+        ...prev,
+        [column]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setResizingColumn(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      // Save the final widths
+      setColumnWidths(prev => {
+        saveColumnWidths(prev);
+        return prev;
+      });
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   useEffect(() => {
     if (!tenantId) return;
@@ -491,70 +566,121 @@ export default function ScopeLibraryPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="w-32 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ width: columnWidths.trade }}
                       onClick={() => handleSort('trade')}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('trade', e.clientX, columnWidths.trade)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.insurer }}
                     >
                       Insurer
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('insurer', e.clientX, columnWidths.insurer)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.keyword }}
                     >
                       Keyword
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('keyword', e.clientX, columnWidths.keyword)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="w-[500px] px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.description }}
                     >
                       Description
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('description', e.clientX, columnWidths.description)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.unit }}
                     >
                       Unit
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('unit', e.clientX, columnWidths.unit)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.labour_per_unit }}
                     >
                       Labour/Unit
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('labour_per_unit', e.clientX, columnWidths.labour_per_unit)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.materials_per_unit }}
                     >
                       Materials/Unit
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('materials_per_unit', e.clientX, columnWidths.materials_per_unit)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ width: columnWidths.total_per_unit }}
                       onClick={() => handleSort('total_per_unit')}
                     >
                       Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('total_per_unit', e.clientX, columnWidths.total_per_unit)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      style={{ width: columnWidths.estimated_hours }}
                       onClick={() => handleSort('estimated_hours')}
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('estimated_hours', e.clientX, columnWidths.estimated_hours)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.status }}
                     >
                       Status
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#c9a96e]/50 bg-transparent"
+                        onMouseDown={(e) => handleResizeStart('status', e.clientX, columnWidths.status)}
+                      />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="relative px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      style={{ width: columnWidths.actions }}
                     >
                       Actions
                     </th>
@@ -563,7 +689,7 @@ export default function ScopeLibraryPage() {
                 <tbody className="divide-y divide-[#f0ece6] bg-white">
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
-                      <td className="w-32 whitespace-nowrap px-3 py-3">
+                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.trade }}>
                         <select
                           value={item.trade || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'trade', e.target.value || null)}
@@ -577,17 +703,17 @@ export default function ScopeLibraryPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3">
+                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.insurer }}>
                         <span className="text-xs text-[#1a1a1a]/70">
                           {item.insurer_specific || 'Default'}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3">
+                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.keyword }}>
                         <span className="text-xs font-mono text-[#1a1a1a]">
                           {item.keyword || '-'}
                         </span>
                       </td>
-                      <td className="w-[500px] px-3 py-3">
+                      <td className="px-3 py-3" style={{ width: columnWidths.description }}>
                         <input
                           type="text"
                           defaultValue={item.item_description || ''}
@@ -596,7 +722,7 @@ export default function ScopeLibraryPage() {
                           style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3">
+                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.unit }}>
                         <select
                           value={item.unit || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'unit', e.target.value || null)}
@@ -608,27 +734,27 @@ export default function ScopeLibraryPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.labour_per_unit }}>
                         <span className="text-xs font-mono text-[#1a1a1a]/70">
                           {formatCurrency(item.labour_per_unit)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.materials_per_unit }}>
                         <span className="text-xs font-mono text-[#1a1a1a]/70">
                           {formatCurrency(item.materials_per_unit)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.total_per_unit }}>
                         <span className="text-xs font-mono font-semibold text-[#1a1a1a]">
                           {formatCurrency(item.total_per_unit)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.estimated_hours }}>
                         <span className="text-xs font-mono text-[#1a1a1a]/70">
                           {formatNumber(item.estimated_hours)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.status }}>
                         <button
                           onClick={() => handleToggleApproval(item.id, (item as any).approval_status)}
                           className={`text-xs px-2 py-1 rounded ${
@@ -640,7 +766,7 @@ export default function ScopeLibraryPage() {
                           {(item as any).approval_status === 'approved' ? 'Approved' : 'Pending'}
                         </button>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.actions }}>
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleDelete(item)}
