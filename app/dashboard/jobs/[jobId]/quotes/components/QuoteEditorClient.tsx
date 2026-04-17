@@ -551,6 +551,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
           cashSettlementActive={cashSettlementActive}
           onCashSettlementToggle={handleCashSettlementToggle}
           isLocked={isLocked}
+          quoteId={quoteId}
+          tenantId={tenantId}
         />
       )}
 
