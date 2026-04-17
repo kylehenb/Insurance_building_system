@@ -549,7 +549,7 @@ export function ReportAccordionItem({
             >
               <button
                 onClick={() => {
-                  window.open(`/api/reports/${report.id}/pdf-preview`, '_blank')
+                  window.open(`/print/reports/${report.id}`, '_blank')
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-[12px] font-medium text-white transition-colors"
                 style={{ background: '#c8b89a', fontFamily: 'DM Sans, sans-serif' }}

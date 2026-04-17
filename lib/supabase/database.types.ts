@@ -2390,51 +2390,84 @@ export type Database = {
       work_orders: {
         Row: {
           agreed_amount: number | null
+          blueprint_id: string | null
           charge_out_amount: number | null
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string | null
+          current_visit: number | null
+          estimated_hours: number | null
+          gary_state: string | null
           id: string
+          is_concurrent: boolean | null
           job_id: string
           notes: string | null
+          predecessor_work_order_id: string | null
+          proximity_range: string | null
           quote_id: string | null
           report_id: string | null
           scheduled_date: string | null
           scope_summary: string | null
+          sequence_order: number | null
           status: string | null
           tenant_id: string
+          total_visits: number | null
           trade_cost: number | null
           trade_id: string | null
           work_type: string | null
         }
         Insert: {
           agreed_amount?: number | null
+          blueprint_id?: string | null
           charge_out_amount?: number | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string | null
+          current_visit?: number | null
+          estimated_hours?: number | null
+          gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
+          predecessor_work_order_id?: string | null
+          proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
           scope_summary?: string | null
+          sequence_order?: number | null
           status?: string | null
           tenant_id: string
+          total_visits?: number | null
           trade_cost?: number | null
           trade_id?: string | null
           work_type?: string | null
         }
         Update: {
           agreed_amount?: number | null
+          blueprint_id?: string | null
           charge_out_amount?: number | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string | null
+          current_visit?: number | null
+          estimated_hours?: number | null
+          gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
+          predecessor_work_order_id?: string | null
+          proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
           scope_summary?: string | null
+          sequence_order?: number | null
           status?: string | null
           tenant_id?: string
+          total_visits?: number | null
           trade_cost?: number | null
           trade_id?: string | null
           work_type?: string | null
@@ -2480,6 +2513,215 @@ export type Database = {
             columns: ["trade_id"]
             isOneToOne: false
             referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_predecessor_work_order_id_fkey"
+            columns: ["predecessor_work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "job_schedule_blueprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_visits: {
+        Row: {
+          confirmed_date: string | null
+          created_at: string | null
+          estimated_hours: number | null
+          gary_return_trigger_at: string | null
+          gary_triggered_at: string | null
+          id: string
+          job_id: string
+          lag_days_after: number | null
+          lag_description: string | null
+          notes: string | null
+          scheduled_date: string | null
+          scheduled_end_date: string | null
+          status: string | null
+          tenant_id: string
+          trade_confirmed_at: string | null
+          visit_number: number | null
+          work_order_id: string
+        }
+        Insert: {
+          confirmed_date?: string | null
+          created_at?: string | null
+          estimated_hours?: number | null
+          gary_return_trigger_at?: string | null
+          gary_triggered_at?: string | null
+          id?: string
+          job_id: string
+          lag_days_after?: number | null
+          lag_description?: string | null
+          notes?: string | null
+          scheduled_date?: string | null
+          scheduled_end_date?: string | null
+          status?: string | null
+          tenant_id: string
+          trade_confirmed_at?: string | null
+          visit_number: number | null
+          work_order_id: string
+        }
+        Update: {
+          confirmed_date?: string | null
+          created_at?: string | null
+          estimated_hours?: number | null
+          gary_return_trigger_at?: string | null
+          gary_triggered_at?: string | null
+          id?: string
+          job_id?: string
+          lag_days_after?: number | null
+          lag_description?: string | null
+          notes?: string | null
+          scheduled_date?: string | null
+          scheduled_end_date?: string | null
+          status?: string | null
+          tenant_id?: string
+          trade_confirmed_at?: string | null
+          visit_number?: number | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_visits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_order_visits_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_order_visits_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_margin_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "work_order_visits_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_schedule_blueprints: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          draft_data: Json | null
+          id: string
+          job_id: string
+          notes: string | null
+          status: string | null
+          tenant_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          draft_data?: Json | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          status?: string | null
+          tenant_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          draft_data?: Json | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          status?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_schedule_blueprints_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_schedule_blueprints_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_margin_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_schedule_blueprints_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_schedule_blueprints_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_type_sequence: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          tenant_id: string
+          trade_type: string | null
+          typical_sequence_order: number | null
+          typical_visit_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          tenant_id: string
+          trade_type: string | null
+          typical_sequence_order?: number | null
+          typical_visit_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          tenant_id?: string
+          trade_type?: string | null
+          typical_sequence_order?: number | null
+          typical_visit_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_type_sequence_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]

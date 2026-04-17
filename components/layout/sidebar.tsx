@@ -139,6 +139,16 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
         </svg>
       ),
     },
+    {
+      label: 'Work Orders',
+      href: '/dashboard/work-orders',
+      icon: (
+        <svg className="nav-icon" viewBox="0 0 16 16" strokeWidth="1.6" stroke="currentColor" fill="none">
+          <path d="M2 5v8a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2H4a2 2 0 00-2 2z" />
+          <path d="M2 5l4 3 4-3" />
+        </svg>
+      ),
+    },
   ]
 
   const utilItems = [
