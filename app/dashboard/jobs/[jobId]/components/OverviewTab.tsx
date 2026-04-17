@@ -13,7 +13,7 @@ interface JobDetails {
   job_number: string
   insured_name: string | null
   property_address: string | null
-  status: string
+  override_stage: 'on_hold' | 'cancelled' | null
   insurer: string | null
   claim_number: string | null
   loss_type: string | null
@@ -670,7 +670,7 @@ function PinnedPlaybookCards({ jobId, tenantId, job }: { jobId: string; tenantId
       ] = await Promise.all([
         supabase
           .from('jobs')
-          .select('id,status,kpi_contacted_at,scope_sent_at,building_contract_sent_at,building_permit_required,building_permit_obtained_at')
+          .select('id,override_stage,kpi_contacted_at,scope_sent_at,building_contract_sent_at,building_permit_required,building_permit_obtained_at')
           .eq('id', jobId)
           .eq('tenant_id', tenantId)
           .single(),
@@ -728,7 +728,7 @@ function PinnedPlaybookCards({ jobId, tenantId, job }: { jobId: string; tenantId
       setCtx({
         job: {
           id: jobId,
-          status: jx.status ?? job.status ?? 'active',
+          override_stage: jx.override_stage ?? job.override_stage ?? null,
           kpi_contacted_at: jx.kpi_contacted_at ?? null,
           kpi_reported_at: null,
           scope_sent_at: jx.scope_sent_at ?? null,
@@ -754,9 +754,9 @@ function PinnedPlaybookCards({ jobId, tenantId, job }: { jobId: string; tenantId
       })
     }
     load()
-  }, [jobId, tenantId, job.status])
+  }, [jobId, tenantId, job.override_stage])
 
-  const { steps, currentStepId, progress, skipStep, unskipStep } = usePlaybookState(ctx ?? { job: { id: jobId, status: 'active', kpi_contacted_at: null, kpi_reported_at: null, scope_sent_at: null, building_contract_sent_at: null, building_permit_required: false, building_permit_obtained_at: null }, inspections: [], reports: [], quotes: [], workOrders: [], workOrderVisits: [], invoices: { inbound: [], outbound: [] }, blueprint: { exists: false, status: null }, hasMakeSafe: false, hasRoofReport: false, hasSpecialistReport: false, buildingPermitRequired: false, approvedQuoteTotal: null })
+  const { steps, currentStepId, progress, skipStep, unskipStep } = usePlaybookState(ctx ?? { job: { id: jobId, override_stage: null, kpi_contacted_at: null, kpi_reported_at: null, scope_sent_at: null, building_contract_sent_at: null, building_permit_required: false, building_permit_obtained_at: null }, inspections: [], reports: [], quotes: [], workOrders: [], workOrderVisits: [], invoices: { inbound: [], outbound: [] }, blueprint: { exists: false, status: null }, hasMakeSafe: false, hasRoofReport: false, hasSpecialistReport: false, buildingPermitRequired: false, approvedQuoteTotal: null })
   const currentStep = steps.find(s => s.id === currentStepId)
 
   const percentComplete = progress.total > 0 ? Math.round((progress.complete / progress.total) * 100) : 0
@@ -1884,7 +1884,7 @@ function PlaybookSection({ jobId, tenantId, job }: { jobId: string; tenantId: st
         // Extended job fields added by playbook migration
         supabase
           .from('jobs')
-          .select('id,status,kpi_contacted_at,scope_sent_at,building_contract_sent_at,building_permit_required,building_permit_obtained_at')
+          .select('id,override_stage,kpi_contacted_at,scope_sent_at,building_contract_sent_at,building_permit_required,building_permit_obtained_at')
           .eq('id', jobId)
           .eq('tenant_id', tenantId)
           .single(),
@@ -1955,7 +1955,7 @@ function PlaybookSection({ jobId, tenantId, job }: { jobId: string; tenantId: st
       const builtCtx: JobPlaybookContext = {
         job: {
           id: jobId,
-          status: jx.status ?? job.status ?? 'active',
+          override_stage: jx.override_stage ?? job.override_stage ?? null,
           kpi_contacted_at: jx.kpi_contacted_at ?? null,
           kpi_reported_at: null, // not used by any playbook step currently
           scope_sent_at: jx.scope_sent_at ?? null,

@@ -9,16 +9,12 @@ import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'active')
-    return <span style={{ background: '#eaf3f0', color: '#2a6b50', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Active</span>
-  if (status === 'on_hold')
+function StatusBadge({ override_stage }: { override_stage: 'on_hold' | 'cancelled' | null }) {
+  if (override_stage === 'on_hold')
     return <span style={{ background: '#fdf5e8', color: '#8a6020', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>On Hold</span>
-  if (status === 'complete')
-    return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Complete</span>
-  if (status === 'cancelled')
+  if (override_stage === 'cancelled')
     return <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Cancelled</span>
-  return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{status}</span>
+  return null
 }
 
 function formatDate(dateString: string | null): string {
@@ -59,7 +55,7 @@ export default function JobsListPage() {
     async function fetchJobs() {
       const { data } = await supabase
         .from('jobs')
-        .select('id, job_number, insured_name, property_address, insurer, status, created_at')
+        .select('id, job_number, insured_name, property_address, insurer, override_stage, created_at')
         .eq('tenant_id', tenantId!)
         .order('created_at', { ascending: false });
       setJobs((data as JobRow[]) ?? []);
@@ -206,7 +202,7 @@ export default function JobsListPage() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <StatusBadge status={job.status ?? 'active'} />
+                          <StatusBadge override_stage={(job as any).override_stage ?? null} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
                           <span className="text-xs text-[#b0a898]">

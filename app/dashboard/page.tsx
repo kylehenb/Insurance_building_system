@@ -29,7 +29,7 @@ interface FlaggedJob {
   property_address: string | null
   insured_name: string | null
   insurer: string | null
-  status: string | null
+  override_stage: 'on_hold' | 'cancelled' | null
   action_count: number
 }
 
@@ -215,7 +215,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     const { data } = await supabase
       .from('job_flags')
-      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, status)`)
+      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage)`)
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .limit(20)
@@ -239,7 +239,7 @@ export default function DashboardPage() {
           property_address: job.property_address,
           insured_name: job.insured_name,
           insurer: job.insurer,
-          status: job.status,
+          override_stage: job.override_stage ?? null,
           action_count: count ?? 0,
         } as FlaggedJob
       })
@@ -759,9 +759,11 @@ export default function DashboardPage() {
                         <td>{job.insured_name ?? '—'}</td>
                         <td>{job.insurer ?? '—'}</td>
                         <td>
-                          <span className={getStatusClass(job.status)}>
-                            {getStatusLabel(job.status)}
-                          </span>
+                          {job.override_stage && (
+                            <span className="sbadge s-pending">
+                              {job.override_stage === 'on_hold' ? 'On Hold' : 'Cancelled'}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}

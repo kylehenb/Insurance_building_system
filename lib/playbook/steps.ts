@@ -90,7 +90,7 @@ export interface PlaybookStep {
 export interface JobPlaybookContext {
   job: {
     id: string
-    status: string
+    override_stage: 'on_hold' | 'cancelled' | null
     kpi_contacted_at: string | null
     kpi_reported_at: string | null
     /** Added by migration: set when scope of works is sent to insured */
@@ -322,7 +322,7 @@ export const playbookSteps: PlaybookStep[] = [
     category: 'send',
     isComplete: (ctx) =>
       ctx.quotes.some(q => q.status === 'approved' || q.status === 'rejected') ||
-      ctx.job.status === 'cancelled',
+      ctx.job.override_stage === 'cancelled',
     isVisible: () => true,
     // Passive waiting step — no primary action button.
     // A subtle "log response manually" link is rendered by the rail component.
@@ -555,7 +555,7 @@ export const playbookSteps: PlaybookStep[] = [
     label: 'Job closed',
     description: 'All tasks complete. Job marked as closed.',
     category: 'close',
-    isComplete: (ctx) => ctx.job.status === 'complete',
+    isComplete: (ctx) => ctx.invoices.outbound.some(i => i.status === 'paid'),
     isVisible: () => true,
     primaryAction: {
       label: 'Mark job complete',
