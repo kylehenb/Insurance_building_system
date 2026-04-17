@@ -22,7 +22,7 @@ export type JobStageKey =
 export type JobContext = {
   job: {
     id: string
-    status: string
+    override_stage: 'on_hold' | 'cancelled' | null
     homeowner_signoff_sent_at: string | null
     homeowner_signoff_received_at: string | null
     completion_approved_at: string | null
@@ -220,12 +220,12 @@ export function getJobStage(context: JobContext): JobStage {
     work_order_visits, trade_invoices, outbound_invoices, open_loops } = context
 
   // 1. on_hold
-  if (job.status === 'on_hold') {
+  if (job.override_stage === 'on_hold') {
     return buildStage('on_hold', open_loops)
   }
 
   // 2. cancelled
-  if (job.status === 'cancelled') {
+  if (job.override_stage === 'cancelled') {
     return buildStage('cancelled', open_loops)
   }
 

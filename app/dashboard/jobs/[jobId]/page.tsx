@@ -6,7 +6,9 @@ import type { Database } from '@/lib/supabase/database.types'
 import { JobDetailShell } from './components/JobDetailShell'
 import StageBanner from '@/components/jobs/StageBanner'
 
-type JobRow = Database['public']['Tables']['jobs']['Row']
+type JobRow = Omit<Database['public']['Tables']['jobs']['Row'], 'status'> & {
+  override_stage: 'on_hold' | 'cancelled' | null
+}
 
 interface JobDetailPageProps {
   params: Promise<{ jobId: string }>
@@ -35,7 +37,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   const { data: jobData, error: jobError } = await supabase
     .from('jobs')
     .select(
-      'id,job_number,insured_name,property_address,status,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,additional_contacts,claim_description,special_instructions,notes'
+      'id,job_number,insured_name,property_address,override_stage,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,additional_contacts,claim_description,special_instructions,notes'
     )
     .eq('id', jobId)
     .eq('tenant_id', tenant_id!)
@@ -45,7 +47,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
     notFound()
   }
 
-  const job = jobData as JobRow
+  const job = jobData as unknown as JobRow
 
   // Fetch pending action count
   const { count: pendingCount } = await supabase
@@ -75,7 +77,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
           job_number: job.job_number,
           insured_name: job.insured_name,
           property_address: job.property_address,
-          status: job.status ?? 'active',
+          override_stage: job.override_stage ?? null,
           insurer: job.insurer,
           claim_number: job.claim_number,
           loss_type: job.loss_type,

@@ -8,7 +8,7 @@ import type { OpenLoop } from './openLoops'
 // the casts through unknown can be replaced with direct property access.
 type JobRow = {
   id: string
-  status: string | null
+  override_stage: 'on_hold' | 'cancelled' | null
   homeowner_signoff_sent_at: string | null
   homeowner_signoff_received_at: string | null
   completion_approved_at: string | null
@@ -38,7 +38,7 @@ export async function fetchJobContext(
   ] = await Promise.all([
     supabaseClient
       .from('jobs')
-      .select('id, status, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at')
+      .select('id, override_stage, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at')
       .eq('id', jobId)
       .single(),
 
@@ -110,7 +110,7 @@ export async function fetchJobContext(
   return {
     job: {
       id: job.id,
-      status: job.status ?? '',
+      override_stage: job.override_stage ?? null,
       homeowner_signoff_sent_at: job.homeowner_signoff_sent_at,
       homeowner_signoff_received_at: job.homeowner_signoff_received_at,
       completion_approved_at: job.completion_approved_at,

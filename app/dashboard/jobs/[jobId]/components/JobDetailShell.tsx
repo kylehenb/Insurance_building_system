@@ -27,7 +27,7 @@ interface JobHeader {
   job_number: string
   insured_name: string | null
   property_address: string | null
-  status: string
+  override_stage: 'on_hold' | 'cancelled' | null
   insurer: string | null
   claim_number: string | null
   loss_type: string | null
@@ -74,18 +74,19 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 // — Status badge ——————————————————————————————————————————————————
-function StatusBadge({ status }: { status: string }) {
-  const isActive = status === 'active'
+function StatusBadge({ override_stage }: { override_stage: 'on_hold' | 'cancelled' | null }) {
+  if (!override_stage) return null
+  const label = override_stage === 'on_hold' ? 'On Hold' : 'Cancelled'
   return (
     <span
       className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium"
       style={{
-        background: isActive ? '#e8f5e9' : '#f5f2ee',
-        color: isActive ? '#2e7d32' : '#9e998f',
-        border: isActive ? 'none' : '1px solid #e0dbd4',
+        background: override_stage === 'on_hold' ? '#fdf5e8' : '#fdecea',
+        color: override_stage === 'on_hold' ? '#8a6020' : '#b91c1c',
+        border: '1px solid #e0dbd4',
       }}
     >
-      {status === 'active' ? 'Active' : status === 'complete' ? 'Closed' : status}
+      {label}
     </span>
   )
 }
@@ -296,7 +297,7 @@ export function JobDetailShell({
                 >
                   {job.job_number}
                 </h1>
-                <StatusBadge status={job.status} />
+                <StatusBadge override_stage={job.override_stage} />
                 <FlagButton
                   isFlagged={flagged}
                   onToggle={toggleFlag}
