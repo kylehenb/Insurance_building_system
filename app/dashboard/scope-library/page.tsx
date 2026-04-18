@@ -103,7 +103,6 @@ export default function ScopeLibraryPage() {
     materials_per_unit: 120,
     total_per_unit: 100,
     estimated_hours: 100,
-    status: 100,
     actions: 80,
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
@@ -603,115 +602,104 @@ export default function ScopeLibraryPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.trade }}
                       onClick={() => handleSort('trade')}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('trade', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.insurer }}
                     >
                       Insurer
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('insurer', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.keyword }}
                     >
                       Keyword
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('keyword', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.description }}
                     >
                       Description
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('description', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.unit }}
                     >
                       Unit
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('unit', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.labour_per_unit }}
                     >
                       Labour/Unit
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('labour_per_unit', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.materials_per_unit }}
                     >
                       Materials/Unit
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('materials_per_unit', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.total_per_unit }}
                       onClick={() => handleSort('total_per_unit')}
                     >
                       Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('total_per_unit', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a]"
+                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.estimated_hours }}
                       onClick={() => handleSort('estimated_hours')}
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('estimated_hours', e)}
-                      />
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
-                      style={{ position: 'relative', width: columnWidths.status }}
-                    >
-                      Status
-                      <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize' }}
-                        onMouseDown={(e) => handleResizeStart('status', e)}
                       />
                     </th>
                     <th
@@ -724,13 +712,26 @@ export default function ScopeLibraryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0ece6] bg-white">
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
-                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.trade }}>
+                  {filteredItems.map((item) => {
+                    const isDraft = (item as any).approval_status !== 'approved';
+                    return (
+                    <tr 
+                      key={item.id} 
+                      className={`hover:bg-[#faf9f7] transition-colors ${isDraft ? 'bg-[#fff7ed]' : ''}`}
+                    >
+                      <td className="whitespace-nowrap px-3 py-3 relative" style={{ width: columnWidths.trade }}>
+                        {isDraft && (
+                          <div 
+                            className="absolute left-0 top-0 bottom-0 flex items-center justify-center px-1 z-10"
+                            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', fontSize: '9px', fontWeight: 700, letterSpacing: '1px', color: '#d97706' }}
+                          >
+                            DRAFT
+                          </div>
+                        )}
                         <select
                           value={item.trade || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'trade', e.target.value || null)}
-                          className="rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className={`w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${isDraft ? 'pl-8' : ''}`}
                         >
                           <option value="">—</option>
                           {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
@@ -751,19 +752,19 @@ export default function ScopeLibraryPage() {
                         </span>
                       </td>
                       <td className="px-3 py-3" style={{ width: columnWidths.description }}>
-                        <input
-                          type="text"
+                        <textarea
                           defaultValue={item.item_description || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'item_description', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                          style={{ whiteSpace: 'normal', wordWrap: 'break-word' }}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 resize-none"
+                          rows={2}
+                          style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                         />
                       </td>
                       <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.unit }}>
                         <select
                           value={item.unit || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'unit', e.target.value || null)}
-                          className="rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         >
                           <option value="">—</option>
                           {UNITS.map(u => (
@@ -772,14 +773,22 @@ export default function ScopeLibraryPage() {
                         </select>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.labour_per_unit }}>
-                        <span className="text-xs font-mono text-[#1a1a1a]/70">
-                          {formatCurrency(item.labour_per_unit)}
-                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.labour_per_unit || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'labour_per_unit', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        />
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.materials_per_unit }}>
-                        <span className="text-xs font-mono text-[#1a1a1a]/70">
-                          {formatCurrency(item.materials_per_unit)}
-                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.materials_per_unit || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'materials_per_unit', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        />
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.total_per_unit }}>
                         <span className="text-xs font-mono font-semibold text-[#1a1a1a]">
@@ -787,21 +796,13 @@ export default function ScopeLibraryPage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.estimated_hours }}>
-                        <span className="text-xs font-mono text-[#1a1a1a]/70">
-                          {formatNumber(item.estimated_hours)}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.status }}>
-                        <button
-                          onClick={() => handleToggleApproval(item.id, (item as any).approval_status)}
-                          className={`text-xs px-2 py-1 rounded ${
-                            (item as any).approval_status === 'approved'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}
-                        >
-                          {(item as any).approval_status === 'approved' ? 'Approved' : 'Pending'}
-                        </button>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.estimated_hours || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'estimated_hours', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        />
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.actions }}>
                         <div className="flex items-center justify-end gap-2">
@@ -817,7 +818,8 @@ export default function ScopeLibraryPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

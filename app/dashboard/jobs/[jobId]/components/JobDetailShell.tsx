@@ -20,6 +20,7 @@ import { InsurerOrdersTab } from './InsurerOrdersTab'
 import { InvoicesTab } from './InvoicesTab'
 import { JobBudgetTab } from './JobBudgetTab'
 import { SafetyTab } from './SafetyTab'
+import { WorkOrdersTab } from '../work-orders/WorkOrdersTab'
 
 // — Types ——————————————————————————————————————————————————————————
 interface JobHeader {
@@ -63,6 +64,7 @@ const TABS = [
   { id: 'reports',          label: 'Reports' },
   { id: 'quotes',           label: 'Quotes' },
   { id: 'trade-work-orders',label: 'Trade Work Orders' },
+  { id: 'work-orders',      label: 'Work Orders' },
   { id: 'photos',           label: 'Photos' },
   { id: 'files',            label: 'Files' },
   { id: 'insurer-orders',   label: 'Insurer Orders' },
@@ -161,6 +163,8 @@ function TabPanel({
       return <QuotesTab jobId={jobId} tenantId={tenantId} />
     case 'trade-work-orders':
       return <TradeWorkOrdersTab jobId={jobId} />
+    case 'work-orders':
+      return null // rendered outside the padded wrapper below
     case 'photos':
       return <PhotosTab jobId={jobId} tenantId={tenantId} />
     case 'files':
@@ -378,18 +382,24 @@ export function JobDetailShell({
       </div>
 
       {/* ── Tab content ───────────────────────────────────────── */}
-      <div className="px-6 lg:px-8 py-6">
-        <div className="mx-auto max-w-6xl">
-          <TabPanel
-            activeTab={activeTab}
-            jobId={jobId}
-            tenantId={tenantId}
-            currentUserId={currentUserId}
-            currentUserRole={currentUserRole}
-            job={job}
-          />
+      {activeTab === 'work-orders' ? (
+        <div style={{ height: 'calc(100vh - 200px)', overflow: 'hidden' }}>
+          <WorkOrdersTab jobId={jobId} tenantId={tenantId} />
         </div>
-      </div>
+      ) : (
+        <div className="px-6 lg:px-8 py-6">
+          <div className="mx-auto max-w-6xl">
+            <TabPanel
+              activeTab={activeTab}
+              jobId={jobId}
+              tenantId={tenantId}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+              job={job}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
