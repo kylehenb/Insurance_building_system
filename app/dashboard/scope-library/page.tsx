@@ -608,7 +608,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.trade, borderRightWidth: '0.5px' }}
+                      style={{ position: 'relative', width: columnWidths.trade, borderRightWidth: '0.2px' }}
                       onClick={() => handleSort('trade')}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
