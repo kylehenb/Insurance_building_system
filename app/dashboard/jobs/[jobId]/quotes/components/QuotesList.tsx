@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
@@ -167,6 +167,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
   const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
 
+  // Version history state
+  const [showVersions, setShowVersions] = useState<string | null>(null)
+  const [versionsMap, setVersionsMap] = useState<Record<string, any[]>>({})
+  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [reverting, setReverting] = useState<string | null>(null)
+  const versionDropdownRefs = useRef<Record<string, HTMLDivElement>>({})
+
   // ── Data loading ─────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -196,6 +203,37 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuDropdownId])
+
+  // ── Version dropdown: fetch versions when opened ─────────────────────────────
+
+  useEffect(() => {
+    if (!showVersions) return
+    const quoteId = showVersions
+    setLoadingVersions(true)
+    fetch(`/api/quotes/${quoteId}/versions?tenantId=${encodeURIComponent(tenantId)}`)
+      .then(r => r.json())
+      .then((data: any[]) => {
+        setVersionsMap(prev => ({ ...prev, [quoteId]: data }))
+      })
+      .catch(() => {
+        setVersionsMap(prev => ({ ...prev, [quoteId]: [] }))
+      })
+      .finally(() => setLoadingVersions(false))
+  }, [showVersions, tenantId])
+
+  // ── Version dropdown: close on outside click ────────────────────────────────
+
+  useEffect(() => {
+    if (!showVersions) return
+    const handler = (e: MouseEvent) => {
+      const ref = versionDropdownRefs.current[showVersions]
+      if (ref && !ref.contains(e.target as Node)) {
+        setShowVersions(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showVersions])
 
   // ── Create / delete ───────────────────────────────────────────────────────
 
@@ -382,6 +420,32 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     },
     [tenantId, load]
   )
+
+  // ── Handle revert to previous version ────────────────────────────────────────
+
+  const handleRevert = useCallback(async (currentQuoteId: string, targetQuoteId: string) => {
+    setReverting(targetQuoteId)
+    try {
+      const response = await fetch(`/api/quotes/${currentQuoteId}/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          targetQuoteId,
+        }),
+      })
+      if (response.ok) {
+        // Navigate to the reverted quote
+        window.location.href = window.location.pathname.replace(currentQuoteId, targetQuoteId)
+      } else {
+        console.error('Failed to revert quote')
+        setReverting(null)
+      }
+    } catch (error) {
+      console.error('Error reverting quote:', error)
+      setReverting(null)
+    }
+  }, [tenantId])
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
@@ -1249,21 +1313,178 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 </span>
 
 
-                {/* Version badge */}
+                {/* Version badge with dropdown */}
                 {q.version > 1 && (
-                  <span
-                    style={{
-                      padding: '1px 7px',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      background: '#e8f0fe',
-                      color: '#1a73e8',
-                      flexShrink: 0,
+                  <div
+                    ref={el => {
+                      if (el) versionDropdownRefs.current[q.id] = el
                     }}
+                    style={{ position: 'relative' }}
                   >
-                    V{q.version}
-                  </span>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        setShowVersions(showVersions === q.id ? null : q.id)
+                      }}
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: '#e8f0fe',
+                        color: '#1a73e8',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        fontFamily: 'DM Sans, sans-serif',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#d2e3fc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#e8f0fe')}
+                    >
+                      V{q.version} ▾
+                    </button>
+
+                    {showVersions === q.id && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          left: 0,
+                          zIndex: 200,
+                          background: '#ffffff',
+                          border: '1px solid #e0dbd4',
+                          borderRadius: 6,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                          minWidth: 280,
+                          padding: '4px',
+                        }}
+                      >
+                        {loadingVersions ? (
+                          <div
+                            style={{
+                              padding: '12px',
+                              fontSize: 12,
+                              color: '#9e998f',
+                              textAlign: 'center',
+                              fontFamily: 'DM Sans, sans-serif',
+                            }}
+                          >
+                            Loading...
+                          </div>
+                        ) : !versionsMap[q.id] || versionsMap[q.id].length === 0 ? (
+                          <div
+                            style={{
+                              padding: '12px',
+                              fontSize: 12,
+                              color: '#9e998f',
+                              textAlign: 'center',
+                              fontFamily: 'DM Sans, sans-serif',
+                            }}
+                          >
+                            No versions found
+                          </div>
+                        ) : (
+                          versionsMap[q.id].map((v: any) => (
+                            <div
+                              key={v.id}
+                              style={{
+                                padding: '8px 10px',
+                                borderBottom:
+                                  v.id !== versionsMap[q.id][versionsMap[q.id].length - 1].id
+                                    ? '1px solid #e8e4e0'
+                                    : 'none',
+                                fontFamily: 'DM Sans, sans-serif',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: '#3a3530',
+                                  }}
+                                >
+                                  V{v.version}
+                                </span>
+                                {v.is_active_version && (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 500,
+                                      color: '#2e7d32',
+                                      background: '#e8f5e9',
+                                      padding: '1px 6px',
+                                      borderRadius: 10,
+                                    }}
+                                  >
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: '#9e998f',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {v.status.replace(/_/g, ' ')} • {v.item_count} items
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: '#b0a89e',
+                                  marginBottom: 6,
+                                }}
+                              >
+                                {new Date(v.created_at).toLocaleDateString('en-AU', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                              {!v.is_active_version && (
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleRevert(q.id, v.id)
+                                  }}
+                                  disabled={reverting === v.id}
+                                  style={{
+                                    fontFamily: 'DM Sans, sans-serif',
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    color: '#ffffff',
+                                    background: '#2e7d32',
+                                    border: 'none',
+                                    borderRadius: 4,
+                                    padding: '4px 10px',
+                                    cursor: reverting === v.id ? 'not-allowed' : 'pointer',
+                                    transition: 'background 0.15s',
+                                    opacity: reverting === v.id ? 0.7 : 1,
+                                  }}
+                                  onMouseEnter={e => !reverting && (e.currentTarget.style.background = '#1b5e20')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                                >
+                                  {reverting === v.id ? 'Reverting...' : 'Revert to this version'}
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Rejection reason badge */}
