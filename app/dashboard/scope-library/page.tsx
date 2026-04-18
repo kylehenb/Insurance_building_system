@@ -607,7 +607,7 @@ export default function ScopeLibraryPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.trade, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('trade')}
                     >
@@ -619,7 +619,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.insurer, borderRightWidth: '0.5px' }}
                     >
                       Insurer
@@ -630,7 +630,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.keyword, borderRightWidth: '0.5px' }}
                     >
                       Keyword
@@ -641,7 +641,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.description, borderRightWidth: '0.5px' }}
                     >
                       Description
@@ -652,7 +652,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.unit, borderRightWidth: '0.5px' }}
                     >
                       Unit
@@ -663,7 +663,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.labour_per_unit, borderRightWidth: '0.5px' }}
                     >
                       Labour
@@ -674,7 +674,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.materials_per_unit, borderRightWidth: '0.5px' }}
                     >
                       Material
@@ -685,7 +685,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.total_per_unit, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('total_per_unit')}
                     >
@@ -697,7 +697,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.estimated_hours, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('estimated_hours')}
                     >
@@ -709,7 +709,7 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.actions }}
                     >
                       Actions
@@ -724,7 +724,7 @@ export default function ScopeLibraryPage() {
                       key={item.id} 
                       className={`hover:bg-[#faf9f7] transition-colors ${isDraft ? 'bg-[#fff7ed]' : ''}`}
                     >
-                      <td className="whitespace-nowrap px-3 py-3 relative" style={{ width: columnWidths.trade }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 relative" style={{ width: columnWidths.trade }}>
                         {isDraft && (
                           <div 
                             className="absolute left-0 top-0 bottom-0 flex items-center justify-center px-1 z-10"
@@ -736,7 +736,7 @@ export default function ScopeLibraryPage() {
                         <select
                           value={item.trade || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'trade', e.target.value || null)}
-                          className={`w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${isDraft ? 'pl-8' : ''}`}
+                          className={`w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${isDraft ? 'pl-8' : ''}`}
                         >
                           <option value="">—</option>
                           {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
@@ -746,30 +746,30 @@ export default function ScopeLibraryPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.insurer }}>
+                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.insurer }}>
                         <span className="text-xs text-[#1a1a1a]/70">
                           {item.insurer_specific || 'Default'}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.keyword }}>
+                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.keyword }}>
                         <span className="text-xs font-mono text-[#1a1a1a]">
                           {item.keyword || '-'}
                         </span>
                       </td>
-                      <td className="px-3 py-3" style={{ width: columnWidths.description }}>
+                      <td className="px-1.5 py-3" style={{ width: columnWidths.description }}>
                         <textarea
                           defaultValue={item.item_description || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'item_description', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 resize-none"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 resize-none"
                           rows={2}
                           style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3" style={{ width: columnWidths.unit }}>
+                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.unit }}>
                         <select
                           value={item.unit || ''}
                           onChange={(e) => handleInlineEdit(item.id, 'unit', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         >
                           <option value="">—</option>
                           {UNITS.map(u => (
@@ -777,39 +777,39 @@ export default function ScopeLibraryPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.labour_per_unit }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.labour_per_unit }}>
                         <input
                           type="number"
                           step="0.01"
                           defaultValue={item.labour_per_unit || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'labour_per_unit', e.target.value ? parseFloat(e.target.value) : null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.materials_per_unit }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.materials_per_unit }}>
                         <input
                           type="number"
                           step="0.01"
                           defaultValue={item.materials_per_unit || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'materials_per_unit', e.target.value ? parseFloat(e.target.value) : null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.total_per_unit }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.total_per_unit }}>
                         <span className="text-xs font-mono font-semibold text-[#1a1a1a]">
                           {formatCurrency(item.total_per_unit)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.estimated_hours }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.estimated_hours }}>
                         <input
                           type="number"
                           step="0.01"
                           defaultValue={item.estimated_hours || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'estimated_hours', e.target.value ? parseFloat(e.target.value) : null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-2 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.actions }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.actions }}>
                         <div className="flex items-center justify-end gap-2">
                           {isDraft && (
                             <button
