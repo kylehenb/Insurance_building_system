@@ -6,15 +6,17 @@ function buildContext(overrides: Partial<JobContext> = {}): JobContext {
   return {
     job: {
       id: 'job-1',
-      status: 'active',
+      override_stage: null,
+      current_stage: null,
+      current_stage_updated_at: null,
       homeowner_signoff_sent_at: null,
       homeowner_signoff_received_at: null,
       completion_approved_at: null,
     },
     insurer_orders: [],
-    inspection: null,
+    inspections: [],
     primary_quote: null,
-    primary_report: null,
+    reports: [],
     blueprint: null,
     work_order_visits: [],
     trade_invoices: [],
@@ -35,19 +37,20 @@ describe('getJobStage', () => {
   })
 
   it('job active, no inspection exists', () => {
-    const ctx = buildContext({ inspection: null })
+    const ctx = buildContext({ inspections: [] })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('awaiting_schedule')
   })
 
   it('awaiting schedule with prior no-show', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'unscheduled',
         form_submitted_at: null,
         no_show_count: 1,
         last_no_show_at: '2025-01-01',
-      },
+      }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('awaiting_schedule')
@@ -57,12 +60,13 @@ describe('getJobStage', () => {
 
   it('inspection confirmed', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'confirmed',
         form_submitted_at: null,
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('inspection_scheduled')
@@ -72,12 +76,13 @@ describe('getJobStage', () => {
 
   it('inspection submitted, quote still draft', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'draft' },
     })
     const stage = getJobStage(ctx)
@@ -87,14 +92,15 @@ describe('getJobStage', () => {
 
   it('quote and report both sent', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'sent' },
-      primary_report: { status: 'sent' },
+      reports: [{ id: 'report-1', report_type: 'BAR', status: 'sent', version: 1 }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('sent_awaiting_approval')
@@ -104,12 +110,13 @@ describe('getJobStage', () => {
 
   it('quote rejected', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'rejected' },
     })
     const stage = getJobStage(ctx)
@@ -120,16 +127,19 @@ describe('getJobStage', () => {
 
   it('quote approved, signoff not yet sent', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: null,
         homeowner_signoff_received_at: null,
         completion_approved_at: null,
@@ -142,16 +152,19 @@ describe('getJobStage', () => {
 
   it('signoff sent, not yet received', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: null,
         completion_approved_at: null,
@@ -165,16 +178,19 @@ describe('getJobStage', () => {
 
   it('signoff received, no blueprint yet', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
@@ -188,16 +204,19 @@ describe('getJobStage', () => {
 
   it('blueprint confirmed, visits in progress', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
@@ -213,16 +232,19 @@ describe('getJobStage', () => {
 
   it('all visits complete, no completion approval', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
@@ -237,16 +259,19 @@ describe('getJobStage', () => {
 
   it('completion approved, trade invoices pending', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
@@ -262,16 +287,19 @@ describe('getJobStage', () => {
 
   it('all trade invoices approved, no outbound invoice', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
@@ -288,16 +316,19 @@ describe('getJobStage', () => {
 
   it('outbound invoice sent, not paid', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
@@ -315,16 +346,19 @@ describe('getJobStage', () => {
 
   it('invoice paid', () => {
     const ctx = buildContext({
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'complete',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       job: {
         id: 'job-1',
-        status: 'active',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
@@ -344,18 +378,21 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       job: {
         id: 'job-1',
-        status: 'on_hold',
+        override_stage: 'on_hold',
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
       insurer_orders: [{ status: 'pending' }],
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'confirmed',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       blueprint: { status: 'confirmed' },
       work_order_visits: [{ status: 'complete' }],
@@ -371,18 +408,21 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       job: {
         id: 'job-1',
-        status: 'cancelled',
+        override_stage: 'cancelled',
+        current_stage: null,
+        current_stage_updated_at: null,
         homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
       insurer_orders: [{ status: 'pending' }],
-      inspection: {
+      inspections: [{
+        id: 'insp-1',
         status: 'confirmed',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
-      },
+      }],
       primary_quote: { status: 'approved' },
       blueprint: { status: 'confirmed' },
       work_order_visits: [{ status: 'complete' }],

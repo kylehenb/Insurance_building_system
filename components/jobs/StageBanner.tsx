@@ -58,13 +58,65 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
 
   const row = raw as unknown as JobStageRow | null
 
+  // Loading state: job not yet computed
+  if (row === null || row.current_stage === null) {
+    const borderColor = getBorderColor('order_received')
+    const sectionLabelColor = getSectionLabelColor('order_received')
+    const sectionBorderBottom = getSectionBorderBottom('order_received')
+
+    return (
+      <div
+        style={{
+          width: 365.0625,
+          minWidth: 365.0625,
+          borderLeft: `3px solid ${borderColor}`,
+          backgroundColor: '#f5f0e8',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: 'inherit',
+        }}
+      >
+        <div
+          style={{
+            padding: '13px 16px 11px',
+            borderBottom: `1px solid ${sectionBorderBottom}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: sectionLabelColor,
+              marginBottom: 5,
+            }}
+          >
+            Current Stage
+          </div>
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 500,
+              color: '#1a1a1a',
+              marginBottom: 4,
+              letterSpacing: '-0.2px',
+            }}
+          >
+            —
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Resolve effective stage key: override_stage takes precedence
   const effectiveKey: JobStageKey =
-    row?.override_stage === 'on_hold'
+    row.override_stage === 'on_hold'
       ? 'on_hold'
-      : row?.override_stage === 'cancelled'
+      : row.override_stage === 'cancelled'
         ? 'cancelled'
-        : row?.current_stage != null && row.current_stage in STAGE_CONFIG
+        : row.current_stage in STAGE_CONFIG
           ? (row.current_stage as JobStageKey)
           : 'order_received'
 

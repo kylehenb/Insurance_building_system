@@ -30,18 +30,22 @@ export type JobContext = {
     completion_approved_at: string | null
   }
   insurer_orders: Array<{ status: string }>
-  inspection: {
+  inspections: Array<{
+    id: string
     status: string
     form_submitted_at: string | null
     no_show_count: number
     last_no_show_at: string | null
-  } | null
+  }>
   primary_quote: {
     status: string
   } | null
-  primary_report: {
+  reports: Array<{
+    id: string
+    report_type: string
     status: string
-  } | null
+    version: number
+  }>
   blueprint: {
     status: string
   } | null
@@ -218,7 +222,7 @@ function buildStage(
 }
 
 export function getJobStage(context: JobContext): JobStage {
-  const { job, insurer_orders, inspection, primary_quote, primary_report, blueprint,
+  const { job, insurer_orders, inspections, primary_quote, reports, blueprint,
     work_order_visits, trade_invoices, outbound_invoices, open_loops } = context
 
   // 1. on_hold
@@ -231,18 +235,61 @@ export function getJobStage(context: JobContext): JobStage {
     return buildStage('cancelled', open_loops)
   }
 
+  // Derived variables for determining path
+  const hasActiveInspection = context.inspections.some(
+    i => i.status !== 'cancelled'
+  )
+
+  const hasActiveBarReport = context.reports.some(
+    r => r.report_type === 'BAR' && r.status !== 'cancelled'
+  )
+
+  const isBarPath = hasActiveInspection || hasActiveBarReport
+
+  const primaryInspection = context.inspections
+    .find(i => i.status !== 'cancelled') ?? null
+
+  const primaryBarReport = context.reports
+    .filter(r => r.report_type === 'BAR' && r.status !== 'cancelled')
+    .sort((a, b) => a.version - b.version)[0] ?? null
+
   // 3. order_received — pending insurer order, not yet lodged
   if (insurer_orders.some((o) => o.status === 'pending')) {
     return buildStage('order_received', open_loops)
   }
 
+  // Non-BAR fast path: skip inspection stages for quote-only, restoration-only, etc.
+  if (!isBarPath) {
+    // No active inspection and no active BAR report —
+    // job is quote-only, restoration-only, or similar.
+    // Skip all inspection stages, evaluate from awaiting_compilation onwards.
+
+    if (!context.primary_quote || 
+        context.primary_quote.status === 'draft') {
+      return buildStage('awaiting_compilation', open_loops)
+    }
+
+    if (context.primary_quote.status === 'sent') {
+      return buildStage('sent_awaiting_approval', open_loops)
+    }
+
+    if (context.primary_quote.status === 'rejected') {
+      return buildStage('declined_close_out', open_loops)
+    }
+
+    // primary_quote.status === 'approved':
+    // Fall through to the standard path below.
+    // All stages from approved_awaiting_signoff onwards are identical.
+  }
+
+  // BAR path inspection checks
   // 4. awaiting_schedule — no inspection or unscheduled
   const unscheduledStatuses = ['unscheduled', 'proposed', 'awaiting_reschedule']
-  if (inspection === null || unscheduledStatuses.includes(inspection.status)) {
+  if (primaryInspection === null || unscheduledStatuses.includes(primaryInspection.status)) {
     let warning: JobStage['contextualWarning']
-    if (inspection !== null && inspection.no_show_count > 0) {
+    if (primaryInspection !== null && primaryInspection.no_show_count > 0) {
       warning = {
-        message: `Previous no-show on ${inspection.last_no_show_at} — confirm access before booking`,
+        message: `Previous no-show on ${primaryInspection.last_no_show_at} — confirm access before booking`,
         severity: 'warning',
       }
     }
@@ -250,24 +297,22 @@ export function getJobStage(context: JobContext): JobStage {
   }
 
   // 5. inspection_scheduled
-  if (inspection.status === 'confirmed') {
+  if (primaryInspection.status === 'confirmed') {
     return buildStage('inspection_scheduled', open_loops)
   }
 
   // 6. awaiting_compilation — inspection submitted, quote draft or missing
   if (
-    inspection.form_submitted_at !== null &&
+    primaryInspection.form_submitted_at !== null &&
     (primary_quote === null || primary_quote.status === 'draft')
   ) {
     return buildStage('awaiting_compilation', open_loops)
   }
 
-  // 7. sent_awaiting_approval — both sent
+  // 7. sent_awaiting_approval — quote sent, and BAR report sent if on BAR path
   if (
-    primary_quote !== null &&
-    primary_quote.status === 'sent' &&
-    primary_report !== null &&
-    primary_report.status === 'sent'
+    context.primary_quote?.status === 'sent' &&
+    (!isBarPath || primaryBarReport?.status === 'sent')
   ) {
     return buildStage('sent_awaiting_approval', open_loops)
   }

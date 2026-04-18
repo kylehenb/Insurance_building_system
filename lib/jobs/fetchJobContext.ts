@@ -16,10 +16,18 @@ type JobRow = {
 }
 
 type InspectionRow = {
+  id: string
   status: string | null
   form_submitted_at: string | null
   no_show_count: number
   last_no_show_at: string | null
+}
+
+type ReportRow = {
+  id: string
+  report_type: string
+  status: string | null
+  version: number
 }
 
 export async function fetchJobContext(
@@ -50,10 +58,8 @@ export async function fetchJobContext(
 
     supabaseClient
       .from('inspections')
-      .select('status, form_submitted_at, no_show_count, last_no_show_at')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: true })
-      .limit(1),
+      .select('id, status, form_submitted_at, no_show_count, last_no_show_at')
+      .eq('job_id', jobId),
 
     supabaseClient
       .from('quotes')
@@ -65,11 +71,8 @@ export async function fetchJobContext(
 
     supabaseClient
       .from('reports')
-      .select('status')
-      .eq('job_id', jobId)
-      .eq('report_type', 'BAR')
-      .order('version', { ascending: true })
-      .limit(1),
+      .select('id, report_type, status, version')
+      .eq('job_id', jobId),
 
     supabaseClient
       .from('job_schedule_blueprints')
@@ -103,9 +106,9 @@ export async function fetchJobContext(
   // Cast through unknown to accommodate columns added by migration that are
   // not yet reflected in the generated database.types.ts
   const job = jobResult.data as unknown as JobRow
-  const inspectionRow = (inspectionResult.data as unknown as InspectionRow[] | null)?.[0] ?? null
+  const inspectionRows = (inspectionResult.data as unknown as InspectionRow[] | null) ?? []
   const quoteRow = quoteResult.data?.[0] ?? null
-  const reportRow = reportResult.data?.[0] ?? null
+  const reportRows = (reportResult.data as unknown as ReportRow[] | null) ?? []
   const blueprintRow = blueprintResult.data?.[0] ?? null
 
   return {
@@ -119,16 +122,20 @@ export async function fetchJobContext(
       completion_approved_at: job.completion_approved_at,
     },
     insurer_orders: (insurerOrdersResult.data ?? []).map((o) => ({ status: o.status ?? '' })),
-    inspection: inspectionRow
-      ? {
-          status: inspectionRow.status ?? '',
-          form_submitted_at: inspectionRow.form_submitted_at ?? null,
-          no_show_count: inspectionRow.no_show_count ?? 0,
-          last_no_show_at: inspectionRow.last_no_show_at ?? null,
-        }
-      : null,
+    inspections: inspectionRows.map((row) => ({
+      id: row.id,
+      status: row.status ?? '',
+      form_submitted_at: row.form_submitted_at ?? null,
+      no_show_count: row.no_show_count ?? 0,
+      last_no_show_at: row.last_no_show_at ?? null,
+    })),
     primary_quote: quoteRow ? { status: quoteRow.status ?? '' } : null,
-    primary_report: reportRow ? { status: reportRow.status ?? '' } : null,
+    reports: reportRows.map((row) => ({
+      id: row.id,
+      report_type: row.report_type,
+      status: row.status ?? '',
+      version: row.version,
+    })),
     blueprint: blueprintRow
       ? { status: (blueprintRow as unknown as { status: string }).status ?? '' }
       : null,

@@ -30,6 +30,7 @@ interface FlaggedJob {
   insured_name: string | null
   insurer: string | null
   override_stage: 'on_hold' | 'cancelled' | null
+  current_stage: string | null
   action_count: number
 }
 
@@ -215,7 +216,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     const { data } = await supabase
       .from('job_flags')
-      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage)`)
+      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage, current_stage)`)
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .limit(20)
@@ -240,6 +241,7 @@ export default function DashboardPage() {
           insured_name: job.insured_name,
           insurer: job.insurer,
           override_stage: job.override_stage ?? null,
+          current_stage: job.current_stage ?? null,
           action_count: count ?? 0,
         } as FlaggedJob
       })
@@ -717,7 +719,7 @@ export default function DashboardPage() {
                       <th>Address</th>
                       <th>Insured</th>
                       <th>Client</th>
-                      <th>Status</th>
+                      <th>Job Stage</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -759,10 +761,16 @@ export default function DashboardPage() {
                         <td>{job.insured_name ?? '—'}</td>
                         <td>{job.insurer ?? '—'}</td>
                         <td>
-                          {job.override_stage && (
+                          {job.override_stage ? (
                             <span className="sbadge s-pending">
                               {job.override_stage === 'on_hold' ? 'On Hold' : 'Cancelled'}
                             </span>
+                          ) : job.current_stage ? (
+                            <span className="sbadge s-active">
+                              {job.current_stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#c8c0b8', fontSize: 12 }}>—</span>
                           )}
                         </td>
                       </tr>
