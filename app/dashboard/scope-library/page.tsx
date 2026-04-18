@@ -613,7 +613,7 @@ export default function ScopeLibraryPage() {
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('trade', e)}
                       />
                     </th>
@@ -624,7 +624,7 @@ export default function ScopeLibraryPage() {
                     >
                       Insurer
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('insurer', e)}
                       />
                     </th>
@@ -635,7 +635,7 @@ export default function ScopeLibraryPage() {
                     >
                       Keyword
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('keyword', e)}
                       />
                     </th>
@@ -646,7 +646,7 @@ export default function ScopeLibraryPage() {
                     >
                       Description
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('description', e)}
                       />
                     </th>
@@ -657,7 +657,7 @@ export default function ScopeLibraryPage() {
                     >
                       Unit
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('unit', e)}
                       />
                     </th>
@@ -668,7 +668,7 @@ export default function ScopeLibraryPage() {
                     >
                       Labour
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('labour_per_unit', e)}
                       />
                     </th>
@@ -679,7 +679,7 @@ export default function ScopeLibraryPage() {
                     >
                       Material
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('materials_per_unit', e)}
                       />
                     </th>
@@ -691,7 +691,7 @@ export default function ScopeLibraryPage() {
                     >
                       Total {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('total_per_unit', e)}
                       />
                     </th>
@@ -703,7 +703,7 @@ export default function ScopeLibraryPage() {
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('estimated_hours', e)}
                       />
                     </th>
