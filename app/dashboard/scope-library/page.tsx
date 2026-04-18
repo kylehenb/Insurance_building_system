@@ -246,40 +246,45 @@ export default function ScopeLibraryPage() {
       );
     }
 
-    // Sort
-    filtered.sort((a, b) => {
-      let aVal: any, bVal: any;
-      
-      switch (sortColumn) {
-        case 'trade':
-          aVal = a.trade || '';
-          bVal = b.trade || '';
-          break;
-        case 'keyword':
-          aVal = a.keyword || '';
-          bVal = b.keyword || '';
-          break;
-        case 'total_per_unit':
-          aVal = a.total_per_unit || 0;
-          bVal = b.total_per_unit || 0;
-          break;
-        case 'estimated_hours':
-          aVal = a.estimated_hours || 0;
-          bVal = b.estimated_hours || 0;
-          break;
-        default:
-          return 0;
-      }
-
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
-    });
-
     setFilteredItems(filtered);
-  }, [items, tradeFilter, insurerFilter, searchQuery, sortColumn, sortDirection]);
+  }, [items, tradeFilter, insurerFilter, searchQuery]);
+
+  // Sort items separately - only triggered by header clicks
+  useEffect(() => {
+    if (sortColumn) {
+      const sorted = [...filteredItems].sort((a, b) => {
+        let aVal: any, bVal: any;
+        
+        switch (sortColumn) {
+          case 'trade':
+            aVal = a.trade || '';
+            bVal = b.trade || '';
+            break;
+          case 'keyword':
+            aVal = a.keyword || '';
+            bVal = b.keyword || '';
+            break;
+          case 'total_per_unit':
+            aVal = a.total_per_unit || 0;
+            bVal = b.total_per_unit || 0;
+            break;
+          case 'estimated_hours':
+            aVal = a.estimated_hours || 0;
+            bVal = b.estimated_hours || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (sortDirection === 'asc') {
+          return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        } else {
+          return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        }
+      });
+      setFilteredItems(sorted);
+    }
+  }, [sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -603,7 +608,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.trade }}
+                      style={{ position: 'relative', width: columnWidths.trade, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('trade')}
                     >
                       Trade {sortColumn === 'trade' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -615,7 +620,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.insurer }}
+                      style={{ position: 'relative', width: columnWidths.insurer, borderRightWidth: '0.5px' }}
                     >
                       Insurer
                       <div
@@ -626,7 +631,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.keyword }}
+                      style={{ position: 'relative', width: columnWidths.keyword, borderRightWidth: '0.5px' }}
                     >
                       Keyword
                       <div
@@ -637,7 +642,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.description }}
+                      style={{ position: 'relative', width: columnWidths.description, borderRightWidth: '0.5px' }}
                     >
                       Description
                       <div
@@ -648,7 +653,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.unit }}
+                      style={{ position: 'relative', width: columnWidths.unit, borderRightWidth: '0.5px' }}
                     >
                       Unit
                       <div
@@ -659,9 +664,9 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.labour_per_unit }}
+                      style={{ position: 'relative', width: columnWidths.labour_per_unit, borderRightWidth: '0.5px' }}
                     >
-                      Labour/Unit
+                      Labour
                       <div
                         style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('labour_per_unit', e)}
@@ -670,9 +675,9 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.materials_per_unit }}
+                      style={{ position: 'relative', width: columnWidths.materials_per_unit, borderRightWidth: '0.5px' }}
                     >
-                      Materials/Unit
+                      Material
                       <div
                         style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('materials_per_unit', e)}
@@ -681,10 +686,10 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.total_per_unit }}
+                      style={{ position: 'relative', width: columnWidths.total_per_unit, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('total_per_unit')}
                     >
-                      Total/Unit {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Total {sortColumn === 'total_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
                         style={{ position: 'absolute', right: 0, top: 0, width: 4, height: '100%', cursor: 'col-resize', backgroundColor: '#d4d0ca' }}
                         onMouseDown={(e) => handleResizeStart('total_per_unit', e)}
@@ -693,7 +698,7 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.estimated_hours }}
+                      style={{ position: 'relative', width: columnWidths.estimated_hours, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('estimated_hours')}
                     >
                       Est. Hours {sortColumn === 'estimated_hours' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -806,13 +811,24 @@ export default function ScopeLibraryPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right" style={{ width: columnWidths.actions }}>
                         <div className="flex items-center justify-end gap-2">
+                          {isDraft && (
+                            <button
+                              onClick={() => handleToggleApproval(item.id, (item as any).approval_status)}
+                              className="text-[#1a1a1a]/60 hover:text-green-600 transition-colors"
+                              title="Accept"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(item)}
                             className="text-[#1a1a1a]/60 hover:text-red-600 transition-colors"
                             title="Delete"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
                         </div>
