@@ -31,6 +31,7 @@ interface QuoteListItem {
   created_at: string
   item_count: number
   room_summary: Record<string, RoomSummary>
+  approval_notes: string | null
 }
 
 interface ActionConfig {
@@ -161,6 +162,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [sendDialogQuoteId, setSendDialogQuoteId] = useState<string | null>(null)
   const [declineDialogQuoteId, setDeclineDialogQuoteId] = useState<string | null>(null)
   const [declineOption, setDeclineOption] = useState<string | null>(null)
+  const [approveDialogQuoteId, setApproveDialogQuoteId] = useState<string | null>(null)
+  const [partialApproveDialogQuoteId, setPartialApproveDialogQuoteId] = useState<string | null>(null)
+  const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
+  const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -703,10 +708,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
-              Decline Quote
+              Reject Quote
             </div>
             <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
-              Please select a reason for declining this quote:
+              Please select a reason for rejecting this quote:
             </p>
 
             {!declineOption ? (
@@ -775,8 +780,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             ) : (
               <div>
                 <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 20 }}>
-                  {declineOption === 'claim_denied' && 'This will decline the quote and mark the job as declined.'}
-                  {declineOption === 'claim_cancelled' && 'This will decline the quote and mark the job as declined.'}
+                  {declineOption === 'claim_denied' && 'This will reject the quote and mark the job as declined.'}
+                  {declineOption === 'claim_cancelled' && 'This will reject the quote and mark the job as declined.'}
                   {declineOption === 'new_quote_required' && 'This will create a new quote by cloning the current one, and mark the current quote as Superseded.'}
                 </p>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
@@ -799,6 +804,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   <button
                     onClick={async () => {
                       if (declineDialogQuoteId) {
+                        // Store rejection reason in approval_notes
+                        const rejectionReason = declineOption === 'claim_denied' ? 'Claim denied by insurer' :
+                                                 declineOption === 'claim_cancelled' ? 'Claim cancelled' :
+                                                 'New quote required'
+                        
                         if (declineOption === 'new_quote_required') {
                           // Clone quote and mark current as superseded
                           try {
@@ -808,15 +818,33 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                               body: JSON.stringify({ tenantId }),
                             })
                             if (res.ok) {
-                              await handleStatusChange(declineDialogQuoteId, 'declined_superseded', true)
+                              await fetch(`/api/quotes/${declineDialogQuoteId}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  tenantId,
+                                  status: 'declined_superseded',
+                                  is_locked: true,
+                                  approval_notes: rejectionReason,
+                                }),
+                              })
                               load()
                             }
                           } catch (error) {
                             console.error('Error cloning quote:', error)
                           }
                         } else {
-                          // Decline quote and mark job as declined
-                          await handleStatusChange(declineDialogQuoteId, 'declined_claim_declined', true)
+                          // Reject quote and mark job as declined
+                          await fetch(`/api/quotes/${declineDialogQuoteId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              tenantId,
+                              status: 'declined_claim_declined',
+                              is_locked: true,
+                              approval_notes: rejectionReason,
+                            }),
+                          })
                           await handleJobStageChange(jobId, 'declined_close_out')
                         }
                         setDeclineDialogQuoteId(null)
@@ -840,6 +868,322 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Approval options dialog */}
+      {approveDialogQuoteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setApproveDialogQuoteId(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 400,
+              width: '90%',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Approve Quote
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              How would you like to approve this quote?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={async () => {
+                  if (approveDialogQuoteId) {
+                    await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    await handleStatusChange(approveDialogQuoteId, 'approved_contracts_pending', true)
+                    setApproveDialogQuoteId(null)
+                  }
+                }}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#2e7d32',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+              >
+                Approve in full
+              </button>
+              <button
+                onClick={async () => {
+                  if (approveDialogQuoteId) {
+                    // Fetch line items for partial approval
+                    try {
+                      const res = await fetch(`/api/quotes/${approveDialogQuoteId}/items?tenantId=${tenantId}`)
+                      if (res.ok) {
+                        const items = await res.json()
+                        setQuoteLineItems(items)
+                        setSelectedLineItems(items.map((i: any) => i.id))
+                        setPartialApproveDialogQuoteId(approveDialogQuoteId)
+                        setApproveDialogQuoteId(null)
+                      }
+                    } catch (error) {
+                      console.error('Error fetching line items:', error)
+                    }
+                  }
+                }}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#ffffff',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+              >
+                Partially Approved
+              </button>
+            </div>
+            <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setApproveDialogQuoteId(null)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial approval dialog with line item selection */}
+      {partialApproveDialogQuoteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setPartialApproveDialogQuoteId(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 600,
+              width: '90%',
+              maxHeight: '80vh',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Partially Approved
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 20 }}>
+              Select which line items to approve:
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <button
+                onClick={() => setSelectedLineItems(quoteLineItems.map((i: any) => i.id))}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#ffffff',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 4,
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+              >
+                Tick all
+              </button>
+              <button
+                onClick={() => setSelectedLineItems([])}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#ffffff',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 4,
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                border: '1px solid #e0dbd4',
+                borderRadius: 6,
+                padding: '12px',
+                marginBottom: 20,
+                maxHeight: '300px',
+              }}
+            >
+              {quoteLineItems.map((item: any) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px',
+                    borderBottom: '1px solid #e8e4e0',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    setSelectedLineItems(prev =>
+                      prev.includes(item.id)
+                        ? prev.filter(id => id !== item.id)
+                        : [...prev, item.id]
+                    )
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedLineItems.includes(item.id)}
+                    onChange={() => {}}
+                    onClick={e => e.stopPropagation()}
+                    style={{ marginRight: 12, cursor: 'pointer' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', marginBottom: 2 }}>
+                      {item.item_description || 'Untitled item'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9e998f' }}>
+                      {item.room && `Room: ${item.room} • `}
+                      Qty: {item.qty} • {fmt(item.line_total || 0)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPartialApproveDialogQuoteId(null)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (partialApproveDialogQuoteId && selectedLineItems.length > 0) {
+                    // Update scope_items approval_status
+                    for (const itemId of selectedLineItems) {
+                      await fetch(`/api/quotes/${partialApproveDialogQuoteId}/items/${itemId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          tenantId,
+                          approval_status: 'approved',
+                        }),
+                      })
+                    }
+                    // Mark unselected items as declined
+                    for (const item of quoteLineItems) {
+                      if (!selectedLineItems.includes(item.id)) {
+                        await fetch(`/api/quotes/${partialApproveDialogQuoteId}/items/${item.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            tenantId,
+                            approval_status: 'declined',
+                          }),
+                        })
+                      }
+                    }
+                    await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    await handleStatusChange(partialApproveDialogQuoteId, 'approved_contracts_pending', true)
+                    setPartialApproveDialogQuoteId(null)
+                    setSelectedLineItems([])
+                    setQuoteLineItems([])
+                  }
+                }}
+                disabled={selectedLineItems.length === 0}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: selectedLineItems.length > 0 ? '#2e7d32' : '#9e998f',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: selectedLineItems.length > 0 ? 'pointer' : 'not-allowed',
+                  opacity: selectedLineItems.length > 0 ? 1 : 0.6,
+                }}
+              >
+                Confirm Partial Approval
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -922,6 +1266,23 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </span>
                 )}
 
+                {/* Rejection reason badge */}
+                {(q.status === 'declined_claim_declined' || q.status === 'declined_superseded') && q.approval_notes && (
+                  <span
+                    style={{
+                      padding: '1px 7px',
+                      borderRadius: 4,
+                      fontSize: 10,
+                      fontWeight: 500,
+                      background: '#fce8e6',
+                      color: '#c5221f',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {q.approval_notes}
+                  </span>
+                )}
+
                 {/* Spacer */}
                 <div style={{ flex: 1 }} />
 
@@ -980,14 +1341,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </button>
                 )}
 
-                {/* Sent: Accept and Decline buttons */}
+                {/* Sent: Approve and Reject buttons */}
                 {q.status === 'sent_to_insurer' && (
                   <>
                     <button
                       onClick={e => {
                         e.stopPropagation()
-                        handleJobStageChange(jobId, 'approved_awaiting_signoff')
-                        handleStatusChange(q.id, 'approved_contracts_pending', true)
+                        setApproveDialogQuoteId(q.id)
                       }}
                       style={{
                         fontFamily: 'DM Sans, sans-serif',
@@ -1005,7 +1365,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
                       onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
                     >
-                      Accept
+                      Approve
                     </button>
                     <button
                       onClick={e => {
@@ -1028,7 +1388,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       onMouseEnter={e => (e.currentTarget.style.background = '#a81815')}
                       onMouseLeave={e => (e.currentTarget.style.background = '#c5221f')}
                     >
-                      Decline
+                      Reject
                     </button>
                   </>
                 )}

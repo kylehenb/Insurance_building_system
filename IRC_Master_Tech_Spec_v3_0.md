@@ -268,7 +268,7 @@ CREATE TABLE inspections (
   inspector_id UUID REFERENCES users(id),
   status TEXT DEFAULT 'unscheduled',
     -- 'unscheduled' | 'urgent_awaiting_assignment' | 'proposed' |
-    -- 'awaiting_reschedule' | 'confirmed' | 'in_progress' | 'submitted' | 'complete'
+    -- 'awaiting_reschedule' | 'confirmed' | 'in_progress' | 'submitted' | 'complete' | 'cancelled'
   insured_notified BOOLEAN DEFAULT false,
   scheduling_sms_sent_at TIMESTAMPTZ,
   scheduling_sms_response TEXT,
@@ -329,7 +329,7 @@ CREATE TABLE reports (
   version INTEGER DEFAULT 1,
   is_locked BOOLEAN DEFAULT false,
   report_type TEXT NOT NULL,           -- 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist'
-  status TEXT DEFAULT 'draft',         -- 'draft' | 'complete' | 'sent'
+  status TEXT DEFAULT 'draft',         -- 'draft' | 'complete' | 'sent' | 'cancelled'
   attendance_date DATE,
   attendance_time TIME,
   person_met TEXT,
@@ -370,7 +370,7 @@ CREATE TABLE quotes (
   version INTEGER DEFAULT 1,
   is_active_version BOOLEAN DEFAULT true,
   is_locked BOOLEAN DEFAULT false,
-  status TEXT DEFAULT 'draft',         -- 'draft' | 'complete' | 'sent' | 'approved' | 'partially_approved' | 'rejected'
+  status TEXT DEFAULT 'draft',         -- 'draft' | 'ready' | 'sent' | 'approved' | 'partially_approved' | 'rejected'
   approved_amount NUMERIC,
   approval_notes TEXT,
   raw_scope_notes TEXT,

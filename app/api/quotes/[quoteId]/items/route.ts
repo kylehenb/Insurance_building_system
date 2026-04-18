@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ quoteId: string }> }
+) {
+  const { quoteId } = await params
+  const { searchParams } = new URL(req.url)
+  const tenantId = searchParams.get('tenantId')
+
+  if (!tenantId) {
+    return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+
+  const { data, error } = await supabase
+    .from('scope_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data ?? [])
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
