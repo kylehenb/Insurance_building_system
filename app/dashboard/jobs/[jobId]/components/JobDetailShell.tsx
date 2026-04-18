@@ -13,7 +13,6 @@ import { OverviewTab } from './OverviewTab'
 import { InspectionsTab } from './InspectionsTab'
 import { ReportsTabWrapper } from './ReportsTabWrapper'
 import { QuotesTab } from './QuotesTab'
-import { TradeWorkOrdersTab } from './TradeWorkOrdersTab'
 import { PhotosTab } from './PhotosTab'
 import { FilesTab } from './FilesTab'
 import { InsurerOrdersTab } from './InsurerOrdersTab'
@@ -63,7 +62,6 @@ const TABS = [
   { id: 'inspections',      label: 'Inspections' },
   { id: 'reports',          label: 'Reports' },
   { id: 'quotes',           label: 'Quotes' },
-  { id: 'trade-work-orders',label: 'Trade Work Orders' },
   { id: 'work-orders',      label: 'Work Orders' },
   { id: 'photos',           label: 'Photos' },
   { id: 'files',            label: 'Files' },
@@ -161,8 +159,6 @@ function TabPanel({
       )
     case 'quotes':
       return <QuotesTab jobId={jobId} tenantId={tenantId} />
-    case 'trade-work-orders':
-      return <TradeWorkOrdersTab jobId={jobId} />
     case 'work-orders':
       return null // rendered outside the padded wrapper below
     case 'photos':

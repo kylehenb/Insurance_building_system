@@ -312,7 +312,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           break
 
         case 'navigate_work_orders':
-          router.push(`${window.location.pathname}?tab=trade-work-orders`)
+          router.push(`${window.location.pathname}?tab=work-orders`)
           break
 
         case 'navigate_invoices':
