@@ -2,6 +2,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { fetchJobContext } from './fetchJobContext'
 import { getJobStage } from './getJobStage'
 import type { JobStageKey } from './getJobStage'
+import type { Database } from '@/lib/supabase/database.types'
+
+type JobUpdate = Database['public']['Tables']['jobs']['Update']
 
 /**
  * Recomputes the job stage from live data and persists it to the jobs table.
@@ -13,12 +16,16 @@ export async function recomputeAndSaveStage(jobId: string): Promise<JobStageKey>
   const context = await fetchJobContext(jobId, supabase)
   const stage = getJobStage(context)
 
+  // current_stage and current_stage_updated_at are not yet in database.types.ts —
+  // cast through unknown to the Update type so strict mode accepts the call.
+  const patch = {
+    current_stage: stage.key,
+    current_stage_updated_at: new Date().toISOString(),
+  } as unknown as JobUpdate
+
   const { error } = await supabase
     .from('jobs')
-    .update({
-      current_stage: stage.key,
-      current_stage_updated_at: new Date().toISOString(),
-    } as Record<string, unknown>)
+    .update(patch)
     .eq('id', jobId)
 
   if (error) {
