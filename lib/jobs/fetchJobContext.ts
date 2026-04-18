@@ -3,12 +3,13 @@ import type { Database } from '../supabase/database.types'
 import type { JobContext } from './getJobStage'
 import type { OpenLoop } from './openLoops'
 
-// These fields are added by the add_job_stage_fields migration.
-// Once database.types.ts is regenerated after applying the migration,
-// the casts through unknown can be replaced with direct property access.
+// These fields are added by migrations not yet reflected in database.types.ts.
+// Once database.types.ts is regenerated the casts through unknown can be removed.
 type JobRow = {
   id: string
   override_stage: 'on_hold' | 'cancelled' | null
+  current_stage: string | null
+  current_stage_updated_at: string | null
   homeowner_signoff_sent_at: string | null
   homeowner_signoff_received_at: string | null
   completion_approved_at: string | null
@@ -38,7 +39,7 @@ export async function fetchJobContext(
   ] = await Promise.all([
     supabaseClient
       .from('jobs')
-      .select('id, override_stage, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at')
+      .select('id, override_stage, current_stage, current_stage_updated_at, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at')
       .eq('id', jobId)
       .single(),
 
@@ -111,6 +112,8 @@ export async function fetchJobContext(
     job: {
       id: job.id,
       override_stage: job.override_stage ?? null,
+      current_stage: job.current_stage ?? null,
+      current_stage_updated_at: job.current_stage_updated_at ?? null,
       homeowner_signoff_sent_at: job.homeowner_signoff_sent_at,
       homeowner_signoff_received_at: job.homeowner_signoff_received_at,
       completion_approved_at: job.completion_approved_at,

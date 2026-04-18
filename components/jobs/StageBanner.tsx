@@ -1,42 +1,47 @@
 import { createClient } from '@/lib/supabase/server'
-import { fetchJobContext } from '@/lib/jobs/fetchJobContext'
-import { getJobStage } from '@/lib/jobs/getJobStage'
-import type { JobStage } from '@/lib/jobs/getJobStage'
+import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
+import type { JobStageKey } from '@/lib/jobs/getJobStage'
 import type { OpenLoop } from '@/lib/jobs/openLoops'
 
-// Border colour is driven by stage state — custom hex values require inline styles
-function getBorderColor(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#f59e0b'
-  if (stage.key === 'cancelled') return '#9e998f'
+// These columns are added by migration and not yet in database.types.ts
+type JobStageRow = {
+  current_stage: string | null
+  current_stage_updated_at: string | null
+  override_stage: 'on_hold' | 'cancelled' | null
+}
+
+function getBorderColor(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#f59e0b'
+  if (stageKey === 'cancelled') return '#9e998f'
   return '#c9a96e'
 }
 
-function getSectionLabelColor(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#b45309'
-  if (stage.key === 'cancelled') return '#9e998f'
+function getSectionLabelColor(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#b45309'
+  if (stageKey === 'cancelled') return '#9e998f'
   return '#a07840'
 }
 
-function getStageNameColor(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#92400e'
-  if (stage.key === 'cancelled') return '#6a6460'
+function getStageNameColor(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#92400e'
+  if (stageKey === 'cancelled') return '#6a6460'
   return '#1a1a1a'
 }
 
-function getStageDescriptionColor(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#a07840'
-  if (stage.key === 'cancelled') return '#9e998f'
+function getStageDescriptionColor(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#a07840'
+  if (stageKey === 'cancelled') return '#9e998f'
   return '#9e8060'
 }
 
-function getSectionBorderBottom(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#f0d58c'
-  if (stage.key === 'cancelled') return '#e0dbd4'
+function getSectionBorderBottom(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#f0d58c'
+  if (stageKey === 'cancelled') return '#e0dbd4'
   return '#e8dfc8'
 }
 
-function getLoopLabelColor(stage: JobStage): string {
-  if (stage.key === 'on_hold') return '#b45309'
+function getLoopLabelColor(stageKey: JobStageKey): string {
+  if (stageKey === 'on_hold') return '#b45309'
   return '#a07840'
 }
 
@@ -44,17 +49,38 @@ type StageBannerProps = { jobId: string }
 
 export default async function StageBanner({ jobId }: StageBannerProps) {
   const supabase = await createClient()
-  const context = await fetchJobContext(jobId, supabase)
-  const stage = getJobStage(context)
 
-  const borderColor = getBorderColor(stage)
-  const sectionLabelColor = getSectionLabelColor(stage)
-  const stageNameColor = getStageNameColor(stage)
-  const stageDescriptionColor = getStageDescriptionColor(stage)
-  const sectionBorderBottom = getSectionBorderBottom(stage)
-  const loopLabelColor = getLoopLabelColor(stage)
-  const isOnHold = stage.key === 'on_hold'
-  const isCancelled = stage.key === 'cancelled'
+  const { data: raw } = await supabase
+    .from('jobs')
+    .select('current_stage, current_stage_updated_at, override_stage')
+    .eq('id', jobId)
+    .single()
+
+  const row = raw as unknown as JobStageRow | null
+
+  // Resolve effective stage key: override_stage takes precedence
+  const effectiveKey: JobStageKey =
+    row?.override_stage === 'on_hold'
+      ? 'on_hold'
+      : row?.override_stage === 'cancelled'
+        ? 'cancelled'
+        : row?.current_stage != null && row.current_stage in STAGE_CONFIG
+          ? (row.current_stage as JobStageKey)
+          : 'order_received'
+
+  const config = STAGE_CONFIG[effectiveKey]
+
+  // Open loops are not yet populated from the database
+  const openLoops: OpenLoop[] = []
+
+  const borderColor = getBorderColor(effectiveKey)
+  const sectionLabelColor = getSectionLabelColor(effectiveKey)
+  const stageNameColor = getStageNameColor(effectiveKey)
+  const stageDescriptionColor = getStageDescriptionColor(effectiveKey)
+  const sectionBorderBottom = getSectionBorderBottom(effectiveKey)
+  const loopLabelColor = getLoopLabelColor(effectiveKey)
+  const isOnHold = effectiveKey === 'on_hold'
+  const isCancelled = effectiveKey === 'cancelled'
 
   return (
     <div
@@ -114,7 +140,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 letterSpacing: '-0.2px',
               }}
             >
-              {stage.label}
+              {config.label}
             </div>
             <div
               style={{
@@ -123,12 +149,12 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 lineHeight: 1.3,
               }}
             >
-              {stage.description}
+              {config.description}
             </div>
           </div>
 
           {/* Action button or waiting pill */}
-          {isOnHold && stage.primaryAction ? (
+          {isOnHold && config.primaryAction ? (
             <button
               type="button"
               style={{
@@ -147,7 +173,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
             >
               Resume Job
             </button>
-          ) : stage.isWaiting ? (
+          ) : config.isWaiting ? (
             <div
               style={{
                 backgroundColor: '#ece6d8',
@@ -177,7 +203,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 Waiting
               </span>
             </div>
-          ) : stage.primaryAction && !isCancelled ? (
+          ) : config.primaryAction && !isCancelled ? (
             <button
               type="button"
               style={{
@@ -194,7 +220,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 fontFamily: 'inherit',
               }}
             >
-              {stage.primaryAction.label}
+              {config.primaryAction.label}
             </button>
           ) : null}
         </div>
@@ -241,20 +267,20 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
             </div>
             <div
               style={{
-                backgroundColor: stage.openLoops.length > 0 ? '#ef4444' : '#e0d8c8',
-                color: stage.openLoops.length > 0 ? 'white' : '#9e8060',
+                backgroundColor: openLoops.length > 0 ? '#ef4444' : '#e0d8c8',
+                color: openLoops.length > 0 ? 'white' : '#9e8060',
                 borderRadius: 10,
                 padding: '1px 6px',
                 fontSize: 9,
                 fontWeight: 600,
               }}
             >
-              {stage.openLoops.length}
+              {openLoops.length}
             </div>
           </div>
 
           {/* Loop rows */}
-          {stage.openLoops.length === 0 ? (
+          {openLoops.length === 0 ? (
             <div
               style={{
                 fontSize: 11,
@@ -272,7 +298,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                 gap: 4,
               }}
             >
-              {stage.openLoops.slice(0, 3).map((loop) => {
+              {openLoops.slice(0, 3).map((loop) => {
                 const isUrgent = loop.urgency === 'urgent'
                 return (
                   <div
@@ -323,7 +349,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                   </div>
                 )
               })}
-              {stage.openLoops.length > 3 && (
+              {openLoops.length > 3 && (
                 <div
                   style={{
                     fontSize: 11,
@@ -331,7 +357,7 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                     padding: '4px 2px',
                   }}
                 >
-                  + {stage.openLoops.length - 3} more{' '}
+                  + {openLoops.length - 3} more{' '}
                   <span
                     style={{
                       color: '#6a5a40',
@@ -339,7 +365,6 @@ export default async function StageBanner({ jobId }: StageBannerProps) {
                       borderBottom: '1px solid #c9a96e4a',
                       cursor: 'pointer',
                     }}
-                    onClick={() => console.log('view all loops')}
                   >
                     view all
                   </span>

@@ -23,6 +23,8 @@ export type JobContext = {
   job: {
     id: string
     override_stage: 'on_hold' | 'cancelled' | null
+    current_stage: string | null
+    current_stage_updated_at: string | null
     homeowner_signoff_sent_at: string | null
     homeowner_signoff_received_at: string | null
     completion_approved_at: string | null

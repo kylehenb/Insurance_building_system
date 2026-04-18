@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
+import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,8 +80,9 @@ export async function POST(req: NextRequest) {
       }
 
       console.log('[lodge] order linked to existing job')
-      return NextResponse.json({ 
-        jobNumber: existingJobByClaim.job_number, 
+      await recomputeAndSaveStage(existingJobByClaim.id)
+      return NextResponse.json({
+        jobNumber: existingJobByClaim.job_number,
         jobId: existingJobByClaim.id,
         linkedToExisting: true,
         message: 'Order linked to existing job with same claim number'
@@ -281,6 +283,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
     }
 
+    await recomputeAndSaveStage(jobId)
     console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
     return NextResponse.json({ jobNumber, jobId })
 

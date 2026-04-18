@@ -6,17 +6,118 @@ import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
 import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
+import { STAGE_CONFIG } from "@/lib/jobs/stageConfig";
+import type { JobStageKey } from "@/lib/jobs/getJobStage";
 
-type JobRow = Omit<Database["public"]["Tables"]["jobs"]["Row"], 'status'> & {
+type JobRow = {
+  id: string
+  job_number: string | null
+  insured_name: string | null
+  property_address: string | null
+  insurer: string | null
   override_stage: 'on_hold' | 'cancelled' | null
-};
+  current_stage: string | null
+  created_at: string | null
+}
 
-function StatusBadge({ override_stage }: { override_stage: 'on_hold' | 'cancelled' | null }) {
-  if (override_stage === 'on_hold')
-    return <span style={{ background: '#fdf5e8', color: '#8a6020', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>On Hold</span>
-  if (override_stage === 'cancelled')
-    return <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Cancelled</span>
-  return null
+type StageFilter =
+  | 'all'
+  | 'active'
+  | 'awaiting_action'
+  | 'waiting'
+  | 'complete'
+  | 'on_hold'
+  | 'cancelled'
+
+const STAGE_GROUPS: Record<Exclude<StageFilter, 'all'>, JobStageKey[]> = {
+  active: [
+    'awaiting_schedule',
+    'inspection_scheduled',
+    'awaiting_compilation',
+    'sent_awaiting_approval',
+    'approved_awaiting_signoff',
+    'awaiting_signed_document',
+    'signed_build_schedule',
+    'repairs_in_progress',
+    'awaiting_completion_signoff',
+    'awaiting_trade_invoices',
+    'ready_to_invoice',
+  ],
+  awaiting_action: [
+    'order_received',
+    'awaiting_schedule',
+    'awaiting_compilation',
+    'approved_awaiting_signoff',
+    'signed_build_schedule',
+    'awaiting_completion_signoff',
+    'awaiting_trade_invoices',
+    'ready_to_invoice',
+  ],
+  waiting: [
+    'inspection_scheduled',
+    'sent_awaiting_approval',
+    'awaiting_signed_document',
+    'repairs_in_progress',
+    'invoiced_awaiting_payment',
+  ],
+  complete: ['complete'],
+  on_hold: ['on_hold'],
+  cancelled: ['cancelled'],
+}
+
+const FILTER_TABS: { key: StageFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'awaiting_action', label: 'Awaiting Action' },
+  { key: 'waiting', label: 'Waiting' },
+  { key: 'complete', label: 'Complete' },
+  { key: 'on_hold', label: 'On Hold' },
+  { key: 'cancelled', label: 'Cancelled' },
+]
+
+function StagePill({ currentStage }: { currentStage: string | null }) {
+  if (!currentStage) {
+    return <span style={{ color: '#b0a898', fontSize: 11 }}>—</span>
+  }
+  const config = currentStage in STAGE_CONFIG
+    ? STAGE_CONFIG[currentStage as JobStageKey]
+    : null
+  if (!config) {
+    return <span style={{ color: '#b0a898', fontSize: 11 }}>{currentStage}</span>
+  }
+  const isOnHold = currentStage === 'on_hold'
+  const isCancelled = currentStage === 'cancelled'
+  const isComplete = currentStage === 'complete'
+  const bgColor = isOnHold
+    ? '#fdf5e8'
+    : isCancelled
+      ? '#fdecea'
+      : isComplete
+        ? '#f0fdf4'
+        : '#f5f0e8'
+  const textColor = isOnHold
+    ? '#8a6020'
+    : isCancelled
+      ? '#b91c1c'
+      : isComplete
+        ? '#166534'
+        : '#6a5a40'
+
+  return (
+    <span
+      style={{
+        background: bgColor,
+        color: textColor,
+        fontSize: 11,
+        fontWeight: 500,
+        padding: '2px 7px',
+        borderRadius: 4,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {config.label}
+    </span>
+  )
 }
 
 function formatDate(dateString: string | null): string {
@@ -33,11 +134,30 @@ export default function JobsListPage() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<StageFilter>('all');
 
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  const SELECT_FIELDS = 'id, job_number, insured_name, property_address, insurer, override_stage, current_stage, created_at'
+
+  async function fetchJobs(tid: string, filter: StageFilter) {
+    let query = supabase
+      .from('jobs')
+      .select(SELECT_FIELDS)
+      .eq('tenant_id', tid)
+      .order('created_at', { ascending: false })
+
+    if (filter !== 'all') {
+      query = query.in('current_stage', STAGE_GROUPS[filter])
+    }
+
+    const { data } = await query
+    setJobs((data as unknown as JobRow[]) ?? []);
+    setLoading(false);
+  }
 
   // Auth bootstrap
   useEffect(() => {
@@ -54,28 +174,14 @@ export default function JobsListPage() {
 
   useEffect(() => {
     if (!tenantId) return;
-    async function fetchJobs() {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, job_number, insured_name, property_address, insurer, override_stage, created_at')
-        .eq('tenant_id', tenantId!)
-        .order('created_at', { ascending: false });
-      setJobs((data as unknown as JobRow[]) ?? []);
-      setLoading(false);
-    }
-    fetchJobs();
-  }, [tenantId, supabase]);
+    fetchJobs(tenantId, activeFilter);
+  }, [tenantId, activeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh when AI actions complete
   useAIActionRefresh(async () => {
     if (!tenantId) return;
-    const { data } = await supabase
-      .from('jobs')
-      .select('id, job_number, insured_name, property_address, insurer, override_stage, created_at')
-      .eq('tenant_id', tenantId!)
-      .order('created_at', { ascending: false });
-    setJobs((data as unknown as JobRow[]) ?? []);
-  }, [tenantId, supabase]);
+    await fetchJobs(tenantId, activeFilter);
+  }, [tenantId, activeFilter, supabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="p-6 lg:p-8">
@@ -96,8 +202,40 @@ export default function JobsListPage() {
             </Link>
           </div>
 
+          {/* Stage filter tabs */}
+          <div className="mt-6 flex gap-1 border-b border-[#e4dfd8]">
+            {FILTER_TABS.map((tab) => {
+              const isActive = tab.key === activeFilter
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setLoading(true)
+                    setActiveFilter(tab.key)
+                  }}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#1a1a1a' : '#9e8060',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: isActive ? '2px solid #c9a96e' : '2px solid transparent',
+                    cursor: 'pointer',
+                    marginBottom: -1,
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
           {/* Jobs Table */}
-          <div className="mt-8 rounded-lg border border-[#e4dfd8] bg-white shadow-sm overflow-hidden">
+          <div className="mt-4 rounded-lg border border-[#e4dfd8] bg-white shadow-sm overflow-hidden">
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-sm text-[#b0a898]">Loading...</div>
@@ -122,15 +260,18 @@ export default function JobsListPage() {
                 </div>
                 <h3 className="mt-4 text-lg font-medium text-[#1a1a1a]">No jobs yet</h3>
                 <p className="mt-2 max-w-sm text-center text-sm text-[#1a1a1a]/60">
-                  Get started by creating your first job. Jobs help you track insurance
-                  repair work from intake through completion.
+                  {activeFilter === 'all'
+                    ? 'Get started by creating your first job. Jobs help you track insurance repair work from intake through completion.'
+                    : 'No jobs match the selected filter.'}
                 </p>
-                <Link
-                  href="/dashboard/jobs/new"
-                  className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
-                >
-                  Create First Job
-                </Link>
+                {activeFilter === 'all' && (
+                  <Link
+                    href="/dashboard/jobs/new"
+                    className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+                  >
+                    Create First Job
+                  </Link>
+                )}
               </div>
             ) : (
               /* Table */
@@ -166,7 +307,7 @@ export default function JobsListPage() {
                         scope="col"
                         className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       >
-                        Status
+                        Stage
                       </th>
                       <th
                         scope="col"
@@ -204,7 +345,7 @@ export default function JobsListPage() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <StatusBadge override_stage={(job as any).override_stage ?? null} />
+                          <StagePill currentStage={job.current_stage} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
                           <span className="text-xs text-[#b0a898]">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
+import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update']
 
@@ -70,6 +71,12 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Recompute stage whenever quote status changes
+  if ('status' in safeUpdates && data.job_id) {
+    await recomputeAndSaveStage(data.job_id)
+  }
+
   return NextResponse.json(data)
 }
 
