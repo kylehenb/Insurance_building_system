@@ -92,20 +92,39 @@ export default function ScopeLibraryPage() {
   const [sortColumn, setSortColumn] = useState<string>('trade');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Column width state
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-    trade: 128,
-    insurer: 100,
-    keyword: 120,
-    description: 500,
-    unit: 80,
-    labour_per_unit: 100,
-    materials_per_unit: 120,
-    total_per_unit: 100,
-    estimated_hours: 100,
-    actions: 80,
+  // Column width state - load from localStorage or use defaults
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('scope-library-column-widths');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse saved column widths:', e);
+        }
+      }
+    }
+    return {
+      trade: 128,
+      insurer: 100,
+      keyword: 120,
+      description: 500,
+      unit: 80,
+      labour_per_unit: 100,
+      materials_per_unit: 120,
+      total_per_unit: 100,
+      estimated_hours: 100,
+      actions: 80,
+    };
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
+
+  // Save column widths to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('scope-library-column-widths', JSON.stringify(columnWidths));
+    }
+  }, [columnWidths]);
 
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
