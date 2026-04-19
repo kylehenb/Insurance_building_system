@@ -90,7 +90,7 @@ export default function ScopeLibraryPage() {
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
 
   // Sort state
-  const [sortColumn, setSortColumn] = useState<string>('trade');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Column width state - load from localStorage or use defaults
@@ -254,7 +254,7 @@ export default function ScopeLibraryPage() {
     new Set(items.map(item => item.trade).filter((t): t is string => Boolean(t)))
   ).sort();
 
-  // Filter items
+  // Filter and sort items
   useEffect(() => {
     let filtered = items;
 
@@ -279,13 +279,9 @@ export default function ScopeLibraryPage() {
       );
     }
 
-    setFilteredItems(filtered);
-  }, [items, tradeFilter, insurerFilter, searchQuery]);
-
-  // Sort items separately - only triggered by header clicks
-  useEffect(() => {
+    // Apply sorting
     if (sortColumn) {
-      const sorted = [...filteredItems].sort((a, b) => {
+      filtered = [...filtered].sort((a, b) => {
         let aVal: any, bVal: any;
         
         switch (sortColumn) {
@@ -315,9 +311,13 @@ export default function ScopeLibraryPage() {
           return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
         }
       });
-      setFilteredItems(sorted);
+    } else {
+      // Maintain stable order by id when no sort column is selected
+      filtered = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
     }
-  }, [sortColumn, sortDirection]);
+
+    setFilteredItems(filtered);
+  }, [items, tradeFilter, insurerFilter, searchQuery, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -490,18 +490,18 @@ export default function ScopeLibraryPage() {
 
     await supabase.from('scope_library_history').insert(historyRecord);
 
-    // Update the item
+    // Update the item in database
     await supabase
       .from('scope_library')
       .update({ [field]: value, updated_at: new Date().toISOString() } as ScopeLibraryInsert)
       .eq('id', itemId);
 
-    // Refresh - don't apply database ordering, let client-side sort handle it
-    const { data } = await supabase
-      .from('scope_library')
-      .select('*')
-      .eq('tenant_id', tenantId);
-    setItems((data as ScopeLibraryRow[]) ?? []);
+    // Update local state directly to preserve table order
+    setItems(items.map(i => 
+      i.id === itemId 
+        ? { ...i, [field]: value, updated_at: new Date().toISOString() }
+        : i
+    ));
   };
 
   // Approve/Unapprove handler
