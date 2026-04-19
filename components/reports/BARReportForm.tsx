@@ -183,19 +183,6 @@ export function BARReportForm({ data, locked, onChange }: BARReportFormProps) {
         </div>
       </div>
 
-      {/* — PROPERTY DESCRIPTION — */}
-      <SectionHeading label="Property Description" />
-      <div>
-        <FieldLabel label="Property Description" />
-        <InlineTextarea
-          value={str('property_description')}
-          onChange={v => onChange('property_description', v)}
-          locked={locked}
-          placeholder="Describe the property type, construction, age, and condition..."
-          rows={3}
-        />
-      </div>
-
       {/* — INCIDENT — */}
       <SectionHeading label="Incident" />
       <div className="space-y-4">

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -13,10 +13,12 @@ import {
   Trash2,
   RotateCcw,
 } from 'lucide-react'
+import { createBrowserClient } from '@supabase/ssr'
 import { BARReportForm } from './BARReportForm'
 import { RoofReportForm } from './RoofReportForm'
 import { MakeSafeReportForm } from './MakeSafeReportForm'
 import { useReportAutosave } from './useReportAutosave'
+import { PropertyDetails, parsePropertyDetails } from '@/lib/types/property-details'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Report {
@@ -62,6 +64,7 @@ interface ReportAccordionItemProps {
   onReportDeleted: (id: string) => void
   onReportDuplicated: (newReport: Report) => void
   onReportReinstated: (id: string) => void
+  jobId: string
 }
 
 // — Helpers ————————————————————————————————————————————————————————
@@ -171,12 +174,85 @@ export function ReportAccordionItem({
   onReportDeleted,
   onReportDuplicated,
   onReportReinstated,
+  jobId,
 }: ReportAccordionItemProps) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   const [report, setReport] = useState<Report>(initialReport)
   const [isOpen, setIsOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isActioning, setIsActioning] = useState(false)
+
+  // Property details state
+  const [propertyDetails, setPropertyDetails] = useState<PropertyDetails>({})
+  const [propertyDetailsLoading, setPropertyDetailsLoading] = useState(true)
+  const [propertyDetailsSaveState, setPropertyDetailsSaveState] = useState<{
+    status: 'idle' | 'saving' | 'saved' | 'error'
+  }>({ status: 'idle' })
+
+  // Fetch job with property_details when accordion opens
+  useEffect(() => {
+    if (isOpen && !propertyDetailsLoading) return
+    if (!isOpen) return
+
+    const fetchJobPropertyDetails = async () => {
+      setPropertyDetailsLoading(true)
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('id, job_number, property_details')
+        .eq('id', report.job_id)
+        .eq('tenant_id', report.tenant_id)
+        .single()
+
+      const parsed = parsePropertyDetails(job?.property_details)
+      setPropertyDetails(parsed)
+      setPropertyDetailsLoading(false)
+    }
+
+    fetchJobPropertyDetails()
+  }, [isOpen, report.job_id, report.tenant_id, supabase, propertyDetailsLoading])
+
+  // Save property details to jobs table
+  const savePropertyDetails = async (updates: PropertyDetails) => {
+    setPropertyDetailsSaveState({ status: 'saving' })
+
+    const { error } = await supabase
+      .from('jobs')
+      .update({ property_details: updates })
+      .eq('id', report.job_id)
+      .eq('tenant_id', report.tenant_id)
+
+    if (error) {
+      console.error('[PropertyDetails] Error:', error)
+      setPropertyDetailsSaveState({ status: 'error' })
+      setTimeout(() => setPropertyDetailsSaveState({ status: 'idle' }), 2000)
+      return
+    }
+
+    setPropertyDetailsSaveState({ status: 'saved' })
+    setTimeout(() => setPropertyDetailsSaveState({ status: 'idle' }), 2000)
+  }
+
+  // Debounced property details save
+  const propertyDetailsDebounceRef = React.useRef<NodeJS.Timeout | null>(null)
+  const handlePropertyDetailChange = useCallback(
+    (field: keyof PropertyDetails, value: string | boolean) => {
+      setPropertyDetails(prev => ({ ...prev, [field]: value }))
+
+      if (propertyDetailsDebounceRef.current) {
+        clearTimeout(propertyDetailsDebounceRef.current)
+      }
+
+      propertyDetailsDebounceRef.current = setTimeout(() => {
+        savePropertyDetails({ ...propertyDetails, [field]: value })
+      }, 1500)
+    },
+    [propertyDetails, savePropertyDetails]
+  )
 
   const currentSnapshot = {
     attendance_date: report.attendance_date,
@@ -187,7 +263,6 @@ export function ReportAccordionItem({
     insured_name: report.insured_name,
     claim_number: report.claim_number,
     loss_type: report.loss_type,
-    property_description: report.property_description,
     incident_description: report.incident_description,
     cause_of_damage: report.cause_of_damage,
     how_damage_occurred: report.how_damage_occurred,
@@ -509,6 +584,219 @@ export function ReportAccordionItem({
                 </span>
               </div>
             )}
+
+            {/* — Property Details Section — */}
+            <div
+              className="mt-4 mb-6 p-5 rounded-lg"
+              style={{
+                background: '#faf8f5',
+                borderLeft: '2px solid #c8b89a',
+                border: '0.5px solid #e4dfd8',
+              }}
+            >
+              <div className="mb-4">
+                <h3
+                  className="text-[12px] font-semibold text-[#3a3530] mb-1"
+                  style={{ fontFamily: 'DM Sans, sans-serif' }}
+                >
+                  Property Details
+                </h3>
+                <p
+                  className="text-[11px] text-[#b0a898]"
+                  style={{ fontFamily: 'DM Sans, sans-serif' }}
+                >
+                  Shared across all reports on this job — editing here updates the job record
+                </p>
+                {propertyDetailsSaveState.status === 'saving' && (
+                  <span className="text-[10px] text-[#b0a898] ml-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    Saving…
+                  </span>
+                )}
+                {propertyDetailsSaveState.status === 'saved' && (
+                  <span className="text-[10px] text-emerald-500 ml-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    Saved
+                  </span>
+                )}
+                {propertyDetailsSaveState.status === 'error' && (
+                  <span className="text-[10px] text-red-500 ml-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    Error saving
+                  </span>
+                )}
+              </div>
+
+              {propertyDetailsLoading ? (
+                <div className="h-32 rounded-lg animate-pulse" style={{ background: '#f0ece6' }} />
+              ) : (
+                <>
+                  {/* Text fields - 2 column grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Building age
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.building_age ?? ''}
+                        onChange={e => handlePropertyDetailChange('building_age', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. ~30 years"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Condition
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.condition ?? ''}
+                        onChange={e => handlePropertyDetailChange('condition', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. Good, Fair, Poor"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Roof type
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.roof_type ?? ''}
+                        onChange={e => handlePropertyDetailChange('roof_type', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. Concrete tile — hip configuration"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Wall type
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.wall_type ?? ''}
+                        onChange={e => handlePropertyDetailChange('wall_type', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. Brick veneer, Double brick"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Storeys
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.storeys ?? ''}
+                        onChange={e => handlePropertyDetailChange('storeys', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. 1, 2"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Foundation
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.foundation ?? ''}
+                        onChange={e => handlePropertyDetailChange('foundation', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. Concrete slab, Suspended timber"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        Fence
+                      </label>
+                      <input
+                        type="text"
+                        value={propertyDetails.fence ?? ''}
+                        onChange={e => handlePropertyDetailChange('fence', e.target.value)}
+                        disabled={isLocked}
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        placeholder="e.g. Colourbond — approx. 15 years, None"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Boolean fields - row of checkboxes */}
+                  <div className="flex flex-wrap gap-6">
+                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      <input
+                        type="checkbox"
+                        checked={propertyDetails.pool ?? false}
+                        onChange={e => handlePropertyDetailChange('pool', e.target.checked)}
+                        disabled={isLocked}
+                        className="accent-[#c8b89a]"
+                      />
+                      Swimming pool
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      <input
+                        type="checkbox"
+                        checked={propertyDetails.detached_garage ?? false}
+                        onChange={e => handlePropertyDetailChange('detached_garage', e.target.checked)}
+                        disabled={isLocked}
+                        className="accent-[#c8b89a]"
+                      />
+                      Detached garage
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      <input
+                        type="checkbox"
+                        checked={propertyDetails.granny_flat ?? false}
+                        onChange={e => handlePropertyDetailChange('granny_flat', e.target.checked)}
+                        disabled={isLocked}
+                        className="accent-[#c8b89a]"
+                      />
+                      Granny flat / outbuilding
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                      <input
+                        type="checkbox"
+                        checked={propertyDetails.tarp_required ?? false}
+                        onChange={e => handlePropertyDetailChange('tarp_required', e.target.checked)}
+                        disabled={isLocked}
+                        className="accent-[#c8b89a]"
+                      />
+                      Tarp required
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
 
             {(report.report_type === 'BAR' || report.report_type === 'storm_wind') && (
               <BARReportForm

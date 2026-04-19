@@ -252,6 +252,7 @@ export function ReportsTab({
               onReportDeleted={handleReportDeleted}
               onReportDuplicated={handleReportDuplicated}
               onReportReinstated={handleReportReinstated}
+              jobId={jobId}
             />
           ))}
         </div>

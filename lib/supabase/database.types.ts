@@ -1088,6 +1088,7 @@ export type Database = {
           loss_type: string | null
           notes: string | null
           property_address: string | null
+          property_details: Json | null
           special_instructions: string | null
           status: string | null
           sum_insured: number | null
@@ -1121,6 +1122,7 @@ export type Database = {
           loss_type?: string | null
           notes?: string | null
           property_address?: string | null
+          property_details?: Json | null
           special_instructions?: string | null
           status?: string | null
           sum_insured?: number | null
@@ -1154,6 +1156,7 @@ export type Database = {
           loss_type?: string | null
           notes?: string | null
           property_address?: string | null
+          property_details?: Json | null
           special_instructions?: string | null
           status?: string | null
           sum_insured?: number | null

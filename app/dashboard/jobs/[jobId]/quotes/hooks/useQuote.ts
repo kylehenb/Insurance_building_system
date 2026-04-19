@@ -216,8 +216,18 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
   const scheduleItemSave = useCallback(
     (itemId: string, changes: Record<string, unknown>) => {
+      // `labour_total` and `materials_total` are client-only display values
+      // (qty × rate) that have no DB column. Including them in a PATCH body
+      // causes Supabase to reject the entire update, silently losing all other
+      // fields (rate_labour, trade, room dimensions, …) in the same batch.
+      // Strip them here so they can still update local state via updateItemLocal
+      // without ever reaching the server.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { labour_total: _lt, materials_total: _mt, ...persistableChanges } = changes
+      if (Object.keys(persistableChanges).length === 0) return
+
       const existing = pendingChanges.current.get(itemId) ?? {}
-      pendingChanges.current.set(itemId, { ...existing, ...changes })
+      pendingChanges.current.set(itemId, { ...existing, ...persistableChanges })
 
       // Temp items: accumulate changes but defer flush until real ID is confirmed
       if (itemId.startsWith('temp-')) return

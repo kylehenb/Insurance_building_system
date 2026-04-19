@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { PrintButton } from './PrintButton'
+import { parsePropertyDetails } from '@/lib/types/property-details'
 
 type Report = Database['public']['Tables']['reports']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
@@ -55,6 +56,13 @@ function tsf(report: Report, key: string): string {
   return String(val)
 }
 
+function pdText(pd: ReturnType<typeof parsePropertyDetails>, key: string): string {
+  const val = (pd as Record<string, unknown>)[key]
+  if (val === null || val === undefined || val === '') return '—'
+  if (typeof val === 'boolean') return val ? 'Yes' : 'No'
+  return String(val)
+}
+
 const formatDate = (date: string | null) => {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('en-AU', {
@@ -94,6 +102,7 @@ const NARRATIVE_SECTION_CONFIG: Record<
     leftBorder?: string
   }
 > = {
+  property_description: { title: 'Property description', getValue: (r) => r.property_description },
   incident_description: { title: 'Incident description', getValue: (r) => r.incident_description },
   cause_of_damage: { title: 'Cause of damage', getValue: (r) => r.cause_of_damage },
   how_damage_occurred: { title: 'How damage occurred', getValue: (r) => r.how_damage_occurred },
@@ -112,6 +121,7 @@ const NARRATIVE_SECTION_CONFIG: Record<
 }
 
 const NARRATIVE_GROUPS: Array<{ label: string; keys: string[] }> = [
+  { label: 'Property', keys: ['property_description'] },
   { label: 'Incident', keys: ['incident_description', 'cause_of_damage', 'how_damage_occurred'] },
   { label: 'Damage findings', keys: ['resulting_damage'] },
   { label: 'Assessment', keys: ['conclusion', 'pre_existing_conditions', 'maintenance_notes'] },
@@ -179,6 +189,8 @@ export default async function ReportPrintPage({
   if (tenantError || !tenant) {
     return <div>Tenant not found</div>
   }
+
+  const pd = parsePropertyDetails(job.property_details)
 
   // Build property table rows from template config
   const propertyFields = DEFAULT_BAR_TEMPLATE.property_table_fields as readonly string[]
@@ -344,11 +356,11 @@ export default async function ReportPrintPage({
                       rows.push(
                         <tr key={leftKey}>
                           <td style={isLast && !rightKey ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[leftKey] ?? leftKey}</td>
-                          <td style={isLast && !rightKey ? tdValueLast : tdValue}>{tsf(report, leftKey)}</td>
+                          <td style={isLast && !rightKey ? tdValueLast : tdValue}>{pdText(pd, leftKey)}</td>
                           {rightKey ? (
                             <>
                               <td style={isLast ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[rightKey] ?? rightKey}</td>
-                              <td style={isLast ? tdValueLast : tdValue}>{tsf(report, rightKey)}</td>
+                              <td style={isLast ? tdValueLast : tdValue}>{pdText(pd, rightKey)}</td>
                             </>
                           ) : (
                             <>
@@ -419,35 +431,15 @@ export default async function ReportPrintPage({
           {(() => {
             const nodes: React.ReactNode[] = []
 
-            // If show_property_table is false, render property_description as section 1 in its own group
-            if (!DEFAULT_BAR_TEMPLATE.show_property_table) {
-              sectionCounter++
-              const num = sectionCounter
-              nodes.push(
-                <div key="group-property">
-                  <div style={{ fontSize: '8px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#c8b89a', fontWeight: '700', paddingTop: '10px', paddingBottom: '4px', borderBottom: '1px solid #e8e4e0', marginBottom: '10px' }}>
-                    Property
-                  </div>
-                  <div key="property_description" style={{ marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
-                      <div style={{ width: '18px', height: '18px', background: '#1a1a1a', color: '#f5f2ee', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {num}
-                      </div>
-                      <div style={{ fontSize: '8.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700' }}>
-                        Property description
-                      </div>
-                    </div>
-                    <div style={{ background: '#fafaf8', border: '1px solid #e8e4e0', borderRadius: '5px', padding: '9px 11px', fontSize: '11.5px', color: '#3a3530', lineHeight: '1.65' }}>
-                      {report.property_description || <span style={{ color: '#9e998f' }}>—</span>}
-                    </div>
-                  </div>
-                </div>
-              )
-            }
-
             // Render narrative groups
             for (const group of NARRATIVE_GROUPS) {
-              const visibleKeys = group.keys.filter(k => activeSections.includes(k))
+              const visibleKeys = group.keys.filter(k => {
+                // Only show property_description if show_property_table is false
+                if (k === 'property_description' && DEFAULT_BAR_TEMPLATE.show_property_table) {
+                  return false
+                }
+                return activeSections.includes(k)
+              })
               if (visibleKeys.length === 0) continue
 
               nodes.push(
@@ -483,6 +475,9 @@ export default async function ReportPrintPage({
             return nodes
           })()}
         </div>
+
+        {/* Bottom padding */}
+        <div style={{ paddingBottom: '60px' }} />
 
         {/* Footer */}
         <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
