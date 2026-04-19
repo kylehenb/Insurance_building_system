@@ -29,8 +29,6 @@ type ScopeLibraryHistoryInsert = {
   changed_at?: string;
 };
 
-const INSURERS = ['All', 'Default', 'Midcity', 'Sedgwick', 'A&G', 'IAG', 'RAC', 'Suncorp'];
-
 function formatCurrency(value: number | null): string {
   if (value === null || value === undefined) return '-';
   return new Intl.NumberFormat('en-AU', {
@@ -87,6 +85,9 @@ export default function ScopeLibraryPage() {
 
   // Trades from API
   const [trades, setTrades] = useState<Array<{ id: string; primary_trade: string; trade_code: string | null }>>([]);
+
+  // Clients from database
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
 
   // Sort state
   const [sortColumn, setSortColumn] = useState<string>('trade');
@@ -216,8 +217,7 @@ export default function ScopeLibraryPage() {
       const { data } = await supabase
         .from('scope_library')
         .select('*')
-        .eq('tenant_id', tenantId!)
-        .order('trade', { ascending: true });
+        .eq('tenant_id', tenantId!);
       setItems((data as ScopeLibraryRow[]) ?? []);
       setLoading(false);
     }
@@ -234,6 +234,20 @@ export default function ScopeLibraryPage() {
       })
       .catch(() => {});
   }, [tenantId]);
+
+  // Fetch clients from database
+  useEffect(() => {
+    if (!tenantId) return;
+    async function fetchClients() {
+      const { data } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('tenant_id', tenantId!)
+        .eq('status', 'active');
+      setClients((data as Array<{ id: string; name: string }>) ?? []);
+    }
+    fetchClients();
+  }, [tenantId, supabase]);
 
   // Get unique trades from items
   const uniqueTrades = Array.from(
@@ -382,7 +396,7 @@ export default function ScopeLibraryPage() {
     // Delete the item
     await supabase.from('scope_library').delete().eq('id', itemToDelete.id);
 
-    // Refresh
+    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
@@ -428,7 +442,7 @@ export default function ScopeLibraryPage() {
       } as ScopeLibraryInsert);
     }
 
-    // Refresh
+    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
@@ -450,12 +464,11 @@ export default function ScopeLibraryPage() {
 
     await supabase.from('scope_library').insert(records);
 
-    // Refresh
+    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
-      .eq('tenant_id', tenantId)
-      .order('trade', { ascending: true });
+      .eq('tenant_id', tenantId);
     setItems((data as ScopeLibraryRow[]) ?? []);
   };
 
@@ -483,7 +496,7 @@ export default function ScopeLibraryPage() {
       .update({ [field]: value, updated_at: new Date().toISOString() } as ScopeLibraryInsert)
       .eq('id', itemId);
 
-    // Refresh
+    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
@@ -559,8 +572,10 @@ export default function ScopeLibraryPage() {
               onChange={(e) => setInsurerFilter(e.target.value)}
               className="rounded-md border border-[#e0dbd4] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
             >
-              {INSURERS.map(insurer => (
-                <option key={insurer} value={insurer}>{insurer}</option>
+              <option value="All">All</option>
+              <option value="Default">Default</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.name}>{client.name}</option>
               ))}
             </select>
           </div>
@@ -766,14 +781,24 @@ export default function ScopeLibraryPage() {
                         </select>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.insurer }}>
-                        <span className="text-xs text-[#1a1a1a]/70">
-                          {item.insurer_specific || 'Default'}
-                        </span>
+                        <select
+                          value={item.insurer_specific ?? 'Default'}
+                          onChange={(e) => handleInlineEdit(item.id, 'insurer_specific', e.target.value === 'Default' ? null : e.target.value)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        >
+                          <option value="Default">Default</option>
+                          {clients.map(client => (
+                            <option key={client.id} value={client.name}>{client.name}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.keyword }}>
-                        <span className="text-xs font-mono text-[#1a1a1a]">
-                          {item.keyword || '-'}
-                        </span>
+                        <input
+                          type="text"
+                          defaultValue={item.keyword || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'keyword', e.target.value || null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        />
                       </td>
                       <td className="px-1.5 py-3" style={{ width: columnWidths.description }}>
                         <textarea
@@ -908,8 +933,8 @@ export default function ScopeLibraryPage() {
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                 >
                   <option value="Default">Default</option>
-                  {INSURERS.filter(i => i !== 'All' && i !== 'Default').map(insurer => (
-                    <option key={insurer} value={insurer}>{insurer}</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.name}>{client.name}</option>
                   ))}
                 </select>
               </div>
