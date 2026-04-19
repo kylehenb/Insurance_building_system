@@ -447,8 +447,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         }),
       })
       if (response.ok) {
-        // Navigate to the reverted quote
-        window.location.href = window.location.pathname.replace(currentQuoteId, targetQuoteId)
+        // Reload quotes list to show updated state
+        load()
+        setReverting(null)
       } else {
         console.error('Failed to revert quote')
         setReverting(null)
@@ -457,7 +458,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       console.error('Error reverting quote:', error)
       setReverting(null)
     }
-  }, [tenantId])
+  }, [tenantId, load])
 
   // ── Handle preview quote version ───────────────────────────────────────────────
 
@@ -1824,29 +1825,54 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
                 {/* Ready: Send it */}
                 {(q.is_locked && q.status === 'ready') && (
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      setSendDialogQuoteId(q.id)
-                    }}
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: '#ffffff',
-                      background: '#1a73e8',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '6px 16px',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s',
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
-                  >
-                    Send it
-                  </button>
+                  <>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        setSendDialogQuoteId(q.id)
+                      }}
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: '#ffffff',
+                        background: '#1a73e8',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '6px 16px',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+                    >
+                      Send it
+                    </button>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        handleStatusChange(q.id, 'draft', false)
+                      }}
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: '#3a3530',
+                        background: '#f5f2ee',
+                        border: '1px solid #d8d0c8',
+                        borderRadius: 6,
+                        padding: '6px 16px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                    >
+                      Unlock and Edit
+                    </button>
+                  </>
                 )}
 
                 {/* Sent: Approve and Reject buttons */}
