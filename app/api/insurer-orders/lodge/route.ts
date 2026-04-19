@@ -159,9 +159,8 @@ export async function POST(req: NextRequest) {
         special_instructions: order.special_instructions,
         sum_insured: order.sum_insured_building,
         excess: order.excess_building,
-        status: 'active',
         created_at: new Date().toISOString(),
-      })
+      } as Database['public']['Tables']['jobs']['Insert'])
       .select('id')
       .single()
 
