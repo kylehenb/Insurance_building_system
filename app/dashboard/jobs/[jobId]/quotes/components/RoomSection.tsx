@@ -442,14 +442,18 @@ export function RoomSection({
       } else {
         // Add a new row and focus its description
         if (!isLocked) {
-          const newItem = onAddItem(name)
+          // Use the locally staged name (nameVal) if it differs from the prop,
+          // so that clicking Add while the name input is uncommitted still lands
+          // the item in the right room.
+          const effectiveRoom = nameVal.trim() || name
+          const newItem = onAddItem(effectiveRoom)
           // Use the stable key from stableKeysRef for focus
           const stableKey = stableKeysRef.current.get(newItem.id) ?? (newItem._key ?? newItem.id)
           pendingFocusId.current = stableKey
         }
       }
     },
-    [items, isLocked, onAddItem, name]
+    [items, isLocked, onAddItem, name, nameVal]
   )
 
   // dnd-kit setup
@@ -748,7 +752,11 @@ export function RoomSection({
             <div style={{ padding: '8px 12px' }}>
               <button
                 onClick={() => {
-                  const newItem = onAddItem(name)
+                  // Use the locally staged name (nameVal) if it differs from the prop,
+                  // so that clicking Add while the name input is uncommitted still lands
+                  // the item in the right room.
+                  const effectiveRoom = nameVal.trim() || name
+                  const newItem = onAddItem(effectiveRoom)
                   // Use the stable key from stableKeysRef for focus
                   const stableKey = stableKeysRef.current.get(newItem.id) ?? (newItem._key ?? newItem.id)
                   pendingFocusId.current = stableKey

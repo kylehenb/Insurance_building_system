@@ -318,7 +318,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   const trades = useTrades(tenantId)
 
   // Local-only rooms (added locally, no items yet)
-  const [pendingRooms, setPendingRooms] = useState<Array<{ name: string; autoFocus: boolean }>>([])
+  const [pendingRooms, setPendingRooms] = useState<Array<{ id: string; name: string }>>([])
 
   // Room drag-and-drop state
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
@@ -370,7 +370,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   )
 
   const handleAddRoom = useCallback(() => {
-    setPendingRooms(prev => [...prev, { name: '', autoFocus: true }])
+    const id = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setPendingRooms(prev => [...prev, { id, name: '' }])
   }, [])
 
   const handleCsvImport = useCallback((importItems: Partial<ScopeItem>[]) => {
@@ -385,7 +386,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   const handleRenamePendingRoom = useCallback((oldName: string, newName: string) => {
     if (!newName.trim() || newName === oldName) return
     setPendingRooms(prev =>
-      prev.map(r => (r.name === oldName ? { name: newName.trim(), autoFocus: false } : r))
+      prev.map(r => (r.name === oldName ? { ...r, name: newName.trim() } : r))
     )
   }, [])
 
@@ -612,9 +613,9 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         {/* Pending rooms (added locally, no items yet) */}
         {(() => {
           const totalItemsInRooms = rooms.reduce((sum, room) => sum + room.items.length, 0)
-          return pendingRooms.map((pr, idx) => (
+          return pendingRooms.map(pr => (
             <RoomSection
-              key={`pending-${idx}-${pr.name}`}
+              key={pr.id}
               name={pr.name}
               items={[]}
               onUpdateItem={updateItemLocal}
@@ -622,8 +623,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               onAddItem={handleAddItem}
               onUpdateDimensions={updateRoomDimensions}
               onRenameRoom={handleRenamePendingRoom}
-              onDeleteRoom={(roomName) => {
-                if (!window.confirm(`Delete room "${roomName}" and all items?`)) return
+              onDeleteRoom={() => {
+                setPendingRooms(prev => prev.filter(r => r.id !== pr.id))
               }}
               onReorderItems={reorderItems}
               search={search}
