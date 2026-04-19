@@ -27,6 +27,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert new item with pending approval status
+    const labourPerUnit = item.rate_labour || null;
+    const materialsPerUnit = item.rate_materials || null;
+    const labourRatePerHour = item.labour_rate_per_hour || null;
+    const totalPerUnit = (labourPerUnit || 0) + (materialsPerUnit || 0);
+    
+    // Calculate estimated_hours if labour_rate_per_hour is provided
+    let estimatedHours = null;
+    if (labourPerUnit !== null && labourRatePerHour !== null && labourRatePerHour > 0) {
+      estimatedHours = labourPerUnit / labourRatePerHour;
+    }
+
     const { data, error } = await supabase
       .from('scope_library')
       .insert({
@@ -35,10 +46,12 @@ export async function POST(req: NextRequest) {
         keyword: item.keyword || null,
         item_description: item.item_description || null,
         unit: item.unit || null,
-        labour_per_unit: item.rate_labour || null,
-        materials_per_unit: item.rate_materials || null,
-        total_per_unit: (item.rate_labour || 0) + (item.rate_materials || 0),
-        estimated_hours: null,
+        labour_rate_per_hour: labourRatePerHour,
+        labour_per_unit: labourPerUnit,
+        materials_per_unit: materialsPerUnit,
+        total_per_unit: totalPerUnit,
+        estimated_hours: estimatedHours,
+        estimated_hours_overridden: false,
         insurer_specific: null,
         approval_status: 'pending',
         updated_at: new Date().toISOString(),

@@ -3,7 +3,7 @@
 -- One snapshot written per autosave event (debounced ~1.5s)
 -- ============================================================
 
-CREATE TABLE report_versions (
+CREATE TABLE IF NOT EXISTS report_versions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
@@ -16,11 +16,12 @@ CREATE TABLE report_versions (
 
 ALTER TABLE report_versions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_isolation" ON report_versions;
 CREATE POLICY "tenant_isolation" ON report_versions
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
-CREATE INDEX idx_report_versions_report_id ON report_versions(report_id, version_number DESC);
-CREATE INDEX idx_report_versions_tenant ON report_versions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_report_versions_report_id ON report_versions(report_id, version_number DESC);
+CREATE INDEX IF NOT EXISTS idx_report_versions_tenant ON report_versions(tenant_id);
 
 -- ============================================================
 -- Add soft-delete columns to reports table

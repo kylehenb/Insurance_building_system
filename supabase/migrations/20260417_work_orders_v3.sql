@@ -146,16 +146,19 @@ ON CONFLICT (tenant_id, trade_type) DO NOTHING;
 -- 6. Add RLS policies
 ALTER TABLE work_order_visits ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_isolation_work_order_visits" ON work_order_visits;
 CREATE POLICY "tenant_isolation_work_order_visits" ON work_order_visits
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 ALTER TABLE job_schedule_blueprints ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_isolation_job_schedule_blueprints" ON job_schedule_blueprints;
 CREATE POLICY "tenant_isolation_job_schedule_blueprints" ON job_schedule_blueprints
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 ALTER TABLE trade_type_sequence ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenant_isolation_trade_type_sequence" ON trade_type_sequence;
 CREATE POLICY "tenant_isolation_trade_type_sequence" ON trade_type_sequence
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 

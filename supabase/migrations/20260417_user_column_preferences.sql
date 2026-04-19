@@ -18,18 +18,22 @@ CREATE INDEX IF NOT EXISTS user_preferences_key_idx ON user_preferences(preferen
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies
+DROP POLICY IF EXISTS "Users can view their own preferences" ON user_preferences;
 CREATE POLICY "Users can view their own preferences"
   ON user_preferences FOR SELECT
   USING (tenant_id = auth.jwt() ->> 'tenant_id' AND user_id = auth.uid()::TEXT);
 
+DROP POLICY IF EXISTS "Users can insert their own preferences" ON user_preferences;
 CREATE POLICY "Users can insert their own preferences"
   ON user_preferences FOR INSERT
   WITH CHECK (tenant_id = auth.jwt() ->> 'tenant_id' AND user_id = auth.uid()::TEXT);
 
+DROP POLICY IF EXISTS "Users can update their own preferences" ON user_preferences;
 CREATE POLICY "Users can update their own preferences"
   ON user_preferences FOR UPDATE
   USING (tenant_id = auth.jwt() ->> 'tenant_id' AND user_id = auth.uid()::TEXT);
 
+DROP POLICY IF EXISTS "Users can delete their own preferences" ON user_preferences;
 CREATE POLICY "Users can delete their own preferences"
   ON user_preferences FOR DELETE
   USING (tenant_id = auth.jwt() ->> 'tenant_id' AND user_id = auth.uid()::TEXT);

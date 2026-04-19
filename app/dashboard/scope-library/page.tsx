@@ -15,6 +15,7 @@ type ScopeLibraryExtended = ScopeLibraryInsert & {
   lag_days?: number | null;
   lag_description?: string | null;
   approval_status?: 'pending' | 'approved';
+  estimated_hours_overridden?: boolean;
 };
 
 // Units from quote editor
@@ -81,6 +82,7 @@ export default function ScopeLibraryPage() {
     split_type: null,
     pair_id: null,
     approval_status: 'pending',
+    estimated_hours_overridden: false,
   });
 
   // Trades from API
@@ -111,6 +113,7 @@ export default function ScopeLibraryPage() {
       keyword: 120,
       description: 500,
       unit: 80,
+      labour_rate_per_hour: 100,
       labour_per_unit: 100,
       materials_per_unit: 120,
       total_per_unit: 100,
@@ -347,6 +350,7 @@ export default function ScopeLibraryPage() {
       split_type: null,
       pair_id: null,
       approval_status: 'pending',
+      estimated_hours_overridden: false,
     });
     setShowModal(true);
   };
@@ -370,6 +374,7 @@ export default function ScopeLibraryPage() {
       split_type: item.split_type,
       pair_id: item.pair_id,
       approval_status: (item as any).approval_status || 'approved',
+      estimated_hours_overridden: (item as any).estimated_hours_overridden || false,
     });
     setShowModal(true);
   };
@@ -490,16 +495,38 @@ export default function ScopeLibraryPage() {
 
     await supabase.from('scope_library_history').insert(historyRecord);
 
+    // If editing estimated_hours manually, set the override flag
+    const updateData: any = { [field]: value, updated_at: new Date().toISOString() };
+    if (field === 'estimated_hours') {
+      updateData.estimated_hours_overridden = true;
+    }
+    // If editing labour_per_unit or labour_rate_per_hour, clear the override flag to re-enable auto-calculation
+    if (field === 'labour_per_unit' || field === 'labour_rate_per_hour') {
+      updateData.estimated_hours_overridden = false;
+      // Recalculate estimated_hours
+      const labour = field === 'labour_per_unit' ? value : item.labour_per_unit;
+      const rate = field === 'labour_rate_per_hour' ? value : item.labour_rate_per_hour;
+      if (labour !== null && rate !== null && rate > 0) {
+        updateData.estimated_hours = labour / rate;
+      }
+    }
+    // If editing labour_per_unit or materials_per_unit, recalculate total_per_unit
+    if (field === 'labour_per_unit' || field === 'materials_per_unit') {
+      const labour = field === 'labour_per_unit' ? value : item.labour_per_unit;
+      const materials = field === 'materials_per_unit' ? value : item.materials_per_unit;
+      updateData.total_per_unit = (labour || 0) + (materials || 0);
+    }
+
     // Update the item in database
     await supabase
       .from('scope_library')
-      .update({ [field]: value, updated_at: new Date().toISOString() } as ScopeLibraryInsert)
+      .update(updateData as ScopeLibraryInsert)
       .eq('id', itemId);
 
     // Update local state directly to preserve table order
     setItems(items.map(i => 
       i.id === itemId 
-        ? { ...i, [field]: value, updated_at: new Date().toISOString() }
+        ? { ...i, ...updateData }
         : i
     ));
   };
@@ -515,12 +542,23 @@ export default function ScopeLibraryPage() {
     if (formData.labour_per_unit !== null || formData.materials_per_unit !== null) {
       const labour = formData.labour_per_unit || 0;
       const materials = formData.materials_per_unit || 0;
-      setFormData(prev => ({
+      setFormData((prev: Partial<ScopeLibraryExtended>) => ({
         ...prev,
         total_per_unit: labour + materials,
       }));
     }
   }, [formData.labour_per_unit, formData.materials_per_unit]);
+
+  // Auto-calculate estimated_hours based on labour_per_unit / labour_rate_per_hour when not overridden
+  useEffect(() => {
+    if (!formData.estimated_hours_overridden && formData.labour_per_unit !== null && formData.labour_rate_per_hour !== null && formData.labour_rate_per_hour > 0) {
+      const calculatedHours = formData.labour_per_unit / formData.labour_rate_per_hour;
+      setFormData((prev: Partial<ScopeLibraryExtended>) => ({
+        ...prev,
+        estimated_hours: calculatedHours,
+      }));
+    }
+  }, [formData.labour_per_unit, formData.labour_rate_per_hour, formData.estimated_hours_overridden]);
 
   return (
     <div className="p-6 lg:p-8">
@@ -698,6 +736,17 @@ export default function ScopeLibraryPage() {
                     <th
                       scope="col"
                       className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      style={{ position: 'relative', width: columnWidths.labour_rate_per_hour, borderRightWidth: '0.5px' }}
+                    >
+                      Rate/Hr
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        onMouseDown={(e) => handleResizeStart('labour_rate_per_hour', e)}
+                      />
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.labour_per_unit, borderRightWidth: '0.5px' }}
                     >
                       Labour
@@ -821,6 +870,15 @@ export default function ScopeLibraryPage() {
                           ))}
                         </select>
                       </td>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.labour_rate_per_hour }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.labour_rate_per_hour || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'labour_rate_per_hour', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.labour_per_unit }}>
                         <input
                           type="number"
@@ -844,13 +902,20 @@ export default function ScopeLibraryPage() {
                           {formatCurrency(item.total_per_unit)}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.estimated_hours }}>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right relative" style={{ width: columnWidths.estimated_hours }}>
+                        {(item as any).estimated_hours_overridden && (
+                          <div className="absolute -top-1 -right-1">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                              MANUAL
+                            </span>
+                          </div>
+                        )}
                         <input
                           type="number"
                           step="0.01"
                           defaultValue={item.estimated_hours || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'estimated_hours', e.target.value ? parseFloat(e.target.value) : null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className={`w-full rounded border px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${(item as any).estimated_hours_overridden ? 'bg-amber-50 border-amber-300' : 'bg-white border-[#e0dbd4]'}`}
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.actions }}>

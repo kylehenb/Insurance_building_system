@@ -34,6 +34,7 @@ create index if not exists quote_note_templates_tenant_idx
 -- RLS
 alter table quote_note_templates enable row level security;
 
+drop policy if exists "Tenant members can read note templates" on quote_note_templates;
 create policy "Tenant members can read note templates"
   on quote_note_templates for select
   using (

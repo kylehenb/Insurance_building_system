@@ -1,5 +1,5 @@
 -- Job Files table
-CREATE TABLE job_files (
+CREATE TABLE IF NOT EXISTS job_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   job_id UUID NOT NULL REFERENCES jobs(id),
@@ -18,31 +18,36 @@ CREATE TABLE job_files (
 ALTER TABLE job_files ENABLE ROW LEVEL SECURITY;
 
 -- Tenant isolation policy
+DROP POLICY IF EXISTS "tenant_isolation" ON job_files;
 CREATE POLICY "tenant_isolation" ON job_files
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 -- Allow read for tenant users
+DROP POLICY IF EXISTS "users_can_read_job_files" ON job_files;
 CREATE POLICY "users_can_read_job_files" ON job_files
   FOR SELECT
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 -- Allow insert for tenant users
+DROP POLICY IF EXISTS "users_can_insert_job_files" ON job_files;
 CREATE POLICY "users_can_insert_job_files" ON job_files
   FOR INSERT
   WITH CHECK (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 -- Allow update for tenant users (description only)
+DROP POLICY IF EXISTS "users_can_update_job_files" ON job_files;
 CREATE POLICY "users_can_update_job_files" ON job_files
   FOR UPDATE
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()))
   WITH CHECK (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 -- Allow delete for tenant users
+DROP POLICY IF EXISTS "users_can_delete_job_files" ON job_files;
 CREATE POLICY "users_can_delete_job_files" ON job_files
   FOR DELETE
   USING (tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid()));
 
 -- Indexes
-CREATE INDEX idx_job_files_job ON job_files(job_id);
-CREATE INDEX idx_job_files_tenant ON job_files(tenant_id);
-CREATE INDEX idx_job_files_created ON job_files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_files_job ON job_files(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_files_tenant ON job_files(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_job_files_created ON job_files(created_at DESC);
