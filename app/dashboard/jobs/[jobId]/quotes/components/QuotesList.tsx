@@ -2134,6 +2134,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               {isExpanded && (
                 <div id={`quote-editor-${q.id}`}>
                   <QuoteEditorClient
+                    key={`${q.id}-${q.status}-${q.is_locked}`}
                     inline
                     jobId={jobId}
                     quoteId={q.id}
