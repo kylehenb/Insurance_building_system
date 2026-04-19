@@ -167,6 +167,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [partialApproveDialogQuoteId, setPartialApproveDialogQuoteId] = useState<string | null>(null)
   const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
   const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
+  const [sendForSignatureQuoteId, setSendForSignatureQuoteId] = useState<string | null>(null)
 
   // Version history state
   const [showVersions, setShowVersions] = useState<string | null>(null)
@@ -983,7 +984,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 onClick={async () => {
                   if (sendDialogQuoteId) {
                     await handleStatusChange(sendDialogQuoteId, 'sent_to_insurer', true)
-                    await handleJobStageChange(jobId, 'sent_awaiting_approval')
+                    // Only update job stage if this is the primary quote (first quote on job)
+                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
+                    if (primaryQuote && primaryQuote.id === sendDialogQuoteId) {
+                      await handleJobStageChange(jobId, 'sent_awaiting_approval')
+                    }
                     setSendDialogQuoteId(null)
                   }
                 }}
@@ -1236,7 +1241,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (approveDialogQuoteId) {
-                    await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    // Only update job stage if this is the primary quote (first quote on job)
+                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
+                    if (primaryQuote && primaryQuote.id === approveDialogQuoteId) {
+                      await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    }
                     await handleStatusChange(approveDialogQuoteId, 'approved_contracts_pending', true)
                     setApproveDialogQuoteId(null)
                   }
@@ -1312,6 +1321,83 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send for Signature dialog */}
+      {sendForSignatureQuoteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setSendForSignatureQuoteId(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 34, marginBottom: 12 }}>✍️</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Send for Signature
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              This part of the system is not yet built - it will be a pre drafted email with pre filled docs for the homeowner to sign.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => setSendForSignatureQuoteId(null)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (sendForSignatureQuoteId) {
+                    await handleJobStageChange(jobId, 'awaiting_signed_document')
+                    setSendForSignatureQuoteId(null)
+                  }
+                }}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#1a73e8',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Confirm
               </button>
             </div>
           </div>
@@ -1488,7 +1574,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         })
                       }
                     }
-                    await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    // Only update job stage if this is the primary quote (first quote on job)
+                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
+                    if (primaryQuote && primaryQuote.id === partialApproveDialogQuoteId) {
+                      await handleJobStageChange(jobId, 'approved_awaiting_signoff')
+                    }
                     await handleStatusChange(partialApproveDialogQuoteId, 'approved_contracts_pending', true)
                     setPartialApproveDialogQuoteId(null)
                     setSelectedLineItems([])
@@ -1927,6 +2017,37 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </>
                 )}
 
+                {/* Approved: Send for Signature button (primary quote only) */}
+                {(q.status === 'approved_contracts_pending' || q.status === 'approved_contracts_sent' || q.status === 'approved_contracts_signed') && (() => {
+                  const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
+                  const isPrimary = primaryQuote && primaryQuote.id === q.id
+                  return isPrimary
+                })() && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      setSendForSignatureQuoteId(q.id)
+                    }}
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: '#ffffff',
+                      background: '#1a73e8',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+                  >
+                    Send for Signature
+                  </button>
+                )}
+
                 {/* Superseded: Show Superseded text */}
                 {q.status === 'declined_superseded' && (
                   <span
@@ -1944,7 +2065,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 )}
 
                 {/* Sent and Locked with date */}
-                {(q.is_locked && q.status !== 'ready' && q.status !== 'draft' && q.status !== 'sent_to_insurer' && q.status !== 'declined_superseded') && (
+                {(q.is_locked && q.status !== 'ready' && q.status !== 'draft') && (
                   <button
                     onClick={e => {
                       e.stopPropagation()

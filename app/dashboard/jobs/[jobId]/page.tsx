@@ -71,7 +71,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <Suspense>
       <JobDetailShell
-        stageBanner={<StageBanner jobId={jobId} />}
+        stageBanner={<StageBanner jobId={jobId} tenantId={tenant_id!} />}
         job={{
           id: job.id,
           job_number: job.job_number,
