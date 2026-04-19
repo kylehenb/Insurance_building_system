@@ -157,6 +157,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [notBuiltVisible, setNotBuiltVisible]   = useState(false)
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
   const [sowLoading, setSowLoading]       = useState<string | null>(null)
+  const initialLoadDone = useRef(false)
 
   // New workflow state
   const [sendDialogQuoteId, setSendDialogQuoteId] = useState<string | null>(null)
@@ -174,10 +175,20 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [reverting, setReverting] = useState<string | null>(null)
   const versionDropdownRefs = useRef<Record<string, HTMLDivElement>>({})
 
+  // Preview modal state
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<any>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
   // ── Data loading ─────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    setLoading(true)
+    // Only show the loading spinner on the very first load.
+    // Background refreshes (e.g. after a status change inside the inline editor)
+    // must not unmount the editor, otherwise pending debounced item saves are killed.
+    const isFirst = !initialLoadDone.current
+    if (isFirst) setLoading(true)
     try {
       const res = await fetch(`/api/quotes?jobId=${jobId}&tenantId=${tenantId}`)
       if (res.ok) {
@@ -185,7 +196,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         setQuotes(data)
       }
     } finally {
-      setLoading(false)
+      if (isFirst) setLoading(false)
+      initialLoadDone.current = true
     }
   }, [jobId, tenantId])
 
@@ -447,6 +459,32 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     }
   }, [tenantId])
 
+  // ── Handle preview quote version ───────────────────────────────────────────────
+
+  const handlePreviewVersion = useCallback((quoteId: string) => {
+    setPreviewQuoteId(quoteId)
+    setShowPreviewModal(true)
+    setShowVersions(null) // Close version dropdown
+  }, [])
+
+  // ── Fetch quote data for preview ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!showPreviewModal || !previewQuoteId) return
+
+    setLoadingPreview(true)
+    fetch(`/api/quotes/${previewQuoteId}?tenantId=${encodeURIComponent(tenantId)}`)
+      .then(r => r.json())
+      .then((data: any) => {
+        setPreviewData(data)
+      })
+      .catch(error => {
+        console.error('Error fetching quote for preview:', error)
+        setPreviewData(null)
+      })
+      .finally(() => setLoadingPreview(false))
+  }, [showPreviewModal, previewQuoteId, tenantId])
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   if (loading) {
@@ -604,6 +642,231 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quote Preview Modal */}
+      {showPreviewModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              maxWidth: 900,
+              width: '90%',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #e0dbd4',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 4 }}>
+                  Quote Version Preview
+                </div>
+                {previewData && (
+                  <div style={{ fontSize: 12, color: '#9e998f' }}>
+                    {previewData.quote_ref ?? '—'} • V{previewData.version} • {previewData.status.replace(/_/g, ' ')}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 20,
+                  color: '#9e998f',
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal content */}
+            <div style={{ padding: '24px', overflow: 'auto', flex: 1 }}>
+              {loadingPreview ? (
+                <div
+                  style={{
+                    padding: '40px',
+                    textAlign: 'center',
+                    fontSize: 13,
+                    color: '#9e998f',
+                  }}
+                >
+                  Loading...
+                </div>
+              ) : !previewData ? (
+                <div
+                  style={{
+                    padding: '40px',
+                    textAlign: 'center',
+                    fontSize: 13,
+                    color: '#c5221f',
+                  }}
+                >
+                  Failed to load quote data
+                </div>
+              ) : (
+                <>
+                  {/* Quote summary */}
+                  <div
+                    style={{
+                      marginBottom: 20,
+                      padding: '16px',
+                      background: '#f5f2ee',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: '#9e998f' }}>Total</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#3a3530' }}>
+                        {fmt(previewData.total_amount ?? 0)} inc GST
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: '#9e998f' }}>Items</span>
+                      <span style={{ fontSize: 13, color: '#3a3530' }}>
+                        {previewData.items?.length ?? 0}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, color: '#9e998f' }}>Markup</span>
+                      <span style={{ fontSize: 13, color: '#3a3530' }}>
+                        {((previewData.markup_pct ?? 0) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Scope items by room */}
+                  {previewData.items && previewData.items.length > 0 ? (
+                    <div>
+                      {(() => {
+                        const itemsByRoom: Record<string, any[]> = {}
+                        previewData.items.forEach((item: any) => {
+                          const room = item.room || 'Uncategorized'
+                          if (!itemsByRoom[room]) itemsByRoom[room] = []
+                          itemsByRoom[room].push(item)
+                        })
+
+                        return Object.entries(itemsByRoom).map(([room, items]) => (
+                          <div key={room} style={{ marginBottom: 16 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: '#3a3530',
+                                marginBottom: 8,
+                                paddingBottom: 4,
+                                borderBottom: '1px solid #e0dbd4',
+                              }}
+                            >
+                              {room}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#3a3530' }}>
+                              {items.map((item: any, idx: number) => (
+                                <div
+                                  key={item.id}
+                                  style={{
+                                    padding: '8px 0',
+                                    borderBottom:
+                                      idx < items.length - 1 ? '1px solid #e8e4e0' : 'none',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                  }}
+                                >
+                                  <div style={{ flex: 1, paddingRight: 16 }}>
+                                    <div style={{ marginBottom: 4 }}>{item.item_description}</div>
+                                    <div style={{ fontSize: 11, color: '#9e998f' }}>
+                                      {item.trade} • {item.qty} {item.unit}
+                                    </div>
+                                  </div>
+                                  <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 500 }}>
+                                      {fmt(item.line_total ?? 0)}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        fontSize: 13,
+                        color: '#9e998f',
+                      }}
+                    >
+                      No items in this quote version
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid #e0dbd4',
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #d8d0c8',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -1453,32 +1716,56 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                                   minute: '2-digit',
                                 })}
                               </div>
-                              {!v.is_active_version && (
+                              <div style={{ display: 'flex', gap: 8 }}>
                                 <button
                                   onClick={e => {
                                     e.stopPropagation()
-                                    handleRevert(q.id, v.id)
+                                    handlePreviewVersion(v.id)
                                   }}
-                                  disabled={reverting === v.id}
                                   style={{
                                     fontFamily: 'DM Sans, sans-serif',
                                     fontSize: 11,
                                     fontWeight: 500,
                                     color: '#ffffff',
-                                    background: '#2e7d32',
+                                    background: '#1a73e8',
                                     border: 'none',
                                     borderRadius: 4,
                                     padding: '4px 10px',
-                                    cursor: reverting === v.id ? 'not-allowed' : 'pointer',
+                                    cursor: 'pointer',
                                     transition: 'background 0.15s',
-                                    opacity: reverting === v.id ? 0.7 : 1,
                                   }}
-                                  onMouseEnter={e => !reverting && (e.currentTarget.style.background = '#1b5e20')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
                                 >
-                                  {reverting === v.id ? 'Reverting...' : 'Revert to this version'}
+                                  View
                                 </button>
-                              )}
+                                {!v.is_active_version && (
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      handleRevert(q.id, v.id)
+                                    }}
+                                    disabled={reverting === v.id}
+                                    style={{
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      fontSize: 11,
+                                      fontWeight: 500,
+                                      color: '#ffffff',
+                                      background: '#2e7d32',
+                                      border: 'none',
+                                      borderRadius: 4,
+                                      padding: '4px 10px',
+                                      cursor: reverting === v.id ? 'not-allowed' : 'pointer',
+                                      transition: 'background 0.15s',
+                                      opacity: reverting === v.id ? 0.7 : 1,
+                                    }}
+                                    onMouseEnter={e => !reverting && (e.currentTarget.style.background = '#1b5e20')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                                  >
+                                    {reverting === v.id ? 'Reverting...' : 'Revert'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))
                         )}

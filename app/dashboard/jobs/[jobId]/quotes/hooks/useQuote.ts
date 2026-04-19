@@ -160,6 +160,31 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     load()
   }, [load])
 
+  // Flush all pending item saves when the hook unmounts (e.g. when the inline
+  // editor is hidden). This prevents data loss if debounce timers are still
+  // pending at the time the component tree is torn down.
+  useEffect(() => {
+    return () => {
+      for (const timer of debounceTimers.current.values()) {
+        clearTimeout(timer)
+      }
+      debounceTimers.current.clear()
+
+      for (const [itemId, changes] of pendingChanges.current) {
+        if (!itemId.startsWith('temp-') && Object.keys(changes).length > 0) {
+          void fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, ...changes }),
+          })
+        }
+      }
+      pendingChanges.current.clear()
+    }
+  // quoteId and tenantId are stable for the lifetime of this hook instance
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const flushItem = useCallback(
     async (itemId: string) => {
       const timer = debounceTimers.current.get(itemId)
