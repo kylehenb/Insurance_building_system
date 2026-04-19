@@ -766,7 +766,7 @@ export function LineItemRow({
             alignItems: 'center',
             justifyContent: 'center',
             gap: 2,
-            padding: '0 6px',
+            padding: '0 4px',
           }}
           onPointerDown={e => e.stopPropagation()}
         >
