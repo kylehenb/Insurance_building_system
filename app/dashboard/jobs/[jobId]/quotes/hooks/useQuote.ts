@@ -315,13 +315,24 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
       setItems(prev => [...prev, tempItem])
 
-      // Persist in background; swap temp ID with real ID on success
-      // Strip client-only fields (_key) before sending to the server
-      const { id: tempId, room: _r, _key: _k, ...postData } = tempItem
+      // Persist in background; swap temp ID with real ID on success.
+      // Send only the caller-supplied `data` overrides — NOT the full tempItem.
+      // The tempItem is populated with client-side defaults (approval_status,
+      // labour_total, materials_total, created_at, sort_order, …) that either
+      // don't exist as DB columns or violate check constraints, causing the
+      // INSERT to be rejected and the optimistic row to be silently removed.
+      const tempId = tempItem.id
+      // Strip any client-only / server-computed keys that may have leaked into
+      // the data param (e.g. from CSV import or calcPermitItems).
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, _key: _dk, room: _dr, tenant_id: _tid, quote_id: _qid,
+              approval_status: _as, created_at: _ca, sort_order: _so,
+              line_total: _lt, rate_total: _rt, labour_total: _labt,
+              materials_total: _matt, ...safeData } = data as Record<string, unknown>
       void fetch(`/api/quotes/${quoteId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, room, ...postData }),
+        body: JSON.stringify({ tenantId, room, ...safeData }),
       })
         .then(res => {
           if (!res.ok) throw new Error('Failed')
