@@ -551,7 +551,7 @@ export default function ScopeLibraryPage() {
 
   // Auto-calculate estimated_hours based on labour_per_unit / labour_rate_per_hour when not overridden
   useEffect(() => {
-    if (!formData.estimated_hours_overridden && formData.labour_per_unit !== null && formData.labour_rate_per_hour !== null && formData.labour_rate_per_hour > 0) {
+    if (!formData.estimated_hours_overridden && formData.labour_per_unit != null && formData.labour_rate_per_hour != null && formData.labour_rate_per_hour > 0) {
       const calculatedHours = formData.labour_per_unit / formData.labour_rate_per_hour;
       setFormData((prev: Partial<ScopeLibraryExtended>) => ({
         ...prev,

@@ -2752,6 +2752,36 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          preference_key: string
+          preference_value: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          preference_key: string
+          preference_value?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          preference_key?: string
+          preference_value?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       job_margin_summary: {
