@@ -459,6 +459,55 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     [tenantId, load]
   )
 
+  // ── Check if any quote has reached target job stage or later ─────────────────
+
+  const hasQuoteReachedStageOrLater = useCallback(
+    (targetStage: string): boolean => {
+      // Define stage order (earlier to later)
+      const stageOrder = [
+        'order_received',
+        'sent_awaiting_approval',
+        'approved_awaiting_signoff',
+        'awaiting_signed_document',
+        'signed_build_schedule',
+        'repairs_in_progress',
+        'complete_and_invoiced',
+        'declined_close_out',
+      ]
+
+      const targetIndex = stageOrder.indexOf(targetStage)
+      if (targetIndex === -1) return false
+
+      // Map quote statuses to job stages
+      const quoteStatusToJobStage: Record<string, string> = {
+        'draft': 'order_received',
+        'ready': 'order_received',
+        'sent_to_insurer': 'sent_awaiting_approval',
+        'approved_contracts_pending': 'approved_awaiting_signoff',
+        'approved_contracts_sent': 'approved_awaiting_signoff',
+        'approved_contracts_signed': 'signed_build_schedule',
+        'pre_repair': 'repairs_in_progress',
+        'repairs_in_progress': 'repairs_in_progress',
+        'repairs_complete_to_invoice': 'complete_and_invoiced',
+        'complete_and_invoiced': 'complete_and_invoiced',
+        'declined_superseded': 'declined_close_out',
+        'declined_claim_declined': 'declined_close_out',
+      }
+
+      // Check if any quote has reached target stage or later
+      for (const quote of quotes) {
+        const quoteStage = quoteStatusToJobStage[quote.status] || 'order_received'
+        const quoteStageIndex = stageOrder.indexOf(quoteStage)
+        if (quoteStageIndex >= targetIndex) {
+          return true
+        }
+      }
+
+      return false
+    },
+    [quotes]
+  )
+
   // ── Receive sign off file upload handler ─────────────────────────────────────
 
   const handleReceiveSignOffUpload = useCallback(
@@ -530,16 +579,18 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         // Set sign off filed date to today
         setSignOffFiledDate(new Date())
         
-        // Change job stage to signed_build_schedule
-        await handleJobStageChange(jobId, 'signed_build_schedule')
-        
-        // Refresh job stage
-        const { data: jobData } = await supabase
-          .from('jobs')
-          .select('current_stage')
-          .eq('id', jobId)
-          .single()
-        setCurrentJobStage(jobData?.current_stage ?? null)
+        // Only change job stage if no quote has already reached signed_build_schedule or later
+        if (!hasQuoteReachedStageOrLater('signed_build_schedule')) {
+          await handleJobStageChange(jobId, 'signed_build_schedule')
+          
+          // Refresh job stage
+          const { data: jobData } = await supabase
+            .from('jobs')
+            .select('current_stage')
+            .eq('id', jobId)
+            .single()
+          setCurrentJobStage(jobData?.current_stage ?? null)
+        }
 
         alert('Files uploaded successfully and job stage updated')
       } catch (error) {
@@ -1207,9 +1258,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 onClick={async () => {
                   if (sendDialogQuoteId) {
                     await handleStatusChange(sendDialogQuoteId, 'sent_to_insurer', true)
-                    // Only update job stage if this is the primary quote (first quote on job)
-                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
-                    if (primaryQuote && primaryQuote.id === sendDialogQuoteId) {
+                    // Only change job stage if no quote has already reached sent_awaiting_approval or later
+                    if (!hasQuoteReachedStageOrLater('sent_awaiting_approval')) {
                       await handleJobStageChange(jobId, 'sent_awaiting_approval')
                     }
                     setSendDialogQuoteId(null)
@@ -1464,12 +1514,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (approveDialogQuoteId) {
-                    // Only update job stage if this is the primary quote (first quote on job)
-                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
-                    if (primaryQuote && primaryQuote.id === approveDialogQuoteId) {
+                    await handleStatusChange(approveDialogQuoteId, 'approved_contracts_pending', true)
+                    // Only change job stage if no quote has already reached approved_awaiting_signoff or later
+                    if (!hasQuoteReachedStageOrLater('approved_awaiting_signoff')) {
                       await handleJobStageChange(jobId, 'approved_awaiting_signoff')
                     }
-                    await handleStatusChange(approveDialogQuoteId, 'approved_contracts_pending', true)
                     setApproveDialogQuoteId(null)
                   }
                 }}
@@ -1604,7 +1653,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (sendForSignatureQuoteId) {
-                    await handleJobStageChange(jobId, 'awaiting_signed_document')
+                    // Only change job stage if no quote has already reached awaiting_signed_document or later
+                    if (!hasQuoteReachedStageOrLater('awaiting_signed_document')) {
+                      await handleJobStageChange(jobId, 'awaiting_signed_document')
+                    }
                     setSendForSignatureQuoteId(null)
                   }
                 }}
@@ -1797,12 +1849,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         })
                       }
                     }
-                    // Only update job stage if this is the primary quote (first quote on job)
-                    const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
-                    if (primaryQuote && primaryQuote.id === partialApproveDialogQuoteId) {
+                    await handleStatusChange(partialApproveDialogQuoteId, 'approved_contracts_pending', true)
+                    // Only change job stage if no quote has already reached approved_awaiting_signoff or later
+                    if (!hasQuoteReachedStageOrLater('approved_awaiting_signoff')) {
                       await handleJobStageChange(jobId, 'approved_awaiting_signoff')
                     }
-                    await handleStatusChange(partialApproveDialogQuoteId, 'approved_contracts_pending', true)
                     setPartialApproveDialogQuoteId(null)
                     setSelectedLineItems([])
                     setQuoteLineItems([])
