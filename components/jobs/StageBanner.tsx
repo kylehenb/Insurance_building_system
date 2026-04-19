@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
@@ -55,21 +55,31 @@ export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
   const [sendForSignatureVisible, setSendForSignatureVisible] = useState(false)
 
   // Fetch job data client-side
-  useEffect(() => {
-    const fetchJobData = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data } = await supabase
-        .from('jobs')
-        .select('current_stage, current_stage_updated_at, override_stage')
-        .eq('id', jobId)
-        .single()
-      setRow(data as unknown as JobStageRow | null)
-    }
-    fetchJobData()
+  const fetchJobData = useCallback(async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    const { data } = await supabase
+      .from('jobs')
+      .select('current_stage, current_stage_updated_at, override_stage')
+      .eq('id', jobId)
+      .single()
+    setRow(data as unknown as JobStageRow | null)
   }, [jobId])
+
+  useEffect(() => {
+    fetchJobData()
+  }, [fetchJobData])
+
+  // Poll for job stage changes every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchJobData()
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [fetchJobData])
 
   // Loading state: job not yet computed
   if (row === null || row.current_stage === null) {
