@@ -168,6 +168,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
   const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
   const [sendForSignatureQuoteId, setSendForSignatureQuoteId] = useState<string | null>(null)
+  const [receiveSignOffVisible, setReceiveSignOffVisible] = useState(false)
+  const [currentJobStage, setCurrentJobStage] = useState<string | null>(null)
+  const [signOffFiledDate, setSignOffFiledDate] = useState<Date | null>(null)
 
   // Version history state
   const [showVersions, setShowVersions] = useState<string | null>(null)
@@ -203,6 +206,28 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   }, [jobId, tenantId])
 
   useEffect(() => { load() }, [load])
+
+  // ── Fetch current job stage ───────────────────────────────────────────────
+
+  useEffect(() => {
+    const fetchJobStage = async () => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+        const { data } = await supabase
+          .from('jobs')
+          .select('current_stage')
+          .eq('id', jobId)
+          .single()
+        setCurrentJobStage(data?.current_stage ?? null)
+      } catch (error) {
+        console.error('Error fetching job stage:', error)
+      }
+    }
+    fetchJobStage()
+  }, [jobId])
 
   // ── Close dropdown on outside click ──────────────────────────────────────
 
@@ -434,6 +459,97 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     [tenantId, load]
   )
 
+  // ── Receive sign off file upload handler ─────────────────────────────────────
+
+  const handleReceiveSignOffUpload = useCallback(
+    async (files: File[]) => {
+      try {
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        // Allowed file types
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
+
+        for (const file of files) {
+          // Validate file type
+          const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
+          if (!allowedExtensions.includes(fileExt) || !allowedTypes.includes(file.type)) {
+            alert(`Invalid file type: ${file.name}. Only PDF, JPG, PNG, DOC, and DOCX files are allowed.`)
+            continue
+          }
+
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}${fileExt}`
+          const filePath = `tenants/${tenantId}/jobs/${jobId}/docs/${fileName}`
+
+          // Upload file to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file)
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert(`Failed to upload ${file.name}`)
+            continue
+          }
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('documents')
+            .getPublicUrl(filePath)
+
+          // Get file kind (uppercase extension without dot)
+          const fileKind = fileExt.replace('.', '').toUpperCase()
+
+          // Insert into job_files table
+          const { error: insertError } = await supabase
+            .from('job_files')
+            .insert({
+              tenant_id: tenantId,
+              job_id: jobId,
+              description: 'Insured signed docs',
+              file_name: file.name,
+              file_kind: fileKind,
+              storage_path: filePath,
+              mime_type: file.type,
+              size_bytes: file.size,
+              added_by: (await supabase.auth.getUser()).data.user?.id,
+              is_system_generated: false,
+            })
+
+          if (insertError) {
+            console.error('Insert error:', insertError)
+            alert(`Failed to save file record for ${file.name}`)
+          }
+        }
+
+        setReceiveSignOffVisible(false)
+        
+        // Set sign off filed date to today
+        setSignOffFiledDate(new Date())
+        
+        // Change job stage to signed_build_schedule
+        await handleJobStageChange(jobId, 'signed_build_schedule')
+        
+        // Refresh job stage
+        const { data: jobData } = await supabase
+          .from('jobs')
+          .select('current_stage')
+          .eq('id', jobId)
+          .single()
+        setCurrentJobStage(jobData?.current_stage ?? null)
+
+        alert('Files uploaded successfully and job stage updated')
+      } catch (error) {
+        console.error('Upload error:', error)
+        alert('Failed to upload files')
+      }
+    },
+    [jobId, tenantId, handleJobStageChange]
+  )
+
   // ── Handle revert to previous version ────────────────────────────────────────
 
   const handleRevert = useCallback(async (currentQuoteId: string, targetQuoteId: string) => {
@@ -631,6 +747,113 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setFileUploadVisible(false)}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  padding: '8px 20px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receive sign off modal */}
+      {receiveSignOffVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setReceiveSignOffVisible(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 480,
+              width: '90%',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Upload Insured Signed Documents
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              Drag and drop files here or click to browse your computer.
+            </p>
+
+            {/* Drop zone */}
+            <div
+              style={{
+                border: '2px dashed #d8d0c8',
+                borderRadius: 8,
+                padding: '40px 20px',
+                textAlign: 'center',
+                marginBottom: 20,
+                cursor: 'pointer',
+                transition: 'border-color 0.2s, background 0.2s',
+              }}
+              onClick={() => {
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.multiple = true
+                input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+                input.onchange = e => {
+                  const files = (e.target as HTMLInputElement).files
+                  if (files && files.length > 0) {
+                    handleReceiveSignOffUpload(Array.from(files))
+                  }
+                }
+                input.click()
+              }}
+              onDragOver={e => {
+                e.preventDefault()
+                e.currentTarget.style.borderColor = '#1a73e8'
+                e.currentTarget.style.background = '#f0f7ff'
+              }}
+              onDragLeave={e => {
+                e.currentTarget.style.borderColor = '#d8d0c8'
+                e.currentTarget.style.background = 'transparent'
+              }}
+              onDrop={e => {
+                e.preventDefault()
+                e.currentTarget.style.borderColor = '#d8d0c8'
+                e.currentTarget.style.background = 'transparent'
+                const files = Array.from(e.dataTransfer.files)
+                if (files.length > 0) {
+                  handleReceiveSignOffUpload(files)
+                }
+              }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
+              <div style={{ fontSize: 13, color: '#3a3530', marginBottom: 4 }}>
+                Drop files here or click to browse
+              </div>
+              <div style={{ fontSize: 11, color: '#9e998f' }}>
+                PDF, JPG, PNG, DOC, DOCX
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setReceiveSignOffVisible(false)}
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
@@ -2023,29 +2246,60 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   const isPrimary = primaryQuote && primaryQuote.id === q.id
                   return isPrimary
                 })() && (
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      setSendForSignatureQuoteId(q.id)
-                    }}
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: '#ffffff',
-                      background: '#1a73e8',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '6px 16px',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s',
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
-                  >
-                    Send for Signature
-                  </button>
+                  <>
+                    {currentJobStage === 'signed_build_schedule' && signOffFiledDate ? (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                        }}
+                        style={{
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: '#9e998f',
+                          background: '#f5f2ee',
+                          border: '1px solid #e0dbd4',
+                          borderRadius: 6,
+                          padding: '6px 16px',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                          flexShrink: 0,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                      >
+                        Sign off received and filed {signOffFiledDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (currentJobStage === 'awaiting_signed_document') {
+                            setReceiveSignOffVisible(true)
+                          } else {
+                            setSendForSignatureQuoteId(q.id)
+                          }
+                        }}
+                        style={{
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: '#ffffff',
+                          background: currentJobStage === 'awaiting_signed_document' ? '#2e7d32' : '#1a73e8',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 16px',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                          flexShrink: 0,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? '#1b5e20' : '#1557b0')}
+                        onMouseLeave={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? '#2e7d32' : '#1a73e8')}
+                      >
+                        {currentJobStage === 'awaiting_signed_document' ? 'Receive sign off' : 'Send for Signature'}
+                      </button>
+                    )}
+                  </>
                 )}
 
                 {/* Superseded: Show Superseded text */}
