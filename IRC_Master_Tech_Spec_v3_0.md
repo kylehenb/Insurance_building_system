@@ -698,12 +698,24 @@ CREATE TABLE automation_config (
   UNIQUE(tenant_id, key)
 );
 -- Default values seeded on tenant creation:
--- gary_response_deadline_hours: 48
--- gary_reminder_1_hours: 24
--- gary_final_nudge_hours: 46
+-- Gary timing (now in days, not hours):
+-- gary_response_deadline_days: 2
+-- gary_reminder_1_days: 1
+-- gary_final_nudge_days: 2
 -- gary_send_window_start: "06:00"
 -- gary_send_window_end: "19:00"
 -- gary_send_window_tz: "Australia/Perth"
+-- Business hours & time mode settings:
+-- business_hours_start: "07:00"
+-- business_hours_end: "17:30"
+-- business_days: "1,2,3,4,5" (ISO weekday numbers, 1=Mon)
+-- public_holidays: "[]" (JSON array of YYYY-MM-DD strings)
+-- waking_hours_start: "07:00"
+-- waking_hours_end: "20:00"
+-- urgent_hours_start: "05:00"
+-- urgent_hours_end: "22:00"
+-- urgent_all_days: "true"
+-- Other automation settings:
 -- makesafe_cascade_wait_minutes: 15
 -- makesafe_cascade_max_trades: 5
 -- trade_portal_token_expiry_days_after_close: 30
@@ -711,6 +723,112 @@ CREATE TABLE automation_config (
 -- homeowner_followup_interval_hours: 24
 -- trade_proximity_standard_km: 40    (v3.0 addition)
 ```
+
+### 4.19a Business Hours & Time Mode System
+
+IRC Master uses a time-aware automation system that controls when messages are sent and how delays are calculated. All time-related logic lives in `/lib/scheduling/business-hours.ts` — this is the single source of truth for time mode behavior.
+
+#### Time Modes
+
+Each automation rule declares a `time_mode` that controls both delivery gating (when to send) and delay calculation (how to calculate next event time).
+
+| Mode | Delivery Gating | Delay Unit Used | Description |
+|---|---|---|---|
+| `business_hours` | Mon–Fri, within business hours, non-holiday | `business_days` | Trade follow-up timelines and trade-facing comms |
+| `waking_hours` | Any day, within waking hours | `calendar_days` | Homeowner and insured SMS |
+| `urgent` | Any day, within urgent hours (5am–10pm default) | `calendar_days` | Make safe cascade and emergency dispatch |
+| `send_window` | Any day, within Gary send window | `calendar_days` | Gary trade SMS |
+
+#### Delay Units
+
+The unit of a delay is a semantic fact about what a timer means. It is hardcoded in the rule definition and is NOT user-configurable.
+
+| Unit | Calculation | Example Use |
+|---|---|---|
+| `minutes` | startTime + value minutes | Make safe cascade (time-critical) |
+| `hours` | startTime + value hours | KPI contact/booking SLAs (real-time) |
+| `calendar_days` | startTime + value calendar days | Homeowner follow-ups, Gary return visits |
+| `business_days` | Count only business days (weekdays in business_days, not holidays) | Gary escalation deadlines, KPI visit/report due dates |
+
+#### automation_config Keys
+
+**Business Hours Settings:**
+- `business_hours_start`: Start of business day HH:MM 24hr (default "07:00")
+- `business_hours_end`: End of business day HH:MM 24hr (default "17:30")
+- `business_days`: ISO weekday numbers counted as business days (default "1,2,3,4,5")
+- `public_holidays`: JSON array of YYYY-MM-DD strings (manually maintained annually)
+
+**Waking Hours (Homeowner/Insured Comms):**
+- `waking_hours_start`: Earliest time for homeowner/insured comms (default "07:00")
+- `waking_hours_end`: Latest time for homeowner/insured comms (default "20:00")
+
+**Urgent Mode (Make Safe & Emergency):**
+- `urgent_hours_start`: Earliest time for urgent mode comms (default "05:00")
+- `urgent_hours_end`: Latest time for urgent mode comms (default "22:00")
+- `urgent_all_days`: If true urgent mode runs all 7 days (default "true")
+
+**Gary Send Window:**
+- `gary_send_window_start`: Gary trade SMS window start (default "06:00")
+- `gary_send_window_end`: Gary trade SMS window end (default "19:00")
+- `gary_send_window_tz`: Timezone for all time calculations (default "Australia/Perth")
+
+#### Per-Job Automation Overrides
+
+The `jobs.automation_overrides` JSONB field allows per-job overrides of time mode behavior:
+
+```typescript
+{
+  // Existing keys
+  gary_enabled?: boolean
+  gary_deadline_hours?: number
+  homeowner_sms_enabled?: boolean
+  gary_send_window_start?: string
+  gary_send_window_end?: string
+  
+  // Time mode overrides (new)
+  time_mode_override?: 'business_hours' | 'waking_hours' | 'urgent' | 'send_window' | null
+  insured_contact_window_start?: string
+  insured_contact_window_end?: string
+  insured_contact_all_days?: boolean
+  trade_contact_overrides?: Record<string, {
+    contact_window_start?: string
+    contact_window_end?: string
+    contact_all_days?: boolean
+  }>
+}
+```
+
+Override resolution order (most specific wins):
+1. `trade_contact_overrides[tradeId]` — trade-specific override
+2. `insured_contact_window_start/end` — insured-specific override
+3. `time_mode_override` — job-level mode override
+4. Rule-level `time_mode` — rule default
+5. Global `automation_config` values — tenant defaults
+
+#### Core Functions (`/lib/scheduling/business-hours.ts`)
+
+- `parseTimeConfig(rawConfig)`: Converts automation_config strings to typed TimeConfig
+- `isWithinSendWindow(config, mode, at?)`: Returns true if current time is within valid delivery window
+- `getNextSendTime(config, mode, referenceTime?)`: Returns next valid delivery time
+- `addDelay(config, startTime, value, unit)`: Calculates timestamp after adding delay
+- `resolveEffectiveTimeConfig(config, mode, jobOverrides?, contactType?, tradeId?)`: Resolves effective window considering overrides
+
+#### KPI Due Date Calculations
+
+KPI due dates are calculated using `addDelay()` when jobs are created:
+
+- `kpi_contact_due`: `addDelay(config, orderedAt, 2, 'hours')` — calendar hours (insurer SLA is real-time)
+- `kpi_booking_due`: `addDelay(config, orderedAt, 24, 'hours')` — calendar hours (same reason)
+- `kpi_visit_due`: `addDelay(config, orderedAt, 2, 'business_days')` — business days (industry standard)
+- `kpi_report_due`: `addDelay(config, orderedAt, 4, 'business_days')` — business days
+
+Contact and booking use calendar hours because insurer SLAs are real-time (weekends don't pause the clock). Visit and report use business days because inspections happen during working days.
+
+#### UI Configuration
+
+- Settings page: `/dashboard/settings/automation` — configure business hours, waking hours, urgent mode, and Gary send window
+- Job detail page: Overview tab includes Automation Overrides accordion for per-job settings
+- Per-job overrides support: time mode override, custom insured contact window, trade-specific contact windows
 
 ### 4.20 rate_config
 ```sql

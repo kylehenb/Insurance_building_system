@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/supabase/get-user'
 
 interface PublicHoliday {
   date: string
@@ -23,25 +24,14 @@ interface AutomationConfig {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServiceClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userSession = await getUser()
 
-    if (!user) {
+    if (!userSession || !userSession.tenant_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get tenant_id from user
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'Failed to get user tenant' }, { status: 500 })
-    }
-
-    const tenantId = userData.tenant_id
+    const tenantId = userSession.tenant_id
+    const supabase = createServiceClient()
 
     // Load automation_config
     const { data: configData, error: configError } = await supabase
@@ -99,25 +89,14 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createServiceClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const userSession = await getUser()
 
-    if (!user) {
+    if (!userSession || !userSession.tenant_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get tenant_id from user
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'Failed to get user tenant' }, { status: 500 })
-    }
-
-    const tenantId = userData.tenant_id
+    const tenantId = userSession.tenant_id
+    const supabase = createServiceClient()
     const config: AutomationConfig = await req.json()
 
     // Helper to update or insert config value
