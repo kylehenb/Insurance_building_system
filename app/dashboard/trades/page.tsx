@@ -48,12 +48,16 @@ export default function TradesPage() {
     abn: null,
     primary_contact: null,
     address: null,
+    lat: null,
+    lng: null,
     contact_email: null,
     contact_mobile: null,
     contact_office: null,
     can_do_make_safe: false,
     makesafe_priority: null,
     can_do_reports: false,
+    availability: 'maintain_capacity',
+    priority_rank: 50,
     gary_opt_out: false,
     gary_contact_preference: null,
     gary_notes: null,
@@ -268,12 +272,16 @@ export default function TradesPage() {
       abn: null,
       primary_contact: null,
       address: null,
+      lat: null,
+      lng: null,
       contact_email: null,
       contact_mobile: null,
       contact_office: null,
       can_do_make_safe: false,
       makesafe_priority: null,
       can_do_reports: false,
+      availability: 'maintain_capacity',
+      priority_rank: 50,
       gary_opt_out: false,
       gary_contact_preference: null,
       gary_notes: null,
@@ -294,12 +302,16 @@ export default function TradesPage() {
       abn: item.abn,
       primary_contact: item.primary_contact,
       address: item.address,
+      lat: item.lat,
+      lng: item.lng,
       contact_email: item.contact_email,
       contact_mobile: item.contact_mobile,
       contact_office: item.contact_office,
       can_do_make_safe: item.can_do_make_safe,
       makesafe_priority: item.makesafe_priority,
       can_do_reports: item.can_do_reports,
+      availability: item.availability || 'maintain_capacity',
+      priority_rank: item.priority_rank ?? 50,
       gary_opt_out: item.gary_opt_out,
       gary_contact_preference: item.gary_contact_preference,
       gary_notes: item.gary_notes,
@@ -821,6 +833,29 @@ export default function TradesPage() {
                     />
                     <span className="text-xs font-medium text-[#1a1a1a]/70">Can Do Reports</span>
                   </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Availability</label>
+                  <select
+                    value={formData.availability || 'maintain_capacity'}
+                    onChange={(e) => setFormData({ ...formData, availability: e.target.value as any })}
+                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                  >
+                    <option value="more_capacity">More Capacity</option>
+                    <option value="maintain_capacity">Maintain Capacity</option>
+                    <option value="reduce_capacity">Reduce Capacity</option>
+                    <option value="on_pause">On Pause</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Priority Rank</label>
+                  <input
+                    type="number"
+                    value={formData.priority_rank ?? 50}
+                    onChange={(e) => setFormData({ ...formData, priority_rank: parseInt(e.target.value) || 50 })}
+                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                  />
+                  <p className="text-[10px] text-[#1a1a1a]/50 mt-1">Lower number = higher priority</p>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Notes</label>

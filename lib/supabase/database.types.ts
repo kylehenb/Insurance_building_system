@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       action_queue: {
@@ -509,6 +484,165 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_scheduling_rules: {
+        Row: {
+          access_constraint_block: boolean | null
+          afternoon_simple_jobs: boolean | null
+          anchor_job_enabled: boolean | null
+          arrival_window_minutes: number | null
+          arrival_window_sms_enabled: boolean | null
+          auto_mode_trigger_count: number | null
+          busy_mode_radius_km: number | null
+          capture_availability_from_sms: boolean | null
+          cat_cluster_order_count: number | null
+          cat_cluster_window_hours: number | null
+          cat_event_active: boolean | null
+          cluster_radius_km: number | null
+          confirmation_threshold_pct: number | null
+          created_at: string | null
+          day_end_cutoff: string | null
+          days_since_lodged_escalation: number | null
+          first_appointment_time: string | null
+          id: string
+          inspection_buffer_minutes: number | null
+          inspector_config: Json | null
+          insurer_sla_config: Json | null
+          job_type_durations: Json | null
+          kpi_override_hours: number | null
+          last_appointment_time: string | null
+          max_daily_inspections: number | null
+          max_daily_travel_hours: number | null
+          min_cluster_size: number | null
+          morning_complex_jobs: boolean | null
+          new_order_hold_minutes: number | null
+          overflow_max_per_day: number | null
+          overflow_radius_km: number | null
+          peak_hour_config: Json | null
+          postcode_zone_map: Json | null
+          quiet_mode_hold_days: number | null
+          repeat_reschedule_threshold: number | null
+          same_address_always_together: boolean | null
+          same_claim_hold_enabled: boolean | null
+          scheduling_mode: string | null
+          service_area_postcodes: string[] | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          vulnerable_person_extra_minutes: number | null
+          vulnerable_person_morning_preference: boolean | null
+          zone_day_map: Json | null
+        }
+        Insert: {
+          access_constraint_block?: boolean | null
+          afternoon_simple_jobs?: boolean | null
+          anchor_job_enabled?: boolean | null
+          arrival_window_minutes?: number | null
+          arrival_window_sms_enabled?: boolean | null
+          auto_mode_trigger_count?: number | null
+          busy_mode_radius_km?: number | null
+          capture_availability_from_sms?: boolean | null
+          cat_cluster_order_count?: number | null
+          cat_cluster_window_hours?: number | null
+          cat_event_active?: boolean | null
+          cluster_radius_km?: number | null
+          confirmation_threshold_pct?: number | null
+          created_at?: string | null
+          day_end_cutoff?: string | null
+          days_since_lodged_escalation?: number | null
+          first_appointment_time?: string | null
+          id?: string
+          inspection_buffer_minutes?: number | null
+          inspector_config?: Json | null
+          insurer_sla_config?: Json | null
+          job_type_durations?: Json | null
+          kpi_override_hours?: number | null
+          last_appointment_time?: string | null
+          max_daily_inspections?: number | null
+          max_daily_travel_hours?: number | null
+          min_cluster_size?: number | null
+          morning_complex_jobs?: boolean | null
+          new_order_hold_minutes?: number | null
+          overflow_max_per_day?: number | null
+          overflow_radius_km?: number | null
+          peak_hour_config?: Json | null
+          postcode_zone_map?: Json | null
+          quiet_mode_hold_days?: number | null
+          repeat_reschedule_threshold?: number | null
+          same_address_always_together?: boolean | null
+          same_claim_hold_enabled?: boolean | null
+          scheduling_mode?: string | null
+          service_area_postcodes?: string[] | null
+          tenant_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+          vulnerable_person_extra_minutes?: number | null
+          vulnerable_person_morning_preference?: boolean | null
+          zone_day_map?: Json | null
+        }
+        Update: {
+          access_constraint_block?: boolean | null
+          afternoon_simple_jobs?: boolean | null
+          anchor_job_enabled?: boolean | null
+          arrival_window_minutes?: number | null
+          arrival_window_sms_enabled?: boolean | null
+          auto_mode_trigger_count?: number | null
+          busy_mode_radius_km?: number | null
+          capture_availability_from_sms?: boolean | null
+          cat_cluster_order_count?: number | null
+          cat_cluster_window_hours?: number | null
+          cat_event_active?: boolean | null
+          cluster_radius_km?: number | null
+          confirmation_threshold_pct?: number | null
+          created_at?: string | null
+          day_end_cutoff?: string | null
+          days_since_lodged_escalation?: number | null
+          first_appointment_time?: string | null
+          id?: string
+          inspection_buffer_minutes?: number | null
+          inspector_config?: Json | null
+          insurer_sla_config?: Json | null
+          job_type_durations?: Json | null
+          kpi_override_hours?: number | null
+          last_appointment_time?: string | null
+          max_daily_inspections?: number | null
+          max_daily_travel_hours?: number | null
+          min_cluster_size?: number | null
+          morning_complex_jobs?: boolean | null
+          new_order_hold_minutes?: number | null
+          overflow_max_per_day?: number | null
+          overflow_radius_km?: number | null
+          peak_hour_config?: Json | null
+          postcode_zone_map?: Json | null
+          quiet_mode_hold_days?: number | null
+          repeat_reschedule_threshold?: number | null
+          same_address_always_together?: boolean | null
+          same_claim_hold_enabled?: boolean | null
+          scheduling_mode?: string | null
+          service_area_postcodes?: string[] | null
+          tenant_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          vulnerable_person_extra_minutes?: number | null
+          vulnerable_person_morning_preference?: boolean | null
+          zone_day_map?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_scheduling_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_scheduling_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2387,6 +2521,7 @@ export type Database = {
         Row: {
           abn: string | null
           address: string | null
+          availability: string | null
           business_name: string | null
           can_do_make_safe: boolean | null
           can_do_reports: boolean | null
@@ -2399,10 +2534,13 @@ export type Database = {
           gary_notes: string | null
           gary_opt_out: boolean | null
           id: string
+          lat: number | null
+          lng: number | null
           makesafe_priority: number | null
           notes: string | null
           primary_contact: string | null
           primary_trade: string | null
+          priority_rank: number | null
           status: string | null
           status_note: string | null
           tenant_id: string
@@ -2411,6 +2549,7 @@ export type Database = {
         Insert: {
           abn?: string | null
           address?: string | null
+          availability?: string | null
           business_name?: string | null
           can_do_make_safe?: boolean | null
           can_do_reports?: boolean | null
@@ -2423,10 +2562,13 @@ export type Database = {
           gary_notes?: string | null
           gary_opt_out?: boolean | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           makesafe_priority?: number | null
           notes?: string | null
           primary_contact?: string | null
           primary_trade?: string | null
+          priority_rank?: number | null
           status?: string | null
           status_note?: string | null
           tenant_id: string
@@ -2435,6 +2577,7 @@ export type Database = {
         Update: {
           abn?: string | null
           address?: string | null
+          availability?: string | null
           business_name?: string | null
           can_do_make_safe?: boolean | null
           can_do_reports?: boolean | null
@@ -2447,10 +2590,13 @@ export type Database = {
           gary_notes?: string | null
           gary_opt_out?: boolean | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           makesafe_priority?: number | null
           notes?: string | null
           primary_contact?: string | null
           primary_trade?: string | null
+          priority_rank?: number | null
           status?: string | null
           status_note?: string | null
           tenant_id?: string
@@ -2752,36 +2898,6 @@ export type Database = {
           },
         ]
       }
-      user_preferences: {
-        Row: {
-          id: string
-          tenant_id: string
-          user_id: string
-          preference_key: string
-          preference_value: Json | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          user_id: string
-          preference_key: string
-          preference_value?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          user_id?: string
-          preference_key?: string
-          preference_value?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       job_margin_summary: {
@@ -2808,6 +2924,10 @@ export type Database = {
     }
     Functions: {
       generate_job_number: { Args: { p_tenant_id: string }; Returns: string }
+      seed_prompts_for_tenant: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -2936,9 +3056,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
