@@ -98,7 +98,10 @@ export function BlueprintView({
       const result = await response.json()
 
       if (!response.ok) {
-        alert(`Failed to generate draft: ${result.error || 'Unknown error'}`)
+        const errorMsg = result.error || 'Unknown error'
+        const errorDetails = result.details ? `\n\nDetails: ${result.details}` : ''
+        alert(`Failed to generate draft: ${errorMsg}${errorDetails}`)
+        console.error('Blueprint generation error:', result)
         return
       }
 
