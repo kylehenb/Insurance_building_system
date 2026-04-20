@@ -34,7 +34,7 @@ clients: id, tenant_id, client_type, parent_id, name, trading_name, abn, submiss
 
 insurer_orders: id, tenant_id, job_id, client_id, order_ref, status, claim_number, insurer, adjuster, wo_type, is_make_safe, property_address, insured_name, insured_phone, insured_email, additional_contacts, date_of_loss, loss_type, claim_description, special_instructions, sum_insured_building, excess_building, raw_email_link, parse_status, entry_method, notes, created_at
 
-trades: id, tenant_id, primary_trade, trade_code, business_name, entity_name, abn, primary_contact, address, lat, lng, contact_email, contact_mobile, contact_office, can_do_make_safe, makesafe_priority, can_do_reports, availability, priority_rank, gary_opt_out, gary_contact_preference, gary_notes, status, status_note, notes, created_at
+trades: id, tenant_id, primary_trade, trade_code, business_name, entity_name, abn, primary_contact, address, lat, lng, contact_email, contact_mobile, contact_office, can_do_make_safe, makesafe_priority, can_do_reports, availability, priority_rank (star rating: 1=lowest priority, 5=highest priority), gary_opt_out, gary_contact_preference, gary_notes, status, status_note, notes, created_at
 
 work_orders: id, tenant_id, job_id, quote_id, trade_id, report_id, blueprint_id, work_type, status, sequence_order, is_concurrent, predecessor_work_order_id, estimated_hours, total_visits, current_visit, proximity_range, gary_state, scope_summary, trade_cost, charge_out_amount, agreed_amount, notes, created_at
 

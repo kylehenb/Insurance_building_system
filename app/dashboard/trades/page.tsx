@@ -57,7 +57,7 @@ export default function TradesPage() {
     makesafe_priority: null,
     can_do_reports: false,
     availability: 'maintain_capacity',
-    priority_rank: 50,
+    priority_rank: 3,
     gary_opt_out: false,
     gary_contact_preference: null,
     gary_notes: null,
@@ -281,7 +281,7 @@ export default function TradesPage() {
       makesafe_priority: null,
       can_do_reports: false,
       availability: 'maintain_capacity',
-      priority_rank: 50,
+      priority_rank: 3,
       gary_opt_out: false,
       gary_contact_preference: null,
       gary_notes: null,
@@ -311,7 +311,7 @@ export default function TradesPage() {
       makesafe_priority: item.makesafe_priority,
       can_do_reports: item.can_do_reports,
       availability: item.availability || 'maintain_capacity',
-      priority_rank: item.priority_rank ?? 50,
+      priority_rank: item.priority_rank ?? 3,
       gary_opt_out: item.gary_opt_out,
       gary_contact_preference: item.gary_contact_preference,
       gary_notes: item.gary_notes,
@@ -849,13 +849,17 @@ export default function TradesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Priority Rank</label>
-                  <input
-                    type="number"
-                    value={formData.priority_rank ?? 50}
-                    onChange={(e) => setFormData({ ...formData, priority_rank: parseInt(e.target.value) || 50 })}
+                  <select
+                    value={formData.priority_rank ?? 3}
+                    onChange={(e) => setFormData({ ...formData, priority_rank: parseInt(e.target.value) })}
                     className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                  <p className="text-[10px] text-[#1a1a1a]/50 mt-1">Lower number = higher priority</p>
+                  >
+                    <option value={1}>⭐ (1) - Lowest Priority</option>
+                    <option value={2}>⭐⭐ (2) - Low Priority</option>
+                    <option value={3}>⭐⭐⭐ (3) - Medium Priority</option>
+                    <option value={4}>⭐⭐⭐⭐ (4) - High Priority</option>
+                    <option value={5}>⭐⭐⭐⭐⭐ (5) - Highest Priority</option>
+                  </select>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Notes</label>

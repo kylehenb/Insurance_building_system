@@ -59,6 +59,10 @@ const NUMERIC_FIELDS: string[] = [
   'priority_rank',
 ]
 
+const STAR_RATING_FIELDS: string[] = [
+  'priority_rank',
+]
+
 const BOOLEAN_FIELDS: string[] = [
   'can_do_make_safe',
   'can_do_reports',
@@ -217,7 +221,14 @@ export function TradesCsvImportDialog({ isOpen, onClose, onImport }: TradesCsvIm
           if (cleaned !== '') {
             const num = parseFloat(cleaned)
             if (!isNaN(num)) {
-              (item as any)[map.tradesField] = num
+              // Validate star rating fields are 1-5
+              if (STAR_RATING_FIELDS.includes(map.tradesField)) {
+                const rounded = Math.round(num)
+                const clamped = Math.max(1, Math.min(5, rounded))
+                ;(item as any)[map.tradesField] = clamped
+              } else {
+                ;(item as any)[map.tradesField] = num
+              }
             }
           }
         } else if (BOOLEAN_FIELDS.includes(map.tradesField)) {
