@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { Database } from '@/lib/supabase/database.types'
-import type { BlueprintDraftData, BlueprintTrade, BlueprintVisit } from '@/lib/types/scheduling'
+import type { BlueprintDraftData } from '@/lib/types/scheduling'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,17 +41,7 @@ export async function POST(
   }
 
   // Get the approved quote for this job
-  const APPROVED_STATUSES = [
-    'approved_contracts_pending',
-    'approved_contracts_sent',
-    'approved_contracts_signed',
-    'pre_repair',
-    'repairs_in_progress',
-    'repairs_complete_to_invoice',
-    'complete_and_invoiced',
-    'approved',
-    'partially_approved',
-  ]
+  const APPROVED_STATUSES = ['approved', 'partially_approved']
 
   const { data: quote } = await supabase
     .from('quotes')

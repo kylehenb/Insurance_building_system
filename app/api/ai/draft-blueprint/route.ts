@@ -67,17 +67,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient()
 
     // Get the approved quote for this job
-    const APPROVED_STATUSES = [
-      'approved_contracts_pending',
-      'approved_contracts_sent',
-      'approved_contracts_signed',
-      'pre_repair',
-      'repairs_in_progress',
-      'repairs_complete_to_invoice',
-      'complete_and_invoiced',
-      'approved',
-      'partially_approved',
-    ]
+    const APPROVED_STATUSES = ['approved', 'partially_approved']
 
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
