@@ -156,7 +156,7 @@ export default function TradeSequencePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="space-y-2">
           {rows.map((row, index) => (
             <div
               key={row.id}
@@ -164,20 +164,19 @@ export default function TradeSequencePage() {
               onDragStart={() => handleDragStart(index)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(index)}
-              className={`bg-white border border-[#e8e4e0] rounded p-3 transition-opacity cursor-move ${
+              className={`bg-white border border-[#e8e4e0] rounded px-4 py-2 transition-opacity cursor-move ${
                 draggedIndex === index ? 'opacity-50' : ''
               } ${draggedIndex !== null && draggedIndex !== index ? 'border-[#c9a96e]' : ''}`}
             >
-              {/* Trade type name and drag handle */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="text-[#b0a89e] text-lg">⠿</div>
-                <div className="font-mono text-sm font-semibold text-[#1a1a1a] truncate flex-1">{row.trade_type}</div>
-              </div>
+              <div className="flex items-center gap-4">
+                {/* Drag handle */}
+                <div className="text-[#b0a89e] text-lg w-6">⠿</div>
 
-              {/* Compact inputs */}
-              <div className="space-y-2">
+                {/* Trade type name */}
+                <div className="w-48 font-mono text-sm font-semibold text-[#1a1a1a">{row.trade_type}</div>
+
                 {/* Visits */}
-                <div>
+                <div className="w-20">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Visits</div>
                   <input
                     type="number"
@@ -190,31 +189,31 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Lag */}
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Lag</div>
-                    <input
-                      type="number"
-                      min={0}
-                      value={row.typical_lag_days}
-                      onChange={(e) => updateRow(index, 'typical_lag_days', parseInt(e.target.value) || 0)}
-                      className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Reason</div>
-                    <input
-                      type="text"
-                      value={row.lag_description || ''}
-                      onChange={(e) => updateRow(index, 'lag_description', e.target.value)}
-                      placeholder="e.g. dry"
-                      className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                    />
-                  </div>
+                <div className="w-16">
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Lag</div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.typical_lag_days}
+                    onChange={(e) => updateRow(index, 'typical_lag_days', parseInt(e.target.value) || 0)}
+                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                  />
+                </div>
+
+                {/* Lag reason */}
+                <div className="w-32">
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Reason</div>
+                  <input
+                    type="text"
+                    value={row.lag_description || ''}
+                    onChange={(e) => updateRow(index, 'lag_description', e.target.value)}
+                    placeholder="e.g. dry"
+                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                  />
                 </div>
 
                 {/* Follows */}
-                <div>
+                <div className="w-40">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Follows</div>
                   <CompactMultiSelect
                     selected={row.typical_depends_on || []}
@@ -224,7 +223,7 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Before */}
-                <div>
+                <div className="w-40">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Before</div>
                   <CompactMultiSelect
                     selected={row.typical_comes_before || []}
@@ -233,8 +232,8 @@ export default function TradeSequencePage() {
                   />
                 </div>
 
-                {/* Paired with */}
-                <div>
+                {/* Paired */}
+                <div className="w-40">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Paired</div>
                   <CompactMultiSelect
                     selected={row.typically_paired_with || []}
@@ -244,7 +243,7 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Concurrent */}
-                <div>
+                <div className="w-40">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Concurrent</div>
                   <CompactMultiSelect
                     selected={row.can_run_concurrent_with || []}
@@ -254,7 +253,7 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Not concurrent */}
-                <div>
+                <div className="w-40">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Not concurrent</div>
                   <CompactMultiSelect
                     selected={row.cant_run_concurrent_with || []}
@@ -264,7 +263,7 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Notes */}
-                <div>
+                <div className="flex-1">
                   <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Notes</div>
                   <input
                     type="text"
