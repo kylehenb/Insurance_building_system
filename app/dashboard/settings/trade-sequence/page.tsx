@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface TradeTypeSequence {
   id: string
@@ -21,42 +26,29 @@ interface TradeTypeSequence {
 
 export default function TradeSequencePage() {
   const router = useRouter()
-  const [tenantId, setTenantId] = useState<string | null>(null)
-  const [ready, setReady] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [rows, setRows] = useState<TradeTypeSequence[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Effect 1: get session + tenant_id
+  // Effect 1: get session
   useEffect(() => {
-    const init = async () => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      
+    const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      
-      const { data: userData } = await supabase
-        .from('users')
-        .select('tenant_id')
-        .eq('id', session.user.id)
-        .single()
-      
-      if (userData) { 
-        setTenantId(userData.tenant_id); 
-        setReady(true) 
+      if (!session) {
+        router.push('/login')
+        return
       }
+      setUserId(session.user.id)
     }
-    init()
+    getSession()
   }, [router])
 
-  // Effect 2: fetch data once tenantId is set
+  // Effect 2: fetch data once userId is set
   useEffect(() => {
-    if (!ready) return
+    if (!userId) return
     
     const fetchData = async () => {
       setLoading(true)
@@ -72,7 +64,7 @@ export default function TradeSequencePage() {
       }
     }
     fetchData()
-  }, [ready])
+  }, [userId])
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index)
