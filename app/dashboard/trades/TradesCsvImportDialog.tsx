@@ -19,6 +19,7 @@ const TRADES_FIELDS = [
   { key: 'can_do_reports', label: 'Can Do Reports', required: false },
   { key: 'availability', label: 'Availability', required: false },
   { key: 'priority_rank', label: 'Priority Rank', required: false },
+  { key: 'service_area', label: 'Service Area', required: false },
   { key: 'gary_opt_out', label: 'Gary Opt Out', required: false },
   { key: 'gary_contact_preference', label: 'Gary Contact Preference', required: false },
   { key: 'gary_notes', label: 'Gary Notes', required: false },
@@ -46,6 +47,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   can_do_reports: ['can_do_reports', 'reports'],
   availability: ['availability', 'capacity'],
   priority_rank: ['priority_rank', 'rank'],
+  service_area: ['service_area', 'service_area', 'service_areas'],
   gary_opt_out: ['gary_opt_out', 'opt_out'],
   gary_contact_preference: ['gary_contact_preference', 'gary_preference', 'contact_preference'],
   gary_notes: ['gary_notes'],
@@ -94,6 +96,7 @@ export interface TradesImportRow {
   can_do_reports?: boolean | null
   availability?: string | null
   priority_rank?: number | null
+  service_area?: string[] | null
   gary_opt_out?: boolean | null
   gary_contact_preference?: string | null
   gary_notes?: string | null

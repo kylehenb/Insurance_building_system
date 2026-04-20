@@ -17,7 +17,10 @@ interface TradeTypeSequence {
   typical_visit_count: number
   notes: string | null
   typical_depends_on: string[]
-  can_run_concurrent: boolean
+  typical_comes_before: string[]
+  typically_paired_with: string[]
+  can_run_concurrent_with: string[]
+  cant_run_concurrent_with: string[]
   typical_lag_days: number
   lag_description: string | null
   updated_at: string
@@ -97,13 +100,13 @@ export default function TradeSequencePage() {
     ))
   }
 
-  const toggleDependsOn = (index: number, tradeType: string) => {
+  const toggleArrayField = (index: number, field: keyof TradeTypeSequence, tradeType: string) => {
     const row = rows[index]
-    const currentDeps = row.typical_depends_on || []
-    const newDeps = currentDeps.includes(tradeType)
-      ? currentDeps.filter(t => t !== tradeType)
-      : [...currentDeps, tradeType]
-    updateRow(index, 'typical_depends_on', newDeps)
+    const currentArray = (row[field] as string[]) || []
+    const newArray = currentArray.includes(tradeType)
+      ? currentArray.filter(t => t !== tradeType)
+      : [...currentArray, tradeType]
+    updateRow(index, field, newArray)
   }
 
   const handleSave = async () => {
@@ -140,12 +143,17 @@ export default function TradeSequencePage() {
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] pb-24">
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-[#1a1a1a] mb-2">Trade Type Sequence</h1>
-          <p className="text-[#9e998f]">
+          <p className="text-[#9e998f] mb-4">
             Define the default sequence and scheduling hints for each trade type. Used by the AI when drafting repair schedule blueprints.
           </p>
+          <div className="bg-[#fff8ed] border border-[#c9a96e] rounded px-4 py-3">
+            <p className="text-sm text-[#1a1a1a]">
+              <span className="font-semibold">Typically</span> — These settings provide guidance to the AI for generating job blueprints. They are typical patterns, not hard-coded rules. The AI may deviate based on job-specific requirements.
+            </p>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -156,35 +164,24 @@ export default function TradeSequencePage() {
               onDragStart={() => handleDragStart(index)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(index)}
-              className={`bg-white border border-[#e8e4e0] rounded-lg p-4 transition-opacity ${
+              className={`bg-white border border-[#e8e4e0] rounded-lg p-5 transition-opacity ${
                 draggedIndex === index ? 'opacity-50' : ''
               } ${draggedIndex !== null && draggedIndex !== index ? 'border-[#c9a96e]' : ''}`}
             >
-              {/* Row 1 - Top fields */}
-              <div className="flex items-center gap-4 mb-4">
+              {/* Header row */}
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-[#e8e4e0]">
                 {/* Drag handle */}
                 <div className="text-[#b0a89e] cursor-grab text-xl">⠿</div>
-
-                {/* Sequence order */}
-                <div className="w-[60px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Order</div>
-                  <input
-                    type="number"
-                    value={row.typical_sequence_order || ''}
-                    onChange={(e) => updateRow(index, 'typical_sequence_order', parseInt(e.target.value) || null)}
-                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                  />
-                </div>
 
                 {/* Trade type name (read-only) */}
                 <div className="flex-1">
                   <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Trade type</div>
-                  <div className="font-mono text-[#1a1a1a]">{row.trade_type}</div>
+                  <div className="font-mono text-lg text-[#1a1a1a]">{row.trade_type}</div>
                 </div>
 
                 {/* Visits */}
-                <div className="w-[80px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Visits</div>
+                <div className="w-[100px]">
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Typical visits</div>
                   <input
                     type="number"
                     min={1}
@@ -195,19 +192,8 @@ export default function TradeSequencePage() {
                   />
                 </div>
 
-                {/* Can run concurrent */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={row.can_run_concurrent}
-                    onChange={(e) => updateRow(index, 'can_run_concurrent', e.target.checked)}
-                    className="w-4 h-4 accent-[#c9a96e]"
-                  />
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold">Can run concurrent</div>
-                </div>
-
                 {/* Lag days */}
-                <div className="w-[70px]">
+                <div className="w-[80px]">
                   <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Lag days</div>
                   <input
                     type="number"
@@ -219,8 +205,8 @@ export default function TradeSequencePage() {
                 </div>
 
                 {/* Lag description */}
-                <div className="w-[160px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Lag reason</div>
+                <div className="w-[180px]">
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Lag description</div>
                   <input
                     type="text"
                     value={row.lag_description || ''}
@@ -231,43 +217,69 @@ export default function TradeSequencePage() {
                 </div>
               </div>
 
-              {/* Row 2 - Bottom fields (full width) */}
-              <div className="flex items-start gap-4">
-                {/* Depends on multi-select */}
-                <div className="flex-1">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Typically follows</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(row.typical_depends_on || []).map((dep) => (
-                      <span
-                        key={dep}
-                        className="bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded font-mono flex items-center gap-1"
-                      >
-                        {dep}
-                        <button
-                          onClick={() => toggleDependsOn(index, dep)}
-                          className="hover:text-[#1a1a1a]"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                    <DependsOnDropdown
-                      availableTradeTypes={allTradeTypes.filter(t => !row.typical_depends_on?.includes(t))}
-                      onSelect={(tradeType) => toggleDependsOn(index, tradeType)}
-                    />
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div className="flex-1">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Notes</div>
-                  <input
-                    type="text"
-                    value={row.notes || ''}
-                    onChange={(e) => updateRow(index, 'notes', e.target.value)}
-                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+              {/* Relationship fields */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Typically follows */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically follows</div>
+                  <MultiSelectTags
+                    selected={row.typical_depends_on || []}
+                    available={allTradeTypes.filter(t => t !== row.trade_type)}
+                    onToggle={(tradeType) => toggleArrayField(index, 'typical_depends_on', tradeType)}
                   />
                 </div>
+
+                {/* Typically comes before */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically comes before</div>
+                  <MultiSelectTags
+                    selected={row.typical_comes_before || []}
+                    available={allTradeTypes.filter(t => t !== row.trade_type)}
+                    onToggle={(tradeType) => toggleArrayField(index, 'typical_comes_before', tradeType)}
+                  />
+                </div>
+
+                {/* Typically paired with */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically paired with</div>
+                  <div className="text-xs text-[#6b6763] mb-2">Parent/child relationships (e.g., cabinet maker + electrician/plumber)</div>
+                  <MultiSelectTags
+                    selected={row.typically_paired_with || []}
+                    available={allTradeTypes.filter(t => t !== row.trade_type)}
+                    onToggle={(tradeType) => toggleArrayField(index, 'typically_paired_with', tradeType)}
+                  />
+                </div>
+
+                {/* Can run concurrent with */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Can run concurrent with</div>
+                  <MultiSelectTags
+                    selected={row.can_run_concurrent_with || []}
+                    available={allTradeTypes.filter(t => t !== row.trade_type)}
+                    onToggle={(tradeType) => toggleArrayField(index, 'can_run_concurrent_with', tradeType)}
+                  />
+                </div>
+
+                {/* Can't run concurrent with */}
+                <div className="col-span-2">
+                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Can't run concurrent with</div>
+                  <MultiSelectTags
+                    selected={row.cant_run_concurrent_with || []}
+                    available={allTradeTypes.filter(t => t !== row.trade_type)}
+                    onToggle={(tradeType) => toggleArrayField(index, 'cant_run_concurrent_with', tradeType)}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Notes</div>
+                <input
+                  type="text"
+                  value={row.notes || ''}
+                  onChange={(e) => updateRow(index, 'notes', e.target.value)}
+                  className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                />
               </div>
             </div>
           ))}
@@ -275,7 +287,7 @@ export default function TradeSequencePage() {
 
         {/* Save button */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e4e0] p-4">
-          <div className="max-w-5xl mx-auto flex justify-end">
+          <div className="max-w-6xl mx-auto flex justify-end">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -299,33 +311,51 @@ export default function TradeSequencePage() {
   )
 }
 
-function DependsOnDropdown({ availableTradeTypes, onSelect }: { availableTradeTypes: string[], onSelect: (tradeType: string) => void }) {
+function MultiSelectTags({ selected, available, onToggle }: { selected: string[], available: string[], onToggle: (tradeType: string) => void }) {
   const [open, setOpen] = useState(false)
 
-  if (availableTradeTypes.length === 0) return null
+  const availableNotSelected = available.filter(t => !selected.includes(t))
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="text-xs text-[#9e998f] hover:text-[#1a1a1a] underline"
-      >
-        + Add
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-10">
-          {availableTradeTypes.map((tradeType) => (
-            <button
-              key={tradeType}
-              onClick={() => {
-                onSelect(tradeType)
-                setOpen(false)
-              }}
-              className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] font-mono"
-            >
-              {tradeType}
-            </button>
-          ))}
+    <div className="flex flex-wrap items-center gap-2">
+      {selected.map((tradeType) => (
+        <span
+          key={tradeType}
+          className="bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded font-mono flex items-center gap-1"
+        >
+          {tradeType}
+          <button
+            onClick={() => onToggle(tradeType)}
+            className="hover:text-[#1a1a1a]"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {availableNotSelected.length > 0 && (
+        <div className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className="text-xs text-[#9e998f] hover:text-[#1a1a1a] underline"
+          >
+            + Add
+          </button>
+          {open && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+              {availableNotSelected.map((tradeType) => (
+                <button
+                  key={tradeType}
+                  onClick={() => {
+                    onToggle(tradeType)
+                    setOpen(false)
+                  }}
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] font-mono whitespace-nowrap"
+                >
+                  {tradeType}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

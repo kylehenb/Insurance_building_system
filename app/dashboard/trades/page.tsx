@@ -58,6 +58,7 @@ export default function TradesPage() {
     can_do_reports: false,
     availability: 'maintain_capacity',
     priority_rank: 3,
+    service_area: ['30kms radius'],
     gary_opt_out: false,
     gary_contact_preference: null,
     gary_notes: null,
@@ -285,6 +286,7 @@ export default function TradesPage() {
       can_do_reports: false,
       availability: 'maintain_capacity',
       priority_rank: 3,
+      service_area: ['30kms radius'],
       gary_opt_out: false,
       gary_contact_preference: null,
       gary_notes: null,
@@ -315,6 +317,7 @@ export default function TradesPage() {
       can_do_reports: item.can_do_reports,
       availability: item.availability || 'maintain_capacity',
       priority_rank: item.priority_rank ?? 3,
+      service_area: (item as any).service_area || ['30kms radius'],
       gary_opt_out: item.gary_opt_out,
       gary_contact_preference: item.gary_contact_preference,
       gary_notes: item.gary_notes,
@@ -885,6 +888,30 @@ export default function TradesPage() {
                     <option value={4}>⭐⭐⭐⭐ (4) - High Priority</option>
                     <option value={5}>⭐⭐⭐⭐⭐ (5) - Highest Priority</option>
                   </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Service Area</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['30kms radius'].map((area) => (
+                      <label key={area} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={(formData.service_area as string[] || []).includes(area)}
+                          onChange={(e) => {
+                            const currentAreas = (formData.service_area as string[]) || [];
+                            if (e.target.checked) {
+                              setFormData({ ...formData, service_area: [...currentAreas, area] });
+                            } else {
+                              setFormData({ ...formData, service_area: currentAreas.filter((a) => a !== area) });
+                            }
+                          }}
+                          className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                        />
+                        <span className="text-xs font-medium text-[#1a1a1a]/70">{area}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-[#1a1a1a]/50 mt-1">Additional options will be available from tenant settings</p>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Notes</label>
