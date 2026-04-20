@@ -44,7 +44,8 @@ export async function proxy(request: NextRequest) {
   const isPublicRoute =
     pathname === "/login" ||
     pathname === "/auth/callback" ||
-    pathname.startsWith("/auth/");
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/api/ai/");
 
   // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
