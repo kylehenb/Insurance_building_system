@@ -143,20 +143,20 @@ export default function TradeSequencePage() {
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] pb-24">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-[#1a1a1a] mb-2">Trade Type Sequence</h1>
-          <p className="text-[#9e998f] mb-4">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-[#1a1a1a] mb-2">Trade Type Sequence</h1>
+          <p className="text-sm text-[#9e998f] mb-3">
             Define the default sequence and scheduling hints for each trade type. Used by the AI when drafting repair schedule blueprints.
           </p>
-          <div className="bg-[#fff8ed] border border-[#c9a96e] rounded px-4 py-3">
-            <p className="text-sm text-[#1a1a1a]">
-              <span className="font-semibold">Typically</span> — These settings provide guidance to the AI for generating job blueprints. They are typical patterns, not hard-coded rules. The AI may deviate based on job-specific requirements.
+          <div className="bg-[#fff8ed] border border-[#c9a96e] rounded px-3 py-2">
+            <p className="text-xs text-[#1a1a1a]">
+              <span className="font-semibold">Typically</span> — These settings provide guidance to the AI for generating job blueprints. They are typical patterns, not hard-coded rules.
             </p>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {rows.map((row, index) => (
             <div
               key={row.id}
@@ -164,122 +164,115 @@ export default function TradeSequencePage() {
               onDragStart={() => handleDragStart(index)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(index)}
-              className={`bg-white border border-[#e8e4e0] rounded-lg p-5 transition-opacity ${
+              className={`bg-white border border-[#e8e4e0] rounded p-3 transition-opacity cursor-move ${
                 draggedIndex === index ? 'opacity-50' : ''
               } ${draggedIndex !== null && draggedIndex !== index ? 'border-[#c9a96e]' : ''}`}
             >
-              {/* Header row */}
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-[#e8e4e0]">
-                {/* Drag handle */}
-                <div className="text-[#b0a89e] cursor-grab text-xl">⠿</div>
+              {/* Trade type name and drag handle */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="text-[#b0a89e] text-lg">⠿</div>
+                <div className="font-mono text-sm font-semibold text-[#1a1a1a] truncate flex-1">{row.trade_type}</div>
+              </div>
 
-                {/* Trade type name (read-only) */}
-                <div className="flex-1">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Trade type</div>
-                  <div className="font-mono text-lg text-[#1a1a1a]">{row.trade_type}</div>
-                </div>
-
+              {/* Compact inputs */}
+              <div className="space-y-2">
                 {/* Visits */}
-                <div className="w-[100px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Typical visits</div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Visits</div>
                   <input
                     type="number"
                     min={1}
                     max={5}
                     value={row.typical_visit_count}
                     onChange={(e) => updateRow(index, 'typical_visit_count', parseInt(e.target.value) || 1)}
-                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                   />
                 </div>
 
-                {/* Lag days */}
-                <div className="w-[80px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Lag days</div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={row.typical_lag_days}
-                    onChange={(e) => updateRow(index, 'typical_lag_days', parseInt(e.target.value) || 0)}
-                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                  />
+                {/* Lag */}
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Lag</div>
+                    <input
+                      type="number"
+                      min={0}
+                      value={row.typical_lag_days}
+                      onChange={(e) => updateRow(index, 'typical_lag_days', parseInt(e.target.value) || 0)}
+                      className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Reason</div>
+                    <input
+                      type="text"
+                      value={row.lag_description || ''}
+                      onChange={(e) => updateRow(index, 'lag_description', e.target.value)}
+                      placeholder="e.g. dry"
+                      className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                    />
+                  </div>
                 </div>
 
-                {/* Lag description */}
-                <div className="w-[180px]">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Lag description</div>
-                  <input
-                    type="text"
-                    value={row.lag_description || ''}
-                    onChange={(e) => updateRow(index, 'lag_description', e.target.value)}
-                    placeholder="e.g. drying time"
-                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                  />
-                </div>
-              </div>
-
-              {/* Relationship fields */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                {/* Typically follows */}
+                {/* Follows */}
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically follows</div>
-                  <MultiSelectTags
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Follows</div>
+                  <CompactMultiSelect
                     selected={row.typical_depends_on || []}
                     available={allTradeTypes.filter(t => t !== row.trade_type)}
                     onToggle={(tradeType) => toggleArrayField(index, 'typical_depends_on', tradeType)}
                   />
                 </div>
 
-                {/* Typically comes before */}
+                {/* Before */}
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically comes before</div>
-                  <MultiSelectTags
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Before</div>
+                  <CompactMultiSelect
                     selected={row.typical_comes_before || []}
                     available={allTradeTypes.filter(t => t !== row.trade_type)}
                     onToggle={(tradeType) => toggleArrayField(index, 'typical_comes_before', tradeType)}
                   />
                 </div>
 
-                {/* Typically paired with */}
+                {/* Paired with */}
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Typically paired with</div>
-                  <div className="text-xs text-[#6b6763] mb-2">Parent/child relationships (e.g., cabinet maker + electrician/plumber)</div>
-                  <MultiSelectTags
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Paired</div>
+                  <CompactMultiSelect
                     selected={row.typically_paired_with || []}
                     available={allTradeTypes.filter(t => t !== row.trade_type)}
                     onToggle={(tradeType) => toggleArrayField(index, 'typically_paired_with', tradeType)}
                   />
                 </div>
 
-                {/* Can run concurrent with */}
+                {/* Concurrent */}
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Can run concurrent with</div>
-                  <MultiSelectTags
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Concurrent</div>
+                  <CompactMultiSelect
                     selected={row.can_run_concurrent_with || []}
                     available={allTradeTypes.filter(t => t !== row.trade_type)}
                     onToggle={(tradeType) => toggleArrayField(index, 'can_run_concurrent_with', tradeType)}
                   />
                 </div>
 
-                {/* Can't run concurrent with */}
-                <div className="col-span-2">
-                  <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">Can't run concurrent with</div>
-                  <MultiSelectTags
+                {/* Not concurrent */}
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Not concurrent</div>
+                  <CompactMultiSelect
                     selected={row.cant_run_concurrent_with || []}
                     available={allTradeTypes.filter(t => t !== row.trade_type)}
                     onToggle={(tradeType) => toggleArrayField(index, 'cant_run_concurrent_with', tradeType)}
                   />
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">Notes</div>
-                <input
-                  type="text"
-                  value={row.notes || ''}
-                  onChange={(e) => updateRow(index, 'notes', e.target.value)}
-                  className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
-                />
+                {/* Notes */}
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">Notes</div>
+                  <input
+                    type="text"
+                    value={row.notes || ''}
+                    onChange={(e) => updateRow(index, 'notes', e.target.value)}
+                    className="w-full border border-[#e8e4e0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -287,7 +280,7 @@ export default function TradeSequencePage() {
 
         {/* Save button */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e4e0] p-4">
-          <div className="max-w-6xl mx-auto flex justify-end">
+          <div className="max-w-7xl mx-auto flex justify-end">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -307,6 +300,56 @@ export default function TradeSequencePage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function CompactMultiSelect({ selected, available, onToggle }: { selected: string[], available: string[], onToggle: (tradeType: string) => void }) {
+  const [open, setOpen] = useState(false)
+
+  const availableNotSelected = available.filter(t => !selected.includes(t))
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {selected.length > 0 && (
+        <span className="text-[10px] text-[#3a3530] font-mono truncate">{selected.join(', ')}</span>
+      )}
+      {availableNotSelected.length > 0 && (
+        <div className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className="text-[10px] text-[#9e998f] hover:text-[#1a1a1a] underline"
+          >
+            +{selected.length === 0 ? ' Add' : ''}
+          </button>
+          {open && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+              {availableNotSelected.map((tradeType) => (
+                <button
+                  key={tradeType}
+                  onClick={() => {
+                    onToggle(tradeType)
+                    setOpen(false)
+                  }}
+                  className="block w-full text-left px-3 py-2 text-xs hover:bg-[#f5f2ee] font-mono whitespace-nowrap"
+                >
+                  {tradeType}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {selected.length > 0 && (
+        <button
+          onClick={() => {
+            selected.forEach(t => onToggle(t))
+          }}
+          className="text-[10px] text-[#9e998f] hover:text-red-600"
+        >
+          ×
+        </button>
+      )}
     </div>
   )
 }

@@ -319,7 +319,23 @@ export async function GET(req: NextRequest) {
     const tenantId = userSession.tenant_id
     const supabase = createServiceClient()
 
-    const { data: rows, error } = await supabase
+    // Fetch all unique trade types from trades table
+    const { data: tradesData, error: tradesError } = await supabase
+      .from('trades')
+      .select('primary_trade')
+      .eq('tenant_id', tenantId)
+      .not('primary_trade', 'is', null)
+
+    if (tradesError) {
+      console.error('Error fetching trades:', tradesError)
+      return NextResponse.json({ error: 'Failed to fetch trades' }, { status: 500 })
+    }
+
+    // Get unique trade types (filter out nulls)
+    const uniqueTradeTypes = Array.from(new Set(tradesData?.map(t => t.primary_trade).filter((t): t is string => t !== null) || []))
+
+    // Fetch existing trade type sequence rows for the tenant
+    const { data: existingRows, error } = await supabase
       .from('trade_type_sequence')
       .select('*')
       .eq('tenant_id', tenantId)
@@ -330,9 +346,48 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch trade type sequence' }, { status: 500 })
     }
 
-    return NextResponse.json(rows || [])
+    // Create a map of existing rows by trade_type
+    const existingMap = new Map(existingRows?.map(row => [row.trade_type, row]) || [])
+
+    // Ensure we have a row for each trade type
+    const rows: TradeTypeSequence[] = uniqueTradeTypes.map((tradeType, index) => {
+      const existing = existingMap.get(tradeType)
+      if (existing) {
+        // Merge with defaults for any missing new fields
+        return {
+          ...existing,
+          typical_depends_on: (existing as any).typical_depends_on || [],
+          typical_comes_before: (existing as any).typical_comes_before || [],
+          typically_paired_with: (existing as any).typically_paired_with || [],
+          can_run_concurrent_with: (existing as any).can_run_concurrent_with || [],
+          cant_run_concurrent_with: (existing as any).cant_run_concurrent_with || [],
+          typical_lag_days: (existing as any).typical_lag_days || 0,
+          lag_description: (existing as any).lag_description || null,
+        } as TradeTypeSequence
+      }
+      // Create a new row with defaults
+      return {
+        id: crypto.randomUUID(),
+        tenant_id: tenantId,
+        trade_type: tradeType,
+        typical_sequence_order: (index + 1) * 10,
+        typical_visit_count: 1,
+        notes: null,
+        typical_depends_on: [],
+        typical_comes_before: [],
+        typically_paired_with: [],
+        can_run_concurrent_with: [],
+        cant_run_concurrent_with: [],
+        typical_lag_days: 0,
+        lag_description: null,
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      }
+    })
+
+    return NextResponse.json(rows)
   } catch (error) {
-    console.error('Error in GET /api/settings/trade-sequence:', error)
+    console.error('Error in GET trade-sequence:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

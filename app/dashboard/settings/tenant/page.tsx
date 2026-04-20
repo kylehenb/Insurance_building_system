@@ -20,12 +20,30 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { AU_SUBURBS, type AuSuburb } from '@/lib/data/au-suburbs'
+import { AU_LGA_PRESETS, type LgaPreset } from '@/lib/data/au-lgas'
 
 // ─────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────
 
 type GeocodingState = 'idle' | 'loading' | 'success' | 'error'
+
+// Extends AuSuburb with an optional LGA tag — set when added via LGA preset bulk-add.
+// The lga field drives the group-display logic: suburbs sharing a complete LGA set
+// render under a collapsible LGA header; once any suburb is removed the header disappears.
+interface TaggedSuburb {
+  suburb: string
+  state: string
+  postcode: string
+  lga?: string
+}
+
+interface PlaceSuggestion {
+  description: string
+  place_id: string
+  main_text: string
+  secondary_text: string
+}
 
 interface RadiusZone {
   id: string
@@ -40,7 +58,7 @@ interface RadiusZone {
 interface SpecificArea {
   id: string
   label: string
-  suburbs: AuSuburb[]
+  suburbs: TaggedSuburb[]
   extended_km: number
 }
 
@@ -1003,34 +1021,17 @@ function RadiusZoneCard({
         </button>
       </div>
 
-      {/* Base address */}
+      {/* Base address — fuzzy search via Places Autocomplete */}
       <div className="mb-3">
         <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
           Base address
         </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={zone.address}
-            onChange={(e) => onChange({ ...zone, address: e.target.value, lat: null, lng: null })}
-            onBlur={(e) => {
-              if (e.target.value.trim()) onGeocodeBlur(e.target.value, zone.id)
-            }}
-            placeholder="Street address, suburb, state"
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] pr-20"
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            {geocodingState === 'loading' && (
-              <span className="text-xs text-[#9e998f]">Geocoding…</span>
-            )}
-            {geocodingState === 'success' && (
-              <span className="text-green-500 text-sm" title="Geocoded successfully">✓</span>
-            )}
-            {geocodingState === 'error' && (
-              <span className="text-red-500 text-xs" title="Address not found">✗ Not found</span>
-            )}
-          </div>
-        </div>
+        <AddressSearch
+          value={zone.address}
+          onChange={(address) => onChange({ ...zone, address, lat: null, lng: null })}
+          onSelect={(address) => onGeocodeBlur(address, zone.id)}
+          geocodingState={geocodingState}
+        />
       </div>
 
       {/* Radius inputs */}
@@ -1082,13 +1083,45 @@ function RadiusZoneCard({
             {zone.address.trim()
               ? geocodingState === 'loading'
                 ? 'Geocoding address…'
-                : 'Address not yet geocoded — blur the address field to geocode'
+                : 'Select an address from the search dropdown to geocode'
               : 'Enter a base address to see a map preview'}
           </span>
         </div>
       )}
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// computeSuburbGroups — used by SpecificAreaCard
+// ─────────────────────────────────────────────────────────────────
+
+function computeSuburbGroups(suburbs: TaggedSuburb[]) {
+  // Collect unique LGA names that appear in the current suburb list
+  const lgaNames = [...new Set(suburbs.filter((s) => s.lga).map((s) => s.lga!))]
+  const completeLgaGroups: { lga: string; suburbs: TaggedSuburb[] }[] = []
+  const completeLgaKeys = new Set<string>()
+
+  for (const lgaName of lgaNames) {
+    const preset = AU_LGA_PRESETS.find((p) => p.lga === lgaName)
+    if (!preset) continue
+    // LGA group is only shown when ALL preset suburbs are still present
+    const isComplete = preset.suburbs.every((ps) =>
+      suburbs.some((s) => s.suburb === ps.suburb && s.postcode === ps.postcode)
+    )
+    if (isComplete) {
+      const lgaSuburbs = suburbs.filter((s) => s.lga === lgaName)
+      completeLgaGroups.push({ lga: lgaName, suburbs: lgaSuburbs })
+      lgaSuburbs.forEach((s) => completeLgaKeys.add(`${s.suburb}-${s.postcode}`))
+    }
+  }
+
+  // Individual suburbs = everything not in a complete LGA group
+  const individualSuburbs = suburbs.filter(
+    (s) => !completeLgaKeys.has(`${s.suburb}-${s.postcode}`)
+  )
+
+  return { completeLgaGroups, individualSuburbs }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1104,8 +1137,52 @@ function SpecificAreaCard({
   onChange: (updated: SpecificArea) => void
   onDelete: () => void
 }) {
+  const [showLgaSelector, setShowLgaSelector] = useState(false)
+  const [lgaQuery, setLgaQuery] = useState('')
+  const lgaSelectorRef = useRef<HTMLDivElement>(null)
+
+  // Close LGA selector on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (lgaSelectorRef.current && !lgaSelectorRef.current.contains(e.target as Node)) {
+        setShowLgaSelector(false)
+        setLgaQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const removeSuburb = (suburb: TaggedSuburb) => {
+    onChange({
+      ...area,
+      suburbs: area.suburbs.filter(
+        (s) => !(s.suburb === suburb.suburb && s.postcode === suburb.postcode)
+      ),
+    })
+  }
+
+  const addLga = (preset: LgaPreset) => {
+    // Add all preset suburbs not already in the list, tagged with the LGA name
+    const newSuburbs: TaggedSuburb[] = preset.suburbs
+      .filter(
+        (ps) => !area.suburbs.some((s) => s.suburb === ps.suburb && s.postcode === ps.postcode)
+      )
+      .map((ps) => ({ ...ps, lga: preset.lga }))
+    onChange({ ...area, suburbs: [...area.suburbs, ...newSuburbs] })
+    setShowLgaSelector(false)
+    setLgaQuery('')
+  }
+
+  const { completeLgaGroups, individualSuburbs } = computeSuburbGroups(area.suburbs)
+
+  const filteredLgas = AU_LGA_PRESETS.filter((p) =>
+    p.lga.toLowerCase().includes(lgaQuery.toLowerCase())
+  )
+
   return (
     <div className="border border-[#e8e4e0] rounded-lg p-4">
+      {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 mr-4">
           <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
@@ -1128,9 +1205,9 @@ function SpecificAreaCard({
         </button>
       </div>
 
-      {/* Suburbs */}
+      {/* Suburbs section */}
       <div className="mb-3">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-2">
           <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold">
             Suburbs / Postcodes
           </label>
@@ -1140,18 +1217,133 @@ function SpecificAreaCard({
             </span>
           )}
         </div>
+
+        {/* Complete LGA group cards */}
+        {completeLgaGroups.length > 0 && (
+          <div className="space-y-2 mb-2">
+            {completeLgaGroups.map(({ lga, suburbs: lgaSuburbs }) => (
+              <div
+                key={lga}
+                className="border border-[#c9a96e] rounded-lg p-2.5 bg-[#fdf8f0]"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-[#c9a96e]">{lga}</span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Remove all ${lgaSuburbs.length} suburbs in ${lga}?`)) {
+                        onChange({
+                          ...area,
+                          suburbs: area.suburbs.filter((s) => s.lga !== lga),
+                        })
+                      }
+                    }}
+                    className="text-[10px] text-[#9e998f] hover:text-red-500 transition-colors"
+                  >
+                    Remove LGA
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {lgaSuburbs.map((s) => (
+                    <span
+                      key={`${s.suburb}-${s.postcode}`}
+                      className="inline-flex items-center gap-1 bg-white border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded"
+                    >
+                      {s.suburb} {s.postcode}
+                      <button
+                        onClick={() => removeSuburb(s)}
+                        className="text-[#9e998f] hover:text-[#1a1a1a] leading-none"
+                        title={`Remove ${s.suburb} (will break LGA group)`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Individual suburb chips (non-LGA or partial LGA) */}
+        {individualSuburbs.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {individualSuburbs.map((s) => (
+              <span
+                key={`${s.suburb}-${s.postcode}`}
+                className="inline-flex items-center gap-1 bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded"
+              >
+                {s.suburb} {s.postcode}
+                <button
+                  onClick={() => removeSuburb(s)}
+                  className="text-[#9e998f] hover:text-[#1a1a1a] leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Search input */}
         <SuburbAutocomplete
           selected={area.suburbs}
           onAdd={(suburb) => onChange({ ...area, suburbs: [...area.suburbs, suburb] })}
-          onRemove={(suburb) =>
-            onChange({
-              ...area,
-              suburbs: area.suburbs.filter(
-                (s) => !(s.suburb === suburb.suburb && s.postcode === suburb.postcode)
-              ),
-            })
-          }
         />
+
+        {/* LGA bulk-add */}
+        <div ref={lgaSelectorRef} className="relative mt-2">
+          <button
+            onClick={() => setShowLgaSelector(!showLgaSelector)}
+            className="text-xs text-[#6b6763] border border-[#e8e4e0] rounded px-2.5 py-1 hover:bg-[#f5f2ee] transition-colors"
+          >
+            + Add by LGA
+          </button>
+          {showLgaSelector && (
+            <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-[#e8e4e0] rounded-lg shadow-lg z-30">
+              <div className="p-2 border-b border-[#e8e4e0]">
+                <input
+                  type="text"
+                  value={lgaQuery}
+                  onChange={(e) => setLgaQuery(e.target.value)}
+                  placeholder="Search LGA name…"
+                  autoFocus
+                  className="w-full text-xs border border-[#e8e4e0] rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                />
+              </div>
+              <div className="max-h-56 overflow-y-auto">
+                {filteredLgas.length === 0 ? (
+                  <p className="text-xs text-[#9e998f] px-3 py-2">No LGAs match</p>
+                ) : (
+                  filteredLgas.map((preset) => {
+                    const alreadyAdded = preset.suburbs.every((ps) =>
+                      area.suburbs.some((s) => s.suburb === ps.suburb && s.postcode === ps.postcode)
+                    )
+                    return (
+                      <button
+                        key={preset.lga}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          if (!alreadyAdded) addLga(preset)
+                        }}
+                        disabled={alreadyAdded}
+                        className={`block w-full text-left px-3 py-2 text-xs border-b border-[#f5f2ee] last:border-0 transition-colors ${
+                          alreadyAdded
+                            ? 'text-[#9e998f] cursor-not-allowed'
+                            : 'text-[#1a1a1a] hover:bg-[#f5f2ee]'
+                        }`}
+                      >
+                        <span className="font-medium">{preset.lga}</span>
+                        <span className="text-[#9e998f] ml-1">
+                          {alreadyAdded ? '✓ added' : `${preset.suburbs.length} suburbs`}
+                        </span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Extended buffer */}
@@ -1179,20 +1371,19 @@ function SpecificAreaCard({
 // SuburbAutocomplete
 // ─────────────────────────────────────────────────────────────────
 
+// SuburbAutocomplete is a pure search-and-add input.
+// Tag display is handled by SpecificAreaCard (LGA groups + individual chips).
 function SuburbAutocomplete({
   selected,
   onAdd,
-  onRemove,
 }: {
-  selected: AuSuburb[]
-  onAdd: (suburb: AuSuburb) => void
-  onRemove: (suburb: AuSuburb) => void
+  selected: TaggedSuburb[]
+  onAdd: (suburb: TaggedSuburb) => void
 }) {
   const [query, setQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -1214,34 +1405,13 @@ function SuburbAutocomplete({
     : []
 
   const handleSelect = (suburb: AuSuburb) => {
-    onAdd(suburb)
+    onAdd(suburb) // AuSuburb satisfies TaggedSuburb (lga is optional)
     setQuery('')
     setShowDropdown(false)
   }
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Selected tags */}
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {selected.map((s) => (
-            <span
-              key={`${s.suburb}-${s.postcode}`}
-              className="inline-flex items-center gap-1 bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded"
-            >
-              {s.suburb} {s.postcode}
-              <button
-                onClick={() => onRemove(s)}
-                className="text-[#9e998f] hover:text-[#1a1a1a] leading-none"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Input */}
       <input
         type="text"
         value={query}
@@ -1250,18 +1420,16 @@ function SuburbAutocomplete({
           setShowDropdown(true)
         }}
         onFocus={() => setShowDropdown(true)}
-        placeholder="Type suburb name or postcode…"
+        placeholder="Search suburb name or postcode to add…"
         className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
       />
-
-      {/* Dropdown */}
       {showDropdown && filtered.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-20 max-h-48 overflow-y-auto">
           {filtered.map((s) => (
             <button
               key={`${s.suburb}-${s.postcode}`}
               onMouseDown={(e) => {
-                e.preventDefault() // prevent blur before click
+                e.preventDefault()
                 handleSelect(s)
               }}
               className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] text-[#1a1a1a]"
@@ -1270,6 +1438,112 @@ function SuburbAutocomplete({
               <span className="text-[#9e998f]">
                 {s.state} {s.postcode}
               </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AddressSearch — fuzzy Australian address search for radius zones
+// ─────────────────────────────────────────────────────────────────
+
+function AddressSearch({
+  value,
+  onChange,
+  onSelect,
+  geocodingState,
+}: {
+  value: string
+  onChange: (address: string) => void
+  onSelect: (address: string) => void
+  geocodingState: GeocodingState
+}) {
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const fetchSuggestions = async (input: string) => {
+    if (input.trim().length < 3) {
+      setSuggestions([])
+      return
+    }
+    try {
+      const res = await fetch(`/api/places-autocomplete?input=${encodeURIComponent(input)}`)
+      if (!res.ok) return
+      const data = (await res.json()) as { suggestions: PlaceSuggestion[] }
+      setSuggestions(data.suggestions ?? [])
+      setShowDropdown(true)
+    } catch {
+      setSuggestions([])
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    onChange(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 300)
+  }
+
+  const handleSelect = (suggestion: PlaceSuggestion) => {
+    onChange(suggestion.description)
+    onSelect(suggestion.description)
+    setSuggestions([])
+    setShowDropdown(false)
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={handleChange}
+          onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+          placeholder="Start typing an address…"
+          className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] pr-28"
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+          {geocodingState === 'loading' && (
+            <span className="text-xs text-[#9e998f]">Geocoding…</span>
+          )}
+          {geocodingState === 'success' && (
+            <span className="text-green-500 text-sm" title="Geocoded">✓</span>
+          )}
+          {geocodingState === 'error' && (
+            <span className="text-red-500 text-xs">✗ Not found</span>
+          )}
+        </div>
+      </div>
+      {showDropdown && suggestions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-30 max-h-52 overflow-y-auto">
+          {suggestions.map((s) => (
+            <button
+              key={s.place_id}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                handleSelect(s)
+              }}
+              className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] border-b border-[#f5f2ee] last:border-0"
+            >
+              <span className="text-[#1a1a1a]">{s.main_text}</span>
+              {s.secondary_text && (
+                <span className="text-[#9e998f] text-xs ml-1">{s.secondary_text}</span>
+              )}
             </button>
           ))}
         </div>
