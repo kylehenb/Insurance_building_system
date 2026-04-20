@@ -657,7 +657,9 @@ export default function TradesPage() {
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-center" style={{ width: columnWidths.priority_rank }}>
                         <span className="text-sm">
-                          {item.priority_rank ? '⭐'.repeat(item.priority_rank) : '⭐⭐⭐'}
+                          {item.priority_rank && item.priority_rank >= 1 && item.priority_rank <= 5
+                            ? '⭐'.repeat(item.priority_rank)
+                            : '⭐⭐⭐'}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.availability }}>
