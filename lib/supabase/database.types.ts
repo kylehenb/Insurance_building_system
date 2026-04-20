@@ -2541,6 +2541,7 @@ export type Database = {
           primary_contact: string | null
           primary_trade: string | null
           priority_rank: number | null
+          service_area: string[] | null
           status: string | null
           status_note: string | null
           tenant_id: string
@@ -2569,6 +2570,7 @@ export type Database = {
           primary_contact?: string | null
           primary_trade?: string | null
           priority_rank?: number | null
+          service_area?: string[] | null
           status?: string | null
           status_note?: string | null
           tenant_id: string
@@ -2597,6 +2599,7 @@ export type Database = {
           primary_contact?: string | null
           primary_trade?: string | null
           priority_rank?: number | null
+          service_area?: string[] | null
           status?: string | null
           status_note?: string | null
           tenant_id?: string
