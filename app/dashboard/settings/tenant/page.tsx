@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { AU_SUBURBS, type AuSuburb } from '@/lib/data/au-suburbs'
 import { AU_LGA_PRESETS, type LgaPreset } from '@/lib/data/au-lgas'
+import ServiceAreaMap from '@/components/maps/ServiceAreaMap'
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -868,6 +869,22 @@ export default function TenantSettingsPage() {
                     ))}
                   </div>
 
+                  {/* Interactive Map Visualization */}
+                  {serviceAreaConfig.specific_areas.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-[#e8e4e0]">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-[#1a1a1a]">Service Area Map</h4>
+                        <span className="text-xs text-[#9e998f]">
+                          {serviceAreaConfig.specific_areas.reduce((sum, area) => sum + area.suburbs.length, 0)} suburbs across {serviceAreaConfig.specific_areas.length} areas
+                        </span>
+                      </div>
+                      <ServiceAreaMap
+                        suburbs={serviceAreaConfig.specific_areas.flatMap(area => area.suburbs)}
+                        className="h-[400px]"
+                      />
+                    </div>
+                  )}
+
                   <button
                     onClick={addSpecificArea}
                     className="mt-4 text-sm text-[#c9a96e] hover:text-[#b8965e] font-medium"
@@ -1509,28 +1526,61 @@ function AddressSearch({
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
+        {/* Search icon */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg
+            className="w-4 h-4 text-[#9e998f]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </div>
+        
         <input
           type="text"
           value={value}
           onChange={handleChange}
           onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-          placeholder="Start typing an address…"
-          className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] pr-28"
+          placeholder="Search any Australian address (street, suburb, postcode)…"
+          className="w-full border border-[#e8e4e0] rounded pl-10 pr-32 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
         />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+        
+        {/* Right side indicators */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+          {/* Google Places badge */}
+          {suggestions.length > 0 && geocodingState === 'idle' && (
+            <span className="text-[10px] text-[#9e998f] bg-[#f5f2ee] px-1.5 py-0.5 rounded">
+              Google Places
+            </span>
+          )}
           {geocodingState === 'loading' && (
-            <span className="text-xs text-[#9e998f]">Geocoding…</span>
+            <span className="text-xs text-[#c9a96e]">Searching…</span>
           )}
           {geocodingState === 'success' && (
-            <span className="text-green-500 text-sm" title="Geocoded">✓</span>
+            <span className="text-green-500 text-sm" title="Address geocoded successfully">
+              ✓
+            </span>
           )}
           {geocodingState === 'error' && (
-            <span className="text-red-500 text-xs">✗ Not found</span>
+            <span className="text-red-500 text-xs" title="Address not found">
+              ✗
+            </span>
           )}
         </div>
       </div>
+      
       {showDropdown && suggestions.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-30 max-h-52 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-[#f5f2ee] bg-[#f5f2ee]">
+            <p className="text-[10px] text-[#9e998f]">Suggestions from Google Places</p>
+          </div>
           {suggestions.map((s) => (
             <button
               key={s.place_id}
@@ -1540,9 +1590,9 @@ function AddressSearch({
               }}
               className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] border-b border-[#f5f2ee] last:border-0"
             >
-              <span className="text-[#1a1a1a]">{s.main_text}</span>
+              <span className="text-[#1a1a1a] font-medium">{s.main_text}</span>
               {s.secondary_text && (
-                <span className="text-[#9e998f] text-xs ml-1">{s.secondary_text}</span>
+                <span className="text-[#9e998f] text-xs ml-2">{s.secondary_text}</span>
               )}
             </button>
           ))}
