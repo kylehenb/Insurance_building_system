@@ -92,8 +92,11 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (quoteError || !quote) {
+      console.error('Quote fetch error:', quoteError)
       return NextResponse.json({ error: 'No approved quote found for this job' }, { status: 404 })
     }
+
+    console.log('Found quote:', quote.id, quote.quote_ref, quote.status)
 
     // Get scope items with library scheduling data
     const { data: scopeItems, error: itemsError } = await supabase
@@ -110,8 +113,13 @@ export async function POST(req: NextRequest) {
       .eq('quote_id', quote.id)
       .eq('tenant_id', tenantId)
 
+    console.log('Scope items fetch - error:', itemsError, 'count:', scopeItems?.length || 0)
+
     if (itemsError || !scopeItems || scopeItems.length === 0) {
-      return NextResponse.json({ error: 'No scope items found for this quote' }, { status: 404 })
+      return NextResponse.json({
+        error: 'No scope items found for this quote',
+        details: `Quote ID: ${quote.id}, Quote Ref: ${quote.quote_ref}, Error: ${itemsError?.message || 'No items returned'}`
+      }, { status: 404 })
     }
 
     // Flatten scope items with library data
