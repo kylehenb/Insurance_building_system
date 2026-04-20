@@ -16,9 +16,6 @@ interface ScopeItemWithLibrary {
   rate_total: number | null
   line_total: number | null
   estimated_hours: number | null
-  has_lag: boolean | null
-  lag_days: number | null
-  lag_description: string | null
 }
 
 interface TradeTypeSequenceRow {
@@ -67,9 +64,20 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceClient()
 
     // Get the approved quote for this job
-    const APPROVED_STATUSES = ['approved', 'partially_approved']
+    const APPROVED_STATUSES = [
+      'approved_contracts_pending',
+      'approved_contracts_sent',
+      'approved_contracts_signed',
+      'pre_repair',
+      'repairs_in_progress',
+      'repairs_complete_to_invoice',
+      'complete_and_invoiced',
+      // legacy short-form values
+      'approved',
+      'partially_approved',
+    ]
 
-    const { data: quote, error: quoteError } = await supabase
+    const { data: quotes, error: quoteError } = await supabase
       .from('quotes')
       .select('*')
       .eq('job_id', jobId)
@@ -78,7 +86,8 @@ export async function POST(req: NextRequest) {
       .eq('is_active_version', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+
+    const quote = quotes?.[0] ?? null
 
     if (quoteError || !quote) {
       console.error('Quote fetch error:', quoteError)
@@ -87,22 +96,12 @@ export async function POST(req: NextRequest) {
 
     console.log('Found quote:', quote.id, quote.quote_ref, quote.status)
 
-    // Get scope items with library scheduling data
+    // Get scope items
     const { data: scopeItems, error: itemsError } = await supabase
       .from('scope_items')
-      .select(`
-        *,
-        scope_library (
-          estimated_hours,
-          has_lag,
-          lag_days,
-          lag_description
-        )
-      `)
+      .select('id, quote_id, trade, keyword, item_description, unit, qty, rate_total, line_total, estimated_hours')
       .eq('quote_id', quote.id)
       .eq('tenant_id', tenantId)
-
-    console.log('Scope items fetch - error:', itemsError, 'count:', scopeItems?.length || 0)
 
     if (itemsError || !scopeItems || scopeItems.length === 0) {
       return NextResponse.json({
@@ -111,7 +110,6 @@ export async function POST(req: NextRequest) {
       }, { status: 404 })
     }
 
-    // Flatten scope items with library data
     const itemsWithLibrary: ScopeItemWithLibrary[] = scopeItems.map((item: any) => ({
       id: item.id,
       quote_id: item.quote_id,
@@ -122,10 +120,7 @@ export async function POST(req: NextRequest) {
       qty: item.qty,
       rate_total: item.rate_total,
       line_total: item.line_total,
-      estimated_hours: item.scope_library?.estimated_hours ?? null,
-      has_lag: item.scope_library?.has_lag ?? null,
-      lag_days: item.scope_library?.lag_days ?? null,
-      lag_description: item.scope_library?.lag_description ?? null,
+      estimated_hours: item.estimated_hours ?? null,
     }))
 
     // Get trade type sequence
@@ -172,9 +167,7 @@ export async function POST(req: NextRequest) {
       const sequenceInfo = sequenceMap.get(tradeName)
       const totalHours = items.reduce((sum, item) => sum + (item.estimated_hours || 0), 0)
       const totalValue = items.reduce((sum, item) => sum + (item.line_total || 0), 0)
-      const hasLag = items.some(item => item.has_lag === true)
-      const maxLagDays = Math.max(...items.map(item => item.lag_days || 0))
-      
+
       return {
         trade_type: tradeName,
         item_count: items.length,
@@ -188,8 +181,6 @@ export async function POST(req: NextRequest) {
         cant_run_concurrent_with: sequenceInfo?.cant_run_concurrent_with || [],
         typical_lag_days: sequenceInfo?.typical_lag_days || 0,
         lag_description: sequenceInfo?.lag_description || null,
-        has_lag_items: hasLag,
-        max_lag_days: maxLagDays,
         available_trades: (trades || []).filter((t: any) =>
           t.primary_trade?.toLowerCase() === tradeName
         ).map((t: any) => ({

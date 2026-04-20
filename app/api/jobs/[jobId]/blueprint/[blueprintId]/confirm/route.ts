@@ -41,9 +41,20 @@ export async function POST(
   }
 
   // Get the approved quote for this job
-  const APPROVED_STATUSES = ['approved', 'partially_approved']
+  const APPROVED_STATUSES = [
+    'approved_contracts_pending',
+    'approved_contracts_sent',
+    'approved_contracts_signed',
+    'pre_repair',
+    'repairs_in_progress',
+    'repairs_complete_to_invoice',
+    'complete_and_invoiced',
+    // legacy short-form values
+    'approved',
+    'partially_approved',
+  ]
 
-  const { data: quote } = await supabase
+  const { data: quoteRows } = await supabase
     .from('quotes')
     .select('id')
     .eq('job_id', jobId)
@@ -52,7 +63,8 @@ export async function POST(
     .eq('is_active_version', true)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+
+  const quote = quoteRows?.[0] ?? null
 
   if (!quote) {
     return NextResponse.json({ error: 'No approved quote found for this job' }, { status: 404 })
