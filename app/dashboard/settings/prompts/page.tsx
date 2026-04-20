@@ -94,6 +94,9 @@ export default function PromptsSettingsPage() {
       
       const data = await response.json()
       console.log('Prompts data:', data)
+      console.log('data.prompts:', data.prompts)
+      console.log('data.prompts length:', data.prompts?.length)
+      console.log('data.prompts type:', Array.isArray(data.prompts) ? 'array' : typeof data.prompts)
       setPrompts(data.prompts)
       
       // Initialize edit states
