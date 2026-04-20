@@ -96,12 +96,54 @@ export async function POST(req: NextRequest) {
 
     console.log('Found quote:', quote.id, quote.quote_ref, quote.status)
 
-    // Get scope items
-    const { data: scopeItems, error: itemsError } = await supabase
-      .from('scope_items')
-      .select('id, quote_id, trade, keyword, item_description, unit, qty, rate_total, line_total, estimated_hours')
-      .eq('quote_id', quote.id)
-      .eq('tenant_id', tenantId)
+    // Get scope items - try to include estimated_hours, fall back to join with scope_library
+    let scopeItems: any[] = []
+    let itemsError: any = null
+
+    try {
+      const result = await supabase
+        .from('scope_items')
+        .select('id, quote_id, trade, keyword, item_description, unit, qty, rate_total, line_total, estimated_hours, scope_library_id')
+        .eq('quote_id', quote.id)
+        .eq('tenant_id', tenantId)
+
+      if (result.error) {
+        // If column doesn't exist, try without estimated_hours
+        const fallbackResult = await supabase
+          .from('scope_items')
+          .select('id, quote_id, trade, keyword, item_description, unit, qty, rate_total, line_total, scope_library_id')
+          .eq('quote_id', quote.id)
+          .eq('tenant_id', tenantId)
+
+        if (fallbackResult.error) {
+          itemsError = fallbackResult.error
+        } else {
+          scopeItems = fallbackResult.data || []
+          // Fetch library items to get estimated_hours
+          const libraryIds = scopeItems
+            .filter((item: any) => item.scope_library_id)
+            .map((item: any) => item.scope_library_id)
+
+          if (libraryIds.length > 0) {
+            const { data: libraryItems } = await supabase
+              .from('scope_library')
+              .select('id, estimated_hours')
+              .in('id', libraryIds)
+
+            const libraryMap = new Map(libraryItems?.map((li: any) => [li.id, li.estimated_hours]))
+            scopeItems.forEach((item: any) => {
+              if (item.scope_library_id) {
+                item.estimated_hours = libraryMap.get(item.scope_library_id)
+              }
+            })
+          }
+        }
+      } else {
+        scopeItems = result.data || []
+      }
+    } catch (e) {
+      itemsError = e
+    }
 
     if (itemsError || !scopeItems || scopeItems.length === 0) {
       return NextResponse.json({
@@ -110,18 +152,32 @@ export async function POST(req: NextRequest) {
       }, { status: 404 })
     }
 
-    const itemsWithLibrary: ScopeItemWithLibrary[] = scopeItems.map((item: any) => ({
-      id: item.id,
-      quote_id: item.quote_id,
-      trade: item.trade,
-      keyword: item.keyword,
-      item_description: item.item_description,
-      unit: item.unit,
-      qty: item.qty,
-      rate_total: item.rate_total,
-      line_total: item.line_total,
-      estimated_hours: item.estimated_hours ?? null,
-    }))
+    const itemsWithLibrary: ScopeItemWithLibrary[] = scopeItems.map((item: any) => {
+      // For custom items without estimated_hours, estimate from line_total/rate
+      let estimatedHours = item.estimated_hours
+      if (estimatedHours === null || estimatedHours === undefined) {
+        if (item.rate_total && item.rate_total > 0 && item.qty && item.qty > 0) {
+          // Rough estimate: (line_total / rate_total) * qty / 60 (assuming hourly rate)
+          estimatedHours = (item.line_total || 0) / item.rate_total * item.qty / 60
+        } else {
+          // Fallback: 1 hour per $100 of line_total
+          estimatedHours = (item.line_total || 0) / 100
+        }
+      }
+
+      return {
+        id: item.id,
+        quote_id: item.quote_id,
+        trade: item.trade,
+        keyword: item.keyword,
+        item_description: item.item_description,
+        unit: item.unit,
+        qty: item.qty,
+        rate_total: item.rate_total,
+        line_total: item.line_total,
+        estimated_hours: estimatedHours ?? 0,
+      }
+    })
 
     // Get trade type sequence
     const { data: tradeSequence } = await supabase
@@ -167,6 +223,8 @@ export async function POST(req: NextRequest) {
       const sequenceInfo = sequenceMap.get(tradeName)
       const totalHours = items.reduce((sum, item) => sum + (item.estimated_hours || 0), 0)
       const totalValue = items.reduce((sum, item) => sum + (item.line_total || 0), 0)
+
+      console.log(`Trade: ${tradeName}, Items: ${items.length}, Total Hours: ${totalHours}, Total Value: ${totalValue}`)
 
       return {
         trade_type: tradeName,
