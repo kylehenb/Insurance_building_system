@@ -82,10 +82,18 @@ export default function PromptsSettingsPage() {
 
   const fetchPrompts = async () => {
     try {
+      console.log('Fetching prompts...')
       const response = await fetch('/api/settings/prompts')
-      if (!response.ok) throw new Error('Failed to load prompts')
+      console.log('Response status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Failed to load prompts:', errorText)
+        throw new Error('Failed to load prompts')
+      }
       
       const data = await response.json()
+      console.log('Prompts data:', data)
       setPrompts(data.prompts)
       
       // Initialize edit states
@@ -100,6 +108,7 @@ export default function PromptsSettingsPage() {
       })
       setEditStates(initialEditStates)
     } catch (err) {
+      console.error('Error fetching prompts:', err)
       setError('Failed to load prompts. Please refresh.')
     } finally {
       setLoading(false)

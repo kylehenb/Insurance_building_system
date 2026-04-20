@@ -18,13 +18,17 @@ interface PromptRow {
 }
 
 export async function GET(req: NextRequest) {
+  console.log('GET /api/settings/prompts - Starting')
   const userSession = await getUser()
+  console.log('User session:', userSession ? 'Found' : 'Not found')
   
   if (!userSession || !userSession.tenant_id) {
+    console.log('Unauthorized - no session or tenant_id')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenantId = userSession.tenant_id
+  console.log('Tenant ID:', tenantId)
   const supabase = createServiceClient()
 
   const { data: prompts, error } = await supabase
@@ -33,6 +37,9 @@ export async function GET(req: NextRequest) {
     .eq('tenant_id', tenantId)
     .order('category', { ascending: true })
     .order('name', { ascending: true })
+
+  console.log('Prompts query error:', error)
+  console.log('Prompts count:', prompts?.length ?? 0)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
