@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { HelpCircle } from 'lucide-react'
 import type { InspectionSchedulingRules } from '@/lib/scheduling/inspection-rules.types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,25 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+function LabelWithTooltip({ children, tooltip }: { children: React.ReactNode; tooltip: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Label>{children}</Label>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HelpCircle className="w-4 h-4 text-[#6b6763] cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  )
+}
 
 interface InspectionSchedulingSettingsProps {
   tenantId: string
@@ -117,7 +137,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
               <AccordionContent>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
-                    <Label>Scheduling Mode</Label>
+                    <LabelWithTooltip tooltip="Controls how jobs are batched and scheduled. Quiet mode holds jobs for clustering, Busy mode schedules immediately, CAT Event maximizes throughput, Manual disables auto-scheduling.">Scheduling Mode</LabelWithTooltip>
                     <Select
                       value={rules.scheduling_mode}
                       onValueChange={(value: any) => updateRule('scheduling_mode', value)}
@@ -150,8 +170,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>CAT Event Active</Label>
-                      <p className="text-sm text-[#6b6763]">When on, zone-day and cluster rules are suspended</p>
+                      <LabelWithTooltip tooltip="When enabled, automatically switches to CAT Event mode and suspends zone-day and cluster rules to maximise throughput during high-volume events.">CAT Event Active</LabelWithTooltip>
                     </div>
                     <Switch
                       checked={rules.cat_event_active}
@@ -161,7 +180,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Auto-switch Threshold</Label>
+                      <LabelWithTooltip tooltip="Number of pending jobs that triggers automatic switch from Quiet to Busy mode. Set to 0 to disable auto-switching.">Auto-switch Threshold</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -175,7 +194,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Max Daily Inspections</Label>
+                      <LabelWithTooltip tooltip="Maximum number of inspections a single inspector can complete in one day.">Max Daily Inspections</LabelWithTooltip>
                       <Input
                         type="number"
                         min="1"
@@ -186,7 +205,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Overflow Slots</Label>
+                      <LabelWithTooltip tooltip="Additional inspection slots allowed per day beyond the normal maximum, used for urgent or nearby jobs.">Overflow Slots</LabelWithTooltip>
                       <Input
                         type="number"
                         min="0"
@@ -197,7 +216,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Overflow Radius</Label>
+                      <LabelWithTooltip tooltip="Maximum distance from existing jobs to qualify for overflow slot allocation.">Overflow Radius</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -210,7 +229,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Quiet Mode Hold Period</Label>
+                      <LabelWithTooltip tooltip="Maximum number of days to hold a job in Quiet mode waiting for cluster formation before forcing scheduling.">Quiet Mode Hold Period</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -223,7 +242,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Busy Mode Radius</Label>
+                      <LabelWithTooltip tooltip="Radius in km within which jobs are considered close enough to existing run jobs for immediate scheduling in Busy mode.">Busy Mode Radius</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -256,7 +275,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
               <AccordionContent>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
-                    <Label>Service Area Postcodes</Label>
+                    <LabelWithTooltip tooltip="Whitelist of postcodes in your service area. Jobs outside this list will not be auto-scheduled. Leave empty to accept all postcodes.">Service Area Postcodes</LabelWithTooltip>
                     <Input
                       placeholder="e.g. 6000, 6001, 6002"
                       value={rules.service_area_postcodes.join(', ')}
@@ -267,7 +286,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Cluster Radius</Label>
+                      <LabelWithTooltip tooltip="Maximum distance in km for a job to be added to an existing cluster. Jobs beyond this distance won't be grouped together.">Cluster Radius</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -280,7 +299,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Min Cluster Size</Label>
+                      <LabelWithTooltip tooltip="Minimum number of jobs required in a cluster before it can be scheduled in Quiet mode.">Min Cluster Size</LabelWithTooltip>
                       <Input
                         type="number"
                         min="1"
@@ -292,8 +311,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Anchor Job Logic</Label>
-                      <p className="text-sm text-[#6b6763]">One confirmed job in a zone opens that zone for the day</p>
+                      <LabelWithTooltip tooltip="When enabled, a single confirmed job in a zone opens that zone for the day, allowing other jobs in that zone to be scheduled.">Anchor Job Logic</LabelWithTooltip>
                     </div>
                     <Switch
                       checked={rules.anchor_job_enabled}
@@ -303,8 +321,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Same Address Always Together</Label>
-                      <p className="text-sm text-[#6b6763]">Always schedule jobs at the same address or complex on the same run</p>
+                      <LabelWithTooltip tooltip="When enabled, jobs at the same address or complex will always be scheduled on the same run, regardless of other constraints.">Same Address Always Together</LabelWithTooltip>
                     </div>
                     <Switch
                       checked={rules.same_address_always_together}
@@ -339,7 +356,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>KPI Breach Override</Label>
+                      <LabelWithTooltip tooltip="Jobs within this many hours of breaching their KPI visit deadline will jump the queue and be scheduled immediately, bypassing normal batching rules.">KPI Breach Override</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -353,7 +370,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Days Since Lodged Escalation</Label>
+                      <LabelWithTooltip tooltip="Jobs that have been unscheduled for this many days will receive priority weighting regardless of location, helping prevent long-standing jobs from being held indefinitely.">Days Since Lodged Escalation</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -394,7 +411,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>First Appointment</Label>
+                      <LabelWithTooltip tooltip="Earliest time of day that inspections can be scheduled.">First Appointment</LabelWithTooltip>
                       <Input
                         type="time"
                         value={rules.first_appointment_time}
@@ -403,7 +420,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Last Appointment</Label>
+                      <LabelWithTooltip tooltip="Latest time of day that inspections can be scheduled.">Last Appointment</LabelWithTooltip>
                       <Input
                         type="time"
                         value={rules.last_appointment_time}
@@ -412,7 +429,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Buffer Between Inspections</Label>
+                      <LabelWithTooltip tooltip="Travel and buffer time between consecutive inspections to ensure inspectors can arrive on time.">Buffer Between Inspections</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -425,7 +442,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Vulnerable Person Extra Time</Label>
+                      <LabelWithTooltip tooltip="Additional time allocated for inspections involving vulnerable persons to allow for extra care and communication.">Vulnerable Person Extra Time</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -441,8 +458,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Morning Preference for Complex Jobs</Label>
-                        <p className="text-sm text-[#6b6763]">Prefer morning slots for complex job types (BAR+Make Safe, Roof Report, Specialist)</p>
+                        <LabelWithTooltip tooltip="When enabled, complex job types (BAR+Make Safe, Roof Report, Specialist) are preferred for morning appointment slots.">Morning Preference for Complex Jobs</LabelWithTooltip>
                       </div>
                       <Switch
                         checked={rules.morning_complex_jobs}
@@ -452,8 +468,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Afternoon Preference for Simple Jobs</Label>
-                        <p className="text-sm text-[#6b6763]">Prefer afternoon slots for standard BARs</p>
+                        <LabelWithTooltip tooltip="When enabled, standard BAR inspections are preferred for afternoon appointment slots.">Afternoon Preference for Simple Jobs</LabelWithTooltip>
                       </div>
                       <Switch
                         checked={rules.afternoon_simple_jobs}
@@ -466,7 +481,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     <p className="text-sm font-medium mb-2">Peak Hour Traffic Rules</p>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm">Enable peak hour avoidance</Label>
+                        <LabelWithTooltip tooltip="When enabled, the scheduler will avoid scheduling jobs during peak traffic hours in CBD areas to minimise travel delays.">Enable peak hour avoidance</LabelWithTooltip>
                         <Switch
                           checked={rules.peak_hour_config.enabled}
                           onCheckedChange={(checked) => updateRule('peak_hour_config', { ...rules.peak_hour_config, enabled: checked })}
@@ -504,8 +519,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Capture Availability from SMS</Label>
-                        <p className="text-sm text-[#6b6763]">Parse insured availability preferences from SMS replies</p>
+                        <LabelWithTooltip tooltip="When enabled, the system will parse insured availability preferences from SMS replies and use them to schedule inspections at preferred times.">Capture Availability from SMS</LabelWithTooltip>
                       </div>
                       <Switch
                         checked={rules.capture_availability_from_sms}
@@ -515,8 +529,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Access Constraint Block</Label>
-                        <p className="text-sm text-[#6b6763]">Jobs with access constraints not auto-scheduled</p>
+                        <LabelWithTooltip tooltip="When enabled, jobs with access constraints (e.g. keys required, restricted access) will not be auto-scheduled and require manual assignment.">Access Constraint Block</LabelWithTooltip>
                       </div>
                       <Switch
                         checked={rules.access_constraint_block}
@@ -526,8 +539,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>Vulnerable Person Morning Preference</Label>
-                        <p className="text-sm text-[#6b6763]">Prefer morning slot for vulnerable person jobs</p>
+                        <LabelWithTooltip tooltip="When enabled, jobs involving vulnerable persons will be preferred for morning appointment slots.">Vulnerable Person Morning Preference</LabelWithTooltip>
                       </div>
                       <Switch
                         checked={rules.vulnerable_person_morning_preference}
@@ -538,7 +550,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Repeat Reschedule Threshold</Label>
+                      <LabelWithTooltip tooltip="After this many reschedule attempts, the system will flag the job for phone call follow-up instead of continuing SMS-based scheduling.">Repeat Reschedule Threshold</LabelWithTooltip>
                       <Input
                         type="number"
                         min="0"
@@ -570,7 +582,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>New Order Hold Minutes</Label>
+                      <LabelWithTooltip tooltip="Hold window after a new order arrives before the scheduler considers it for scheduling. Allows time for clustering.">New Order Hold Minutes</LabelWithTooltip>
                       <Input
                         type="number"
                         min="0"
@@ -581,7 +593,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>CAT Cluster Order Count</Label>
+                      <LabelWithTooltip tooltip="Number of orders from the same postcode cluster required to trigger automatic CAT Event mode.">CAT Cluster Order Count</LabelWithTooltip>
                       <Input
                         type="number"
                         min="0"
@@ -592,7 +604,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>CAT Cluster Window Hours</Label>
+                      <LabelWithTooltip tooltip="Time window in hours for detecting postcode clusters that trigger CAT Event mode.">CAT Cluster Window Hours</LabelWithTooltip>
                       <Input
                         type="number"
                         min="0"
@@ -605,8 +617,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Same Claim Hold Enabled</Label>
-                      <p className="text-sm text-[#6b6763]">Hold multi-order same-claim jobs until linked before scheduling</p>
+                      <LabelWithTooltip tooltip="When enabled, jobs from the same claim that haven't been linked yet will be held until they are linked, allowing them to be scheduled together.">Same Claim Hold Enabled</LabelWithTooltip>
                     </div>
                     <Switch
                       checked={rules.same_claim_hold_enabled}
@@ -635,7 +646,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Confirmation Threshold %</Label>
+                      <LabelWithTooltip tooltip="Minimum percentage of insureds who must confirm their appointment before the run is locked and finalised.">Confirmation Threshold %</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -650,7 +661,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Arrival Window Minutes</Label>
+                      <LabelWithTooltip tooltip="Width of the arrival time window communicated to insureds (e.g., 120 minutes means 'between 9am and 11am').">Arrival Window Minutes</LabelWithTooltip>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -666,8 +677,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Arrival Window SMS Enabled</Label>
-                      <p className="text-sm text-[#6b6763]">Send morning-of arrival window SMS to insured</p>
+                      <LabelWithTooltip tooltip="When enabled, insureds will receive an SMS on the morning of their inspection with their specific arrival time window.">Arrival Window SMS Enabled</LabelWithTooltip>
                     </div>
                     <Switch
                       checked={rules.arrival_window_sms_enabled}
