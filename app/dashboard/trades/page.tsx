@@ -84,10 +84,11 @@ export default function TradesPage() {
     }
     return {
       primary_trade: 140,
-      trade_code: 100,
       business_name: 200,
       primary_contact: 140,
       contact_mobile: 120,
+      priority_rank: 100,
+      availability: 120,
       can_do_make_safe: 80,
       can_do_reports: 80,
       status: 80,
@@ -523,17 +524,6 @@ export default function TradesPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
-                      style={{ position: 'relative', width: columnWidths.trade_code, borderRightWidth: '0.5px' }}
-                    >
-                      Code
-                      <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
-                        onMouseDown={(e) => handleResizeStart('trade_code', e)}
-                      />
-                    </th>
-                    <th
-                      scope="col"
                       className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
                       style={{ position: 'relative', width: columnWidths.business_name, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('business_name')}
@@ -564,6 +554,28 @@ export default function TradesPage() {
                       <div
                         style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('contact_mobile', e)}
+                      />
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      style={{ position: 'relative', width: columnWidths.priority_rank, borderRightWidth: '0.5px' }}
+                    >
+                      Priority
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        onMouseDown={(e) => handleResizeStart('priority_rank', e)}
+                      />
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      style={{ position: 'relative', width: columnWidths.availability, borderRightWidth: '0.5px' }}
+                    >
+                      Availability
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        onMouseDown={(e) => handleResizeStart('availability', e)}
                       />
                     </th>
                     <th
@@ -619,14 +631,6 @@ export default function TradesPage() {
                           className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
                       </td>
-                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.trade_code }}>
-                        <input
-                          type="text"
-                          defaultValue={item.trade_code || ''}
-                          onBlur={(e) => handleInlineEdit(item.id, 'trade_code', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                        />
-                      </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.business_name }}>
                         <input
                           type="text"
@@ -650,6 +654,23 @@ export default function TradesPage() {
                           onBlur={(e) => handleInlineEdit(item.id, 'contact_mobile', e.target.value || null)}
                           className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
+                      </td>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-center" style={{ width: columnWidths.priority_rank }}>
+                        <span className="text-sm">
+                          {item.priority_rank ? '⭐'.repeat(item.priority_rank) : '⭐⭐⭐'}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.availability }}>
+                        <select
+                          defaultValue={item.availability || 'maintain_capacity'}
+                          onChange={(e) => handleInlineEdit(item.id, 'availability', e.target.value)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                        >
+                          <option value="more_capacity">More</option>
+                          <option value="maintain_capacity">Maintain</option>
+                          <option value="reduce_capacity">Reduce</option>
+                          <option value="on_pause">Pause</option>
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-center" style={{ width: columnWidths.can_do_make_safe }}>
                         <input
