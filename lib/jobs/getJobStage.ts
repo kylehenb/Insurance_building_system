@@ -48,6 +48,8 @@ export type JobContext = {
   }>
   blueprint: {
     status: string
+    draft_data: unknown | null
+    id: string | null
   } | null
   work_order_visits: Array<{ status: string }>
   trade_invoices: Array<{ status: string }>

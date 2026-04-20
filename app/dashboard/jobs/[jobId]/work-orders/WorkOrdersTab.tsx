@@ -23,7 +23,7 @@ export interface WorkOrdersTabProps {
 }
 
 export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
-  const { workOrders, quotes, trades, isLoading, error, mutations } = useWorkOrders(jobId, tenantId)
+  const { workOrders, quotes, trades, isLoading, error, mutations, refetch } = useWorkOrders(jobId, tenantId)
 
   const [view,         setView]         = useState<View>('blueprint')
   const [expandedIds,  setExpandedIds]  = useState<Set<string>>(new Set())
@@ -232,6 +232,9 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               onAddVisit={id => mutations.addVisit(id)}
               onSetPred={(id, predId, conc) => mutations.setPredecessor(id, predId, conc)}
               onReorder={handleReorder}
+              jobId={jobId}
+              tenantId={tenantId}
+              onDraftGenerated={() => refetch()}
             />
           ) : (
             <GanttView workOrders={workOrders} scale={view} />

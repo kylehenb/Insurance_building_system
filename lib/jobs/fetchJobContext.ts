@@ -76,7 +76,7 @@ export async function fetchJobContext(
 
     supabaseClient
       .from('job_schedule_blueprints')
-      .select('status')
+      .select('status, draft_data, id')
       .eq('job_id', jobId)
       .order('created_at', { ascending: false })
       .limit(1),
@@ -137,7 +137,11 @@ export async function fetchJobContext(
       version: row.version,
     })),
     blueprint: blueprintRow
-      ? { status: (blueprintRow as unknown as { status: string }).status ?? '' }
+      ? {
+          status: (blueprintRow as unknown as { status: string }).status ?? '',
+          draft_data: (blueprintRow as unknown as { draft_data: unknown }).draft_data ?? null,
+          id: (blueprintRow as unknown as { id: string }).id ?? null,
+        }
       : null,
     work_order_visits: (workOrderVisitsResult.data ?? []).map((v) => ({
       status: (v as unknown as { status: string }).status ?? '',
