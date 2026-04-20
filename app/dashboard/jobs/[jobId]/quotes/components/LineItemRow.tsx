@@ -711,11 +711,13 @@ export function LineItemRow({
             style={selectStyle}
           >
             <option value="">—</option>
-            {trades.map(t => (
-              <option key={t.id} value={t.primary_trade}>
-                {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
-              </option>
-            ))}
+            {Array.from(new Set(trades.map(t => t.primary_trade)))
+              .sort()
+              .map(trade => (
+                <option key={trade} value={trade}>
+                  {trade}
+                </option>
+              ))}
           </select>
         </div>
 
