@@ -1178,7 +1178,7 @@ export const AU_SUBURBS: AuSuburb[] = [
   { suburb: 'Nunierra', state: 'WA', postcode: '6630' },
   { suburb: 'Nunile', state: 'WA', postcode: '6566' },
   { suburb: 'Nyabing', state: 'WA', postcode: '6341' },
-  { suburb: 'O'Connor (WA)', state: 'WA', postcode: '2602' },
+  { suburb: 'O\'Connor (WA)', state: 'WA', postcode: '2602' },
   { suburb: 'Oakajee', state: 'WA', postcode: '6532' },
   { suburb: 'Oakford', state: 'WA', postcode: '6121' },
   { suburb: 'Ocean Beach', state: 'WA', postcode: '6333' },

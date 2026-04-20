@@ -267,7 +267,10 @@ export const AU_SUBURBS: AuSuburb[] = [
 `
 
   const body = suburbs
-    .map(s => `  { suburb: '${s.suburb}', state: '${s.state}', postcode: '${s.postcode}' },`)
+    .map(s => {
+      const escapedSuburb = s.suburb.replace(/'/g, "\\'")
+      return `  { suburb: '${escapedSuburb}', state: '${s.state}', postcode: '${s.postcode}' },`
+    })
     .join('\n')
 
   const footer = `
@@ -303,12 +306,16 @@ export const AU_LGA_PRESETS: LgaPreset[] = [
 
   const body = lgas
     .map(lga => {
+      const escapedLgaName = lga.lga.replace(/'/g, "\\'")
       const suburbsStr = lga.suburbs
-        .map(s => `      { suburb: '${s.suburb}', state: '${s.state}', postcode: '${s.postcode}' }`)
+        .map(s => {
+          const escapedSuburb = s.suburb.replace(/'/g, "\\'")
+          return `      { suburb: '${escapedSuburb}', state: '${s.state}', postcode: '${s.postcode}' }`
+        })
         .join(',\n')
       
       return `  {
-    lga: '${lga.lga}',
+    lga: '${escapedLgaName}',
     state: '${lga.state}',
     suburbs: [
 ${suburbsStr}

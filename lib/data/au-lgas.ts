@@ -1117,7 +1117,7 @@ export const AU_LGA_PRESETS: LgaPreset[] = [
       { suburb: 'White Gum Valley', state: 'WA', postcode: '6162' },
       { suburb: 'Beaconsfield (WA)', state: 'WA', postcode: '2015' },
       { suburb: 'South Fremantle', state: 'WA', postcode: '6162' },
-      { suburb: 'O'Connor (WA)', state: 'WA', postcode: '2602' },
+      { suburb: 'O\'Connor (WA)', state: 'WA', postcode: '2602' },
       { suburb: 'North Fremantle', state: 'WA', postcode: '6159' },
       { suburb: 'Fremantle', state: 'WA', postcode: '6160' },
       { suburb: 'Samson', state: 'WA', postcode: '6163' },
