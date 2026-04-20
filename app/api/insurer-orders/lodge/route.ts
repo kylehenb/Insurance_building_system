@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
+import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +48,33 @@ export async function POST(req: NextRequest) {
 
     const prefix = tenant.job_prefix
 
-    // Step 4a: Check for existing job with same claim number
+    // Step 4a: Load automation_config for KPI calculations
+    console.log('[lodge] loading automation_config for KPI calculations')
+    const { data: configData, error: configError } = await supabase
+      .from('automation_config')
+      .select('key, value')
+      .eq('tenant_id', tenantId)
+
+    if (configError) {
+      console.error('[lodge] automation_config load error:', configError)
+      return NextResponse.json({ error: 'Failed to load automation config' }, { status: 500 })
+    }
+
+    const rawConfig: Record<string, string> = {}
+    configData?.forEach(row => {
+      rawConfig[row.key] = row.value
+    })
+
+    const timeConfig = parseTimeConfig(rawConfig)
+    const orderedAt = new Date()
+
+    // Calculate KPI due dates using addDelay
+    const kpi_contact_due = addDelay(timeConfig, orderedAt, 2, 'hours')
+    const kpi_booking_due = addDelay(timeConfig, orderedAt, 24, 'hours')
+    const kpi_visit_due = addDelay(timeConfig, orderedAt, 2, 'business_days')
+    const kpi_report_due = addDelay(timeConfig, orderedAt, 4, 'business_days')
+
+    // Step 4b: Check for existing job with same claim number
     console.log('[lodge] checking for existing job with claim_number:', order.claim_number)
     if (!order.claim_number) {
       return NextResponse.json({ error: 'Claim number is required' }, { status: 400 })
@@ -159,6 +186,10 @@ export async function POST(req: NextRequest) {
         special_instructions: order.special_instructions,
         sum_insured: order.sum_insured_building,
         excess: order.excess_building,
+        kpi_contact_due: kpi_contact_due.toISOString(),
+        kpi_booking_due: kpi_booking_due.toISOString(),
+        kpi_visit_due: kpi_visit_due.toISOString(),
+        kpi_report_due: kpi_report_due.toISOString(),
         created_at: new Date().toISOString(),
       } as Database['public']['Tables']['jobs']['Insert'])
       .select('id')

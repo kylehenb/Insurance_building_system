@@ -639,6 +639,446 @@ function JobDetailsAccordion({
 }
 
 
+// ── Automation Overrides Section ────────────────────────────────────────────
+
+interface AutomationOverrides {
+  time_mode_override?: 'business_hours' | 'waking_hours' | 'urgent' | 'send_window' | null
+  insured_contact_window_start?: string
+  insured_contact_window_end?: string
+  insured_contact_all_days?: boolean
+  trade_contact_overrides?: Record<string, {
+    contact_window_start?: string
+    contact_window_end?: string
+    contact_all_days?: boolean
+  }>
+}
+
+function AutomationOverridesAccordion({
+  jobId,
+  tenantId,
+}: {
+  jobId: string
+  tenantId: string
+}) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [overrides, setOverrides] = useState<AutomationOverrides>({})
+  const [savedOverrides, setSavedOverrides] = useState<AutomationOverrides>({})
+  const [trades, setTrades] = useState<Array<{ id: string; business_name: string; primary_trade: string }>>([])
+
+  useEffect(() => {
+    async function loadOverrides() {
+      const { data } = await supabase
+        .from('jobs')
+        .select('automation_overrides')
+        .eq('id', jobId)
+        .single()
+      
+      if (data?.automation_overrides) {
+        setOverrides(data.automation_overrides as AutomationOverrides)
+        setSavedOverrides(data.automation_overrides as AutomationOverrides)
+      }
+    }
+    loadOverrides()
+  }, [jobId, supabase])
+
+  useEffect(() => {
+    async function loadTrades() {
+      const { data } = await supabase
+        .from('work_orders')
+        .select('trade_id, trades(id, business_name, primary_trade)')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+      
+      if (data) {
+        const uniqueTrades = new Map()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data.forEach((wo: any) => {
+          if (wo.trades && !uniqueTrades.has(wo.trades.id)) {
+            uniqueTrades.set(wo.trades.id, wo.trades)
+          }
+        })
+        setTrades(Array.from(uniqueTrades.values()))
+      }
+    }
+    if (open) {
+      loadTrades()
+    }
+  }, [jobId, tenantId, open, supabase])
+
+  async function saveOverrides() {
+    setSaving(true)
+    await supabase
+      .from('jobs')
+      .update({ automation_overrides: overrides })
+      .eq('id', jobId)
+      .eq('tenant_id', tenantId)
+    setSavedOverrides(overrides)
+    setEditing(false)
+    setSaving(false)
+  }
+
+  function cancelEdit() {
+    setOverrides(savedOverrides)
+    setEditing(false)
+  }
+
+  const subLabel = (extra?: React.CSSProperties): React.CSSProperties => ({
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: '#9e998f',
+    fontWeight: 600,
+    marginBottom: 10,
+    ...extra,
+  })
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '0.5px solid #e4dfd8',
+        borderRadius: 8,
+        overflow: 'hidden',
+        fontFamily: 'DM Sans, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '13px 16px',
+          background: open ? '#faf9f7' : '#fff',
+          borderBottom: open ? '0.5px solid #e4dfd8' : 'none',
+          transition: 'background 0.15s',
+          gap: 12,
+        }}
+      >
+        <button
+          onClick={() => { if (!editing) setOpen(!open) }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: editing ? 'default' : 'pointer',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.07em',
+            color: '#9e998f',
+            fontWeight: 500,
+            fontFamily: 'inherit',
+          }}
+        >
+          Automation Overrides
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {open && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              style={{
+                fontSize: 11,
+                color: '#7a6a58',
+                background: 'transparent',
+                border: '1px solid #d4cfc8',
+                borderRadius: 20,
+                padding: '3px 12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 600,
+                transition: 'all 0.15s',
+              }}
+            >
+              Edit
+            </button>
+          )}
+          {open && editing && (
+            <>
+              <button
+                onClick={saveOverrides}
+                disabled={saving}
+                style={{
+                  fontSize: 11,
+                  color: '#fff',
+                  background: '#2a6b50',
+                  border: '1px solid #2a6b50',
+                  borderRadius: 20,
+                  padding: '3px 14px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  opacity: saving ? 0.7 : 1,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                style={{
+                  fontSize: 11,
+                  color: '#9a9088',
+                  background: 'transparent',
+                  border: '1px solid #e8e3dc',
+                  borderRadius: 20,
+                  padding: '3px 12px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  transition: 'all 0.15s',
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
+          {!editing && (
+            <button
+              onClick={() => setOpen(!open)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                color: '#c8b89a',
+                fontSize: 11,
+                fontFamily: 'inherit',
+              }}
+            >
+              {open ? 'Collapse' : 'Expand'}
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="#9e998f"
+                strokeWidth="1.8"
+                style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+              >
+                <path d="M2 5l5 5 5-5" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {open && (
+        <div
+          style={{
+            padding: '16px 20px 20px',
+            background: editing ? '#fdfcfb' : '#fff',
+            transition: 'background 0.2s',
+          }}
+        >
+          {/* Time Mode Override */}
+          <div style={subLabel()}>Time Mode Override</div>
+          <div className="ov-detail-row">
+            <span className="ov-detail-label">Override Mode</span>
+            {editing ? (
+              <select
+                className="ov-edit-input"
+                value={overrides.time_mode_override || ''}
+                onChange={e => setOverrides(prev => ({ ...prev, time_mode_override: e.target.value as any || null }))}
+              >
+                <option value="">(no override)</option>
+                <option value="business_hours">Business Hours</option>
+                <option value="waking_hours">Waking Hours</option>
+                <option value="urgent">Urgent</option>
+                <option value="send_window">Send Window</option>
+              </select>
+            ) : (
+              <span className="ov-detail-value">
+                {savedOverrides.time_mode_override || '(no override)'}
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: '#9a9088', marginTop: 6 }}>
+            Overrides the time mode for all automations on this job. Use Urgent for CAT events. Leave blank for standard behaviour.
+          </p>
+
+          {/* Custom Insured Contact Window */}
+          <div style={subLabel({ marginTop: 20 })}>Custom Insured Contact Window</div>
+          <div className="ov-detail-row">
+            <span className="ov-detail-label">Enabled</span>
+            {editing ? (
+              <input
+                type="checkbox"
+                checked={!!overrides.insured_contact_window_start}
+                onChange={e => {
+                  if (e.target.checked) {
+                    setOverrides(prev => ({ 
+                      ...prev, 
+                      insured_contact_window_start: '07:00',
+                      insured_contact_window_end: '20:00',
+                      insured_contact_all_days: false
+                    }))
+                  } else {
+                    setOverrides(prev => ({ 
+                      ...prev, 
+                      insured_contact_window_start: undefined,
+                      insured_contact_window_end: undefined,
+                      insured_contact_all_days: undefined
+                    }))
+                  }
+                }}
+              />
+            ) : (
+              <span className="ov-detail-value">
+                {savedOverrides.insured_contact_window_start ? 'Yes' : 'No'}
+              </span>
+            )}
+          </div>
+          {overrides.insured_contact_window_start && (
+            <>
+              <div className="ov-detail-row">
+                <span className="ov-detail-label">Start time</span>
+                {editing ? (
+                  <input
+                    type="time"
+                    className="ov-edit-input"
+                    value={overrides.insured_contact_window_start}
+                    onChange={e => setOverrides(prev => ({ ...prev, insured_contact_window_start: e.target.value }))}
+                  />
+                ) : (
+                  <span className="ov-detail-value">{savedOverrides.insured_contact_window_start}</span>
+                )}
+              </div>
+              <div className="ov-detail-row">
+                <span className="ov-detail-label">End time</span>
+                {editing ? (
+                  <input
+                    type="time"
+                    className="ov-edit-input"
+                    value={overrides.insured_contact_window_end}
+                    onChange={e => setOverrides(prev => ({ ...prev, insured_contact_window_end: e.target.value }))}
+                  />
+                ) : (
+                  <span className="ov-detail-value">{savedOverrides.insured_contact_window_end}</span>
+                )}
+              </div>
+              <div className="ov-detail-row">
+                <span className="ov-detail-label">Any day</span>
+                {editing ? (
+                  <input
+                    type="checkbox"
+                    checked={!!overrides.insured_contact_all_days}
+                    onChange={e => setOverrides(prev => ({ ...prev, insured_contact_all_days: e.target.checked }))}
+                  />
+                ) : (
+                  <span className="ov-detail-value">{savedOverrides.insured_contact_all_days ? 'Yes' : 'No'}</span>
+                )}
+              </div>
+            </>
+          )}
+          <p style={{ fontSize: 11, color: '#9a9088', marginTop: 6 }}>
+            For night-shift workers or contacts with non-standard hours. Example: set 2pm–10pm for a night-shift worker. Overrides global waking hours for this job's insured contact only.
+          </p>
+
+          {/* Trade-Specific Contact Windows */}
+          {trades.length > 0 && (
+            <>
+              <div style={subLabel({ marginTop: 20 })}>Trade-Specific Contact Windows</div>
+              <p style={{ fontSize: 11, color: '#9a9088', marginBottom: 10 }}>
+                Override contact hours for a specific trade on this job only. Gary's global send window covers most cases — use this only for trades with confirmed non-standard availability.
+              </p>
+              {trades.map(trade => (
+                <div key={trade.id} style={{ marginBottom: 16, padding: 12, background: '#faf9f7', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', marginBottom: 8 }}>
+                    {trade.business_name} ({trade.primary_trade})
+                  </div>
+                  <div className="ov-detail-row">
+                    <span className="ov-detail-label">Start time</span>
+                    {editing ? (
+                      <input
+                        type="time"
+                        className="ov-edit-input"
+                        value={overrides.trade_contact_overrides?.[trade.id]?.contact_window_start || ''}
+                        onChange={e => setOverrides(prev => ({
+                          ...prev,
+                          trade_contact_overrides: {
+                            ...prev.trade_contact_overrides,
+                            [trade.id]: {
+                              ...prev.trade_contact_overrides?.[trade.id],
+                              contact_window_start: e.target.value
+                            }
+                          }
+                        }))}
+                      />
+                    ) : (
+                      <span className="ov-detail-value">
+                        {savedOverrides.trade_contact_overrides?.[trade.id]?.contact_window_start || '—'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="ov-detail-row">
+                    <span className="ov-detail-label">End time</span>
+                    {editing ? (
+                      <input
+                        type="time"
+                        className="ov-edit-input"
+                        value={overrides.trade_contact_overrides?.[trade.id]?.contact_window_end || ''}
+                        onChange={e => setOverrides(prev => ({
+                          ...prev,
+                          trade_contact_overrides: {
+                            ...prev.trade_contact_overrides,
+                            [trade.id]: {
+                              ...prev.trade_contact_overrides?.[trade.id],
+                              contact_window_end: e.target.value
+                            }
+                          }
+                        }))}
+                      />
+                    ) : (
+                      <span className="ov-detail-value">
+                        {savedOverrides.trade_contact_overrides?.[trade.id]?.contact_window_end || '—'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="ov-detail-row">
+                    <span className="ov-detail-label">Any day</span>
+                    {editing ? (
+                      <input
+                        type="checkbox"
+                        checked={!!overrides.trade_contact_overrides?.[trade.id]?.contact_all_days}
+                        onChange={e => setOverrides(prev => ({
+                          ...prev,
+                          trade_contact_overrides: {
+                            ...prev.trade_contact_overrides,
+                            [trade.id]: {
+                              ...prev.trade_contact_overrides?.[trade.id],
+                              contact_all_days: e.target.checked
+                            }
+                          }
+                        }))}
+                      />
+                    ) : (
+                      <span className="ov-detail-value">
+                        {savedOverrides.trade_contact_overrides?.[trade.id]?.contact_all_days ? 'Yes' : 'No'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Action Cards Section ───────────────────────────────────────────────────
 
 function ActionCardsSection({ jobId, tenantId, job }: { jobId: string; tenantId: string; job: JobDetails }) {
@@ -1454,7 +1894,10 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
         {/* 1. Job Details accordion — full width */}
         <JobDetailsAccordion job={job} jobId={jobId} tenantId={tenantId} />
 
-        {/* 2. Action Cards — async event-driven tasks (To Do) with pinned Playbook */}
+        {/* 2. Automation Overrides accordion — per-job time mode settings */}
+        <AutomationOverridesAccordion jobId={jobId} tenantId={tenantId} />
+
+        {/* 3. Action Cards — async event-driven tasks (To Do) with pinned Playbook */}
         <div>
           <ActionCardsSection jobId={jobId} tenantId={tenantId} job={job} />
         </div>
