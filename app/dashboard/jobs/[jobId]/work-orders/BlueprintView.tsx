@@ -102,6 +102,22 @@ export function BlueprintView({
         return
       }
 
+      // Manually refetch the blueprint draft to update UI
+      const { data } = await supabase
+        .from('job_schedule_blueprints')
+        .select('id, draft_data, status')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        setBlueprintId(data.id)
+        setBlueprintDraft(data.draft_data as BlueprintDraftData)
+      }
+
       alert('Blueprint draft generated successfully! Review the draft and confirm to create work orders.')
       onDraftGenerated?.()
     } catch (error) {
