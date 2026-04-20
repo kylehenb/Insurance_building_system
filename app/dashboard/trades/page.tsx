@@ -67,22 +67,12 @@ export default function TradesPage() {
   });
 
   // Sort state
-  const [sortColumn, setSortColumn] = useState<string>('primary_trade');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Column width state - load from localStorage or use defaults
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('trades-column-widths');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse saved column widths:', e);
-        }
-      }
-    }
-    return {
+    const defaults = {
       primary_trade: 140,
       business_name: 200,
       primary_contact: 140,
@@ -94,6 +84,18 @@ export default function TradesPage() {
       status: 80,
       actions: 80,
     };
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('trades-column-widths');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return { ...defaults, ...parsed };
+        } catch (e) {
+          console.error('Failed to parse saved column widths:', e);
+        }
+      }
+    }
+    return defaults;
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
 
