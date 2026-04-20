@@ -803,6 +803,7 @@ export function ReportAccordionItem({
                 data={report as unknown as Record<string, unknown>}
                 locked={isLocked}
                 onChange={handleFieldChange}
+                tenantId={report.tenant_id}
               />
             )}
             {report.report_type === 'roof' && (
@@ -817,6 +818,7 @@ export function ReportAccordionItem({
                 data={report as unknown as Record<string, unknown>}
                 locked={isLocked}
                 onChange={handleFieldChange}
+                tenantId={report.tenant_id}
               />
             )}
             {report.report_type === 'specialist' && (

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { Database } from '@/lib/supabase/database.types'
-import type { BlueprintDraftData, BlueprintTrade, BlueprintVisit } from '@/lib/types/scheduling'
+import type { BlueprintDraftData } from '@/lib/types/scheduling'
 
 export const dynamic = 'force-dynamic'
 
@@ -270,7 +269,7 @@ Guidelines:
 `
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [

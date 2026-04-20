@@ -1,11 +1,18 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface BARReportFormProps {
   data: Record<string, unknown>
   locked: boolean
   onChange: (field: string, value: unknown) => void
+  tenantId?: string
 }
 
 function SectionHeading({ label }: { label: string }) {
@@ -98,8 +105,52 @@ function InlineTextarea({
   )
 }
 
-export function BARReportForm({ data, locked, onChange }: BARReportFormProps) {
+export function BARReportForm({ data, locked, onChange, tenantId }: BARReportFormProps) {
+  const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
+
+  async function handleGenerateReport() {
+    const rawDump = str('raw_report_dump')
+    if (!rawDump.trim()) {
+      alert('Please enter some raw notes first')
+      return
+    }
+
+    if (!tenantId) {
+      alert('Tenant ID is required')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/ai/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawReportDump: rawDump,
+          reportType: 'BAR',
+          tenantId,
+        }),
+      })
+
+      const result = await res.json()
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to generate report')
+      }
+
+      // Populate form fields with AI response
+      Object.entries(result.reportData).forEach(([key, value]) => {
+        if (value && typeof value === 'string') {
+          onChange(key, value)
+        }
+      })
+    } catch (error) {
+      console.error('Error generating report:', error)
+      alert('Failed to generate report. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <div>
@@ -269,7 +320,25 @@ export function BARReportForm({ data, locked, onChange }: BARReportFormProps) {
       {/* — RAW NOTES — */}
       <SectionHeading label="Field Notes (Internal)" />
       <div>
-        <FieldLabel label="Raw Report Dump" />
+        <div className="flex items-center justify-between mb-1">
+          <FieldLabel label="Raw Report Dump" />
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={locked || generating || !str('raw_report_dump').trim()}
+            className={`
+              px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
+              transition-all duration-200
+              ${locked || generating || !str('raw_report_dump').trim()
+                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
+                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
+              }
+            `}
+            style={{ fontFamily: 'DM Sans, sans-serif' }}
+          >
+            {generating ? 'Generating...' : 'AI Generate'}
+          </button>
+        </div>
         <InlineTextarea
           value={str('raw_report_dump')}
           onChange={v => onChange('raw_report_dump', v)}

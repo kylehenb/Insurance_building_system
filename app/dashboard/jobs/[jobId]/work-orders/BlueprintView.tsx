@@ -66,7 +66,7 @@ export function BlueprintView({
         .eq('status', 'draft')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (data) {
         setBlueprintId(data.id)
