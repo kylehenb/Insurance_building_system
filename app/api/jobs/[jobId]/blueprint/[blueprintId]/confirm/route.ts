@@ -10,25 +10,14 @@ export async function POST(
   { params }: { params: Promise<{ jobId: string; blueprintId: string }> }
 ) {
   const { jobId, blueprintId } = await params
+  const body = await req.json()
+  const { tenantId } = body
+
+  if (!tenantId) {
+    return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
-
-  // Get the user's tenant_id from auth
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
-
-  const tenantId = userData.tenant_id
 
   // Get the blueprint
   const { data: blueprint, error: blueprintError } = await supabase
@@ -160,7 +149,6 @@ export async function POST(
     .from('job_schedule_blueprints')
     .update({
       status: 'confirmed',
-      confirmed_by: user.id,
       confirmed_at: new Date().toISOString(),
     })
     .eq('id', blueprintId)

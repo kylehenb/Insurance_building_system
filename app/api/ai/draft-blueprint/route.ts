@@ -55,31 +55,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { jobId } = body
+    const { jobId, tenantId } = body
 
     if (!jobId) {
       return NextResponse.json({ error: 'jobId is required' }, { status: 400 })
     }
 
+    if (!tenantId) {
+      return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
+    }
+
     const supabase = createServiceClient()
-
-    // Get the user's tenant_id from auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const tenantId = userData.tenant_id
 
     // Get the approved quote for this job
     const APPROVED_STATUSES = [

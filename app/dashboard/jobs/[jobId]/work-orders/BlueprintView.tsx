@@ -92,7 +92,7 @@ export function BlueprintView({
       const response = await fetch('/api/ai/draft-blueprint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId }),
+        body: JSON.stringify({ jobId, tenantId }),
       })
 
       const result = await response.json()
@@ -119,6 +119,8 @@ export function BlueprintView({
     try {
       const response = await fetch(`/api/jobs/${jobId}/blueprint/${blueprintId}/confirm`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
       })
 
       const result = await response.json()
