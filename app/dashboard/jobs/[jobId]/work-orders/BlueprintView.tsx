@@ -85,17 +85,21 @@ export function BlueprintView({
   const unplaced = workOrders.filter(w => w.placementState === 'unplaced')
 
   async function handleGenerateDraft() {
+    console.log('[BlueprintView] handleGenerateDraft called', { jobId, tenantId, isGenerating })
     if (isGenerating) return
     setIsGenerating(true)
 
     try {
+      console.log('[BlueprintView] Fetching /api/ai/draft-blueprint with', { jobId, tenantId })
       const response = await fetch('/api/ai/draft-blueprint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, tenantId }),
       })
 
+      console.log('[BlueprintView] Response status:', response.status)
       const result = await response.json()
+      console.log('[BlueprintView] Response result:', result)
 
       if (!response.ok) {
         const errorMsg = result.error || 'Unknown error'
