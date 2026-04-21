@@ -69,6 +69,11 @@ interface TenantPatchBody {
   contact_phone?: string | null
   address?: string | null
   logo_storage_path?: string | null
+  alternative_logo_storage_path?: string | null
+  bsb?: string | null
+  account_number?: string | null
+  bank_name?: string | null
+  account_name?: string | null
   service_area_config?: ServiceAreaConfig | null
 }
 
@@ -140,6 +145,11 @@ export async function PATCH(req: NextRequest) {
       'contact_phone',
       'address',
       'logo_storage_path',
+      'alternative_logo_storage_path',
+      'bsb',
+      'account_number',
+      'bank_name',
+      'account_name',
       'service_area_config',
     ]
 

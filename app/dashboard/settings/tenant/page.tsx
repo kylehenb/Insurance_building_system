@@ -89,6 +89,11 @@ interface ProfileFormData {
   contact_phone: string
   address: string
   logo_storage_path: string
+  alternative_logo_storage_path: string
+  bsb: string
+  account_number: string
+  bank_name: string
+  account_name: string
   plan: string
 }
 
@@ -105,6 +110,11 @@ interface TenantApiResponse {
     contact_email: string | null
     contact_phone: string | null
     logo_storage_path: string | null
+    alternative_logo_storage_path: string | null
+    bsb: string | null
+    account_number: string | null
+    bank_name: string | null
+    account_name: string | null
     plan: string | null
     service_area_config: ServiceAreaConfig | null
   }
@@ -137,6 +147,11 @@ const EMPTY_PROFILE: ProfileFormData = {
   contact_phone: '',
   address: '',
   logo_storage_path: '',
+  alternative_logo_storage_path: '',
+  bsb: '',
+  account_number: '',
+  bank_name: '',
+  account_name: '',
   plan: '',
 }
 
@@ -212,6 +227,7 @@ export default function TenantSettingsPage() {
 
   // Logo upload state
   const [logoUploading, setLogoUploading] = useState(false)
+  const [alternativeLogoUploading, setAlternativeLogoUploading] = useState(false)
 
   // Section nav
   const [activeSection, setActiveSection] = useState<string>('tenant-profile')
@@ -255,6 +271,11 @@ export default function TenantSettingsPage() {
           contact_phone: t.contact_phone ?? '',
           address: t.address ?? '',
           logo_storage_path: t.logo_storage_path ?? '',
+          alternative_logo_storage_path: t.alternative_logo_storage_path ?? '',
+          bsb: t.bsb ?? '',
+          account_number: t.account_number ?? '',
+          bank_name: t.bank_name ?? '',
+          account_name: t.account_name ?? '',
           plan: t.plan ?? '',
         })
         setServiceAreaConfig(t.service_area_config ?? EMPTY_SERVICE_CONFIG)
@@ -311,6 +332,11 @@ export default function TenantSettingsPage() {
           contact_phone: profileForm.contact_phone || null,
           address: profileForm.address || null,
           logo_storage_path: profileForm.logo_storage_path || null,
+          alternative_logo_storage_path: profileForm.alternative_logo_storage_path || null,
+          bsb: profileForm.bsb || null,
+          account_number: profileForm.account_number || null,
+          bank_name: profileForm.bank_name || null,
+          account_name: profileForm.account_name || null,
         }),
       })
       if (!res.ok) throw new Error('Failed to save')
@@ -361,6 +387,25 @@ export default function TenantSettingsPage() {
       console.error('Logo upload failed:', err)
     } finally {
       setLogoUploading(false)
+    }
+  }
+
+  const handleAlternativeLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !tenantId) return
+    setAlternativeLogoUploading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `tenants/${tenantId}/logo/alternative-logo.${ext}`
+      const { error } = await supabase.storage
+        .from('tenant-assets') // bucket must exist in Supabase Storage
+        .upload(path, file, { upsert: true })
+      if (error) throw error
+      setProfileForm((prev) => ({ ...prev, alternative_logo_storage_path: path }))
+    } catch (err) {
+      console.error('Alternative logo upload failed:', err)
+    } finally {
+      setAlternativeLogoUploading(false)
     }
   }
 
@@ -467,6 +512,10 @@ export default function TenantSettingsPage() {
   const logoDisplayUrl =
     profileForm.logo_storage_path && process.env.NEXT_PUBLIC_SUPABASE_URL
       ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${profileForm.logo_storage_path}`
+      : null
+  const alternativeLogoDisplayUrl =
+    profileForm.alternative_logo_storage_path && process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${profileForm.alternative_logo_storage_path}`
       : null
 
   // ── Loading skeleton ───────────────────────────────────────────
@@ -763,6 +812,110 @@ export default function TenantSettingsPage() {
                         <p className="text-xs text-[#9e998f] mt-1">
                           PNG, JPG or SVG. Stored to tenant-assets bucket.
                         </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Alternative logo upload */}
+                  <div className="col-span-2">
+                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+                      Alternative Logo
+                    </label>
+                    <div className="flex items-center gap-4">
+                      {alternativeLogoDisplayUrl && (
+                        <img
+                          src={alternativeLogoDisplayUrl}
+                          alt="Alternative company logo"
+                          className="h-12 w-auto border border-[#e8e4e0] rounded object-contain bg-white p-1"
+                        />
+                      )}
+                      <div>
+                        <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-[#3a3530] border border-[#e8e4e0] rounded px-3 py-1.5 hover:bg-[#f5f2ee] transition-colors">
+                          {alternativeLogoUploading ? 'Uploading...' : alternativeLogoDisplayUrl ? 'Replace alternative logo' : 'Upload alternative logo'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleAlternativeLogoUpload}
+                            disabled={alternativeLogoUploading || !tenantId}
+                          />
+                        </label>
+                        <p className="text-xs text-[#9e998f] mt-1">
+                          Optional secondary logo (e.g., for dark mode or specialized documents).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial details */}
+                  <div className="col-span-2 mt-6 pt-6 border-t border-[#e8e4e0]">
+                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-4">
+                      Financial Details
+                    </label>
+                    <div className="grid grid-cols-2 gap-5">
+                      {/* BSB */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          BSB
+                        </label>
+                        <input
+                          type="text"
+                          value={profileForm.bsb}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, bsb: e.target.value }))
+                          }
+                          placeholder="6 digits"
+                          maxLength={6}
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
+                      </div>
+
+                      {/* Account Number */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Account Number
+                        </label>
+                        <input
+                          type="text"
+                          value={profileForm.account_number}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, account_number: e.target.value }))
+                          }
+                          placeholder="Account number"
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
+                      </div>
+
+                      {/* Bank Name */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Bank Name
+                        </label>
+                        <input
+                          type="text"
+                          value={profileForm.bank_name}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, bank_name: e.target.value }))
+                          }
+                          placeholder="e.g. Commonwealth Bank"
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
+                      </div>
+
+                      {/* Account Name */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Account Name
+                        </label>
+                        <input
+                          type="text"
+                          value={profileForm.account_name}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, account_name: e.target.value }))
+                          }
+                          placeholder="Account holder name"
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
                       </div>
                     </div>
                   </div>
