@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       action_queue: {
@@ -2436,6 +2461,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          abn: string | null
           address: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -2446,9 +2472,12 @@ export type Database = {
           logo_storage_path: string | null
           name: string
           plan: string | null
+          service_area_config: Json | null
           slug: string
+          trading_name: string | null
         }
         Insert: {
+          abn?: string | null
           address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -2459,9 +2488,12 @@ export type Database = {
           logo_storage_path?: string | null
           name: string
           plan?: string | null
+          service_area_config?: Json | null
           slug: string
+          trading_name?: string | null
         }
         Update: {
+          abn?: string | null
           address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -2472,39 +2504,62 @@ export type Database = {
           logo_storage_path?: string | null
           name?: string
           plan?: string | null
+          service_area_config?: Json | null
           slug?: string
+          trading_name?: string | null
         }
         Relationships: []
       }
       trade_type_sequence: {
         Row: {
+          can_run_concurrent_with: string[] | null
+          cant_run_concurrent_with: string[] | null
           created_at: string | null
           id: string
+          lag_description: string | null
           notes: string | null
           tenant_id: string
           trade_type: string
+          typical_comes_before: string[] | null
+          typical_depends_on: string[] | null
+          typical_lag_days: number | null
           typical_sequence_order: number | null
           typical_visit_count: number | null
+          typically_paired_with: string[] | null
           updated_at: string | null
         }
         Insert: {
+          can_run_concurrent_with?: string[] | null
+          cant_run_concurrent_with?: string[] | null
           created_at?: string | null
           id?: string
+          lag_description?: string | null
           notes?: string | null
           tenant_id: string
           trade_type: string
+          typical_comes_before?: string[] | null
+          typical_depends_on?: string[] | null
+          typical_lag_days?: number | null
           typical_sequence_order?: number | null
           typical_visit_count?: number | null
+          typically_paired_with?: string[] | null
           updated_at?: string | null
         }
         Update: {
+          can_run_concurrent_with?: string[] | null
+          cant_run_concurrent_with?: string[] | null
           created_at?: string | null
           id?: string
+          lag_description?: string | null
           notes?: string | null
           tenant_id?: string
           trade_type?: string
+          typical_comes_before?: string[] | null
+          typical_depends_on?: string[] | null
+          typical_lag_days?: number | null
           typical_sequence_order?: number | null
           typical_visit_count?: number | null
+          typically_paired_with?: string[] | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2814,11 +2869,13 @@ export type Database = {
           is_concurrent: boolean | null
           job_id: string
           notes: string | null
+          parent_work_order_id: string | null
           predecessor_work_order_id: string | null
           proximity_range: string | null
           quote_id: string | null
           report_id: string | null
           scheduled_date: string | null
+          scheduling_offset_days: number | null
           scope_summary: string | null
           sequence_order: number | null
           status: string | null
@@ -2840,11 +2897,13 @@ export type Database = {
           is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
+          parent_work_order_id?: string | null
           predecessor_work_order_id?: string | null
           proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
+          scheduling_offset_days?: number | null
           scope_summary?: string | null
           sequence_order?: number | null
           status?: string | null
@@ -2866,11 +2925,13 @@ export type Database = {
           is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
+          parent_work_order_id?: string | null
           predecessor_work_order_id?: string | null
           proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
+          scheduling_offset_days?: number | null
           scope_summary?: string | null
           sequence_order?: number | null
           status?: string | null
@@ -2900,6 +2961,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_parent_work_order_id_fkey"
+            columns: ["parent_work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
           {
@@ -3097,6 +3165,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

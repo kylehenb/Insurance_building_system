@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react'
 import { type WorkOrderRow, woIsSent } from './types'
 import { useWorkOrders } from './useWorkOrders'
 import { BlueprintView } from './BlueprintView'
+import { BlueprintTimelineView } from './BlueprintTimelineView'
 import { GanttView, type GanttScale } from './GanttView'
 import { BottomPanel } from './BottomPanel'
 import { SendAllModal } from './SendAllModal'
@@ -82,6 +83,13 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
       u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }
     ) => {
       mutations.updateWorkOrder(id, u)
+    },
+    [mutations]
+  )
+
+  const handleSetParent = useCallback(
+    (id: string, parentId: string | null, offsetDays: number) => {
+      mutations.setParentWorkOrder(id, parentId, offsetDays)
     },
     [mutations]
   )
@@ -219,7 +227,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         {/* ── Main panel ──────────────────────────────────────────────────── */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           {view === 'blueprint' ? (
-            <BlueprintView
+            <BlueprintTimelineView
               workOrders={workOrders}
               trades={trades}
               expandedIds={expandedIds}
@@ -232,6 +240,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               onAddVisit={id => mutations.addVisit(id)}
               onSetPred={(id, predId, conc) => mutations.setPredecessor(id, predId, conc)}
               onReorder={handleReorder}
+              onSetParent={handleSetParent}
               jobId={jobId}
               tenantId={tenantId}
               onDraftGenerated={() => refetch()}

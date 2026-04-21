@@ -26,6 +26,7 @@ export interface WorkOrderMutations {
   cancelWorkOrder:   (id: string) => Promise<void>
   updateWorkOrder:   (id: string, updates: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => Promise<void>
   setPredecessor:    (id: string, predecessorId: string | null, isConcurrent: boolean) => Promise<void>
+  setParentWorkOrder: (id: string, parentId: string | null, offsetDays: number) => Promise<void>
   addVisit:          (workOrderId: string) => Promise<void>
   addWorkOrder:      (quoteId: string | null, workType: string) => Promise<void>
 }
@@ -190,6 +191,22 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           quotedAllowance,
           lagDays,
           lagDescription,
+          parentWorkOrder: null,
+          children: [],
+        }
+      })
+
+      // Populate parent/child relationships
+      const woMap = new Map<string, WorkOrderWithDetails>()
+      composed.forEach(wo => woMap.set(wo.id, wo))
+
+      composed.forEach(wo => {
+        if (wo.parent_work_order_id) {
+          const parent = woMap.get(wo.parent_work_order_id)
+          if (parent) {
+            wo.parentWorkOrder = parent
+            parent.children.push(wo)
+          }
         }
       })
 
@@ -370,6 +387,15 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       await supabase
         .from('work_orders')
         .update({ predecessor_work_order_id: predecessorId, is_concurrent: isConcurrent })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+      fetchData()
+    },
+
+    setParentWorkOrder: async (id, parentId, offsetDays) => {
+      await supabase
+        .from('work_orders')
+        .update({ parent_work_order_id: parentId, scheduling_offset_days: offsetDays })
         .eq('id', id)
         .eq('tenant_id', tenantId)
       fetchData()
