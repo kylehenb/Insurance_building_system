@@ -93,6 +93,7 @@ export default async function InvoicePrintPage({
       account_number?: string | null
       account_name?: string | null
       building_licence_number?: string | null
+      accounts_email?: string | null
     },
     lineItems: lineItems || [],
   })
