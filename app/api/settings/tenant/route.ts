@@ -69,6 +69,7 @@ interface TenantPatchBody {
   accounts_email?: string | null
   contact_phone?: string | null
   address?: string | null
+  building_licence_number?: string | null
   logo_storage_path?: string | null
   alternative_logo_storage_path?: string | null
   bsb?: string | null
@@ -146,6 +147,7 @@ export async function PATCH(req: NextRequest) {
       'accounts_email',
       'contact_phone',
       'address',
+      'building_licence_number',
       'logo_storage_path',
       'alternative_logo_storage_path',
       'bsb',

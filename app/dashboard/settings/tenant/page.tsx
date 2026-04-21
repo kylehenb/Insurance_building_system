@@ -89,6 +89,7 @@ interface ProfileFormData {
   accounts_email: string
   contact_phone: string
   address: string
+  building_licence_number: string
   logo_storage_path: string
   alternative_logo_storage_path: string
   bsb: string
@@ -111,6 +112,7 @@ interface TenantApiResponse {
     contact_email: string | null
     accounts_email: string | null
     contact_phone: string | null
+    building_licence_number: string | null
     logo_storage_path: string | null
     alternative_logo_storage_path: string | null
     bsb: string | null
@@ -149,6 +151,7 @@ const EMPTY_PROFILE: ProfileFormData = {
   accounts_email: '',
   contact_phone: '',
   address: '',
+  building_licence_number: '',
   logo_storage_path: '',
   alternative_logo_storage_path: '',
   bsb: '',
@@ -274,6 +277,7 @@ export default function TenantSettingsPage() {
           accounts_email: t.accounts_email ?? '',
           contact_phone: t.contact_phone ?? '',
           address: t.address ?? '',
+          building_licence_number: t.building_licence_number ?? '',
           logo_storage_path: t.logo_storage_path ?? '',
           alternative_logo_storage_path: t.alternative_logo_storage_path ?? '',
           bsb: t.bsb ?? '',
@@ -336,6 +340,7 @@ export default function TenantSettingsPage() {
           accounts_email: profileForm.accounts_email || null,
           contact_phone: profileForm.contact_phone || null,
           address: profileForm.address || null,
+          building_licence_number: profileForm.building_licence_number || null,
           logo_storage_path: profileForm.logo_storage_path || null,
           alternative_logo_storage_path: profileForm.alternative_logo_storage_path || null,
           bsb: profileForm.bsb || null,
@@ -800,6 +805,21 @@ export default function TenantSettingsPage() {
                         setProfileForm((prev) => ({ ...prev, contact_phone: e.target.value }))
                       }
                       className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                    />
+                  </div>
+
+                  {/* Building licence # */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                      Building licence #
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.building_licence_number}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({ ...prev, building_licence_number: e.target.value }))
+                      }
+                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                     />
                   </div>
 
