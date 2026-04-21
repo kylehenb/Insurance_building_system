@@ -83,8 +83,19 @@ export async function POST(req: NextRequest) {
     amountExGst = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
   }
 
-  const gst = amountExGst * 0.10
-  const amountIncGst = amountExGst + gst
+  // For excess invoices, the amount is GST inclusive
+  let gst = 0
+  let amountIncGst = 0
+  if (invoiceType === 'excess') {
+    // Excess amount is already GST inclusive
+    amountIncGst = amountExGst
+    amountExGst = amountExGst / 1.10
+    gst = amountIncGst - amountExGst
+  } else {
+    // Other invoices add GST
+    gst = amountExGst * 0.10
+    amountIncGst = amountExGst + gst
+  }
 
   const { data: invoice, error } = await supabase
     .from('invoices')
@@ -127,5 +138,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json(invoice, { status: 201 })
+  // Fetch line items for the created invoice to return consistent structure
+  const { data: items } = await supabase
+    .from('invoice_line_items')
+    .select('*')
+    .eq('invoice_id', invoice.id)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
+  return NextResponse.json({
+    ...invoice,
+    line_items: items ?? [],
+    item_count: items?.length ?? 0,
+  }, { status: 201 })
 }
