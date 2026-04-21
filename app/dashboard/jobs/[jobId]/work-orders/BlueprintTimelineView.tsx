@@ -48,44 +48,94 @@ export function BlueprintTimelineView({
   const [dependencyMode, setDependencyMode] = useState<string | null>(null) // ID of bar waiting for predecessor selection
   const [parentMode, setParentMode] = useState<string | null>(null) // ID of bar waiting for parent selection
   const [dragDependencyMode, setDragDependencyMode] = useState<string | null>(null) // ID of bar being dragged for dependency creation
-  const [subColumnPositions, setSubColumnPositions] = useState<Map<string, number>>(new Map()) // Sub-column position for each work order (0 or 1)
+  const [barPositions, setBarPositions] = useState<Map<string, { horizontal: number; swimLane: number }>>(new Map()) // Free positioning: horizontal (0-1) and swim lane index
   
   const placed = workOrders
     .filter(w => w.placementState !== 'unplaced')
-    .sort((a, b) => (a.sequence_order ?? 999) - (b.sequence_order ?? 999))
   const unplaced = workOrders.filter(w => w.placementState === 'unplaced')
 
-  // Group trades by sequence order to handle concurrent trades
-  const sequenceGroups = new Map<number, WorkOrderWithDetails[]>()
-  placed.forEach(wo => {
-    const seq = wo.sequence_order ?? 999
-    if (!sequenceGroups.has(seq)) sequenceGroups.set(seq, [])
-    sequenceGroups.get(seq)!.push(wo)
-  })
+  // Initialize bar positions for work orders that don't have them yet
+  React.useEffect(() => {
+    if (placed.length > 0 && barPositions.size === 0) {
+      const newPositions = new Map<string, { horizontal: number; swimLane: number }>()
+      placed.forEach((wo, idx) => {
+        // Use sequence_order as initial horizontal position if available
+        const seq = wo.sequence_order ?? idx + 1
+        const horizontal = (seq - 1) / Math.max(placed.length, 1)
+        newPositions.set(wo.id, { horizontal, swimLane: 0 })
+      })
+      setBarPositions(newPositions)
+    }
+  }, [placed, barPositions.size])
 
-  // Calculate concurrent offset for each work order
-  const concurrentOffsets = new Map<string, number>()
-  sequenceGroups.forEach((group, seq) => {
-    group.forEach((wo, idx) => {
-      concurrentOffsets.set(wo.id, idx)
-    })
-  })
+  // Auto-assign swim lanes based on horizontal positions
+  const swimLanes = autoAssignSwimLanes(placed)
 
   const bodyRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
-  // Calculate bar position based on sequence order and sub-column position
-  // Each sequence slot is split into 3 sub-columns, bars take 2 columns
-  function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, concurrentOffset: number = 0, subColumn: number = 0): { left: number; width: number; top: number } {
-    const seq = (wo.sequence_order ?? totalPlaced) - 1
-    const slotW = 1 / Math.max(totalPlaced, 1)
-    const subColW = slotW / 3
-    // Bars take 2 sub-columns, can be positioned at sub-column 0 or 1
-    const validSubCol = Math.min(subColumn, 1)
-    const left = seq * slotW + (validSubCol * subColW)
-    const width = Math.max(0.04, subColW * 2)
-    const top = 6 + (concurrentOffset * 16) // Stack concurrent trades vertically
-    return { left: Math.min(left, 0.96), width, top }
+  // Calculate display sequence number based on horizontal position
+  // Leftmost bars get lower numbers, bars in same swim lane get same number if overlapping
+  function calculateDisplaySequence(wo: WorkOrderWithDetails, allPlaced: WorkOrderWithDetails[]): number {
+    const thisPos = barPositions.get(wo.id)?.horizontal ?? 0
+    const thisSwimLane = swimLanes.get(wo.id) ?? 0
+    
+    // Sort all bars by horizontal position
+    const sorted = [...allPlaced].sort((a, b) => {
+      const posA = barPositions.get(a.id)?.horizontal ?? 0
+      const posB = barPositions.get(b.id)?.horizontal ?? 0
+      return posA - posB
+    })
+    
+    // Find this bar's index in sorted order
+    const index = sorted.findIndex(b => b.id === wo.id)
+    return index + 1 // 1-based sequence
+  }
+
+  // Auto-assign swim lanes to prevent overlaps
+  function autoAssignSwimLanes(workOrders: WorkOrderWithDetails[]): Map<string, number> {
+    const barWidth = 0.08
+    const lanes = new Map<string, number>()
+    const laneEnds: number[] = [] // Track where each lane ends (horizontal position)
+
+    // Sort by horizontal position
+    const sorted = [...workOrders].sort((a, b) => {
+      const posA = barPositions.get(a.id)?.horizontal ?? 0
+      const posB = barPositions.get(b.id)?.horizontal ?? 0
+      return posA - posB
+    })
+
+    sorted.forEach(wo => {
+      const horizontal = barPositions.get(wo.id)?.horizontal ?? 0
+      const left = horizontal
+      const right = horizontal + barWidth
+
+      // Find first available lane
+      let assignedLane = 0
+      for (let i = 0; i < laneEnds.length; i++) {
+        if (laneEnds[i] <= left) {
+          assignedLane = i
+          break
+        }
+        if (i === laneEnds.length - 1) {
+          assignedLane = laneEnds.length
+        }
+      }
+
+      lanes.set(wo.id, assignedLane)
+      laneEnds[assignedLane] = right
+    })
+
+    return lanes
+  }
+
+  // Calculate bar position based on horizontal position and swim lane
+  // Horizontal position is 0-1 (left to right), swim lane determines vertical stacking
+  function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, swimLane: number = 0, horizontal: number = 0): { left: number; width: number; top: number } {
+    const barWidth = 0.08 // Fixed equal width for all bars
+    const left = Math.max(0, Math.min(1 - barWidth, horizontal))
+    const top = 6 + (swimLane * 36) // Each swim lane is 36px tall
+    return { left, width: barWidth, top }
   }
 
   // SVG dependency connectors
@@ -275,18 +325,12 @@ export function BlueprintTimelineView({
     const wo = workOrders.find(w => w.id === draggingId)
     if (!wo) { handleDragEnd(); return }
 
-    // Detect which sub-column the drop is in
+    // Calculate horizontal position based on drop location
     const body = bodyRef.current
     if (!body) { handleDragEnd(); return }
     const bodyRect = body.getBoundingClientRect()
     const dropX = e.clientX - bodyRect.left
-    const slotW = bodyRect.width / placed.length
-    const subColW = slotW / 3
-    const targetSeq = laneIndex + 1
-    const dropSubCol = Math.floor((dropX % slotW) / subColW)
-
-    const targetWo = placed[laneIndex]
-    const draggingWoSeq = wo.sequence_order ?? 999
+    const horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
 
     if (wo.placementState === 'unplaced') {
       // Moving from unplaced to placed
@@ -302,24 +346,10 @@ export function BlueprintTimelineView({
       }
 
       onPlace(draggingId)
-      // Set sequence and sub-column
-      onUpdate(draggingId, { sequence_order: targetSeq })
-      setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
+      setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane: 0 }))
     } else {
-      // Reordering within placed
-      if (targetSeq === draggingWoSeq) {
-        // Same row - just update sub-column
-        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
-      } else if (targetSeq < draggingWoSeq) {
-        // Dragged before (to the left) - move rows
-        const newOrder = placed.filter(p => p.id !== draggingId)
-        newOrder.splice(laneIndex, 0, wo)
-        onReorder(newOrder.map(p => p.id))
-        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
-      } else {
-        // Dragged after - no sequence change, just sub-column
-        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
-      }
+      // Reordering within placed - just update horizontal position
+      setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane: 0 }))
     }
 
     handleDragEnd()
@@ -470,10 +500,9 @@ export function BlueprintTimelineView({
             placed.map((wo, idx) => {
               const color = getTradeColor(wo.tradeTypeLabel)
               const hasDate = wo.visits[0]?.scheduled_date
-              const subCol = subColumnPositions.get(wo.id) ?? 0
-              const pos = estimateBarPos(wo, placed.length, concurrentOffsets.get(wo.id) ?? 0, subCol)
-              const seqGroup = sequenceGroups.get(wo.sequence_order ?? 999) ?? [wo]
-              const groupSize = seqGroup.length
+              const barPos = barPositions.get(wo.id) ?? { horizontal: 0, swimLane: 0 }
+              const swimLane = swimLanes.get(wo.id) ?? 0
+              const pos = estimateBarPos(wo, placed.length, swimLane, barPos.horizontal)
 
               return (
                 <div
@@ -483,7 +512,7 @@ export function BlueprintTimelineView({
                   style={{
                     display: 'flex',
                     borderBottom: '1px solid #e8e4de',
-                    minHeight: expandedTradeIds.has(wo.id) ? 200 : (44 + (groupSize > 1 ? (groupSize - 1) * 16 : 0)),
+                    minHeight: expandedTradeIds.has(wo.id) ? 200 : 44,
                     position: 'relative',
                     background: dragOverLane === idx ? '#f5f2ee' : '#fff',
                   }}
@@ -506,7 +535,7 @@ export function BlueprintTimelineView({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#5a5650', minWidth: 20 }}>
-                        {wo.sequence_order ?? '—'}
+                        {calculateDisplaySequence(wo, placed)}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.09em', color: '#9a9590' }}>
                         {wo.tradeTypeLabel}
@@ -668,26 +697,6 @@ export function BlueprintTimelineView({
 
                   {/* Timeline Track */}
                   <div style={{ flex: 1, position: 'relative', padding: '6px 0' }}>
-                    {/* Grid lines - sub-columns */}
-                    {placed.map((wo, i) => {
-                      const seq = wo.sequence_order ?? i + 1
-                      const slotW = 1 / placed.length
-                      return [0, 1, 2, 3].map((subCol, j) => (
-                        <div
-                          key={`${i}-${j}`}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            left: `${(seq - 1) * slotW + (subCol * slotW / 3)}%`,
-                            width: 1,
-                            background: subCol === 0 ? '#ddd8d0' : '#f5f2ee',
-                            pointerEvents: 'none',
-                          }}
-                        />
-                      ))
-                    })}
-
                     {/* Bar */}
                     <div
                       id={`bt-bar-${wo.id}`}
