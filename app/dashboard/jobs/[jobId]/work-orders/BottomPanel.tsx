@@ -132,7 +132,7 @@ function WORow({
       >
         {wo.sequence_order ?? '—'}
       </td>
-      <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
         <span
           style={{
             width: 6, height: 6, borderRadius: '50%',
@@ -168,7 +168,7 @@ function WORow({
           whiteSpace: 'nowrap',
         }}
       >
-        {wo.estimated_hours ?? '—'}
+        {wo.estimated_hours !== null && wo.estimated_hours !== undefined ? wo.estimated_hours.toFixed(2) : '—'}
       </td>
       <td
         style={{
@@ -231,18 +231,6 @@ function WORow({
         <span
           style={{
             fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 10,
-            background: wo.proximity_range === 'extended' ? '#fff0f0' : '#f1f5f9',
-            color:      wo.proximity_range === 'extended' ? '#991b1b' : '#475569',
-            border:     `1px solid ${wo.proximity_range === 'extended' ? '#fca5a5' : '#cbd5e1'}`,
-          }}
-        >
-          {wo.proximity_range ?? 'standard'}
-        </span>
-      </td>
-      <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 10,
             background: xeroStyle.bg,
             color:      xeroStyle.color,
             border:     `1px solid ${xeroStyle.border}`,
@@ -250,6 +238,37 @@ function WORow({
         >
           {xeroStyle.label}
         </span>
+      </td>
+      <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
+        <a
+          href={`/print/work-orders/${wo.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 9,
+            fontWeight: 500,
+            padding: '2px 7px',
+            borderRadius: 4,
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid #1a1a1a',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            display: 'inline-block',
+          }}
+          onMouseEnter={e => {
+            const t = e.target as HTMLElement
+            t.style.background = '#333'
+            t.style.borderColor = '#333'
+          }}
+          onMouseLeave={e => {
+            const t = e.target as HTMLElement
+            t.style.background = '#1a1a1a'
+            t.style.borderColor = '#1a1a1a'
+          }}
+        >
+          Preview
+        </a>
       </td>
     </tr>
   )
@@ -279,7 +298,7 @@ function WOTable({
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
       <thead>
         <tr>
-          {['Seq','Trade','Contractor','Status','Gary','Hours','Lag','Quoted','Override','Trade cost','Invoice chain','Depends on','Proximity','Xero'].map(h => (
+          {['Seq','Trade','Contractor','Status','Gary','Hours','Lag','Quoted','Override','Trade cost','Invoice chain','Depends on','Xero','Preview'].map(h => (
             <th key={h} style={TH_STYLE}>{h}</th>
           ))}
         </tr>
