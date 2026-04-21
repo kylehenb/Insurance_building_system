@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { generateInvoiceHtml } from '@/lib/documents/invoice-html'
+import { InvoicePrintButton } from './InvoicePrintButton'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
 type InvoiceLineItem = Database['public']['Tables']['invoice_line_items']['Row']
@@ -96,12 +97,7 @@ export default async function InvoicePrintPage({
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 relative">
         {/* Print button - hidden when printing */}
         <div className="no-print absolute top-4 right-4 z-10 print:hidden">
-          <button
-            onClick={() => window.print()}
-            className="bg-[#3a3530] text-white px-4 py-2 rounded text-sm font-medium hover:bg-[#4a4540] transition-colors"
-          >
-            Print / Save as PDF
-          </button>
+          <InvoicePrintButton />
         </div>
 
         {/* Render HTML */}
