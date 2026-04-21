@@ -25,7 +25,6 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "frappe-gantt": "^1.2.2",
     "fuse.js": "^7.3.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",

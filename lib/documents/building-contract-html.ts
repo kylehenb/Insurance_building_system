@@ -27,7 +27,14 @@ export function generateBuildingContractHtml(params: {
 
   const contractDate = formatDate(new Date().toISOString())
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'
-  const approvedAmount = quote.approved_amount != null ? fmt(quote.approved_amount) : fmt(quote.total_amount)
+  
+  // Calculate total incl GST if approved_amount is not set
+  const subtotal = scopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+  const markup = subtotal * (quote.markup_pct || 0.2)
+  const subtotalAfterMarkup = subtotal + markup
+  const gst = subtotalAfterMarkup * (quote.gst_pct || 0.1)
+  const totalInclGst = subtotalAfterMarkup + gst
+  const approvedAmount = quote.approved_amount != null ? fmt(quote.approved_amount) : fmt(totalInclGst)
 
   // Group and sort items — identical logic to sow-html.ts
   const items = [...scopeItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -69,7 +76,7 @@ export function generateBuildingContractHtml(params: {
 
     const roomHeaderHtml = `
     <tr>
-      <td colspan="3" style="padding:4px 12px;background:#f5f2ee;
+      <td colspan="5" style="padding:4px 12px;background:#f5f2ee;
         border-bottom:1px solid #e0dbd4;border-top:6px solid white;">
         <span style="font-weight:700;color:#3a3530;font-size:12px;
           text-transform:uppercase;">${room}</span>
@@ -88,6 +95,9 @@ export function generateBuildingContractHtml(params: {
           line-height:1.5;">${item.item_description || '-'}</td>
         <td style="width:44px;padding:6px 4px;text-align:center;
           font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
+        <td style="width:44px;padding:6px 4px;text-align:center;
+          font-size:10px;color:#3a3530;">${item.unit ?? '-'}</td>
+        <td style="width:80px;padding:6px 8px;font-size:10px;color:#3a3530;">${item.trade ?? '-'}</td>
       </tr>`
     }).join('')
 
@@ -132,6 +142,7 @@ export function generateBuildingContractHtml(params: {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    gap: 2px;
   }
   .page-header img {
     height: 36px;
@@ -393,6 +404,7 @@ export function generateBuildingContractHtml(params: {
   <div class="page-header">
     <div class="logo-block">
       <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
     </div>
     <div class="doc-type">
       <div class="doc-title">INSURANCE REPAIR CONTRACT - WA</div>
@@ -452,13 +464,17 @@ export function generateBuildingContractHtml(params: {
 ═══════════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="page-header">
-    <div class="logo-block"><img src="/logo-alt.png" alt="Insurance Repair Co" /></div>
+    <div class="logo-block">
+      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
+      <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
+    </div>
     <div class="doc-type">
       <div class="doc-title">INSURANCE REPAIR CONTRACT - WA</div>
       <div class="doc-sub">PRIVATE INSURER</div>
       <div class="doc-section">CONTRACT SCHEDULE</div>
     </div>
-    <div class="contact-block">office@insurancerepairco.com.au</div>
+    <div class="contact-block"></div>
   </div>
 
   <div class="content">
@@ -485,7 +501,7 @@ export function generateBuildingContractHtml(params: {
       <tr><td class="label">CONTRACTOR NAME:</td><td class="value">Insurance Repair Co Pty Ltd</td></tr>
       <tr><td class="label">ABN No:</td><td class="value">12 686 067 881 &nbsp;&nbsp; Licence No: BC105884</td></tr>
       <tr><td class="label">Postal Address:</td><td class="value">20 Roche Road, Duncraig, WA 6023</td></tr>
-      <tr><td class="label">Phone:</td><td class="value">&nbsp;</td></tr>
+      <tr><td class="label">Phone:</td><td class="value">0431 132 077</td></tr>
       <tr><td class="label">Email:</td><td class="value">office@insurancerepairco.com.au</td></tr>
     </table>
 
@@ -588,13 +604,17 @@ export function generateBuildingContractHtml(params: {
 ═══════════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="page-header">
-    <div class="logo-block"><img src="/logo-alt.png" alt="Insurance Repair Co" /></div>
+    <div class="logo-block">
+      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
+      <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
+    </div>
     <div class="doc-type">
       <div class="doc-title">INSURANCE REPAIR CONTRACT - WA</div>
       <div class="doc-sub">PRIVATE INSURER</div>
       <div class="doc-section">CONTRACT SCHEDULE</div>
     </div>
-    <div class="contact-block">office@insurancerepairco.com.au</div>
+    <div class="contact-block"></div>
   </div>
 
   <div class="content">
@@ -616,10 +636,12 @@ export function generateBuildingContractHtml(params: {
       <div class="sow-section-title">SCOPE OF WORKS (Approved by Insurer)</div>
       <table class="sow-table">
         <thead>
-          <tr>
-            <td class="sow-num">#</td>
-            <td class="sow-desc">Description of works</td>
-            <td class="sow-qty">Qty</td>
+          <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
+            <td class="sow-num" style="width:28px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">#</td>
+            <td class="sow-desc" style="text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Description of works</td>
+            <td class="sow-qty" style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</td>
+            <td class="sow-qty" style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Unit</td>
+            <td class="sow-desc" style="width:80px;text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Trade</td>
           </tr>
         </thead>
         <tbody>
@@ -711,13 +733,17 @@ export function generateBuildingContractHtml(params: {
 ═══════════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="page-header">
-    <div class="logo-block"><img src="/logo-alt.png" alt="Insurance Repair Co" /></div>
+    <div class="logo-block">
+      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
+      <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
+    </div>
     <div class="doc-type">
       <div class="doc-title">INSURANCE REPAIR CONTRACT - WA</div>
       <div class="doc-sub">PRIVATE INSURER</div>
       <div class="doc-section">CONTRACT SCHEDULE</div>
     </div>
-    <div class="contact-block">office@insurancerepairco.com.au</div>
+    <div class="contact-block"></div>
   </div>
 
   <div class="content">
@@ -806,13 +832,17 @@ export function generateBuildingContractHtml(params: {
 ═══════════════════════════════════════════════════════════════ -->
 <div class="page">
   <div class="page-header">
-    <div class="logo-block"><img src="/logo-alt.png" alt="Insurance Repair Co" /></div>
+    <div class="logo-block">
+      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
+      <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
+    </div>
     <div class="doc-type">
       <div class="doc-title">INSURANCE REPAIR CONTRACT - WA</div>
       <div class="doc-sub">PRIVATE INSURER</div>
       <div class="doc-section">CONTRACT SCHEDULE</div>
     </div>
-    <div class="contact-block">office@insurancerepairco.com.au</div>
+    <div class="contact-block"></div>
   </div>
 
   <div class="content">
@@ -834,7 +864,9 @@ export function generateBuildingContractHtml(params: {
         <p class="mt8">Insurance Repair Co Pty Ltd</p>
         <p style="font-size:7.5pt;color:#555;">(Printed Name of Contractor)</p>
         <p class="mt8">Authorised Signature/s:</p>
-        <div class="sig-line"></div>
+        <div class="sig-line" style="position:relative;">
+          <img src="/signature.png" alt="Kyle Bindon signature" style="position:absolute;top:4px;left:0;height:28px;opacity:0.85;" />
+        </div>
         <p class="sig-label">(on behalf of Contractor)</p>
         <p class="mt4">Kyle Bindon</p>
         <p style="font-size:7.5pt;color:#555;">(Printed Name of Authorised Representative of the Contractor)</p>
