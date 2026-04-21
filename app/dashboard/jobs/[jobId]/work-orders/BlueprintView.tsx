@@ -449,8 +449,6 @@ export function BlueprintView({
           onDrop={handleDropPlaced}
           onDragLeave={() => handleDragLeave('placed')}
           style={{
-            flex: 1,
-            overflowY: 'auto',
             padding: '10px 12px',
             display: 'flex',
             flexDirection: 'column',

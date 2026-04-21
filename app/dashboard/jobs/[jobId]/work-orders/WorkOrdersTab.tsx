@@ -217,7 +217,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         </div>
 
         {/* ── Main panel ──────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
           {view === 'blueprint' ? (
             <BlueprintView
               workOrders={workOrders}

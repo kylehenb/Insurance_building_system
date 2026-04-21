@@ -3,6 +3,125 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 
+async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string, tenantId: string) {
+  const supabase = createServiceClient()
+
+  // Check if work orders already exist for this quote
+  const { data: existingWOs } = await supabase
+    .from('work_orders')
+    .select('id')
+    .eq('quote_id', quoteId)
+    .eq('tenant_id', tenantId)
+
+  if (existingWOs && existingWOs.length > 0) {
+    console.log(`[Auto-create] Work orders already exist for quote ${quoteId}, skipping`)
+    return
+  }
+
+  // Get scope items
+  const { data: scopeItems } = await supabase
+    .from('scope_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+    .eq('tenant_id', tenantId)
+
+  if (!scopeItems || scopeItems.length === 0) {
+    console.log(`[Auto-create] No scope items for quote ${quoteId}`)
+    return
+  }
+
+  // Group by trade
+  const itemsByTrade = new Map<string, typeof scopeItems>()
+  scopeItems.forEach(item => {
+    if (item.trade) {
+      if (!itemsByTrade.has(item.trade)) {
+        itemsByTrade.set(item.trade, [])
+      }
+      itemsByTrade.get(item.trade)!.push(item)
+    }
+  })
+
+  // Get trades to map trade names to IDs
+  const { data: allTrades } = await supabase
+    .from('trades')
+    .select('*')
+    .eq('tenant_id', tenantId)
+
+  const tradeMap = new Map<string, string>()
+  allTrades?.forEach(trade => {
+    if (trade.primary_trade) {
+      tradeMap.set(trade.primary_trade.toLowerCase(), trade.id)
+    }
+  })
+
+  // Get trade type sequence for visit counts
+  const { data: tradeSequence } = await supabase
+    .from('trade_type_sequence')
+    .select('*')
+    .eq('tenant_id', tenantId)
+
+  const sequenceMap = new Map<string, number>()
+  tradeSequence?.forEach(ts => {
+    if (ts.trade_type) {
+      sequenceMap.set(ts.trade_type.toLowerCase(), ts.typical_visit_count || 1)
+    }
+  })
+
+  // Create unplaced work orders (no sequence_order)
+  for (const [tradeName, items] of itemsByTrade) {
+    const tradeNameLower = tradeName.toLowerCase()
+    const tradeId = tradeMap.get(tradeNameLower)
+
+    if (!tradeId) {
+      console.log(`[Auto-create] Trade not found: ${tradeName}`)
+      continue
+    }
+
+    const totalVisits = sequenceMap.get(tradeNameLower) || 1
+    const totalHours = items.reduce((sum, item) => sum + (item.estimated_hours || 0), 0)
+
+    const { data: workOrder, error: woError } = await supabase
+      .from('work_orders')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        quote_id: quoteId,
+        trade_id: tradeId,
+        work_type: 'repair',
+        status: 'pending',
+        estimated_hours: totalHours,
+        total_visits: totalVisits,
+        current_visit: 1,
+        gary_state: 'not_started',
+        scope_summary: `${items.length} items`,
+      })
+      .select('id')
+      .single()
+
+    if (woError || !workOrder) {
+      console.error(`[Auto-create] Failed to create work order for ${tradeName}:`, woError)
+      continue
+    }
+
+    // Create visits
+    for (let visitNum = 1; visitNum <= totalVisits; visitNum++) {
+      const visitHours = totalHours / totalVisits
+      await supabase
+        .from('work_order_visits')
+        .insert({
+          tenant_id: tenantId,
+          work_order_id: workOrder.id,
+          job_id: jobId,
+          visit_number: visitNum,
+          estimated_hours: visitHours,
+          status: 'unscheduled',
+        })
+    }
+
+    console.log(`[Auto-create] Created unplaced work order for ${tradeName}`)
+  }
+}
+
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update']
 
 export async function GET(
@@ -75,6 +194,23 @@ export async function PATCH(
   // Recompute stage whenever quote status changes
   if ('status' in safeUpdates && data.job_id) {
     await recomputeAndSaveStage(data.job_id)
+
+    // Auto-create unplaced work orders when quote is approved
+    const APPROVED_STATUSES = [
+      'approved_contracts_pending',
+      'approved_contracts_sent',
+      'approved_contracts_signed',
+      'pre_repair',
+      'repairs_in_progress',
+      'repairs_complete_to_invoice',
+      'complete_and_invoiced',
+      'approved',
+      'partially_approved',
+    ]
+
+    if (APPROVED_STATUSES.includes(safeUpdates.status as string)) {
+      await createUnplacedWorkOrdersFromQuote(data.id, data.job_id, tenantId as string)
+    }
   }
 
   return NextResponse.json(data)
