@@ -273,14 +273,18 @@ export function BlueprintTimelineView({
     const wo = workOrders.find(w => w.id === draggingId)
     if (!wo) { handleDragEnd(); return }
 
-    // Check if dropping for concurrent placement (Shift key or vertical alignment)
+    // Detect which sub-column the drop is in
+    const body = bodyRef.current
+    if (!body) { handleDragEnd(); return }
+    const bodyRect = body.getBoundingClientRect()
+    const dropX = e.clientX - bodyRect.left
+    const slotW = bodyRect.width / placed.length
+    const subColW = slotW / 3
+    const targetSeq = laneIndex + 1
+    const dropSubCol = Math.floor((dropX % slotW) / subColW)
+
     const targetWo = placed[laneIndex]
-    if (targetWo && e.shiftKey) {
-      // Make concurrent with target
-      onUpdate(wo.id, { sequence_order: targetWo.sequence_order })
-      handleDragEnd()
-      return
-    }
+    const draggingWoSeq = wo.sequence_order ?? 999
 
     if (wo.placementState === 'unplaced') {
       // Moving from unplaced to placed
@@ -295,18 +299,25 @@ export function BlueprintTimelineView({
         return
       }
 
-      const maxSeq = Math.max(0, ...placed.map(p => p.sequence_order ?? 0))
       onPlace(draggingId)
-
-      // Then reorder to the correct position
-      const newOrder = [...placed.map(p => p.id)]
-      newOrder.splice(laneIndex, 0, draggingId)
-      setTimeout(() => onReorder(newOrder), 100)
+      // Set sequence and sub-column
+      onUpdate(draggingId, { sequence_order: targetSeq })
+      setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
     } else {
       // Reordering within placed
-      const withoutDragging = placed.filter(p => p.id !== draggingId)
-      withoutDragging.splice(laneIndex, 0, wo)
-      onReorder(withoutDragging.map(p => p.id))
+      if (targetSeq === draggingWoSeq) {
+        // Same row - just update sub-column
+        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
+      } else if (targetSeq < draggingWoSeq) {
+        // Dragged before (to the left) - move rows
+        const newOrder = placed.filter(p => p.id !== draggingId)
+        newOrder.splice(laneIndex, 0, wo)
+        onReorder(newOrder.map(p => p.id))
+        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
+      } else {
+        // Dragged after - no sequence change, just sub-column
+        setSubColumnPositions(prev => new Map(prev).set(draggingId, dropSubCol))
+      }
     }
 
     handleDragEnd()
@@ -457,10 +468,10 @@ export function BlueprintTimelineView({
             placed.map((wo, idx) => {
               const color = getTradeColor(wo.tradeTypeLabel)
               const hasDate = wo.visits[0]?.scheduled_date
-              const concurrentOffset = concurrentOffsets.get(wo.id) ?? 0
+              const subCol = subColumnPositions.get(wo.id) ?? 0
+              const pos = estimateBarPos(wo, placed.length, concurrentOffsets.get(wo.id) ?? 0, subCol)
               const seqGroup = sequenceGroups.get(wo.sequence_order ?? 999) ?? [wo]
               const groupSize = seqGroup.length
-              const pos = estimateBarPos(wo, placed.length, concurrentOffset)
 
               return (
                 <div

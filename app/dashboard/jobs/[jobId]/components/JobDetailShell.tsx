@@ -168,7 +168,7 @@ function TabPanel({
     case 'insurer-orders':
       return <InsurerOrdersTab jobId={jobId} tenantId={tenantId} />
     case 'invoices':
-      return <InvoicesTab jobId={jobId} />
+      return <InvoicesTab jobId={jobId} tenantId={tenantId} />
     case 'job-budget':
       return <JobBudgetTab jobId={jobId} />
     case 'safety':
