@@ -74,34 +74,30 @@ export function generateBuildingContractHtml(params: {
       ? `${roomLength ?? '—'} × ${roomWidth ?? '—'} × ${roomHeight ?? '—'} m`
       : ''
 
-    const roomHeaderHtml = `
-    <tr>
-      <td colspan="5" style="padding:4px 12px;background:#f5f2ee;
-        border-bottom:1px solid #e0dbd4;border-top:6px solid white;">
-        <span style="font-weight:700;color:#3a3530;font-size:12px;
-          text-transform:uppercase;">${room}</span>
-        ${hasDimensions ? `<span style="font-size:12px;color:#9e998f;
-          font-family:monospace;margin-left:8px;">${roomSizeStr}</span>` : ''}
-      </td>
-    </tr>`
+    const roomHtml = `
+    <div style="margin-bottom:8px;">
+      <div style="padding:4px 12px;border-bottom:1px solid #e0dbd4;background-color:#f5f2ee;">
+        <span style="font-weight:700;color:#3a3530;font-size:12px;text-transform:uppercase;">${room}</span>
+        ${hasDimensions ? `<span style="font-size:12px;color:#9e998f;font-family:monospace;margin-left:8px;">${roomSizeStr}</span>` : ''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tbody>
+          ${roomItems.map(item => {
+            globalCounter++
+            return `
+            <tr style="border-bottom:1px solid #f0ece6;">
+              <td style="width:28px;padding:6px 4px;text-align:center;font-family:monospace;font-size:10px;color:#3a3530;">${globalCounter}</td>
+              <td style="padding:6px 8px;font-size:10px;color:#3a3530;line-height:1.5;">${item.item_description || '-'}</td>
+              <td style="width:44px;padding:6px 4px;text-align:center;font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
+              <td style="width:44px;padding:6px 4px;text-align:center;font-size:10px;color:#3a3530;">${item.unit ?? '-'}</td>
+              <td style="width:80px;padding:6px 8px;font-size:10px;color:#3a3530;">${item.trade ?? '-'}</td>
+            </tr>`
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`
 
-    const rowsHtml = roomItems.map(item => {
-      globalCounter++
-      return `
-      <tr style="border-bottom:1px solid #f0ece6;">
-        <td style="width:28px;padding:6px 4px;text-align:center;
-          font-family:monospace;font-size:10px;color:#3a3530;">${globalCounter}</td>
-        <td style="padding:6px 8px;font-size:10px;color:#3a3530;
-          line-height:1.5;">${item.item_description || '-'}</td>
-        <td style="width:44px;padding:6px 4px;text-align:center;
-          font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
-        <td style="width:44px;padding:6px 4px;text-align:center;
-          font-size:10px;color:#3a3530;">${item.unit ?? '-'}</td>
-        <td style="width:80px;padding:6px 8px;font-size:10px;color:#3a3530;">${item.trade ?? '-'}</td>
-      </tr>`
-    }).join('')
-
-    return roomHeaderHtml + rowsHtml
+    return roomHtml
   }).join('')
 
   return `<!DOCTYPE html>
@@ -632,22 +628,26 @@ export function generateBuildingContractHtml(params: {
     </table>
 
     <!-- Scope of Works Table (similar to SOW but no pricing) -->
-    <div class="sow-section">
-      <div class="sow-section-title">SCOPE OF WORKS (Approved by Insurer)</div>
-      <table class="sow-table">
+    <div style="margin-bottom:0;">
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;color:#b0a89e;font-weight:700;margin-bottom:6px;">
+        SCOPE OF WORKS (Approved by Insurer)
+      </div>
+
+      {/* Table header */}
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
         <thead>
           <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
-            <td class="sow-num" style="width:28px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">#</td>
-            <td class="sow-desc" style="text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Description of works</td>
-            <td class="sow-qty" style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</td>
-            <td class="sow-qty" style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Unit</td>
-            <td class="sow-desc" style="width:80px;text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Trade</td>
+            <th style="width:28px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">#</th>
+            <th style="text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Description of works</th>
+            <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</th>
+            <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Unit</th>
+            <th style="width:80px;text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Trade</th>
           </tr>
         </thead>
-        <tbody>
-          ${scopeRowsHtml}
-        </tbody>
       </table>
+
+      {/* Rooms and items */}
+      ${scopeRowsHtml}
     </div>
 
     <!-- Item 10 -->

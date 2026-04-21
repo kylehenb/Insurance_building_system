@@ -48,6 +48,7 @@ export function BlueprintTimelineView({
   const [dependencyMode, setDependencyMode] = useState<string | null>(null) // ID of bar waiting for predecessor selection
   const [parentMode, setParentMode] = useState<string | null>(null) // ID of bar waiting for parent selection
   const [dragDependencyMode, setDragDependencyMode] = useState<string | null>(null) // ID of bar being dragged for dependency creation
+  const [subColumnPositions, setSubColumnPositions] = useState<Map<string, number>>(new Map()) // Sub-column position for each work order (0 or 1)
   
   const placed = workOrders
     .filter(w => w.placementState !== 'unplaced')
@@ -73,13 +74,16 @@ export function BlueprintTimelineView({
   const bodyRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
-  // Calculate bar position based on sequence order (not dates)
-  // Support concurrent trades by grouping by sequence order
-  function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, concurrentOffset: number = 0): { left: number; width: number; top: number } {
+  // Calculate bar position based on sequence order and sub-column position
+  // Each sequence slot is split into 3 sub-columns, bars take 2 columns
+  function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, concurrentOffset: number = 0, subColumn: number = 0): { left: number; width: number; top: number } {
     const seq = (wo.sequence_order ?? totalPlaced) - 1
     const slotW = 1 / Math.max(totalPlaced, 1)
-    const left = seq * slotW
-    const width = Math.max(0.04, slotW * 0.6)
+    const subColW = slotW / 3
+    // Bars take 2 sub-columns, can be positioned at sub-column 0 or 1
+    const validSubCol = Math.min(subColumn, 1)
+    const left = seq * slotW + (validSubCol * subColW)
+    const width = Math.max(0.04, subColW * 2)
     const top = 6 + (concurrentOffset * 16) // Stack concurrent trades vertically
     return { left: Math.min(left, 0.96), width, top }
   }
@@ -137,7 +141,7 @@ export function BlueprintTimelineView({
         fill="none" stroke="${stroke}" stroke-width="2" ${dash}
         marker-end="url(#${marker})"
         class="dep-path" data-from="${predWo.id}" data-to="${wo.id}"
-        style="cursor: pointer;"/>`
+        style="cursor: pointer; pointer-events: stroke;"/>`
     })
 
     svg.innerHTML = defs + paths
@@ -650,21 +654,25 @@ export function BlueprintTimelineView({
 
                   {/* Timeline Track */}
                   <div style={{ flex: 1, position: 'relative', padding: '6px 8px' }}>
-                    {/* Grid lines */}
-                    {[0, 0.2, 0.4, 0.6, 0.8].map((p, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          left: `${p * 100}%`,
-                          width: 1,
-                          background: '#e8e4de',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    ))}
+                    {/* Grid lines - sub-columns */}
+                    {placed.map((wo, i) => {
+                      const seq = wo.sequence_order ?? i + 1
+                      const slotW = 1 / placed.length
+                      return [0, 1, 2, 3].map((subCol, j) => (
+                        <div
+                          key={`${i}-${j}`}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            left: `${(seq - 1) * slotW + (subCol * slotW / 3)}%`,
+                            width: 1,
+                            background: subCol === 0 ? '#ddd8d0' : '#f5f2ee',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      ))
+                    })}
 
                     {/* Bar */}
                     <div
@@ -807,7 +815,7 @@ export function BlueprintTimelineView({
             style={{
               position: 'absolute',
               inset: 0,
-              pointerEvents: 'auto',
+              pointerEvents: 'none',
               zIndex: 3,
               overflow: 'visible',
             }}
