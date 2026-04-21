@@ -53,7 +53,7 @@ interface ServiceAreaConfig {
 type BaseTenantRow = Database['public']['Tables']['tenants']['Row']
 type BaseTenantUpdate = Database['public']['Tables']['tenants']['Update']
 
-interface ExtendedTenantRow extends BaseTenantRow {
+interface ExtendedTenantRow extends Omit<BaseTenantRow, 'service_area_config'> {
   trading_name: string | null
   abn: string | null
   service_area_config: ServiceAreaConfig | null
