@@ -69,73 +69,32 @@ export function BlueprintTimelineView({
     }
   }, [placed, barPositions.size])
 
-  // Auto-assign swim lanes based on horizontal positions
-  const swimLanes = autoAssignSwimLanes(placed)
-
   const bodyRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
   // Calculate display sequence number based on horizontal position
-  // Leftmost bars get lower numbers, bars in same swim lane get same number if overlapping
+  // Leftmost bars get lower numbers
   function calculateDisplaySequence(wo: WorkOrderWithDetails, allPlaced: WorkOrderWithDetails[]): number {
     const thisPos = barPositions.get(wo.id)?.horizontal ?? 0
-    const thisSwimLane = swimLanes.get(wo.id) ?? 0
-    
+
     // Sort all bars by horizontal position
     const sorted = [...allPlaced].sort((a, b) => {
       const posA = barPositions.get(a.id)?.horizontal ?? 0
       const posB = barPositions.get(b.id)?.horizontal ?? 0
       return posA - posB
     })
-    
+
     // Find this bar's index in sorted order
     const index = sorted.findIndex(b => b.id === wo.id)
     return index + 1 // 1-based sequence
   }
 
-  // Auto-assign swim lanes to prevent overlaps
-  function autoAssignSwimLanes(workOrders: WorkOrderWithDetails[]): Map<string, number> {
-    const barWidth = 0.08
-    const lanes = new Map<string, number>()
-    const laneEnds: number[] = [] // Track where each lane ends (horizontal position)
-
-    // Sort by horizontal position
-    const sorted = [...workOrders].sort((a, b) => {
-      const posA = barPositions.get(a.id)?.horizontal ?? 0
-      const posB = barPositions.get(b.id)?.horizontal ?? 0
-      return posA - posB
-    })
-
-    sorted.forEach(wo => {
-      const horizontal = barPositions.get(wo.id)?.horizontal ?? 0
-      const left = horizontal
-      const right = horizontal + barWidth
-
-      // Find first available lane
-      let assignedLane = 0
-      for (let i = 0; i < laneEnds.length; i++) {
-        if (laneEnds[i] <= left) {
-          assignedLane = i
-          break
-        }
-        if (i === laneEnds.length - 1) {
-          assignedLane = laneEnds.length
-        }
-      }
-
-      lanes.set(wo.id, assignedLane)
-      laneEnds[assignedLane] = right
-    })
-
-    return lanes
-  }
-
-  // Calculate bar position based on horizontal position and swim lane
-  // Horizontal position is 0-1 (left to right), swim lane determines vertical stacking
+  // Calculate bar position based on horizontal position (single row)
+  // Horizontal position is 0-1 (left to right), all bars in single row
   function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, swimLane: number = 0, horizontal: number = 0): { left: number; width: number; top: number } {
     const barWidth = 0.08 // Fixed equal width for all bars
     const left = Math.max(0, Math.min(1 - barWidth, horizontal))
-    const top = 6 + (swimLane * 36) // Each swim lane is 36px tall
+    const top = 6 // Single row at top of timeline track
     return { left, width: barWidth, top }
   }
 
@@ -308,16 +267,11 @@ export function BlueprintTimelineView({
 
     const bodyRect = body.getBoundingClientRect()
     const dropX = e.clientX - bodyRect.left
-    const dropY = e.clientY - bodyRect.top
 
-    // Calculate horizontal position
+    // Calculate horizontal position only (single row)
     const horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
 
-    // Calculate swim lane based on vertical position
-    const swimLaneHeight = 36
-    const swimLane = Math.max(0, Math.floor((dropY - 6) / swimLaneHeight))
-
-    setDragPosition({ horizontal: horizontalPos, swimLane })
+    setDragPosition({ horizontal: horizontalPos, swimLane: 0 })
   }
 
   function handleDropOnTimeline(e: React.DragEvent) {
@@ -345,17 +299,13 @@ export function BlueprintTimelineView({
 
     // Use the calculated drag position if available, otherwise calculate from event
     let horizontalPos = dragPosition?.horizontal ?? 0
-    let swimLane = dragPosition?.swimLane ?? 0
 
     if (!dragPosition) {
       const body = bodyRef.current
       if (body) {
         const bodyRect = body.getBoundingClientRect()
         const dropX = e.clientX - bodyRect.left
-        const dropY = e.clientY - bodyRect.top
         horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
-        const swimLaneHeight = 36
-        swimLane = Math.max(0, Math.floor((dropY - 6) / swimLaneHeight))
       }
     }
 
@@ -375,7 +325,7 @@ export function BlueprintTimelineView({
       onPlace(draggingId)
     }
 
-    setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane }))
+    setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane: 0 }))
     handleDragEnd()
   }
 
@@ -525,8 +475,7 @@ export function BlueprintTimelineView({
               const color = getTradeColor(wo.tradeTypeLabel)
               const hasDate = wo.visits[0]?.scheduled_date
               const barPos = barPositions.get(wo.id) ?? { horizontal: 0, swimLane: 0 }
-              const swimLane = swimLanes.get(wo.id) ?? 0
-              const pos = estimateBarPos(wo, placed.length, swimLane, barPos.horizontal)
+              const pos = estimateBarPos(wo, placed.length, 0, barPos.horizontal)
 
               return (
                 <div
@@ -723,22 +672,6 @@ export function BlueprintTimelineView({
                     onDragOver={handleDragOverTimeline}
                     onDrop={handleDropOnTimeline}
                   >
-                    {/* Swim lane indicators */}
-                    {Array.from({ length: Math.max(swimLanes.size + 1, 3) }).map((_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: `${6 + (i * 36)}px`,
-                          height: i === 0 ? 36 : 0,
-                          borderTop: i > 0 ? '1px dashed #e8e4de' : 'none',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    ))}
-
                     {/* Ghost bar for drag feedback */}
                     {draggingId && dragPosition && (
                       <div
@@ -746,7 +679,7 @@ export function BlueprintTimelineView({
                           position: 'absolute',
                           left: `${dragPosition.horizontal * 100}%`,
                           width: '8%',
-                          top: `${6 + (dragPosition.swimLane * 36)}px`,
+                          top: 6,
                           height: 28,
                           borderRadius: 5,
                           background: 'rgba(26, 26, 26, 0.2)',
