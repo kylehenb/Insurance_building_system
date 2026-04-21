@@ -383,6 +383,12 @@ export default function TenantSettingsPage() {
         .upload(path, file, { upsert: true })
       if (error) throw error
       setProfileForm((prev) => ({ ...prev, logo_storage_path: path }))
+      // Auto-save to persist the path to database
+      await fetch('/api/settings/tenant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo_storage_path: path }),
+      })
     } catch (err) {
       console.error('Logo upload failed:', err)
     } finally {
@@ -402,6 +408,12 @@ export default function TenantSettingsPage() {
         .upload(path, file, { upsert: true })
       if (error) throw error
       setProfileForm((prev) => ({ ...prev, alternative_logo_storage_path: path }))
+      // Auto-save to persist the path to database
+      await fetch('/api/settings/tenant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alternative_logo_storage_path: path }),
+      })
     } catch (err) {
       console.error('Alternative logo upload failed:', err)
     } finally {
