@@ -5,6 +5,7 @@ import { type WorkOrderRow, woIsSent } from './types'
 import { useWorkOrders } from './useWorkOrders'
 import { BlueprintView } from './BlueprintView'
 import { BlueprintTimelineView } from './BlueprintTimelineView'
+import { FrappeGanttView } from './FrappeGanttView'
 import { GanttView, type GanttScale } from './GanttView'
 import { BottomPanel } from './BottomPanel'
 import { SendAllModal } from './SendAllModal'
@@ -227,7 +228,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         {/* ── Main panel ──────────────────────────────────────────────────── */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           {view === 'blueprint' ? (
-            <BlueprintTimelineView
+            <FrappeGanttView
               workOrders={workOrders}
               trades={trades}
               expandedIds={expandedIds}
