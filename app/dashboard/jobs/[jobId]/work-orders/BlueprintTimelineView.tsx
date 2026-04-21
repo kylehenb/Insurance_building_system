@@ -77,11 +77,11 @@ export function BlueprintTimelineView({
   // Support concurrent trades by grouping by sequence order
   function estimateBarPos(wo: WorkOrderWithDetails, totalPlaced: number, concurrentOffset: number = 0): { left: number; width: number; top: number } {
     const seq = (wo.sequence_order ?? totalPlaced) - 1
-    const slotW = 0.92 / Math.max(totalPlaced, 1)
-    const left = seq * slotW + 0.04
-    const width = Math.max(0.03, slotW * 0.7)
+    const slotW = 1 / Math.max(totalPlaced, 1)
+    const left = seq * slotW
+    const width = Math.max(0.04, slotW * 0.6)
     const top = 6 + (concurrentOffset * 16) // Stack concurrent trades vertically
-    return { left: Math.min(left, 0.92), width, top }
+    return { left: Math.min(left, 0.96), width, top }
   }
 
   // SVG dependency connectors
@@ -124,14 +124,16 @@ export function BlueprintTimelineView({
       const y1 = pR.top + pR.height / 2 - bRect.top
       const x2 = tR.left - bRect.left - 8
       const y2 = tR.top + tR.height / 2 - bRect.top
-      const mx = Math.min(x1 + 32, x2 - 4)
+      const mx = (x1 + x2) / 2
 
       const isDash = wo.is_concurrent
       const stroke = isDash ? '#9ca3af' : '#1a1a1a'
       const dash = isDash ? 'stroke-dasharray="4,4"' : ''
       const marker = isDash ? 'arr-concurrent' : 'arr-solid'
 
-      paths += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
+      // Orthogonal routing with rounded corners
+      const cornerRadius = 6
+      paths += `<path d="M${x1},${y1} L${mx - cornerRadius},${y1} Q${mx},${y1} ${mx},${y1 + cornerRadius} L${mx},${y2 - cornerRadius} Q${mx},${y2} ${mx + cornerRadius},${y2} L${x2},${y2}"
         fill="none" stroke="${stroke}" stroke-width="2" ${dash}
         marker-end="url(#${marker})"
         class="dep-path" data-from="${predWo.id}" data-to="${wo.id}"
@@ -151,11 +153,25 @@ export function BlueprintTimelineView({
       })
       path.addEventListener('mouseenter', () => {
         path.setAttribute('stroke-width', '3')
+        path.setAttribute('cursor', 'pointer')
       })
       path.addEventListener('mouseleave', () => {
         path.setAttribute('stroke-width', '2')
+        path.setAttribute('cursor', 'pointer')
       })
     })
+
+    // Add click handler to SVG to catch clicks on paths
+    svg.onclick = (e) => {
+      const target = e.target as SVGElement
+      if (target.classList.contains('dep-path')) {
+        e.stopPropagation()
+        const toId = target.getAttribute('data-to')
+        if (toId) {
+          handleClearDependency(toId)
+        }
+      }
+    }
   }, [placed])
 
   // Drag handlers
@@ -252,6 +268,15 @@ export function BlueprintTimelineView({
 
     const wo = workOrders.find(w => w.id === draggingId)
     if (!wo) { handleDragEnd(); return }
+
+    // Check if dropping for concurrent placement (Shift key or vertical alignment)
+    const targetWo = placed[laneIndex]
+    if (targetWo && e.shiftKey) {
+      // Make concurrent with target
+      onUpdate(wo.id, { sequence_order: targetWo.sequence_order })
+      handleDragEnd()
+      return
+    }
 
     if (wo.placementState === 'unplaced') {
       // Moving from unplaced to placed
@@ -674,12 +699,12 @@ export function BlueprintTimelineView({
                         fontWeight: 500,
                         cursor: (dependencyMode || parentMode) ? 'pointer' : 'pointer',
                         background: hasDate ? color : `${color}15`,
-                        border: 
+                        border:
                           parentMode && parentMode !== wo.id ? `2px solid #c9a96e` :
                           dependencyMode && dependencyMode !== wo.id ? `2px solid #1a1a1a` :
                           (hasDate ? `1px solid ${color}` : `1px dashed ${color}`),
                         color: hasDate ? '#fff' : color,
-                        opacity: 
+                        opacity:
                           (dependencyMode && dependencyMode === wo.id) ||
                           (parentMode && parentMode === wo.id) ? 0.5 : 1,
                       }}
@@ -704,6 +729,37 @@ export function BlueprintTimelineView({
                           Unscheduled
                         </span>
                       )}
+
+                      {/* Dependency drag handle */}
+                      <div
+                        draggable
+                        onDragStart={e => {
+                          e.stopPropagation()
+                          setDragDependencyMode(wo.id)
+                          e.dataTransfer.effectAllowed = 'link'
+                          e.dataTransfer.setData('text/plain', 'dependency')
+                        }}
+                        onDragEnd={() => {
+                          setDragDependencyMode(null)
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: -8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 12,
+                          height: 12,
+                          borderRadius: 2,
+                          background: '#1a1a1a',
+                          cursor: 'crosshair',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        title="Drag to create dependency"
+                      >
+                        <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>→</span>
+                      </div>
                     </div>
 
                     {/* Line Items Dropdown */}
@@ -751,7 +807,7 @@ export function BlueprintTimelineView({
             style={{
               position: 'absolute',
               inset: 0,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
               zIndex: 3,
               overflow: 'visible',
             }}

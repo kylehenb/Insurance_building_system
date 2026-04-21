@@ -2513,6 +2513,54 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           {sowLoading === q.id ? 'Opening...' : 'Scope of Works Authorisation'}
                         </span>
                       </button>
+                      {/* Building Contract - only show for approved quotes */}
+                      {(q.status === 'approved_contracts_pending' ||
+                        q.status === 'approved_contracts_sent' ||
+                        q.status === 'approved_contracts_signed') && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setSowLoading(q.id)
+                            setMenuDropdownId(null)
+                            // Open print version in new tab (without sidebar)
+                            window.open(`/print/quotes/${q.id}/building-contract`, '_blank')
+                            // Clear loading state after a short delay
+                            setTimeout(() => setSowLoading(null), 500)
+                          }}
+                          disabled={sowLoading === q.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '7px 14px',
+                            fontSize: 12,
+                            color: sowLoading === q.id ? '#9e998f' : '#3a3530',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: sowLoading === q.id ? 'default' : 'pointer',
+                            fontWeight: 400,
+                            fontFamily: 'DM Sans, sans-serif',
+                            transition: 'background 0.1s',
+                            opacity: sowLoading === q.id ? 0.7 : 1,
+                          }}
+                          onMouseEnter={e => {
+                            if (sowLoading !== q.id)
+                              (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                          }}
+                        >
+                          <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                            {sowLoading === q.id ? '⏳' : '📋'}
+                          </span>
+                          <span>
+                            {sowLoading === q.id ? 'Opening...' : 'Building Contract'}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
