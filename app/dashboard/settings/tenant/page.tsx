@@ -86,6 +86,7 @@ interface ProfileFormData {
   job_prefix: string
   job_sequence: number
   contact_email: string
+  accounts_email: string
   contact_phone: string
   address: string
   logo_storage_path: string
@@ -108,6 +109,7 @@ interface TenantApiResponse {
     job_sequence: number | null
     address: string | null
     contact_email: string | null
+    accounts_email: string | null
     contact_phone: string | null
     logo_storage_path: string | null
     alternative_logo_storage_path: string | null
@@ -144,6 +146,7 @@ const EMPTY_PROFILE: ProfileFormData = {
   job_prefix: '',
   job_sequence: 1,
   contact_email: '',
+  accounts_email: '',
   contact_phone: '',
   address: '',
   logo_storage_path: '',
@@ -268,6 +271,7 @@ export default function TenantSettingsPage() {
           job_prefix: t.job_prefix ?? '',
           job_sequence: t.job_sequence ?? 1,
           contact_email: t.contact_email ?? '',
+          accounts_email: t.accounts_email ?? '',
           contact_phone: t.contact_phone ?? '',
           address: t.address ?? '',
           logo_storage_path: t.logo_storage_path ?? '',
@@ -329,6 +333,7 @@ export default function TenantSettingsPage() {
           job_prefix: profileForm.job_prefix.toUpperCase(),
           job_sequence: profileForm.job_sequence,
           contact_email: profileForm.contact_email || null,
+          accounts_email: profileForm.accounts_email || null,
           contact_phone: profileForm.contact_phone || null,
           address: profileForm.address || null,
           logo_storage_path: profileForm.logo_storage_path || null,
@@ -752,10 +757,10 @@ export default function TenantSettingsPage() {
                     )}
                   </div>
 
-                  {/* Contact email */}
+                  {/* Primary email */}
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
-                      Contact email
+                      Primary Email
                     </label>
                     <input
                       type="email"
@@ -763,6 +768,22 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, contact_email: e.target.value }))
                       }
+                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                    />
+                  </div>
+
+                  {/* Accounts email */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                      Accounts Email
+                    </label>
+                    <input
+                      type="email"
+                      value={profileForm.accounts_email}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({ ...prev, accounts_email: e.target.value }))
+                      }
+                      placeholder="For invoices and payments"
                       className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                     />
                   </div>

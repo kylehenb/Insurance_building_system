@@ -35,8 +35,6 @@ export async function GET(req: NextRequest) {
     url.searchParams.set('key', apiKey)
     url.searchParams.set('components', 'country:au')
     url.searchParams.set('language', 'en')
-    // Bias toward addresses but allow establishment/locality names too
-    url.searchParams.set('types', 'geocode')
 
     const res = await fetch(url.toString())
     if (!res.ok) {

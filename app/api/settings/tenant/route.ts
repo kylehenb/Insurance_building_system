@@ -66,6 +66,7 @@ interface TenantPatchBody {
   job_prefix?: string
   job_sequence?: number | null
   contact_email?: string | null
+  accounts_email?: string | null
   contact_phone?: string | null
   address?: string | null
   logo_storage_path?: string | null
@@ -142,6 +143,7 @@ export async function PATCH(req: NextRequest) {
       'job_prefix',
       'job_sequence',
       'contact_email',
+      'accounts_email',
       'contact_phone',
       'address',
       'logo_storage_path',
