@@ -379,7 +379,7 @@ export function JobDetailShell({
 
       {/* ── Tab content ───────────────────────────────────────── */}
       {activeTab === 'work-orders' ? (
-        <div style={{ height: 'calc(100vh - 200px)', overflow: 'hidden' }}>
+        <div style={{ height: 'auto', overflow: 'auto' }}>
           <WorkOrdersTab jobId={jobId} tenantId={tenantId} />
         </div>
       ) : (
