@@ -605,22 +605,23 @@ export function BlueprintView({
 
       <DragOverlay>
         {activeWo && (
-          <WorkOrderCard
-            wo={activeWo}
-            isExpanded={false}
-            onToggleExpand={() => {}}
-            onPlace={() => {}}
-            onUnplace={() => {}}
-            onSendOne={() => {}}
-            onCancel={() => {}}
-            onUpdate={() => {}}
-            onAddVisit={() => {}}
-            onSetPredecessor={() => {}}
-            trades={trades}
-            allPlacedOrders={allPlaced}
-            onDragStart={() => {}}
-            onDragEnd={() => {}}
-          />
+          <div
+            style={{
+              padding: '12px 16px',
+              background: '#fff',
+              border: '1px solid #c9a96e',
+              borderRadius: 8,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+              minWidth: 250,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a' }}>
+              {activeWo.trade?.business_name ?? 'No contractor'}
+            </div>
+            <div style={{ fontSize: 10, color: '#9a9590', marginTop: 2 }}>
+              {activeWo.tradeTypeLabel || activeWo.work_type}
+            </div>
+          </div>
         )}
       </DragOverlay>
     </div>
