@@ -802,15 +802,25 @@ export default function TenantSettingsPage() {
                     <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
                       Logo
                     </label>
-                    <div className="flex items-center gap-4">
-                      {logoDisplayUrl && (
-                        <img
-                          src={logoDisplayUrl}
-                          alt="Company logo"
-                          className="h-12 w-auto border border-[#e8e4e0] rounded object-contain bg-white p-1"
-                        />
+                    <div className="flex items-start gap-6">
+                      {logoDisplayUrl ? (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={logoDisplayUrl}
+                            alt="Company logo"
+                            className="h-24 w-auto border border-[#e8e4e0] rounded-lg object-contain bg-white p-2 shadow-sm"
+                            onError={(e) => {
+                              console.error('Failed to load logo image:', logoDisplayUrl)
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-[#e8e4e0] rounded-lg bg-[#f5f2ee] flex items-center justify-center">
+                          <span className="text-xs text-[#9e998f]">No logo</span>
+                        </div>
                       )}
-                      <div>
+                      <div className="flex-1">
                         <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-[#3a3530] border border-[#e8e4e0] rounded px-3 py-1.5 hover:bg-[#f5f2ee] transition-colors">
                           {logoUploading ? 'Uploading...' : logoDisplayUrl ? 'Replace logo' : 'Upload logo'}
                           <input
@@ -824,6 +834,11 @@ export default function TenantSettingsPage() {
                         <p className="text-xs text-[#9e998f] mt-1">
                           PNG, JPG or SVG. Stored to tenant-assets bucket.
                         </p>
+                        {profileForm.logo_storage_path && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Logo uploaded and saved
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -833,15 +848,25 @@ export default function TenantSettingsPage() {
                     <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
                       Alternative Logo
                     </label>
-                    <div className="flex items-center gap-4">
-                      {alternativeLogoDisplayUrl && (
-                        <img
-                          src={alternativeLogoDisplayUrl}
-                          alt="Alternative company logo"
-                          className="h-12 w-auto border border-[#e8e4e0] rounded object-contain bg-white p-1"
-                        />
+                    <div className="flex items-start gap-6">
+                      {alternativeLogoDisplayUrl ? (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={alternativeLogoDisplayUrl}
+                            alt="Alternative company logo"
+                            className="h-24 w-auto border border-[#e8e4e0] rounded-lg object-contain bg-white p-2 shadow-sm"
+                            onError={(e) => {
+                              console.error('Failed to load alternative logo image:', alternativeLogoDisplayUrl)
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-[#e8e4e0] rounded-lg bg-[#f5f2ee] flex items-center justify-center">
+                          <span className="text-xs text-[#9e998f]">No logo</span>
+                        </div>
                       )}
-                      <div>
+                      <div className="flex-1">
                         <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-[#3a3530] border border-[#e8e4e0] rounded px-3 py-1.5 hover:bg-[#f5f2ee] transition-colors">
                           {alternativeLogoUploading ? 'Uploading...' : alternativeLogoDisplayUrl ? 'Replace alternative logo' : 'Upload alternative logo'}
                           <input
@@ -855,6 +880,11 @@ export default function TenantSettingsPage() {
                         <p className="text-xs text-[#9e998f] mt-1">
                           Optional secondary logo (e.g., for dark mode or specialized documents).
                         </p>
+                        {profileForm.alternative_logo_storage_path && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Alternative logo uploaded and saved
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

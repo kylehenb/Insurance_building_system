@@ -8,7 +8,12 @@ type Tenant = Database['public']['Tables']['tenants']['Row']
 export function generateInvoiceHtml(params: {
   invoice: Invoice
   job: Job
-  tenant: Tenant
+  tenant: Tenant & {
+    bank_name?: string | null
+    bsb?: string | null
+    account_number?: string | null
+    account_name?: string | null
+  }
   lineItems: InvoiceLineItem[]
 }): string {
   const { invoice, job, tenant, lineItems } = params
@@ -28,9 +33,8 @@ export function generateInvoiceHtml(params: {
   }
 
   const issueDateDisplay = formatDate(invoice.issued_date || invoice.created_at)
-  const dueDateDisplay = invoice.issued_date 
-    ? formatDate(new Date(new Date(invoice.issued_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString())
-    : 'Due within 14 days'
+  const baseDate = invoice.issued_date || invoice.created_at || ''
+  const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString())
 
   // Build line items table HTML
   const lineItemsHtml = lineItems.map((item, idx) => `
@@ -41,16 +45,6 @@ export function generateInvoiceHtml(params: {
       <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:#1a1a1a;">${fmt(item.line_total)}</td>
     </tr>
   `).join('')
-
-  // Payment details - placeholders for data not yet in system
-  const paymentDetails = {
-    bankName: 'PLACEHOLDER: Bank Name',
-    bsb: 'PLACEHOLDER: BSB',
-    accountNumber: 'PLACEHOLDER: Account Number',
-    accountName: 'PLACEHOLDER: Account Name',
-    paymentTerms: 'Payment due within 14 days of invoice date',
-    abn: 'PLACEHOLDER: ABN',
-  }
 
   return `<!DOCTYPE html>
 <html>
@@ -69,32 +63,11 @@ export function generateInvoiceHtml(params: {
   <div style="display:flex;align-items:stretch;background:white;">
     <div style="width:148px;min-width:148px;padding:14px 8px 14px 20px;
       border-right:1px solid #e0dbd4;">
+      <img src="/logo-alt.png" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;
-        color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">
-        INSURANCE REPAIR CO
-      </div>
+        color:#9e998f;font-weight:700;white-space:nowrap;">INSURANCE REPAIR CO</div>
     </div>
     <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:7px;">BILL TO</div>
-      ${job.insurer ? `<div style="font-size:16px;font-weight:600;color:#1a1a1a;
-        margin-bottom:2px;">${job.insurer}</div>` : ''}
-      ${job.property_address ? `<div style="font-size:13px;color:#9e998f;
-        margin-bottom:10px;">${job.property_address}</div>` : ''}
-      <div style="display:flex;flex-wrap:wrap;font-size:12px;">
-        ${[
-          { label: 'Job #', value: job.job_number },
-          { label: 'Claim #', value: job.claim_number },
-          { label: 'Insured', value: job.insured_name },
-        ].map((field, i, arr) => `
-          <span style="padding-right:8px;margin-right:8px;
-            border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
-            <span style="color:#b0a89e;">${field.label}: </span>
-            <span style="color:#3a3530;">${field.value || '—'}</span>
-          </span>`).join('')}
-      </div>
-    </div>
-    <div style="width:184px;min-width:184px;padding:14px 20px 14px 16px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:7px;">INVOICE DETAILS</div>
       <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
@@ -109,6 +82,21 @@ export function generateInvoiceHtml(params: {
         Due Date</div>
       <div style="font-size:13px;color:#3a3530;">
         ${dueDateDisplay}</div>
+    </div>
+    <div style="width:184px;min-width:184px;padding:14px 20px 14px 16px;">
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:7px;">CONTACT</div>
+      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px;">Kyle Bindon</div>
+      <div style="font-size:12px;color:#9e998f;margin-bottom:2px;">kyle@insurancerepairco.com.au</div>
+      <div style="font-size:12px;color:#9e998f;margin-bottom:2px;">0431 132 077</div>
+      <div style="display:flex;gap:4px;margin-top:8px;">
+        <span style="font-size:9.5px;background:#f5f2ee;color:#6a6460;
+          border:1px solid #e0dbd4;border-radius:3px;padding:2px 6px;
+          font-weight:700;">BC105884</span>
+        <span style="font-size:9.5px;background:#f5f2ee;color:#6a6460;
+          border:1px solid #e0dbd4;border-radius:3px;padding:2px 6px;
+          font-weight:700;">IICRC Certified</span>
+      </div>
     </div>
   </div>
 
@@ -125,17 +113,25 @@ export function generateInvoiceHtml(params: {
   <!-- BODY -->
   <div style="padding:14px 20px 0;">
 
-    <!-- Invoice Type Note -->
+    <!-- Invoice To Section -->
     <div style="margin-bottom:14px;">
-      <div style="background:#f5f2ee;border-radius:6px;padding:10px 14px;
-        display:flex;align-items:center;gap:10px;">
-        <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-          color:#b0a89e;font-weight:700;">
-          INVOICE TYPE
-        </div>
-        <div style="font-size:12px;color:#1a1a1a;font-weight:600;text-transform:capitalize;">
-          ${invoice.invoice_type} ${invoice.direction === 'outbound' ? '(Accounts Receivable)' : '(Accounts Payable)'}
-        </div>
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:6px;">INVOICE TO</div>
+      ${job.insurer ? `<div style="font-size:16px;font-weight:600;color:#1a1a1a;
+        margin-bottom:2px;">${job.insurer}</div>` : ''}
+      ${job.property_address ? `<div style="font-size:13px;color:#9e998f;
+        margin-bottom:10px;">${job.property_address}</div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;font-size:12px;">
+        ${[
+          { label: 'Job #', value: job.job_number },
+          { label: 'Claim #', value: job.claim_number },
+          { label: 'Insured', value: job.insured_name },
+        ].map((field, i, arr) => `
+          <span style="padding-right:8px;margin-right:8px;
+            border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
+            <span style="color:#b0a89e;">${field.label}: </span>
+            <span style="color:#3a3530;">${field.value || '—'}</span>
+          </span>`).join('')}
       </div>
     </div>
 
@@ -194,28 +190,33 @@ export function generateInvoiceHtml(params: {
           <div>
             <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
               color:#b0a89e;font-weight:700;margin-bottom:2px;">BANK</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${paymentDetails.bankName}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.bank_name || '—'}</div>
           </div>
           <div>
             <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
               color:#b0a89e;font-weight:700;margin-bottom:2px;">BSB</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${paymentDetails.bsb}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.bsb || '—'}</div>
           </div>
           <div>
             <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
               color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NUMBER</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${paymentDetails.accountNumber}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_number || '—'}</div>
           </div>
           <div>
             <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
               color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NAME</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${paymentDetails.accountName}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_name || '—'}</div>
           </div>
         </div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
           <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
+            color:#b0a89e;font-weight:700;margin-bottom:2px;">REFERENCE</div>
+          <div style="font-size:11px;color:#3a3530;">Please use invoice reference: ${invoice.invoice_ref || invoice.id}</div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
+          <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
             color:#b0a89e;font-weight:700;margin-bottom:2px;">PAYMENT TERMS</div>
-          <div style="font-size:11px;color:#3a3530;">${paymentDetails.paymentTerms}</div>
+          <div style="font-size:11px;color:#3a3530;">Payment due within 14 days of invoice date</div>
         </div>
       </div>
     </div>
@@ -231,34 +232,6 @@ export function generateInvoiceHtml(params: {
       </div>
     </div>
 
-    <!-- Contact Information -->
-    <div style="margin-bottom:6px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">CONTACT INFORMATION</div>
-      <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">BUSINESS ADDRESS</div>
-            <div style="font-size:11px;color:#3a3530;">${tenant.address || 'PLACEHOLDER: Business Address'}</div>
-          </div>
-          <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">CONTACT</div>
-            <div style="font-size:11px;color:#3a3530;">
-              ${tenant.contact_email || 'PLACEHOLDER: Email'}<br/>
-              ${tenant.contact_phone || 'PLACEHOLDER: Phone'}
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
-          <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-            color:#b0a89e;font-weight:700;margin-bottom:2px;">ABN</div>
-          <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${paymentDetails.abn}</div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- FOOTER -->
@@ -269,12 +242,12 @@ export function generateInvoiceHtml(params: {
       font-size:9px;font-weight:800;color:#c8b89a;font-style:italic;">IRC.</div>
     <div>
       <div style="font-size:7.5px;font-weight:700;letter-spacing:1.5px;
-        text-transform:uppercase;color:#f5f2ee;">INSURANCE REPAIR CO PTY LTD</div>
+        text-transform:uppercase;color:#f5f2ee;">${tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}</div>
       <div style="font-size:10px;color:#c8b89a;">Building &amp; Restoration</div>
     </div>
     <div style="width:1px;height:22px;background:#c8b89a;margin:0 4px;
       flex-shrink:0;"></div>
-    <span style="font-size:12px;color:#c8b89a;">BC105884 · IICRC Certified</span>
+    <span style="font-size:12px;color:#c8b89a;">${tenant.abn || '—'} · BC105884 · IICRC Certified</span>
     <div style="flex:1;"></div>
   </div>
 

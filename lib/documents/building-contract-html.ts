@@ -449,7 +449,6 @@ export function generateBuildingContractHtml(params: {
   <div class="page-footer">
     <span>DOC-${job.job_number || ''}</span>
     <span>Insurance Repair Co Pty Ltd &nbsp;ABN 12 686 067 881 &nbsp;WA Lic. BC105884</span>
-    <span>Page 1</span>
   </div>
 </div>
 

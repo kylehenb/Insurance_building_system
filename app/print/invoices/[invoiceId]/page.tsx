@@ -87,7 +87,12 @@ export default async function InvoicePrintPage({
   const html = generateInvoiceHtml({
     invoice,
     job,
-    tenant,
+    tenant: tenant as Tenant & {
+      bank_name?: string | null
+      bsb?: string | null
+      account_number?: string | null
+      account_name?: string | null
+    },
     lineItems: lineItems || [],
   })
 
