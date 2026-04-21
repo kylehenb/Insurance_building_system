@@ -47,14 +47,22 @@ export function FrappeGanttView({
   const [unplacedCollapsed, setUnplacedCollapsed] = useState(true)
 
   const placed = workOrders
-    .filter(w => w.placementState !== 'unplaced' && w.visits[0]?.scheduled_date)
+    .filter(w => w.placementState !== 'unplaced')
     .sort((a, b) => (a.sequence_order ?? 999) - (b.sequence_order ?? 999))
   const unplaced = workOrders.filter(w => w.placementState === 'unplaced')
 
   // Map work orders to Frappe Gantt format
   const ganttTasks = placed.map(wo => {
     const visit = wo.visits[0]
-    const startDate = visit?.scheduled_date ? new Date(visit.scheduled_date) : new Date()
+    let startDate: Date
+    if (visit?.scheduled_date) {
+      startDate = new Date(visit.scheduled_date)
+    } else {
+      // For unscheduled work orders, use sequence order to space them out
+      const seqOffset = (wo.sequence_order ?? 1) - 1
+      startDate = new Date()
+      startDate.setDate(startDate.getDate() + seqOffset)
+    }
     const durationHours = wo.estimated_hours || 4
     const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000)
 
