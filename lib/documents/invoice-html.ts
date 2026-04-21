@@ -72,24 +72,39 @@ export function generateInvoiceHtml(params: {
     <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:7px;">INVOICE DETAILS</div>
-      <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
-        Invoice to</div>
-      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:6px;">
-        ${job.insurer || '—'}</div>
-      <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
-        Invoice Number</div>
-      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:6px;">
-        ${invoice.invoice_ref || 'Draft'}</div>
-      <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
-        Invoice Date</div>
-      <div style="font-size:13px;color:#3a3530;margin-bottom:6px;">
-        ${issueDateDisplay}</div>
-      <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
-        Due Date</div>
-      <div style="font-size:13px;color:#3a3530;">
-        ${dueDateDisplay}</div>
-    </div>
-    <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+            Invoice to</div>
+          <div style="font-size:14px;font-weight:600;color:#1a1a1a;">
+            ${job.insurer || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+            Invoice Number</div>
+          <div style="font-size:14px;font-weight:600;color:#1a1a1a;">
+            ${invoice.invoice_ref || 'Draft'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">
+        <div>
+          <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+            Invoice Date</div>
+          <div style="font-size:13px;color:#3a3530;">
+            ${issueDateDisplay}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+            Due Date</div>
+          <div style="font-size:13px;color:#3a3530;">
+            ${dueDateDisplay}</div>
+        </div>
+      </div>
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-top:12px;margin-bottom:7px;">JOB DETAILS</div>
+      ${job.insurer ? `<div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+        Insurer</div>
+      <div style="font-size:13px;color:#3a3530;margin-bottom:6px;">${job.insurer}</div>` : ''}
       ${job.property_address ? `<div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
         Property Address</div>
       <div style="font-size:13px;color:#3a3530;margin-bottom:6px;">${job.property_address}</div>` : ''}
@@ -121,7 +136,7 @@ export function generateInvoiceHtml(params: {
     <span style="font-size:15px;font-weight:700;color:#1a1a1a;font-family:monospace;
       letter-spacing:-0.5px;">${invoice.invoice_ref || 'DRAFT'}</span>
     <span style="position:absolute;left:50%;transform:translateX(-50%);
-      font-size:16px;font-weight:700;color:#9e998f;text-transform:uppercase;
+      font-size:22px;font-weight:700;color:#9e998f;text-transform:uppercase;
       letter-spacing:2px;white-space:nowrap;">TAX INVOICE</span>
   </div>
 
@@ -179,7 +194,7 @@ export function generateInvoiceHtml(params: {
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:8px;">PAYMENT DETAILS</div>
       <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div>
             <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
               color:#b0a89e;font-weight:700;margin-bottom:2px;">BANK</div>
@@ -198,11 +213,11 @@ export function generateInvoiceHtml(params: {
               color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NUMBER</div>
             <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_number || '—'}</div>
           </div>
-          <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NAME</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_name || '—'}</div>
-          </div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
+          <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
+            color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NAME</div>
+          <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_name || '—'}</div>
         </div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
           <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
