@@ -92,6 +92,7 @@ export default async function InvoicePrintPage({
       bsb?: string | null
       account_number?: string | null
       account_name?: string | null
+      building_licence_number?: string | null
     },
     lineItems: lineItems || [],
   })

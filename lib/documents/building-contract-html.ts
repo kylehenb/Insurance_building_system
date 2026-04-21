@@ -495,7 +495,7 @@ export function generateBuildingContractHtml(params: {
       <tr><td colspan="2" class="section-header">Item 2 - CONTRACTOR</td></tr>
       <tr><td class="label">CONTRACTOR NAME:</td><td class="value">Insurance Repair Co Pty Ltd</td></tr>
       <tr><td class="label">ABN No:</td><td class="value">12 686 067 881 &nbsp;&nbsp; Licence No: BC105884</td></tr>
-      <tr><td class="label">Postal Address:</td><td class="value">20 Roche Road, Duncraig, WA 6023</td></tr>
+      <tr><td class="label">Postal Address:</td><td class="value">Level 28, 140 St Georges Terrace, Perth, WA 6000</td></tr>
       <tr><td class="label">Phone:</td><td class="value">0431 132 077</td></tr>
       <tr><td class="label">Email:</td><td class="value">office@insurancerepairco.com.au</td></tr>
     </table>
