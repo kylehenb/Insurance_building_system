@@ -5,6 +5,118 @@ import { createBrowserClient } from '@supabase/ssr'
 import { type WorkOrderWithDetails, type WorkOrderRow, type TradeRow, woIsSent } from './types'
 import { WorkOrderCard } from './WorkOrderCard'
 import type { BlueprintDraftData } from '@/lib/types/scheduling'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useDroppable } from '@dnd-kit/core'
+
+// ─── SortableWorkOrderCard wrapper ─────────────────────────────────────────────
+function SortableWorkOrderCard({
+  wo,
+  isExpanded,
+  onToggleExpand,
+  onPlace,
+  onUnplace,
+  onSendOne,
+  onCancel,
+  onUpdate,
+  onAddVisit,
+  onSetPredecessor,
+  trades,
+  allPlacedOrders,
+}: {
+  wo: WorkOrderWithDetails
+  isExpanded: boolean
+  onToggleExpand: () => void
+  onPlace: () => void
+  onUnplace: () => void
+  onSendOne: () => void
+  onCancel: () => void
+  onUpdate: (u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
+  onAddVisit: () => void
+  onSetPredecessor: (predId: string | null, isConcurrent: boolean) => void
+  trades: TradeRow[]
+  allPlacedOrders: WorkOrderWithDetails[]
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: wo.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <WorkOrderCard
+        wo={wo}
+        isExpanded={isExpanded}
+        onToggleExpand={onToggleExpand}
+        onPlace={onPlace}
+        onUnplace={onUnplace}
+        onSendOne={onSendOne}
+        onCancel={onCancel}
+        onUpdate={onUpdate}
+        onAddVisit={onAddVisit}
+        onSetPredecessor={onSetPredecessor}
+        trades={trades}
+        allPlacedOrders={allPlacedOrders}
+        onDragStart={() => {}}
+        onDragEnd={() => {}}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  )
+}
+
+// ─── Droppable column wrapper ───────────────────────────────────────────────────
+function DroppableColumn({
+  id,
+  children,
+  style,
+}: {
+  id: string
+  children: React.ReactNode
+  style?: React.CSSProperties
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        outline: isOver ? '2px dashed #c9a96e' : undefined,
+        outlineOffset: isOver ? -4 : undefined,
+        borderRadius: isOver ? 4 : undefined,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 export interface BlueprintViewProps {
   workOrders:    WorkOrderWithDetails[]
@@ -41,14 +153,22 @@ export function BlueprintView({
   tenantId,
   onDraftGenerated,
 }: BlueprintViewProps) {
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOverCol, setDragOverCol] = useState<'unplaced' | 'placed' | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const dragOverIndexRef = useRef<number | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [blueprintDraft, setBlueprintDraft] = useState<BlueprintDraftData | null>(null)
   const [blueprintId, setBlueprintId] = useState<string | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   const supabase = useRef(createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -163,109 +283,108 @@ export function BlueprintView({
     }
   }
 
-  // ── Drag handlers ───────────────────────────────────────────────────────────
-  function handleDragStart(e: React.DragEvent<HTMLDivElement>, id: string) {
-    setDraggingId(id)
-    e.dataTransfer.effectAllowed = 'move'
-    // Fade card
-    setTimeout(() => {
-      const el = document.getElementById(`wo-card-${id}`)
-      if (el) el.style.opacity = '0.35'
-    }, 0)
+  // ── dnd-kit drag handlers ───────────────────────────────────────────────────
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string)
   }
 
-  function handleDragEnd() {
-    if (draggingId) {
-      const el = document.getElementById(`wo-card-${draggingId}`)
-      if (el) el.style.opacity = ''
-    }
-    setDraggingId(null)
-    setDragOverCol(null)
-    setDragOverIndex(null)
-    dragOverIndexRef.current = null
-  }
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    const activeId = active.id as string
+    const overId = over?.id as string | undefined
 
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>, col: 'unplaced' | 'placed') {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverCol(col)
-  }
+    setActiveId(null)
 
-  function handleDragOverCard(e: React.DragEvent<HTMLDivElement>, idx: number) {
-    e.preventDefault()
-    e.stopPropagation()
-    dragOverIndexRef.current = idx
-    setDragOverIndex(idx)
-  }
+    if (!overId) return
 
-  function handleDragLeave(col: 'unplaced' | 'placed') {
-    setDragOverCol(prev => (prev === col ? null : prev))
-  }
+    const activeWo = workOrders.find(w => w.id === activeId)
+    if (!activeWo) return
 
-  function handleDropUnplaced(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    if (!draggingId) return
-    const wo = workOrders.find(w => w.id === draggingId)
-    if (!wo) { handleDragEnd(); return }
+    const overWo = workOrders.find(w => w.id === overId)
 
-    if (woIsSent(wo)) {
-      alert('Cannot unplace a sent work order. Use Cancel if needed.')
-      handleDragEnd()
+    // Check if dropping on unplaced column
+    if (overId === 'unplaced-column') {
+      if (woIsSent(activeWo)) {
+        alert('Cannot unplace a sent work order. Use Cancel if needed.')
+        return
+      }
+      onUnplace(activeId)
       return
     }
 
-    onUnplace(draggingId)
-    handleDragEnd()
-  }
-
-  function handleDropPlaced(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    if (!draggingId) return
-    const wo = workOrders.find(w => w.id === draggingId)
-    if (!wo) { handleDragEnd(); return }
-
-    const insertIdx = dragOverIndexRef.current
-
-    if (wo.placementState === 'unplaced') {
-      // Moving from unplaced → placed: validate gate
-      if (!wo.trade_id) {
-        alert('Cannot place: Select a contractor first')
-        handleDragEnd()
-        return
+    // Check if dropping on placed column
+    if (overId === 'placed-column') {
+      if (activeWo.placementState === 'unplaced') {
+        // Validate gate
+        if (!activeWo.trade_id) {
+          alert('Cannot place: Select a contractor first')
+          return
+        }
+        if (!(activeWo.estimated_hours && activeWo.estimated_hours > 0)) {
+          alert('Cannot place: Set estimated hours first')
+          return
+        }
+        onPlace(activeId)
       }
-      if (!(wo.estimated_hours && wo.estimated_hours > 0)) {
-        alert('Cannot place: Set estimated hours first')
-        handleDragEnd()
-        return
-      }
-
-      // Insert at position or end
-      if (insertIdx !== null) {
-        const newOrder = [...placed.map(p => p.id)]
-        newOrder.splice(insertIdx, 0, draggingId)
-        onReorder(newOrder)
-      } else {
-        const maxSeq = Math.max(0, ...placed.map(p => p.sequence_order ?? 0))
-        onPlace(draggingId)
-        // onPlace will use the next seq, but reorder call will normalise it
-        void maxSeq
-      }
-    } else {
-      // Reordering within placed
-      if (insertIdx !== null) {
-        const withoutDragging = placed.filter(p => p.id !== draggingId)
-        withoutDragging.splice(insertIdx, 0, wo)
-        onReorder(withoutDragging.map(p => p.id))
-      }
+      return
     }
 
-    handleDragEnd()
+    // Reordering within a column
+    if (overWo) {
+      const activeIsPlaced = activeWo.placementState !== 'unplaced'
+      const overIsPlaced = overWo.placementState !== 'unplaced'
+
+      // Moving between columns
+      if (activeIsPlaced !== overIsPlaced) {
+        if (overIsPlaced) {
+          // Moving to placed
+          if (!activeWo.trade_id) {
+            alert('Cannot place: Select a contractor first')
+            return
+          }
+          if (!(activeWo.estimated_hours && activeWo.estimated_hours > 0)) {
+            alert('Cannot place: Set estimated hours first')
+            return
+          }
+          onPlace(activeId)
+        } else {
+          // Moving to unplaced
+          if (woIsSent(activeWo)) {
+            alert('Cannot unplace a sent work order. Use Cancel if needed.')
+            return
+          }
+          onUnplace(activeId)
+        }
+        return
+      }
+
+      // Reordering within same column
+      if (activeIsPlaced && overIsPlaced) {
+        const newOrder = [...placed.map(p => p.id)]
+        const oldIndex = newOrder.indexOf(activeId)
+        const newIndex = newOrder.indexOf(overId)
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          newOrder.splice(oldIndex, 1)
+          newOrder.splice(newIndex, 0, activeId)
+          onReorder(newOrder)
+        }
+      }
+    }
   }
 
   const allPlaced = placed
 
+  const activeWo = activeId ? workOrders.find(w => w.id === activeId) : null
+
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* ── Unplaced column ──────────────────────────────────────────────────── */}
       <div
         style={{
@@ -309,10 +428,8 @@ export function BlueprintView({
         </div>
 
         {/* Scroll area */}
-        <div
-          onDragOver={e => handleDragOver(e, 'unplaced')}
-          onDrop={handleDropUnplaced}
-          onDragLeave={() => handleDragLeave('unplaced')}
+        <DroppableColumn
+          id="unplaced-column"
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -320,28 +437,26 @@ export function BlueprintView({
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
-            outline: dragOverCol === 'unplaced' ? '2px dashed #ddd8d0' : undefined,
-            outlineOffset: dragOverCol === 'unplaced' ? -4 : undefined,
-            borderRadius: dragOverCol === 'unplaced' ? 4 : undefined,
           }}
         >
-          {unplaced.length === 0 ? (
-            <div
-              style={{
-                border: '1.5px dashed #e8e4de',
-                borderRadius: 8,
-                padding: 24,
-                textAlign: 'center',
-                fontSize: 11,
-                color: '#9a9590',
-              }}
-            >
-              All work orders placed
-            </div>
-          ) : (
-            unplaced.map(wo => (
-              <div id={`wo-card-${wo.id}`} key={wo.id}>
-                <WorkOrderCard
+          <SortableContext items={unplaced.map(w => w.id)} strategy={verticalListSortingStrategy}>
+            {unplaced.length === 0 ? (
+              <div
+                style={{
+                  border: '1.5px dashed #e8e4de',
+                  borderRadius: 8,
+                  padding: 24,
+                  textAlign: 'center',
+                  fontSize: 11,
+                  color: '#9a9590',
+                }}
+              >
+                All work orders placed
+              </div>
+            ) : (
+              unplaced.map(wo => (
+                <SortableWorkOrderCard
+                  key={wo.id}
                   wo={wo}
                   isExpanded={expandedIds.has(wo.id)}
                   onToggleExpand={() => onToggleExpand(wo.id)}
@@ -354,13 +469,11 @@ export function BlueprintView({
                   onSetPredecessor={(p, c) => onSetPred(wo.id, p, c)}
                   trades={trades}
                   allPlacedOrders={allPlaced}
-                  onDragStart={e => handleDragStart(e, wo.id)}
-                  onDragEnd={handleDragEnd}
                 />
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </SortableContext>
+        </DroppableColumn>
       </div>
 
       {/* ── Placed column ────────────────────────────────────────────────────── */}
@@ -444,49 +557,33 @@ export function BlueprintView({
         </div>
 
         {/* Scroll area */}
-        <div
-          onDragOver={e => handleDragOver(e, 'placed')}
-          onDrop={handleDropPlaced}
-          onDragLeave={() => handleDragLeave('placed')}
+        <DroppableColumn
+          id="placed-column"
           style={{
             padding: '10px 12px',
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
-            outline: dragOverCol === 'placed' ? '2px dashed #ddd8d0' : undefined,
-            outlineOffset: dragOverCol === 'placed' ? -4 : undefined,
-            borderRadius: dragOverCol === 'placed' ? 4 : undefined,
           }}
         >
-          {placed.length === 0 ? (
-            <div
-              style={{
-                border: '1.5px dashed #e8e4de',
-                borderRadius: 8,
-                padding: 24,
-                textAlign: 'center',
-                fontSize: 11,
-                color: '#9a9590',
-                background: dragOverCol === 'placed' ? '#e8d5b0' : undefined,
-                borderColor: dragOverCol === 'placed' ? '#c9a96e' : undefined,
-              }}
-            >
-              Drag work orders here to place them in sequence
-            </div>
-          ) : (
-            placed.map((wo, idx) => (
+          <SortableContext items={placed.map(w => w.id)} strategy={verticalListSortingStrategy}>
+            {placed.length === 0 ? (
               <div
-                key={wo.id}
-                id={`wo-card-${wo.id}`}
-                onDragOver={e => handleDragOverCard(e, idx)}
                 style={{
-                  borderTop:
-                    dragOverIndex === idx && draggingId !== wo.id
-                      ? '2px solid #c9a96e'
-                      : '2px solid transparent',
+                  border: '1.5px dashed #e8e4de',
+                  borderRadius: 8,
+                  padding: 24,
+                  textAlign: 'center',
+                  fontSize: 11,
+                  color: '#9a9590',
                 }}
               >
-                <WorkOrderCard
+                Drag work orders here to place them in sequence
+              </div>
+            ) : (
+              placed.map(wo => (
+                <SortableWorkOrderCard
+                  key={wo.id}
                   wo={wo}
                   isExpanded={expandedIds.has(wo.id)}
                   onToggleExpand={() => onToggleExpand(wo.id)}
@@ -499,14 +596,34 @@ export function BlueprintView({
                   onSetPredecessor={(p, c) => onSetPred(wo.id, p, c)}
                   trades={trades}
                   allPlacedOrders={allPlaced}
-                  onDragStart={e => handleDragStart(e, wo.id)}
-                  onDragEnd={handleDragEnd}
                 />
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </SortableContext>
+        </DroppableColumn>
       </div>
+
+      <DragOverlay>
+        {activeWo && (
+          <WorkOrderCard
+            wo={activeWo}
+            isExpanded={false}
+            onToggleExpand={() => {}}
+            onPlace={() => {}}
+            onUnplace={() => {}}
+            onSendOne={() => {}}
+            onCancel={() => {}}
+            onUpdate={() => {}}
+            onAddVisit={() => {}}
+            onSetPredecessor={() => {}}
+            trades={trades}
+            allPlacedOrders={allPlaced}
+            onDragStart={() => {}}
+            onDragEnd={() => {}}
+          />
+        )}
+      </DragOverlay>
     </div>
+    </DndContext>
   )
 }

@@ -484,6 +484,7 @@ export interface WorkOrderCardProps {
   allPlacedOrders:  WorkOrderWithDetails[]
   onDragStart:      (e: React.DragEvent<HTMLDivElement>) => void
   onDragEnd:        () => void
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
 }
 
 export function WorkOrderCard({
@@ -501,6 +502,7 @@ export function WorkOrderCard({
   allPlacedOrders,
   onDragStart,
   onDragEnd,
+  dragHandleProps,
 }: WorkOrderCardProps) {
   const isPlacedWo  = wo.placementState !== 'unplaced'
   const sent        = woIsSent(wo)
@@ -630,16 +632,17 @@ export function WorkOrderCard({
   if (isPlacedWo) {
     return (
       <div
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        draggable={!dragHandleProps}
+        onDragStart={!dragHandleProps ? onDragStart : undefined}
+        onDragEnd={!dragHandleProps ? onDragEnd : undefined}
+        {...dragHandleProps}
         style={{
           borderRadius: 8,
           overflow: 'hidden',
           background: cardBg,
           border: cardBorder,
           borderLeft: cardBorderLeft,
-          cursor: 'grab',
+          cursor: dragHandleProps ? 'grab' : 'grab',
           position: 'relative',
           opacity: complete ? 0.8 : 1,
         }}
@@ -793,15 +796,16 @@ export function WorkOrderCard({
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={!dragHandleProps}
+      onDragStart={!dragHandleProps ? onDragStart : undefined}
+      onDragEnd={!dragHandleProps ? onDragEnd : undefined}
+      {...dragHandleProps}
       style={{
         borderRadius: 8,
         overflow: 'hidden',
         background: '#ede9e3',
         border: '1px solid #ddd8d0',
-        cursor: 'grab',
+        cursor: dragHandleProps ? 'grab' : 'grab',
       }}
     >
       <div style={{ padding: '10px 12px 9px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
