@@ -329,7 +329,7 @@ export function BottomPanel({
         background: '#fff',
         display: 'flex',
         flexDirection: 'column',
-        height: open ? 210 : 'auto',
+        height: 'auto',
         transition: 'height .2s ease',
       }}
     >
@@ -374,7 +374,7 @@ export function BottomPanel({
 
       {/* Body */}
       {open && (
-        <div style={{ overflow: 'auto', flex: 1 }}>
+        <div style={{}}>
           {/* Quote sections */}
           {quotes.map(quote => {
             const qWOs = quotedWOs.filter(wo => wo.quote_id === quote.id)
