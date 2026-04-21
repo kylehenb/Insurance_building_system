@@ -81,9 +81,13 @@ export function generateInvoiceHtml(params: {
         ${issueDateDisplay}</div>
       <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
         Due Date</div>
-      <div style="font-size:13px;color:#3a3530;margin-bottom:12px;">
+      <div style="font-size:13px;color:#3a3530;">
         ${dueDateDisplay}</div>
-      ${job.insurer ? `<div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
+    </div>
+    <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
+      ${job.insurer ? `<div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:7px;">JOB DETAILS</div>
+      <div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
         Insurer</div>
       <div style="font-size:13px;color:#3a3530;margin-bottom:6px;">${job.insurer}</div>` : ''}
       ${job.property_address ? `<div style="font-size:11px;color:#9e998f;margin-bottom:2px;">
@@ -103,7 +107,7 @@ export function generateInvoiceHtml(params: {
       </div>
     </div>
     <div style="width:184px;min-width:184px;padding:14px 20px 14px 16px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+      <div style="font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:7px;">INSURANCE REPAIR CO</div>
       <div style="font-size:12px;color:#3a3530;margin-bottom:3px;">${tenant.address || '—'}</div>
       <div style="font-size:12px;color:#3a3530;margin-bottom:3px;">${tenant.contact_email || '—'}</div>
