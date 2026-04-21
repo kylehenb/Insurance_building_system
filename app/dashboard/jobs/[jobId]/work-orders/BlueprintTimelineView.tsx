@@ -42,6 +42,7 @@ export function BlueprintTimelineView({
 }: BlueprintTimelineViewProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverLane, setDragOverLane] = useState<number | null>(null)
+  const [dragPosition, setDragPosition] = useState<{ horizontal: number; swimLane: number } | null>(null) // Visual feedback during drag
   const [unplacedCollapsed, setUnplacedCollapsed] = useState(true)
   const [expandedTradeIds, setExpandedTradeIds] = useState<Set<string>>(new Set())
   const [lineItemsOpenId, setLineItemsOpenId] = useState<string | null>(null)
@@ -247,6 +248,7 @@ export function BlueprintTimelineView({
     setDraggingId(null)
     setDragOverLane(null)
     setDragDependencyMode(null)
+    setDragPosition(null)
   }
 
   function toggleTradeExpand(id: string) {
@@ -297,22 +299,40 @@ export function BlueprintTimelineView({
     onSetParent(id, null, 0)
   }
 
-  function handleDragOverLane(e: React.DragEvent, laneIndex: number) {
+  function handleDragOverTimeline(e: React.DragEvent) {
     e.preventDefault()
-    if (dragDependencyMode) {
-      e.dataTransfer.dropEffect = 'link'
-    } else {
-      e.dataTransfer.dropEffect = 'move'
-    }
-    setDragOverLane(laneIndex)
+    if (!draggingId || dragDependencyMode) return
+
+    const body = bodyRef.current
+    if (!body) return
+
+    const bodyRect = body.getBoundingClientRect()
+    const dropX = e.clientX - bodyRect.left
+    const dropY = e.clientY - bodyRect.top
+
+    // Calculate horizontal position
+    const horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
+
+    // Calculate swim lane based on vertical position
+    const swimLaneHeight = 36
+    const swimLane = Math.max(0, Math.floor((dropY - 6) / swimLaneHeight))
+
+    setDragPosition({ horizontal: horizontalPos, swimLane })
   }
 
-  function handleDropOnLane(e: React.DragEvent, laneIndex: number) {
+  function handleDropOnTimeline(e: React.DragEvent) {
     e.preventDefault()
+    if (!draggingId) return
 
     if (dragDependencyMode) {
-      // Creating dependency via drag
-      const targetWo = placed[laneIndex]
+      // Creating dependency via drag - find target bar under mouse
+      const targetWo = placed.find(wo => {
+        const bar = document.getElementById(`bt-bar-${wo.id}`)
+        if (!bar) return false
+        const rect = bar.getBoundingClientRect()
+        return e.clientX >= rect.left && e.clientX <= rect.right &&
+               e.clientY >= rect.top && e.clientY <= rect.bottom
+      })
       if (targetWo && targetWo.id !== dragDependencyMode) {
         onSetPred(dragDependencyMode, targetWo.id, false)
       }
@@ -320,17 +340,24 @@ export function BlueprintTimelineView({
       return
     }
 
-    if (!draggingId) return
-
     const wo = workOrders.find(w => w.id === draggingId)
     if (!wo) { handleDragEnd(); return }
 
-    // Calculate horizontal position based on drop location
-    const body = bodyRef.current
-    if (!body) { handleDragEnd(); return }
-    const bodyRect = body.getBoundingClientRect()
-    const dropX = e.clientX - bodyRect.left
-    const horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
+    // Use the calculated drag position if available, otherwise calculate from event
+    let horizontalPos = dragPosition?.horizontal ?? 0
+    let swimLane = dragPosition?.swimLane ?? 0
+
+    if (!dragPosition) {
+      const body = bodyRef.current
+      if (body) {
+        const bodyRect = body.getBoundingClientRect()
+        const dropX = e.clientX - bodyRect.left
+        const dropY = e.clientY - bodyRect.top
+        horizontalPos = Math.max(0, Math.min(1 - 0.08, dropX / bodyRect.width))
+        const swimLaneHeight = 36
+        swimLane = Math.max(0, Math.floor((dropY - 6) / swimLaneHeight))
+      }
+    }
 
     if (wo.placementState === 'unplaced') {
       // Moving from unplaced to placed
@@ -346,12 +373,9 @@ export function BlueprintTimelineView({
       }
 
       onPlace(draggingId)
-      setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane: 0 }))
-    } else {
-      // Reordering within placed - just update horizontal position
-      setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane: 0 }))
     }
 
+    setBarPositions(prev => new Map(prev).set(draggingId, { horizontal: horizontalPos, swimLane }))
     handleDragEnd()
   }
 
@@ -507,8 +531,6 @@ export function BlueprintTimelineView({
               return (
                 <div
                   key={wo.id}
-                  onDragOver={e => handleDragOverLane(e, idx)}
-                  onDrop={e => handleDropOnLane(e, idx)}
                   style={{
                     display: 'flex',
                     borderBottom: '1px solid #e8e4de',
@@ -696,7 +718,45 @@ export function BlueprintTimelineView({
                   </div>
 
                   {/* Timeline Track */}
-                  <div style={{ flex: 1, position: 'relative', padding: '6px 0' }}>
+                  <div
+                    style={{ flex: 1, position: 'relative', padding: '6px 0' }}
+                    onDragOver={handleDragOverTimeline}
+                    onDrop={handleDropOnTimeline}
+                  >
+                    {/* Swim lane indicators */}
+                    {Array.from({ length: Math.max(swimLanes.size + 1, 3) }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: `${6 + (i * 36)}px`,
+                          height: i === 0 ? 36 : 0,
+                          borderTop: i > 0 ? '1px dashed #e8e4de' : 'none',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    ))}
+
+                    {/* Ghost bar for drag feedback */}
+                    {draggingId && dragPosition && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${dragPosition.horizontal * 100}%`,
+                          width: '8%',
+                          top: `${6 + (dragPosition.swimLane * 36)}px`,
+                          height: 28,
+                          borderRadius: 5,
+                          background: 'rgba(26, 26, 26, 0.2)',
+                          border: '2px dashed #1a1a1a',
+                          pointerEvents: 'none',
+                          zIndex: 10,
+                        }}
+                      />
+                    )}
+
                     {/* Bar */}
                     <div
                       id={`bt-bar-${wo.id}`}
