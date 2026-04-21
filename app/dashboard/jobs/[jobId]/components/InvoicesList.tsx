@@ -706,8 +706,7 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        setNotBuiltAction('pdf_preview')
-                        setNotBuiltVisible(true)
+                        window.open(`/print/invoices/${invoice.id}`, '_blank')
                         setMenuDropdownId(null)
                       }}
                       style={{
