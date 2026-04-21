@@ -81,7 +81,7 @@ export function generateInvoiceHtml(params: {
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:11px;color:#9e998f;">Invoice to: </span>
           <span style="font-size:14px;font-weight:600;color:#1a1a1a;">
-            ${job.insurer || '—'}</span>
+            ${invoice.invoice_type === 'excess' ? (job.insured_name || '—') : (job.insurer || '—')}</span>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
