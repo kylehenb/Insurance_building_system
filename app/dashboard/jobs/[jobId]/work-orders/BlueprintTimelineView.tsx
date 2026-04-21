@@ -100,13 +100,13 @@ export function BlueprintTimelineView({
 
     const defs = `<defs>
       <marker id="arr-solid" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-        <circle cx="5" cy="5" r="3" fill="#1a1a1a"/>
+        <path d="M0,0 L10,5 L0,10 L2,5 Z" fill="#1a1a1a"/>
       </marker>
       <marker id="arr-concurrent" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-        <circle cx="5" cy="5" r="3" fill="#9ca3af"/>
+        <path d="M0,0 L10,5 L0,10 L2,5 Z" fill="#9ca3af"/>
       </marker>
       <marker id="arr-parent" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-        <circle cx="5" cy="5" r="3" fill="#c9a96e"/>
+        <path d="M0,0 L10,5 L0,10 L2,5 Z" fill="#c9a96e"/>
       </marker>
     </defs>`
 
@@ -124,20 +124,22 @@ export function BlueprintTimelineView({
       const pR = predBar.getBoundingClientRect()
       const tR = thisBar.getBoundingClientRect()
 
+      // Route lines below the bars to avoid crossing
       const x1 = pR.right - bRect.left
-      const y1 = pR.top + pR.height / 2 - bRect.top
+      const y1 = pR.bottom - bRect.top
       const x2 = tR.left - bRect.left - 8
-      const y2 = tR.top + tR.height / 2 - bRect.top
+      const y2 = tR.bottom - bRect.top
       const mx = (x1 + x2) / 2
+      const belowBars = Math.max(y1, y2) + 12
 
       const isDash = wo.is_concurrent
       const stroke = isDash ? '#9ca3af' : '#1a1a1a'
       const dash = isDash ? 'stroke-dasharray="4,4"' : ''
       const marker = isDash ? 'arr-concurrent' : 'arr-solid'
 
-      // Orthogonal routing with rounded corners
+      // Orthogonal routing below bars
       const cornerRadius = 6
-      paths += `<path d="M${x1},${y1} L${mx - cornerRadius},${y1} Q${mx},${y1} ${mx},${y1 + cornerRadius} L${mx},${y2 - cornerRadius} Q${mx},${y2} ${mx + cornerRadius},${y2} L${x2},${y2}"
+      paths += `<path d="M${x1},${y1} L${x1},${belowBars - cornerRadius} Q${x1},${belowBars} ${x1 + cornerRadius},${belowBars} L${x2 - cornerRadius},${belowBars} Q${x2},${belowBars} ${x2},${belowBars - cornerRadius} L${x2},${y2}"
         fill="none" stroke="${stroke}" stroke-width="2" ${dash}
         marker-end="url(#${marker})"
         class="dep-path" data-from="${predWo.id}" data-to="${wo.id}"
@@ -561,7 +563,8 @@ export function BlueprintTimelineView({
                           <label style={{ color: '#5a5650', minWidth: 70 }}>Est. Hours:</label>
                           <input
                             type="number"
-                            value={wo.estimated_hours ?? ''}
+                            step="0.01"
+                            value={wo.estimated_hours !== null && wo.estimated_hours !== undefined ? parseFloat(wo.estimated_hours.toFixed(2)) : ''}
                             onChange={e => onUpdate(wo.id, { estimated_hours: parseFloat(e.target.value) || null })}
                             style={{ width: 50, padding: 2, fontSize: 10, border: '1px solid #ddd8d0', borderRadius: 3 }}
                           />
@@ -664,7 +667,7 @@ export function BlueprintTimelineView({
                   </div>
 
                   {/* Timeline Track */}
-                  <div style={{ flex: 1, position: 'relative', padding: '6px 8px' }}>
+                  <div style={{ flex: 1, position: 'relative', padding: '6px 0' }}>
                     {/* Grid lines - sub-columns */}
                     {placed.map((wo, i) => {
                       const seq = wo.sequence_order ?? i + 1

@@ -374,7 +374,7 @@ export function BottomPanel({
 
       {/* Body */}
       {open && (
-        <div style={{}}>
+        <div style={{ overflowX: 'auto' }}>
           {/* Quote sections */}
           {quotes.map(quote => {
             const qWOs = quotedWOs.filter(wo => wo.quote_id === quote.id)
