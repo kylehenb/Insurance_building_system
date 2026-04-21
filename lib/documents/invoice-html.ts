@@ -122,10 +122,9 @@ export function generateInvoiceHtml(params: {
   </div>
 
   <!-- FORM BAND -->
-  <div style="border-bottom:1px solid #e0dbd4;
-    padding:4px 20px;display:flex;align-items:baseline;position:relative;margin-bottom:14px;">
-    <span style="position:absolute;left:50%;transform:translateX(-50%);
-      font-size:28px;font-weight:700;color:#9e998f;text-transform:uppercase;
+  <div style="border-top:1px solid #e0dbd4;border-bottom:1px solid #e0dbd4;
+    height:32px;padding:0 20px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:14px;">
+    <span style="font-size:28px;font-weight:700;color:#9e998f;text-transform:uppercase;
       letter-spacing:2px;white-space:nowrap;">TAX INVOICE</span>
   </div>
 
@@ -182,46 +181,48 @@ export function generateInvoiceHtml(params: {
     <div style="margin-bottom:14px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:8px;">PAYMENT DETAILS</div>
-      <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+      <div style="background:#f5f2ee;border-radius:6px;padding:8px 10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
           <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">BANK</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.bank_name || '—'}</div>
+            <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+              color:#b0a89e;font-weight:700;margin-bottom:1px;">BANK</div>
+            <div style="font-size:16px;color:#1a1a1a;font-weight:600;">${tenant.bank_name || '—'}</div>
           </div>
           <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">BSB</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.bsb || '—'}</div>
+            <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+              color:#b0a89e;font-weight:700;margin-bottom:1px;">BSB</div>
+            <div style="font-size:16px;color:#1a1a1a;font-weight:600;">${tenant.bsb || '—'}</div>
           </div>
           <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NUMBER</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_number || '—'}</div>
+            <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+              color:#b0a89e;font-weight:700;margin-bottom:1px;">ACCOUNT NUMBER</div>
+            <div style="font-size:16px;color:#1a1a1a;font-weight:600;">${tenant.account_number || '—'}</div>
           </div>
           <div>
-            <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-              color:#b0a89e;font-weight:700;margin-bottom:2px;">ACCOUNT NAME</div>
-            <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${tenant.account_name || '—'}</div>
+            <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+              color:#b0a89e;font-weight:700;margin-bottom:1px;">ACCOUNT NAME</div>
+            <div style="font-size:16px;color:#1a1a1a;font-weight:600;">${tenant.account_name || '—'}</div>
           </div>
         </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
-          <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-            color:#b0a89e;font-weight:700;margin-bottom:2px;">REFERENCE</div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div style="font-size:11px;color:#3a3530;">Please use invoice reference: ${invoice.invoice_ref || invoice.id}</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e0dbd4;">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">
+            <div>
+              <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+                color:#b0a89e;font-weight:700;margin-bottom:1px;">REFERENCE</div>
+              <div style="font-size:15px;color:#3a3530;">Please use invoice reference: ${invoice.invoice_ref || invoice.id}</div>
+            </div>
+            <div>
+              <div style="font-size:13px;letter-spacing:1.2px;text-transform:uppercase;
+                color:#b0a89e;font-weight:700;margin-bottom:1px;">PAYMENT TERMS</div>
+              <div style="font-size:15px;color:#3a3530;">Payment due within 14 days</div>
+            </div>
             <div style="background:#e8f4e8;border-left:3px solid #2d7d2d;padding:4px 8px;
               border-radius:3px;white-space:nowrap;">
-              <div style="font-size:9px;color:#2d5a2d;font-weight:600;">
+              <div style="font-size:13px;color:#2d5a2d;font-weight:600;">
                 Send receipt to ${tenant.accounts_email || tenant.contact_email || '—'}
               </div>
             </div>
           </div>
-        </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e0dbd4;">
-          <div style="font-size:9px;letter-spacing:1.2px;text-transform:uppercase;
-            color:#b0a89e;font-weight:700;margin-bottom:2px;">PAYMENT TERMS</div>
-          <div style="font-size:11px;color:#3a3530;">Payment due within 14 days</div>
         </div>
       </div>
     </div>
