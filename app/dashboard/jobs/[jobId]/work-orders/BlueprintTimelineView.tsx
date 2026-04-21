@@ -47,6 +47,7 @@ export function BlueprintTimelineView({
   const [lineItemsOpenId, setLineItemsOpenId] = useState<string | null>(null)
   const [dependencyMode, setDependencyMode] = useState<string | null>(null) // ID of bar waiting for predecessor selection
   const [parentMode, setParentMode] = useState<string | null>(null) // ID of bar waiting for parent selection
+  const [dragDependencyMode, setDragDependencyMode] = useState<string | null>(null) // ID of bar being dragged for dependency creation
   
   const placed = workOrders
     .filter(w => w.placementState !== 'unplaced')
@@ -94,11 +95,14 @@ export function BlueprintTimelineView({
     svg.setAttribute('height', String(bRect.height))
 
     const defs = `<defs>
-      <marker id="arr-solid" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-        <polygon points="0,0 7,3.5 0,7" fill="#b0a89e"/>
+      <marker id="arr-solid" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+        <circle cx="5" cy="5" r="3" fill="#1a1a1a"/>
       </marker>
-      <marker id="arr-parent" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-        <polygon points="0,0 7,3.5 0,7" fill="#c9a96e"/>
+      <marker id="arr-concurrent" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+        <circle cx="5" cy="5" r="3" fill="#9ca3af"/>
+      </marker>
+      <marker id="arr-parent" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+        <circle cx="5" cy="5" r="3" fill="#c9a96e"/>
       </marker>
     </defs>`
 
@@ -118,32 +122,59 @@ export function BlueprintTimelineView({
 
       const x1 = pR.right - bRect.left
       const y1 = pR.top + pR.height / 2 - bRect.top
-      const x2 = tR.left - bRect.left - 6
+      const x2 = tR.left - bRect.left - 8
       const y2 = tR.top + tR.height / 2 - bRect.top
-      const mx = Math.min(x1 + 28, x2 - 4)
+      const mx = Math.min(x1 + 32, x2 - 4)
 
       const isDash = wo.is_concurrent
-      const stroke = isDash ? '#d4cdc4' : '#b0a89e'
-      const dash = isDash ? 'stroke-dasharray="5,3"' : ''
-      const marker = isDash ? 'arr-solid' : 'arr-solid'
+      const stroke = isDash ? '#9ca3af' : '#1a1a1a'
+      const dash = isDash ? 'stroke-dasharray="4,4"' : ''
+      const marker = isDash ? 'arr-concurrent' : 'arr-solid'
 
       paths += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
-        fill="none" stroke="${stroke}" stroke-width="1.5" ${dash}
-        marker-end="url(#${marker})"/>`
+        fill="none" stroke="${stroke}" stroke-width="2" ${dash}
+        marker-end="url(#${marker})"
+        class="dep-path" data-from="${predWo.id}" data-to="${wo.id}"
+        style="cursor: pointer;"/>`
     })
 
     svg.innerHTML = defs + paths
+
+    // Add click handlers to paths for deletion
+    svg.querySelectorAll('.dep-path').forEach(path => {
+      path.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const toId = path.getAttribute('data-to')
+        if (toId) {
+          handleClearDependency(toId)
+        }
+      })
+      path.addEventListener('mouseenter', () => {
+        path.setAttribute('stroke-width', '3')
+      })
+      path.addEventListener('mouseleave', () => {
+        path.setAttribute('stroke-width', '2')
+      })
+    })
   }, [placed])
 
   // Drag handlers
   function handleDragStart(e: React.DragEvent, id: string) {
-    setDraggingId(id)
-    e.dataTransfer.effectAllowed = 'move'
+    if (e.altKey || e.metaKey) {
+      // Alt/Option key pressed - entering dependency drag mode
+      setDragDependencyMode(id)
+      e.dataTransfer.effectAllowed = 'link'
+      e.dataTransfer.setData('text/plain', 'dependency')
+    } else {
+      setDraggingId(id)
+      e.dataTransfer.effectAllowed = 'move'
+    }
   }
 
   function handleDragEnd() {
     setDraggingId(null)
     setDragOverLane(null)
+    setDragDependencyMode(null)
   }
 
   function toggleTradeExpand(id: string) {
@@ -196,12 +227,27 @@ export function BlueprintTimelineView({
 
   function handleDragOverLane(e: React.DragEvent, laneIndex: number) {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    if (dragDependencyMode) {
+      e.dataTransfer.dropEffect = 'link'
+    } else {
+      e.dataTransfer.dropEffect = 'move'
+    }
     setDragOverLane(laneIndex)
   }
 
   function handleDropOnLane(e: React.DragEvent, laneIndex: number) {
     e.preventDefault()
+
+    if (dragDependencyMode) {
+      // Creating dependency via drag
+      const targetWo = placed[laneIndex]
+      if (targetWo && targetWo.id !== dragDependencyMode) {
+        onSetPred(dragDependencyMode, targetWo.id, false)
+      }
+      handleDragEnd()
+      return
+    }
+
     if (!draggingId) return
 
     const wo = workOrders.find(w => w.id === draggingId)
@@ -222,7 +268,7 @@ export function BlueprintTimelineView({
 
       const maxSeq = Math.max(0, ...placed.map(p => p.sequence_order ?? 0))
       onPlace(draggingId)
-      
+
       // Then reorder to the correct position
       const newOrder = [...placed.map(p => p.id)]
       newOrder.splice(laneIndex, 0, draggingId)
@@ -365,25 +411,6 @@ export function BlueprintTimelineView({
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: '10px 16px',
-            borderBottom: '1px solid #ddd8d0',
-            background: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.1em', color: '#5a5650' }}>
-            Blueprint Timeline
-          </span>
-          <span style={{ fontSize: 10, color: '#9a9590' }}>
-            {placed.length} placed
-          </span>
-        </div>
-
         {/* Timeline Body */}
         <div ref={bodyRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
           {placed.length === 0 ? (
