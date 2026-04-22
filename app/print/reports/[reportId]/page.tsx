@@ -25,7 +25,6 @@ const DEFAULT_BAR_TEMPLATE = {
     'foundation',
     'fence',
     'pool',
-    'detached_garage',
     'granny_flat',
   ] as const,
 
@@ -269,13 +268,17 @@ export default async function ReportPrintPage({
     ...tdBase,
   }
   const tdCellLast: React.CSSProperties = { ...tdCell, borderBottom: 'none' }
+  const cellContentStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'baseline',
+  }
   const labelStyle: React.CSSProperties = {
     color: '#6a6460',
     fontSize: '9px',
     fontWeight: '700',
     letterSpacing: '0.5px',
     textTransform: 'uppercase',
-    marginBottom: '3px',
+    marginRight: '6px',
   }
   const valueStyle: React.CSSProperties = {
     color: '#1a1a1a',
@@ -306,7 +309,7 @@ export default async function ReportPrintPage({
   return (
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       {/* Document container */}
-      <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
+      <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0" style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}>
         <PrintButton reportRef={report.report_ref} jobNumber={job.job_number} />
 
         {/* Header - 3-column flex (matching invoice layout) */}
@@ -378,25 +381,43 @@ export default async function ReportPrintPage({
               {dividerRow('Attendance')}
               <tr>
                 <td style={tdCell}>
-                  <div style={labelStyle}>Date attended</div>
-                  <div style={valueStyle}>{formatDate(report.attendance_date)}</div>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Date attended</span>
+                    <span style={valueStyle}>{formatDate(report.attendance_date)}</span>
+                  </div>
                 </td>
                 <td style={tdCell}>
-                  <div style={labelStyle}>Time arrived</div>
-                  <div style={valueStyle}>{formatTime(report.attendance_time)}</div>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Time arrived</span>
+                    <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
+                  </div>
                 </td>
                 <td style={tdCell}>
-                  <div style={labelStyle}>Person met</div>
-                  <div style={valueStyle}>{report.person_met || '—'}</div>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Person met</span>
+                    <span style={valueStyle}>{report.person_met || '—'}</span>
+                  </div>
                 </td>
               </tr>
               <tr>
-                <td style={tdCellLast}>
-                  <div style={labelStyle}>Assessor</div>
-                  <div style={valueStyle}>{report.assessor_name || '—'}</div>
+                <td style={tdCell}>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Assessor</span>
+                    <span style={valueStyle}>{report.assessor_name || '—'}</span>
+                  </div>
                 </td>
-                <td style={tdCellLast}></td>
-                <td style={tdCellLast}></td>
+                <td style={tdCell}>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Email</span>
+                    <span style={valueStyle}>{tenant.contact_email || '—'}</span>
+                  </div>
+                </td>
+                <td style={tdCell}>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Phone</span>
+                    <span style={valueStyle}>{tenant.contact_phone || '—'}</span>
+                  </div>
+                </td>
               </tr>
 
               {/* Block 2 — Property details (conditional) */}
@@ -416,21 +437,27 @@ export default async function ReportPrintPage({
                       rows.push(
                         <tr key={key1}>
                           <td style={isLast ? tdCellLast : tdCell}>
-                            <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</div>
-                            <div style={valueStyle}>{pdText(pd, key1)}</div>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</span>
+                              <span style={valueStyle}>{pdText(pd, key1)}</span>
+                            </div>
                           </td>
                           {key2 ? (
                             <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</div>
-                              <div style={valueStyle}>{pdText(pd, key2)}</div>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</span>
+                                <span style={valueStyle}>{pdText(pd, key2)}</span>
+                              </div>
                             </td>
                           ) : (
                             <td style={isLast ? tdCellLast : tdCell}></td>
                           )}
                           {key3 ? (
                             <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</div>
-                              <div style={valueStyle}>{pdText(pd, key3)}</div>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</span>
+                                <span style={valueStyle}>{pdText(pd, key3)}</span>
+                              </div>
                             </td>
                           ) : (
                             <td style={isLast ? tdCellLast : tdCell}></td>
@@ -446,25 +473,18 @@ export default async function ReportPrintPage({
               {/* Block 3 — Make safe & specialist */}
               {dividerRow('Make safe & specialist')}
               <tr>
-                <td style={tdCell}>
-                  <div style={labelStyle}>Make safe conducted</div>
-                  <div style={valueStyle}>{tsf(report, 'make_safe_conducted')}</div>
-                </td>
-                <td style={tdCell}>
-                  <div style={labelStyle}>Specialist report obtained</div>
-                  <div style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</div>
-                </td>
-                <td style={tdCell}>
-                  <div style={labelStyle}>Drone utilised</div>
-                  <div style={valueStyle}>{tsf(report, 'drone_utilised')}</div>
-                </td>
-              </tr>
-              <tr>
                 <td style={tdCellLast}>
-                  <div style={labelStyle}>Tarp required</div>
-                  <div style={valueStyle}>{tsf(report, 'tarp_required')}</div>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Make safe conducted</span>
+                    <span style={valueStyle}>{tsf(report, 'make_safe_conducted')}</span>
+                  </div>
                 </td>
-                <td style={tdCellLast}></td>
+                <td style={tdCellLast}>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Specialist report obtained</span>
+                    <span style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</span>
+                  </div>
+                </td>
                 <td style={tdCellLast}></td>
               </tr>
 
@@ -562,24 +582,6 @@ export default async function ReportPrintPage({
           })()}
         </div>
 
-        {/* Assessor Details Section */}
-        <div style={{ marginTop: '24px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
-            ASSESSOR CONTACT DETAILS
-          </div>
-          <div style={{ background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: '6px', padding: '14px 16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '6px' }}>
-              {report.assessor_name || 'Kyle Bindon'}
-            </div>
-            <div style={{ fontSize: '12px', color: '#3a3530', marginBottom: '4px' }}>
-              Email: <span style={{ color: '#1a1a1a' }}>{tenant.contact_email || 'kyle@insurancerepairco.com.au'}</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#3a3530' }}>
-              Phone: <span style={{ color: '#1a1a1a' }}>{tenant.contact_phone || '0431 132 077'}</span>
-            </div>
-          </div>
-        </div>
-
         {/* Bottom padding */}
         <div style={{ paddingBottom: '60px' }} />
 
@@ -592,7 +594,7 @@ export default async function ReportPrintPage({
               </div>
             </div>
             
-            {/* Photo grid - 6 per page (3x2 layout) */}
+            {/* Photo grid - 6 per page (2x3 layout) */}
             {(() => {
               const photoPages: Photo[][] = []
               for (let i = 0; i < photos.length; i += 6) {
@@ -601,7 +603,7 @@ export default async function ReportPrintPage({
               
               return photoPages.map((pagePhotos, pageIndex) => (
                 <div key={pageIndex} style={{ marginBottom: pageIndex < photoPages.length - 1 ? '32px' : '0' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                     {pagePhotos.map((photo) => (
                       <div key={photo.id} style={{ breakInside: 'avoid' }}>
                         <div style={{ 
@@ -636,29 +638,31 @@ export default async function ReportPrintPage({
         )}
 
         {/* Footer - matching invoice footer */}
-        <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {tenant.logo_storage_path ? (
-            <img 
-              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`} 
-              alt="Tenant Logo" 
-              style={{ width: '26px', height: '26px', objectFit: 'contain', flexShrink: 0 }} 
-            />
-          ) : (
-            <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: '#c8b89a', fontStyle: 'italic' }}>
-              IRC.
+        <div style={{ paddingTop: '16px' }}>
+          <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {tenant.logo_storage_path ? (
+              <img 
+                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`} 
+                alt="Tenant Logo" 
+                style={{ width: '26px', height: '26px', objectFit: 'contain', flexShrink: 0 }} 
+              />
+            ) : (
+              <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: '#c8b89a', fontStyle: 'italic' }}>
+                IRC.
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>
+                {tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}
+              </div>
+              <div style={{ fontSize: '10px', color: '#c8b89a' }}>Building &amp; Restoration</div>
             </div>
-          )}
-          <div>
-            <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>
-              {tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}
-            </div>
-            <div style={{ fontSize: '10px', color: '#c8b89a' }}>Building &amp; Restoration</div>
+            <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
+            <span style={{ fontSize: '12px', color: '#c8b89a' }}>
+              {(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}
+            </span>
+            <div style={{ flex: 1 }}></div>
           </div>
-          <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
-          <span style={{ fontSize: '12px', color: '#c8b89a' }}>
-            {(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}
-          </span>
-          <div style={{ flex: 1 }}></div>
         </div>
       </div>
     </div>
