@@ -1,10 +1,10 @@
 import type { Database } from '@/lib/supabase/database.types'
 
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
-type WorkOrderVisit = Database['public']['Tables']['work_order_visits']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
+type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 
 export function generateWorkOrderHtml(params: {
   workOrder: WorkOrder
@@ -13,9 +13,10 @@ export function generateWorkOrderHtml(params: {
     building_licence_number?: string | null
   }
   trade: Trade | null
-  visits: WorkOrderVisit[]
+  tradeScopeItems: ScopeItem[]
+  otherScopeItems: ScopeItem[]
 }): string {
-  const { workOrder, job, tenant, trade, visits } = params
+  const { workOrder, job, tenant, trade, tradeScopeItems, otherScopeItems } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''

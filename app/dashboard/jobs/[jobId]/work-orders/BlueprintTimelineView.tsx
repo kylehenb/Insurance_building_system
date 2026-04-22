@@ -84,9 +84,24 @@ export function BlueprintTimelineView({
         const color = getTradeColor(wo.tradeTypeLabel)
         const sent = wo.placementState === 'placed_sent' || wo.placementState === 'placed_complete'
 
+        // Build custom item content with badges
+        let badges = ''
+        if ((wo.total_visits ?? 1) > 1) {
+          badges += `<span style="margin-left: 4px; padding: 1px 4px; border-radius: 3px; background: #eff4ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 8px;">V${wo.current_visit}/${wo.total_visits}</span>`
+        }
+        if (wo.proximity_range === 'extended') {
+          badges += `<span style="margin-left: 4px; padding: 1px 4px; border-radius: 3px; background: #fff0f0; border: 1px solid #fca5a5; color: #991b1b; font-size: 8px;">Ext</span>`
+        }
+
         const item = {
           id: wo.id,
-          content: `${sent ? '🔒 ' : ''}${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
+          content: `
+            <div style="display: flex; align-items: center; gap: 4px;">
+              ${sent ? '🔒' : ''}
+              <span>${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}</span>
+              ${badges}
+            </div>
+          `,
           group: wo.tradeTypeLabel || 'Unknown',
           start: startDate,
           end: endDate,
@@ -118,10 +133,74 @@ export function BlueprintTimelineView({
 
     console.log('[BlueprintTimelineView] Items dataset:', items)
 
+    // Create background items for lag and cushion periods
+    const backgroundItems: any[] = []
+    placed.forEach((wo, index) => {
+      const startDate = wo.visits[0]?.scheduled_date
+        ? new Date(wo.visits[0].scheduled_date)
+        : new Date(Date.now() + index * 24 * 60 * 60 * 1000)
+      
+      const endDate = wo.estimated_hours
+        ? new Date(startDate.getTime() + wo.estimated_hours * 60 * 60 * 1000)
+        : new Date(startDate.getTime() + 24 * 60 * 60 * 1000)
+
+      // Lag period background item
+      if (wo.lagDays > 0) {
+        const lagStart = new Date(endDate.getTime())
+        const lagEnd = new Date(endDate.getTime() + wo.lagDays * 24 * 60 * 60 * 1000)
+        backgroundItems.push({
+          id: `${wo.id}-lag`,
+          content: '',
+          group: wo.tradeTypeLabel || 'Unknown',
+          start: lagStart,
+          end: lagEnd,
+          type: 'background',
+          style: `
+            background: repeating-linear-gradient(
+              -45deg, transparent, transparent 3px,
+              rgba(146,64,14,.12) 3px, rgba(146,64,14,.12) 6px
+            );
+            border: 1px dashed #f0c080;
+            border-radius: 0 5px 5px 0;
+          `,
+        })
+      }
+
+      // Cushion period background item
+      if (wo.cushionDays > 0) {
+        const cushionStart = wo.lagDays > 0
+          ? new Date(endDate.getTime() + wo.lagDays * 24 * 60 * 60 * 1000)
+          : new Date(endDate.getTime())
+        const cushionEnd = new Date(cushionStart.getTime() + wo.cushionDays * 24 * 60 * 60 * 1000)
+        backgroundItems.push({
+          id: `${wo.id}-cushion`,
+          content: '',
+          group: wo.tradeTypeLabel || 'Unknown',
+          start: cushionStart,
+          end: cushionEnd,
+          type: 'background',
+          style: `
+            background: rgba(176, 176, 176, 0.12);
+            border-radius: 0 3px 3px 0;
+          `,
+        })
+      }
+    })
+
+    // Combine regular items with background items
+    const allItems = new DataSet([...(items.get() as any[]), ...backgroundItems])
+
+    // Calculate custom time range
+    const now = new Date()
+    const minDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
+    const maxDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000) // 60 days from now
+
     // Options with groups and enabled interactions
     const options = {
       height: '400px',
       width: '100%',
+      min: minDate,
+      max: maxDate,
       groupOrder: 'order',
       stack: false,
       showCurrentTime: false,
@@ -137,15 +216,37 @@ export function BlueprintTimelineView({
         const snapTo = 24 * 60 * 60 * 1000 // 1 day in milliseconds
         return new Date(Math.round(date.getTime() / snapTo) * snapTo)
       },
+      format: {
+        minorLabels: {
+          millisecond: 'SSS',
+          second: 's',
+          minute: 'HH:mm',
+          hour: 'HH:mm',
+          weekday: 'ddd D',
+          day: 'D',
+          month: 'MMM',
+          year: 'YYYY',
+        },
+        majorLabels: {
+          millisecond: 'HH:mm:ss',
+          second: 'D MMM HH:mm',
+          minute: 'ddd D MMM',
+          hour: 'ddd D MMM',
+          weekday: 'MMMM YYYY',
+          day: 'MMMM YYYY',
+          month: 'YYYY',
+          year: 'YYYY',
+        },
+      },
     }
 
     console.log('[BlueprintTimelineView] Creating timeline with options:', options)
 
     try {
-      // Create timeline with groups
+      // Create timeline with groups and all items (including background)
       timelineInstance.current = new Timeline(
         timelineRef.current,
-        items,
+        allItems,
         groups,
         options
       )
