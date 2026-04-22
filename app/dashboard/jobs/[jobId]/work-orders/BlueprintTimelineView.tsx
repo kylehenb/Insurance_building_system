@@ -92,62 +92,33 @@ export function BlueprintTimelineView({
     const placed = workOrders.filter(wo => wo.placementState !== 'unplaced')
     console.log('[BlueprintTimelineView] Placed work orders:', placed.length, placed)
 
-    // Create nested groups: trade type → contractor hierarchy
-    const tradeToContractors = new Map<string, Set<string>>()
-    placed.forEach(wo => {
-      const tradeType = wo.tradeTypeLabel || 'Unknown'
-      const contractor = wo.trade?.business_name?.split(' ')[0] || 'Unassigned'
-      if (!tradeToContractors.has(tradeType)) {
-        tradeToContractors.set(tradeType, new Set())
-      }
-      tradeToContractors.get(tradeType)!.add(contractor)
-    })
+    // Create simple groups based on trade types only
+    const uniqueTradeTypes = Array.from(
+      new Set(placed.map(wo => wo.tradeTypeLabel || 'Unknown'))
+    ).sort()
 
-    // Build nested group structure with color coding
-    const groups: any[] = []
-    let groupOrder = 0
+    console.log('[BlueprintTimelineView] Unique trade types:', uniqueTradeTypes)
 
-    tradeToContractors.forEach((contractors, tradeType) => {
-      const color = getTradeColor(tradeType)
-      
-      // Parent group for trade type
-      groups.push({
-        id: `trade-${tradeType}`,
-        content: tradeType,
-        order: groupOrder++,
-        className: 'trade-group-header',
-        style: `
-          background-color: ${color}18;
-          border-left: 3px solid ${color};
-          color: ${color};
-          font-weight: 600;
-          font-size: 11px;
-          padding: 4px 8px;
-        `,
-      })
-
-      // Child groups for each contractor
-      contractors.forEach(contractor => {
-        groups.push({
-          id: `${tradeType}-${contractor}`,
-          content: contractor,
-          parent: `trade-${tradeType}`,
-          order: groupOrder++,
-          className: 'contractor-group-header',
+    const groups = new DataSet(
+      uniqueTradeTypes.map((tradeType, index) => {
+        const color = getTradeColor(tradeType)
+        return {
+          id: tradeType,
+          content: tradeType,
+          order: index,
           style: `
-            background-color: #fafafa;
-            border-left: 2px solid ${color}40;
-            color: #666;
-            font-size: 10px;
-            padding: 3px 12px;
+            background-color: ${color}18;
+            border-left: 3px solid ${color};
+            color: ${color};
+            font-weight: 600;
+            font-size: 11px;
+            padding: 4px 8px;
           `,
-        })
+        }
       })
-    })
+    )
 
-    console.log('[BlueprintTimelineView] Nested groups:', groups)
-
-    const groupsDataSet = new DataSet(groups)
+    console.log('[BlueprintTimelineView] Groups:', groups)
 
     // Convert work orders to vis.js timeline items with group assignment
     const items = new DataSet(
@@ -182,7 +153,7 @@ export function BlueprintTimelineView({
               ${badges}
             </div>
           `,
-          group: `${wo.tradeTypeLabel || 'Unknown'}-${wo.trade?.business_name?.split(' ')[0] || 'Unassigned'}`,
+          group: wo.tradeTypeLabel || 'Unknown',
           start: startDate,
           end: endDate,
           title: `
@@ -262,7 +233,7 @@ export function BlueprintTimelineView({
         ? new Date(startDate.getTime() + wo.estimated_hours * 60 * 60 * 1000)
         : new Date(startDate.getTime() + 24 * 60 * 60 * 1000)
 
-      const groupKey = `${wo.tradeTypeLabel || 'Unknown'}-${wo.trade?.business_name?.split(' ')[0] || 'Unassigned'}`
+      const groupKey = wo.tradeTypeLabel || 'Unknown'
 
       // Lag period background item
       if (wo.lagDays > 0) {
@@ -363,11 +334,11 @@ export function BlueprintTimelineView({
     console.log('[BlueprintTimelineView] Creating timeline with options:', options)
 
     try {
-      // Create timeline with nested groups and all items (including background)
+      // Create timeline with groups and all items (including background)
       timelineInstance.current = new Timeline(
         timelineRef.current,
         allItems,
-        groupsDataSet,
+        groups,
         options
       )
       console.log('[BlueprintTimelineView] Timeline created successfully')
