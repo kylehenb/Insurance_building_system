@@ -50,11 +50,14 @@ export function BlueprintTimelineView({
     if (!timelineRef.current) return
 
     const placed = workOrders.filter(wo => wo.placementState !== 'unplaced')
+    console.log('[BlueprintTimelineView] Placed work orders:', placed.length, placed)
 
     // Create groups based on trade types
     const uniqueTradeTypes = Array.from(
       new Set(placed.map(wo => wo.tradeTypeLabel || 'Unknown'))
     ).sort()
+
+    console.log('[BlueprintTimelineView] Unique trade types:', uniqueTradeTypes)
 
     const groups = new DataSet(
       uniqueTradeTypes.map((tradeType, index) => ({
@@ -64,12 +67,15 @@ export function BlueprintTimelineView({
       }))
     )
 
+    console.log('[BlueprintTimelineView] Groups:', groups)
+
     // Convert work orders to vis.js timeline items with group assignment
     const items = new DataSet(
-      placed.map((wo) => {
+      placed.map((wo, index) => {
+        // If no scheduled date, spread them out by day for visibility
         const startDate = wo.visits[0]?.scheduled_date
           ? new Date(wo.visits[0].scheduled_date)
-          : new Date()
+          : new Date(Date.now() + index * 24 * 60 * 60 * 1000) // Spread by day
         
         const endDate = wo.estimated_hours
           ? new Date(startDate.getTime() + wo.estimated_hours * 60 * 60 * 1000)
@@ -78,7 +84,7 @@ export function BlueprintTimelineView({
         const color = getTradeColor(wo.tradeTypeLabel)
         const sent = wo.placementState === 'placed_sent' || wo.placementState === 'placed_complete'
 
-        return {
+        const item = {
           id: wo.id,
           content: `${sent ? '🔒 ' : ''}${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
           group: wo.tradeTypeLabel || 'Unknown',
@@ -96,8 +102,13 @@ export function BlueprintTimelineView({
             ${wo.placementState === 'placed_complete' ? 'opacity: 0.65;' : ''}
           `,
         }
+
+        console.log('[BlueprintTimelineView] Item:', item)
+        return item
       })
     )
+
+    console.log('[BlueprintTimelineView] Items dataset:', items)
 
     // Configure timeline with groups and autosize height
     const options = {
@@ -140,13 +151,20 @@ export function BlueprintTimelineView({
       },
     }
 
-    // Create timeline with groups
-    timelineInstance.current = new Timeline(
-      timelineRef.current,
-      items,
-      groups,
-      options
-    )
+    console.log('[BlueprintTimelineView] Creating timeline with options:', options)
+
+    try {
+      // Create timeline with groups
+      timelineInstance.current = new Timeline(
+        timelineRef.current,
+        items,
+        groups,
+        options
+      )
+      console.log('[BlueprintTimelineView] Timeline created successfully')
+    } catch (error) {
+      console.error('[BlueprintTimelineView] Error creating timeline:', error)
+    }
 
     // Cleanup
     return () => {
@@ -223,6 +241,7 @@ export function BlueprintTimelineView({
           background: '#fff',
           overflow: 'auto',
           borderLeft: '1px solid #e8e4de',
+          minHeight: 400,
         }}
       />
     </div>
