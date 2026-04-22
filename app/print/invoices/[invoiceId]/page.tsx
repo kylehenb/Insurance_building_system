@@ -104,7 +104,7 @@ export default async function InvoicePrintPage({
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 relative">
         {/* Print button - hidden when printing */}
         <div className="no-print absolute top-4 right-4 z-10 print:hidden">
-          <InvoicePrintButton />
+          <InvoicePrintButton invoiceRef={invoice.invoice_ref} />
         </div>
 
         {/* Render HTML */}

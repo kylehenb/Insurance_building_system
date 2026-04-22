@@ -69,7 +69,7 @@ export function generateInvoiceHtml(params: {
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;
         color:#9e998f;font-weight:700;white-space:nowrap;">INSURANCE REPAIR CO</div>
     </div>
-    <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
+    <div style="flex:1;padding:14px 14px;border-right:1px solid #e0dbd4;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:7px;">INVOICE DETAILS</div>
       <div style="display:flex;gap:24px;align-items:center;">
@@ -112,7 +112,7 @@ export function generateInvoiceHtml(params: {
           </span>`).join('')}
       </div>
     </div>
-    <div style="width:184px;min-width:184px;padding:14px 20px 14px 16px;">
+    <div style="width:184px;min-width:184px;padding:14px 22px 14px 14px;">
       <div style="font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:7px;">INSURANCE REPAIR CO</div>
       <div style="font-size:12px;color:#3a3530;margin-bottom:3px;">${tenant.address || '—'}</div>
