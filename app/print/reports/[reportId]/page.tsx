@@ -329,15 +329,10 @@ export default async function ReportPrintPage({
                 <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Reference: </span>
                 <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_ref || '—'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: '#9e998f' }}>Person met: </span>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.person_met || '—'}</span>
-              </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
               {[
-                { label: 'Attendance date', value: formatDate(report.attendance_date) },
-                { label: 'Time arrived', value: formatTime(report.attendance_time) },
+                { label: 'Report date', value: formatDate(new Date().toISOString()) },
               ].filter(f => f.value).map((field, i, arr) => (
                 <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
                   <span style={{ color: '#b0a89e' }}>{field.label}: </span>
