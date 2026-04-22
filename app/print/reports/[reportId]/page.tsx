@@ -127,6 +127,39 @@ const NARRATIVE_GROUPS: Array<{ label: string; keys: string[] }> = [
   { label: 'Assessment', keys: ['conclusion', 'pre_existing_conditions', 'maintenance_notes'] },
 ]
 
+// Function to preserve text formatting (newlines, bullet points, paragraphs)
+function formatTextWithPreservedFormatting(text: string | null): React.ReactNode {
+  if (!text) return <span style={{ color: '#9e998f' }}>—</span>
+  
+  const lines = text.split('\n')
+  const nodes: React.ReactNode[] = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+    
+    // Check if line is a bullet point (starts with •, -, *, or digits followed by . or ))
+    const isBullet = /^[•\-\*]\s/.test(trimmed) || /^\d+[\.)]\s/.test(trimmed)
+    
+    if (isBullet) {
+      nodes.push(
+        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '4px' }}>
+          <span style={{ marginRight: '8px', color: '#3a3530' }}>{trimmed[0]}</span>
+          <span style={{ flex: 1 }}>{trimmed.substring(1).trim()}</span>
+        </div>
+      )
+    } else if (trimmed === '') {
+      // Empty line - add paragraph break
+      nodes.push(<div key={i} style={{ height: '8px' }} />)
+    } else {
+      // Regular text line
+      nodes.push(<div key={i} style={{ marginBottom: '2px' }}>{line}</div>)
+    }
+  }
+  
+  return <>{nodes}</>
+}
+
 export default async function ReportPrintPage({
   params,
 }: {
@@ -216,7 +249,7 @@ export default async function ReportPrintPage({
   // Assign sequential section numbers
   let sectionCounter = 0
 
-  // TD cell base style
+  // TD cell base style (3-column layout)
   const tdBase: React.CSSProperties = {
     padding: '5px 10px',
     borderBottom: '1px solid #f0ece6',
@@ -227,7 +260,7 @@ export default async function ReportPrintPage({
     color: '#b0a89e',
     fontSize: '10px',
     fontWeight: '600',
-    width: '28%',
+    width: '25%',
     whiteSpace: 'nowrap',
   }
   const tdValue: React.CSSProperties = {
@@ -263,7 +296,7 @@ export default async function ReportPrintPage({
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
         <PrintButton reportRef={report.report_ref} jobNumber={job.job_number} />
 
-        {/* Header - 3-column flex */}
+        {/* Header - 3-column flex (matching invoice layout) */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
           {/* Column 1: Logo (148px fixed) */}
           <div style={{ width: '148px', minWidth: '148px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
@@ -271,14 +304,28 @@ export default async function ReportPrintPage({
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
-          {/* Column 2: Job details (flex: 1) */}
-          <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e0dbd4' }}>
+          {/* Column 2: Report & Job details (flex: 1) */}
+          <div style={{ flex: 1, padding: '14px 10px', borderRight: '1px solid #e0dbd4' }}>
+            {/* Report Details */}
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>REPORT DETAILS</div>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Reference: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_ref || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Type: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_type || '—'}</span>
+              </div>
+            </div>
+            
+            {/* Job Details */}
             <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
             {job.insured_name && (
               <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
             )}
             {job.property_address && (
-              <div style={{ fontSize: '13px', color: '#9e998f', marginBottom: '10px' }}>{job.property_address}</div>
+              <div style={{ fontSize: '13px', color: '#9e998f', marginBottom: '6px' }}>{job.property_address}</div>
             )}
             {/* Field strip */}
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px' }}>
@@ -297,26 +344,17 @@ export default async function ReportPrintPage({
           </div>
 
           {/* Column 3: Contact (184px fixed) */}
-          <div style={{ width: '184px', minWidth: '184px', padding: '14px 20px 14px 16px' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>{tenant.name || 'Kyle Bindon'}</div>
-            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
-            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
-            {/* Badge row */}
-            <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-              {['BC105884', 'IICRC Certified'].map(badge => (
-                <span key={badge} style={{ fontSize: '9.5px', background: '#f5f2ee', color: '#6a6460', border: '1px solid #e0dbd4', borderRadius: '3px', padding: '2px 6px', fontWeight: '700' }}>{badge}</span>
-              ))}
-            </div>
+          <div style={{ width: '184px', minWidth: '184px', padding: '14px 26px 14px 10px' }}>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>INSURANCE REPAIR CO</div>
+            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.address || '—'}</div>
+            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.contact_email || '—'}</div>
+            <div style={{ fontSize: '10px', color: '#3a3530' }}>{tenant.contact_phone || '—'}</div>
           </div>
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 20px', display: 'flex', alignItems: 'baseline', position: 'relative' }}>
-          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>
-            {report.report_ref}
-          </span>
-          <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
+          <span style={{ fontSize: '28px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
             Building Assessment Report
           </span>
         </div>
@@ -324,7 +362,7 @@ export default async function ReportPrintPage({
         {/* Body */}
         <div style={{ padding: '16px 20px 0' }}>
 
-          {/* Metadata table */}
+          {/* Metadata table - 3-column layout */}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: '1px solid #e0dbd4', borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
             <tbody>
               {/* Block 1 — Attendance */}
@@ -333,13 +371,16 @@ export default async function ReportPrintPage({
                 <td style={tdLabel}>Date attended</td>
                 <td style={tdValue}>{formatDate(report.attendance_date)}</td>
                 <td style={tdLabel}>Time arrived</td>
-                <td style={tdValue}>{formatTime(report.attendance_time)}</td>
               </tr>
               <tr>
                 <td style={tdLabel}>Person met</td>
                 <td style={tdValue}>{report.person_met || '—'}</td>
-                <td style={tdLabel}>Assessor</td>
-                <td style={tdValue}>{report.assessor_name || '—'}</td>
+                <td style={tdValue}>{formatTime(report.attendance_time)}</td>
+              </tr>
+              <tr>
+                <td style={tdLabelLast}>Assessor</td>
+                <td style={tdValueLast}>{report.assessor_name || '—'}</td>
+                <td style={tdLabelLast}></td>
               </tr>
 
               {/* Block 2 — Property details (conditional) */}
@@ -349,27 +390,32 @@ export default async function ReportPrintPage({
                   {(() => {
                     const fields = propertyFields
                     const rows: React.ReactNode[] = []
-                    for (let i = 0; i < fields.length; i += 2) {
-                      const leftKey = fields[i]
-                      const rightKey = fields[i + 1]
-                      const isLast = i + 2 >= fields.length
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const key1 = fields[i]
+                      const key2 = fields[i + 1]
+                      const key3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
                       rows.push(
-                        <tr key={leftKey}>
-                          <td style={isLast && !rightKey ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[leftKey] ?? leftKey}</td>
-                          <td style={isLast && !rightKey ? tdValueLast : tdValue}>{pdText(pd, leftKey)}</td>
-                          {rightKey ? (
-                            <>
-                              <td style={isLast ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[rightKey] ?? rightKey}</td>
-                              <td style={isLast ? tdValueLast : tdValue}>{pdText(pd, rightKey)}</td>
-                            </>
+                        <tr key={key1}>
+                          <td style={isLast && !key2 && !key3 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</td>
+                          <td style={isLast && !key2 && !key3 ? tdValueLast : tdValue}>{pdText(pd, key1)}</td>
+                          {key2 ? (
+                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</td>
                           ) : (
-                            <>
-                              <td style={tdLabelLast}></td>
-                              <td style={tdValueLast}></td>
-                            </>
+                            <td style={isLast ? tdLabelLast : tdLabel}></td>
                           )}
                         </tr>
                       )
+                      // Second row for remaining values if needed
+                      if (key2 || key3) {
+                        rows.push(
+                          <tr key={`${key1}-2`}>
+                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}>{key3 ? (PROPERTY_FIELD_LABELS[key3] ?? key3) : ''}</td>
+                            <td style={isLast && !key3 ? tdValueLast : tdValue}>{key3 ? pdText(pd, key3) : ''}</td>
+                            <td style={isLast ? tdLabelLast : tdLabel}></td>
+                          </tr>
+                        )
+                      }
                     }
                     return rows
                   })()}
@@ -382,13 +428,16 @@ export default async function ReportPrintPage({
                 <td style={tdLabel}>Make safe conducted</td>
                 <td style={tdValue}>{tsf(report, 'make_safe_conducted')}</td>
                 <td style={tdLabel}>Specialist report obtained</td>
-                <td style={tdValue}>{tsf(report, 'specialist_report_obtained')}</td>
               </tr>
               <tr>
                 <td style={tdLabel}>Drone utilised</td>
                 <td style={tdValue}>{tsf(report, 'drone_utilised')}</td>
-                <td style={tdLabel}>Tarp required</td>
-                <td style={tdValue}>{tsf(report, 'tarp_required')}</td>
+                <td style={tdValue}>{tsf(report, 'specialist_report_obtained')}</td>
+              </tr>
+              <tr>
+                <td style={tdLabelLast}>Tarp required</td>
+                <td style={tdValueLast}>{tsf(report, 'tarp_required')}</td>
+                <td style={tdLabelLast}></td>
               </tr>
 
               {/* Block 4 — Insurer-specific rows (conditional) */}
@@ -463,7 +512,7 @@ export default async function ReportPrintPage({
                           </div>
                         </div>
                         <div style={{ background: '#fafaf8', border: '1px solid #e8e4e0', borderRadius: '5px', padding: '9px 11px', fontSize: '11.5px', color: '#3a3530', lineHeight: '1.65', ...(config.leftBorder ? { borderLeft: config.leftBorder } : {}) }}>
-                          {value ? value : <span style={{ color: '#9e998f' }}>—</span>}
+                          {formatTextWithPreservedFormatting(value)}
                         </div>
                       </div>
                     )
