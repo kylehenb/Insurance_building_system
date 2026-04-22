@@ -17,7 +17,7 @@ export interface BlueprintTimelineViewProps {
   onCancel: (id: string) => void
   onUpdate: (id: string, u: any) => void
   onAddVisit: (id: string) => void
-  onSetPred: (id: string, predId: string | null, isConcurrent: boolean) => void
+  onSetPred: (id: string, predId: string | null) => void
   onReorder: (orderedIds: string[]) => void
   onSetParent: (id: string, parentId: string | null, offsetDays: number) => void
   jobId: string
@@ -84,7 +84,7 @@ export function BlueprintTimelineView({
     // Simple prompt for dependency - in a real app, this would be a modal with a dropdown
     const predecessorId = prompt('Enter predecessor work order ID (or leave blank to remove dependency):')
     if (predecessorId !== null) {
-      onSetPred(contextMenu.workOrderId, predecessorId || null, false)
+      onSetPred(contextMenu.workOrderId, predecessorId || null)
     }
     setContextMenu(null)
   }

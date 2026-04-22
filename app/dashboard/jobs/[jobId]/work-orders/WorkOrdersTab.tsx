@@ -238,7 +238,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               onCancel={handleCancel}
               onUpdate={handleUpdate}
               onAddVisit={id => mutations.addVisit(id)}
-              onSetPred={(id, predId, conc) => mutations.setPredecessor(id, predId, conc)}
+              onSetPred={(id, predId) => mutations.setPredecessor(id, predId)}
               onReorder={handleReorder}
               onSetParent={handleSetParent}
               jobId={jobId}

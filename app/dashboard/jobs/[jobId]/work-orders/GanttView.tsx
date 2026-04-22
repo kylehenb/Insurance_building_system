@@ -121,14 +121,9 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
       const y2 = tR.top    + tR.height / 2 - bRect.top
       const mx = Math.min(x1 + 28, x2 - 4)
 
-      const isDash = wo.is_concurrent
-      const stroke = isDash ? '#d4cdc4' : '#b0a89e'
-      const dash   = isDash ? 'stroke-dasharray="5,3"' : ''
-      const marker = isDash ? 'arr-dash' : 'arr-solid'
-
       paths += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
-        fill="none" stroke="${stroke}" stroke-width="1.5" ${dash}
-        marker-end="url(#${marker})"/>`
+        fill="none" stroke="#b0a89e" stroke-width="1.5"
+        marker-end="url(#arr-solid)"/>`
     })
 
     svg.innerHTML = defs + paths
