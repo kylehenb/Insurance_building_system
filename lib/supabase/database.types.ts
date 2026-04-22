@@ -513,6 +513,165 @@ export type Database = {
           },
         ]
       }
+      inspection_scheduling_rules: {
+        Row: {
+          access_constraint_block: boolean | null
+          afternoon_simple_jobs: boolean | null
+          anchor_job_enabled: boolean | null
+          arrival_window_minutes: number | null
+          arrival_window_sms_enabled: boolean | null
+          auto_mode_trigger_count: number | null
+          busy_mode_radius_km: number | null
+          capture_availability_from_sms: boolean | null
+          cat_cluster_order_count: number | null
+          cat_cluster_window_hours: number | null
+          cat_event_active: boolean | null
+          cluster_radius_km: number | null
+          confirmation_threshold_pct: number | null
+          created_at: string | null
+          day_end_cutoff: string | null
+          days_since_lodged_escalation: number | null
+          first_appointment_time: string | null
+          id: string
+          inspection_buffer_minutes: number | null
+          inspector_config: Json | null
+          insurer_sla_config: Json | null
+          job_type_durations: Json | null
+          kpi_override_hours: number | null
+          last_appointment_time: string | null
+          max_daily_inspections: number | null
+          max_daily_travel_hours: number | null
+          min_cluster_size: number | null
+          morning_complex_jobs: boolean | null
+          new_order_hold_minutes: number | null
+          overflow_max_per_day: number | null
+          overflow_radius_km: number | null
+          peak_hour_config: Json | null
+          postcode_zone_map: Json | null
+          quiet_mode_hold_days: number | null
+          repeat_reschedule_threshold: number | null
+          same_address_always_together: boolean | null
+          same_claim_hold_enabled: boolean | null
+          scheduling_mode: string | null
+          service_area_postcodes: string[] | null
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+          vulnerable_person_extra_minutes: number | null
+          vulnerable_person_morning_preference: boolean | null
+          zone_day_map: Json | null
+        }
+        Insert: {
+          access_constraint_block?: boolean | null
+          afternoon_simple_jobs?: boolean | null
+          anchor_job_enabled?: boolean | null
+          arrival_window_minutes?: number | null
+          arrival_window_sms_enabled?: boolean | null
+          auto_mode_trigger_count?: number | null
+          busy_mode_radius_km?: number | null
+          capture_availability_from_sms?: boolean | null
+          cat_cluster_order_count?: number | null
+          cat_cluster_window_hours?: number | null
+          cat_event_active?: boolean | null
+          cluster_radius_km?: number | null
+          confirmation_threshold_pct?: number | null
+          created_at?: string | null
+          day_end_cutoff?: string | null
+          days_since_lodged_escalation?: number | null
+          first_appointment_time?: string | null
+          id?: string
+          inspection_buffer_minutes?: number | null
+          inspector_config?: Json | null
+          insurer_sla_config?: Json | null
+          job_type_durations?: Json | null
+          kpi_override_hours?: number | null
+          last_appointment_time?: string | null
+          max_daily_inspections?: number | null
+          max_daily_travel_hours?: number | null
+          min_cluster_size?: number | null
+          morning_complex_jobs?: boolean | null
+          new_order_hold_minutes?: number | null
+          overflow_max_per_day?: number | null
+          overflow_radius_km?: number | null
+          peak_hour_config?: Json | null
+          postcode_zone_map?: Json | null
+          quiet_mode_hold_days?: number | null
+          repeat_reschedule_threshold?: number | null
+          same_address_always_together?: boolean | null
+          same_claim_hold_enabled?: boolean | null
+          scheduling_mode?: string | null
+          service_area_postcodes?: string[] | null
+          tenant_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+          vulnerable_person_extra_minutes?: number | null
+          vulnerable_person_morning_preference?: boolean | null
+          zone_day_map?: Json | null
+        }
+        Update: {
+          access_constraint_block?: boolean | null
+          afternoon_simple_jobs?: boolean | null
+          anchor_job_enabled?: boolean | null
+          arrival_window_minutes?: number | null
+          arrival_window_sms_enabled?: boolean | null
+          auto_mode_trigger_count?: number | null
+          busy_mode_radius_km?: number | null
+          capture_availability_from_sms?: boolean | null
+          cat_cluster_order_count?: number | null
+          cat_cluster_window_hours?: number | null
+          cat_event_active?: boolean | null
+          cluster_radius_km?: number | null
+          confirmation_threshold_pct?: number | null
+          created_at?: string | null
+          day_end_cutoff?: string | null
+          days_since_lodged_escalation?: number | null
+          first_appointment_time?: string | null
+          id?: string
+          inspection_buffer_minutes?: number | null
+          inspector_config?: Json | null
+          insurer_sla_config?: Json | null
+          job_type_durations?: Json | null
+          kpi_override_hours?: number | null
+          last_appointment_time?: string | null
+          max_daily_inspections?: number | null
+          max_daily_travel_hours?: number | null
+          min_cluster_size?: number | null
+          morning_complex_jobs?: boolean | null
+          new_order_hold_minutes?: number | null
+          overflow_max_per_day?: number | null
+          overflow_radius_km?: number | null
+          peak_hour_config?: Json | null
+          postcode_zone_map?: Json | null
+          quiet_mode_hold_days?: number | null
+          repeat_reschedule_threshold?: number | null
+          same_address_always_together?: boolean | null
+          same_claim_hold_enabled?: boolean | null
+          scheduling_mode?: string | null
+          service_area_postcodes?: string[] | null
+          tenant_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          vulnerable_person_extra_minutes?: number | null
+          vulnerable_person_morning_preference?: boolean | null
+          zone_day_map?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_scheduling_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_scheduling_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspections: {
         Row: {
           access_notes: string | null
@@ -771,6 +930,57 @@ export type Database = {
           },
         ]
       }
+      invoice_line_items: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          invoice_id: string
+          line_total: number
+          quantity: number
+          sort_order: number | null
+          tenant_id: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          invoice_id: string
+          line_total: number
+          quantity?: number
+          sort_order?: number | null
+          tenant_id: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          quantity?: number
+          sort_order?: number | null
+          tenant_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount_ex_gst: number | null
@@ -900,57 +1110,6 @@ export type Database = {
             columns: ["work_order_id"]
             isOneToOne: false
             referencedRelation: "work_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invoice_line_items: {
-        Row: {
-          created_at: string | null
-          description: string
-          id: string
-          invoice_id: string
-          line_total: number
-          quantity: number
-          sort_order: number | null
-          tenant_id: string
-          unit_price: number
-        }
-        Insert: {
-          created_at?: string | null
-          description: string
-          id?: string
-          invoice_id: string
-          line_total: number
-          quantity: number
-          sort_order?: number | null
-          tenant_id: string
-          unit_price: number
-        }
-        Update: {
-          created_at?: string | null
-          description?: string
-          id?: string
-          invoice_id?: string
-          line_total?: number
-          quantity?: number
-          sort_order?: number | null
-          tenant_id?: string
-          unit_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_line_items_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_line_items_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -2353,8 +2512,14 @@ export type Database = {
       }
       tenants: {
         Row: {
-          address: string | null
           abn: string | null
+          account_name: string | null
+          account_number: string | null
+          accounts_email: string | null
+          address: string | null
+          alternative_logo_storage_path: string | null
+          bank_name: string | null
+          bsb: string | null
           building_licence_number: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -2365,12 +2530,19 @@ export type Database = {
           logo_storage_path: string | null
           name: string
           plan: string | null
+          service_area_config: Json | null
           slug: string
           trading_name: string | null
         }
         Insert: {
-          address?: string | null
           abn?: string | null
+          account_name?: string | null
+          account_number?: string | null
+          accounts_email?: string | null
+          address?: string | null
+          alternative_logo_storage_path?: string | null
+          bank_name?: string | null
+          bsb?: string | null
           building_licence_number?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -2381,12 +2553,19 @@ export type Database = {
           logo_storage_path?: string | null
           name: string
           plan?: string | null
+          service_area_config?: Json | null
           slug: string
           trading_name?: string | null
         }
         Update: {
-          address?: string | null
           abn?: string | null
+          account_name?: string | null
+          account_number?: string | null
+          accounts_email?: string | null
+          address?: string | null
+          alternative_logo_storage_path?: string | null
+          bank_name?: string | null
+          bsb?: string | null
           building_licence_number?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -2397,6 +2576,7 @@ export type Database = {
           logo_storage_path?: string | null
           name?: string
           plan?: string | null
+          service_area_config?: Json | null
           slug?: string
           trading_name?: string | null
         }
@@ -2404,33 +2584,54 @@ export type Database = {
       }
       trade_type_sequence: {
         Row: {
+          can_run_concurrent_with: string[] | null
+          cant_run_concurrent_with: string[] | null
           created_at: string | null
           id: string
+          lag_description: string | null
           notes: string | null
           tenant_id: string
           trade_type: string
+          typical_comes_before: string[] | null
+          typical_depends_on: string[] | null
+          typical_lag_days: number | null
           typical_sequence_order: number | null
           typical_visit_count: number | null
+          typically_paired_with: string[] | null
           updated_at: string | null
         }
         Insert: {
+          can_run_concurrent_with?: string[] | null
+          cant_run_concurrent_with?: string[] | null
           created_at?: string | null
           id?: string
+          lag_description?: string | null
           notes?: string | null
           tenant_id: string
           trade_type: string
+          typical_comes_before?: string[] | null
+          typical_depends_on?: string[] | null
+          typical_lag_days?: number | null
           typical_sequence_order?: number | null
           typical_visit_count?: number | null
+          typically_paired_with?: string[] | null
           updated_at?: string | null
         }
         Update: {
+          can_run_concurrent_with?: string[] | null
+          cant_run_concurrent_with?: string[] | null
           created_at?: string | null
           id?: string
+          lag_description?: string | null
           notes?: string | null
           tenant_id?: string
           trade_type?: string
+          typical_comes_before?: string[] | null
+          typical_depends_on?: string[] | null
+          typical_lag_days?: number | null
           typical_sequence_order?: number | null
           typical_visit_count?: number | null
+          typically_paired_with?: string[] | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2447,6 +2648,7 @@ export type Database = {
         Row: {
           abn: string | null
           address: string | null
+          availability: string | null
           business_name: string | null
           can_do_make_safe: boolean | null
           can_do_reports: boolean | null
@@ -2459,10 +2661,14 @@ export type Database = {
           gary_notes: string | null
           gary_opt_out: boolean | null
           id: string
+          lat: number | null
+          lng: number | null
           makesafe_priority: number | null
           notes: string | null
           primary_contact: string | null
           primary_trade: string | null
+          priority_rank: number | null
+          service_area: string[] | null
           status: string | null
           status_note: string | null
           tenant_id: string
@@ -2471,6 +2677,7 @@ export type Database = {
         Insert: {
           abn?: string | null
           address?: string | null
+          availability?: string | null
           business_name?: string | null
           can_do_make_safe?: boolean | null
           can_do_reports?: boolean | null
@@ -2483,10 +2690,14 @@ export type Database = {
           gary_notes?: string | null
           gary_opt_out?: boolean | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           makesafe_priority?: number | null
           notes?: string | null
           primary_contact?: string | null
           primary_trade?: string | null
+          priority_rank?: number | null
+          service_area?: string[] | null
           status?: string | null
           status_note?: string | null
           tenant_id: string
@@ -2495,6 +2706,7 @@ export type Database = {
         Update: {
           abn?: string | null
           address?: string | null
+          availability?: string | null
           business_name?: string | null
           can_do_make_safe?: boolean | null
           can_do_reports?: boolean | null
@@ -2507,10 +2719,14 @@ export type Database = {
           gary_notes?: string | null
           gary_opt_out?: boolean | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           makesafe_priority?: number | null
           notes?: string | null
           primary_contact?: string | null
           primary_trade?: string | null
+          priority_rank?: number | null
+          service_area?: string[] | null
           status?: string | null
           status_note?: string | null
           tenant_id?: string
@@ -2519,6 +2735,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "trades_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          preference_key: string
+          preference_value: Json
+          tenant_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          preference_key: string
+          preference_value?: Json
+          tenant_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          preference_key?: string
+          preference_value?: Json
+          tenant_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2681,17 +2935,19 @@ export type Database = {
           charge_out_amount: number | null
           created_at: string | null
           current_visit: number | null
+          dependency_type: string | null
           estimated_hours: number | null
           gary_state: string | null
           id: string
-          is_concurrent: boolean | null
           job_id: string
           notes: string | null
+          parent_work_order_id: string | null
           predecessor_work_order_id: string | null
           proximity_range: string | null
           quote_id: string | null
           report_id: string | null
           scheduled_date: string | null
+          scheduling_offset_days: number | null
           scope_summary: string | null
           sequence_order: number | null
           status: string | null
@@ -2708,17 +2964,19 @@ export type Database = {
           charge_out_amount?: number | null
           created_at?: string | null
           current_visit?: number | null
+          dependency_type?: string | null
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
-          is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
+          parent_work_order_id?: string | null
           predecessor_work_order_id?: string | null
           proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
+          scheduling_offset_days?: number | null
           scope_summary?: string | null
           sequence_order?: number | null
           status?: string | null
@@ -2735,17 +2993,19 @@ export type Database = {
           charge_out_amount?: number | null
           created_at?: string | null
           current_visit?: number | null
+          dependency_type?: string | null
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
-          is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
+          parent_work_order_id?: string | null
           predecessor_work_order_id?: string | null
           proximity_range?: string | null
           quote_id?: string | null
           report_id?: string | null
           scheduled_date?: string | null
+          scheduling_offset_days?: number | null
           scope_summary?: string | null
           sequence_order?: number | null
           status?: string | null
@@ -2776,6 +3036,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_parent_work_order_id_fkey"
+            columns: ["parent_work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
           {
@@ -2815,36 +3082,6 @@ export type Database = {
           },
         ]
       }
-      user_preferences: {
-        Row: {
-          id: string
-          tenant_id: string
-          user_id: string
-          preference_key: string
-          preference_value: Json | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          user_id: string
-          preference_key: string
-          preference_value?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          user_id?: string
-          preference_key?: string
-          preference_value?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       job_margin_summary: {
@@ -2871,6 +3108,14 @@ export type Database = {
     }
     Functions: {
       generate_job_number: { Args: { p_tenant_id: string }; Returns: string }
+      generate_work_order_ref: {
+        Args: { p_job_id: string; p_tenant_id: string }
+        Returns: string
+      }
+      seed_prompts_for_tenant: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
