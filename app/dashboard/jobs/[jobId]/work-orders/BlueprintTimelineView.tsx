@@ -52,7 +52,24 @@ export function BlueprintTimelineView({
     const placed = workOrders.filter(wo => wo.placementState !== 'unplaced')
     console.log('[BlueprintTimelineView] Placed work orders:', placed.length, placed)
 
-    // Convert work orders to vis.js timeline items WITHOUT groups first
+    // Create groups based on trade types
+    const uniqueTradeTypes = Array.from(
+      new Set(placed.map(wo => wo.tradeTypeLabel || 'Unknown'))
+    ).sort()
+
+    console.log('[BlueprintTimelineView] Unique trade types:', uniqueTradeTypes)
+
+    const groups = new DataSet(
+      uniqueTradeTypes.map((tradeType, index) => ({
+        id: tradeType,
+        content: tradeType,
+        order: index,
+      }))
+    )
+
+    console.log('[BlueprintTimelineView] Groups:', groups)
+
+    // Convert work orders to vis.js timeline items with group assignment
     const items = new DataSet(
       placed.map((wo, index) => {
         // If no scheduled date, spread them out by day for visibility
@@ -69,7 +86,8 @@ export function BlueprintTimelineView({
 
         const item = {
           id: wo.id,
-          content: `${sent ? '🔒 ' : ''}${wo.tradeTypeLabel} - ${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
+          content: `${sent ? '🔒 ' : ''}${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
+          group: wo.tradeTypeLabel || 'Unknown',
           start: startDate,
           end: endDate,
           title: `${wo.trade?.business_name || 'No contractor'} - ${wo.tradeTypeLabel}`,
@@ -92,23 +110,30 @@ export function BlueprintTimelineView({
 
     console.log('[BlueprintTimelineView] Items dataset:', items)
 
-    // Simple options without groups
+    // Options with groups and enabled interactions
     const options = {
       height: '400px',
       width: '100%',
+      groupOrder: 'order',
       stack: false,
       showCurrentTime: false,
-      moveable: false,
-      zoomable: false,
+      moveable: true,
+      zoomable: true,
+      editable: {
+        updateTime: true,
+        updateGroup: false,
+        remove: false,
+      },
     }
 
     console.log('[BlueprintTimelineView] Creating timeline with options:', options)
 
     try {
-      // Create timeline WITHOUT groups
+      // Create timeline with groups
       timelineInstance.current = new Timeline(
         timelineRef.current,
         items,
+        groups,
         options
       )
       console.log('[BlueprintTimelineView] Timeline created successfully')
