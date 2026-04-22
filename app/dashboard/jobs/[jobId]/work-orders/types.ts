@@ -27,6 +27,7 @@ export interface WorkOrderWithDetails extends WorkOrderRow {
   quotedAllowance: number   // sum of scopeItems.line_total
   lagDays:         number   // first visit lag_days_after
   lagDescription:  string   // first visit lag_description
+  parent_work_order_id?: string | null  // parent work order ID for key trade relationships
   dependency_type?: string | null  // 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish'
   parentWorkOrder: WorkOrderWithDetails | null  // parent/child relationship for key trades
   children:        WorkOrderWithDetails[]       // child trades that depend on this one

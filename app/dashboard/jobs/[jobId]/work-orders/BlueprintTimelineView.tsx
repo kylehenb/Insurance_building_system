@@ -121,71 +121,95 @@ export function BlueprintTimelineView({
     console.log('[BlueprintTimelineView] Groups:', groups)
 
     // Convert work orders to vis.js timeline items with group assignment
-    const items = new DataSet(
-      placed.map((wo, index) => {
-        // If no scheduled date, spread them out by day for visibility
-        const startDate = wo.visits[0]?.scheduled_date
-          ? new Date(wo.visits[0].scheduled_date)
-          : new Date(Date.now() + index * 24 * 60 * 60 * 1000) // Spread by day
-        
-        const endDate = wo.estimated_hours
-          ? new Date(startDate.getTime() + wo.estimated_hours * 60 * 60 * 1000)
-          : new Date(startDate.getTime() + 24 * 60 * 60 * 1000) // Default 1 day
+    // Create separate items for each visit
+    const items: any[] = []
+    placed.forEach((wo, woIndex) => {
+      const sent = wo.gary_state && wo.gary_state !== 'not_started'
+      const color = getTradeColor(wo.tradeTypeLabel || '')
 
-        const color = getTradeColor(wo.tradeTypeLabel)
-        const sent = wo.placementState === 'placed_sent' || wo.placementState === 'placed_complete'
+      // If the work order has multiple visits, create a timeline item for each
+      if (wo.visits.length > 0) {
+        wo.visits.forEach((visit, visitIndex) => {
+          const startDate = visit.scheduled_date
+            ? new Date(visit.scheduled_date)
+            : new Date(Date.now() + woIndex * 24 * 60 * 60 * 1000 + visitIndex * 12 * 60 * 60 * 1000)
+          
+          const duration = visit.estimated_hours || wo.estimated_hours || 4
+          const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000)
 
-        // Build custom item content with badges
-        let badges = ''
-        if ((wo.total_visits ?? 1) > 1) {
-          badges += `<span style="margin-left: 4px; padding: 1px 4px; border-radius: 3px; background: #eff4ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 8px;">V${wo.current_visit}/${wo.total_visits}</span>`
-        }
-        if (wo.proximity_range === 'extended') {
-          badges += `<span style="margin-left: 4px; padding: 1px 4px; border-radius: 3px; background: #fff0f0; border: 1px solid #fca5a5; color: #991b1b; font-size: 8px;">Ext</span>`
-        }
+          // Build badges
+          const badges: string[] = []
+          if (wo.visits.length > 1) {
+            badges.push(`<span style="background: rgba(0,0,0,0.1); padding: 2px 5px; border-radius: 3px; font-size: 9px;">Visit ${visit.visit_number}/${wo.total_visits}</span>`)
+          }
+          if (wo.proximity_range === 'extended') {
+            badges.push(`<span style="background: rgba(0,0,0,0.1); padding: 2px 5px; border-radius: 3px; font-size: 9px;">extended</span>`)
+          }
 
-        const item = {
+          const item = {
+            id: `${wo.id}-visit-${visit.visit_number}`,
+            workOrderId: wo.id, // Store original work order ID
+            content: `
+              <div style="display: flex; align-items: center; gap: 4px;">
+                ${sent ? '🔒' : ''}
+                <span>${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}</span>
+                ${badges}
+              </div>
+            `,
+            group: wo.tradeTypeLabel || 'Unknown',
+            start: startDate,
+            end: endDate,
+            title: `
+              <strong>${wo.tradeTypeLabel}</strong> (Visit ${visit.visit_number})<br/>
+              Contractor: ${wo.trade?.business_name || 'No contractor'}<br/>
+              Est. Hours: ${visit.estimated_hours || wo.estimated_hours || 'N/A'}<br/>
+              Status: ${wo.placementState}<br/>
+              ${(visit.lag_days_after || 0) > 0 ? `Lag: ${visit.lag_days_after} days<br/>` : ''}
+              ${wo.scopeItems.length > 0 ? `Line Items: ${wo.scopeItems.length}` : ''}
+            `,
+            style: `
+              background-color: ${color}${sent ? '30' : '18'};
+              border-color: ${color};
+              color: ${color};
+              border-radius: 5px;
+              font-size: 10px;
+              font-weight: 500;
+              padding: 0 9px;
+              ${wo.placementState === 'placed_complete' ? 'opacity: 0.65;' : ''}
+            `,
+          }
+
+          items.push(item)
+        })
+      } else {
+        // Fallback for work orders without visits (shouldn't happen in normal flow)
+        const startDate = new Date(Date.now() + woIndex * 24 * 60 * 60 * 1000)
+        const endDate = new Date(startDate.getTime() + (wo.estimated_hours || 4) * 60 * 60 * 1000)
+
+        items.push({
           id: wo.id,
-          content: `
-            <div style="display: flex; align-items: center; gap: 4px;">
-              ${sent ? '🔒' : ''}
-              <span>${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}</span>
-              ${badges}
-            </div>
-          `,
+          workOrderId: wo.id,
+          content: wo.tradeTypeLabel,
           group: wo.tradeTypeLabel || 'Unknown',
           start: startDate,
           end: endDate,
-          title: `
-            <strong>${wo.tradeTypeLabel}</strong><br/>
-            Contractor: ${wo.trade?.business_name || 'No contractor'}<br/>
-            Est. Hours: ${wo.estimated_hours || 'N/A'}<br/>
-            Status: ${wo.placementState}<br/>
-            ${wo.lagDays > 0 ? `Lag: ${wo.lagDays} days<br/>` : ''}
-            ${wo.cushionDays > 0 ? `Cushion: ${wo.cushionDays} days<br/>` : ''}
-            ${wo.scopeItems.length > 0 ? `Line Items: ${wo.scopeItems.length}` : ''}
-          `,
           style: `
-            background-color: ${color}${sent ? '30' : '18'};
-            border-color: ${color};
+            background-color: ${color}18;
+            border: 1px solid ${color};
             color: ${color};
             border-radius: 5px;
             font-size: 10px;
-            font-weight: 500;
-            padding: 0 9px;
-            ${wo.placementState === 'placed_complete' ? 'opacity: 0.65;' : ''}
           `,
-        }
+        })
+      }
+    })
 
-        console.log('[BlueprintTimelineView] Item:', item)
-        return item
-      })
-    )
+    const itemsDataSet = new DataSet(items)
 
-    console.log('[BlueprintTimelineView] Items dataset:', items)
+    console.log('[BlueprintTimelineView] Items dataset:', itemsDataSet)
 
     // Collision detection: identify scheduling conflicts
-    const itemsArray = (items.get() as any[])
+    const itemsArray = items
     const conflicts = new Set<string>()
     
     for (let i = 0; i < itemsArray.length; i++) {
@@ -213,25 +237,23 @@ export function BlueprintTimelineView({
 
     // Update items with conflict styling
     conflicts.forEach(conflictId => {
-      const item = items.get(conflictId)
-      if (item && item.content) {
-        items.update({
-          id: conflictId,
-          style: `${item.style} border: 2px solid #ef4444 !important; box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);`,
-        })
+      const itemIndex = items.findIndex(item => item.id === conflictId)
+      if (itemIndex !== -1 && items[itemIndex].content) {
+        items[itemIndex].style = `${items[itemIndex].style} border: 2px solid #ef4444 !important; box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);`
       }
     })
 
     // Create background items for lag and cushion periods
     const backgroundItems: any[] = []
     placed.forEach((wo, index) => {
-      const startDate = wo.visits[0]?.scheduled_date
-        ? new Date(wo.visits[0].scheduled_date)
+      // Use the last visit's end date for lag/cushion calculations
+      const lastVisit = wo.visits[wo.visits.length - 1]
+      const startDate = lastVisit?.scheduled_date
+        ? new Date(lastVisit.scheduled_date)
         : new Date(Date.now() + index * 24 * 60 * 60 * 1000)
       
-      const endDate = wo.estimated_hours
-        ? new Date(startDate.getTime() + wo.estimated_hours * 60 * 60 * 1000)
-        : new Date(startDate.getTime() + 24 * 60 * 60 * 1000)
+      const duration = lastVisit?.estimated_hours || wo.estimated_hours || 4
+      const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000)
 
       const groupKey = wo.tradeTypeLabel || 'Unknown'
 
@@ -279,12 +301,15 @@ export function BlueprintTimelineView({
     })
 
     // Combine regular items with background items
-    const allItems = new DataSet([...(items.get() as any[]), ...backgroundItems])
+    const allItems = new DataSet([...items, ...backgroundItems])
 
-    // Calculate custom time range
-    const now = new Date()
-    const minDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
-    const maxDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000) // 60 days from now
+    // Calculate min/max dates for view range
+    const allDates = items.flatMap(item => [new Date(item.start), new Date(item.end)])
+    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
+    // Add some padding
+    minDate.setDate(minDate.getDate() - 2)
+    maxDate.setDate(maxDate.getDate() + 7)
 
     // Options with groups and enabled interactions
     const options = {
@@ -336,7 +361,7 @@ export function BlueprintTimelineView({
     try {
       // Create timeline with groups and all items (including background)
       timelineInstance.current = new Timeline(
-        timelineRef.current,
+        timelineRef.current!,
         allItems,
         groups,
         options
@@ -572,6 +597,11 @@ export function BlueprintTimelineView({
           {workOrders.filter(w => w.placementState === 'unplaced').map(wo => (
             <div
               key={wo.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('workOrderId', wo.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
               style={{
                 padding: '8px 10px',
                 borderRadius: 6,
@@ -580,6 +610,8 @@ export function BlueprintTimelineView({
                 fontSize: 11,
                 fontWeight: 600,
                 color: '#1a1a1a',
+                cursor: 'grab',
+                userSelect: 'none',
               }}
             >
               {wo.tradeTypeLabel}
@@ -591,6 +623,45 @@ export function BlueprintTimelineView({
       {/* Timeline */}
       <div
         ref={timelineRef}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const workOrderId = e.dataTransfer.getData('workOrderId')
+          if (!workOrderId) return
+
+          const workOrder = workOrders.find(wo => wo.id === workOrderId)
+          if (!workOrder || workOrder.placementState !== 'unplaced') return
+
+          // Calculate the drop date from the timeline
+          if (timelineInstance.current) {
+            const rect = timelineRef.current?.getBoundingClientRect()
+            if (rect) {
+              const x = e.clientX - rect.left
+              const window = timelineInstance.current.getWindow()
+              if (window) {
+                // Calculate date based on x position within the visible window
+                const ratio = x / rect.width
+                const timeDiff = window.end.getTime() - window.start.getTime()
+                const dropDate = new Date(window.start.getTime() + timeDiff * ratio)
+                console.log('[BlueprintTimelineView] Dropped work order at date:', dropDate)
+                
+                // Call onUpdate to place the work order
+                if (onUpdate) {
+                  onUpdate(workOrderId, {
+                    sequence_order: Date.now(), // Temporary sequence order
+                    visits: [{
+                      ...workOrder.visits[0],
+                      scheduled_date: dropDate.toISOString().split('T')[0],
+                    }]
+                  })
+                }
+              }
+            }
+          }
+        }}
         style={{
           flex: 1,
           background: '#fff',
