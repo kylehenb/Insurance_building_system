@@ -2939,6 +2939,7 @@ export type Database = {
           estimated_hours: number | null
           gary_state: string | null
           id: string
+          is_concurrent: boolean | null
           job_id: string
           notes: string | null
           parent_work_order_id: string | null
@@ -2968,6 +2969,7 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
           parent_work_order_id?: string | null
@@ -2997,6 +2999,7 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
           parent_work_order_id?: string | null
