@@ -258,27 +258,30 @@ export default async function ReportPrintPage({
   // Assign sequential section numbers
   let sectionCounter = 0
 
-  // TD cell base style (3-column layout)
+  // TD cell base style (3-column layout with label + value in same cell)
   const tdBase: React.CSSProperties = {
-    padding: '5px 10px',
+    padding: '8px 12px',
     borderBottom: '1px solid #f0ece6',
     verticalAlign: 'top',
+    width: '33.33%',
   }
-  const tdLabel: React.CSSProperties = {
+  const tdCell: React.CSSProperties = {
     ...tdBase,
+  }
+  const tdCellLast: React.CSSProperties = { ...tdCell, borderBottom: 'none' }
+  const labelStyle: React.CSSProperties = {
     color: '#6a6460',
-    fontSize: '10px',
+    fontSize: '9px',
     fontWeight: '700',
-    width: '28%',
-    whiteSpace: 'nowrap',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    marginBottom: '3px',
   }
-  const tdValue: React.CSSProperties = {
-    ...tdBase,
+  const valueStyle: React.CSSProperties = {
     color: '#1a1a1a',
+    fontSize: '11px',
     fontWeight: '500',
   }
-  const tdLabelLast: React.CSSProperties = { ...tdLabel, borderBottom: 'none' }
-  const tdValueLast: React.CSSProperties = { ...tdValue, borderBottom: 'none' }
 
   const dividerRow = (label: string) => (
     <tr>
@@ -374,24 +377,26 @@ export default async function ReportPrintPage({
               {/* Block 1 — Attendance */}
               {dividerRow('Attendance')}
               <tr>
-                <td style={tdLabel}>Date attended</td>
-                <td style={tdValue}>{formatDate(report.attendance_date)}</td>
-                <td style={tdLabel}>Time arrived</td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Date attended</div>
+                  <div style={valueStyle}>{formatDate(report.attendance_date)}</div>
+                </td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Time arrived</div>
+                  <div style={valueStyle}>{formatTime(report.attendance_time)}</div>
+                </td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Person met</div>
+                  <div style={valueStyle}>{report.person_met || '—'}</div>
+                </td>
               </tr>
               <tr>
-                <td style={tdLabel}></td>
-                <td style={tdValue}>{formatTime(report.attendance_time)}</td>
-                <td style={tdLabel}>Person met</td>
-              </tr>
-              <tr>
-                <td style={tdLabelLast}></td>
-                <td style={tdValueLast}>{report.person_met || '—'}</td>
-                <td style={tdLabelLast}>Assessor</td>
-              </tr>
-              <tr>
-                <td style={tdLabelLast}></td>
-                <td style={tdValueLast}>{report.assessor_name || '—'}</td>
-                <td style={tdLabelLast}></td>
+                <td style={tdCellLast}>
+                  <div style={labelStyle}>Assessor</div>
+                  <div style={valueStyle}>{report.assessor_name || '—'}</div>
+                </td>
+                <td style={tdCellLast}></td>
+                <td style={tdCellLast}></td>
               </tr>
 
               {/* Block 2 — Property details (conditional) */}
@@ -408,44 +413,30 @@ export default async function ReportPrintPage({
                       const key3 = fields[i + 2]
                       const isLast = i + 3 >= fields.length
                       
-                      // First row: label1, value1, label2
                       rows.push(
                         <tr key={key1}>
-                          <td style={isLast && !key2 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</td>
-                          <td style={isLast && !key2 ? tdValueLast : tdValue}>{pdText(pd, key1)}</td>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</div>
+                            <div style={valueStyle}>{pdText(pd, key1)}</div>
+                          </td>
                           {key2 ? (
-                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</td>
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</div>
+                              <div style={valueStyle}>{pdText(pd, key2)}</div>
+                            </td>
                           ) : (
-                            <td style={isLast ? tdLabelLast : tdLabel}></td>
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {key3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={labelStyle}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</div>
+                              <div style={valueStyle}>{pdText(pd, key3)}</div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
                           )}
                         </tr>
                       )
-                      
-                      // Second row: empty, value2, label3 (if key2 exists)
-                      if (key2) {
-                        rows.push(
-                          <tr key={`${key1}-2`}>
-                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}></td>
-                            <td style={isLast && !key3 ? tdValueLast : tdValue}>{pdText(pd, key2)}</td>
-                            {key3 ? (
-                              <td style={isLast ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</td>
-                            ) : (
-                              <td style={isLast ? tdLabelLast : tdLabel}></td>
-                            )}
-                          </tr>
-                        )
-                      }
-                      
-                      // Third row: empty, value3, empty (if key3 exists)
-                      if (key3) {
-                        rows.push(
-                          <tr key={`${key1}-3`}>
-                            <td style={tdLabelLast}></td>
-                            <td style={tdValueLast}>{pdText(pd, key3)}</td>
-                            <td style={tdLabelLast}></td>
-                          </tr>
-                        )
-                      }
                     }
                     return rows
                   })()}
@@ -455,24 +446,26 @@ export default async function ReportPrintPage({
               {/* Block 3 — Make safe & specialist */}
               {dividerRow('Make safe & specialist')}
               <tr>
-                <td style={tdLabel}>Make safe conducted</td>
-                <td style={tdValue}>{tsf(report, 'make_safe_conducted')}</td>
-                <td style={tdLabel}>Specialist report obtained</td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Make safe conducted</div>
+                  <div style={valueStyle}>{tsf(report, 'make_safe_conducted')}</div>
+                </td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Specialist report obtained</div>
+                  <div style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</div>
+                </td>
+                <td style={tdCell}>
+                  <div style={labelStyle}>Drone utilised</div>
+                  <div style={valueStyle}>{tsf(report, 'drone_utilised')}</div>
+                </td>
               </tr>
               <tr>
-                <td style={tdLabel}></td>
-                <td style={tdValue}>{tsf(report, 'specialist_report_obtained')}</td>
-                <td style={tdLabel}>Drone utilised</td>
-              </tr>
-              <tr>
-                <td style={tdLabel}></td>
-                <td style={tdValue}>{tsf(report, 'drone_utilised')}</td>
-                <td style={tdLabel}>Tarp required</td>
-              </tr>
-              <tr>
-                <td style={tdLabelLast}></td>
-                <td style={tdValueLast}>{tsf(report, 'tarp_required')}</td>
-                <td style={tdLabelLast}></td>
+                <td style={tdCellLast}>
+                  <div style={labelStyle}>Tarp required</div>
+                  <div style={valueStyle}>{tsf(report, 'tarp_required')}</div>
+                </td>
+                <td style={tdCellLast}></td>
+                <td style={tdCellLast}></td>
               </tr>
 
               {/* Block 4 — Insurer-specific rows (conditional) */}
@@ -488,44 +481,30 @@ export default async function ReportPrintPage({
                       const item3 = specific[i + 2]
                       const isLast = i + 3 >= specific.length
                       
-                      // First row: label1, value1, label2
                       rows.push(
                         <tr key={item1.field}>
-                          <td style={isLast && !item2 ? tdLabelLast : tdLabel}>{item1.label}</td>
-                          <td style={isLast && !item2 ? tdValueLast : tdValue}>{tsf(report, item1.field)}</td>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={labelStyle}>{item1.label}</div>
+                            <div style={valueStyle}>{tsf(report, item1.field)}</div>
+                          </td>
                           {item2 ? (
-                            <td style={isLast && !item3 ? tdLabelLast : tdLabel}>{item2.label}</td>
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={labelStyle}>{item2.label}</div>
+                              <div style={valueStyle}>{tsf(report, item2.field)}</div>
+                            </td>
                           ) : (
-                            <td style={isLast ? tdLabelLast : tdLabel}></td>
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={labelStyle}>{item3.label}</div>
+                              <div style={valueStyle}>{tsf(report, item3.field)}</div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
                           )}
                         </tr>
                       )
-                      
-                      // Second row: empty, value2, label3 (if item2 exists)
-                      if (item2) {
-                        rows.push(
-                          <tr key={`${item1.field}-2`}>
-                            <td style={isLast && !item3 ? tdLabelLast : tdLabel}></td>
-                            <td style={isLast && !item3 ? tdValueLast : tdValue}>{tsf(report, item2.field)}</td>
-                            {item3 ? (
-                              <td style={isLast ? tdLabelLast : tdLabel}>{item3.label}</td>
-                            ) : (
-                              <td style={isLast ? tdLabelLast : tdLabel}></td>
-                            )}
-                          </tr>
-                        )
-                      }
-                      
-                      // Third row: empty, value3, empty (if item3 exists)
-                      if (item3) {
-                        rows.push(
-                          <tr key={`${item1.field}-3`}>
-                            <td style={tdLabelLast}></td>
-                            <td style={tdValueLast}>{tsf(report, item3.field)}</td>
-                            <td style={tdLabelLast}></td>
-                          </tr>
-                        )
-                      }
                     }
                     return rows
                   })()}
