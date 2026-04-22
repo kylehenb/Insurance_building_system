@@ -238,9 +238,12 @@ export type Database = {
         Row: {
           abn: string | null
           address: string | null
+          bar_amount: number | null
+          builders_margin_pct: number | null
           client_type: string
           contact_phone: string | null
           created_at: string | null
+          double_storey_roof_report_amount: number | null
           id: string
           kpi_booking_hours: number | null
           kpi_contact_hours: number | null
@@ -250,17 +253,22 @@ export type Database = {
           notes: string | null
           parent_id: string | null
           send_booking_confirmation: boolean | null
+          single_storey_roof_report_amount: number | null
           status: string | null
           submission_email: string | null
           tenant_id: string
           trading_name: string | null
+          travel_allowance_outside_service_area: number | null
         }
         Insert: {
           abn?: string | null
           address?: string | null
+          bar_amount?: number | null
+          builders_margin_pct?: number | null
           client_type: string
           contact_phone?: string | null
           created_at?: string | null
+          double_storey_roof_report_amount?: number | null
           id?: string
           kpi_booking_hours?: number | null
           kpi_contact_hours?: number | null
@@ -270,17 +278,22 @@ export type Database = {
           notes?: string | null
           parent_id?: string | null
           send_booking_confirmation?: boolean | null
+          single_storey_roof_report_amount?: number | null
           status?: string | null
           submission_email?: string | null
           tenant_id: string
           trading_name?: string | null
+          travel_allowance_outside_service_area?: number | null
         }
         Update: {
           abn?: string | null
           address?: string | null
+          bar_amount?: number | null
+          builders_margin_pct?: number | null
           client_type?: string
           contact_phone?: string | null
           created_at?: string | null
+          double_storey_roof_report_amount?: number | null
           id?: string
           kpi_booking_hours?: number | null
           kpi_contact_hours?: number | null
@@ -290,10 +303,12 @@ export type Database = {
           notes?: string | null
           parent_id?: string | null
           send_booking_confirmation?: boolean | null
+          single_storey_roof_report_amount?: number | null
           status?: string | null
           submission_email?: string | null
           tenant_id?: string
           trading_name?: string | null
+          travel_allowance_outside_service_area?: number | null
         }
         Relationships: [
           {
@@ -2914,6 +2929,7 @@ export type Database = {
           estimated_hours: number | null
           gary_state: string | null
           id: string
+          is_concurrent: boolean | null
           job_id: string
           notes: string | null
           parent_work_order_id: string | null
@@ -2943,6 +2959,7 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
           parent_work_order_id?: string | null
@@ -2972,6 +2989,7 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
+          is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
           parent_work_order_id?: string | null
