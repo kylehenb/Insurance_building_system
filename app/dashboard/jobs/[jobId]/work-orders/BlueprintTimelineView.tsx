@@ -45,6 +45,7 @@ export function BlueprintTimelineView({
 }: BlueprintTimelineViewProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const timelineInstance = useRef<Timeline | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // Load view state from local storage
   useEffect(() => {
@@ -393,6 +394,157 @@ export function BlueprintTimelineView({
         // TODO: Handle range selection for bulk operations
       })
 
+      // Handle item move - update lag/cushion background items
+      timelineInstance.current.on('onMoving', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          const workOrder = placed.find(wo => wo.id === itemId)
+          if (!workOrder) return
+
+          const lagItem = allItems.get(`${itemId}-lag`)
+          const cushionItem = allItems.get(`${itemId}-cushion`)
+
+          if (lagItem) {
+            const duration = workOrder.lagDays * 24 * 60 * 60 * 1000
+            const newEnd = new Date(properties.start.getTime() + duration)
+            allItems.update({
+              id: `${itemId}-lag`,
+              start: properties.end,
+              end: newEnd,
+            })
+          }
+
+          if (cushionItem) {
+            const lagDuration = workOrder.lagDays * 24 * 60 * 60 * 1000
+            const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
+            const lagEnd = lagItem ? lagItem.end : properties.end
+            const newEnd = new Date(lagEnd.getTime() + cushionDuration)
+            allItems.update({
+              id: `${itemId}-cushion`,
+              start: lagEnd,
+              end: newEnd,
+            })
+          }
+        }
+      })
+
+      // Handle item resize - update lag/cushion background items
+      timelineInstance.current.on('onChanging', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          const workOrder = placed.find(wo => wo.id === itemId)
+          if (!workOrder) return
+
+          const lagItem = allItems.get(`${itemId}-lag`)
+          const cushionItem = allItems.get(`${itemId}-cushion`)
+
+          if (lagItem) {
+            const duration = workOrder.lagDays * 24 * 60 * 60 * 1000
+            const newEnd = new Date(properties.end.getTime() + duration)
+            allItems.update({
+              id: `${itemId}-lag`,
+              start: properties.end,
+              end: newEnd,
+            })
+          }
+
+          if (cushionItem) {
+            const lagDuration = workOrder.lagDays * 24 * 60 * 60 * 1000
+            const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
+            const lagEnd = lagItem ? lagItem.end : properties.end
+            const newEnd = new Date(lagEnd.getTime() + cushionDuration)
+            allItems.update({
+              id: `${itemId}-cushion`,
+              start: lagEnd,
+              end: newEnd,
+            })
+          }
+        }
+      })
+
+      // Handle item move/resize completion - sync with database
+      timelineInstance.current.on('move', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          const workOrder = placed.find(wo => wo.id === itemId)
+          if (!workOrder) return
+
+          console.log('[BlueprintTimelineView] Item moved:', itemId, properties.start, properties.end)
+          // TODO: Update work order visit dates in database via onUpdate callback
+        }
+      })
+
+      timelineInstance.current.on('change', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          const workOrder = placed.find(wo => wo.id === itemId)
+          if (!workOrder) return
+
+          console.log('[BlueprintTimelineView] Item resized:', itemId, properties.start, properties.end)
+          // TODO: Update work order estimated hours in database via onUpdate callback
+        }
+      })
+
+      // Draw dependency arrows
+      const drawDependencies = () => {
+        if (!svgRef.current || !timelineRef.current) return
+
+        const svg = svgRef.current
+        const timelineContainer = timelineRef.current
+        const containerRect = timelineContainer.getBoundingClientRect()
+
+        // Clear existing arrows
+        svg.innerHTML = ''
+
+        // Draw arrows for items with dependencies
+        placed.forEach(wo => {
+          if ((wo as any).pred_id) {
+            const predId = (wo as any).pred_id
+            const predWo = placed.find(p => p.id === predId)
+            if (!predWo) return
+
+            // Find DOM elements for the items
+            const itemA = document.querySelector(`[data-id="${wo.id}"]`)
+            const itemB = document.querySelector(`[data-id="${predId}"]`)
+
+            if (!itemA || !itemB) return
+
+            const rectA = itemA.getBoundingClientRect()
+            const rectB = itemB.getBoundingClientRect()
+
+            // Calculate positions relative to the timeline container
+            const fromX = rectB.right - containerRect.left
+            const fromY = rectB.top + rectB.height / 2 - containerRect.top
+            const toX = rectA.left - containerRect.left
+            const toY = rectA.top + rectA.height / 2 - containerRect.top
+
+            // Create curved path
+            const midX = (fromX + toX) / 2
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+            path.setAttribute('d', `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`)
+            path.setAttribute('stroke', '#666')
+            path.setAttribute('stroke-width', '1.5')
+            path.setAttribute('stroke-dasharray', '4,2')
+            path.setAttribute('fill', 'none')
+            svg.appendChild(path)
+
+            // Create arrowhead
+            const arrowhead = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+            arrowhead.setAttribute('points', `${toX},${toY} ${toX - 6},${toY - 4} ${toX - 6},${toY + 4}`)
+            arrowhead.setAttribute('fill', '#666')
+            svg.appendChild(arrowhead)
+          }
+        })
+      }
+
+      // Redraw dependencies on timeline events
+      timelineInstance.current.on('changed', drawDependencies)
+      timelineInstance.current.on('rangechanged', drawDependencies)
+      timelineInstance.current.on('scroll', drawDependencies)
+
+      // Initial draw with delay to ensure DOM is ready
+      setTimeout(drawDependencies, 200)
+
       // Fit timeline to show all items
       timelineInstance.current.fit()
       console.log('[BlueprintTimelineView] Timeline fitted to items')
@@ -475,7 +627,21 @@ export function BlueprintTimelineView({
           position: 'relative',
           height: '500px',
         }}
-      />
+      >
+        {/* SVG overlay for dependency arrows */}
+        <svg
+          ref={svgRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
+      </div>
     </div>
   )
 }
