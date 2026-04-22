@@ -257,15 +257,16 @@ export default async function ReportPrintPage({
   }
   const tdLabel: React.CSSProperties = {
     ...tdBase,
-    color: '#b0a89e',
+    color: '#6a6460',
     fontSize: '10px',
-    fontWeight: '600',
-    width: '25%',
+    fontWeight: '700',
+    width: '28%',
     whiteSpace: 'nowrap',
   }
   const tdValue: React.CSSProperties = {
     ...tdBase,
-    color: '#3a3530',
+    color: '#1a1a1a',
+    fontWeight: '500',
   }
   const tdLabelLast: React.CSSProperties = { ...tdLabel, borderBottom: 'none' }
   const tdValueLast: React.CSSProperties = { ...tdValue, borderBottom: 'none' }
@@ -273,15 +274,15 @@ export default async function ReportPrintPage({
   const dividerRow = (label: string) => (
     <tr>
       <td
-        colSpan={4}
+        colSpan={3}
         style={{
           backgroundColor: '#f5f2ee',
           padding: '4px 10px',
-          fontSize: '7.5px',
+          fontSize: '8px',
           letterSpacing: '1.2px',
           textTransform: 'uppercase',
-          color: '#b0a89e',
-          fontWeight: '700',
+          color: '#6a6460',
+          fontWeight: '800',
           borderBottom: '1px solid #e0dbd4',
         }}
       >
@@ -313,14 +314,10 @@ export default async function ReportPrintPage({
                 <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Reference: </span>
                 <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_ref || '—'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Type: </span>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_type || '—'}</span>
-              </div>
             </div>
             
             {/* Job Details */}
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
             {job.insured_name && (
               <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
             )}
@@ -373,12 +370,17 @@ export default async function ReportPrintPage({
                 <td style={tdLabel}>Time arrived</td>
               </tr>
               <tr>
-                <td style={tdLabel}>Person met</td>
-                <td style={tdValue}>{report.person_met || '—'}</td>
+                <td style={tdLabel}></td>
                 <td style={tdValue}>{formatTime(report.attendance_time)}</td>
+                <td style={tdLabel}>Person met</td>
               </tr>
               <tr>
+                <td style={tdLabelLast}></td>
+                <td style={tdValueLast}>{report.person_met || '—'}</td>
                 <td style={tdLabelLast}>Assessor</td>
+              </tr>
+              <tr>
+                <td style={tdLabelLast}></td>
                 <td style={tdValueLast}>{report.assessor_name || '—'}</td>
                 <td style={tdLabelLast}></td>
               </tr>
@@ -390,15 +392,18 @@ export default async function ReportPrintPage({
                   {(() => {
                     const fields = propertyFields
                     const rows: React.ReactNode[] = []
+                    // Process fields in groups of 3 for 3-column layout
                     for (let i = 0; i < fields.length; i += 3) {
                       const key1 = fields[i]
                       const key2 = fields[i + 1]
                       const key3 = fields[i + 2]
                       const isLast = i + 3 >= fields.length
+                      
+                      // First row: label1, value1, label2
                       rows.push(
                         <tr key={key1}>
-                          <td style={isLast && !key2 && !key3 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</td>
-                          <td style={isLast && !key2 && !key3 ? tdValueLast : tdValue}>{pdText(pd, key1)}</td>
+                          <td style={isLast && !key2 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key1] ?? key1}</td>
+                          <td style={isLast && !key2 ? tdValueLast : tdValue}>{pdText(pd, key1)}</td>
                           {key2 ? (
                             <td style={isLast && !key3 ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key2] ?? key2}</td>
                           ) : (
@@ -406,13 +411,29 @@ export default async function ReportPrintPage({
                           )}
                         </tr>
                       )
-                      // Second row for remaining values if needed
-                      if (key2 || key3) {
+                      
+                      // Second row: empty, value2, label3 (if key2 exists)
+                      if (key2) {
                         rows.push(
                           <tr key={`${key1}-2`}>
-                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}>{key3 ? (PROPERTY_FIELD_LABELS[key3] ?? key3) : ''}</td>
-                            <td style={isLast && !key3 ? tdValueLast : tdValue}>{key3 ? pdText(pd, key3) : ''}</td>
-                            <td style={isLast ? tdLabelLast : tdLabel}></td>
+                            <td style={isLast && !key3 ? tdLabelLast : tdLabel}></td>
+                            <td style={isLast && !key3 ? tdValueLast : tdValue}>{pdText(pd, key2)}</td>
+                            {key3 ? (
+                              <td style={isLast ? tdLabelLast : tdLabel}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</td>
+                            ) : (
+                              <td style={isLast ? tdLabelLast : tdLabel}></td>
+                            )}
+                          </tr>
+                        )
+                      }
+                      
+                      // Third row: empty, value3, empty (if key3 exists)
+                      if (key3) {
+                        rows.push(
+                          <tr key={`${key1}-3`}>
+                            <td style={tdLabelLast}></td>
+                            <td style={tdValueLast}>{pdText(pd, key3)}</td>
+                            <td style={tdLabelLast}></td>
                           </tr>
                         )
                       }
@@ -430,12 +451,17 @@ export default async function ReportPrintPage({
                 <td style={tdLabel}>Specialist report obtained</td>
               </tr>
               <tr>
-                <td style={tdLabel}>Drone utilised</td>
-                <td style={tdValue}>{tsf(report, 'drone_utilised')}</td>
+                <td style={tdLabel}></td>
                 <td style={tdValue}>{tsf(report, 'specialist_report_obtained')}</td>
+                <td style={tdLabel}>Drone utilised</td>
               </tr>
               <tr>
-                <td style={tdLabelLast}>Tarp required</td>
+                <td style={tdLabel}></td>
+                <td style={tdValue}>{tsf(report, 'drone_utilised')}</td>
+                <td style={tdLabel}>Tarp required</td>
+              </tr>
+              <tr>
+                <td style={tdLabelLast}></td>
                 <td style={tdValueLast}>{tsf(report, 'tarp_required')}</td>
                 <td style={tdLabelLast}></td>
               </tr>
@@ -447,27 +473,50 @@ export default async function ReportPrintPage({
                   {(() => {
                     const rows: React.ReactNode[] = []
                     const specific = DEFAULT_BAR_TEMPLATE.insurer_specific_rows
-                    for (let i = 0; i < specific.length; i += 2) {
-                      const left = specific[i]
-                      const right = specific[i + 1]
-                      const isLast = i + 2 >= specific.length
+                    for (let i = 0; i < specific.length; i += 3) {
+                      const item1 = specific[i]
+                      const item2 = specific[i + 1]
+                      const item3 = specific[i + 2]
+                      const isLast = i + 3 >= specific.length
+                      
+                      // First row: label1, value1, label2
                       rows.push(
-                        <tr key={left.field}>
-                          <td style={isLast && !right ? tdLabelLast : tdLabel}>{left.label}</td>
-                          <td style={isLast && !right ? tdValueLast : tdValue}>{tsf(report, left.field)}</td>
-                          {right ? (
-                            <>
-                              <td style={isLast ? tdLabelLast : tdLabel}>{right.label}</td>
-                              <td style={isLast ? tdValueLast : tdValue}>{tsf(report, right.field)}</td>
-                            </>
+                        <tr key={item1.field}>
+                          <td style={isLast && !item2 ? tdLabelLast : tdLabel}>{item1.label}</td>
+                          <td style={isLast && !item2 ? tdValueLast : tdValue}>{tsf(report, item1.field)}</td>
+                          {item2 ? (
+                            <td style={isLast && !item3 ? tdLabelLast : tdLabel}>{item2.label}</td>
                           ) : (
-                            <>
-                              <td style={tdLabelLast}></td>
-                              <td style={tdValueLast}></td>
-                            </>
+                            <td style={isLast ? tdLabelLast : tdLabel}></td>
                           )}
                         </tr>
                       )
+                      
+                      // Second row: empty, value2, label3 (if item2 exists)
+                      if (item2) {
+                        rows.push(
+                          <tr key={`${item1.field}-2`}>
+                            <td style={isLast && !item3 ? tdLabelLast : tdLabel}></td>
+                            <td style={isLast && !item3 ? tdValueLast : tdValue}>{tsf(report, item2.field)}</td>
+                            {item3 ? (
+                              <td style={isLast ? tdLabelLast : tdLabel}>{item3.label}</td>
+                            ) : (
+                              <td style={isLast ? tdLabelLast : tdLabel}></td>
+                            )}
+                          </tr>
+                        )
+                      }
+                      
+                      // Third row: empty, value3, empty (if item3 exists)
+                      if (item3) {
+                        rows.push(
+                          <tr key={`${item1.field}-3`}>
+                            <td style={tdLabelLast}></td>
+                            <td style={tdValueLast}>{tsf(report, item3.field)}</td>
+                            <td style={tdLabelLast}></td>
+                          </tr>
+                        )
+                      }
                     }
                     return rows
                   })()}
@@ -493,7 +542,7 @@ export default async function ReportPrintPage({
 
               nodes.push(
                 <div key={`group-${group.label}`}>
-                  <div style={{ fontSize: '8px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#c8b89a', fontWeight: '700', paddingTop: '10px', paddingBottom: '4px', borderBottom: '1px solid #e8e4e0', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', paddingTop: '10px', paddingBottom: '4px', borderBottom: '1px solid #e8e4e0', marginBottom: '10px' }}>
                     {group.label}
                   </div>
                   {visibleKeys.map(key => {
@@ -507,7 +556,7 @@ export default async function ReportPrintPage({
                           <div style={{ width: '18px', height: '18px', background: '#1a1a1a', color: '#f5f2ee', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {num}
                           </div>
-                          <div style={{ fontSize: '8.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700' }}>
+                          <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800' }}>
                             {config.title}
                           </div>
                         </div>
@@ -525,20 +574,50 @@ export default async function ReportPrintPage({
           })()}
         </div>
 
+        {/* Assessor Details Section */}
+        <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
+            ASSESSOR CONTACT DETAILS
+          </div>
+          <div style={{ background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: '6px', padding: '14px 16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '6px' }}>
+              {report.assessor_name || 'Kyle Bindon'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#3a3530', marginBottom: '4px' }}>
+              Email: <span style={{ color: '#1a1a1a' }}>{tenant.contact_email || 'kyle@insurancerepairco.com.au'}</span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#3a3530' }}>
+              Phone: <span style={{ color: '#1a1a1a' }}>{tenant.contact_phone || '0431 132 077'}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom padding */}
         <div style={{ paddingBottom: '60px' }} />
 
-        {/* Footer */}
+        {/* Footer - matching invoice footer */}
         <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <img src="/logo.png?v=1" alt="IRC" style={{ height: '16px' }} />
-          </div>
+          {tenant.logo_storage_path ? (
+            <img 
+              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`} 
+              alt="Tenant Logo" 
+              style={{ width: '26px', height: '26px', objectFit: 'contain', flexShrink: 0 }} 
+            />
+          ) : (
+            <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: '#c8b89a', fontStyle: 'italic' }}>
+              IRC.
+            </div>
+          )}
           <div>
-            <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee', textAlign: 'center' }}>INSURANCE REPAIR CO PTY LTD</div>
-            <div style={{ fontSize: '10px', color: '#c8b89a', textAlign: 'center' }}>Building &amp; Restoration</div>
+            <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>
+              {tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}
+            </div>
+            <div style={{ fontSize: '10px', color: '#c8b89a' }}>Building &amp; Restoration</div>
           </div>
           <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
-          <span style={{ fontSize: '12px', color: '#c8b89a' }}>BC105884 · IICRC Certified</span>
+          <span style={{ fontSize: '12px', color: '#c8b89a' }}>
+            {(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}
+          </span>
           <div style={{ flex: 1 }}></div>
         </div>
       </div>
