@@ -20,16 +20,12 @@ interface GoogleAutocompleteResponse {
 export async function GET(req: NextRequest) {
   const input = req.nextUrl.searchParams.get('input')
 
-  console.log('[places-autocomplete] Input:', input)
-  console.log('[places-autocomplete] GOOGLE_MAPS_API_KEY exists:', !!process.env.GOOGLE_MAPS_API_KEY)
-
   if (!input || input.trim().length < 2) {
     return NextResponse.json({ suggestions: [] })
   }
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) {
-    console.error('[places-autocomplete] GOOGLE_MAPS_API_KEY is not set')
     return NextResponse.json({ error: 'Geocoding service not configured' }, { status: 503 })
   }
 
