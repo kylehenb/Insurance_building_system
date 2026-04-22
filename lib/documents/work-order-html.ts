@@ -38,14 +38,16 @@ export function generateWorkOrderHtml(params: {
   const statusDisplay = workOrder.status ? 
     workOrder.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'
 
-  // Build trade scope items table HTML
+  // Calculate total from trade's scope items
+  const allocatedAmount = tradeScopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+
+  // Build trade scope items table HTML (without individual prices)
   const tradeScopeHtml = tradeScopeItems.map((item) => `
     <tr style="border-bottom:1px solid #f0ece6;">
       <td style="padding:8px 12px;font-size:11px;color:#3a3530;line-height:1.5;">${item.item_description || '-'}</td>
       <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.room || '-'}</td>
       <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.qty || '-'}</td>
       <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.unit || '-'}</td>
-      <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:#1a1a1a;">${fmt(item.line_total)}</td>
     </tr>
   `).join('')
 
@@ -165,6 +167,17 @@ export function generateWorkOrderHtml(params: {
   <!-- BODY -->
   <div style="padding:14px 20px 0;">
 
+    <!-- Trade Details -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">ASSIGNED TRADE</div>
+      <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
+        <div style="font-size:18px;color:#1a1a1a;font-weight:700;">
+          ${trade?.business_name || trade?.primary_trade || 'Unassigned'}
+        </div>
+      </div>
+    </div>
+
     <!-- Homeowner Details -->
     <div style="margin-bottom:14px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
@@ -183,33 +196,6 @@ export function generateWorkOrderHtml(params: {
             </div>
             <div style="font-size:12px;color:#3a3530;">
               ${job.insured_email ? `Email: ${job.insured_email}` : ''}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Trade Details -->
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">ASSIGNED TRADE</div>
-      <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
-        <div style="display:flex;gap:20px;">
-          <div style="flex:1;">
-            <div style="font-size:14px;color:#1a1a1a;font-weight:700;margin-bottom:4px;">
-              ${trade?.business_name || trade?.primary_trade || 'Unassigned'}
-            </div>
-            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
-              ${trade?.primary_contact ? `Contact: ${trade.primary_contact}` : ''}
-            </div>
-            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
-              ${trade?.contact_mobile ? `Mobile: ${trade.contact_mobile}` : ''}
-            </div>
-            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
-              ${trade?.contact_email ? `Email: ${trade.contact_email}` : ''}
-            </div>
-            <div style="font-size:12px;color:#3a3530;">
-              ${trade?.abn ? `ABN: ${trade.abn}` : ''}
             </div>
           </div>
         </div>
@@ -235,15 +221,23 @@ export function generateWorkOrderHtml(params: {
             <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
               Unit</th>
-            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Total</th>
           </tr>
         </thead>
         <tbody>
-          ${tradeScopeHtml || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9e998f;font-size:11px;">No scope items assigned</td></tr>'}
+          ${tradeScopeHtml || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#9e998f;font-size:11px;">No scope items assigned</td></tr>'}
         </tbody>
       </table>
+    </div>
+
+    <!-- Allocated Amount -->
+    <div style="margin-bottom:14px;">
+      <div style="background:#1a1a1a;border-radius:8px;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
+            color:#c8b89a;font-weight:700;">ALLOCATED AMOUNT</div>
+          <div style="font-size:28px;color:#ffffff;font-weight:700;">${fmt(allocatedAmount)}</div>
+        </div>
+      </div>
     </div>
 
     <!-- Other Trades Scope (Context) -->
@@ -256,23 +250,6 @@ export function generateWorkOrderHtml(params: {
       </div>
     </div>
     ` : ''}
-
-    <!-- Financial Details -->
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">ALLOCATED AMOUNT</div>
-      <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
-        <div style="display:flex;gap:20px;">
-          <div style="flex:1;">
-            <div>
-              <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;
-                color:#9e998f;margin-bottom:4px;">Agreed Amount</div>
-              <div style="font-size:24px;color:#1a1a1a;font-weight:700;">${fmt(workOrder.agreed_amount)}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Notes -->
     <div style="margin-bottom:14px;">

@@ -331,8 +331,8 @@ export function BlueprintTimelineView({
         remove: false,
       },
       snap: (date: Date, scale: string, step: number) => {
-        // Snap to day increments
-        const snapTo = 24 * 60 * 60 * 1000 // 1 day in milliseconds
+        // Snap to 1 hour increments
+        const snapTo = 60 * 60 * 1000 // 1 hour in milliseconds
         return new Date(Math.round(date.getTime() / snapTo) * snapTo)
       },
       format: {
@@ -455,13 +455,11 @@ export function BlueprintTimelineView({
                 background: '#fff',
                 border: '1px solid #e8e4de',
                 fontSize: 11,
+                fontWeight: 600,
                 color: '#1a1a1a',
               }}
             >
-              <div style={{ fontWeight: 600, marginBottom: 2 }}>{wo.tradeTypeLabel}</div>
-              <div style={{ fontSize: 10, color: '#9a9590' }}>
-                {wo.trade?.business_name?.split(' ')[0] ?? '—'}
-              </div>
+              {wo.tradeTypeLabel}
             </div>
           ))}
         </div>
