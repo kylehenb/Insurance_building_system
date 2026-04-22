@@ -100,6 +100,9 @@ export default function TradesPage() {
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
 
+  // Primary trade options
+  const [primaryTradeOptions, setPrimaryTradeOptions] = useState<string[]>([]);
+
   // Save column widths to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -143,6 +146,19 @@ export default function TradesPage() {
     }
     loadColumnWidths();
   }, [tenantId, userId, supabase]);
+
+  // Fetch primary trade options
+  useEffect(() => {
+    if (!tenantId) return;
+    async function fetchPrimaryTrades() {
+      const response = await fetch(`/api/trades/primary-trades?tenantId=${tenantId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPrimaryTradeOptions(data);
+      }
+    }
+    fetchPrimaryTrades();
+  }, [tenantId]);
 
   // Save column widths to database
   const saveColumnWidths = async (widths: Record<string, number>) => {
@@ -629,12 +645,16 @@ export default function TradesPage() {
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.primary_trade }}>
-                        <input
-                          type="text"
+                        <select
                           defaultValue={item.primary_trade || ''}
-                          onBlur={(e) => handleInlineEdit(item.id, 'primary_trade', e.target.value || null)}
+                          onChange={(e) => handleInlineEdit(item.id, 'primary_trade', e.target.value || null)}
                           className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                        />
+                        >
+                          <option value="">Select...</option>
+                          {primaryTradeOptions.map(trade => (
+                            <option key={trade} value={trade}>{trade}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.business_name }}>
                         <input
@@ -742,12 +762,16 @@ export default function TradesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Primary Trade *</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.primary_trade || ''}
                     onChange={(e) => setFormData({ ...formData, primary_trade: e.target.value })}
                     className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
+                  >
+                    <option value="">Select...</option>
+                    {primaryTradeOptions.map(trade => (
+                      <option key={trade} value={trade}>{trade}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Trade Code</label>

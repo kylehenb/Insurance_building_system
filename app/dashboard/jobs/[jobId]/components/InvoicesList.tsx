@@ -237,6 +237,33 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
     }
   }, [jobId, tenantId, onInvoiceUpdated])
 
+  const handleCreateStandardInvoice = useCallback(async () => {
+    setCreating(true)
+    setCreateDropdownOpen(false)
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          tenantId,
+          invoiceType: 'standard',
+          direction: 'outbound',
+          lineItems: [],
+        }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const invoice: InvoiceListItem = await res.json()
+      setInvoices(prev => [...prev, invoice])
+      setExpandedId(invoice.id)
+      onInvoiceUpdated?.()
+    } catch {
+      alert('Failed to create invoice. Please try again.')
+    } finally {
+      setCreating(false)
+    }
+  }, [jobId, tenantId, onInvoiceUpdated])
+
   // ── Delete handler ───────────────────────────────────────────────────────
 
   const handleDelete = useCallback(
@@ -479,6 +506,25 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
               }}
             >
               <button
+                onClick={handleCreateStandardInvoice}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 16px',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  color: '#3a3530',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #f5f2ee',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                Standard Invoice
+              </button>
+              <button
                 onClick={handleCreateExcessInvoice}
                 style={{
                   width: '100%',
@@ -704,27 +750,6 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
                       minWidth: 150,
                     }}
                   >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpandedId(invoice.id)
-                        setMenuDropdownId(null)
-                      }}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '8px 12px',
-                        fontSize: 13,
-                        color: '#3a3530',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      Standard Invoice
-                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
