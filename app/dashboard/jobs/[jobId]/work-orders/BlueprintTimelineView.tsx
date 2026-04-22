@@ -52,24 +52,7 @@ export function BlueprintTimelineView({
     const placed = workOrders.filter(wo => wo.placementState !== 'unplaced')
     console.log('[BlueprintTimelineView] Placed work orders:', placed.length, placed)
 
-    // Create groups based on trade types
-    const uniqueTradeTypes = Array.from(
-      new Set(placed.map(wo => wo.tradeTypeLabel || 'Unknown'))
-    ).sort()
-
-    console.log('[BlueprintTimelineView] Unique trade types:', uniqueTradeTypes)
-
-    const groups = new DataSet(
-      uniqueTradeTypes.map((tradeType, index) => ({
-        id: tradeType,
-        content: tradeType,
-        order: index,
-      }))
-    )
-
-    console.log('[BlueprintTimelineView] Groups:', groups)
-
-    // Convert work orders to vis.js timeline items with group assignment
+    // Convert work orders to vis.js timeline items WITHOUT groups first
     const items = new DataSet(
       placed.map((wo, index) => {
         // If no scheduled date, spread them out by day for visibility
@@ -86,8 +69,7 @@ export function BlueprintTimelineView({
 
         const item = {
           id: wo.id,
-          content: `${sent ? '🔒 ' : ''}${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
-          group: wo.tradeTypeLabel || 'Unknown',
+          content: `${sent ? '🔒 ' : ''}${wo.tradeTypeLabel} - ${wo.trade?.business_name?.split(' ')[0] ?? 'No contractor'}`,
           start: startDate,
           end: endDate,
           title: `${wo.trade?.business_name || 'No contractor'} - ${wo.tradeTypeLabel}`,
@@ -110,58 +92,30 @@ export function BlueprintTimelineView({
 
     console.log('[BlueprintTimelineView] Items dataset:', items)
 
-    // Configure timeline with groups and autosize height
+    // Simple options without groups
     const options = {
-      height: 'auto',
+      height: '400px',
       width: '100%',
-      margin: {
-        item: {
-          horizontal: 0,
-          vertical: 10,
-        },
-        axis: 0,
-      },
-      groupOrder: 'order',
       stack: false,
       showCurrentTime: false,
       moveable: false,
       zoomable: false,
-      orientation: 'top',
-      format: {
-        minorLabels: {
-          millisecond: 'SSS',
-          second: 's',
-          minute: 'HH:mm',
-          hour: 'HH:mm',
-          weekday: 'ddd D',
-          day: 'D',
-          month: 'MMM',
-          year: 'YYYY',
-        },
-        majorLabels: {
-          millisecond: 'HH:mm:ss',
-          second: 'D MMM HH:mm',
-          minute: 'ddd D MMM',
-          hour: 'ddd D MMM',
-          weekday: 'MMMM YYYY',
-          day: 'MMMM YYYY',
-          month: 'YYYY',
-          year: 'YYYY',
-        },
-      },
     }
 
     console.log('[BlueprintTimelineView] Creating timeline with options:', options)
 
     try {
-      // Create timeline with groups
+      // Create timeline WITHOUT groups
       timelineInstance.current = new Timeline(
         timelineRef.current,
         items,
-        groups,
         options
       )
       console.log('[BlueprintTimelineView] Timeline created successfully')
+
+      // Fit timeline to show all items
+      timelineInstance.current.fit()
+      console.log('[BlueprintTimelineView] Timeline fitted to items')
     } catch (error) {
       console.error('[BlueprintTimelineView] Error creating timeline:', error)
     }
@@ -239,9 +193,9 @@ export function BlueprintTimelineView({
         style={{
           flex: 1,
           background: '#fff',
-          overflow: 'auto',
           borderLeft: '1px solid #e8e4de',
-          minHeight: 400,
+          position: 'relative',
+          height: '500px',
         }}
       />
     </div>
