@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { InvoiceEditor } from './InvoiceEditor'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -706,6 +707,27 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
+                        setExpandedId(invoice.id)
+                        setMenuDropdownId(null)
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 12px',
+                        fontSize: 13,
+                        color: '#3a3530',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Standard Invoice
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
                         window.open(`/print/invoices/${invoice.id}`, '_blank')
                         setMenuDropdownId(null)
                       }}
@@ -753,127 +775,14 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
 
             {/* Expanded content */}
             {expandedId === invoice.id && (
-              <div style={{ padding: '20px', borderTop: '1px solid #e0dbd4' }}>
-                {/* Invoice details */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>
-                    Invoice Details
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        Invoice Type
-                      </div>
-                      <div style={{ fontSize: 13, color: '#3a3530', textTransform: 'capitalize' }}>
-                        {invoice.invoice_type}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        Direction
-                      </div>
-                      <div style={{ fontSize: 13, color: '#3a3530', textTransform: 'capitalize' }}>
-                        {invoice.direction}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        Amount Ex GST
-                      </div>
-                      <div style={{ fontSize: 13, color: '#3a3530' }}>
-                        {fmt(invoice.amount_ex_gst || 0)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        GST
-                      </div>
-                      <div style={{ fontSize: 13, color: '#3a3530' }}>
-                        {fmt(invoice.gst || 0)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        Amount Inc GST
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>
-                        {fmt(invoice.amount_inc_gst || 0)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 2 }}>
-                        Issued Date
-                      </div>
-                      <div style={{ fontSize: 13, color: '#3a3530' }}>
-                        {invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString('en-AU') : '—'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Line items */}
-                <div>
-                  <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>
-                    Line Items ({invoice.item_count})
-                  </div>
-                  {(!invoice.line_items || invoice.line_items.length === 0) ? (
-                    <div
-                      style={{
-                        padding: '16px',
-                        background: '#f5f2ee',
-                        borderRadius: 6,
-                        textAlign: 'center',
-                        fontSize: 13,
-                        color: '#9e998f',
-                      }}
-                    >
-                      No line items yet
-                    </div>
-                  ) : (
-                    <div style={{ background: '#f5f2ee', borderRadius: 6, overflow: 'hidden' }}>
-                      {/* Header */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '3fr 1fr 1fr 1fr',
-                          gap: 12,
-                          padding: '10px 16px',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: '#9e998f',
-                          borderBottom: '1px solid #e0dbd4',
-                        }}
-                      >
-                        <div>Description</div>
-                        <div style={{ textAlign: 'right' }}>Qty</div>
-                        <div style={{ textAlign: 'right' }}>Unit Price</div>
-                        <div style={{ textAlign: 'right' }}>Total</div>
-                      </div>
-                      {/* Items */}
-                      {invoice.line_items.map((item) => (
-                        <div
-                          key={item.id}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '3fr 1fr 1fr 1fr',
-                            gap: 12,
-                            padding: '10px 16px',
-                            fontSize: 13,
-                            color: '#3a3530',
-                            borderBottom: '1px solid #e8e0d0',
-                          }}
-                        >
-                          <div>{item.description}</div>
-                          <div style={{ textAlign: 'right' }}>{item.quantity}</div>
-                          <div style={{ textAlign: 'right' }}>{fmt(item.unit_price)}</div>
-                          <div style={{ textAlign: 'right', fontWeight: 600 }}>
-                            {fmt(item.line_total)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div style={{ padding: '20px', borderTop: '1px solid #e0dbd4', background: '#f5f2ee' }}>
+                <InvoiceEditor
+                  jobId={jobId}
+                  invoiceId={invoice.id}
+                  tenantId={tenantId}
+                  job={job}
+                  onInvoiceUpdated={load}
+                />
               </div>
             )}
           </div>
