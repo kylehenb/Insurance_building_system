@@ -24,7 +24,7 @@ export interface WorkOrderMutations {
   sendWorkOrder:     (id: string) => Promise<void>
   sendAllUnsent:     () => Promise<void>
   cancelWorkOrder:   (id: string) => Promise<void>
-  updateWorkOrder:   (id: string, updates: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => Promise<void>
+  updateWorkOrder:   (id: string, updates: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string; visits?: Array<{ visit_number: number; scheduled_date?: string; estimated_hours?: number; status?: string }> }) => Promise<void>
   setPredecessor:    (id: string, predecessorId: string | null) => Promise<void>
   setParentWorkOrder: (id: string, parentId: string | null, offsetDays: number) => Promise<void>
   addVisit:          (workOrderId: string) => Promise<void>
@@ -340,6 +340,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       delete (dbUpdates as Record<string, unknown>).cushionDays
       delete (dbUpdates as Record<string, unknown>).lagDays
       delete (dbUpdates as Record<string, unknown>).lagDescription
+      delete (dbUpdates as Record<string, unknown>).visits
 
       // Handle cushionDays → notes JSON
       if (updates.cushionDays !== undefined) {
@@ -354,7 +355,37 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           .eq('tenant_id', tenantId)
       }
 
-      // Handle lag → update/create first visit
+      // Handle visits array (for drag-and-drop placement)
+      if (updates.visits && Array.isArray(updates.visits)) {
+        for (const visitUpdate of updates.visits) {
+          const existingVisit = wo.visits.find(v => v.visit_number === visitUpdate.visit_number)
+          if (existingVisit) {
+            // Update existing visit
+            await supabase
+              .from('work_order_visits')
+              .update({
+                scheduled_date: visitUpdate.scheduled_date ?? existingVisit.scheduled_date,
+                estimated_hours: visitUpdate.estimated_hours ?? existingVisit.estimated_hours,
+                status: visitUpdate.status ?? existingVisit.status,
+              })
+              .eq('id', existingVisit.id)
+              .eq('tenant_id', tenantId)
+          } else {
+            // Create new visit
+            await supabase.from('work_order_visits').insert({
+              tenant_id: tenantId,
+              job_id: jobId,
+              work_order_id: id,
+              visit_number: visitUpdate.visit_number,
+              scheduled_date: visitUpdate.scheduled_date,
+              estimated_hours: visitUpdate.estimated_hours,
+              status: visitUpdate.status ?? 'unscheduled',
+            })
+          }
+        }
+      }
+
+      // Handle lag → update/create first visit (legacy support)
       if (updates.lagDays !== undefined || updates.lagDescription !== undefined) {
         const firstVisit = wo.visits[0]
         if (firstVisit) {

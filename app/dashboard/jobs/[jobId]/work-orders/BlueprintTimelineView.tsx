@@ -775,14 +775,30 @@ export function BlueprintTimelineView({
                 const timeDiff = window.end.getTime() - window.start.getTime()
                 const dropDate = new Date(window.start.getTime() + timeDiff * ratio)
                 console.log('[BlueprintTimelineView] Dropped work order at date:', dropDate)
-                
-                // Call onUpdate to place the work order
-                if (onUpdate) {
-                  onUpdate(workOrderId, {
-                    sequence_order: Date.now(), // Temporary sequence order
-                    scheduled_date: dropDate.toISOString().split('T')[0],
-                  })
-                }
+
+                // Calculate the next sequence order
+                const placed = workOrders.filter(w => w.placementState !== 'unplaced')
+                const maxSeq = Math.max(0, ...placed.map(p => p.sequence_order ?? 0))
+
+                // First place the work order to set sequence_order
+                onPlace(workOrderId)
+
+                // Then create the first visit with the dropped date
+                // We need to wait a moment for the place to complete, then update
+                setTimeout(() => {
+                  if (onUpdate) {
+                    onUpdate(workOrderId, {
+                      visits: [
+                        {
+                          visit_number: 1,
+                          scheduled_date: dropDate.toISOString().split('T')[0],
+                          estimated_hours: workOrder.estimated_hours || 4,
+                          status: 'unscheduled',
+                        }
+                      ]
+                    })
+                  }
+                }, 100)
               }
             }
           }
