@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       action_queue: {
@@ -1521,6 +1546,7 @@ export type Database = {
           label: string | null
           mime_type: string | null
           report_code: string | null
+          report_id: string | null
           sequence_number: number | null
           size_bytes: number | null
           storage_path: string
@@ -1535,6 +1561,7 @@ export type Database = {
           label?: string | null
           mime_type?: string | null
           report_code?: string | null
+          report_id?: string | null
           sequence_number?: number | null
           size_bytes?: number | null
           storage_path: string
@@ -1549,6 +1576,7 @@ export type Database = {
           label?: string | null
           mime_type?: string | null
           report_code?: string | null
+          report_id?: string | null
           sequence_number?: number | null
           size_bytes?: number | null
           storage_path?: string
@@ -1575,6 +1603,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
             referencedColumns: ["id"]
           },
           {
@@ -2929,7 +2964,6 @@ export type Database = {
           estimated_hours: number | null
           gary_state: string | null
           id: string
-          is_concurrent: boolean | null
           job_id: string
           notes: string | null
           parent_work_order_id: string | null
@@ -2959,7 +2993,6 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
-          is_concurrent?: boolean | null
           job_id: string
           notes?: string | null
           parent_work_order_id?: string | null
@@ -2989,7 +3022,6 @@ export type Database = {
           estimated_hours?: number | null
           gary_state?: string | null
           id?: string
-          is_concurrent?: boolean | null
           job_id?: string
           notes?: string | null
           parent_work_order_id?: string | null
@@ -3237,6 +3269,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

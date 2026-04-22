@@ -225,7 +225,6 @@ export default async function ReportPrintPage({
   }
 
   // Fetch photos for this report
-  // @ts-ignore - report_id column added via migration, types need regeneration
   const { data: photos, error: photosError } = await supabase
     .from('photos')
     .select('*')
@@ -634,7 +633,6 @@ export default async function ReportPrintPage({
                           border: '1px solid #e0dbd4',
                           marginBottom: '8px'
                         }}>
-                          {/* @ts-ignore - storage_path exists in photos table */}
                           <img 
                             src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
                             alt={photo.label || photo.file_name || 'Photo'}
