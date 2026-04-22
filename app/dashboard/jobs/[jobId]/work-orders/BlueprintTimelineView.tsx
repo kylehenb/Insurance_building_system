@@ -469,8 +469,8 @@ export function BlueprintTimelineView({
 
         // Draw arrows for items with dependencies
         placed.forEach(wo => {
-          if ((wo as any).pred_id) {
-            const predId = (wo as any).pred_id
+          if (wo.predecessor_work_order_id) {
+            const predId = wo.predecessor_work_order_id
             const predWo = placed.find(p => p.id === predId)
             if (!predWo) return
 
