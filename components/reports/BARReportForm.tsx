@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { ReportPhotos } from './ReportPhotos'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,8 @@ interface BARReportFormProps {
   locked: boolean
   onChange: (field: string, value: unknown) => void
   tenantId?: string
+  reportId?: string
+  jobId?: string
 }
 
 function SectionHeading({ label }: { label: string }) {
@@ -105,7 +108,7 @@ function InlineTextarea({
   )
 }
 
-export function BARReportForm({ data, locked, onChange, tenantId }: BARReportFormProps) {
+export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobId }: BARReportFormProps) {
   const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
 
@@ -347,6 +350,19 @@ export function BARReportForm({ data, locked, onChange, tenantId }: BARReportFor
           rows={4}
         />
       </div>
+
+      {/* — PHOTOS — */}
+      {reportId && jobId && tenantId && (
+        <>
+          <SectionHeading label="Photos" />
+          <ReportPhotos
+            reportId={reportId}
+            jobId={jobId}
+            tenantId={tenantId}
+            locked={locked}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { parsePropertyDetails } from '@/lib/types/property-details'
 type Report = Database['public']['Tables']['reports']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
+type Photo = Database['public']['Tables']['photos']['Row']
 
 const DEFAULT_BAR_TEMPLATE = {
   // true = render structured property details table block
@@ -222,6 +223,15 @@ export default async function ReportPrintPage({
   if (tenantError || !tenant) {
     return <div>Tenant not found</div>
   }
+
+  // Fetch photos for this report
+  // @ts-ignore - report_id column added via migration, types need regeneration
+  const { data: photos, error: photosError } = await supabase
+    .from('photos')
+    .select('*')
+    .eq('report_id', reportId)
+    .eq('tenant_id', tenantId)
+    .order('sequence_number', { ascending: true })
 
   const pd = parsePropertyDetails(job.property_details)
 
@@ -594,6 +604,59 @@ export default async function ReportPrintPage({
 
         {/* Bottom padding */}
         <div style={{ paddingBottom: '60px' }} />
+
+        {/* Photos Section */}
+        {photos && photos.length > 0 && (
+          <>
+            <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
+                PHOTOGRAPHS
+              </div>
+            </div>
+            
+            {/* Photo grid - 6 per page (3x2 layout) */}
+            {(() => {
+              const photoPages: Photo[][] = []
+              for (let i = 0; i < photos.length; i += 6) {
+                photoPages.push(photos.slice(i, i + 6))
+              }
+              
+              return photoPages.map((pagePhotos, pageIndex) => (
+                <div key={pageIndex} style={{ marginBottom: pageIndex < photoPages.length - 1 ? '32px' : '0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    {pagePhotos.map((photo) => (
+                      <div key={photo.id} style={{ breakInside: 'avoid' }}>
+                        <div style={{ 
+                          aspectRatio: '4/3', 
+                          background: '#f5f2ee', 
+                          borderRadius: '6px', 
+                          overflow: 'hidden',
+                          border: '1px solid #e0dbd4',
+                          marginBottom: '8px'
+                        }}>
+                          {/* @ts-ignore - storage_path exists in photos table */}
+                          <img 
+                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
+                            alt={photo.label || photo.file_name || 'Photo'}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                        {photo.label && (
+                          <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center' }}>
+                            {photo.label}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {pageIndex < photoPages.length - 1 && (
+                    <div style={{ height: '32px' }} />
+                  )}
+                </div>
+              ))
+            })()}
+          </>
+        )}
 
         {/* Footer - matching invoice footer */}
         <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>

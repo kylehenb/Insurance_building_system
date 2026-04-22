@@ -804,6 +804,8 @@ export function ReportAccordionItem({
                 locked={isLocked}
                 onChange={handleFieldChange}
                 tenantId={report.tenant_id}
+                reportId={report.id}
+                jobId={report.job_id}
               />
             )}
             {report.report_type === 'roof' && (
