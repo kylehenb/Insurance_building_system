@@ -588,7 +588,6 @@ export function generateBuildingContractHtml(params: {
   <div class="page-footer">
     <span>DOC-${job.job_number || ''}</span>
     <span>Insurance Repair Co Pty Ltd &nbsp;ABN 12 686 067 881 &nbsp;WA Lic. BC105884</span>
-    <span>Page 2</span>
   </div>
 </div>
 
@@ -721,7 +720,6 @@ export function generateBuildingContractHtml(params: {
   <div class="page-footer">
     <span>DOC-${job.job_number || ''}</span>
     <span>Insurance Repair Co Pty Ltd &nbsp;ABN 12 686 067 881 &nbsp;WA Lic. BC105884</span>
-    <span>Page 3</span>
   </div>
 </div>
 
@@ -820,7 +818,6 @@ export function generateBuildingContractHtml(params: {
   <div class="page-footer">
     <span>DOC-${job.job_number || ''}</span>
     <span>Insurance Repair Co Pty Ltd &nbsp;ABN 12 686 067 881 &nbsp;WA Lic. BC105884</span>
-    <span>Page 4</span>
   </div>
 </div>
 
@@ -877,7 +874,6 @@ export function generateBuildingContractHtml(params: {
   <div class="page-footer">
     <span>DOC-${job.job_number || ''}</span>
     <span>Insurance Repair Co Pty Ltd &nbsp;ABN 12 686 067 881 &nbsp;WA Lic. BC105884</span>
-    <span>Page 5</span>
   </div>
 </div>
 

@@ -90,7 +90,15 @@ export function BlueprintTimelineView({
           group: wo.tradeTypeLabel || 'Unknown',
           start: startDate,
           end: endDate,
-          title: `${wo.trade?.business_name || 'No contractor'} - ${wo.tradeTypeLabel}`,
+          title: `
+            <strong>${wo.tradeTypeLabel}</strong><br/>
+            Contractor: ${wo.trade?.business_name || 'No contractor'}<br/>
+            Est. Hours: ${wo.estimated_hours || 'N/A'}<br/>
+            Status: ${wo.placementState}<br/>
+            ${wo.lagDays > 0 ? `Lag: ${wo.lagDays} days<br/>` : ''}
+            ${wo.cushionDays > 0 ? `Cushion: ${wo.cushionDays} days<br/>` : ''}
+            ${wo.scopeItems.length > 0 ? `Line Items: ${wo.scopeItems.length}` : ''}
+          `,
           style: `
             background-color: ${color}${sent ? '30' : '18'};
             border-color: ${color};
@@ -124,6 +132,11 @@ export function BlueprintTimelineView({
         updateGroup: false,
         remove: false,
       },
+      snap: (date: Date, scale: string, step: number) => {
+        // Snap to day increments
+        const snapTo = 24 * 60 * 60 * 1000 // 1 day in milliseconds
+        return new Date(Math.round(date.getTime() / snapTo) * snapTo)
+      },
     }
 
     console.log('[BlueprintTimelineView] Creating timeline with options:', options)
@@ -137,6 +150,28 @@ export function BlueprintTimelineView({
         options
       )
       console.log('[BlueprintTimelineView] Timeline created successfully')
+
+      // Add click callback
+      timelineInstance.current.on('click', (properties) => {
+        if (properties.item) {
+          console.log('[BlueprintTimelineView] Item clicked:', properties.item)
+          // TODO: Open edit modal for the work order
+        }
+      })
+
+      // Add double-click callback
+      timelineInstance.current.on('doubleClick', (properties) => {
+        if (properties.item) {
+          console.log('[BlueprintTimelineView] Item double-clicked:', properties.item)
+          // TODO: Open edit modal for the work order
+        }
+      })
+
+      // Add range selection callback
+      timelineInstance.current.on('select', (properties) => {
+        console.log('[BlueprintTimelineView] Selection:', properties)
+        // TODO: Handle range selection for bulk operations
+      })
 
       // Fit timeline to show all items
       timelineInstance.current.fit()
