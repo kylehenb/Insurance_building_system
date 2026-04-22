@@ -157,6 +157,37 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
 
   return (
     <div>
+      {/* — RAW NOTES — */}
+      <SectionHeading label="Field Notes (Internal)" />
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <FieldLabel label="Raw Report Dump" />
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={locked || generating || !str('raw_report_dump').trim()}
+            className={`
+              px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
+              transition-all duration-200
+              ${locked || generating || !str('raw_report_dump').trim()
+                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
+                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
+              }
+            `}
+            style={{ fontFamily: 'DM Sans, sans-serif' }}
+          >
+            {generating ? 'Generating...' : 'AI Generate'}
+          </button>
+        </div>
+        <InlineTextarea
+          value={str('raw_report_dump')}
+          onChange={v => onChange('raw_report_dump', v)}
+          locked={locked}
+          placeholder="Raw dictation or field notes used to generate this report (internal only, not included in PDF)..."
+          rows={4}
+        />
+      </div>
+
       {/* — ATTENDANCE — */}
       <SectionHeading label="Attendance" />
       <div className="grid grid-cols-2 gap-4">
@@ -317,37 +348,6 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
           locked={locked}
           placeholder="State your professional opinion and conclusions regarding the claim..."
           rows={5}
-        />
-      </div>
-
-      {/* — RAW NOTES — */}
-      <SectionHeading label="Field Notes (Internal)" />
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <FieldLabel label="Raw Report Dump" />
-          <button
-            type="button"
-            onClick={handleGenerateReport}
-            disabled={locked || generating || !str('raw_report_dump').trim()}
-            className={`
-              px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
-              transition-all duration-200
-              ${locked || generating || !str('raw_report_dump').trim()
-                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
-                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
-              }
-            `}
-            style={{ fontFamily: 'DM Sans, sans-serif' }}
-          >
-            {generating ? 'Generating...' : 'AI Generate'}
-          </button>
-        </div>
-        <InlineTextarea
-          value={str('raw_report_dump')}
-          onChange={v => onChange('raw_report_dump', v)}
-          locked={locked}
-          placeholder="Raw dictation or field notes used to generate this report (internal only, not included in PDF)..."
-          rows={4}
         />
       </div>
 

@@ -783,16 +783,6 @@ export function ReportAccordionItem({
                       />
                       Granny flat / outbuilding
                     </label>
-                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-                      <input
-                        type="checkbox"
-                        checked={propertyDetails.tarp_required ?? false}
-                        onChange={e => handlePropertyDetailChange('tarp_required', e.target.checked)}
-                        disabled={isLocked}
-                        className="accent-[#c8b89a]"
-                      />
-                      Tarp required
-                    </label>
                   </div>
                 </>
               )}
