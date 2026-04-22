@@ -219,7 +219,7 @@ function CardDetail({
   allTrades: TradeRow[]
   allPlaced: WorkOrderWithDetails[]
   onUpdate: (u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
-  onSetPredecessor: (predId: string | null, isConcurrent: boolean) => void
+  onSetPredecessor: (predId: string | null) => void
   showDependency: boolean
 }) {
   // Debounce
@@ -389,7 +389,7 @@ function CardDetail({
             className="wo-dep-select"
             value={wo.predecessor_work_order_id ?? ''}
             onChange={e =>
-              onSetPredecessor(e.target.value || null, wo.is_concurrent ?? false)
+              onSetPredecessor(e.target.value || null)
             }
           >
             <option value="">None</option>
@@ -400,26 +400,6 @@ function CardDetail({
               </option>
             ))}
           </select>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 10,
-              color: '#9a9590',
-              cursor: 'pointer',
-              marginLeft: 4,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={wo.is_concurrent ?? false}
-              onChange={e =>
-                onSetPredecessor(wo.predecessor_work_order_id ?? null, e.target.checked)
-              }
-            />
-            concurrent
-          </label>
         </div>
       )}
 
@@ -479,7 +459,7 @@ export interface WorkOrderCardProps {
   onCancel:         () => void
   onUpdate:         (u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
   onAddVisit:       () => void
-  onSetPredecessor: (predId: string | null, isConcurrent: boolean) => void
+  onSetPredecessor: (predId: string | null) => void
   trades:           TradeRow[]
   allPlacedOrders:  WorkOrderWithDetails[]
   onDragStart:      (e: React.DragEvent<HTMLDivElement>) => void
@@ -538,8 +518,6 @@ export function WorkOrderCard({
     chips.push(<span key="ext" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff0f0', color: '#991b1b' }}>Extended range</span>)
   if ((wo.total_visits ?? 1) > 1)
     chips.push(<span key="visits" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#f5f2ee', color: '#5a5650' }}>{wo.current_visit}/{wo.total_visits} visits</span>)
-  if (wo.is_concurrent && isPlacedWo)
-    chips.push(<span key="conc" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #bfdbfe', background: '#eff4ff', color: '#1e40af' }}>Concurrent</span>)
 
   // ── Context menu items ─────────────────────────────────────────────────────
   const ctxItems: { label: string; onClick: () => void; danger?: boolean }[] = [

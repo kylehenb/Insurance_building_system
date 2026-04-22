@@ -25,7 +25,7 @@ export interface WorkOrderMutations {
   sendAllUnsent:     () => Promise<void>
   cancelWorkOrder:   (id: string) => Promise<void>
   updateWorkOrder:   (id: string, updates: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => Promise<void>
-  setPredecessor:    (id: string, predecessorId: string | null, isConcurrent: boolean) => Promise<void>
+  setPredecessor:    (id: string, predecessorId: string | null) => Promise<void>
   setParentWorkOrder: (id: string, parentId: string | null, offsetDays: number) => Promise<void>
   addVisit:          (workOrderId: string) => Promise<void>
   addWorkOrder:      (quoteId: string | null, workType: string) => Promise<void>
@@ -383,10 +383,10 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       fetchData()
     },
 
-    setPredecessor: async (id, predecessorId, isConcurrent) => {
+    setPredecessor: async (id: string, predecessorId: string | null) => {
       await supabase
         .from('work_orders')
-        .update({ predecessor_work_order_id: predecessorId, is_concurrent: isConcurrent })
+        .update({ predecessor_work_order_id: predecessorId })
         .eq('id', id)
         .eq('tenant_id', tenantId)
       fetchData()

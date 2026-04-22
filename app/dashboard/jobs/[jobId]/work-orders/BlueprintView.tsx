@@ -49,7 +49,7 @@ function SortableWorkOrderCard({
   onCancel: () => void
   onUpdate: (u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
   onAddVisit: () => void
-  onSetPredecessor: (predId: string | null, isConcurrent: boolean) => void
+  onSetPredecessor: (predId: string | null) => void
   trades: TradeRow[]
   allPlacedOrders: WorkOrderWithDetails[]
 }) {
@@ -129,7 +129,7 @@ export interface BlueprintViewProps {
   onCancel:      (id: string) => void
   onUpdate:      (id: string, u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
   onAddVisit:    (id: string) => void
-  onSetPred:     (id: string, predId: string | null, isConcurrent: boolean) => void
+  onSetPred:     (id: string, predId: string | null) => void
   onReorder:     (orderedIds: string[]) => void
   jobId:         string
   tenantId:      string
@@ -466,7 +466,7 @@ export function BlueprintView({
                   onCancel={() => onCancel(wo.id)}
                   onUpdate={u => onUpdate(wo.id, u)}
                   onAddVisit={() => onAddVisit(wo.id)}
-                  onSetPredecessor={(p, c) => onSetPred(wo.id, p, c)}
+                  onSetPredecessor={(p) => onSetPred(wo.id, p)}
                   trades={trades}
                   allPlacedOrders={allPlaced}
                 />
@@ -593,7 +593,7 @@ export function BlueprintView({
                   onCancel={() => onCancel(wo.id)}
                   onUpdate={u => onUpdate(wo.id, u)}
                   onAddVisit={() => onAddVisit(wo.id)}
-                  onSetPredecessor={(p, c) => onSetPred(wo.id, p, c)}
+                  onSetPredecessor={(p) => onSetPred(wo.id, p)}
                   trades={trades}
                   allPlacedOrders={allPlaced}
                 />
