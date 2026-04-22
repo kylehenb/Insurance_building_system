@@ -1,8 +1,6 @@
 import type { Database } from '@/lib/supabase/database.types'
 
-type WorkOrder = Database['public']['Tables']['work_orders']['Row'] & {
-  work_order_ref?: string | null
-}
+type WorkOrder = Database['public']['Tables']['work_orders']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
