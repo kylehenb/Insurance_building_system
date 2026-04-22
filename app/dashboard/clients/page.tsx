@@ -12,6 +12,22 @@ type ClientsInsert = Database['public']['Tables']['clients']['Insert'];
 const CLIENT_TYPE_OPTIONS = ['insurer', 'adjuster_firm', 'other'] as const;
 const STATUS_OPTIONS = ['active', 'inactive'] as const;
 
+// Modal tab button component
+function ModalTabButton({ id, label, active, onClick, small = false }: { id: string; label: string; active: boolean; onClick: (id: string) => void; small?: boolean }) {
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+        active
+          ? 'bg-white text-[#1a1a1a] font-medium shadow-sm'
+          : 'text-[#3a3530] hover:bg-[#e8e4e0]'
+      } ${small ? 'pl-6 text-xs' : ''}`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ClientsPage() {
   const router = useRouter();
   const [items, setItems] = useState<ClientsRow[]>([]);
@@ -31,6 +47,7 @@ export default function ClientsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ClientsRow | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<string>('basic');
 
   // Form state
   const [formData, setFormData] = useState<Partial<ClientsInsert>>({
@@ -49,6 +66,11 @@ export default function ClientsPage() {
     send_booking_confirmation: false,
     notes: null,
     status: 'active',
+    bar_amount: null,
+    single_storey_roof_report_amount: null,
+    double_storey_roof_report_amount: null,
+    travel_allowance_outside_service_area: null,
+    builders_margin_pct: null,
   });
 
   // Sort state
@@ -277,7 +299,13 @@ export default function ClientsPage() {
       send_booking_confirmation: false,
       notes: null,
       status: 'active',
+      bar_amount: null,
+      single_storey_roof_report_amount: null,
+      double_storey_roof_report_amount: null,
+      travel_allowance_outside_service_area: null,
+      builders_margin_pct: null,
     });
+    setActiveModalTab('basic');
     setShowModal(true);
   };
 
@@ -299,7 +327,13 @@ export default function ClientsPage() {
       send_booking_confirmation: item.send_booking_confirmation,
       notes: item.notes,
       status: item.status,
+      bar_amount: (item as any).bar_amount || null,
+      single_storey_roof_report_amount: (item as any).single_storey_roof_report_amount || null,
+      double_storey_roof_report_amount: (item as any).double_storey_roof_report_amount || null,
+      travel_allowance_outside_service_area: (item as any).travel_allowance_outside_service_area || null,
+      builders_margin_pct: (item as any).builders_margin_pct || null,
     });
+    setActiveModalTab('basic');
     setShowModal(true);
   };
 
@@ -767,162 +801,403 @@ export default function ClientsPage() {
         {/* Edit/Add Modal */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">
-                {editingItem ? 'Edit Client' : 'Add Client'}
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Client Type *</label>
-                  <select
-                    value={formData.client_type || 'insurer'}
-                    onChange={(e) => setFormData({ ...formData, client_type: e.target.value as any })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  >
-                    {CLIENT_TYPE_OPTIONS.map(type => (
-                      <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Status</label>
-                  <select
-                    value={formData.status || 'active'}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  >
-                    {STATUS_OPTIONS.map(status => (
-                      <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Name *</label>
-                  <input
-                    type="text"
-                    value={formData.name || ''}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Trading Name</label>
-                  <input
-                    type="text"
-                    value={formData.trading_name || ''}
-                    onChange={(e) => setFormData({ ...formData, trading_name: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">ABN</label>
-                  <input
-                    type="text"
-                    value={formData.abn || ''}
-                    onChange={(e) => setFormData({ ...formData, abn: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Submission Email</label>
-                  <input
-                    type="email"
-                    value={formData.submission_email || ''}
-                    onChange={(e) => setFormData({ ...formData, submission_email: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={formData.contact_phone || ''}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={formData.address || ''}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">KPI Contact Hours</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.kpi_contact_hours || 2}
-                    onChange={(e) => setFormData({ ...formData, kpi_contact_hours: e.target.value ? parseFloat(e.target.value) : 2 })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">KPI Booking Hours</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.kpi_booking_hours || 24}
-                    onChange={(e) => setFormData({ ...formData, kpi_booking_hours: e.target.value ? parseFloat(e.target.value) : 24 })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">KPI Visit Days</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.kpi_visit_days || 2}
-                    onChange={(e) => setFormData({ ...formData, kpi_visit_days: e.target.value ? parseFloat(e.target.value) : 2 })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">KPI Report Days</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.kpi_report_days || 4}
-                    onChange={(e) => setFormData({ ...formData, kpi_report_days: e.target.value ? parseFloat(e.target.value) : 4 })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.send_booking_confirmation || false}
-                      onChange={(e) => setFormData({ ...formData, send_booking_confirmation: e.target.checked })}
-                      className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+            <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Modal Header */}
+              <div className="border-b border-[#e8e4e0] px-6 py-4">
+                <h2 className="text-lg font-semibold text-[#1a1a1a]">
+                  {editingItem ? 'Edit Client' : 'Add Client'}
+                </h2>
+              </div>
+
+              <div className="flex flex-1 overflow-hidden">
+                {/* Left Sidebar Navigation */}
+                <div className="w-48 border-r border-[#e8e4e0] bg-[#f5f2ee]">
+                  <nav className="p-3 space-y-1">
+                    <ModalTabButton
+                      id="basic"
+                      label="Basic Info"
+                      active={activeModalTab === 'basic'}
+                      onClick={setActiveModalTab}
                     />
-                    <span className="text-xs font-medium text-[#1a1a1a]/70">Send Booking Confirmation</span>
-                  </label>
+                    <ModalTabButton
+                      id="contact"
+                      label="Contact Info"
+                      active={activeModalTab === 'contact'}
+                      onClick={setActiveModalTab}
+                    />
+                    <ModalTabButton
+                      id="kpi"
+                      label="KPI Settings"
+                      active={activeModalTab === 'kpi'}
+                      onClick={setActiveModalTab}
+                    />
+                    <ModalTabButton
+                      id="financial"
+                      label="Financial Config"
+                      active={activeModalTab === 'financial'}
+                      onClick={setActiveModalTab}
+                    />
+                    <ModalTabButton
+                      id="notes"
+                      label="Notes"
+                      active={activeModalTab === 'notes'}
+                      onClick={setActiveModalTab}
+                    />
+                  </nav>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Notes</label>
-                  <textarea
-                    value={formData.notes || ''}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value || null })}
-                    rows={3}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 resize-none"
-                  />
+
+                {/* Main Content Area */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* Basic Info Section */}
+                  {activeModalTab === 'basic' && (
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Client Details
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">Basic Information</h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-5">
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Client Type <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={formData.client_type || 'insurer'}
+                            onChange={(e) => setFormData({ ...formData, client_type: e.target.value as any })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          >
+                            {CLIENT_TYPE_OPTIONS.map(type => (
+                              <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={formData.status || 'active'}
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          >
+                            {STATUS_OPTIONS.map(status => (
+                              <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.name || ''}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Trading Name
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.trading_name || ''}
+                            onChange={(e) => setFormData({ ...formData, trading_name: e.target.value || null })}
+                            placeholder="Optional"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            ABN
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.abn || ''}
+                            onChange={(e) => setFormData({ ...formData, abn: e.target.value || null })}
+                            placeholder="11 digits"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contact Info Section */}
+                  {activeModalTab === 'contact' && (
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Contact Details
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">Contact Information</h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-5">
+                        <div className="col-span-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Submission Email
+                          </label>
+                          <input
+                            type="email"
+                            value={formData.submission_email || ''}
+                            onChange={(e) => setFormData({ ...formData, submission_email: e.target.value || null })}
+                            placeholder="Primary reports submission email"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Contact Phone
+                          </label>
+                          <input
+                            type="tel"
+                            value={formData.contact_phone || ''}
+                            onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value || null })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Address
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.address || ''}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value || null })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* KPI Settings Section */}
+                  {activeModalTab === 'kpi' && (
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Performance Metrics
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">KPI Configuration</h3>
+                        <p className="text-sm text-[#9e998f] mt-1">
+                          Configure service level agreement targets for this client
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Contact Hours
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={formData.kpi_contact_hours || 2}
+                            onChange={(e) => setFormData({ ...formData, kpi_contact_hours: e.target.value ? parseFloat(e.target.value) : 2 })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Hours to acknowledge new order</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Booking Hours
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={formData.kpi_booking_hours || 24}
+                            onChange={(e) => setFormData({ ...formData, kpi_booking_hours: e.target.value ? parseFloat(e.target.value) : 24 })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Hours to book inspection</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Visit Days
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={formData.kpi_visit_days || 2}
+                            onChange={(e) => setFormData({ ...formData, kpi_visit_days: e.target.value ? parseFloat(e.target.value) : 2 })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Business days to complete inspection</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Report Days
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={formData.kpi_report_days || 4}
+                            onChange={(e) => setFormData({ ...formData, kpi_report_days: e.target.value ? parseFloat(e.target.value) : 4 })}
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Business days to submit report</p>
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="flex items-center gap-2 mt-2">
+                            <input
+                              type="checkbox"
+                              checked={formData.send_booking_confirmation || false}
+                              onChange={(e) => setFormData({ ...formData, send_booking_confirmation: e.target.checked })}
+                              className="rounded border-[#e8e4e0] text-[#c9a96e] focus:ring-[#c9a96e]"
+                            />
+                            <span className="text-sm text-[#1a1a1a]">Send booking confirmation to insured</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Financial Configuration Section */}
+                  {activeModalTab === 'financial' && (
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Pricing & Margins
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">Financial Configuration</h3>
+                        <p className="text-sm text-[#9e998f] mt-1">
+                          Configure report fees, travel allowances, and margin settings for this client
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            BAR Amount ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.bar_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, bar_amount: e.target.value ? parseFloat(e.target.value) : null })}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Building Assessment Report fee</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Single Storey Roof Report ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.single_storey_roof_report_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, single_storey_roof_report_amount: e.target.value ? parseFloat(e.target.value) : null })}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Roof report fee for single-storey</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Double Storey Roof Report ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.double_storey_roof_report_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, double_storey_roof_report_amount: e.target.value ? parseFloat(e.target.value) : null })}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Roof report fee for double-storey</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Travel Allowance ($/km)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.travel_allowance_outside_service_area || ''}
+                            onChange={(e) => setFormData({ ...formData, travel_allowance_outside_service_area: e.target.value ? parseFloat(e.target.value) : null })}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Per km for work outside service area</p>
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Builder's Margin (%)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={formData.builders_margin_pct || ''}
+                            onChange={(e) => setFormData({ ...formData, builders_margin_pct: e.target.value ? parseFloat(e.target.value) : null })}
+                            placeholder="e.g. 20 for 20%"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Margin percentage applied to quotes</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes Section */}
+                  {activeModalTab === 'notes' && (
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Additional Information
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">Notes</h3>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Client Notes
+                        </label>
+                        <textarea
+                          value={formData.notes || ''}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value || null })}
+                          rows={8}
+                          placeholder="Add any additional notes about this client..."
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="mt-6 flex justify-end gap-2">
+
+              {/* Modal Footer */}
+              <div className="border-t border-[#e8e4e0] px-6 py-4 bg-[#f5f2ee] flex justify-end gap-2">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#3a3530] bg-white border border-[#e0dbd4] rounded-lg hover:bg-[#f5f0e8] transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-[#3a3530] bg-white border border-[#e8e4e0] rounded hover:bg-[#e8e4e0] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded-lg hover:bg-[#1a1a1a]/90 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded hover:bg-[#1a1a1a]/90 transition-colors"
                 >
-                  Save
+                  Save Client
                 </button>
               </div>
             </div>

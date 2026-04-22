@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Timeline } from 'vis-timeline/standalone'
 import { DataSet } from 'vis-data/peer'
 import 'vis-timeline/styles/vis-timeline-graph2d.css'
@@ -46,6 +46,48 @@ export function BlueprintTimelineView({
   const timelineRef = useRef<HTMLDivElement>(null)
   const timelineInstance = useRef<Timeline | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; itemId: string | null; workOrderId: string | null } | null>(null)
+
+  // Handlers for context menu actions
+  const handleAddVisit = () => {
+    if (contextMenu?.workOrderId) {
+      onAddVisit(contextMenu.workOrderId)
+    }
+    setContextMenu(null)
+  }
+
+  const handleDeleteVisit = () => {
+    if (!contextMenu?.workOrderId) return
+
+    const workOrder = workOrders.find(wo => wo.id === contextMenu.workOrderId)
+    if (!workOrder) return
+
+    // Extract visit number from item ID (format: workOrderId-visit-visitNumber)
+    const visitNumber = contextMenu.itemId ? parseInt(contextMenu.itemId.split('-visit-')[1]) : null
+
+    if (visitNumber && workOrder.visits.length > 1) {
+      // Delete specific visit - need to implement this in the backend
+      // For now, just log it
+      console.log('[BlueprintTimelineView] Delete visit:', visitNumber, 'for work order:', contextMenu.workOrderId)
+    } else if (workOrder.visits.length <= 1) {
+      // Last visit - unplace the work order
+      onUnplace(contextMenu.workOrderId)
+    }
+
+    setContextMenu(null)
+  }
+
+  const handleSetDependency = () => {
+    if (!contextMenu?.workOrderId) return
+    // Simple prompt for dependency - in a real app, this would be a modal with a dropdown
+    const predecessorId = prompt('Enter predecessor work order ID (or leave blank to remove dependency):')
+    if (predecessorId !== null) {
+      onSetPred(contextMenu.workOrderId, predecessorId || null, false)
+    }
+    setContextMenu(null)
+  }
 
   // Load view state from local storage
   useEffect(() => {
@@ -243,47 +285,57 @@ export function BlueprintTimelineView({
       }
     })
 
-    // Create background items for lag and cushion periods
+    // Create background items for lag and cushion periods (per visit for lag, per work order for cushion)
     const backgroundItems: any[] = []
     placed.forEach((wo, index) => {
-      // Use the last visit's end date for lag/cushion calculations
-      const lastVisit = wo.visits[wo.visits.length - 1]
-      const startDate = lastVisit?.scheduled_date
-        ? new Date(lastVisit.scheduled_date)
-        : new Date(Date.now() + index * 24 * 60 * 60 * 1000)
-      
-      const duration = lastVisit?.estimated_hours || wo.estimated_hours || 4
-      const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000)
-
       const groupKey = wo.tradeTypeLabel || 'Unknown'
 
-      // Lag period background item
-      if (wo.lagDays > 0) {
-        const lagStart = new Date(endDate.getTime())
-        const lagEnd = new Date(endDate.getTime() + wo.lagDays * 24 * 60 * 60 * 1000)
-        backgroundItems.push({
-          id: `${wo.id}-lag`,
-          content: '',
-          group: groupKey,
-          start: lagStart,
-          end: lagEnd,
-          type: 'background',
-          style: `
-            background: repeating-linear-gradient(
-              -45deg, transparent, transparent 3px,
-              rgba(146,64,14,.12) 3px, rgba(146,64,14,.12) 6px
-            );
-            border: 1px dashed #f0c080;
-            border-radius: 0 5px 5px 0;
-          `,
-        })
-      }
+      // Create lag for each visit
+      wo.visits.forEach((visit) => {
+        const startDate = visit.scheduled_date
+          ? new Date(visit.scheduled_date)
+          : new Date(Date.now() + index * 24 * 60 * 60 * 1000)
+        
+        const duration = visit.estimated_hours || wo.estimated_hours || 4
+        const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000)
+        const visitItemId = `${wo.id}-visit-${visit.visit_number}`
 
-      // Cushion period background item
-      if (wo.cushionDays > 0) {
-        const cushionStart = wo.lagDays > 0
-          ? new Date(endDate.getTime() + wo.lagDays * 24 * 60 * 60 * 1000)
-          : new Date(endDate.getTime())
+        // Lag period background item (per visit)
+        if ((visit.lag_days_after || 0) > 0) {
+          const lagStart = new Date(endDate.getTime())
+          const lagEnd = new Date(endDate.getTime() + (visit.lag_days_after || 0) * 24 * 60 * 60 * 1000)
+          backgroundItems.push({
+            id: `${visitItemId}-lag`,
+            content: '',
+            group: groupKey,
+            start: lagStart,
+            end: lagEnd,
+            type: 'background',
+            style: `
+              background: repeating-linear-gradient(
+                -45deg, transparent, transparent 3px,
+                rgba(146,64,14,.12) 3px, rgba(146,64,14,.12) 6px
+              );
+              border: 1px dashed #f0c080;
+              border-radius: 0 5px 5px 0;
+            `,
+          })
+        }
+      })
+
+      // Cushion period background item (per work order - after last visit)
+      if (wo.cushionDays > 0 && wo.visits.length > 0) {
+        const lastVisit = wo.visits[wo.visits.length - 1]
+        const lastVisitStartDate = lastVisit.scheduled_date
+          ? new Date(lastVisit.scheduled_date)
+          : new Date(Date.now() + index * 24 * 60 * 60 * 1000)
+        const lastVisitDuration = lastVisit.estimated_hours || wo.estimated_hours || 4
+        const lastVisitEndDate = new Date(lastVisitStartDate.getTime() + lastVisitDuration * 60 * 60 * 1000)
+        const lastVisitLag = lastVisit.lag_days_after || 0
+        
+        const cushionStart = lastVisitLag > 0
+          ? new Date(lastVisitEndDate.getTime() + lastVisitLag * 24 * 60 * 60 * 1000)
+          : new Date(lastVisitEndDate.getTime())
         const cushionEnd = new Date(cushionStart.getTime() + wo.cushionDays * 24 * 60 * 60 * 1000)
         backgroundItems.push({
           id: `${wo.id}-cushion`,
@@ -374,6 +426,23 @@ export function BlueprintTimelineView({
           console.log('[BlueprintTimelineView] Item clicked:', properties.item)
           // TODO: Open edit modal for the work order
         }
+        // Close context menu on click
+        setContextMenu(null)
+      })
+
+      // Add right-click callback for context menu
+      timelineInstance.current.on('contextmenu', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          // Extract work order ID from item ID (format: workOrderId-visit-visitNumber)
+          const workOrderId = itemId.split('-visit-')[0]
+          setContextMenu({
+            x: properties.event?.clientX || 0,
+            y: properties.event?.clientY || 0,
+            itemId,
+            workOrderId,
+          })
+        }
       })
 
       // Add double-click callback
@@ -394,48 +463,19 @@ export function BlueprintTimelineView({
       timelineInstance.current.on('onMoving', (properties) => {
         if (properties.item) {
           const itemId = properties.item as string
-          const workOrder = placed.find(wo => wo.id === itemId)
+          // Extract work order ID from item ID (format: workOrderId-visit-visitNumber)
+          const workOrderId = itemId.split('-visit-')[0]
+          const workOrder = placed.find(wo => wo.id === workOrderId)
           if (!workOrder) return
 
+          // Update lag item for this specific visit
           const lagItem = allItems.get(`${itemId}-lag`)
-          const cushionItem = allItems.get(`${itemId}-cushion`)
-
           if (lagItem) {
-            const duration = workOrder.lagDays * 24 * 60 * 60 * 1000
-            const newEnd = new Date(properties.start.getTime() + duration)
-            allItems.update({
-              id: `${itemId}-lag`,
-              start: properties.end,
-              end: newEnd,
-            })
-          }
-
-          if (cushionItem) {
-            const lagDuration = workOrder.lagDays * 24 * 60 * 60 * 1000
-            const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
-            const lagEnd = lagItem ? lagItem.end : properties.end
-            const newEnd = new Date(lagEnd.getTime() + cushionDuration)
-            allItems.update({
-              id: `${itemId}-cushion`,
-              start: lagEnd,
-              end: newEnd,
-            })
-          }
-        }
-      })
-
-      // Handle item resize - update lag/cushion background items
-      timelineInstance.current.on('onChanging', (properties) => {
-        if (properties.item) {
-          const itemId = properties.item as string
-          const workOrder = placed.find(wo => wo.id === itemId)
-          if (!workOrder) return
-
-          const lagItem = allItems.get(`${itemId}-lag`)
-          const cushionItem = allItems.get(`${itemId}-cushion`)
-
-          if (lagItem) {
-            const duration = workOrder.lagDays * 24 * 60 * 60 * 1000
+            // Find the visit number
+            const visitNumber = itemId.split('-visit-')[1]
+            const visit = workOrder.visits.find(v => v.visit_number === parseInt(visitNumber || '0'))
+            const lagDays = visit?.lag_days_after || 0
+            const duration = lagDays * 24 * 60 * 60 * 1000
             const newEnd = new Date(properties.end.getTime() + duration)
             allItems.update({
               id: `${itemId}-lag`,
@@ -444,16 +484,71 @@ export function BlueprintTimelineView({
             })
           }
 
-          if (cushionItem) {
-            const lagDuration = workOrder.lagDays * 24 * 60 * 60 * 1000
-            const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
-            const lagEnd = lagItem ? lagItem.end : properties.end
-            const newEnd = new Date(lagEnd.getTime() + cushionDuration)
+          // Update cushion item (work order level) - only if this is the last visit
+          if (workOrder.visits.length > 0) {
+            const lastVisit = workOrder.visits[workOrder.visits.length - 1]
+            const lastVisitItemId = `${workOrder.id}-visit-${lastVisit.visit_number}`
+            if (itemId === lastVisitItemId && workOrder.cushionDays > 0) {
+              const cushionItem = allItems.get(`${workOrder.id}-cushion`)
+              const lastVisitLag = lastVisit.lag_days_after || 0
+              const lagEnd = lastVisitLag > 0
+                ? new Date(properties.end.getTime() + lastVisitLag * 24 * 60 * 60 * 1000)
+                : properties.end
+              const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
+              const newEnd = new Date(lagEnd.getTime() + cushionDuration)
+              allItems.update({
+                id: `${workOrder.id}-cushion`,
+                start: lagEnd,
+                end: newEnd,
+              })
+            }
+          }
+        }
+      })
+
+      // Handle item resize - update lag/cushion background items
+      timelineInstance.current.on('onChanging', (properties) => {
+        if (properties.item) {
+          const itemId = properties.item as string
+          // Extract work order ID from item ID (format: workOrderId-visit-visitNumber)
+          const workOrderId = itemId.split('-visit-')[0]
+          const workOrder = placed.find(wo => wo.id === workOrderId)
+          if (!workOrder) return
+
+          // Update lag item for this specific visit
+          const lagItem = allItems.get(`${itemId}-lag`)
+          if (lagItem) {
+            // Find the visit number
+            const visitNumber = itemId.split('-visit-')[1]
+            const visit = workOrder.visits.find(v => v.visit_number === parseInt(visitNumber || '0'))
+            const lagDays = visit?.lag_days_after || 0
+            const duration = lagDays * 24 * 60 * 60 * 1000
+            const newEnd = new Date(properties.end.getTime() + duration)
             allItems.update({
-              id: `${itemId}-cushion`,
-              start: lagEnd,
+              id: `${itemId}-lag`,
+              start: properties.end,
               end: newEnd,
             })
+          }
+
+          // Update cushion item (work order level) - only if this is the last visit
+          if (workOrder.visits.length > 0) {
+            const lastVisit = workOrder.visits[workOrder.visits.length - 1]
+            const lastVisitItemId = `${workOrder.id}-visit-${lastVisit.visit_number}`
+            if (itemId === lastVisitItemId && workOrder.cushionDays > 0) {
+              const cushionItem = allItems.get(`${workOrder.id}-cushion`)
+              const lastVisitLag = lastVisit.lag_days_after || 0
+              const lagEnd = lastVisitLag > 0
+                ? new Date(properties.end.getTime() + lastVisitLag * 24 * 60 * 60 * 1000)
+                : properties.end
+              const cushionDuration = workOrder.cushionDays * 24 * 60 * 60 * 1000
+              const newEnd = new Date(lagEnd.getTime() + cushionDuration)
+              allItems.update({
+                id: `${workOrder.id}-cushion`,
+                start: lagEnd,
+                end: newEnd,
+              })
+            }
           }
         }
       })
@@ -462,22 +557,55 @@ export function BlueprintTimelineView({
       timelineInstance.current.on('move', (properties) => {
         if (properties.item) {
           const itemId = properties.item as string
-          const workOrder = placed.find(wo => wo.id === itemId)
+          // Extract work order ID from item ID (format: workOrderId-visit-visitNumber)
+          const workOrderId = itemId.split('-visit-')[0]
+          const workOrder = placed.find(wo => wo.id === workOrderId)
           if (!workOrder) return
 
           console.log('[BlueprintTimelineView] Item moved:', itemId, properties.start, properties.end)
-          // TODO: Update work order visit dates in database via onUpdate callback
+          // Extract visit number
+          const visitNumber = itemId.split('-visit-')[1]
+          if (visitNumber) {
+            // Update the specific visit's scheduled date
+            const visit = workOrder.visits.find(v => v.visit_number === parseInt(visitNumber))
+            if (visit && onUpdate) {
+              onUpdate(workOrderId, {
+                visits: workOrder.visits.map(v => 
+                  v.visit_number === parseInt(visitNumber)
+                    ? { ...v, scheduled_date: properties.start.toISOString().split('T')[0] }
+                    : v
+                )
+              })
+            }
+          }
         }
       })
 
       timelineInstance.current.on('change', (properties) => {
         if (properties.item) {
           const itemId = properties.item as string
-          const workOrder = placed.find(wo => wo.id === itemId)
+          // Extract work order ID from item ID (format: workOrderId-visit-visitNumber)
+          const workOrderId = itemId.split('-visit-')[0]
+          const workOrder = placed.find(wo => wo.id === workOrderId)
           if (!workOrder) return
 
           console.log('[BlueprintTimelineView] Item resized:', itemId, properties.start, properties.end)
-          // TODO: Update work order estimated hours in database via onUpdate callback
+          // Extract visit number and update estimated hours
+          const visitNumber = itemId.split('-visit-')[1]
+          if (visitNumber) {
+            const visit = workOrder.visits.find(v => v.visit_number === parseInt(visitNumber))
+            if (visit && onUpdate) {
+              const durationMs = properties.end.getTime() - properties.start.getTime()
+              const durationHours = durationMs / (60 * 60 * 1000)
+              onUpdate(workOrderId, {
+                visits: workOrder.visits.map(v =>
+                  v.visit_number === parseInt(visitNumber)
+                    ? { ...v, estimated_hours: durationHours }
+                    : v
+                )
+              })
+            }
+          }
         }
       })
 
@@ -652,10 +780,7 @@ export function BlueprintTimelineView({
                 if (onUpdate) {
                   onUpdate(workOrderId, {
                     sequence_order: Date.now(), // Temporary sequence order
-                    visits: [{
-                      ...workOrder.visits[0],
-                      scheduled_date: dropDate.toISOString().split('T')[0],
-                    }]
+                    scheduled_date: dropDate.toISOString().split('T')[0],
                   })
                 }
               }
@@ -683,6 +808,63 @@ export function BlueprintTimelineView({
             zIndex: 10,
           }}
         />
+
+        {/* Context menu */}
+        {contextMenu && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              background: '#fff',
+              border: '1px solid #ddd',
+              borderRadius: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              minWidth: 150,
+            }}
+          >
+            <div
+              onClick={handleAddVisit}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                cursor: 'pointer',
+                borderBottom: '1px solid #f0f0f0',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            >
+              Add visit
+            </div>
+            <div
+              onClick={handleDeleteVisit}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                cursor: 'pointer',
+                color: '#ef4444',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            >
+              Delete visit
+            </div>
+            <div
+              onClick={handleSetDependency}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+            >
+              Set dependency
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
