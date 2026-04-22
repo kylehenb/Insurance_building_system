@@ -79,7 +79,6 @@ export async function POST(
     const { data: workOrder, error: woError } = await supabase
       .from('work_orders')
       .insert({
-        tenant_id: tenantId,
         job_id: jobId,
         quote_id: quote.id,
         trade_id: blueprintTrade.trade_id || null,
@@ -87,7 +86,7 @@ export async function POST(
         work_type: 'repair',
         status: 'pending',
         sequence_order: blueprintTrade.sequence_order,
-        is_concurrent: blueprintTrade.is_concurrent,
+        dependency_type: blueprintTrade.is_concurrent ? 'concurrent' : 'sequential',
         predecessor_work_order_id: null, // Will set after all WOs are created
         estimated_hours: blueprintTrade.estimated_hours,
         total_visits: blueprintTrade.visits.length,
@@ -95,7 +94,7 @@ export async function POST(
         proximity_range: blueprintTrade.proximity_range,
         gary_state: 'not_started',
         scope_summary: `${blueprintTrade.trade_type} - ${blueprintTrade.visits.length} visit(s)`,
-      })
+      } as any)
       .select('id')
       .single()
 
