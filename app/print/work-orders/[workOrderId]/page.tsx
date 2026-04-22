@@ -5,10 +5,11 @@ import { generateWorkOrderHtml } from '@/lib/documents/work-order-html'
 import { WorkOrderPrintButton } from './WorkOrderPrintButton'
 
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
-type WorkOrderVisit = Database['public']['Tables']['work_order_visits']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
+type ScopeItem = Database['public']['Tables']['scope_items']['Row']
+type Quote = Database['public']['Tables']['quotes']['Row']
 
 export default async function WorkOrderPrintPage({
   params,
@@ -77,16 +78,51 @@ export default async function WorkOrderPrintPage({
     }
   }
 
-  // Fetch work order visits
-  const { data: visits, error: visitsError } = await supabase
-    .from('work_order_visits')
-    .select('*')
-    .eq('work_order_id', workOrderId)
-    .eq('tenant_id', tenantId)
-    .order('visit_number', { ascending: true })
+  // Fetch quote to get scope items
+  let quote: Quote | null = null
+  if (workOrder.quote_id) {
+    const { data: quoteData, error: quoteError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', workOrder.quote_id)
+      .eq('tenant_id', tenantId)
+      .single()
 
-  if (visitsError) {
-    return <div>Error fetching visits</div>
+    if (!quoteError && quoteData) {
+      quote = quoteData
+    }
+  }
+
+  // Fetch all scope items for the quote
+  let allScopeItems: ScopeItem[] = []
+  if (quote) {
+    const { data: scopeItems, error: scopeError } = await supabase
+      .from('scope_items')
+      .select('*')
+      .eq('quote_id', quote.id)
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
+
+    if (!scopeError && scopeItems) {
+      allScopeItems = scopeItems
+    }
+  }
+
+  // Separate scope items: trade's items vs other trades' items
+  const tradeScopeItems: ScopeItem[] = []
+  const otherScopeItems: ScopeItem[] = []
+
+  if (trade) {
+    allScopeItems.forEach(item => {
+      if (item.trade === trade.primary_trade) {
+        tradeScopeItems.push(item)
+      } else {
+        otherScopeItems.push(item)
+      }
+    })
+  } else {
+    // If no trade assigned, all items are "other"
+    otherScopeItems.push(...allScopeItems)
   }
 
   // Fetch tenant details
@@ -107,7 +143,8 @@ export default async function WorkOrderPrintPage({
       building_licence_number?: string | null
     },
     trade,
-    visits: visits || [],
+    tradeScopeItems,
+    otherScopeItems,
   })
 
   return (

@@ -38,14 +38,45 @@ export function generateWorkOrderHtml(params: {
   const statusDisplay = workOrder.status ? 
     workOrder.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'
 
-  // Build visits table HTML
-  const visitsHtml = visits.map((visit) => `
+  // Build trade scope items table HTML
+  const tradeScopeHtml = tradeScopeItems.map((item) => `
     <tr style="border-bottom:1px solid #f0ece6;">
-      <td style="padding:8px 12px;font-size:11px;color:#3a3530;line-height:1.5;">Visit ${visit.visit_number}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${visit.estimated_hours || '—'} hrs</td>
-      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${formatDate(visit.scheduled_date) || '—'}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${visit.status ? visit.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'}</td>
+      <td style="padding:8px 12px;font-size:11px;color:#3a3530;line-height:1.5;">${item.item_description || '-'}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.room || '-'}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.qty || '-'}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.unit || '-'}</td>
+      <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:#1a1a1a;">${fmt(item.line_total)}</td>
     </tr>
+  `).join('')
+
+  // Build other trades scope items table HTML (grouped by trade)
+  const otherTradesMap = new Map<string, ScopeItem[]>()
+  otherScopeItems.forEach(item => {
+    const tradeKey = item.trade || 'Other'
+    if (!otherTradesMap.has(tradeKey)) {
+      otherTradesMap.set(tradeKey, [])
+    }
+    otherTradesMap.get(tradeKey)!.push(item)
+  })
+
+  const otherScopeHtml = Array.from(otherTradesMap.entries()).map(([tradeName, items]) => `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
+        color:#9e998f;margin-bottom:6px;padding-left:8px;border-left:3px solid #c9a96e;">
+        ${tradeName}
+      </div>
+      <table style="margin-bottom:8px;">
+        <tbody>
+          ${items.map(item => `
+            <tr style="border-bottom:1px solid #f0ece6;">
+              <td style="padding:6px 12px;font-size:10px;color:#6a6560;line-height:1.4;">${item.item_description || '-'}</td>
+              <td style="padding:6px 12px;text-align:center;font-size:10px;color:#6a6560;">${item.room || '-'}</td>
+              <td style="padding:6px 12px;text-align:center;font-size:10px;color:#6a6560;">${item.qty || '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `).join('')
 
   return `<!DOCTYPE html>
@@ -92,8 +123,7 @@ export function generateWorkOrderHtml(params: {
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
         ${[
           { label: 'Created', value: formatDate(workOrder.created_at) },
-          { label: 'Sequence', value: workOrder.sequence_order ? `#${workOrder.sequence_order}` : '—' },
-          { label: 'Est. Hours', value: workOrder.estimated_hours ? `${workOrder.estimated_hours} hrs` : '—' },
+          { label: 'Work Type', value: workTypeDisplay },
         ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
             border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
@@ -108,8 +138,6 @@ export function generateWorkOrderHtml(params: {
           { label: 'Job #', value: job.job_number },
           { label: 'Claim #', value: job.claim_number },
           { label: 'Insurer', value: job.insurer },
-          { label: 'Insured', value: job.insured_name },
-          { label: 'Property', value: job.property_address },
         ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
             border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
@@ -136,6 +164,30 @@ export function generateWorkOrderHtml(params: {
 
   <!-- BODY -->
   <div style="padding:14px 20px 0;">
+
+    <!-- Homeowner Details -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">HOMEOWNER / SITE CONTACT</div>
+      <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
+        <div style="display:flex;gap:20px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#1a1a1a;font-weight:700;margin-bottom:4px;">
+              ${job.insured_name || '—'}
+            </div>
+            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
+              ${job.property_address ? `Site: ${job.property_address}` : ''}
+            </div>
+            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
+              ${job.insured_phone ? `Phone: ${job.insured_phone}` : ''}
+            </div>
+            <div style="font-size:12px;color:#3a3530;">
+              ${job.insured_email ? `Email: ${job.insured_email}` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Trade Details -->
     <div style="margin-bottom:14px;">
@@ -164,65 +216,58 @@ export function generateWorkOrderHtml(params: {
       </div>
     </div>
 
-    <!-- Scope Summary -->
+    <!-- Trade Scope Items -->
     <div style="margin-bottom:14px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:6px;">SCOPE OF WORK</div>
-      <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
-        <div style="font-size:11px;color:#3a3530;line-height:1.65;white-space:pre-wrap;">
-          ${workOrder.scope_summary || 'No scope summary provided.'}
-        </div>
-      </div>
-    </div>
-
-    <!-- Visits Table -->
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">SCHEDULED VISITS</div>
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">YOUR SCOPE OF WORK</div>
       <table>
         <thead>
           <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
             <th style="text-align:left;padding:8px 12px;font-size:8px;font-weight:600;
               text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Visit</th>
+              Description</th>
             <th style="width:80px;text-align:center;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Est. Hours</th>
-            <th style="width:100px;text-align:center;padding:8px 12px;font-size:8px;
+              Room</th>
+            <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Scheduled Date</th>
-            <th style="width:100px;text-align:center;padding:8px 12px;font-size:8px;
+              Qty</th>
+            <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Status</th>
+              Unit</th>
+            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;
+              font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
+              Total</th>
           </tr>
         </thead>
         <tbody>
-          ${visitsHtml || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#9e998f;font-size:11px;">No visits scheduled</td></tr>'}
+          ${tradeScopeHtml || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9e998f;font-size:11px;">No scope items assigned</td></tr>'}
         </tbody>
       </table>
     </div>
 
+    <!-- Other Trades Scope (Context) -->
+    ${otherScopeItems.length > 0 ? `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">OTHER TRADES ON THIS JOB (FOR CONTEXT)</div>
+      <div style="background:#faf8f5;border-radius:8px;padding:14px;border:1px solid #e8e4e0;">
+        ${otherScopeHtml}
+      </div>
+    </div>
+    ` : ''}
+
     <!-- Financial Details -->
     <div style="margin-bottom:14px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">FINANCIAL DETAILS</div>
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">ALLOCATED AMOUNT</div>
       <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
         <div style="display:flex;gap:20px;">
           <div style="flex:1;">
-            <div style="margin-bottom:12px;">
-              <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;
-                color:#9e998f;margin-bottom:4px;">Trade Cost</div>
-              <div style="font-size:16px;color:#1a1a1a;font-weight:700;">${fmt(workOrder.trade_cost)}</div>
-            </div>
-            <div style="margin-bottom:12px;">
-              <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;
-                color:#9e998f;margin-bottom:4px;">Charge Out Amount</div>
-              <div style="font-size:16px;color:#1a1a1a;font-weight:700;">${fmt(workOrder.charge_out_amount)}</div>
-            </div>
             <div>
               <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;
                 color:#9e998f;margin-bottom:4px;">Agreed Amount</div>
-              <div style="font-size:20px;color:#1a1a1a;font-weight:700;">${fmt(workOrder.agreed_amount)}</div>
+              <div style="font-size:24px;color:#1a1a1a;font-weight:700;">${fmt(workOrder.agreed_amount)}</div>
             </div>
           </div>
         </div>
