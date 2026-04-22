@@ -32,7 +32,7 @@ const DEFAULT_BAR_TEMPLATE = {
   // Empty on the default template. Each entry maps a display label to a key
   // in type_specific_fields JSONB.
   // Example for a future Allianz template:
-  // { label: 'Hailstone size', field: 'hailstone_size' }
+  // { label: 'Hailstone size:', field: 'hailstone_size' }
   insurer_specific_rows: [] as Array<{ label: string; field: string }>,
 
   // Narrative sections to render, in order.
@@ -82,16 +82,16 @@ const formatTime = (time: string | null) => {
 }
 
 const PROPERTY_FIELD_LABELS: Record<string, string> = {
-  building_age: 'Building age',
-  condition: 'Condition',
-  roof_type: 'Roof type',
-  wall_type: 'Wall type',
-  storeys: 'Storeys',
-  foundation: 'Foundation',
-  fence: 'Fence',
-  pool: 'Swimming pool',
-  detached_garage: 'Detached garage',
-  granny_flat: 'Granny flat / outbuilding',
+  building_age: 'Building age:',
+  condition: 'Condition:',
+  roof_type: 'Roof type:',
+  wall_type: 'Wall type:',
+  storeys: 'Storeys:',
+  foundation: 'Foundation:',
+  fence: 'Fence:',
+  pool: 'Swimming pool:',
+  detached_garage: 'Detached garage:',
+  granny_flat: 'Granny flat / outbuilding:',
 }
 
 const NARRATIVE_SECTION_CONFIG: Record<
@@ -324,29 +324,38 @@ export default async function ReportPrintPage({
           <div style={{ flex: 1, padding: '14px 10px', borderRight: '1px solid #e0dbd4' }}>
             {/* Report Details */}
             <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>REPORT DETAILS</div>
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', color: '#9e998f' }}>Report Reference: </span>
                 <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.report_ref || '—'}</span>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#9e998f' }}>Person met: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{report.person_met || '—'}</span>
+              </div>
             </div>
-            
+            <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
+              {[
+                { label: 'Attendance date', value: formatDate(report.attendance_date) },
+                { label: 'Time arrived', value: formatTime(report.attendance_time) },
+              ].filter(f => f.value).map((field, i, arr) => (
+                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
+                  <span style={{ color: '#b0a89e' }}>{field.label}: </span>
+                  <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
+                </span>
+              ))}
+            </div>
+
             {/* Job Details */}
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
-            {job.insured_name && (
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
-            )}
-            {job.property_address && (
-              <div style={{ fontSize: '13px', color: '#9e998f', marginBottom: '6px' }}>{job.property_address}</div>
-            )}
-            {/* Field strip */}
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginTop: '12px', marginBottom: '7px' }}>JOB DETAILS</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px' }}>
               {[
-                { label: 'Insurer',           value: job.insurer },
-                { label: 'Claim #',           value: job.claim_number },
-                { label: 'Adjuster',          value: job.adjuster },
-                { label: 'Inspection date',   value: formatDate(report.attendance_date) },
-              ].map((field, i, arr) => (
+                { label: 'Insurer', value: job.insurer },
+                { label: 'Property Address', value: job.property_address },
+                { label: 'Insured', value: job.insured_name },
+                { label: 'Claim #', value: job.claim_number },
+                { label: 'Job #', value: job.job_number },
+              ].filter(f => f.value).map((field, i, arr) => (
                 <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
                   <span style={{ color: '#b0a89e' }}>{field.label}: </span>
                   <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
@@ -372,7 +381,7 @@ export default async function ReportPrintPage({
         </div>
 
         {/* Body */}
-        <div style={{ padding: '16px 20px 0' }}>
+        <div style={{ padding: '0 20px' }}>
 
           {/* Metadata table - 3-column layout */}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: '1px solid #e0dbd4', borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
@@ -382,19 +391,19 @@ export default async function ReportPrintPage({
               <tr>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Date attended</span>
+                    <span style={labelStyle}>Date attended:</span>
                     <span style={valueStyle}>{formatDate(report.attendance_date)}</span>
                   </div>
                 </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Time arrived</span>
+                    <span style={labelStyle}>Time arrived:</span>
                     <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
                   </div>
                 </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Person met</span>
+                    <span style={labelStyle}>Person met:</span>
                     <span style={valueStyle}>{report.person_met || '—'}</span>
                   </div>
                 </td>
@@ -402,19 +411,19 @@ export default async function ReportPrintPage({
               <tr>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Assessor</span>
+                    <span style={labelStyle}>Assessor:</span>
                     <span style={valueStyle}>{report.assessor_name || '—'}</span>
                   </div>
                 </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Email</span>
+                    <span style={labelStyle}>Email:</span>
                     <span style={valueStyle}>{tenant.contact_email || '—'}</span>
                   </div>
                 </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Phone</span>
+                    <span style={labelStyle}>Phone:</span>
                     <span style={valueStyle}>{tenant.contact_phone || '—'}</span>
                   </div>
                 </td>
@@ -475,13 +484,13 @@ export default async function ReportPrintPage({
               <tr>
                 <td style={tdCellLast}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Make safe conducted</span>
+                    <span style={labelStyle}>Make safe conducted:</span>
                     <span style={valueStyle}>{tsf(report, 'make_safe_conducted')}</span>
                   </div>
                 </td>
                 <td style={tdCellLast}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Specialist report obtained</span>
+                    <span style={labelStyle}>Specialist report obtained:</span>
                     <span style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</span>
                   </div>
                 </td>
@@ -561,7 +570,7 @@ export default async function ReportPrintPage({
                     return (
                       <div key={key} style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
-                          <div style={{ width: '18px', height: '18px', background: '#1a1a1a', color: '#f5f2ee', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: '18px', height: '18px', border: '1.5px solid #1a1a1a', color: '#1a1a1a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {num}
                           </div>
                           <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800' }}>
@@ -604,29 +613,32 @@ export default async function ReportPrintPage({
               return photoPages.map((pagePhotos, pageIndex) => (
                 <div key={pageIndex} style={{ marginBottom: pageIndex < photoPages.length - 1 ? '32px' : '0' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                    {pagePhotos.map((photo) => (
-                      <div key={photo.id} style={{ breakInside: 'avoid' }}>
-                        <div style={{ 
-                          aspectRatio: '4/3', 
-                          background: '#f5f2ee', 
-                          borderRadius: '6px', 
-                          overflow: 'hidden',
-                          border: '1px solid #e0dbd4',
-                          marginBottom: '8px'
-                        }}>
-                          <img 
-                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
-                            alt={photo.label || photo.file_name || 'Photo'}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
-                        {photo.label && (
-                          <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center' }}>
-                            {photo.label}
+                    {pagePhotos.map((photo, photoIndex) => {
+                      const globalSequence = pageIndex * 6 + photoIndex + 1
+                      return (
+                        <div key={photo.id} style={{ breakInside: 'avoid' }}>
+                          <div style={{ 
+                            aspectRatio: '4/3', 
+                            background: '#f5f2ee', 
+                            borderRadius: '6px', 
+                            overflow: 'hidden',
+                            border: '1px solid #e0dbd4',
+                            marginBottom: '8px'
+                          }}>
+                            <img 
+                              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
+                              alt={photo.label || photo.file_name || 'Photo'}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {photo.label && (
+                            <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center' }}>
+                              {globalSequence}. {photo.label}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                   {pageIndex < photoPages.length - 1 && (
                     <div style={{ height: '32px' }} />
@@ -638,7 +650,7 @@ export default async function ReportPrintPage({
         )}
 
         {/* Footer - matching invoice footer */}
-        <div style={{ paddingTop: '16px' }}>
+        <div style={{ paddingTop: '32px' }}>
           <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             {tenant.logo_storage_path ? (
               <img 
