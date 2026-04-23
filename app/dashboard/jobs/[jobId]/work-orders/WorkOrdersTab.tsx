@@ -301,8 +301,10 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         <BottomPanel
           workOrders={workOrders}
           quotes={quotes}
+          trades={trades}
           onAddToQuote={openAddQuote}
           onAddAdditional={openAddAdditional}
+          onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
         />
       </div>
 

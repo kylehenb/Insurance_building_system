@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import {
   type WorkOrderWithDetails,
   type QuoteRow,
+  type TradeRow,
   getTradeColor,
   garyLabel,
   aud,
@@ -104,9 +105,13 @@ function InvoiceChain({ extStatus }: { extStatus: string | null }) {
 function WORow({
   wo,
   allPlaced,
+  trades,
+  onUpdate,
 }: {
   wo: WorkOrderWithDetails
   allPlaced: WorkOrderWithDetails[]
+  trades: TradeRow[]
+  onUpdate: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
 }) {
   const color  = getTradeColor(wo.tradeTypeLabel)
   const predWo = wo.predecessor_work_order_id
@@ -117,6 +122,10 @@ function WORow({
     wo.invoice?.xero_sync_status === 'synced'
       ? { bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Synced' }
       : { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' }
+
+  const isEditable = wo.status === 'pending'
+  const tradeType = wo.work_type === 'make_safe' ? 'make_safe' : wo.tradeTypeLabel
+  const eligibleTrades = trades.filter(t => t.primary_trade === tradeType || t.primary_trade === tradeType.toLowerCase())
 
   return (
     <tr>
@@ -150,8 +159,29 @@ function WORow({
           whiteSpace: 'nowrap',
         }}
       >
-        {wo.trade?.business_name ?? (
-          <span style={{ color: '#991b1b', fontSize: 10 }}>No contractor</span>
+        {isEditable ? (
+          <select
+            value={wo.trade_id || ''}
+            onChange={(e) => onUpdate(wo.id, { trade_id: e.target.value })}
+            style={{
+              fontSize: 10,
+              padding: '2px 4px',
+              borderRadius: 4,
+              border: '1px solid #ddd8d0',
+              background: '#fff',
+              color: '#1a1a1a',
+              minWidth: 120,
+            }}
+          >
+            <option value="">Select contractor...</option>
+            {eligibleTrades.map(t => (
+              <option key={t.id} value={t.id}>{t.business_name || t.primary_trade}</option>
+            ))}
+          </select>
+        ) : (
+          wo.trade?.business_name ?? (
+            <span style={{ color: '#991b1b', fontSize: 10 }}>No contractor</span>
+          )
         )}
       </td>
       <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
@@ -199,7 +229,26 @@ function WORow({
           whiteSpace: 'nowrap',
         }}
       >
-        {wo.agreed_amount ? aud.format(wo.agreed_amount) : '—'}
+        {isEditable ? (
+          <input
+            type="number"
+            value={wo.agreed_amount ?? ''}
+            onChange={(e) => onUpdate(wo.id, { agreed_amount: e.target.value ? parseFloat(e.target.value) : null })}
+            placeholder="0"
+            style={{
+              fontFamily: 'DM Mono, monospace',
+              fontSize: 10,
+              padding: '2px 4px',
+              borderRadius: 4,
+              border: '1px solid #ddd8d0',
+              background: '#fff',
+              color: '#1a1a1a',
+              width: 80,
+            }}
+          />
+        ) : (
+          wo.agreed_amount ? aud.format(wo.agreed_amount) : '—'
+        )}
       </td>
       <td
         style={{
@@ -290,9 +339,13 @@ const TH_STYLE: React.CSSProperties = {
 function WOTable({
   workOrders,
   allWorkOrders,
+  trades,
+  onUpdate,
 }: {
   workOrders: WorkOrderWithDetails[]
   allWorkOrders: WorkOrderWithDetails[]
+  trades: TradeRow[]
+  onUpdate: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
 }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
@@ -305,7 +358,7 @@ function WOTable({
       </thead>
       <tbody>
         {workOrders.map(wo => (
-          <WORow key={wo.id} wo={wo} allPlaced={allWorkOrders} />
+          <WORow key={wo.id} wo={wo} allPlaced={allWorkOrders} trades={trades} onUpdate={onUpdate} />
         ))}
       </tbody>
     </table>
@@ -315,15 +368,19 @@ function WOTable({
 export interface BottomPanelProps {
   workOrders:  WorkOrderWithDetails[]
   quotes:      QuoteRow[]
+  trades:      TradeRow[]
   onAddToQuote: (quoteId: string) => void
   onAddAdditional: () => void
+  onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
 }
 
 export function BottomPanel({
   workOrders,
   quotes,
+  trades,
   onAddToQuote,
   onAddAdditional,
+  onUpdateWorkOrder,
 }: BottomPanelProps) {
   const [open, setOpen] = useState(true)
 
@@ -393,7 +450,7 @@ export function BottomPanel({
 
       {/* Body */}
       {open && (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', paddingBottom: '24px' }}>
           {/* Quote sections */}
           {quotes.map(quote => {
             const qWOs = quotedWOs.filter(wo => wo.quote_id === quote.id)
@@ -459,7 +516,7 @@ export function BottomPanel({
                   </button>
                 </div>
                 {qWOs.length > 0 ? (
-                  <WOTable workOrders={qWOs} allWorkOrders={workOrders} />
+                  <WOTable workOrders={qWOs} allWorkOrders={workOrders} trades={trades} onUpdate={onUpdateWorkOrder} />
                 ) : (
                   <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>
                     No work orders for this quote yet.
@@ -531,7 +588,7 @@ export function BottomPanel({
               </button>
             </div>
             {additionalWOs.length > 0 ? (
-              <WOTable workOrders={additionalWOs} allWorkOrders={workOrders} />
+              <WOTable workOrders={additionalWOs} allWorkOrders={workOrders} trades={trades} onUpdate={onUpdateWorkOrder} />
             ) : (
               <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>
                 No additional work orders yet.
