@@ -37,6 +37,7 @@ interface JobScheduleProps {
   onCancel?: (id: string) => void
   onUpdate?: (id: string, u: any) => void
   onAddVisit?: (id: string) => void
+  onDeleteVisit?: (workOrderId: string, visitId: string) => void
   onSetPred?: (id: string, predId: string | null) => void
   onReorder?: (orderedIds: string[]) => void
   onSetParent?: (id: string, parentId: string | null, offsetDays: number) => void
@@ -53,12 +54,9 @@ interface WorkOrderWithTrade {
   estimated_hours: number | null
   proximity_range: string | null
   work_type: string | null
-  trades: {
-    business_name: string | null
-    primary_trade: string | null
-    contact_mobile: string | null
-  } | null
+  trades?: any
   visits: WorkOrderVisit[]
+  scopeItems?: any[]
 }
 
 interface WorkOrderVisit {
@@ -91,6 +89,7 @@ export default function JobSchedule({
   onCancel,
   onUpdate,
   onAddVisit,
+  onDeleteVisit,
   onSetPred,
   onReorder,
   onSetParent,
@@ -174,16 +173,16 @@ export default function JobSchedule({
       return
     }
 
-    // Reordering within scheduled visit cards
-    // We need to reorder the work orders based on the new position of their visit cards
+    // Reordering within scheduled visit cards - allow independent visit movement
     const activeIndex = scheduledVisitCards.indexOf(activeVC)
     const overIndex = scheduledVisitCards.indexOf(overVC)
 
     if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-      // Get the work orders in the new order
+      // Reorder the visit cards independently
       const reorderedVisitCards = arrayMove(scheduledVisitCards, activeIndex, overIndex)
       
-      // Extract unique work orders in their new order
+      // Reconstruct work orders based on the new visit order
+      // Each work order's visits should be in the order they appear in the new sequence
       const newWorkOrderOrder: string[] = []
       const seenWorkOrders = new Set<string>()
       
@@ -432,6 +431,7 @@ export default function JobSchedule({
                     sequenceIndex={index}
                     isLast={index === scheduledVisitCards.length - 1}
                     onAddVisit={onAddVisit}
+                    onDeleteVisit={onDeleteVisit}
                   />
                 ))}
               </div>
@@ -515,6 +515,7 @@ export default function JobSchedule({
                   sequenceIndex={index}
                   isLast={index === scheduledVisitCards.length - 1}
                   onAddVisit={onAddVisit}
+                  onDeleteVisit={onDeleteVisit}
                 />
               ))}
             </div>
@@ -581,6 +582,7 @@ function SortableVisitCard({
   sequenceIndex,
   isLast,
   onAddVisit,
+  onDeleteVisit,
 }: {
   workOrder: WorkOrderWithTrade
   visit: WorkOrderVisit
@@ -589,9 +591,11 @@ function SortableVisitCard({
   sequenceIndex: number
   isLast: boolean
   onAddVisit?: (id: string) => void
+  onDeleteVisit?: (workOrderId: string, visitId: string) => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCommsPopup, setShowCommsPopup] = useState(false)
+  const [showScopeItems, setShowScopeItems] = useState(false)
   const {
     attributes,
     listeners,
@@ -614,6 +618,12 @@ function SortableVisitCard({
   const visitDate = visit.confirmed_date || visit.scheduled_date
   const visitNumber = visit.visit_number || visitIndex + 1
   const sequenceNumber = sequenceIndex + 1
+
+  const handleDeleteVisit = () => {
+    if (onDeleteVisit) {
+      onDeleteVisit(workOrder.id, visit.id || `${workOrder.id}-${visitIndex}`)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', gap: 0 }}>
@@ -648,7 +658,7 @@ function SortableVisitCard({
           {sequenceNumber}
         </div>
 
-        {/* Vertical line */}
+        {/* Vertical line with arrow */}
         {!isLast && (
           <div
             style={{
@@ -658,7 +668,22 @@ function SortableVisitCard({
               marginTop: 4,
               position: 'relative',
             }}
-          />
+          >
+            {/* Arrow pointer */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: -1,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '4px solid transparent',
+                borderRight: '4px solid transparent',
+                borderTop: '6px solid #e0dbd4',
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -678,7 +703,7 @@ function SortableVisitCard({
         }}
         {...attributes}
       >
-        {/* Row 1: Trade name + type pill + menu + drag handle */}
+        {/* Row 1: Trade name + type pill + chevron menu + x button + drag handle */}
         <div
           style={{
             display: 'flex',
@@ -725,22 +750,21 @@ function SortableVisitCard({
             {tradeType}
           </span>
 
-          {/* Menu button - moved to right of trade type label */}
+          {/* Chevron menu - no border */}
           <div style={{ position: 'relative', marginLeft: 4 }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               style={{
-                padding: '4px 8px',
-                fontSize: 12,
+                padding: '4px 6px',
+                fontSize: 14,
                 color: '#9e998f',
                 background: 'transparent',
-                border: '1px solid #e0dbd4',
-                borderRadius: 4,
+                border: 'none',
                 cursor: 'pointer',
                 fontFamily: 'DM Sans, sans-serif',
               }}
             >
-              ⋮
+              {showMenu ? '▼' : '▶'}
             </button>
 
             {/* Dropdown menu */}
@@ -760,10 +784,8 @@ function SortableVisitCard({
                 }}
               >
                 <button
-                  onClick={() => {
-                    setShowMenu(false)
-                    // TODO: Open scope items modal
-                  }}
+                  onMouseEnter={() => setShowScopeItems(true)}
+                  onMouseLeave={() => setShowScopeItems(false)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -776,7 +798,7 @@ function SortableVisitCard({
                     color: '#1a1a1a',
                   }}
                 >
-                  View scope items
+                  Scope items
                 </button>
                 <button
                   onClick={() => {
@@ -799,7 +821,74 @@ function SortableVisitCard({
                 </button>
               </div>
             )}
+
+            {/* Scope items hover modal */}
+            {showScopeItems && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 4,
+                  background: '#fff',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: 300,
+                  padding: '12px',
+                }}
+                onMouseEnter={() => setShowScopeItems(true)}
+                onMouseLeave={() => setShowScopeItems(false)}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#1a1a1a',
+                    marginBottom: 8,
+                  }}
+                >
+                  Scope Items
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#9e998f',
+                  }}
+                >
+                  {workOrder.scopeItems && workOrder.scopeItems.length > 0 ? (
+                    workOrder.scopeItems.map((item: any, i: number) => (
+                      <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: i < workOrder.scopeItems!.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
+                        <div style={{ fontWeight: 500, color: '#1a1a1a' }}>{item.room || 'N/A'}</div>
+                        <div style={{ color: '#9e998f' }}>{item.description || 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: '#9e998f' }}>Qty: {item.quantity || 'N/A'}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div>No scope items</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* X button to delete visit */}
+          <button
+            onClick={handleDeleteVisit}
+            style={{
+              marginLeft: 'auto',
+              padding: '4px 8px',
+              fontSize: 14,
+              color: '#9e998f',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            ×
+          </button>
         </div>
 
         {/* Row 2: Visit number + date */}

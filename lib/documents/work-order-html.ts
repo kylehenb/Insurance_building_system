@@ -95,81 +95,59 @@ export function generateWorkOrderHtml(params: {
     return roomHeaderHtml + rowsHtml
   }).join('')
 
-  // Build other trades scope items table HTML (grouped by trade, then by room)
-  const otherTradesMap = new Map<string, ScopeItem[]>()
-  otherScopeItems.forEach(item => {
-    const tradeKey = item.trade || 'Other'
-    if (!otherTradesMap.has(tradeKey)) {
-      otherTradesMap.set(tradeKey, [])
-    }
-    otherTradesMap.get(tradeKey)!.push(item)
-  })
+  // Build other trades scope items table HTML (grouped by room, with trade shown in table)
+  const otherGroupedByRoom = otherScopeItems.reduce((acc, item) => {
+    const room = item.room || 'Unassigned'
+    if (!acc[room]) acc[room] = []
+    acc[room].push(item)
+    return acc
+  }, {} as Record<string, ScopeItem[]>)
 
-  const otherScopeHtml = Array.from(otherTradesMap.entries()).map(([tradeName, items]) => {
-    // Group items by room within each trade
-    const groupedByRoom = items.reduce((acc, item) => {
-      const room = item.room || 'Unassigned'
-      if (!acc[room]) acc[room] = []
-      acc[room].push(item)
-      return acc
-    }, {} as Record<string, ScopeItem[]>)
+  const otherSortedRooms = Object.keys(otherGroupedByRoom).sort((a, b) => a.localeCompare(b))
 
-    const sortedRooms = Object.keys(groupedByRoom).sort((a, b) => a.localeCompare(b))
+  let otherGlobalCounter = 0
+  const otherScopeHtml = otherSortedRooms.map(room => {
+    const roomItems = otherGroupedByRoom[room]
+    const itemWithDimensions = roomItems.find(
+      item => item.room_length != null || item.room_width != null || item.room_height != null
+    )
+    const roomLength = itemWithDimensions?.room_length
+    const roomWidth = itemWithDimensions?.room_width
+    const roomHeight = itemWithDimensions?.room_height
+    const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
+    const roomSizeStr = hasDimensions
+      ? `${roomLength ?? '—'} × ${roomWidth ?? '—'} × ${roomHeight ?? '—'} m`
+      : ''
 
-    let roomCounter = 0
-    const roomHtml = sortedRooms.map(room => {
-      const roomItems = groupedByRoom[room]
-      const itemWithDimensions = roomItems.find(
-        item => item.room_length != null || item.room_width != null || item.room_height != null
-      )
-      const roomLength = itemWithDimensions?.room_length
-      const roomWidth = itemWithDimensions?.room_width
-      const roomHeight = itemWithDimensions?.room_height
-      const hasDimensions = roomLength != null || roomWidth != null || roomHeight != null
-      const roomSizeStr = hasDimensions
-        ? `${roomLength ?? '—'} × ${roomWidth ?? '—'} × ${roomHeight ?? '—'} m`
-        : ''
+    const roomHeaderHtml = `
+    <tr>
+      <td colspan="4" style="padding:4px 12px;background:#faf8f5;
+        border-bottom:1px solid #e8e4e0;border-top:6px solid white;">
+        <span style="font-weight:700;color:#6a6560;font-size:11px;
+          text-transform:uppercase;">${room}</span>
+        ${hasDimensions ? `<span style="font-size:11px;color:#9e998f;
+          font-family:monospace;margin-left:8px;">${roomSizeStr}</span>` : ''}
+      </td>
+    </tr>`
 
-      const roomHeaderHtml = `
-      <tr>
-        <td colspan="3" style="padding:4px 12px;background:#faf8f5;
-          border-bottom:1px solid #e8e4e0;border-top:6px solid white;">
-          <span style="font-weight:700;color:#6a6560;font-size:11px;
-            text-transform:uppercase;">${room}</span>
-          ${hasDimensions ? `<span style="font-size:11px;color:#9e998f;
-            font-family:monospace;margin-left:8px;">${roomSizeStr}</span>` : ''}
+    const rowsHtml = roomItems.map(item => {
+      otherGlobalCounter++
+      return `
+      <tr style="border-bottom:1px solid #f0ece6;">
+        <td style="width:28px;padding:6px 4px;text-align:center;
+          font-family:monospace;font-size:9px;color:#6a6560;">${otherGlobalCounter}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#6a6560;
+          line-height:1.4;">${item.item_description || '-'}</td>
+        <td style="width:44px;padding:6px 4px;text-align:center;
+          font-size:9px;color:#6a6560;">${item.qty ?? '-'}</td>
+        <td style="width:70px;padding:6px 4px;text-align:center;
+          font-size:9px;color:#6a6560;font-weight:600;text-transform:uppercase;">
+          ${item.trade || '—'}
         </td>
       </tr>`
-
-      const rowsHtml = roomItems.map(item => {
-        roomCounter++
-        return `
-        <tr style="border-bottom:1px solid #f0ece6;">
-          <td style="width:28px;padding:6px 4px;text-align:center;
-            font-family:monospace;font-size:9px;color:#6a6560;">${roomCounter}</td>
-          <td style="padding:6px 8px;font-size:9px;color:#6a6560;
-            line-height:1.4;">${item.item_description || '-'}</td>
-          <td style="width:44px;padding:6px 4px;text-align:center;
-            font-size:9px;color:#6a6560;">${item.qty ?? '-'}</td>
-        </tr>`
-      }).join('')
-
-      return roomHeaderHtml + rowsHtml
     }).join('')
 
-    return `
-    <div style="margin-bottom:12px;">
-      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
-        color:#9e998f;margin-bottom:6px;padding-left:8px;border-left:3px solid #c9a96e;">
-        ${tradeName}
-      </div>
-      <table style="margin-bottom:8px;">
-        <tbody>
-          ${roomHtml}
-        </tbody>
-      </table>
-    </div>
-    `
+    return roomHeaderHtml + rowsHtml
   }).join('')
 
   return `<!DOCTYPE html>
@@ -315,7 +293,10 @@ export function generateWorkOrderHtml(params: {
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
             color:#c8b89a;font-weight:700;">ALLOCATED AMOUNT</div>
-          <div style="font-size:28px;color:#ffffff;font-weight:700;">${fmt(allocatedAmount)}</div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <div style="font-size:28px;color:#ffffff;font-weight:700;">${fmt(allocatedAmount)}</div>
+            <div style="font-size:14px;color:#c8b89a;font-weight:600;">+ GST</div>
+          </div>
         </div>
       </div>
     </div>
@@ -326,7 +307,27 @@ export function generateWorkOrderHtml(params: {
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:8px;">OTHER TRADES ON THIS JOB (FOR CONTEXT)</div>
       <div style="background:#faf8f5;border-radius:8px;padding:14px;border:1px solid #e8e4e0;">
-        ${otherScopeHtml}
+        <table>
+          <thead>
+            <tr style="background:#f5f2ee;border-bottom:1px solid #e0dbd4;">
+              <th style="width:28px;text-align:center;padding:6px 4px;font-size:8px;
+                font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                color:#9e998f;">#</th>
+              <th style="text-align:left;padding:6px 8px;font-size:8px;font-weight:600;
+                text-transform:uppercase;letter-spacing:1px;color:#9e998f;">
+                Description</th>
+              <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;
+                font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                color:#9e998f;">Qty</th>
+              <th style="width:70px;text-align:center;padding:6px 4px;font-size:8px;
+                font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                color:#9e998f;">Trade</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${otherScopeHtml}
+          </tbody>
+        </table>
       </div>
     </div>
     ` : ''}

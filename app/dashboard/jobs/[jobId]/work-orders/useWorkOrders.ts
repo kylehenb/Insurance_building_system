@@ -28,6 +28,7 @@ export interface WorkOrderMutations {
   setPredecessor:    (id: string, predecessorId: string | null) => Promise<void>
   setParentWorkOrder: (id: string, parentId: string | null, offsetDays: number) => Promise<void>
   addVisit:          (workOrderId: string) => Promise<void>
+  deleteVisit:       (workOrderId: string, visitId: string) => Promise<void>
   addWorkOrder:      (quoteId: string | null, workType: string) => Promise<void>
 }
 
@@ -448,6 +449,36 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         .update({ total_visits: nextVisitNum })
         .eq('id', workOrderId)
         .eq('tenant_id', tenantId)
+      fetchData()
+    },
+
+    deleteVisit: async (workOrderId: string, visitId: string) => {
+      const wo = workOrders.find(w => w.id === workOrderId)
+      if (!wo) return
+
+      // If this is the only visit, unplace the work order instead of deleting
+      if (wo.total_visits === 1) {
+        await supabase
+          .from('work_orders')
+          .update({ sequence_order: null })
+          .eq('id', workOrderId)
+          .eq('tenant_id', tenantId)
+      } else {
+        // Delete the visit
+        await supabase
+          .from('work_order_visits')
+          .delete()
+          .eq('id', visitId)
+          .eq('tenant_id', tenantId)
+        
+        // Update total_visits
+        const newTotalVisits = (wo.total_visits ?? 1) - 1
+        await supabase
+          .from('work_orders')
+          .update({ total_visits: newTotalVisits })
+          .eq('id', workOrderId)
+          .eq('tenant_id', tenantId)
+      }
       fetchData()
     },
 
