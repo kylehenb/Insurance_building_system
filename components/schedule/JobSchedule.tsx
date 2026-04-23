@@ -137,6 +137,14 @@ export default function JobSchedule({
     // If dropping on the same item, do nothing
     if (activeId === overId) return
 
+    // Check if this is a visit card (contains hyphen) or work order card
+    const isVisitCard = activeId.includes('-')
+    const isOverVisitCard = overId.includes('-')
+
+    // Extract work order ID from visit card ID
+    const activeWorkOrderId = isVisitCard ? activeId.split('-')[0] : activeId
+    const overWorkOrderId = isOverVisitCard ? overId.split('-')[0] : overId
+
     // Compute scheduled and unscheduled work orders from current state
     const scheduledWorkOrders = workOrders.filter(
       wo => wo.sequence_order !== null
@@ -146,15 +154,15 @@ export default function JobSchedule({
       wo => wo.sequence_order === null
     )
 
-    const activeWO = workOrders.find(wo => wo.id === activeId)
-    const overWO = workOrders.find(wo => wo.id === overId)
+    const activeWO = workOrders.find(wo => wo.id === activeWorkOrderId)
+    const overWO = workOrders.find(wo => wo.id === overWorkOrderId)
 
     if (!activeWO) return
 
     // Case 1: Unscheduled card dropped on scheduled card -> place it
     if (activeWO.sequence_order === null && overWO && overWO.sequence_order !== null) {
       if (onPlace) {
-        onPlace(activeId)
+        onPlace(activeWorkOrderId)
       }
       return
     }
@@ -162,16 +170,16 @@ export default function JobSchedule({
     // Case 2: Scheduled card dropped on unscheduled card -> unplace it
     if (activeWO.sequence_order !== null && overWO && overWO.sequence_order === null) {
       if (onUnplace) {
-        onUnplace(activeId)
+        onUnplace(activeWorkOrderId)
       }
       return
     }
 
-    // Case 3: Reordering within scheduled cards
-    if (activeWO.sequence_order !== null && overWO && overWO.sequence_order !== null) {
+    // Case 3: Reordering within scheduled cards (only if both are work order cards, not visit cards)
+    if (!isVisitCard && !isOverVisitCard && activeWO.sequence_order !== null && overWO && overWO.sequence_order !== null) {
       if (onReorder) {
-        const oldIndex = scheduledWorkOrders.findIndex(wo => wo.id === activeId)
-        const newIndex = scheduledWorkOrders.findIndex(wo => wo.id === overId)
+        const oldIndex = scheduledWorkOrders.findIndex(wo => wo.id === activeWorkOrderId)
+        const newIndex = scheduledWorkOrders.findIndex(wo => wo.id === overWorkOrderId)
 
         if (oldIndex !== -1 && newIndex !== -1) {
           const newOrder = arrayMove(scheduledWorkOrders, oldIndex, newIndex)
@@ -181,7 +189,7 @@ export default function JobSchedule({
       return
     }
 
-    // Case 4: Reordering within unscheduled cards (optional, not needed for now)
+    // Case 4: Visit card reordering within same work order (not implemented for now)
   }
 
   useEffect(() => {
@@ -356,7 +364,34 @@ export default function JobSchedule({
     wo => wo.sequence_order === null
   )
 
-  const scheduledIds = scheduledWorkOrders.map(wo => wo.id)
+  // Flatten scheduled work orders into visit cards
+  const scheduledVisitCards: Array<{ workOrder: WorkOrderWithTrade; visit: WorkOrderVisit; index: number; totalVisits: number }> = []
+  scheduledWorkOrders.forEach(wo => {
+    if (wo.visits.length > 0) {
+      wo.visits.forEach((visit, vIndex) => {
+        scheduledVisitCards.push({
+          workOrder: wo,
+          visit,
+          index: vIndex,
+          totalVisits: wo.visits.length,
+        })
+      })
+    } else {
+      // Work order with no visits - show as a placeholder card
+      scheduledVisitCards.push({
+        workOrder: wo,
+        visit: {
+          id: `${wo.id}-placeholder`,
+          visit_number: 1,
+          status: 'unscheduled',
+        } as WorkOrderVisit,
+        index: 0,
+        totalVisits: 1,
+      })
+    }
+  })
+
+  const scheduledIds = scheduledVisitCards.map((vc, i) => vc.visit.id || `${vc.workOrder.id}-${vc.index}`)
   const unscheduledIds = unscheduledWorkOrders.map(wo => wo.id)
   const allIds = [...scheduledIds, ...unscheduledIds]
 
@@ -377,16 +412,20 @@ export default function JobSchedule({
         >
           <SortableContext items={allIds} strategy={verticalListSortingStrategy}>
             {/* Main schedule */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {scheduledWorkOrders.map((wo, index) => (
-                <SortableWorkOrderCard
-                  key={wo.id}
-                  workOrder={wo}
-                  index={index}
-                  isLast={index === scheduledWorkOrders.length - 1}
-                  onAddVisit={onAddVisit}
-                />
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: '75%', maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {scheduledVisitCards.map((vc, index) => (
+                  <SortableVisitCard
+                    key={vc.visit.id}
+                    workOrder={vc.workOrder}
+                    visit={vc.visit}
+                    visitIndex={vc.index}
+                    totalVisits={vc.totalVisits}
+                    isLast={index === scheduledVisitCards.length - 1}
+                    onAddVisit={onAddVisit}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Unscheduled section */}
@@ -455,16 +494,20 @@ export default function JobSchedule({
       ) : (
         // Read-only mode (no drag and drop)
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {scheduledWorkOrders.map((wo, index) => (
-              <SortableWorkOrderCard
-                key={wo.id}
-                workOrder={wo}
-                index={index}
-                isLast={index === scheduledWorkOrders.length - 1}
-                onAddVisit={onAddVisit}
-              />
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '75%', maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {scheduledVisitCards.map((vc, index) => (
+                <SortableVisitCard
+                  key={vc.visit.id}
+                  workOrder={vc.workOrder}
+                  visit={vc.visit}
+                  visitIndex={vc.index}
+                  totalVisits={vc.totalVisits}
+                  isLast={index === scheduledVisitCards.length - 1}
+                  onAddVisit={onAddVisit}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Unscheduled section */}
@@ -518,20 +561,25 @@ export default function JobSchedule({
   )
 }
 
-// — Work Order Card ———————————————————————————————————————————————————————
+// — Visit Card —————————————————————————————————————————————————————————
 
-function SortableWorkOrderCard({
+function SortableVisitCard({
   workOrder,
-  index,
+  visit,
+  visitIndex,
+  totalVisits,
   isLast,
   onAddVisit,
 }: {
   workOrder: WorkOrderWithTrade
-  index: number
+  visit: WorkOrderVisit
+  visitIndex: number
+  totalVisits: number
   isLast: boolean
   onAddVisit?: (id: string) => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const [showCommsPopup, setShowCommsPopup] = useState(false)
   const {
     attributes,
     listeners,
@@ -539,7 +587,7 @@ function SortableWorkOrderCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: workOrder.id })
+  } = useSortable({ id: visit.id || `${workOrder.id}-${visitIndex}` })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -551,14 +599,8 @@ function SortableWorkOrderCard({
   const tradeName = workOrder.trades?.business_name || workOrder.trades?.primary_trade || 'Unknown Trade'
   const tradeType = workOrder.trades?.primary_trade || 'trade'
 
-  const visitCount = workOrder.visits.length
-  const estimatedHours = workOrder.estimated_hours
-
-  // Get last or next date
-  const dates = workOrder.visits
-    .map(v => v.confirmed_date || v.scheduled_date)
-    .filter((d): d is string => d !== null)
-  const lastDate = dates.length > 0 ? dates[dates.length - 1] : null
+  const visitDate = visit.confirmed_date || visit.scheduled_date
+  const visitNumber = visit.visit_number || visitIndex + 1
 
   return (
     <div style={{ display: 'flex', gap: 0 }}>
@@ -590,7 +632,7 @@ function SortableWorkOrderCard({
             zIndex: 1,
           }}
         >
-          {index + 1}
+          {visitNumber}
         </div>
 
         {/* Vertical line */}
@@ -623,7 +665,7 @@ function SortableWorkOrderCard({
         }}
         {...attributes}
       >
-        {/* Row 1: Trade name + type pill + proximity + status + menu + drag handle */}
+        {/* Row 1: Trade name + type pill + menu + drag handle */}
         <div
           style={{
             display: 'flex',
@@ -656,8 +698,22 @@ function SortableWorkOrderCard({
             {tradeName}
           </span>
 
-          {/* Menu button */}
-          <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <span
+            style={{
+              fontSize: 8.5,
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              background: '#e8e0d0',
+              color: '#9e998f',
+              padding: '2px 6px',
+              borderRadius: 4,
+            }}
+          >
+            {tradeType}
+          </span>
+
+          {/* Menu button - moved to right of trade type label */}
+          <div style={{ position: 'relative', marginLeft: 4 }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               style={{
@@ -712,7 +768,7 @@ function SortableWorkOrderCard({
                 <button
                   onClick={() => {
                     setShowMenu(false)
-                    // TODO: Open comms modal
+                    setShowCommsPopup(true)
                   }}
                   style={{
                     width: '100%',
@@ -731,92 +787,144 @@ function SortableWorkOrderCard({
               </div>
             )}
           </div>
-          <span
-            style={{
-              fontSize: 8.5,
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              background: '#e8e0d0',
-              color: '#9e998f',
-              padding: '2px 6px',
-              borderRadius: 4,
-            }}
-          >
-            {tradeType}
-          </span>
-          {workOrder.proximity_range === 'extended' && (
-            <span
-              style={{
-                fontSize: 9,
-                background: '#fef3c7',
-                color: '#92400e',
-                padding: '2px 6px',
-                borderRadius: 4,
-                fontWeight: 500,
-              }}
-            >
-              Extended
-            </span>
-          )}
-          <div style={{ flex: 1 }} />
-          <StatusChip status={workOrder.status || 'pending'} garyState={workOrder.gary_state || 'not_started'} />
         </div>
 
-        {/* Row 2: Meta line */}
+        {/* Row 2: Visit number + date */}
         <div
           style={{
-            fontSize: 11,
-            color: '#9e998f',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
             marginBottom: 8,
           }}
         >
-          {visitCount > 0 && `${visitCount} visit${visitCount > 1 ? 's' : ''} · `}
-          {estimatedHours && `${estimatedHours}h · `}
-          {lastDate && formatDate(lastDate)}
-        </div>
+          {/* + button for adding visit */}
+          {onAddVisit && visitIndex === totalVisits - 1 && (
+            <button
+              onClick={() => onAddVisit(workOrder.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 20,
+                height: 20,
+                fontSize: 16,
+                fontWeight: 300,
+                color: '#c9a96e',
+                background: '#fef9f0',
+                border: '1px solid #e8d9c0',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+                lineHeight: 1,
+              }}
+            >
+              +
+            </button>
+          )}
 
-        {/* Visit pills */}
-        {workOrder.visits.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {workOrder.visits.map((visit, vIndex) => (
-              <div key={visit.id || vIndex}>
-                <VisitPill visit={visit} />
-                {(visit.lag_days_after || 0) > 0 && vIndex < workOrder.visits.length - 1 && (
-                  <LagRow
-                    lagDays={visit.lag_days_after || 0}
-                    description={visit.lag_description}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add visit button */}
-        {onAddVisit && (
-          <button
-            onClick={() => onAddVisit(workOrder.id)}
+          <span
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 10px',
-              fontSize: 11,
-              fontWeight: 500,
-              color: '#c9a96e',
-              background: '#fef9f0',
-              border: '1px solid #e8d9c0',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontFamily: 'DM Sans, sans-serif',
-              marginTop: 8,
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: '#9e998f',
             }}
           >
-            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
-            <span>Add visit</span>
-          </button>
-        )}
+            v{visitIndex + 1} of {totalVisits}
+          </span>
+
+          {visitDate && (
+            <span
+              style={{
+                fontSize: 11,
+                color: '#9e998f',
+              }}
+            >
+              · {formatDate(visitDate)}
+            </span>
+          )}
+
+          {visit.estimated_hours && (
+            <span
+              style={{
+                fontSize: 11,
+                color: '#9e998f',
+              }}
+            >
+              · {visit.estimated_hours}h
+            </span>
+          )}
+        </div>
+
+        {/* Row 3: Status chip */}
+        <StatusChip status={workOrder.status || 'pending'} garyState={workOrder.gary_state || 'not_started'} />
       </div>
+
+      {/* Comms popup */}
+      {showCommsPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowCommsPopup(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              padding: '24px',
+              borderRadius: 8,
+              maxWidth: 400,
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#1a1a1a',
+                marginBottom: 12,
+              }}
+            >
+              Communications
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: '#9e998f',
+                marginBottom: 16,
+              }}
+            >
+              This section of the app is not yet built.
+            </div>
+            <button
+              onClick={() => setShowCommsPopup(false)}
+              style={{
+                padding: '8px 16px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1a1a1a',
+                background: '#e8e0d0',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
