@@ -186,7 +186,8 @@ function WORow({
               border: '1px solid #ddd8d0',
               background: '#fff',
               color: '#1a1a1a',
-              minWidth: 120,
+              maxWidth: '140px',
+              width: '100%',
             }}
           >
             <option value="">Select contractor...</option>
