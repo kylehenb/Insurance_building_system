@@ -12,15 +12,15 @@ import {
   woIsSent,
 } from './types'
 
-function PlacementPill({ wo }: { wo: WorkOrderWithDetails }) {
-  const { placementState } = wo
+function StatusPill({ status }: { status: string | null }) {
+  const s = status ?? 'pending'
   const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
-    unplaced:       { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Unplaced' },
-    placed_unsent:  { bg: '#eff4ff', color: '#1e40af', border: '#bfdbfe', label: 'Placed' },
-    placed_sent:    { bg: '#fef3e2', color: '#92400e', border: '#fcd38d', label: 'Sent' },
-    placed_complete:{ bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Complete' },
+    pending:         { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' },
+    engaged:         { bg: '#eff4ff', color: '#1e40af', border: '#bfdbfe', label: 'Engaged' },
+    works_complete:  { bg: '#fef3e2', color: '#92400e', border: '#fcd38d', label: 'Works Complete' },
+    invoice_received:{ bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Invoice Received' },
   }
-  const s = styles[placementState] ?? styles.unplaced
+  const style = styles[s] ?? styles.pending
   return (
     <span
       style={{
@@ -29,12 +29,12 @@ function PlacementPill({ wo }: { wo: WorkOrderWithDetails }) {
         padding: '2px 7px',
         borderRadius: 10,
         display: 'inline-block',
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
+        background: style.bg,
+        color: style.color,
+        border: `1px solid ${style.border}`,
       }}
     >
-      {s.label}
+      {style.label}
     </span>
   )
 }
@@ -201,7 +201,7 @@ function WORow({
         )}
       </td>
       <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
-        <PlacementPill wo={wo} />
+        <StatusPill status={wo.status} />
       </td>
       <td style={{ padding: '6px 14px', borderBottom: '1px solid #e8e4de', whiteSpace: 'nowrap' }}>
         <GaryPill state={wo.gary_state} />
