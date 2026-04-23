@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import type { WorkOrderRow, WorkOrderVisitRow } from './useWorkOrders'
+import { formatEstHours } from '@/lib/utils'
 import {
   type WorkOrderWithDetails,
   type QuoteRow,
@@ -215,7 +217,7 @@ function WORow({
           whiteSpace: 'nowrap',
         }}
       >
-        {wo.estimated_hours !== null && wo.estimated_hours !== undefined ? wo.estimated_hours.toFixed(2) : '—'}
+        {formatEstHours(wo.estimated_hours)}
       </td>
       <td
         style={{

@@ -11,6 +11,7 @@ import {
   aud,
   woIsSent,
 } from './types'
+import { formatEstHours } from '@/lib/utils'
 
 // ─── CSS shared across card variants (injected once via WorkOrdersTab) ────────
 export const CARD_CSS = `
@@ -707,7 +708,7 @@ export function WorkOrderCard({
                   color: '#5a5650',
                 }}
               >
-                {wo.estimated_hours ? `${wo.estimated_hours}h` : '—'}
+                {wo.estimated_hours != null ? `${formatEstHours(wo.estimated_hours)}h` : '—'}
               </span>
               {wo.lagDays > 0 && (
                 <>

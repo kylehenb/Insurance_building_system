@@ -129,12 +129,13 @@ export function DescriptionSearch({
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
-  // Sync local state with value prop only on mount
-  // Local state is the source of truth throughout the component's lifecycle
+  // Sync local state with value prop when it changes from outside (e.g., library selection)
+  // But only when not focused to avoid interfering with typing
   useEffect(() => {
-    setLocal(value ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!isFocusedRef.current) {
+      setLocal(value ?? '')
+    }
+  }, [value])
 
   // Auto-resize textarea
   const rows = Math.max(2, Math.ceil((value?.length ?? 0) / 52))

@@ -5,6 +5,7 @@ import type { LibraryItem } from '../hooks/useScopeLibrary'
 import type { ScopeItem, ItemType } from '../hooks/useQuote'
 import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
+import { formatEstHours } from '@/lib/utils'
 
 const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const
 
@@ -509,12 +510,10 @@ export function LineItemRow({
 
   useEffect(() => {
     setLocalUnit(item.unit ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [item.unit])
   useEffect(() => {
     setLocalTrade(item.trade ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [item.trade])
 
   const hasLineTotal = (item.line_total ?? 0) > 0
   const typeInfo = item.item_type ? ITEM_TYPE_LABELS[item.item_type] : null
@@ -727,7 +726,7 @@ export function LineItemRow({
           title="Labour hours per unit — used for scheduling"
         >
           <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#9e998f' }}>
-            {estHours != null ? estHours : '—'}
+            {formatEstHours(estHours)}
           </span>
         </div>
 
