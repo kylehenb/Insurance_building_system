@@ -225,7 +225,7 @@ export default function JobSchedule({
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .eq('status', 'confirmed')
-        .single()
+        .maybeSingle()
         .then(({ data }) => setBlueprint(data))
       return
     }
@@ -241,7 +241,7 @@ export default function JobSchedule({
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .eq('status', 'confirmed')
-        .single()
+        .maybeSingle()
 
       setBlueprint(blueprintData)
 

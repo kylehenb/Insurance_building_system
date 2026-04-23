@@ -111,8 +111,11 @@ function WORow({
   wo: WorkOrderWithDetails
   allPlaced: WorkOrderWithDetails[]
   trades: TradeRow[]
-  onUpdate: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
+  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
 }) {
+  const [localTradeId, setLocalTradeId] = React.useState(wo.trade_id || '')
+  const [localAgreedAmount, setLocalAgreedAmount] = React.useState(wo.agreed_amount?.toString() || '')
+
   const color  = getTradeColor(wo.tradeTypeLabel)
   const predWo = wo.predecessor_work_order_id
     ? allPlaced.find(p => p.id === wo.predecessor_work_order_id)
@@ -126,6 +129,12 @@ function WORow({
   const isEditable = wo.status === 'pending'
   const tradeType = wo.work_type === 'make_safe' ? 'make_safe' : wo.tradeTypeLabel
   const eligibleTrades = trades.filter(t => t.primary_trade === tradeType || t.primary_trade === tradeType.toLowerCase())
+
+  // Sync local state when wo props change (e.g., after successful update)
+  React.useEffect(() => {
+    setLocalTradeId(wo.trade_id || '')
+    setLocalAgreedAmount(wo.agreed_amount?.toString() || '')
+  }, [wo.trade_id, wo.agreed_amount])
 
   return (
     <tr>
@@ -156,13 +165,20 @@ function WORow({
           padding: '6px 14px',
           borderBottom: '1px solid #e8e4de',
           color: '#1a1a1a',
-          whiteSpace: 'nowrap',
+          maxWidth: '140px',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
         }}
       >
         {isEditable ? (
           <select
-            value={wo.trade_id || ''}
-            onChange={(e) => onUpdate(wo.id, { trade_id: e.target.value })}
+            value={localTradeId}
+            onChange={(e) => setLocalTradeId(e.target.value)}
+            onBlur={() => {
+              if (localTradeId !== (wo.trade_id || '')) {
+                onUpdate(wo.id, { trade_id: localTradeId || undefined })
+              }
+            }}
             style={{
               fontSize: 10,
               padding: '2px 4px',
@@ -232,8 +248,14 @@ function WORow({
         {isEditable ? (
           <input
             type="number"
-            value={wo.agreed_amount ?? ''}
-            onChange={(e) => onUpdate(wo.id, { agreed_amount: e.target.value ? parseFloat(e.target.value) : null })}
+            value={localAgreedAmount}
+            onChange={(e) => setLocalAgreedAmount(e.target.value)}
+            onBlur={() => {
+              const newValue = localAgreedAmount ? parseFloat(localAgreedAmount) : null
+              if (newValue !== wo.agreed_amount) {
+                onUpdate(wo.id, { agreed_amount: newValue })
+              }
+            }}
             placeholder="0"
             style={{
               fontFamily: 'DM Mono, monospace',
@@ -336,6 +358,12 @@ const TH_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+const TH_STYLE_WRAP: React.CSSProperties = {
+  ...TH_STYLE,
+  maxWidth: '140px',
+  whiteSpace: 'normal',
+}
+
 function WOTable({
   workOrders,
   allWorkOrders,
@@ -345,15 +373,26 @@ function WOTable({
   workOrders: WorkOrderWithDetails[]
   allWorkOrders: WorkOrderWithDetails[]
   trades: TradeRow[]
-  onUpdate: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
+  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
 }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
       <thead>
         <tr>
-          {['Seq','Trade','Contractor','Status','Gary','Hours','Lag','Quoted','Override','Trade cost','Invoice chain','Depends on','Xero','Preview'].map(h => (
-            <th key={h} style={TH_STYLE}>{h}</th>
-          ))}
+          <th style={TH_STYLE}>Seq</th>
+          <th style={TH_STYLE}>Trade</th>
+          <th style={TH_STYLE_WRAP}>Contractor</th>
+          <th style={TH_STYLE}>Status</th>
+          <th style={TH_STYLE}>Gary</th>
+          <th style={TH_STYLE}>Hours</th>
+          <th style={TH_STYLE}>Lag</th>
+          <th style={TH_STYLE}>Quoted</th>
+          <th style={TH_STYLE}>Override</th>
+          <th style={TH_STYLE}>Trade cost</th>
+          <th style={TH_STYLE}>Invoice chain</th>
+          <th style={TH_STYLE}>Depends on</th>
+          <th style={TH_STYLE}>Xero</th>
+          <th style={TH_STYLE}>Preview</th>
         </tr>
       </thead>
       <tbody>
@@ -371,7 +410,7 @@ export interface BottomPanelProps {
   trades:      TradeRow[]
   onAddToQuote: (quoteId: string) => void
   onAddAdditional: () => void
-  onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string; agreed_amount: number | null }>) => void
+  onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
 }
 
 export function BottomPanel({
