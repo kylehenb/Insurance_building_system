@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { WorkOrderRow, WorkOrderVisitRow } from './useWorkOrders'
 import { formatEstHours } from '@/lib/utils'
 import {
   type WorkOrderWithDetails,
+  type WorkOrderRow,
+  type WorkOrderVisitRow,
   type QuoteRow,
   type TradeRow,
   getTradeColor,
