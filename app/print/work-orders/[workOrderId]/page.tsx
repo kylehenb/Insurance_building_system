@@ -145,6 +145,7 @@ export default async function WorkOrderPrintPage({
     trade,
     tradeScopeItems,
     otherScopeItems,
+    generatedDate: new Date(),
   })
 
   return (

@@ -15,8 +15,9 @@ export function generateWorkOrderHtml(params: {
   trade: Trade | null
   tradeScopeItems: ScopeItem[]
   otherScopeItems: ScopeItem[]
+  generatedDate?: Date
 }): string {
-  const { workOrder, job, tenant, trade, tradeScopeItems, otherScopeItems } = params
+  const { workOrder, job, tenant, trade, tradeScopeItems, otherScopeItems, generatedDate = new Date() } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -183,7 +184,7 @@ export function generateWorkOrderHtml(params: {
       </div>
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
         ${[
-          { label: 'Created', value: formatDate(workOrder.created_at) },
+          { label: 'Generated', value: formatDate(generatedDate.toISOString()) },
         ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
             border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">

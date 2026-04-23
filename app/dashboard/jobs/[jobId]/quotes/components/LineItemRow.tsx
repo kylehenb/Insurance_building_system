@@ -7,7 +7,7 @@ import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
 import { formatEstHours } from '@/lib/utils'
 
-const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const
+const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set', 'each', 'm', 'mm', 'l', 'kg'] as const
 
 const ITEM_TYPE_LABELS: Record<NonNullable<ItemType>, { label: string; pill: string; color: string; border: string }> = {
   provisional_sum: { label: 'Provisional Sum', pill: 'PS', color: '#b45309', border: '#f59e0b' },
@@ -506,7 +506,7 @@ export function LineItemRow({
 
   // Sync local state with item props only on mount
   // Local state is the source of truth throughout the component's lifecycle
-  const unitSelectRef = useRef<HTMLSelectElement>(null)
+  const unitInputRef = useRef<HTMLInputElement>(null)
   const tradeSelectRef = useRef<HTMLSelectElement>(null)
   const unitFocusedRef = useRef(false)
   const tradeFocusedRef = useRef(false)
@@ -638,26 +638,28 @@ export function LineItemRow({
 
         {/* Unit */}
         <div style={col} onPointerDown={e => e.stopPropagation()}>
-          <select
-            ref={unitSelectRef}
+          <input
+            ref={unitInputRef}
+            type="text"
             value={localUnit}
             onChange={e => setLocalUnit(e.target.value)}
             onFocus={() => { unitFocusedRef.current = true }}
             onBlur={() => {
               unitFocusedRef.current = false
-              onUpdate(item.id, { unit: localUnit })
+              onUpdate(item.id, { unit: localUnit || null })
             }}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); onNavigateNext?.() }
             }}
             disabled={isLocked}
-            style={selectStyle}
-          >
-            <option value="">—</option>
-            {UNITS.map(u => (
-              <option key={u} value={u}>{u}</option>
-            ))}
-          </select>
+            placeholder="—"
+            style={{
+              ...selectStyle,
+              appearance: 'none',
+              backgroundImage: 'none',
+              paddingLeft: '4px',
+            }}
+          />
         </div>
 
         {/* Labour/Unit */}
