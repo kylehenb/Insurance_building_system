@@ -137,14 +137,6 @@ export default function JobSchedule({
     // If dropping on the same item, do nothing
     if (activeId === overId) return
 
-    // Check if this is a visit card (contains hyphen) or work order card
-    const isVisitCard = activeId.includes('-')
-    const isOverVisitCard = overId.includes('-')
-
-    // Extract work order ID from visit card ID
-    const activeWorkOrderId = isVisitCard ? activeId.split('-')[0] : activeId
-    const overWorkOrderId = isOverVisitCard ? overId.split('-')[0] : overId
-
     // Compute scheduled and unscheduled work orders from current state
     const scheduledWorkOrders = workOrders.filter(
       wo => wo.sequence_order !== null
@@ -154,42 +146,58 @@ export default function JobSchedule({
       wo => wo.sequence_order === null
     )
 
-    const activeWO = workOrders.find(wo => wo.id === activeWorkOrderId)
-    const overWO = workOrders.find(wo => wo.id === overWorkOrderId)
+    // Find the visit cards for the active and over items
+    const activeVC = scheduledVisitCards.find(vc => (vc.visit.id || `${vc.workOrder.id}-${vc.index}`) === activeId)
+    const overVC = scheduledVisitCards.find(vc => (vc.visit.id || `${vc.workOrder.id}-${vc.index}`) === overId)
 
-    if (!activeWO) return
+    if (!activeVC || !overVC) {
+      // Try to find in unscheduled
+      const unscheduledActive = unscheduledWorkOrders.find(wo => wo.id === activeId)
+      const unscheduledOver = unscheduledWorkOrders.find(wo => wo.id === overId)
 
-    // Case 1: Unscheduled card dropped on scheduled card -> place it
-    if (activeWO.sequence_order === null && overWO && overWO.sequence_order !== null) {
-      if (onPlace) {
-        onPlace(activeWorkOrderId)
-      }
-      return
-    }
-
-    // Case 2: Scheduled card dropped on unscheduled card -> unplace it
-    if (activeWO.sequence_order !== null && overWO && overWO.sequence_order === null) {
-      if (onUnplace) {
-        onUnplace(activeWorkOrderId)
-      }
-      return
-    }
-
-    // Case 3: Reordering within scheduled cards (only if both are work order cards, not visit cards)
-    if (!isVisitCard && !isOverVisitCard && activeWO.sequence_order !== null && overWO && overWO.sequence_order !== null) {
-      if (onReorder) {
-        const oldIndex = scheduledWorkOrders.findIndex(wo => wo.id === activeWorkOrderId)
-        const newIndex = scheduledWorkOrders.findIndex(wo => wo.id === overWorkOrderId)
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(scheduledWorkOrders, oldIndex, newIndex)
-          onReorder(newOrder.map(wo => wo.id))
+      if (unscheduledActive && overVC) {
+        // Unscheduled card dropped on scheduled card -> place it
+        if (onPlace) {
+          onPlace(unscheduledActive.id)
         }
+        return
       }
+
+      if (activeVC && unscheduledOver) {
+        // Scheduled card dropped on unscheduled card -> unplace it
+        if (onUnplace) {
+          onUnplace(activeVC.workOrder.id)
+        }
+        return
+      }
+
       return
     }
 
-    // Case 4: Visit card reordering within same work order (not implemented for now)
+    // Reordering within scheduled visit cards
+    // We need to reorder the work orders based on the new position of their visit cards
+    const activeIndex = scheduledVisitCards.indexOf(activeVC)
+    const overIndex = scheduledVisitCards.indexOf(overVC)
+
+    if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+      // Get the work orders in the new order
+      const reorderedVisitCards = arrayMove(scheduledVisitCards, activeIndex, overIndex)
+      
+      // Extract unique work orders in their new order
+      const newWorkOrderOrder: string[] = []
+      const seenWorkOrders = new Set<string>()
+      
+      reorderedVisitCards.forEach(vc => {
+        if (!seenWorkOrders.has(vc.workOrder.id)) {
+          seenWorkOrders.add(vc.workOrder.id)
+          newWorkOrderOrder.push(vc.workOrder.id)
+        }
+      })
+
+      if (onReorder && newWorkOrderOrder.length > 0) {
+        onReorder(newWorkOrderOrder)
+      }
+    }
   }
 
   useEffect(() => {
@@ -421,6 +429,7 @@ export default function JobSchedule({
                     visit={vc.visit}
                     visitIndex={vc.index}
                     totalVisits={vc.totalVisits}
+                    sequenceIndex={index}
                     isLast={index === scheduledVisitCards.length - 1}
                     onAddVisit={onAddVisit}
                   />
@@ -503,6 +512,7 @@ export default function JobSchedule({
                   visit={vc.visit}
                   visitIndex={vc.index}
                   totalVisits={vc.totalVisits}
+                  sequenceIndex={index}
                   isLast={index === scheduledVisitCards.length - 1}
                   onAddVisit={onAddVisit}
                 />
@@ -568,6 +578,7 @@ function SortableVisitCard({
   visit,
   visitIndex,
   totalVisits,
+  sequenceIndex,
   isLast,
   onAddVisit,
 }: {
@@ -575,6 +586,7 @@ function SortableVisitCard({
   visit: WorkOrderVisit
   visitIndex: number
   totalVisits: number
+  sequenceIndex: number
   isLast: boolean
   onAddVisit?: (id: string) => void
 }) {
@@ -601,6 +613,7 @@ function SortableVisitCard({
 
   const visitDate = visit.confirmed_date || visit.scheduled_date
   const visitNumber = visit.visit_number || visitIndex + 1
+  const sequenceNumber = sequenceIndex + 1
 
   return (
     <div style={{ display: 'flex', gap: 0 }}>
@@ -632,7 +645,7 @@ function SortableVisitCard({
             zIndex: 1,
           }}
         >
-          {visitNumber}
+          {sequenceNumber}
         </div>
 
         {/* Vertical line */}
