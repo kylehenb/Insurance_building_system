@@ -314,7 +314,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
     setAllItemTypes,
   } = useQuote({ quoteId, tenantId })
 
-  const { search } = useScopeLibrary({ tenantId, insurer: job.insurer })
+  const { search } = useScopeLibrary({ tenantId })
   const trades = useTrades(tenantId)
 
   // Local-only rooms (added locally, no items yet)

@@ -252,9 +252,9 @@ export default function ScopeLibraryPage() {
     fetchClients();
   }, [tenantId, supabase]);
 
-  // Get unique trades from items
+  // Get unique trades from trades table (primary_trade)
   const uniqueTrades = Array.from(
-    new Set(items.map(item => item.trade).filter((t): t is string => Boolean(t)))
+    new Set(trades.map(t => t.primary_trade).filter((t): t is string => Boolean(t)))
   ).sort();
 
   // Filter and sort items

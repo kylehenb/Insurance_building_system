@@ -17,19 +17,10 @@ export async function GET(req: NextRequest) {
     )
     .eq('tenant_id', tenantId)
 
-  if (insurer) {
-    query = query.or(`insurer_specific.eq.${insurer},insurer_specific.is.null`)
-  } else {
-    query = query.is('insurer_specific', null)
-  }
-
   const { data, error } = await query.order('item_description')
 
-  // Filter to only approved items (approval_status field not in types yet)
-  const filteredData = (data ?? []).filter((item: any) => item.approval_status === 'approved')
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(filteredData, {
+  return NextResponse.json(data ?? [], {
     headers: { 'Cache-Control': 'private, max-age=300' },
   })
 }
