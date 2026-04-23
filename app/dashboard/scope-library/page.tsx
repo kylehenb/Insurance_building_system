@@ -824,7 +824,7 @@ export default function ScopeLibraryPage() {
                           <option value="">—</option>
                           {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
                             <option key={t.id} value={t.primary_trade}>
-                              {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
+                              {t.primary_trade}
                             </option>
                           ))}
                         </select>
@@ -1016,7 +1016,7 @@ export default function ScopeLibraryPage() {
                   <option value="">—</option>
                   {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
                     <option key={t.id} value={t.primary_trade}>
-                      {t.trade_code ? `${t.trade_code} – ${t.primary_trade}` : t.primary_trade}
+                      {t.primary_trade}
                     </option>
                   ))}
                 </select>
