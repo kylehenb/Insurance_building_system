@@ -329,38 +329,8 @@ export default function JobSchedule({
     )
   }
 
-  if (!blueprint) {
-    return (
-      <div
-        style={{
-          background: '#fff',
-          border: '1px solid #e0dbd4',
-          borderRadius: 8,
-          padding: '40px',
-          textAlign: 'center',
-          fontFamily: 'DM Sans, sans-serif',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            color: '#9e998f',
-            marginBottom: 8,
-          }}
-        >
-          No schedule confirmed yet
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: '#9e998f',
-          }}
-        >
-          Confirm a blueprint to activate the schedule and Gary.
-        </div>
-      </div>
-    )
-  }
+  // Show schedule if work orders exist, regardless of blueprint status
+  // This allows building the blueprint by scheduling work orders first
 
   // Separate scheduled and unscheduled work orders
   const scheduledWorkOrders = workOrders.filter(
