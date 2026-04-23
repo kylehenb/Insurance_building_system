@@ -589,6 +589,16 @@ export default async function ReportPrintPage({
         {/* Bottom padding */}
         <div style={{ paddingBottom: '60px' }} />
 
+        {/* Quote Section */}
+        <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
+            QUOTE
+          </div>
+          <div style={{ background: '#fafaf8', border: '1px solid #e8e4e0', borderRadius: '5px', padding: '9px 11px', fontSize: '11.5px', color: '#3a3530', lineHeight: '1.65' }}>
+            Refer to the separately attached quote for information relating to the proposed repair scope and costs.
+          </div>
+        </div>
+
         {/* Photos Section */}
         {photos && photos.length > 0 && (
           <>
