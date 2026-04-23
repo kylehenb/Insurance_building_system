@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import JobSchedule from '@/components/schedule/JobSchedule'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1905,7 +1906,7 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
         {/* 3. Two equal columns: Communications + Calendar */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <CommunicationsCard jobId={jobId} tenantId={tenantId} />
-          <CalendarCard jobId={jobId} tenantId={tenantId} />
+          <JobSchedule jobId={jobId} tenantId={tenantId} />
         </div>
       </div>
     </div>
