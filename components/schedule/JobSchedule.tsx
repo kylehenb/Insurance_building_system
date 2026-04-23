@@ -3,10 +3,44 @@
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface JobScheduleProps {
   jobId: string
   tenantId: string
+  // Optional interactive props for Work Orders tab
+  workOrders?: any[]
+  trades?: any[]
+  expandedIds?: Set<string>
+  onToggleExpand?: (id: string) => void
+  onPlace?: (id: string) => void
+  onUnplace?: (id: string) => void
+  onSendOne?: (id: string) => void
+  onCancel?: (id: string) => void
+  onUpdate?: (id: string, u: any) => void
+  onAddVisit?: (id: string) => void
+  onSetPred?: (id: string, predId: string | null) => void
+  onReorder?: (orderedIds: string[]) => void
+  onSetParent?: (id: string, parentId: string | null, offsetDays: number) => void
+  onDraftGenerated?: () => void
 }
 
 interface WorkOrderWithTrade {
@@ -44,7 +78,24 @@ interface Blueprint {
   draft_data: any
 }
 
-export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
+export default function JobSchedule({
+  jobId,
+  tenantId,
+  workOrders: providedWorkOrders,
+  trades: providedTrades,
+  expandedIds,
+  onToggleExpand,
+  onPlace,
+  onUnplace,
+  onSendOne,
+  onCancel,
+  onUpdate,
+  onAddVisit,
+  onSetPred,
+  onReorder,
+  onSetParent,
+  onDraftGenerated,
+}: JobScheduleProps) {
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -53,8 +104,118 @@ export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null)
   const [workOrders, setWorkOrders] = useState<WorkOrderWithTrade[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Determine if we're in interactive mode (Work Orders tab) or read-only mode (Calendar tab)
+  const isInteractive = !!providedWorkOrders
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Small movement required to start drag for smoother UX
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // If dropping on the same item, do nothing
+    if (activeId === overId) return
+
+    // Compute scheduled and unscheduled work orders from current state
+    const scheduledWorkOrders = workOrders.filter(
+      wo => wo.sequence_order !== null
+    ).sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0))
+
+    const unscheduledWorkOrders = workOrders.filter(
+      wo => wo.sequence_order === null
+    )
+
+    const activeWO = workOrders.find(wo => wo.id === activeId)
+    const overWO = workOrders.find(wo => wo.id === overId)
+
+    if (!activeWO) return
+
+    // Case 1: Unscheduled card dropped on scheduled card -> place it
+    if (activeWO.sequence_order === null && overWO && overWO.sequence_order !== null) {
+      if (onPlace) {
+        onPlace(activeId)
+      }
+      return
+    }
+
+    // Case 2: Scheduled card dropped on unscheduled card -> unplace it
+    if (activeWO.sequence_order !== null && overWO && overWO.sequence_order === null) {
+      if (onUnplace) {
+        onUnplace(activeId)
+      }
+      return
+    }
+
+    // Case 3: Reordering within scheduled cards
+    if (activeWO.sequence_order !== null && overWO && overWO.sequence_order !== null) {
+      if (onReorder) {
+        const oldIndex = scheduledWorkOrders.findIndex(wo => wo.id === activeId)
+        const newIndex = scheduledWorkOrders.findIndex(wo => wo.id === overId)
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(scheduledWorkOrders, oldIndex, newIndex)
+          onReorder(newOrder.map(wo => wo.id))
+        }
+      }
+      return
+    }
+
+    // Case 4: Reordering within unscheduled cards (optional, not needed for now)
+  }
 
   useEffect(() => {
+    // If workOrders are provided (interactive mode), use them directly
+    if (providedWorkOrders && providedTrades) {
+      const workOrdersWithVisits: WorkOrderWithTrade[] = providedWorkOrders.map((wo: any) => ({
+        id: wo.id,
+        trade_id: wo.trade_id,
+        status: wo.status,
+        gary_state: wo.gary_state,
+        sequence_order: wo.sequence_order,
+        predecessor_work_order_id: wo.predecessor_work_order_id,
+        estimated_hours: wo.estimated_hours,
+        proximity_range: wo.proximity_range,
+        work_type: wo.work_type,
+        trades: wo.trade || providedTrades.find((t: any) => t.id === wo.trade_id),
+        visits: wo.visits || []
+      }))
+      setWorkOrders(workOrdersWithVisits)
+      setLoading(false)
+
+      // Fetch blueprint separately
+      supabase
+        .from('job_schedule_blueprints')
+        .select('id, status, draft_data')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'confirmed')
+        .single()
+        .then(({ data }) => setBlueprint(data))
+      return
+    }
+
+    // Otherwise fetch data (read-only mode)
     async function loadData() {
       setLoading(true)
 
@@ -133,7 +294,7 @@ export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
     }
 
     loadData()
-  }, [jobId, tenantId, supabase])
+  }, [jobId, tenantId, providedWorkOrders, providedTrades, supabase])
 
   if (loading) {
     return (
@@ -195,6 +356,10 @@ export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
     wo => wo.sequence_order === null
   )
 
+  const scheduledIds = scheduledWorkOrders.map(wo => wo.id)
+  const unscheduledIds = unscheduledWorkOrders.map(wo => wo.id)
+  const allIds = [...scheduledIds, ...unscheduledIds]
+
   return (
     <div
       style={{
@@ -203,63 +368,151 @@ export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
         color: '#1a1a1a',
       }}
     >
-      {/* Main schedule */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {scheduledWorkOrders.map((wo, index) => (
-          <WorkOrderCard
-            key={wo.id}
-            workOrder={wo}
-            index={index}
-            isLast={index === scheduledWorkOrders.length - 1}
-          />
-        ))}
-      </div>
-
-      {/* Unscheduled section */}
-      {unscheduledWorkOrders.length > 0 && (
-        <div
-          style={{
-            marginTop: 24,
-            borderTop: '2px dashed #e0dbd4',
-            paddingTop: 16,
-            background: '#f9f8f6',
-            borderRadius: 8,
-            padding: '16px',
-          }}
+      {isInteractive ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              color: '#9e998f',
-              marginBottom: 12,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            Unscheduled
-            <span
-              style={{
-                background: '#e0dbd4',
-                color: '#6b7280',
-                fontSize: 10,
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: 12,
-              }}
-            >
-              {unscheduledWorkOrders.length}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {unscheduledWorkOrders.map(wo => (
-              <UnscheduledCard key={wo.id} workOrder={wo} />
+          <SortableContext items={allIds} strategy={verticalListSortingStrategy}>
+            {/* Main schedule */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {scheduledWorkOrders.map((wo, index) => (
+                <SortableWorkOrderCard
+                  key={wo.id}
+                  workOrder={wo}
+                  index={index}
+                  isLast={index === scheduledWorkOrders.length - 1}
+                  onAddVisit={onAddVisit}
+                />
+              ))}
+            </div>
+
+            {/* Unscheduled section */}
+            {unscheduledWorkOrders.length > 0 && (
+              <div
+                style={{
+                  marginTop: 24,
+                  borderTop: '2px dashed #e0dbd4',
+                  paddingTop: 16,
+                  background: '#f9f8f6',
+                  borderRadius: 8,
+                  padding: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    color: '#9e998f',
+                    marginBottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  Unscheduled
+                  <span
+                    style={{
+                      background: '#e8e0d0',
+                      color: '#9e998f',
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      fontSize: 9,
+                    }}
+                  >
+                    {unscheduledWorkOrders.length}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {unscheduledWorkOrders.map(wo => (
+                    <UnscheduledCard key={wo.id} workOrder={wo} onPlace={onPlace} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </SortableContext>
+          <DragOverlay>
+            {activeId ? (
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 8,
+                  padding: '12px 14px 12px 18px',
+                  opacity: 0.8,
+                }}
+              >
+                {scheduledWorkOrders.find(wo => wo.id === activeId)?.trades?.business_name ||
+                 unscheduledWorkOrders.find(wo => wo.id === activeId)?.trades?.business_name}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        // Read-only mode (no drag and drop)
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {scheduledWorkOrders.map((wo, index) => (
+              <SortableWorkOrderCard
+                key={wo.id}
+                workOrder={wo}
+                index={index}
+                isLast={index === scheduledWorkOrders.length - 1}
+                onAddVisit={onAddVisit}
+              />
             ))}
           </div>
-        </div>
+
+          {/* Unscheduled section */}
+          {unscheduledWorkOrders.length > 0 && (
+            <div
+              style={{
+                marginTop: 24,
+                borderTop: '2px dashed #e0dbd4',
+                paddingTop: 16,
+                background: '#f9f8f6',
+                borderRadius: 8,
+                padding: '16px',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '2px',
+                  color: '#9e998f',
+                  marginBottom: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                Unscheduled
+                <span
+                  style={{
+                    background: '#e8e0d0',
+                    color: '#9e998f',
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    fontSize: 9,
+                  }}
+                >
+                  {unscheduledWorkOrders.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {unscheduledWorkOrders.map(wo => (
+                  <UnscheduledCard key={wo.id} workOrder={wo} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -267,15 +520,33 @@ export default function JobSchedule({ jobId, tenantId }: JobScheduleProps) {
 
 // — Work Order Card ———————————————————————————————————————————————————————
 
-function WorkOrderCard({
+function SortableWorkOrderCard({
   workOrder,
   index,
   isLast,
+  onAddVisit,
 }: {
   workOrder: WorkOrderWithTrade
   index: number
   isLast: boolean
+  onAddVisit?: (id: string) => void
 }) {
+  const [showMenu, setShowMenu] = useState(false)
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: workOrder.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   const statusColor = getStatusColor(workOrder.status || 'pending', workOrder.gary_state || 'not_started')
   const tradeName = workOrder.trades?.business_name || workOrder.trades?.primary_trade || 'Unknown Trade'
   const tradeType = workOrder.trades?.primary_trade || 'trade'
@@ -338,6 +609,7 @@ function WorkOrderCard({
 
       {/* Card */}
       <div
+        ref={setNodeRef}
         style={{
           flex: 1,
           background: '#fff',
@@ -347,9 +619,11 @@ function WorkOrderCard({
           marginBottom: isLast ? 0 : 16,
           padding: '12px 14px 12px 18px',
           borderLeft: `4px solid ${statusColor.circle}`,
+          ...style,
         }}
+        {...attributes}
       >
-        {/* Row 1: Trade name + type pill + proximity + status */}
+        {/* Row 1: Trade name + type pill + proximity + status + menu + drag handle */}
         <div
           style={{
             display: 'flex',
@@ -358,6 +632,20 @@ function WorkOrderCard({
             marginBottom: 6,
           }}
         >
+          {/* Drag handle */}
+          <div
+            {...listeners}
+            style={{
+              cursor: 'grab',
+              color: '#9e998f',
+              padding: '2px',
+              fontSize: 14,
+              userSelect: 'none',
+            }}
+          >
+            ⋮⋮
+          </div>
+
           <span
             style={{
               fontSize: 13,
@@ -367,6 +655,82 @@ function WorkOrderCard({
           >
             {tradeName}
           </span>
+
+          {/* Menu button */}
+          <div style={{ position: 'relative', marginLeft: 'auto' }}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              style={{
+                padding: '4px 8px',
+                fontSize: 12,
+                color: '#9e998f',
+                background: 'transparent',
+                border: '1px solid #e0dbd4',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+              }}
+            >
+              ⋮
+            </button>
+
+            {/* Dropdown menu */}
+            {showMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 4,
+                  background: '#fff',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: 160,
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setShowMenu(false)
+                    // TODO: Open scope items modal
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'DM Sans, sans-serif',
+                    color: '#1a1a1a',
+                  }}
+                >
+                  View scope items
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false)
+                    // TODO: Open comms modal
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'DM Sans, sans-serif',
+                    color: '#1a1a1a',
+                  }}
+                >
+                  Send comms
+                </button>
+              </div>
+            )}
+          </div>
           <span
             style={{
               fontSize: 8.5,
@@ -427,6 +791,31 @@ function WorkOrderCard({
             ))}
           </div>
         )}
+
+        {/* Add visit button */}
+        {onAddVisit && (
+          <button
+            onClick={() => onAddVisit(workOrder.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 10px',
+              fontSize: 11,
+              fontWeight: 500,
+              color: '#c9a96e',
+              background: '#fef9f0',
+              border: '1px solid #e8d9c0',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+              marginTop: 8,
+            }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+            <span>Add visit</span>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -434,12 +823,34 @@ function WorkOrderCard({
 
 // — Unscheduled Card —————————————————————————————————————————————————————
 
-function UnscheduledCard({ workOrder }: { workOrder: WorkOrderWithTrade }) {
+function UnscheduledCard({
+  workOrder,
+  onPlace,
+}: {
+  workOrder: WorkOrderWithTrade
+  onPlace?: (id: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: workOrder.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   const tradeName = workOrder.trades?.business_name || workOrder.trades?.primary_trade || 'Unknown Trade'
   const tradeType = workOrder.trades?.primary_trade || 'trade'
 
   return (
     <div
+      ref={setNodeRef}
       style={{
         background: '#fff',
         border: '1px dashed #e0dbd4',
@@ -449,7 +860,11 @@ function UnscheduledCard({ workOrder }: { workOrder: WorkOrderWithTrade }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        cursor: 'grab',
+        ...style,
       }}
+      {...attributes}
+      {...listeners}
     >
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -639,5 +1054,5 @@ function getStatusChipConfig(status: string, garyState: string) {
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr)
-  return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
 }

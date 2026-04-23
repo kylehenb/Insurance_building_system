@@ -351,7 +351,7 @@ export default async function QuotePrintPage({
                 {/* Informational breakdown for special item types */}
                 {(provisionalSumItems.length > 0 || primeCostItems.length > 0 || cashSettlementItems.length > 0) && (
                   <div className="mt-4 pt-4 border-t border-dashed border-[#e0dbd4]">
-                    <p className="text-[#b0a89e] text-[7px] uppercase tracking-wider font-semibold mb-2">Informational breakdown</p>
+                    <p className="text-[#3a3530] text-[9px] uppercase tracking-wider font-semibold mb-2">INCLUDED IN TOTAL</p>
                     {provisionalSumItems.length > 0 && (
                       <div 
                         className="flex justify-between mb-1 px-2"
