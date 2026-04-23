@@ -140,15 +140,18 @@ function BidirectionalNumericCell({
   const unitRateFocusedRef = useRef(false)
   const totalFocusedRef = useRef(false)
 
-  // Sync local state with props only on mount
+  // Sync local state with props when they change (e.g., library selection)
+  // But only when not focused to avoid interfering with typing
   useEffect(() => {
-    setLocalUnitRate(unitRate != null ? String(unitRate) : '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!unitRateFocusedRef.current) {
+      setLocalUnitRate(unitRate != null ? String(unitRate) : '')
+    }
+  }, [unitRate])
   useEffect(() => {
-    setLocalTotal(total != null ? String(total) : '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!totalFocusedRef.current) {
+      setLocalTotal(total != null ? String(total) : '')
+    }
+  }, [total])
 
   // Calculate total from unit rate when qty changes
   useEffect(() => {

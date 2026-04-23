@@ -58,12 +58,13 @@ export function DescriptionSearch({
 
   const handleSelect = useCallback(
     (item: LibraryItem) => {
-      onSelect(item)
+      setLocal(item.item_description ?? '')
       setMatchedLibraryId(item.id)
       setOpen(false)
       setResults([])
       setNoMatch(false)
       setActiveIdx(-1)
+      onSelect(item)
     },
     [onSelect]
   )
