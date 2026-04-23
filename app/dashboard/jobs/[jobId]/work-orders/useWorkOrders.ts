@@ -348,12 +348,25 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         dbUpdates.notes = mergeCushionDays(wo.notes, updates.cushionDays)
       }
 
+      // Optimistic update: update local state immediately
+      setWorkOrders(prev =>
+        prev.map(w => {
+          if (w.id !== id) return w
+          return { ...w, ...dbUpdates }
+        })
+      )
+
       if (Object.keys(dbUpdates).length > 0) {
-        await supabase
+        const { error } = await supabase
           .from('work_orders')
           .update(dbUpdates)
           .eq('id', id)
           .eq('tenant_id', tenantId)
+        
+        // If update failed, refetch to restore correct state
+        if (error) {
+          fetchData()
+        }
       }
 
       // Handle visits array (for drag-and-drop placement)
