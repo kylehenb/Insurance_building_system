@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState } from 'react'
 import {
   type WorkOrderWithDetails,
   type WorkOrderRow,
+  type WorkOrderVisitRow,
   type TradeRow,
   getTradeColor,
   garyLabel,
@@ -465,6 +466,8 @@ export interface WorkOrderCardProps {
   onDragStart:      (e: React.DragEvent<HTMLDivElement>) => void
   onDragEnd:        () => void
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
+  visitNumber?:     number // If rendering as a visit card
+  visit?:           WorkOrderVisitRow // The visit data if rendering as a visit card
 }
 
 export function WorkOrderCard({
@@ -483,6 +486,8 @@ export function WorkOrderCard({
   onDragStart,
   onDragEnd,
   dragHandleProps,
+  visitNumber,
+  visit,
 }: WorkOrderCardProps) {
   const isPlacedWo  = wo.placementState !== 'unplaced'
   const sent        = woIsSent(wo)
@@ -516,8 +521,11 @@ export function WorkOrderCard({
     chips.push(<span key="sent" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #a7d4bc', background: '#eaf4ef', color: '#2d6a4f' }}>Sent</span>)
   if (wo.proximity_range === 'extended')
     chips.push(<span key="ext" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff0f0', color: '#991b1b' }}>Extended range</span>)
-  if ((wo.total_visits ?? 1) > 1)
+  if (visitNumber !== undefined) {
+    chips.push(<span key="visit" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #c9a96e', background: '#fef9e7', color: '#92400e' }}>Visit {visitNumber}/{wo.total_visits}</span>)
+  } else if ((wo.total_visits ?? 1) > 1) {
     chips.push(<span key="visits" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#f5f2ee', color: '#5a5650' }}>{wo.current_visit}/{wo.total_visits} visits</span>)
+  }
 
   // ── Context menu items ─────────────────────────────────────────────────────
   const ctxItems: { label: string; onClick: () => void; danger?: boolean }[] = [

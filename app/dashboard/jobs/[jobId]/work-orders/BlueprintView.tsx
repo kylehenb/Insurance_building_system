@@ -39,6 +39,7 @@ function SortableWorkOrderCard({
   onSetPredecessor,
   trades,
   allPlacedOrders,
+  visitNumber,
 }: {
   wo: WorkOrderWithDetails
   isExpanded: boolean
@@ -52,7 +53,9 @@ function SortableWorkOrderCard({
   onSetPredecessor: (predId: string | null) => void
   trades: TradeRow[]
   allPlacedOrders: WorkOrderWithDetails[]
+  visitNumber?: number // If provided, render as a visit card
 }) {
+  const id = visitNumber !== undefined ? `${wo.id}-visit-${visitNumber}` : wo.id
   const {
     attributes,
     listeners,
@@ -60,13 +63,15 @@ function SortableWorkOrderCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: wo.id })
+  } = useSortable({ id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   }
+
+  const visit = visitNumber !== undefined ? wo.visits.find(v => v.visit_number === visitNumber) : undefined
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -86,6 +91,8 @@ function SortableWorkOrderCard({
         onDragStart={() => {}}
         onDragEnd={() => {}}
         dragHandleProps={{ ...attributes, ...listeners }}
+        visitNumber={visitNumber}
+        visit={visit}
       />
     </div>
   )
@@ -119,21 +126,23 @@ function DroppableColumn({
 }
 
 export interface BlueprintViewProps {
-  workOrders:    WorkOrderWithDetails[]
-  trades:        TradeRow[]
-  expandedIds:   Set<string>
+  jobId:       string
+  tenantId:    string
+  workOrders:  WorkOrderWithDetails[]
+  trades:      TradeRow[]
+  expandedIds: Set<string>
   onToggleExpand: (id: string) => void
-  onPlace:       (id: string) => void
-  onUnplace:     (id: string) => void
-  onSendOne:     (id: string) => void
-  onCancel:      (id: string) => void
-  onUpdate:      (id: string, u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
-  onAddVisit:    (id: string) => void
-  onSetPred:     (id: string, predId: string | null) => void
-  onReorder:     (orderedIds: string[]) => void
-  jobId:         string
-  tenantId:      string
-  onDraftGenerated?: () => void
+  onPlace:     (id: string) => void
+  onUnplace:   (id: string) => void
+  onSendOne:   (id: string) => void
+  onCancel:    (id: string) => void
+  onUpdate:    (id: string, u: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string }) => void
+  onAddVisit:  (id: string) => void
+  onSetPred:   (id: string, predId: string | null) => void
+  onReorder:   (orderedIds: string[]) => void
+  onReorderVisits: (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => void
+  onSetParent: (id: string, parentId: string | null, offsetDays: number) => void
+  onDraftGenerated: () => void
 }
 
 export function BlueprintView({
@@ -149,6 +158,7 @@ export function BlueprintView({
   onAddVisit,
   onSetPred,
   onReorder,
+  onReorderVisits,
   jobId,
   tenantId,
   onDraftGenerated,
@@ -201,8 +211,26 @@ export function BlueprintView({
   }, [jobId, tenantId, supabase])
 
   const placed   = workOrders.filter(w => w.placementState !== 'unplaced')
-    .sort((a, b) => (a.sequence_order ?? 999) - (b.sequence_order ?? 999))
   const unplaced = workOrders.filter(w => w.placementState === 'unplaced')
+
+  // Flatten placed work orders into individual visit items for multi-visit work orders
+  // Sort by visit sequence_order (or work order sequence_order for single-visit work orders)
+  const placedItems: Array<{ wo: WorkOrderWithDetails; visitNumber?: number; sequenceOrder: number }> = []
+  placed.forEach(wo => {
+    if ((wo.total_visits ?? 1) > 1 && wo.visits.length > 0) {
+      // Render each visit as a separate item, sorted by visit sequence_order
+      const sortedVisits = [...wo.visits].sort((a, b) => (a.sequence_order ?? 999) - (b.sequence_order ?? 999))
+      sortedVisits.forEach(visit => {
+        placedItems.push({ wo, visitNumber: visit.visit_number, sequenceOrder: visit.sequence_order ?? wo.sequence_order ?? 999 })
+      })
+    } else {
+      // Single visit work order, render as one item
+      placedItems.push({ wo, sequenceOrder: wo.sequence_order ?? 999 })
+    }
+  })
+
+  // Sort all placed items by sequence_order
+  placedItems.sort((a, b) => a.sequenceOrder - b.sequenceOrder)
 
   async function handleGenerateDraft() {
     console.log('[BlueprintView] handleGenerateDraft called', { jobId, tenantId, isGenerating })
@@ -297,10 +325,13 @@ export function BlueprintView({
 
     if (!overId) return
 
-    const activeWo = workOrders.find(w => w.id === activeId)
+    // Extract work order ID from visit ID if it's a visit
+    const activeWoId = activeId.includes('-visit-') ? activeId.split('-visit-')[0] : activeId
+    const activeWo = workOrders.find(w => w.id === activeWoId)
     if (!activeWo) return
 
-    const overWo = workOrders.find(w => w.id === overId)
+    const overWoId = overId.includes('-visit-') ? overId.split('-visit-')[0] : overId
+    const overWo = workOrders.find(w => w.id === overWoId)
 
     // Check if dropping on unplaced column
     if (overId === 'unplaced-column') {
@@ -308,7 +339,7 @@ export function BlueprintView({
         alert('Cannot unplace a sent work order. Use Cancel if needed.')
         return
       }
-      onUnplace(activeId)
+      onUnplace(activeWoId)
       return
     }
 
@@ -324,7 +355,7 @@ export function BlueprintView({
           alert('Cannot place: Set estimated hours first')
           return
         }
-        onPlace(activeId)
+        onPlace(activeWoId)
       }
       return
     }
@@ -346,28 +377,48 @@ export function BlueprintView({
             alert('Cannot place: Set estimated hours first')
             return
           }
-          onPlace(activeId)
+          onPlace(activeWoId)
         } else {
           // Moving to unplaced
           if (woIsSent(activeWo)) {
             alert('Cannot unplace a sent work order. Use Cancel if needed.')
             return
           }
-          onUnplace(activeId)
+          onUnplace(activeWoId)
         }
         return
       }
 
       // Reordering within same column
       if (activeIsPlaced && overIsPlaced) {
-        const newOrder = [...placed.map(p => p.id)]
-        const oldIndex = newOrder.indexOf(activeId)
-        const newIndex = newOrder.indexOf(overId)
+        // Get the current order of items (including visits)
+        const currentItemIds = placedItems.map(item =>
+          item.visitNumber !== undefined ? `${item.wo.id}-visit-${item.visitNumber}` : item.wo.id
+        )
+
+        const oldIndex = currentItemIds.indexOf(activeId)
+        const newIndex = currentItemIds.indexOf(overId)
 
         if (oldIndex !== -1 && newIndex !== -1) {
+          // Reorder the items
+          const newOrder = [...currentItemIds]
           newOrder.splice(oldIndex, 1)
           newOrder.splice(newIndex, 0, activeId)
-          onReorder(newOrder)
+
+          // Convert to visit-level reordering
+          const orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }> = []
+
+          newOrder.forEach(itemId => {
+            if (itemId.includes('-visit-')) {
+              const [woId, visitNum] = itemId.split('-visit-')
+              orderedVisitIds.push({ workOrderId: woId, visitNumber: parseInt(visitNum) })
+            } else {
+              // Single-visit work order, use visit number 1
+              orderedVisitIds.push({ workOrderId: itemId, visitNumber: 1 })
+            }
+          })
+
+          onReorderVisits(orderedVisitIds)
         }
       }
     }
@@ -375,7 +426,10 @@ export function BlueprintView({
 
   const allPlaced = placed
 
-  const activeWo = activeId ? workOrders.find(w => w.id === activeId) : null
+  // Extract work order ID from active ID if it's a visit
+  const activeWoId = activeId ? (activeId.includes('-visit-') ? activeId.split('-visit-')[0] : activeId) : null
+  const activeVisitNumber = activeId && activeId.includes('-visit-') ? parseInt(activeId.split('-visit-')[1]) : undefined
+  const activeWo = activeWoId ? workOrders.find(w => w.id === activeWoId) : null
 
   return (
     <DndContext
@@ -566,8 +620,13 @@ export function BlueprintView({
             gap: 6,
           }}
         >
-          <SortableContext items={placed.map(w => w.id)} strategy={verticalListSortingStrategy}>
-            {placed.length === 0 ? (
+          <SortableContext 
+            items={placedItems.map(item => 
+              item.visitNumber !== undefined ? `${item.wo.id}-visit-${item.visitNumber}` : item.wo.id
+            )} 
+            strategy={verticalListSortingStrategy}
+          >
+            {placedItems.length === 0 ? (
               <div
                 style={{
                   border: '1.5px dashed #e8e4de',
@@ -581,21 +640,22 @@ export function BlueprintView({
                 Drag work orders here to place them in sequence
               </div>
             ) : (
-              placed.map(wo => (
+              placedItems.map((item, index) => (
                 <SortableWorkOrderCard
-                  key={wo.id}
-                  wo={wo}
-                  isExpanded={expandedIds.has(wo.id)}
-                  onToggleExpand={() => onToggleExpand(wo.id)}
-                  onPlace={() => onPlace(wo.id)}
-                  onUnplace={() => onUnplace(wo.id)}
-                  onSendOne={() => onSendOne(wo.id)}
-                  onCancel={() => onCancel(wo.id)}
-                  onUpdate={u => onUpdate(wo.id, u)}
-                  onAddVisit={() => onAddVisit(wo.id)}
-                  onSetPredecessor={(p) => onSetPred(wo.id, p)}
+                  key={item.visitNumber !== undefined ? `${item.wo.id}-visit-${item.visitNumber}` : item.wo.id}
+                  wo={item.wo}
+                  isExpanded={expandedIds.has(item.wo.id)}
+                  onToggleExpand={() => onToggleExpand(item.wo.id)}
+                  onPlace={() => onPlace(item.wo.id)}
+                  onUnplace={() => onUnplace(item.wo.id)}
+                  onSendOne={() => onSendOne(item.wo.id)}
+                  onCancel={() => onCancel(item.wo.id)}
+                  onUpdate={u => onUpdate(item.wo.id, u)}
+                  onAddVisit={() => onAddVisit(item.wo.id)}
+                  onSetPredecessor={(p) => onSetPred(item.wo.id, p)}
                   trades={trades}
                   allPlacedOrders={allPlaced}
+                  visitNumber={item.visitNumber}
                 />
               ))
             )}
@@ -620,6 +680,11 @@ export function BlueprintView({
             </div>
             <div style={{ fontSize: 10, color: '#9a9590', marginTop: 2 }}>
               {activeWo.tradeTypeLabel || activeWo.work_type}
+              {activeVisitNumber !== undefined && (
+                <span style={{ marginLeft: 6, color: '#c9a96e' }}>
+                  (Visit {activeVisitNumber}/{activeWo.total_visits})
+                </span>
+              )}
             </div>
           </div>
         )}

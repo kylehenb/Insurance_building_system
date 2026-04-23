@@ -21,6 +21,7 @@ export interface WorkOrderMutations {
   placeWorkOrder:    (id: string, seqOrder: number) => Promise<void>
   unplaceWorkOrder:  (id: string) => Promise<void>
   reorderWorkOrders: (orderedIds: string[]) => Promise<void>
+  reorderVisits:     (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => Promise<void>
   sendWorkOrder:     (id: string) => Promise<void>
   sendAllUnsent:     () => Promise<void>
   cancelWorkOrder:   (id: string) => Promise<void>
@@ -86,7 +87,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           .select('*')
           .eq('job_id', jobId)
           .eq('tenant_id', tenantId)
-          .order('visit_number', { ascending: true }),
+          .order('sequence_order', { ascending: true, nullsFirst: false }),
         supabase
           .from('quotes')
           .select('*')
@@ -248,20 +249,49 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const mutations: WorkOrderMutations = {
     placeWorkOrder: async (id, seqOrder) => {
+      const wo = workOrders.find(w => w.id === id)
+      if (!wo) return
+
+      // Set sequence_order on the work order
       await supabase
         .from('work_orders')
         .update({ sequence_order: seqOrder })
         .eq('id', id)
         .eq('tenant_id', tenantId)
+
+      // Set sequence_order on the first visit (or all visits for single-visit work orders)
+      if (wo.visits.length > 0) {
+        const firstVisit = wo.visits[0]
+        await supabase
+          .from('work_order_visits')
+          .update({ sequence_order: seqOrder })
+          .eq('id', firstVisit.id)
+          .eq('tenant_id', tenantId)
+      }
+
       fetchData()
     },
 
     unplaceWorkOrder: async (id) => {
+      const wo = workOrders.find(w => w.id === id)
+      if (!wo) return
+
+      // Clear sequence_order on the work order
       await supabase
         .from('work_orders')
         .update({ sequence_order: null, predecessor_work_order_id: null })
         .eq('id', id)
         .eq('tenant_id', tenantId)
+
+      // Clear sequence_order on all visits
+      if (wo.visits.length > 0) {
+        await supabase
+          .from('work_order_visits')
+          .update({ sequence_order: null })
+          .eq('work_order_id', id)
+          .eq('tenant_id', tenantId)
+      }
+
       fetchData()
     },
 
@@ -273,6 +303,25 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           .eq('id', id)
           .eq('tenant_id', tenantId)
       )
+      await Promise.all(updates)
+      fetchData()
+    },
+
+    reorderVisits: async (orderedVisitIds) => {
+      // Update sequence_order for each visit
+      const updates = orderedVisitIds.map(({ workOrderId, visitNumber }, idx) => {
+        // Find the visit ID for this work order and visit number
+        const wo = workOrders.find(w => w.id === workOrderId)
+        if (!wo) return Promise.resolve()
+        const visit = wo.visits.find(v => v.visit_number === visitNumber)
+        if (!visit) return Promise.resolve()
+
+        return supabase
+          .from('work_order_visits')
+          .update({ sequence_order: idx + 1 })
+          .eq('id', visit.id)
+          .eq('tenant_id', tenantId)
+      })
       await Promise.all(updates)
       fetchData()
     },

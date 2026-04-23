@@ -40,6 +40,7 @@ interface JobScheduleProps {
   onDeleteVisit?: (workOrderId: string, visitId: string) => void
   onSetPred?: (id: string, predId: string | null) => void
   onReorder?: (orderedIds: string[]) => void
+  onReorderVisits?: (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => void
   onSetParent?: (id: string, parentId: string | null, offsetDays: number) => void
   onDraftGenerated?: () => void
 }
@@ -92,6 +93,7 @@ export default function JobSchedule({
   onDeleteVisit,
   onSetPred,
   onReorder,
+  onReorderVisits,
   onSetParent,
   onDraftGenerated,
 }: JobScheduleProps) {
@@ -180,21 +182,34 @@ export default function JobSchedule({
     if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
       // Reorder the visit cards independently
       const reorderedVisitCards = arrayMove(scheduledVisitCards, activeIndex, overIndex)
-      
-      // Reconstruct work orders based on the new visit order
-      // Each work order's visits should be in the order they appear in the new sequence
-      const newWorkOrderOrder: string[] = []
-      const seenWorkOrders = new Set<string>()
-      
+
+      // Convert to visit-level reordering
+      const orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }> = []
+
       reorderedVisitCards.forEach(vc => {
-        if (!seenWorkOrders.has(vc.workOrder.id)) {
-          seenWorkOrders.add(vc.workOrder.id)
-          newWorkOrderOrder.push(vc.workOrder.id)
-        }
+        orderedVisitIds.push({
+          workOrderId: vc.workOrder.id,
+          visitNumber: vc.visit.visit_number || vc.index + 1
+        })
       })
 
-      if (onReorder && newWorkOrderOrder.length > 0) {
-        onReorder(newWorkOrderOrder)
+      if (onReorderVisits && orderedVisitIds.length > 0) {
+        onReorderVisits(orderedVisitIds)
+      } else if (onReorder) {
+        // Fallback to work order-level reordering if onReorderVisits not provided
+        const newWorkOrderOrder: string[] = []
+        const seenWorkOrders = new Set<string>()
+
+        reorderedVisitCards.forEach(vc => {
+          if (!seenWorkOrders.has(vc.workOrder.id)) {
+            seenWorkOrders.add(vc.workOrder.id)
+            newWorkOrderOrder.push(vc.workOrder.id)
+          }
+        })
+
+        if (newWorkOrderOrder.length > 0) {
+          onReorder(newWorkOrderOrder)
+        }
       }
     }
   }

@@ -2878,6 +2878,7 @@ export type Database = {
           notes: string | null
           scheduled_date: string | null
           scheduled_end_date: string | null
+          sequence_order: number | null
           status: string | null
           tenant_id: string
           trade_confirmed_at: string | null
@@ -2897,6 +2898,7 @@ export type Database = {
           notes?: string | null
           scheduled_date?: string | null
           scheduled_end_date?: string | null
+          sequence_order?: number | null
           status?: string | null
           tenant_id: string
           trade_confirmed_at?: string | null
@@ -2916,6 +2918,7 @@ export type Database = {
           notes?: string | null
           scheduled_date?: string | null
           scheduled_end_date?: string | null
+          sequence_order?: number | null
           status?: string | null
           tenant_id?: string
           trade_confirmed_at?: string | null

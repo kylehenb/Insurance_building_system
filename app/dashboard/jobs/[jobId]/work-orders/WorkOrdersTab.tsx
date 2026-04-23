@@ -102,6 +102,13 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
     [mutations]
   )
 
+  const handleReorderVisits = useCallback(
+    (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => {
+      mutations.reorderVisits(orderedVisitIds)
+    },
+    [mutations]
+  )
+
   // ── Send bar ─────────────────────────────────────────────────────────────────
   const unsentPlaced = workOrders.filter(
     w => w.placementState !== 'unplaced' && !woIsSent(w) && w.placementState !== 'placed_complete'
@@ -243,6 +250,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               onDeleteVisit={(workOrderId: string, visitId: string) => mutations.deleteVisit(workOrderId, visitId)}
               onSetPred={(id: string, predId: string | null) => mutations.setPredecessor(id, predId)}
               onReorder={handleReorder}
+              onReorderVisits={handleReorderVisits}
               onSetParent={handleSetParent}
               onDraftGenerated={() => refetch()}
             />
