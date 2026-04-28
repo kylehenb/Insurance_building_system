@@ -72,9 +72,20 @@ CREATE TABLE tenants (
   job_sequence INTEGER DEFAULT 1000,   -- starting number for job sequence
   plan TEXT DEFAULT 'solo',            -- 'solo' | 'team' | 'enterprise'
   contact_email TEXT,
+  accounts_email TEXT,                 -- separate email for accounts-related communications
   contact_phone TEXT,
   address TEXT,
+  trading_name TEXT,                   -- optional trading name (may differ from legal business name)
+  abn TEXT,                            -- Australian Business Number (11 digits, no spaces)
+  building_licence_number TEXT,        -- building licence number for regulatory compliance
   logo_storage_path TEXT,              -- path in Supabase Storage
+  alternative_logo_storage_path TEXT,  -- path for alternative logo (e.g., dark mode or specialized documents)
+  service_area_config JSONB DEFAULT '{"radius_zones":[],"specific_areas":[],"cat_areas":[]}', -- JSONB config for radius zones, specific suburb areas, and CAT service areas
+  -- Financial details for invoicing and payment processing
+  bsb TEXT,                            -- Bank State Branch number
+  account_number TEXT,                 -- Bank account number
+  bank_name TEXT,                      -- Name of the bank
+  account_name TEXT,                   -- Account holder name
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
@@ -131,6 +142,12 @@ CREATE TABLE clients (
   kpi_visit_days NUMERIC DEFAULT 2,
   kpi_report_days NUMERIC DEFAULT 4,
   send_booking_confirmation BOOLEAN DEFAULT false,
+  -- Per-insurer pricing and margin configuration
+  bar_amount NUMERIC,                   -- Standard BAR (Building Assessment Report) fee for this insurer
+  single_storey_roof_report_amount NUMERIC, -- Roof report fee for single-storey properties
+  double_storey_roof_report_amount NUMERIC, -- Roof report fee for double-storey properties
+  travel_allowance_outside_service_area NUMERIC, -- Travel allowance per km for work outside standard service area ($/km)
+  builders_margin_pct NUMERIC,         -- Builder margin percentage (e.g. 20 for 20%)
   notes TEXT,
   status TEXT DEFAULT 'active',        -- 'active' | 'inactive'
   created_at TIMESTAMPTZ DEFAULT now()
@@ -210,6 +227,27 @@ CREATE TABLE jobs (
   kpi_booked_at TIMESTAMPTZ,           -- set when inspection confirmed
   kpi_visited_at TIMESTAMPTZ,          -- set when field app safety tick fires
   kpi_reported_at TIMESTAMPTZ,         -- set when report sent to insurer
+  -- Job stage tracking (computed by getJobStage function)
+  current_stage TEXT,                  -- e.g. 'order_received', 'awaiting_schedule', 'inspection_scheduled', etc.
+  current_stage_updated_at TIMESTAMPTZ,
+  override_stage TEXT,                 -- 'on_hold' | 'cancelled' | null (takes precedence over current_stage)
+  -- Job playbook fields
+  scope_sent_at TIMESTAMPTZ,          -- set when scope of works document is sent to insured for signature
+  building_contract_sent_at TIMESTAMPTZ, -- set when building contract is sent to insured for signature
+  building_permit_required BOOLEAN DEFAULT false, -- flag indicating this job requires a council building permit
+  building_permit_obtained_at TIMESTAMPTZ, -- set when building permit has been granted
+  -- Homeowner sign-off tracking
+  homeowner_signoff_sent_at TIMESTAMPTZ,
+  homeowner_signoff_received_at TIMESTAMPTZ,
+  homeowner_signoff_method TEXT,
+  homeowner_signoff_notes TEXT,
+  -- Completion approval tracking
+  completion_approved_at TIMESTAMPTZ,
+  completion_approved_method TEXT,
+  completion_approved_notes TEXT,
+  -- Property details
+  property_type TEXT,                  -- e.g. 'single_storey', 'double_storey', 'commercial'
+  property_age_years INTEGER,
   notes TEXT,
   automation_overrides JSONB DEFAULT '{}', -- per-job automation overrides
   -- e.g. {"gary_enabled": false, "gary_deadline_hours": 168, "homeowner_sms_enabled": false}
@@ -301,6 +339,10 @@ CREATE TABLE inspections (
   form_submitted_at TIMESTAMPTZ,
   safety_confirmed_at TIMESTAMPTZ,     -- timestamps inspection start; moves status to In Progress; sets kpi_visited_at
   person_met TEXT,
+  -- No-show tracking
+  no_show_count INTEGER DEFAULT 0,
+  last_no_show_at TIMESTAMPTZ,
+  no_show_notes TEXT,
   -- Post-submission status
   scope_status TEXT DEFAULT 'pending',   -- 'pending' | 'parsed' | 'reviewed'
   report_status TEXT DEFAULT 'pending',  -- 'pending' | 'draft' | 'reviewed' | 'sent'
@@ -409,13 +451,14 @@ CREATE TABLE quotes (
   version INTEGER DEFAULT 1,           -- 1 for original; increments on variation
   is_active_version BOOLEAN DEFAULT true, -- only one version active at a time per quote chain
   is_locked BOOLEAN DEFAULT false,     -- true once sent; prevents edits
-  status TEXT DEFAULT 'draft',         -- 'draft' | 'complete' | 'sent' | 'approved' | 'partially_approved' | 'rejected'
+  status TEXT DEFAULT 'draft',         -- 'draft' | 'complete' | 'sent' | 'approved' | 'partially_approved' | 'rejected' | 'ready'
   approved_amount NUMERIC,             -- set on approval
   approval_notes TEXT,                 -- insurer approval reference or notes
   raw_scope_notes TEXT,
   total_amount NUMERIC,
   markup_pct NUMERIC DEFAULT 0.20,
   gst_pct NUMERIC DEFAULT 0.10,
+  permit_block_dismissed BOOLEAN DEFAULT false, -- suppresses 20k permit alert if true
   doc_storage_path TEXT,
   pdf_storage_path TEXT,
   notes TEXT,
@@ -444,6 +487,7 @@ CREATE TABLE scope_items (
   rate_total NUMERIC,
   line_total NUMERIC,
   split_type TEXT,                     -- null | 'labour' | 'materials' (for split-insurer items)
+  item_type TEXT,                      -- 'provisional_sum' | 'prime_cost' | 'cash_settlement' | null
   approval_status TEXT DEFAULT 'pending', -- 'pending' | 'approved' | 'declined'
   is_custom BOOLEAN DEFAULT false,     -- true if AI created with no library match
   library_writeback_approved BOOLEAN DEFAULT false, -- user ticked to write back to scope_library
@@ -573,6 +617,7 @@ CREATE TABLE work_orders (
   sequence_order INTEGER,              -- position in job schedule; lower = earlier
   is_concurrent BOOLEAN DEFAULT false, -- true = runs in parallel with preceding trade, not after it
   predecessor_work_order_id UUID REFERENCES work_orders(id), -- null = no predecessor; Gary fires immediately
+  dependency_type TEXT DEFAULT 'finish-to-start', -- 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish'
   estimated_hours NUMERIC,             -- summed from scope line items at blueprint draft time; editable
   total_visits INTEGER DEFAULT 1,      -- total number of visits planned for this work order
   current_visit INTEGER DEFAULT 1,     -- which visit is currently active
@@ -580,6 +625,8 @@ CREATE TABLE work_orders (
   gary_state TEXT DEFAULT 'not_started',
     -- 'not_started' | 'waiting_on_dependent' | 'waiting_reply' | 'booking_proposed'
     -- | 'confirmed' | 'return_visit_pending' | 'complete'
+  -- Reference
+  work_order_ref TEXT,                 -- e.g. WO-IRC1001-001, auto-generated
   -- Financials
   scope_summary TEXT,
   trade_cost NUMERIC,                  -- what IRC pays the trade
@@ -601,6 +648,7 @@ CREATE TABLE work_order_visits (
   work_order_id UUID NOT NULL REFERENCES work_orders(id),
   job_id UUID NOT NULL REFERENCES jobs(id),
   visit_number INTEGER NOT NULL,          -- 1, 2, 3...
+  sequence_order INTEGER,                 -- independent sequence order for interleaving visits from same work order
   estimated_hours NUMERIC,               -- portion of total WO hours allocated to this visit
                                          -- default: total WO hours ÷ total_visits (equal split)
                                          -- user can resize via drag in the timeline UI
@@ -719,6 +767,7 @@ CREATE TABLE photos (
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   job_id UUID NOT NULL REFERENCES jobs(id),
   inspection_id UUID REFERENCES inspections(id),
+  report_id UUID REFERENCES reports(id), -- links photo to specific report version
   storage_path TEXT NOT NULL,          -- Supabase Storage path
   label TEXT,                          -- standardised label e.g. "Roof - Hail Damage"
   report_code TEXT,
@@ -767,6 +816,21 @@ CREATE TABLE invoices (
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+### 4.17a invoice_line_items
+```sql
+-- Line items for outbound invoices (AR)
+CREATE TABLE invoice_line_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity NUMERIC NOT NULL DEFAULT 1,
+  unit_price NUMERIC NOT NULL,
+  line_total NUMERIC NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
 ### 4.18 email_templates
@@ -801,12 +865,25 @@ CREATE TABLE automation_config (
   UNIQUE(tenant_id, key)
 );
 -- Default values (seeded on tenant creation):
--- gary_response_deadline_hours: 48
--- gary_reminder_1_hours: 24
--- gary_final_nudge_hours: 46
+-- Gary SMS timing (renamed from hours to days in v3.0):
+-- gary_response_deadline_days: 2
+-- gary_reminder_1_days: 1
+-- gary_final_nudge_days: 2
+-- Business hours & time mode:
+-- business_hours_start: "07:00"
+-- business_hours_end: "17:30"
+-- business_days: "1,2,3,4,5" -- ISO weekday numbers (1=Mon, 7=Sun)
+-- public_holidays: "[]" -- JSON array of YYYY-MM-DD strings
+-- waking_hours_start: "07:00" -- earliest time for homeowner/insured comms
+-- waking_hours_end: "20:00" -- latest time for homeowner/insured comms
+-- urgent_hours_start: "05:00" -- earliest time for urgent mode comms
+-- urgent_hours_end: "22:00" -- latest time for urgent mode comms
+-- urgent_all_days: "true" -- if true urgent mode runs all 7 days
+-- Gary send window:
 -- gary_send_window_start: "06:00"      -- no Gary SMS before 6am local time
 -- gary_send_window_end: "19:00"        -- no Gary SMS after 7pm local time
 -- gary_send_window_tz: "Australia/Perth"
+-- Other automation:
 -- makesafe_cascade_wait_minutes: 15
 -- makesafe_cascade_max_trades: 5
 -- trade_portal_token_expiry_days_after_close: 30
@@ -1013,6 +1090,233 @@ CREATE TABLE action_queue (
 );
 ```
 
+### 4.28 job_files
+```sql
+-- File attachments for jobs (PDFs, documents, etc.)
+CREATE TABLE job_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  job_id UUID NOT NULL REFERENCES jobs(id),
+  description TEXT,                     -- Auto-generated or manual, can be blank
+  file_name TEXT NOT NULL,              -- Actual file name
+  file_kind TEXT NOT NULL,              -- File type: PDF, JPEG, etc.
+  storage_path TEXT NOT NULL,           -- Supabase storage path
+  mime_type TEXT NOT NULL,              -- MIME type for validation
+  size_bytes INTEGER NOT NULL,          -- File size
+  added_by UUID REFERENCES users(id),   -- User who uploaded, null if system-generated
+  is_system_generated BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 4.29 user_preferences
+```sql
+-- User UI preferences including column widths and other display settings
+CREATE TABLE user_preferences (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  preference_key TEXT NOT NULL,
+  preference_value JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, user_id, preference_key)
+);
+```
+
+### 4.30 quote_note_templates
+```sql
+-- Reusable note templates for quotes
+CREATE TABLE quote_note_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 4.31 inspection_scheduling_rules
+```sql
+-- Configuration for the auto-scheduler rules engine
+CREATE TABLE inspection_scheduling_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+
+  -- Zone & Geography
+  zone_day_map JSONB DEFAULT '[]',
+  -- [{zone_name: string, postcodes: string[], preferred_days: string[]}]
+  -- preferred_days: ['monday','tuesday','wednesday','thursday','friday']
+
+  service_area_postcodes TEXT[] DEFAULT '{}',
+  -- Whitelist of postcodes in service area. Empty = no boundary enforced.
+
+  cluster_radius_km NUMERIC DEFAULT 15,
+  -- Only add a job to a day's run if it's within this radius of an existing job
+
+  anchor_job_enabled BOOLEAN DEFAULT true,
+  -- One confirmed job opens the zone for that day; others cluster around it
+
+  postcode_zone_map JSONB DEFAULT '[]',
+  -- [{postcode: string, zone_name: string}] — flat lookup table, editable in UI
+
+  -- Urgency & Priority
+  kpi_override_hours NUMERIC DEFAULT 8,
+  -- Jobs within this many hours of breaching their KPI visit deadline jump the queue
+
+  days_since_lodged_escalation INTEGER DEFAULT 3,
+  -- Jobs unscheduled for this many days get priority weighting regardless of location
+
+  insurer_sla_config JSONB DEFAULT '[]',
+  -- [{client_id: string, insurer_name: string, visit_days: number, priority_boost: boolean}]
+
+  -- Batch & Efficiency
+  min_cluster_size INTEGER DEFAULT 2,
+  -- Minimum number of jobs in a zone before scheduling a run (unless urgent or overdue)
+
+  max_daily_inspections INTEGER DEFAULT 6,
+  -- Hard ceiling per inspector per day
+
+  day_end_cutoff TIME DEFAULT '15:00',
+  -- No new inspection starts after this time
+
+  max_daily_travel_hours NUMERIC DEFAULT 2.5,
+  -- Total drive time across the run should not exceed this value (hours)
+
+  same_address_always_together BOOLEAN DEFAULT true,
+  -- Jobs at the same street address or complex are always scheduled on the same run
+
+  -- Busy vs Quiet Mode
+  scheduling_mode TEXT DEFAULT 'quiet',
+  -- 'quiet' | 'busy' | 'cat_event' | 'manual'
+
+  quiet_mode_hold_days INTEGER DEFAULT 3,
+  -- In quiet mode: hold a job until a cluster forms OR this many days have elapsed
+
+  busy_mode_radius_km NUMERIC DEFAULT 20,
+  -- In busy mode: schedule immediately if within this radius of any existing job that day
+
+  cat_event_active BOOLEAN DEFAULT false,
+  -- When true: zone-day rules suspended, cluster rules suspended, maximise throughput
+
+  auto_mode_trigger_count INTEGER DEFAULT 8,
+  -- If unscheduled job count exceeds this, auto-switch from quiet to busy mode
+
+  -- Inspector Rules
+  inspector_config JSONB DEFAULT '[]',
+  -- Per-inspector configuration. One object per inspector (user_id).
+  -- [{
+  --   user_id: string,
+  --   name: string,
+  --   home_address: string,
+  --   home_lat: number,
+  --   home_lng: number,
+  --   max_drive_radius_km: number,
+  --   preferred_zones: string[],          -- zone_names from zone_day_map
+  --   availability: {                      -- days and time windows
+  --     monday: {available: boolean, start: string, end: string},
+  --     tuesday: {available: boolean, start: string, end: string},
+  --     wednesday: {available: boolean, start: string, end: string},
+  --     thursday: {available: boolean, start: string, end: string},
+  --     friday: {available: boolean, start: string, end: string}
+  --   },
+  --   handles_complex_jobs: boolean        -- if false, only assigned simple BARs
+  -- }]
+
+  -- Time of Day Rules
+  morning_complex_jobs BOOLEAN DEFAULT true,
+  -- Prefer morning slots for complex/combination job types
+
+  afternoon_simple_jobs BOOLEAN DEFAULT true,
+  -- Prefer afternoon slots for simple BARs and return visits
+
+  first_appointment_time TIME DEFAULT '08:00',
+  -- No inspections before this time
+
+  last_appointment_time TIME DEFAULT '15:00',
+  -- No inspections starting after this time (mirrors day_end_cutoff — both must agree)
+
+  peak_hour_config JSONB DEFAULT '{
+    "enabled": true,
+    "morning_peak_start": "07:30",
+    "morning_peak_end": "09:30",
+    "afternoon_peak_start": "15:30",
+    "afternoon_peak_end": "17:30",
+    "cbd_lat": -31.9505,
+    "cbd_lng": 115.8605,
+    "inbound_threshold_pct": 50
+  }',
+  -- inbound_threshold_pct: if more than this % of the drive is toward CBD during
+  -- morning peak (or away from CBD during afternoon peak), reschedule.
+  -- Perth CBD coordinates are the default.
+
+  inspection_buffer_minutes INTEGER DEFAULT 30,
+  -- Minimum gap between inspections (travel + notes + overrun buffer)
+
+  job_type_durations JSONB DEFAULT '[
+    {"job_type": "BAR", "duration_minutes": 45},
+    {"job_type": "BAR_make_safe", "duration_minutes": 90},
+    {"job_type": "roof_report", "duration_minutes": 60},
+    {"job_type": "make_safe", "duration_minutes": 45},
+    {"job_type": "leak_detection", "duration_minutes": 60},
+    {"job_type": "specialist", "duration_minutes": 60}
+  ]',
+
+  -- Insured Constraints
+  capture_availability_from_sms BOOLEAN DEFAULT true,
+  -- Parse insured availability preferences from SMS replies and store on inspection record
+
+  access_constraint_block BOOLEAN DEFAULT true,
+  -- Jobs with access constraints (key collection, agent required) not auto-scheduled
+
+  vulnerable_person_morning_preference BOOLEAN DEFAULT true,
+  -- Vulnerable person flag on job → prefer morning slot + longer block
+
+  vulnerable_person_extra_minutes INTEGER DEFAULT 15,
+  -- Additional minutes added to job type duration for vulnerable person jobs
+
+  repeat_reschedule_threshold INTEGER DEFAULT 2,
+  -- After this many cancellations, flag for phone call instead of SMS proposal
+
+  -- Hold & Batching
+  new_order_hold_minutes INTEGER DEFAULT 30,
+  -- Hold window after new order arrives before scheduling (cluster detection)
+
+  cat_cluster_order_count INTEGER DEFAULT 5,
+  -- Number of orders from same postcode cluster within cat_cluster_window_hours to trigger CAT mode
+
+  cat_cluster_window_hours INTEGER DEFAULT 2,
+  -- Time window for CAT cluster detection
+
+  same_claim_hold_enabled BOOLEAN DEFAULT true,
+  -- Hold multi-order same-claim jobs until linked before scheduling
+
+  -- Operational Efficiency
+  confirmation_threshold_pct INTEGER DEFAULT 60,
+  -- Lock and finalise run only once this % of insureds have confirmed
+
+  overflow_max_per_day INTEGER DEFAULT 2,
+  -- Number of overflow inspection slots allowed above max_daily_inspections
+
+  overflow_radius_km NUMERIC DEFAULT 5,
+  -- Overflow slots only available for jobs within this radius of a confirmed run job
+
+  arrival_window_sms_enabled BOOLEAN DEFAULT true,
+  -- Send morning-of arrival window SMS to insured
+
+  arrival_window_minutes INTEGER DEFAULT 120,
+  -- Width of arrival window communicated to insured (e.g. 120 = "between 9am and 11am")
+
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE(tenant_id)
+  -- One config row per tenant
+);
+```
+
 **RLS:** Same tenant isolation policy as all other tables.
 
 **Index:** `(tenant_id, status, job_id)` — efficient dashboard queries filtering pending items across all jobs.
@@ -1032,6 +1336,7 @@ CREATE TABLE action_queue (
     /safety/           -- safety record PDFs
     /invoices/         -- trade invoice PDFs + IRC invoice PDFs
   /logos/              -- tenant logo
+  /assets/             -- tenant assets (alternative logos, etc.)
 ```
 
 Storage RLS mirrors database RLS — users can only access their own tenant's storage bucket paths.
@@ -1107,6 +1412,32 @@ CREATE INDEX idx_work_order_visits_gary_trigger ON work_order_visits(gary_return
 
 -- Blueprints
 CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
+
+-- Job files
+CREATE INDEX idx_job_files_job ON job_files(job_id);
+CREATE INDEX idx_job_files_tenant ON job_files(tenant_id);
+CREATE INDEX idx_job_files_created ON job_files(created_at DESC);
+
+-- User preferences
+CREATE INDEX user_preferences_tenant_user_idx ON user_preferences(tenant_id, user_id);
+CREATE INDEX user_preferences_key_idx ON user_preferences(preference_key);
+
+-- Quote note templates
+CREATE INDEX quote_note_templates_tenant_idx ON quote_note_templates(tenant_id, sort_order);
+
+-- Inspection scheduling rules
+CREATE INDEX idx_scheduling_rules_tenant ON inspection_scheduling_rules(tenant_id);
+
+-- Invoice line items
+CREATE INDEX idx_invoice_line_items_invoice ON invoice_line_items(invoice_id);
+CREATE INDEX idx_invoice_line_items_tenant ON invoice_line_items(tenant_id);
+
+-- Work order reference
+CREATE INDEX idx_work_orders_work_order_ref ON work_orders(work_order_ref);
+CREATE UNIQUE INDEX idx_work_orders_tenant_ref_unique ON work_orders(tenant_id, work_order_ref) WHERE work_order_ref IS NOT NULL;
+
+-- Work order visits sequence order
+CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_order);
 ```
 
 ---
@@ -1171,10 +1502,13 @@ CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
       /page.tsx                  -- AI & Automation Activity Dashboard (admin only; Phase 6c)
     /settings/
       /page.tsx                  -- tenant settings
+      /tenant/page.tsx           -- tenant configuration (service area, financial details, etc.)
+      /inspection-scheduling/page.tsx -- inspection scheduling rules configuration
       /prompts/page.tsx          -- AI prompt library management (front-end editable)
       /scope-library/page.tsx    -- scope library view + edit (admin only)
       /email-templates/page.tsx  -- email template management (admin only)
       /trade-sequence/page.tsx   -- trade type sequence config (admin only)
+      /automation/page.tsx       -- automation configuration (via AI chat interface)
   /trade-portal/
     /[workOrderToken]/page.tsx   -- public trade portal (token-gated, no login)
   /api/
@@ -1187,6 +1521,7 @@ CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
     /ai/execute-action/route.ts  -- executes a confirmed action's playbook steps
     /ai/config-update/route.ts   -- writes to automation_config via AI chat instruction
     /ai/draft-blueprint/route.ts -- calls Claude to generate job_schedule_blueprints.draft_data
+    /ai/assistant/route.ts       -- AI assistant chat endpoint
     /ai/activity/
       /summary/route.ts          -- GET: 24hr/7day metric aggregates for dashboard top strip
       /feed/route.ts             -- GET: paginated chronological feed of ai_audit + automation_audit
@@ -1202,6 +1537,33 @@ CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
     /webhooks/
       /twilio/route.ts           -- inbound SMS handler (Gary + Client Comms Bot)
       /email-inbound/route.ts    -- inbound email handler; Gemini parses + job-links
+    /geocode/route.ts            -- Google Maps Geocoding API (server-side, hides API key)
+    /places-autocomplete/route.ts -- Google Places Autocomplete API (server-side, hides API key)
+    /docuseal/send/route.ts      -- Docuseal document signing integration
+    /jobs/[jobId]/stage/route.ts -- PATCH: update job current_stage
+    /jobs/[jobId]/blueprint/[blueprintId]/confirm/route.ts -- POST: confirm blueprint, generate work orders
+    /jobs/[jobId]/work-orders/route.ts -- GET/POST: work orders for a job
+    /quotes/[quoteId]/route.ts   -- GET/POST/PATCH: quote CRUD
+    /quotes/[quoteId]/items/route.ts -- GET/POST: quote line items
+    /quotes/[quoteId]/items/[itemId]/route.ts -- PATCH/DELETE: individual line item
+    /quotes/[quoteId]/items/reorder/route.ts -- POST: reorder line items
+    /quotes/[quoteId]/clone/route.ts -- POST: clone quote for variation
+    /quotes/[quoteId]/revert/route.ts -- POST: revert to previous version
+    /quotes/[quoteId]/versions/route.ts -- GET: quote version history
+    /quote-note-templates/route.ts -- GET: quote note templates for tenant
+    /scope-library/search/route.ts -- GET: search scope library
+    /scope-library/save/route.ts -- POST: save to scope library
+    /trades/route.ts              -- GET/POST: trades CRUD
+    /trades/primary-trades/route.ts -- GET: primary trade types list
+    /reports/[id]/route.ts        -- GET/POST/PATCH: report CRUD
+    /invoices/route.ts            -- GET/POST: invoices CRUD
+    /insurer-orders/lodge/route.ts -- POST: lodge insurer order as job
+    /job-files/route.ts           -- GET/POST: job file attachments
+    /settings/tenant/route.ts     -- GET/PATCH: tenant settings
+    /settings/automation/route.ts  -- GET/PATCH: automation configuration
+    /settings/prompts/route.ts     -- GET/PATCH: AI prompts
+    /settings/inspection-scheduling/route.ts -- GET/PATCH: inspection scheduling rules
+    /settings/trade-sequence/route.ts -- GET/PATCH: trade type sequence
 
 /lib
   /automation/
@@ -1222,6 +1584,19 @@ CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
     /proximity.ts                -- Google Maps Distance Matrix API wrapper; returns 'standard' | 'extended'
     /visit-splitter.ts           -- splits estimated_hours across visits; applies lag from scope_library
     /gary-triggers.ts            -- logic for when to fire Gary per work_order visit state
+  /jobs/
+    /getJobStage.ts              -- computes job stage from live data (inspections, quotes, reports, work orders, etc.)
+    /stageConfig.ts              -- stage metadata (label, description, primary action, waiting state)
+    /recomputeStage.ts           -- recomputes and persists current_stage to jobs table
+    /fetchJobContext.ts          -- fetches all data needed for stage computation
+    /openLoops.ts                -- open loop types and configuration (blockers, urgent items)
+/components
+  /jobs/
+    /StageBanner.tsx             -- displays current job stage, open loops, and primary action button
+  /maps/
+    /ServiceAreaMap.tsx          -- Leaflet-based map for visualizing tenant service area
+  /ai/
+    /floating-assistant.tsx      -- AI assistant chat widget
 ```
 
 ---
@@ -1229,6 +1604,61 @@ CREATE INDEX idx_blueprints_job ON job_schedule_blueprints(job_id);
 ## 8. Workflow Documentation
 
 ### WF-0: Platform Design Principles ✅ LOCKED
+
+#### Job Stage System
+The job stage system provides a unified view of where each job is in its lifecycle. Stages are computed dynamically from live data (inspections, quotes, reports, work orders, invoices, open loops) via the `getJobStage` function in `lib/jobs/getJobStage.ts`.
+
+**Stage Keys:**
+- `order_received` - Review insurer order and lodge as job
+- `awaiting_schedule` - Schedule inspection with insured
+- `inspection_scheduled` - Inspection confirmed, awaiting attendance
+- `inspection_complete` - Inspection submitted, awaiting review
+- `awaiting_quote` - Quote in progress
+- `quote_ready` - Quote ready for review
+- `quote_sent` - Quote sent to insurer
+- `awaiting_approval` - Awaiting insurer approval
+- `approved_awaiting_signoff` - Approved, awaiting homeowner sign-off
+- `awaiting_signed_document` - Homeowner sign-off in progress
+- `repairs_in_progress` - Repairs underway
+- `ready_to_invoice` - Repairs complete, ready to invoice
+- `complete` - Job complete
+- `on_hold` - Job on hold (override)
+- `cancelled` - Job cancelled (override)
+
+**Stage Computation:**
+The `getJobStage` function fetches job context via `fetchJobContext` and applies conditional logic to determine the current stage. Override stages (`on_hold`, `cancelled`) take precedence over computed stages.
+
+**Stage Banner Component:**
+The `StageBanner` component (`components/jobs/StageBanner.tsx`) displays the current job stage with:
+- Color-coded stage label
+- Stage description
+- Primary action button (e.g., "Schedule Inspection", "Send for Signature")
+- Open loops display (blockers and urgent items)
+- Polling every 3 seconds for stage updates
+
+**Stage Persistence:**
+The `recomputeAndSaveStage` function (`lib/jobs/recomputeStage.ts`) recomputes the stage from live data and persists it to `jobs.current_stage` and `jobs.current_stage_updated_at`. This is the only place in the codebase that writes to `current_stage` (override stages are written separately).
+
+**Open Loops:**
+Open loops are blockers and urgent items that require attention. Defined in `lib/jobs/openLoops.ts` with types:
+- `make_safe_required` - urgent
+- `specialist_report_required` - normal
+- `trade_quote_required` - normal
+- `restoration_engaged` - normal
+- `variation_requested` - normal
+- `report_revision_requested` - normal
+- `insurer_query` - normal
+- `partial_approval` - normal
+- `homeowner_not_responding` - normal
+- `missing_contact_details` - urgent
+- `trade_unresponsive` - normal
+- `trade_pricing_dispute` - normal
+- `invoice_queried` - normal
+- `close_out_blocker` - urgent
+
+Each open loop has a label, urgency level, and action key for the primary action button.
+
+
 
 #### Manual fallback principle
 Every automated or AI-assisted action in IRC Master has a manual fallback. The system is designed so that if any automation fails, is disabled, or is distrusted, the user can always complete the task manually through the standard UI. Automations are accelerators — they are never the only path.
