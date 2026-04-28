@@ -39,10 +39,14 @@ interface JobHeader {
   created_at: string
   insured_phone: string | null
   insured_email: string | null
-  additional_contacts: string | null
   claim_description: string | null
   special_instructions: string | null
   notes: string | null
+  contacts: unknown
+  adjuster_reference: string | null
+  order_sender_name: string | null
+  order_sender_email: string | null
+  client_id: string | null
 }
 
 interface JobDetailShellProps {

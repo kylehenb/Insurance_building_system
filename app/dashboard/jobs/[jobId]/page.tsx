@@ -37,7 +37,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   const { data: jobData, error: jobError } = await supabase
     .from('jobs')
     .select(
-      'id,job_number,insured_name,property_address,override_stage,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,additional_contacts,claim_description,special_instructions,notes'
+      'id,job_number,insured_name,property_address,override_stage,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,claim_description,special_instructions,notes,contacts,adjuster_reference,order_sender_name,order_sender_email,client_id'
     )
     .eq('id', jobId)
     .eq('tenant_id', tenant_id!)
@@ -89,10 +89,14 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
           created_at: job.created_at ?? '',
           insured_phone: job.insured_phone ?? '',
           insured_email: job.insured_email ?? '',
-          additional_contacts: job.additional_contacts ?? '',
           claim_description: job.claim_description ?? '',
           special_instructions: job.special_instructions ?? '',
           notes: job.notes ?? '',
+          contacts: job.contacts ?? null,
+          adjuster_reference: job.adjuster_reference ?? null,
+          order_sender_name: job.order_sender_name ?? null,
+          order_sender_email: job.order_sender_email ?? null,
+          client_id: job.client_id ?? null,
         }}
         jobId={jobId}
         tenantId={tenant_id!}
