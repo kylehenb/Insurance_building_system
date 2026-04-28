@@ -621,7 +621,7 @@ function JobDetailsAccordion({
             <div style={accentLabel({ marginTop: 14 })}>Contacts</div>
             {editing ? (
               <ContactsEditor
-                contacts={(job.contacts as JobContact[]) || []}
+                contacts={(job.contacts as unknown as JobContact[]) || []}
                 onChange={(contacts) => {
                   // Will be saved separately
                 }}

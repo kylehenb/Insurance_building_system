@@ -350,7 +350,7 @@ export default function InsurerOrdersPage() {
       const order = orders.find(o => o.id === id)
       if (order) {
         // Initialize contacts from insured fields if empty
-        let contacts: JobContact[] = order.contacts as JobContact[] || []
+        let contacts: JobContact[] = (order.contacts as unknown as JobContact[]) || []
         if (contacts.length === 0 && (order.insured_name || order.insured_phone || order.insured_email)) {
           contacts = [{
             slot: 'insured',
