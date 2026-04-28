@@ -963,7 +963,7 @@ export default function ClientsPage() {
                             <input
                               type="email"
                               value={formData.adjuster_submission_email || ''}
-                              onChange={(e) => setFormData({ ...formData, adjuster_submission_email: e.target.value || null })}
+                              onChange={(e) => setFormData({ ...formData, adjuster_submission_email: e.target.value || null as any })}
                               placeholder="Adjuster firm's generic inbox"
                               className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                             />
