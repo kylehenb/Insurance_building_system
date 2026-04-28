@@ -57,6 +57,7 @@ export default function ClientsPage() {
     trading_name: null,
     abn: null,
     submission_email: null,
+    adjuster_submission_email: null,
     contact_phone: null,
     address: null,
     kpi_contact_hours: 2,
@@ -943,7 +944,7 @@ export default function ClientsPage() {
                       <div className="grid grid-cols-2 gap-5">
                         <div className="col-span-2">
                           <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
-                            Submission Email
+                            Insurer Submission Email
                           </label>
                           <input
                             type="email"
@@ -953,6 +954,21 @@ export default function ClientsPage() {
                             className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                           />
                         </div>
+
+                        {formData.client_type === 'adjuster_firm' && (
+                          <div className="col-span-2">
+                            <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                              Adjuster Firm Submission Email
+                            </label>
+                            <input
+                              type="email"
+                              value={formData.adjuster_submission_email || ''}
+                              onChange={(e) => setFormData({ ...formData, adjuster_submission_email: e.target.value || null })}
+                              placeholder="Adjuster firm's generic inbox"
+                              className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                            />
+                          </div>
+                        )}
 
                         <div className="col-span-2 sm:col-span-1">
                           <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">

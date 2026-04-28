@@ -4,6 +4,10 @@ import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import JobSchedule from '@/components/schedule/JobSchedule'
+import ContactsEditor from '@/components/contacts/ContactsEditor'
+import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
+import { JobContact } from '@/lib/types/contacts'
+import { applyContactDefaults } from '@/lib/contacts/defaults'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,10 +27,14 @@ interface JobDetails {
   created_at: string
   insured_phone: string | null
   insured_email: string | null
-  additional_contacts: string | null
+  contacts: unknown
+  adjuster_reference: string | null
+  order_sender_name: string | null
+  order_sender_email: string | null
   claim_description: string | null
   special_instructions: string | null
   notes: string | null
+  client_id: string | null
 }
 
 interface ActionCard {
@@ -209,8 +217,10 @@ type EditFields = {
   insured_phone: string
   insured_email: string
   property_address: string
-  additional_contacts: string
   notes: string
+  adjuster_reference: string
+  order_sender_name: string
+  order_sender_email: string
 }
 
 function jobToEditFields(job: JobDetails): EditFields {
@@ -229,8 +239,10 @@ function jobToEditFields(job: JobDetails): EditFields {
     insured_phone: job.insured_phone ?? '',
     insured_email: job.insured_email ?? '',
     property_address: job.property_address ?? '',
-    additional_contacts: job.additional_contacts ?? '',
     notes: job.notes ?? '',
+    adjuster_reference: job.adjuster_reference ?? '',
+    order_sender_name: job.order_sender_name ?? '',
+    order_sender_email: job.order_sender_email ?? '',
   }
 }
 
@@ -280,8 +292,10 @@ function JobDetailsAccordion({
       insured_phone: vals.insured_phone || null,
       insured_email: vals.insured_email || null,
       property_address: vals.property_address || null,
-      additional_contacts: vals.additional_contacts || null,
       notes: vals.notes || null,
+      adjuster_reference: vals.adjuster_reference || null,
+      order_sender_name: vals.order_sender_name || null,
+      order_sender_email: vals.order_sender_email || null,
     }
     await supabase.from('jobs').update(patch).eq('id', jobId).eq('tenant_id', tenantId)
     setSaved(prev => ({ ...prev, ...patch }))
@@ -603,19 +617,36 @@ function JobDetailsAccordion({
               </div>
             ))}
 
-            {/* Additional Contacts */}
-            <div style={accentLabel({ marginTop: 14 })}>Additional Contacts</div>
+            {/* Contacts Editor */}
+            <div style={accentLabel({ marginTop: 14 })}>Contacts</div>
             {editing ? (
-              <textarea
-                className="ov-edit-textarea"
-                value={vals.additional_contacts}
-                onChange={e => set('additional_contacts', e.target.value)}
-                placeholder="Enter additional contacts…"
+              <ContactsEditor
+                contacts={(job.contacts as JobContact[]) || []}
+                onChange={(contacts) => {
+                  // Will be saved separately
+                }}
               />
             ) : (
-              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, whiteSpace: 'pre-wrap', margin: 0 }}>
-                {saved.additional_contacts || '—'}
+              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+                {/* Contacts display */}
               </p>
+            )}
+
+            {/* Insurer Email Fields */}
+            <div style={accentLabel({ marginTop: 16 })}>Order Sender & Adjuster</div>
+            {editing ? (
+              <InsurerEmailFields
+                orderSenderName={vals.order_sender_name}
+                orderSenderEmail={vals.order_sender_email}
+                adjusterReference={vals.adjuster_reference}
+                onChange={(field, value) => set(field as keyof EditFields, value)}
+              />
+            ) : (
+              <div style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65 }}>
+                <div>Order Sender Name: {saved.order_sender_name || '—'}</div>
+                <div>Order Sender Email: {saved.order_sender_email || '—'}</div>
+                <div>Adjuster Reference: {saved.adjuster_reference || '—'}</div>
+              </div>
             )}
 
             {/* Notes */}

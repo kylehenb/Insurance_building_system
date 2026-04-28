@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
+import ContactsEditor from '@/components/contacts/ContactsEditor'
+import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
+import { JobContact } from '@/lib/types/contacts'
+import { applyContactDefaults } from '@/lib/contacts/defaults'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -242,6 +246,18 @@ export default function InsurerOrdersPage() {
   const [creatingOrder, setCreatingOrder] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
+  // Per-order contacts and email fields state
+  const [orderContacts, setOrderContacts] = useState<Record<string, JobContact[]>>({})
+  const [orderEmailFields, setOrderEmailFields] = useState<Record<string, {
+    orderSenderName: string
+    orderSenderEmail: string
+    adjusterReference: string
+  }>>({})
+  const [clientEmails, setClientEmails] = useState<Record<string, {
+    adjusterSubmissionEmail?: string
+    insurerSubmissionEmail?: string
+  }>>({})
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auth bootstrap
@@ -329,6 +345,48 @@ export default function InsurerOrdersPage() {
       setLodging(false); setLodgeError(null)
       setRejectOpen(false); setRejectReason('')
       setLinkOpen(false); setLinkSearch(''); setLinkResults([])
+
+      // Initialize contacts and email fields for this order
+      const order = orders.find(o => o.id === id)
+      if (order) {
+        // Initialize contacts from insured fields if empty
+        let contacts: JobContact[] = order.contacts as JobContact[] || []
+        if (contacts.length === 0 && (order.insured_name || order.insured_phone || order.insured_email)) {
+          contacts = [{
+            slot: 'insured',
+            name: order.insured_name || '',
+            phone: order.insured_phone || '',
+            email: order.insured_email || '',
+            roles: ['insured', 'auth', 'primary_site'],
+          }]
+        }
+        setOrderContacts(prev => ({ ...prev, [id]: contacts }))
+
+        // Initialize email fields
+        setOrderEmailFields(prev => ({
+          ...prev,
+          [id]: {
+            orderSenderName: order.order_sender_name || '',
+            orderSenderEmail: order.order_sender_email || '',
+            adjusterReference: order.adjuster_reference || '',
+          }
+        }))
+
+        // Fetch client submission emails
+        if (order.client_id) {
+          supabase.from('clients').select('submission_email, adjuster_submission_email').eq('id', order.client_id).single().then(({ data }) => {
+            if (data) {
+              setClientEmails(prev => ({
+                ...prev,
+                [id]: {
+                  adjusterSubmissionEmail: data.adjuster_submission_email || undefined,
+                  insurerSubmissionEmail: data.submission_email || undefined,
+                }
+              }))
+            }
+          })
+        }
+      }
     }
   }
 
@@ -353,6 +411,37 @@ export default function InsurerOrdersPage() {
     const value = raw.trim() ? parseFloat(raw.trim()) : null
     await supabase.from('insurer_orders').update({ [field]: value } as never).eq('id', orderId)
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o))
+  }
+
+  // Save contacts array
+  async function saveContacts(orderId: string, contacts: JobContact[]) {
+    await supabase.from('insurer_orders').update({ contacts: contacts as never }).eq('id', orderId)
+    setOrderContacts(prev => ({ ...prev, [orderId]: contacts }))
+    // Also update insured fields from the insured contact
+    const insured = contacts.find(c => c.slot === 'insured')
+    if (insured) {
+      await supabase.from('insurer_orders').update({
+        insured_name: insured.name || null,
+        insured_phone: insured.phone || null,
+        insured_email: insured.email || null,
+      } as never).eq('id', orderId)
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, insured_name: insured.name, insured_phone: insured.phone, insured_email: insured.email } : o))
+    }
+  }
+
+  // Save email fields
+  async function saveEmailField(orderId: string, field: string, value: string) {
+    const update: Record<string, string | null> = {}
+    if (field === 'orderSenderName') update.order_sender_name = value || null
+    if (field === 'orderSenderEmail') update.order_sender_email = value || null
+    if (field === 'adjusterReference') update.adjuster_reference = value || null
+    
+    await supabase.from('insurer_orders').update(update as never).eq('id', orderId)
+    setOrderEmailFields(prev => ({
+      ...prev,
+      [orderId]: { ...prev[orderId], [field]: value }
+    }))
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...update } : o))
   }
 
   async function handleLodge(order: InsurerOrder) {
@@ -770,33 +859,40 @@ export default function InsurerOrdersPage() {
                                   </div>
 
                                   {/* Right column */}
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-                                    <FEdit
-                                      label="Claim Number" value={order.claim_number} mono
-                                      onSave={v => saveField(order.id, 'claim_number', v)}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    {/* Insurer Email Fields */}
+                                    <InsurerEmailFields
+                                      orderSenderName={orderEmailFields[order.id]?.orderSenderName || ''}
+                                      orderSenderEmail={orderEmailFields[order.id]?.orderSenderEmail || ''}
+                                      adjusterReference={orderEmailFields[order.id]?.adjusterReference || ''}
+                                      adjusterSubmissionEmail={clientEmails[order.id]?.adjusterSubmissionEmail}
+                                      insurerSubmissionEmail={clientEmails[order.id]?.insurerSubmissionEmail}
+                                      onChange={(field, value) => saveEmailField(order.id, field, value)}
                                     />
-                                    <FEdit
-                                      label="Adjuster" value={order.adjuster}
-                                      onSave={v => saveField(order.id, 'adjuster', v)}
+
+                                    {/* Basic fields */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
+                                      <FEdit
+                                        label="Claim Number" value={order.claim_number} mono
+                                        onSave={v => saveField(order.id, 'claim_number', v)}
+                                      />
+                                      <FEdit
+                                        label="Adjuster" value={order.adjuster}
+                                        onSave={v => saveField(order.id, 'adjuster', v)}
+                                      />
+                                      <FEdit
+                                        label="Loss Type" value={order.loss_type}
+                                        onSave={v => saveField(order.id, 'loss_type', v)}
+                                      />
+                                      <F label="Entry Method">{order.entry_method ?? '—'}</F>
+                                      {order.parse_status && <F label="Parse Status">{order.parse_status}</F>}
+                                    </div>
+
+                                    {/* Contacts Editor */}
+                                    <ContactsEditor
+                                      contacts={orderContacts[order.id] || []}
+                                      onChange={(contacts) => saveContacts(order.id, contacts)}
                                     />
-                                    <FEdit
-                                      label="Insured Name" value={order.insured_name}
-                                      onSave={v => saveField(order.id, 'insured_name', v)}
-                                    />
-                                    <FEdit
-                                      label="Loss Type" value={order.loss_type}
-                                      onSave={v => saveField(order.id, 'loss_type', v)}
-                                    />
-                                    <FEdit
-                                      label="Phone" value={order.insured_phone} type="tel"
-                                      onSave={v => saveField(order.id, 'insured_phone', v)}
-                                    />
-                                    <FEdit
-                                      label="Email" value={order.insured_email} type="email"
-                                      onSave={v => saveField(order.id, 'insured_email', v)}
-                                    />
-                                    <F label="Entry Method">{order.entry_method ?? '—'}</F>
-                                    {order.parse_status && <F label="Parse Status">{order.parse_status}</F>}
                                   </div>
                                 </div>
 

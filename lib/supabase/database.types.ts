@@ -263,6 +263,7 @@ export type Database = {
         Row: {
           abn: string | null
           address: string | null
+          adjuster_submission_email: string | null
           bar_amount: number | null
           builders_margin_pct: number | null
           client_type: string
@@ -288,6 +289,7 @@ export type Database = {
         Insert: {
           abn?: string | null
           address?: string | null
+          adjuster_submission_email?: string | null
           bar_amount?: number | null
           builders_margin_pct?: number | null
           client_type: string
@@ -313,6 +315,7 @@ export type Database = {
         Update: {
           abn?: string | null
           address?: string | null
+          adjuster_submission_email?: string | null
           bar_amount?: number | null
           builders_margin_pct?: number | null
           client_type?: string
@@ -828,11 +831,12 @@ export type Database = {
       }
       insurer_orders: {
         Row: {
-          additional_contacts: string | null
           adjuster: string | null
+          adjuster_reference: string | null
           claim_description: string | null
           claim_number: string | null
           client_id: string | null
+          contacts: Json | null
           created_at: string | null
           date_of_loss: string | null
           entry_method: string | null
@@ -847,6 +851,8 @@ export type Database = {
           loss_type: string | null
           notes: string | null
           order_ref: string | null
+          order_sender_email: string | null
+          order_sender_name: string | null
           parse_status: string | null
           property_address: string | null
           raw_email_link: string | null
@@ -857,11 +863,12 @@ export type Database = {
           wo_type: string | null
         }
         Insert: {
-          additional_contacts?: string | null
           adjuster?: string | null
+          adjuster_reference?: string | null
           claim_description?: string | null
           claim_number?: string | null
           client_id?: string | null
+          contacts?: Json | null
           created_at?: string | null
           date_of_loss?: string | null
           entry_method?: string | null
@@ -876,6 +883,8 @@ export type Database = {
           loss_type?: string | null
           notes?: string | null
           order_ref?: string | null
+          order_sender_email?: string | null
+          order_sender_name?: string | null
           parse_status?: string | null
           property_address?: string | null
           raw_email_link?: string | null
@@ -886,11 +895,12 @@ export type Database = {
           wo_type?: string | null
         }
         Update: {
-          additional_contacts?: string | null
           adjuster?: string | null
+          adjuster_reference?: string | null
           claim_description?: string | null
           claim_number?: string | null
           client_id?: string | null
+          contacts?: Json | null
           created_at?: string | null
           date_of_loss?: string | null
           entry_method?: string | null
@@ -905,6 +915,8 @@ export type Database = {
           loss_type?: string | null
           notes?: string | null
           order_ref?: string | null
+          order_sender_email?: string | null
+          order_sender_name?: string | null
           parse_status?: string | null
           property_address?: string | null
           raw_email_link?: string | null
@@ -1385,8 +1397,8 @@ export type Database = {
       }
       jobs: {
         Row: {
-          additional_contacts: string | null
           adjuster: string | null
+          adjuster_reference: string | null
           assigned_to: string | null
           automation_overrides: Json | null
           claim_description: string | null
@@ -1395,6 +1407,7 @@ export type Database = {
           completion_approved_at: string | null
           completion_approved_method: string | null
           completion_approved_notes: string | null
+          contacts: Json | null
           created_at: string | null
           current_stage: string | null
           current_stage_updated_at: string | null
@@ -1420,6 +1433,8 @@ export type Database = {
           kpi_visited_at: string | null
           loss_type: string | null
           notes: string | null
+          order_sender_email: string | null
+          order_sender_name: string | null
           override_stage: string | null
           property_address: string | null
           property_details: Json | null
@@ -1428,8 +1443,8 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
-          additional_contacts?: string | null
           adjuster?: string | null
+          adjuster_reference?: string | null
           assigned_to?: string | null
           automation_overrides?: Json | null
           claim_description?: string | null
@@ -1438,6 +1453,7 @@ export type Database = {
           completion_approved_at?: string | null
           completion_approved_method?: string | null
           completion_approved_notes?: string | null
+          contacts?: Json | null
           created_at?: string | null
           current_stage?: string | null
           current_stage_updated_at?: string | null
@@ -1463,6 +1479,8 @@ export type Database = {
           kpi_visited_at?: string | null
           loss_type?: string | null
           notes?: string | null
+          order_sender_email?: string | null
+          order_sender_name?: string | null
           override_stage?: string | null
           property_address?: string | null
           property_details?: Json | null
@@ -1471,8 +1489,8 @@ export type Database = {
           tenant_id: string
         }
         Update: {
-          additional_contacts?: string | null
           adjuster?: string | null
+          adjuster_reference?: string | null
           assigned_to?: string | null
           automation_overrides?: Json | null
           claim_description?: string | null
@@ -1481,6 +1499,7 @@ export type Database = {
           completion_approved_at?: string | null
           completion_approved_method?: string | null
           completion_approved_notes?: string | null
+          contacts?: Json | null
           created_at?: string | null
           current_stage?: string | null
           current_stage_updated_at?: string | null
@@ -1506,6 +1525,8 @@ export type Database = {
           kpi_visited_at?: string | null
           loss_type?: string | null
           notes?: string | null
+          order_sender_email?: string | null
+          order_sender_name?: string | null
           override_stage?: string | null
           property_address?: string | null
           property_details?: Json | null
