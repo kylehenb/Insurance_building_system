@@ -10,6 +10,14 @@ interface JobInfo {
   property_address: string | null
 }
 
+interface Invoice {
+  id: string
+  invoice_type: string
+  amount_ex_gst: number
+  gst: number
+  amount_inc_gst: number
+}
+
 interface InvoiceLineItem {
   id: string
   description: string
@@ -33,6 +41,7 @@ function fmt(v: number) {
 
 export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdated }: InvoiceEditorProps) {
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([])
+  const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
   const [subtotal, setSubtotal] = useState(0)
@@ -48,6 +57,16 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
       
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('id, invoice_type, amount_ex_gst, gst, amount_inc_gst')
+        .eq('id', invoiceId)
+        .eq('tenant_id', tenantId)
+        .single()
+
+      if (invoiceError) throw invoiceError
+      setInvoice(invoiceData)
+      
       const { data: items, error } = await supabase
         .from('invoice_line_items')
         .select('*')
@@ -58,12 +77,19 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       if (error) throw error
       setLineItems(items ?? [])
       
-      // Calculate totals
-      const exGst = (items ?? []).reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-      const gstAmount = exGst * 0.10
-      setSubtotal(exGst)
-      setGst(gstAmount)
-      setTotal(exGst + gstAmount)
+      // For excess invoices, use stored values (GST-inclusive excess amount)
+      // For other invoices, calculate from line items
+      if (invoiceData.invoice_type === 'excess') {
+        setSubtotal(invoiceData.amount_ex_gst)
+        setGst(invoiceData.gst)
+        setTotal(invoiceData.amount_inc_gst)
+      } else {
+        const exGst = (items ?? []).reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
+        const gstAmount = exGst * 0.10
+        setSubtotal(exGst)
+        setGst(gstAmount)
+        setTotal(exGst + gstAmount)
+      }
     } catch (error) {
       console.error('Error loading invoice items:', error)
     } finally {
@@ -110,26 +136,31 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
       if (error) throw error
       
-      // Recalculate totals
-      const updatedItems = lineItems.map(item => 
-        item.id === itemId ? { ...item, ...changes, line_total: updateData.line_total } : item
-      )
-      const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-      const gstAmount = exGst * 0.10
-      setSubtotal(exGst)
-      setGst(gstAmount)
-      setTotal(exGst + gstAmount)
-      
-      // Update invoice totals
-      await supabase
-        .from('invoices')
-        .update({
-          amount_ex_gst: exGst,
-          gst: gstAmount,
-          amount_inc_gst: exGst + gstAmount,
-        })
-        .eq('id', invoiceId)
-        .eq('tenant_id', tenantId)
+      // Recalculate totals - for excess invoices, don't recalculate from line items
+      if (invoice?.invoice_type === 'excess') {
+        // Excess invoices keep their stored GST values
+        // Line item changes don't affect the excess amount
+      } else {
+        const updatedItems = lineItems.map(item => 
+          item.id === itemId ? { ...item, ...changes, line_total: updateData.line_total } : item
+        )
+        const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
+        const gstAmount = exGst * 0.10
+        setSubtotal(exGst)
+        setGst(gstAmount)
+        setTotal(exGst + gstAmount)
+        
+        // Update invoice totals
+        await supabase
+          .from('invoices')
+          .update({
+            amount_ex_gst: exGst,
+            gst: gstAmount,
+            amount_inc_gst: exGst + gstAmount,
+          })
+          .eq('id', invoiceId)
+          .eq('tenant_id', tenantId)
+      }
 
       setSaveStatus('saved')
       onInvoiceUpdated?.()
@@ -137,7 +168,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       console.error('Error updating item:', error)
       setSaveStatus('error')
     }
-  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated, invoice])
 
   // Add new line item
   const addItem = useCallback(async () => {
@@ -193,27 +224,32 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
     setLineItems(prev => prev.filter(item => item.id !== itemId))
     
-    // Recalculate totals
-    const updatedItems = lineItems.filter(item => item.id !== itemId)
-    const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-    const gstAmount = exGst * 0.10
-    setSubtotal(exGst)
-    setGst(gstAmount)
-    setTotal(exGst + gstAmount)
-    
-    // Update invoice totals
-    await supabase
-      .from('invoices')
-      .update({
-        amount_ex_gst: exGst,
-        gst: gstAmount,
-        amount_inc_gst: exGst + gstAmount,
-      })
-      .eq('id', invoiceId)
-      .eq('tenant_id', tenantId)
+    // Recalculate totals - for excess invoices, don't recalculate from line items
+    if (invoice?.invoice_type === 'excess') {
+      // Excess invoices keep their stored GST values
+      // Line item changes don't affect the excess amount
+    } else {
+      const updatedItems = lineItems.filter(item => item.id !== itemId)
+      const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
+      const gstAmount = exGst * 0.10
+      setSubtotal(exGst)
+      setGst(gstAmount)
+      setTotal(exGst + gstAmount)
+      
+      // Update invoice totals
+      await supabase
+        .from('invoices')
+        .update({
+          amount_ex_gst: exGst,
+          gst: gstAmount,
+          amount_inc_gst: exGst + gstAmount,
+        })
+        .eq('id', invoiceId)
+        .eq('tenant_id', tenantId)
+    }
 
     onInvoiceUpdated?.()
-  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated, invoice])
 
   if (loading) {
     return (
