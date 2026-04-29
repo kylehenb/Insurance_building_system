@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
+  const { jobId } = await params
+  const tenantId = req.nextUrl.searchParams.get('tenantId')
+
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+
+  const [
+    { data: workOrders, error: woError },
+    { data: visits, error: visitsError },
+  ] = await Promise.all([
+    supabase
+      .from('work_orders')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .order('sequence_order', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('work_order_visits')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .order('sequence_order', { ascending: true, nullsFirst: false }),
+  ])
+
+  if (woError) return NextResponse.json({ error: woError.message }, { status: 500 })
+  if (visitsError) return NextResponse.json({ error: visitsError.message }, { status: 500 })
+
+  return NextResponse.json({ workOrders: workOrders ?? [], visits: visits ?? [] })
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
@@ -113,19 +150,33 @@ export async function POST(
     .eq('quote_id', quote.id)
     .eq('tenant_id', tenantId)
 
+  // Delete orphaned work orders that have no trade_id and no trade_name — these were
+  // created by the old sync code before trade_name was stored and cannot be identified.
+  const orphanedWOIds = (existingWOs ?? [])
+    .filter(wo => wo.trade_id === null && !wo.trade_name)
+    .map(wo => wo.id)
+
+  if (orphanedWOIds.length > 0) {
+    await supabase.from('work_order_visits').delete().in('work_order_id', orphanedWOIds).eq('tenant_id', tenantId)
+    await supabase.from('work_orders').delete().in('id', orphanedWOIds).eq('tenant_id', tenantId)
+  }
+
+  // Remaining WOs after orphan cleanup
+  const cleanExistingWOs = (existingWOs ?? []).filter(wo => !orphanedWOIds.includes(wo.id))
+
   const existingTradeIds = new Set(
-    (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
+    cleanExistingWOs.map(wo => wo.trade_id).filter((id): id is string => id !== null)
   )
 
   // Track unmatched (trade_id=null) WOs by trade_name to prevent duplicates
   const existingNullTradeNames = new Set(
-    (existingWOs ?? [])
+    cleanExistingWOs
       .filter(wo => wo.trade_id === null && wo.trade_name)
       .map(wo => wo.trade_name!.toLowerCase())
   )
 
   // Start sequence_order after any already-placed work orders
-  const maxExistingSeq = Math.max(0, ...(existingWOs ?? []).map(wo => wo.sequence_order ?? 0))
+  const maxExistingSeq = Math.max(0, ...cleanExistingWOs.map(wo => wo.sequence_order ?? 0))
 
   // Create work orders for each trade
   const workOrdersCreated: any[] = []

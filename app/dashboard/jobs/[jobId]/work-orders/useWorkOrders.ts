@@ -69,25 +69,16 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
     setError(null)
 
     try {
+      // work_orders and work_order_visits are fetched via the server API (service client)
+      // so that RLS policies on trade_id do not filter out unmatched trade work orders.
       const [
-        { data: woData,       error: woErr },
-        { data: visitsData },
+        woApiResult,
         { data: quotesData },
         { data: invoicesData },
         { data: tradesData },
       ] = await Promise.all([
-        supabase
-          .from('work_orders')
-          .select('*')
-          .eq('job_id', jobId)
-          .eq('tenant_id', tenantId)
-          .order('sequence_order', { ascending: true, nullsFirst: false }),
-        supabase
-          .from('work_order_visits')
-          .select('*')
-          .eq('job_id', jobId)
-          .eq('tenant_id', tenantId)
-          .order('sequence_order', { ascending: true, nullsFirst: false }),
+        fetch(`/api/jobs/${jobId}/work-orders?tenantId=${encodeURIComponent(tenantId)}`)
+          .then(r => r.json() as Promise<{ workOrders: any[]; visits: any[]; error?: string }>),
         supabase
           .from('quotes')
           .select('*')
@@ -110,7 +101,10 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       ])
 
       if (fetchId !== fetchCount.current) return
-      if (woErr) { setError(woErr.message); return }
+      if (woApiResult.error) { setError(woApiResult.error); return }
+
+      const woData = woApiResult.workOrders ?? []
+      const visitsData = woApiResult.visits ?? []
 
       // Scope items – only fetch if quotes exist
       const quoteIds = (quotesData ?? []).map(q => q.id)
