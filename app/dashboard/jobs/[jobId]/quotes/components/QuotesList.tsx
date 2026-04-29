@@ -330,7 +330,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           // Upload file to Supabase Storage
           const { error: uploadError } = await supabase.storage
-            .from('documents')
+            .from('job-files')
             .upload(filePath, file)
 
           if (uploadError) {
@@ -341,7 +341,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           // Get public URL
           const { data: { publicUrl } } = supabase.storage
-            .from('documents')
+            .from('job-files')
             .getPublicUrl(filePath)
 
           // Insert into communications table as a file record
@@ -540,7 +540,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           // Upload file to Supabase Storage
           const { error: uploadError } = await supabase.storage
-            .from('documents')
+            .from('job-files')
             .upload(filePath, file)
 
           if (uploadError) {
@@ -552,7 +552,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           // Get public URL
           const { data: { publicUrl } } = supabase.storage
-            .from('documents')
+            .from('job-files')
             .getPublicUrl(filePath)
 
           // Get file kind (uppercase extension without dot)
