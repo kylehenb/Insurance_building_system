@@ -83,14 +83,15 @@ export async function POST(req: NextRequest) {
     amountExGst = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
   }
 
-  // For excess invoices, the excess amount is the final GST-inclusive amount (no GST breakdown)
+  // For excess invoices, the excess amount is GST-inclusive - calculate ex-GST and GST components
   let gst = 0
   let amountIncGst = 0
   if (invoiceType === 'excess') {
-    // Excess is already GST inclusive - no GST to calculate
+    // Excess is entered as GST-inclusive amount
+    // Calculate ex-GST: amountIncGst / 1.10
     amountIncGst = amountExGst
-    amountExGst = amountExGst
-    gst = 0
+    amountExGst = amountIncGst / 1.10
+    gst = amountIncGst - amountExGst
   } else {
     // Other invoices add GST
     gst = amountExGst * 0.10
