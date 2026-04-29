@@ -156,14 +156,11 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         const invoice = woInvoiceMap.get(wo.id) ?? null
         const visits  = visitsMap.get(wo.id) ?? []
 
-        // Trade type label: use assigned trade's primary_trade, else work_type display
-        let tradeTypeLabel = trade?.primary_trade ?? ''
+        // Trade type label: prefer the linked trade record's primary_trade,
+        // then the stored trade_name, then work_type special cases.
+        let tradeTypeLabel = trade?.primary_trade ?? wo.trade_name ?? ''
         if (!tradeTypeLabel) {
           if (wo.work_type === 'make_safe') tradeTypeLabel = 'Make Safe'
-          else if (wo.quote_id) {
-            const items = scopeByQuote.get(wo.quote_id) ?? []
-            tradeTypeLabel = items[0]?.trade ?? ''
-          }
         }
 
         // Scope items for this work order: same quote + same trade label

@@ -6,24 +6,30 @@ import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string, tenantId: string) {
   const supabase = createServiceClient()
 
-  // Check if work orders already exist for this quote
+  // Fetch existing work orders per trade to allow per-trade duplicate detection.
+  // This means re-running (e.g. on a second status change) will fill in any
+  // trades that were missed on the first run rather than bailing out entirely.
   const { data: existingWOs } = await supabase
     .from('work_orders')
-    .select('id')
+    .select('id, trade_id, trade_name')
     .eq('quote_id', quoteId)
     .eq('tenant_id', tenantId)
 
-  if (existingWOs && existingWOs.length > 0) {
-    console.log(`[Auto-create] Work orders already exist for quote ${quoteId}, skipping`)
-    return
-  }
+  const existingTradeIds = new Set(
+    (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
+  )
+  const existingTradeNames = new Set(
+    (existingWOs ?? []).map(wo => wo.trade_name).filter((n): n is string => n !== null)
+  )
 
-  // Get scope items
+  // Exclude items the insurer explicitly declined; include pending (full approval)
+  // and approved (partial approval) items.
   const { data: scopeItems } = await supabase
     .from('scope_items')
     .select('*')
     .eq('quote_id', quoteId)
     .eq('tenant_id', tenantId)
+    .or('approval_status.is.null,approval_status.neq.declined')
 
   if (!scopeItems || scopeItems.length === 0) {
     console.log(`[Auto-create] No scope items for quote ${quoteId}`)
@@ -41,7 +47,7 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
     }
   })
 
-  // Get trades to map trade names to IDs
+  // Build trade lookup by both primary_trade and business_name (case-insensitive)
   const { data: allTrades } = await supabase
     .from('trades')
     .select('*')
@@ -51,6 +57,9 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
   allTrades?.forEach(trade => {
     if (trade.primary_trade) {
       tradeMap.set(trade.primary_trade.toLowerCase(), trade.id)
+    }
+    if (trade.business_name) {
+      tradeMap.set(trade.business_name.toLowerCase(), trade.id)
     }
   })
 
@@ -70,11 +79,20 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
   // Create unplaced work orders (no sequence_order)
   for (const [tradeName, items] of itemsByTrade) {
     const tradeNameLower = tradeName.toLowerCase()
-    const tradeId = tradeMap.get(tradeNameLower)
+    const tradeId = tradeMap.get(tradeNameLower) ?? null
+
+    // Skip only if a work order for this exact trade already exists
+    if (tradeId && existingTradeIds.has(tradeId)) {
+      console.log(`[Auto-create] Work order already exists for trade ${tradeName}, skipping`)
+      continue
+    }
+    if (!tradeId && existingTradeNames.has(tradeName)) {
+      console.log(`[Auto-create] Work order already exists for unmatched trade ${tradeName}, skipping`)
+      continue
+    }
 
     if (!tradeId) {
-      console.log(`[Auto-create] Trade not found: ${tradeName}`)
-      continue
+      console.log(`[Auto-create] No contractor record found for trade "${tradeName}" — creating work order without trade assignment`)
     }
 
     const totalVisits = sequenceMap.get(tradeNameLower) || 1
@@ -87,6 +105,7 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
         job_id: jobId,
         quote_id: quoteId,
         trade_id: tradeId,
+        trade_name: tradeName,
         work_type: 'repair',
         status: 'pending',
         estimated_hours: totalHours,

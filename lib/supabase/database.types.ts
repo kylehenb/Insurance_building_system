@@ -3004,6 +3004,7 @@ export type Database = {
           total_visits: number | null
           trade_cost: number | null
           trade_id: string | null
+          trade_name: string | null
           work_order_ref: string | null
           work_type: string | null
         }
@@ -3033,6 +3034,7 @@ export type Database = {
           total_visits?: number | null
           trade_cost?: number | null
           trade_id?: string | null
+          trade_name?: string | null
           work_order_ref?: string | null
           work_type?: string | null
         }
@@ -3062,6 +3064,7 @@ export type Database = {
           total_visits?: number | null
           trade_cost?: number | null
           trade_id?: string | null
+          trade_name?: string | null
           work_order_ref?: string | null
           work_type?: string | null
         }

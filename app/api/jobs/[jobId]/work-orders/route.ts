@@ -55,12 +55,13 @@ export async function POST(
     return NextResponse.json({ error: 'No approved quote found for this job' }, { status: 404 })
   }
 
-  // Get scope items for the quote
+  // Get scope items for the quote — exclude explicitly declined items
   const { data: scopeItems, error: itemsError } = await supabase
     .from('scope_items')
     .select('*')
     .eq('quote_id', quote.id)
     .eq('tenant_id', tenantId)
+    .or('approval_status.is.null,approval_status.neq.declined')
 
   if (itemsError || !scopeItems || scopeItems.length === 0) {
     return NextResponse.json({ error: 'No scope items found for this quote' }, { status: 404 })
@@ -117,18 +118,45 @@ export async function POST(
     }
   })
 
+  // Fetch existing work orders for this quote to enable per-trade duplicate detection
+  const { data: existingWOs } = await supabase
+    .from('work_orders')
+    .select('id, trade_id, trade_name, sequence_order')
+    .eq('quote_id', quote.id)
+    .eq('tenant_id', tenantId)
+
+  const existingTradeIds = new Set(
+    (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
+  )
+  const existingTradeNames = new Set(
+    (existingWOs ?? []).map(wo => wo.trade_name).filter((n): n is string => n !== null)
+  )
+
+  // Start sequence_order after any already-placed work orders
+  const maxExistingSeq = Math.max(0, ...(existingWOs ?? []).map(wo => wo.sequence_order ?? 0))
+
   // Create work orders for each trade
   const workOrdersCreated: any[] = []
-  let sequenceOrder = 10
+  let sequenceOrder = maxExistingSeq > 0 ? maxExistingSeq + 10 : 10
 
   for (const [tradeName, items] of itemsByTrade) {
     const tradeNameLower = tradeName.toLowerCase()
-    
-    // Get trade details by name
-    const trade = tradeMap.get(tradeNameLower)
-    if (!trade) {
-      console.log(`Trade not found: ${tradeName}`)
+
+    // Get trade details by name (null if no registered contractor found)
+    const trade = tradeMap.get(tradeNameLower) ?? null
+
+    // Skip if a work order already exists for this specific trade
+    if (trade && existingTradeIds.has(trade.id)) {
+      console.log(`Work order already exists for trade ${tradeName}, skipping`)
       continue
+    }
+    if (!trade && existingTradeNames.has(tradeName)) {
+      console.log(`Work order already exists for unmatched trade ${tradeName}, skipping`)
+      continue
+    }
+
+    if (!trade) {
+      console.log(`No contractor record found for trade "${tradeName}" — creating work order without trade assignment`)
     }
 
     // Determine visit count from trade type sequence
@@ -145,8 +173,9 @@ export async function POST(
         tenant_id: tenantId,
         job_id: jobId,
         quote_id: quote.id,
-        trade_id: trade.id,
-        work_type: items[0].item_type || 'General',
+        trade_id: trade?.id ?? null,
+        trade_name: tradeName,
+        work_type: 'repair',
         scope_summary: `${items.length} items`,
         estimated_hours: totalHours,
         total_visits: totalVisits,

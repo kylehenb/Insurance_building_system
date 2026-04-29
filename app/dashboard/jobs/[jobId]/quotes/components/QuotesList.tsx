@@ -523,11 +523,15 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
         const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
 
+        let successfulUploads = 0
+        let failedUploads = 0
+
         for (const file of files) {
           // Validate file type
           const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
           if (!allowedExtensions.includes(fileExt) || !allowedTypes.includes(file.type)) {
             alert(`Invalid file type: ${file.name}. Only PDF, JPG, PNG, DOC, and DOCX files are allowed.`)
+            failedUploads++
             continue
           }
 
@@ -541,7 +545,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           if (uploadError) {
             console.error('Upload error:', uploadError)
-            alert(`Failed to upload ${file.name}`)
+            alert(`Failed to upload ${file.name}: ${uploadError.message}`)
+            failedUploads++
             continue
           }
 
@@ -571,8 +576,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
           if (insertError) {
             console.error('Insert error:', insertError)
-            alert(`Failed to save file record for ${file.name}`)
+            alert(`Failed to save file record for ${file.name}: ${insertError.message}`)
+            failedUploads++
+          } else {
+            successfulUploads++
           }
+        }
+
+        // Only proceed if at least one file was successfully uploaded
+        if (successfulUploads === 0) {
+          alert('No files were successfully uploaded. Please try again.')
+          return
         }
 
         setReceiveSignOffVisible(false)
@@ -593,13 +607,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           setCurrentJobStage(jobData?.current_stage ?? null)
         }
 
-        alert('Files uploaded successfully and job stage updated')
+        const message = failedUploads > 0
+          ? `${successfulUploads} file(s) uploaded successfully. ${failedUploads} file(s) failed. Job stage updated.`
+          : 'Files uploaded successfully and job stage updated'
+        alert(message)
       } catch (error) {
         console.error('Upload error:', error)
         alert('Failed to upload files')
       }
     },
-    [jobId, tenantId, handleJobStageChange]
+    [jobId, tenantId, handleJobStageChange, hasQuoteReachedStageOrLater]
   )
 
   // ── Handle revert to previous version ────────────────────────────────────────

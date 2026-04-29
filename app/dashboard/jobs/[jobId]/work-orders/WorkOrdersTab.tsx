@@ -310,9 +310,11 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           workOrders={workOrders}
           quotes={quotes}
           trades={trades}
+          jobId={jobId}
           onAddToQuote={openAddQuote}
           onAddAdditional={openAddAdditional}
           onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
+          onRefresh={refetch}
         />
       </div>
 

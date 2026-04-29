@@ -412,20 +412,41 @@ export interface BottomPanelProps {
   workOrders:  WorkOrderWithDetails[]
   quotes:      QuoteRow[]
   trades:      TradeRow[]
+  jobId:       string
   onAddToQuote: (quoteId: string) => void
   onAddAdditional: () => void
   onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
+  onRefresh: () => void
 }
 
 export function BottomPanel({
   workOrders,
   quotes,
   trades,
+  jobId,
   onAddToQuote,
   onAddAdditional,
   onUpdateWorkOrder,
+  onRefresh,
 }: BottomPanelProps) {
   const [open, setOpen] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+
+  async function handleSyncFromQuote() {
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/work-orders`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error ?? 'Failed to sync work orders')
+      } else if (data.workOrdersCreated?.length === 0) {
+        alert('All trades already have work orders — nothing to sync.')
+      }
+      onRefresh()
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const total = workOrders.length
 
@@ -529,34 +550,65 @@ export function BottomPanel({
                   <span style={{ fontSize: 10, color: '#9a9590' }}>
                     {aud.format(quoteTotal(quote.id))} ex GST · {qWOs.length} orders
                   </span>
-                  <button
-                    onClick={() => onAddToQuote(quote.id)}
-                    style={{
-                      marginLeft: 'auto',
-                      padding: '2px 9px',
-                      fontSize: 10,
-                      fontFamily: 'DM Sans, sans-serif',
-                      border: '1px solid #ddd8d0',
-                      borderRadius: 4,
-                      background: '#fff',
-                      color: '#9a9590',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={e => {
-                      const t = e.target as HTMLElement
-                      t.style.background = '#1a1a1a'
-                      t.style.color = '#fff'
-                      t.style.borderColor = '#1a1a1a'
-                    }}
-                    onMouseLeave={e => {
-                      const t = e.target as HTMLElement
-                      t.style.background = '#fff'
-                      t.style.color = '#9a9590'
-                      t.style.borderColor = '#ddd8d0'
-                    }}
-                  >
-                    + Add to quote
-                  </button>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={handleSyncFromQuote}
+                      disabled={syncing}
+                      style={{
+                        padding: '2px 9px',
+                        fontSize: 10,
+                        fontFamily: 'DM Sans, sans-serif',
+                        border: '1px solid #ddd8d0',
+                        borderRadius: 4,
+                        background: '#fff',
+                        color: '#9a9590',
+                        cursor: syncing ? 'not-allowed' : 'pointer',
+                        opacity: syncing ? 0.6 : 1,
+                      }}
+                      onMouseEnter={e => {
+                        if (syncing) return
+                        const t = e.target as HTMLElement
+                        t.style.background = '#1a1a1a'
+                        t.style.color = '#fff'
+                        t.style.borderColor = '#1a1a1a'
+                      }}
+                      onMouseLeave={e => {
+                        const t = e.target as HTMLElement
+                        t.style.background = '#fff'
+                        t.style.color = '#9a9590'
+                        t.style.borderColor = '#ddd8d0'
+                      }}
+                    >
+                      {syncing ? 'Syncing…' : '↻ Sync from quote'}
+                    </button>
+                    <button
+                      onClick={() => onAddToQuote(quote.id)}
+                      style={{
+                        padding: '2px 9px',
+                        fontSize: 10,
+                        fontFamily: 'DM Sans, sans-serif',
+                        border: '1px solid #ddd8d0',
+                        borderRadius: 4,
+                        background: '#fff',
+                        color: '#9a9590',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => {
+                        const t = e.target as HTMLElement
+                        t.style.background = '#1a1a1a'
+                        t.style.color = '#fff'
+                        t.style.borderColor = '#1a1a1a'
+                      }}
+                      onMouseLeave={e => {
+                        const t = e.target as HTMLElement
+                        t.style.background = '#fff'
+                        t.style.color = '#9a9590'
+                        t.style.borderColor = '#ddd8d0'
+                      }}
+                    >
+                      + Add to quote
+                    </button>
+                  </div>
                 </div>
                 {qWOs.length > 0 ? (
                   <WOTable workOrders={qWOs} allWorkOrders={workOrders} trades={trades} onUpdate={onUpdateWorkOrder} />
