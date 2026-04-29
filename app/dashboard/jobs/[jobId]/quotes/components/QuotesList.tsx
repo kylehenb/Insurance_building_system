@@ -218,10 +218,12 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         )
         const { data } = await supabase
           .from('jobs')
-          .select('current_stage')
+          .select('current_stage, homeowner_signoff_received_at')
           .eq('id', jobId)
           .single()
-        setCurrentJobStage(data?.current_stage ?? null)
+        setCurrentJobStage((data as any)?.current_stage ?? null)
+        const receivedAt = (data as any)?.homeowner_signoff_received_at
+        if (receivedAt) setSignOffFiledDate(new Date(receivedAt))
       } catch (error) {
         console.error('Error fetching job stage:', error)
       }

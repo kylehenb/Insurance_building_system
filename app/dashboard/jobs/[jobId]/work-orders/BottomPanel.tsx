@@ -4,8 +4,6 @@ import React, { useState } from 'react'
 import { formatEstHours } from '@/lib/utils'
 import {
   type WorkOrderWithDetails,
-  type WorkOrderRow,
-  type WorkOrderVisitRow,
   type QuoteRow,
   type TradeRow,
   getTradeColor,
@@ -445,8 +443,12 @@ export function BottomPanel({
       const data = await res.json()
       if (!res.ok) {
         alert(data.error ?? 'Failed to sync work orders')
-      } else if (data.workOrdersCreated?.length === 0) {
-        alert('All trades already have work orders — nothing to sync.')
+      } else {
+        const created = data.workOrdersCreated?.length ?? 0
+        if (created > 0) {
+          alert(`${created} work order${created === 1 ? '' : 's'} created.`)
+        }
+        // No alert if 0 created — all matched trades already had work orders
       }
       onRefresh()
     } finally {

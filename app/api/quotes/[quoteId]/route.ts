@@ -11,15 +11,12 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
   // trades that were missed on the first run rather than bailing out entirely.
   const { data: existingWOs } = await supabase
     .from('work_orders')
-    .select('id, trade_id, trade_name')
+    .select('id, trade_id')
     .eq('quote_id', quoteId)
     .eq('tenant_id', tenantId)
 
   const existingTradeIds = new Set(
     (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
-  )
-  const existingTradeNames = new Set(
-    (existingWOs ?? []).map(wo => wo.trade_name).filter((n): n is string => n !== null)
   )
 
   // Exclude items the insurer explicitly declined; include pending (full approval)
@@ -86,10 +83,6 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
       console.log(`[Auto-create] Work order already exists for trade ${tradeName}, skipping`)
       continue
     }
-    if (!tradeId && existingTradeNames.has(tradeName)) {
-      console.log(`[Auto-create] Work order already exists for unmatched trade ${tradeName}, skipping`)
-      continue
-    }
 
     if (!tradeId) {
       console.log(`[Auto-create] No contractor record found for trade "${tradeName}" — creating work order without trade assignment`)
@@ -105,7 +98,6 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
         job_id: jobId,
         quote_id: quoteId,
         trade_id: tradeId,
-        trade_name: tradeName,
         work_type: 'repair',
         status: 'pending',
         estimated_hours: totalHours,

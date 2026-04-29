@@ -109,15 +109,12 @@ export async function POST(
   // Fetch existing work orders for this quote to enable per-trade duplicate detection
   const { data: existingWOs } = await supabase
     .from('work_orders')
-    .select('id, trade_id, trade_name, sequence_order')
+    .select('id, trade_id, sequence_order')
     .eq('quote_id', quote.id)
     .eq('tenant_id', tenantId)
 
   const existingTradeIds = new Set(
     (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
-  )
-  const existingTradeNames = new Set(
-    (existingWOs ?? []).map(wo => wo.trade_name).filter((n): n is string => n !== null)
   )
 
   // Start sequence_order after any already-placed work orders
@@ -136,10 +133,6 @@ export async function POST(
     // Skip if a work order already exists for this specific trade
     if (trade && existingTradeIds.has(trade.id)) {
       console.log(`Work order already exists for trade ${tradeName}, skipping`)
-      continue
-    }
-    if (!trade && existingTradeNames.has(tradeName)) {
-      console.log(`Work order already exists for unmatched trade ${tradeName}, skipping`)
       continue
     }
 
@@ -162,7 +155,6 @@ export async function POST(
         job_id: jobId,
         quote_id: quote.id,
         trade_id: trade?.id ?? null,
-        trade_name: tradeName,
         work_type: 'repair',
         scope_summary: `${items.length} items`,
         estimated_hours: totalHours,
