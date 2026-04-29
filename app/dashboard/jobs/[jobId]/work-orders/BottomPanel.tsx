@@ -413,6 +413,7 @@ export interface BottomPanelProps {
   quotes:      QuoteRow[]
   trades:      TradeRow[]
   jobId:       string
+  tenantId:    string
   onAddToQuote: (quoteId: string) => void
   onAddAdditional: () => void
   onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
@@ -424,6 +425,7 @@ export function BottomPanel({
   quotes,
   trades,
   jobId,
+  tenantId,
   onAddToQuote,
   onAddAdditional,
   onUpdateWorkOrder,
@@ -435,7 +437,11 @@ export function BottomPanel({
   async function handleSyncFromQuote() {
     setSyncing(true)
     try {
-      const res = await fetch(`/api/jobs/${jobId}/work-orders`, { method: 'POST' })
+      const res = await fetch(`/api/jobs/${jobId}/work-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
+      })
       const data = await res.json()
       if (!res.ok) {
         alert(data.error ?? 'Failed to sync work orders')

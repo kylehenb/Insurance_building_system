@@ -1,31 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { Database } from '@/lib/supabase/database.types'
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params
+  const body = await req.json().catch(() => ({}))
+  const { tenantId } = body as { tenantId?: string }
+
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
-
-  // Get the user's tenant_id from auth
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
-
-  const tenantId = userData.tenant_id
 
   // Get the approved quote for this job
   const APPROVED_STATUSES = [
