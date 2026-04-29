@@ -157,6 +157,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [notBuiltVisible, setNotBuiltVisible]   = useState(false)
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
   const [sowLoading, setSowLoading]       = useState<string | null>(null)
+  const [cloningQuoteId, setCloningQuoteId] = useState<string | null>(null)
   const initialLoadDone = useRef(false)
 
   // New workflow state
@@ -313,6 +314,36 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       }
     },
     [tenantId, expandedId]
+  )
+
+  const handleClone = useCallback(
+    async (quoteId: string) => {
+      setCloningQuoteId(quoteId)
+      setMenuDropdownId(null)
+      try {
+        const response = await fetch(`/api/quotes/${quoteId}/clone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId }),
+        })
+        if (response.ok) {
+          const newQuote = await response.json()
+          // Reload quotes list and expand the new quote
+          await load()
+          setExpandedId(newQuote.id)
+          setTimeout(() => {
+            const el = document.getElementById(`quote-editor-${newQuote.id}`)
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 150)
+        }
+      } catch (error) {
+        console.error('Error cloning quote:', error)
+        alert('Failed to clone quote. Please try again.')
+      } finally {
+        setCloningQuoteId(null)
+      }
+    },
+    [tenantId, load]
   )
 
   // ── File upload handler ───────────────────────────────────────────────────────
@@ -2486,6 +2517,44 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       >
                         <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
                         <span>Preview Quote</span>
+                      </button>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          handleClone(q.id)
+                        }}
+                        disabled={cloningQuoteId === q.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: cloningQuoteId === q.id ? '#9e998f' : '#3a3530',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: cloningQuoteId === q.id ? 'default' : 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                          opacity: cloningQuoteId === q.id ? 0.7 : 1,
+                        }}
+                        onMouseEnter={e => {
+                          if (cloningQuoteId !== q.id)
+                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                        }}
+                      >
+                        <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                          {cloningQuoteId === q.id ? '⏳' : '📋'}
+                        </span>
+                        <span>
+                          {cloningQuoteId === q.id ? 'Duplicating...' : 'Duplicate Quote'}
+                        </span>
                       </button>
                       <button
                         onClick={e => {
