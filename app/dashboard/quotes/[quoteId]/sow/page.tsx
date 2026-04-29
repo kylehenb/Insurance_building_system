@@ -125,6 +125,7 @@ export default async function SowPrintPage({
   })()
 
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'
+  const docDateDisplay = formatDate(new Date().toISOString())
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
@@ -156,7 +157,7 @@ export default async function SowPrintPage({
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
               {[
-                { label: 'SOW Date', value: formatDate(quote.created_at) },
+                { label: 'Doc Date', value: docDateDisplay },
                 { label: 'Quote Ref', value: quote.quote_ref },
               ].filter(f => f.value).map((field, i, arr) => (
                 <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
@@ -192,14 +193,8 @@ export default async function SowPrintPage({
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '4px 20px', display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.5px' }}>
-            {quote.quote_ref}-SOW
-          </span>
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: '16px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px' }}>
-            Scope of Works &amp; Works Authority
-          </span>
+        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
+          <span style={{ fontSize: '28px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>SCOPE OF WORKS</span>
         </div>
 
         {/* Body */}
@@ -392,7 +387,7 @@ export default async function SowPrintPage({
                   </div>
                   <div style={{ borderBottom: '1px solid #f0ece6', paddingBottom: '14px' }}>
                     <div style={{ fontSize: '8px', color: '#b0a89e', marginBottom: '2px' }}>Date</div>
-                    <div style={{ fontSize: '9px', color: '#3a3530' }}>{formatDate(new Date().toISOString())}</div>
+                    <div style={{ fontSize: '9px', color: '#3a3530' }}>{docDateDisplay}</div>
                   </div>
                 </div>
               </div>

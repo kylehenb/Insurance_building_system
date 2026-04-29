@@ -30,7 +30,7 @@ export function generateSowHtml(params: {
   }
 
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'
-  const issueDateDisplay = formatDate(new Date().toISOString())
+  const docDateDisplay = formatDate(new Date().toISOString())
 
   // Group and sort items — identical logic to page.tsx
   const items = [...scopeItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -154,7 +154,7 @@ export function generateSowHtml(params: {
       </div>
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
         ${[
-          { label: 'SOW Date', value: formatDate(quote.created_at) },
+          { label: 'Doc Date', value: docDateDisplay },
           { label: 'Quote Ref', value: quote.quote_ref },
         ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
@@ -191,12 +191,9 @@ export function generateSowHtml(params: {
 
   <!-- FORM BAND -->
   <div style="border-top:1px solid #e0dbd4;border-bottom:1px solid #e0dbd4;
-    padding:4px 20px;display:flex;align-items:baseline;position:relative;">
-    <span style="font-size:15px;font-weight:700;color:#1a1a1a;font-family:monospace;
-      letter-spacing:-0.5px;">${quote.quote_ref}-SOW</span>
-    <span style="position:absolute;left:50%;transform:translateX(-50%);
-      font-size:16px;font-weight:700;color:#9e998f;text-transform:uppercase;
-      letter-spacing:2px;white-space:nowrap;">Scope of Works &amp; Works Authority</span>
+    padding:12px 20px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:14px;">
+    <span style="font-size:28px;font-weight:700;color:#9e998f;text-transform:uppercase;
+      letter-spacing:2px;white-space:nowrap;">SCOPE OF WORKS</span>
   </div>
 
   <!-- BODY -->
@@ -351,7 +348,7 @@ export function generateSowHtml(params: {
             </div>
             <div style="border-bottom:1px solid #f0ece6;padding-bottom:14px;">
               <div style="font-size:8px;color:#b0a89e;margin-bottom:2px;">Date</div>
-              <div style="font-size:9px;color:#3a3530;">${issueDateDisplay}</div>
+              <div style="font-size:9px;color:#3a3530;">${docDateDisplay}</div>
             </div>
           </div>
         </div>

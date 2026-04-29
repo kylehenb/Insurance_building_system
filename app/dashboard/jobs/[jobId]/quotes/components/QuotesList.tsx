@@ -450,6 +450,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           }),
         })
         if (res.ok) {
+          setCurrentJobStage(stage)
           load()
         }
       } catch (error) {
