@@ -109,12 +109,19 @@ export async function POST(
   // Fetch existing work orders for this quote to enable per-trade duplicate detection
   const { data: existingWOs } = await supabase
     .from('work_orders')
-    .select('id, trade_id, sequence_order')
+    .select('id, trade_id, trade_name, sequence_order')
     .eq('quote_id', quote.id)
     .eq('tenant_id', tenantId)
 
   const existingTradeIds = new Set(
     (existingWOs ?? []).map(wo => wo.trade_id).filter((id): id is string => id !== null)
+  )
+
+  // Track unmatched (trade_id=null) WOs by trade_name to prevent duplicates
+  const existingNullTradeNames = new Set(
+    (existingWOs ?? [])
+      .filter(wo => wo.trade_id === null && wo.trade_name)
+      .map(wo => wo.trade_name!.toLowerCase())
   )
 
   // Start sequence_order after any already-placed work orders
@@ -137,6 +144,11 @@ export async function POST(
     }
 
     if (!trade) {
+      // Skip if an unmatched work order with this trade name already exists
+      if (existingNullTradeNames.has(tradeNameLower)) {
+        console.log(`Unmatched work order already exists for trade "${tradeName}", skipping`)
+        continue
+      }
       console.log(`No contractor record found for trade "${tradeName}" — creating work order without trade assignment`)
     }
 
@@ -155,6 +167,7 @@ export async function POST(
         job_id: jobId,
         quote_id: quote.id,
         trade_id: trade?.id ?? null,
+        trade_name: tradeName,
         work_type: 'repair',
         scope_summary: `${items.length} items`,
         estimated_hours: totalHours,
@@ -196,9 +209,13 @@ export async function POST(
     sequenceOrder += 10
   }
 
+  const tradesInQuote = [...itemsByTrade.keys()]
   return NextResponse.json({
     success: true,
     workOrdersCreated,
-    message: `Created ${workOrdersCreated.length} work orders from quote`,
+    tradesInQuote,
+    message: workOrdersCreated.length > 0
+      ? `Created ${workOrdersCreated.length} work order${workOrdersCreated.length === 1 ? '' : 's'} from quote`
+      : `No new work orders created — all ${tradesInQuote.length} trade${tradesInQuote.length === 1 ? '' : 's'} in the quote already have work orders`,
   })
 }

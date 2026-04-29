@@ -217,19 +217,25 @@ export default function JobSchedule({
   useEffect(() => {
     // If workOrders are provided (interactive mode), use them directly
     if (providedWorkOrders && providedTrades) {
-      const workOrdersWithVisits: WorkOrderWithTrade[] = providedWorkOrders.map((wo: any) => ({
-        id: wo.id,
-        trade_id: wo.trade_id,
-        status: wo.status,
-        gary_state: wo.gary_state,
-        sequence_order: wo.sequence_order,
-        predecessor_work_order_id: wo.predecessor_work_order_id,
-        estimated_hours: wo.estimated_hours,
-        proximity_range: wo.proximity_range,
-        work_type: wo.work_type,
-        trades: wo.trade || providedTrades.find((t: any) => t.id === wo.trade_id),
-        visits: wo.visits || []
-      }))
+      const workOrdersWithVisits: WorkOrderWithTrade[] = providedWorkOrders.map((wo: any) => {
+        const contractorRecord = wo.trade || providedTrades.find((t: any) => t.id === wo.trade_id)
+        // For unmatched trades, synthesise a minimal trades object from trade_name so the
+        // card shows the trade label instead of "Unknown Trade".
+        const tradesValue = contractorRecord ?? (wo.trade_name ? { primary_trade: wo.tradeTypeLabel || wo.trade_name } : null)
+        return {
+          id: wo.id,
+          trade_id: wo.trade_id,
+          status: wo.status,
+          gary_state: wo.gary_state,
+          sequence_order: wo.sequence_order,
+          predecessor_work_order_id: wo.predecessor_work_order_id,
+          estimated_hours: wo.estimated_hours,
+          proximity_range: wo.proximity_range,
+          work_type: wo.work_type,
+          trades: tradesValue,
+          visits: wo.visits || [],
+        }
+      })
       setWorkOrders(workOrdersWithVisits)
       setLoading(false)
 

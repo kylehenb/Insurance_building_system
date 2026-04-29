@@ -447,8 +447,9 @@ export function BottomPanel({
         const created = data.workOrdersCreated?.length ?? 0
         if (created > 0) {
           alert(`${created} work order${created === 1 ? '' : 's'} created.`)
+        } else {
+          alert(data.message ?? 'No new work orders created.')
         }
-        // No alert if 0 created — all matched trades already had work orders
       }
       onRefresh()
     } finally {
