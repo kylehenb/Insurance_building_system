@@ -44,11 +44,11 @@ export async function POST(
     return NextResponse.json({ error: 'Quotes must have the same quote_ref' }, { status: 400 })
   }
 
-  // Update the current quote to mark it as superseded
+  // Update the current quote to mark it as superseded (rejected + inactive)
   const { error: updateCurrentError } = await supabase
     .from('quotes')
     .update({
-      status: 'declined_superseded',
+      status: 'rejected',
       is_active_version: false,
     })
     .eq('id', quoteId)

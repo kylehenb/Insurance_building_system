@@ -1,10 +1,8 @@
 'use client'
 
-import React, { useRef, useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import React, { useState } from 'react'
 import { type WorkOrderWithDetails, type WorkOrderRow, type TradeRow, woIsSent } from './types'
 import { WorkOrderCard } from './WorkOrderCard'
-import type { BlueprintDraftData } from '@/lib/types/scheduling'
 import {
   DndContext,
   closestCenter,
@@ -126,8 +124,6 @@ function DroppableColumn({
 }
 
 export interface BlueprintViewProps {
-  jobId:       string
-  tenantId:    string
   workOrders:  WorkOrderWithDetails[]
   trades:      TradeRow[]
   expandedIds: Set<string>
@@ -142,7 +138,6 @@ export interface BlueprintViewProps {
   onReorder:   (orderedIds: string[]) => void
   onReorderVisits: (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => void
   onSetParent: (id: string, parentId: string | null, offsetDays: number) => void
-  onDraftGenerated: () => void
 }
 
 export function BlueprintView({
@@ -159,15 +154,8 @@ export function BlueprintView({
   onSetPred,
   onReorder,
   onReorderVisits,
-  jobId,
-  tenantId,
-  onDraftGenerated,
 }: BlueprintViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [blueprintDraft, setBlueprintDraft] = useState<BlueprintDraftData | null>(null)
-  const [blueprintId, setBlueprintId] = useState<string | null>(null)
-  const [isConfirming, setIsConfirming] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -179,36 +167,6 @@ export function BlueprintView({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
-
-  const supabase = useRef(createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )).current
-
-  // Fetch blueprint draft on mount and when jobId changes
-  useEffect(() => {
-    async function fetchBlueprint() {
-      const { data } = await supabase
-        .from('job_schedule_blueprints')
-        .select('id, draft_data, status')
-        .eq('job_id', jobId)
-        .eq('tenant_id', tenantId)
-        .eq('status', 'draft')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (data) {
-        setBlueprintId(data.id)
-        setBlueprintDraft(data.draft_data as BlueprintDraftData)
-      } else {
-        setBlueprintId(null)
-        setBlueprintDraft(null)
-      }
-    }
-
-    fetchBlueprint()
-  }, [jobId, tenantId, supabase])
 
   const placed   = workOrders.filter(w => w.placementState !== 'unplaced')
   const unplaced = workOrders.filter(w => w.placementState === 'unplaced')
@@ -231,85 +189,6 @@ export function BlueprintView({
 
   // Sort all placed items by sequence_order
   placedItems.sort((a, b) => a.sequenceOrder - b.sequenceOrder)
-
-  async function handleGenerateDraft() {
-    console.log('[BlueprintView] handleGenerateDraft called', { jobId, tenantId, isGenerating })
-    if (isGenerating) return
-    setIsGenerating(true)
-
-    try {
-      console.log('[BlueprintView] Fetching /api/ai/draft-blueprint with', { jobId, tenantId })
-      const response = await fetch('/api/ai/draft-blueprint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, tenantId }),
-      })
-
-      console.log('[BlueprintView] Response status:', response.status)
-      const result = await response.json()
-      console.log('[BlueprintView] Response result:', result)
-
-      if (!response.ok) {
-        const errorMsg = result.error || 'Unknown error'
-        const errorDetails = result.details ? `\n\nDetails: ${result.details}` : ''
-        alert(`Failed to generate draft: ${errorMsg}${errorDetails}`)
-        console.error('Blueprint generation error:', result)
-        return
-      }
-
-      // Manually refetch the blueprint draft to update UI
-      const { data } = await supabase
-        .from('job_schedule_blueprints')
-        .select('id, draft_data, status')
-        .eq('job_id', jobId)
-        .eq('tenant_id', tenantId)
-        .eq('status', 'draft')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (data) {
-        setBlueprintId(data.id)
-        setBlueprintDraft(data.draft_data as BlueprintDraftData)
-      }
-
-      alert('Blueprint draft generated successfully! Review the draft and confirm to create work orders.')
-      onDraftGenerated?.()
-    } catch (error) {
-      console.error('Error generating draft:', error)
-      alert('Failed to generate draft. Please try again.')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  async function handleConfirmBlueprint() {
-    if (!blueprintId || isConfirming) return
-    setIsConfirming(true)
-
-    try {
-      const response = await fetch(`/api/jobs/${jobId}/blueprint/${blueprintId}/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        alert(`Failed to confirm blueprint: ${result.error || 'Unknown error'}`)
-        return
-      }
-
-      alert(`Blueprint confirmed! Created ${result.workOrdersCreated?.length || 0} work orders.`)
-      onDraftGenerated?.()
-    } catch (error) {
-      console.error('Error confirming blueprint:', error)
-      alert('Failed to confirm blueprint. Please try again.')
-    } finally {
-      setIsConfirming(false)
-    }
-  }
 
   // ── dnd-kit drag handlers ───────────────────────────────────────────────────
   function handleDragStart(event: DragStartEvent) {
@@ -566,48 +445,6 @@ export function BlueprintView({
           <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: '#9a9590' }}>
             {placed.length}
           </span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            {blueprintDraft && blueprintId && (
-              <button
-                onClick={handleConfirmBlueprint}
-                disabled={isConfirming}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: 10,
-                  fontWeight: 500,
-                  fontFamily: 'DM Sans, sans-serif',
-                  background: isConfirming ? '#9a9590' : '#c9a96e',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: isConfirming ? 'not-allowed' : 'pointer',
-                  letterSpacing: '.01em',
-                  transition: 'all .15s',
-                }}
-              >
-                {isConfirming ? 'Confirming...' : 'Confirm Blueprint'}
-              </button>
-            )}
-            <button
-              onClick={handleGenerateDraft}
-              disabled={isGenerating}
-              style={{
-                padding: '4px 12px',
-                fontSize: 10,
-                fontWeight: 500,
-                fontFamily: 'DM Sans, sans-serif',
-                background: isGenerating ? '#9a9590' : '#1a1a1a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 4,
-                cursor: isGenerating ? 'not-allowed' : 'pointer',
-                letterSpacing: '.01em',
-                transition: 'all .15s',
-              }}
-            >
-              {isGenerating ? 'Generating...' : 'Generate AI Draft'}
-            </button>
-          </div>
         </div>
 
         {/* Scroll area */}

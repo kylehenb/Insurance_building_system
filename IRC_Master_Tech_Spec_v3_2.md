@@ -88,6 +88,8 @@ CREATE TABLE tenants (
   account_number TEXT,                 -- Bank account number
   bank_name TEXT,                      -- Name of the bank
   account_name TEXT,                   -- Account holder name
+  invoice_payment_terms INTEGER DEFAULT 14, -- Payment terms in days for standard invoices
+  excess_payment_terms INTEGER DEFAULT 0,  -- Payment terms in days for excess invoices (0 = due immediately)
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```

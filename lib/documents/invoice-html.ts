@@ -15,6 +15,8 @@ export function generateInvoiceHtml(params: {
     account_name?: string | null
     building_licence_number?: string | null
     accounts_email?: string | null
+    invoice_payment_terms?: number | null
+    excess_payment_terms?: number | null
   }
   lineItems: InvoiceLineItem[]
 }): string {
@@ -36,7 +38,11 @@ export function generateInvoiceHtml(params: {
 
   const issueDateDisplay = formatDate(invoice.issued_date || invoice.created_at)
   const baseDate = invoice.issued_date || invoice.created_at || ''
-  const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString())
+  // Use tenant-configured payment terms, defaulting to 14 for standard invoices and 0 for excess
+  const paymentDays = invoice.invoice_type === 'excess'
+    ? (tenant.excess_payment_terms ?? 0)
+    : (tenant.invoice_payment_terms ?? 14)
+  const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + paymentDays * 24 * 60 * 60 * 1000).toISOString())
 
   // Build line items table HTML
   const lineItemsHtml = lineItems.map((item, idx) => `
@@ -223,9 +229,9 @@ export function generateInvoiceHtml(params: {
               </div>
               <div style="margin-bottom:14px;">
                 <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.2px;
-                  color:#9e998f;margin-bottom:6px;">Payment Terms</div>
+                  color:#9e998f;margin-bottom:6px;">Due Date</div>
                 <div style="font-size:14px;color:#1a1a1a;font-weight:600;">
-                  Due within 14 days
+                  ${dueDateDisplay}
                 </div>
               </div>
               <div style="background:#e8f4e8;border-left:3px solid #2d7d2d;padding:10px 12px;border-radius:4px;">

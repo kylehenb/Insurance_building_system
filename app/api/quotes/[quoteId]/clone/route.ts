@@ -107,11 +107,11 @@ export async function POST(
     }
   }
 
-  // Update the original quote to declined_superseded and inactive
+  // Update the original quote to rejected and inactive (superseded by new version)
   const { error: updateError } = await supabase
     .from('quotes')
     .update({
-      status: 'declined_superseded',
+      status: 'rejected',
       is_active_version: false,
     })
     .eq('id', quoteId)

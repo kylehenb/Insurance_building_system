@@ -252,7 +252,6 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               onReorder={handleReorder}
               onReorderVisits={handleReorderVisits}
               onSetParent={handleSetParent}
-              onDraftGenerated={() => refetch()}
             />
           ) : (
             <GanttView workOrders={workOrders} scale={view} />

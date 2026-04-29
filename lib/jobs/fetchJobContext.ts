@@ -40,7 +40,6 @@ export async function fetchJobContext(
     inspectionResult,
     quoteResult,
     reportResult,
-    blueprintResult,
     workOrderVisitsResult,
     tradeInvoicesResult,
     outboundInvoicesResult,
@@ -75,13 +74,6 @@ export async function fetchJobContext(
       .eq('job_id', jobId),
 
     supabaseClient
-      .from('job_schedule_blueprints')
-      .select('status, draft_data, id')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: false })
-      .limit(1),
-
-    supabaseClient
       .from('work_order_visits')
       .select('status')
       .eq('job_id', jobId),
@@ -109,7 +101,6 @@ export async function fetchJobContext(
   const inspectionRows = (inspectionResult.data as unknown as InspectionRow[] | null) ?? []
   const quoteRow = quoteResult.data?.[0] ?? null
   const reportRows = (reportResult.data as unknown as ReportRow[] | null) ?? []
-  const blueprintRow = blueprintResult.data?.[0] ?? null
 
   return {
     job: {
@@ -136,13 +127,6 @@ export async function fetchJobContext(
       status: row.status ?? '',
       version: row.version,
     })),
-    blueprint: blueprintRow
-      ? {
-          status: (blueprintRow as unknown as { status: string }).status ?? '',
-          draft_data: (blueprintRow as unknown as { draft_data: unknown }).draft_data ?? null,
-          id: (blueprintRow as unknown as { id: string }).id ?? null,
-        }
-      : null,
     work_order_visits: (workOrderVisitsResult.data ?? []).map((v) => ({
       status: (v as unknown as { status: string }).status ?? '',
     })),

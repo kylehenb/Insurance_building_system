@@ -50,80 +50,46 @@ interface ActionConfig {
 
 // ─── Status constants ─────────────────────────────────────────────────────────
 
-// Ordered list — determines forward vs backward when changing status manually.
-// Declined statuses sit at the end as terminal/side-branch states.
 const STATUS_ORDER = [
   'draft',
   'ready',
-  'sent_to_insurer',
-  'approved_contracts_pending',
-  'approved_contracts_sent',
-  'approved_contracts_signed',
-  'pre_repair',
-  'repairs_in_progress',
-  'repairs_complete_to_invoice',
-  'complete_and_invoiced',
-  'declined_superseded',
-  'declined_claim_declined',
+  'sent',
+  'approved',
+  'partially_approved',
+  'rejected',
 ]
 
 const STATUS_LABELS: Record<string, string> = {
-  draft:                       'Draft',
-  ready:                       'Ready',
-  sent_to_insurer:             'Sent to insurer',
-  approved_contracts_pending:  'Approved - Contracts pending',
-  approved_contracts_sent:     'Approved - Contracts sent',
-  approved_contracts_signed:   'Approved - Contracts signed',
-  pre_repair:                  'Pre-Repair',
-  repairs_in_progress:         'Repairs in progress',
-  repairs_complete_to_invoice: 'Repairs complete - to invoice',
-  complete_and_invoiced:       'Complete and Invoiced',
-  declined_superseded:         'Declined - Superseded',
-  declined_claim_declined:     'Declined - Claim Declined',
+  draft:             'Draft',
+  ready:             'Ready',
+  sent:              'Sent to insurer',
+  approved:          'Approved',
+  partially_approved:'Partially Approved',
+  rejected:          'Rejected',
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  draft:                       { bg: '#fff8e1', text: '#b45309' },
-  ready:                       { bg: '#e8f5e9', text: '#2e7d32' },
-  sent_to_insurer:             { bg: '#e8f0fe', text: '#1a73e8' },
-  approved_contracts_pending:  { bg: '#e8f5e9', text: '#2e7d32' },
-  approved_contracts_sent:     { bg: '#e8f0fe', text: '#1a73e8' },
-  approved_contracts_signed:   { bg: '#e8f5e9', text: '#2e7d32' },
-  pre_repair:                  { bg: '#fff3e0', text: '#e65100' },
-  repairs_in_progress:         { bg: '#fff3e0', text: '#e65100' },
-  repairs_complete_to_invoice: { bg: '#e8f0fe', text: '#1a73e8' },
-  complete_and_invoiced:       { bg: '#e8f5e9', text: '#2e7d32' },
-  declined_superseded:         { bg: '#fce8e6', text: '#c5221f' },
-  declined_claim_declined:     { bg: '#fce8e6', text: '#c5221f' },
+  draft:             { bg: '#fff8e1', text: '#b45309' },
+  ready:             { bg: '#e8f5e9', text: '#2e7d32' },
+  sent:              { bg: '#e8f0fe', text: '#1a73e8' },
+  approved:          { bg: '#e8f5e9', text: '#2e7d32' },
+  partially_approved:{ bg: '#fff3e0', text: '#e65100' },
+  rejected:          { bg: '#fce8e6', text: '#c5221f' },
 }
 
 const STATUS_ACTIONS: Record<string, ActionConfig> = {
-  draft:                       { label: 'Complete quote',              action: 'expand_quote' },
-  ready:                       { label: 'Send quote',                  action: 'send_quote_email' },
-  sent_to_insurer:             { label: 'Waiting on insurer',          action: 'inactive',            inactive: true },
-  approved_contracts_pending:  { label: 'Send contracts',              action: 'send_contracts_email' },
-  approved_contracts_sent:     { label: 'Receive signed contracts',    action: 'file_upload' },
-  approved_contracts_signed:   { label: 'Repairs in progress',         action: 'not_yet_built' },
-  pre_repair:                  { label: 'Create schedule and work orders', action: 'navigate_work_orders' },
-  repairs_in_progress:         { label: 'Complete repairs',            action: 'navigate_work_orders' },
-  repairs_complete_to_invoice: { label: 'Invoice these repairs',       action: 'navigate_invoices' },
-  complete_and_invoiced:       { label: 'Closed',                      action: 'inactive',            inactive: true },
-  declined_superseded:         { label: 'Closed',                      action: 'inactive',            inactive: true },
-  declined_claim_declined:     { label: 'Closed',                      action: 'inactive',            inactive: true },
+  draft:             { label: 'Complete quote',              action: 'expand_quote' },
+  ready:             { label: 'Send quote',                  action: 'send_quote_email' },
+  sent:              { label: 'Waiting on insurer',          action: 'inactive', inactive: true },
+  approved:          { label: 'View work orders',            action: 'navigate_work_orders' },
+  partially_approved:{ label: 'View work orders',            action: 'navigate_work_orders' },
+  rejected:          { label: 'Closed',                      action: 'inactive', inactive: true },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Map old DB status values to new keys so legacy data still renders correctly. */
 function normalizeStatus(status: string): string {
-  const legacy: Record<string, string> = {
-    sent:               'sent_to_insurer',
-    approved:           'approved_contracts_pending',
-    partially_approved: 'approved_contracts_pending',
-    rejected:           'declined_claim_declined',
-  }
-  const lower = (status ?? 'draft').toLowerCase()
-  return legacy[lower] ?? lower
+  return (status ?? 'draft').toLowerCase()
 }
 
 function getStatusIndex(status: string): number {
@@ -514,18 +480,12 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
       // Map quote statuses to job stages
       const quoteStatusToJobStage: Record<string, string> = {
-        'draft': 'order_received',
-        'ready': 'order_received',
-        'sent_to_insurer': 'sent_awaiting_approval',
-        'approved_contracts_pending': 'approved_awaiting_signoff',
-        'approved_contracts_sent': 'approved_awaiting_signoff',
-        'approved_contracts_signed': 'signed_build_schedule',
-        'pre_repair': 'repairs_in_progress',
-        'repairs_in_progress': 'repairs_in_progress',
-        'repairs_complete_to_invoice': 'complete_and_invoiced',
-        'complete_and_invoiced': 'complete_and_invoiced',
-        'declined_superseded': 'declined_close_out',
-        'declined_claim_declined': 'declined_close_out',
+        'draft':             'order_received',
+        'ready':             'order_received',
+        'sent':              'sent_awaiting_approval',
+        'approved':          'approved_awaiting_signoff',
+        'partially_approved':'approved_awaiting_signoff',
+        'rejected':          'declined_close_out',
       }
 
       // Check if any quote has reached target stage or later
@@ -1308,7 +1268,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (sendDialogQuoteId) {
-                    await handleStatusChange(sendDialogQuoteId, 'sent_to_insurer', true)
+                    await handleStatusChange(sendDialogQuoteId, 'sent', true)
                     // Only change job stage if no quote has already reached sent_awaiting_approval or later
                     if (!hasQuoteReachedStageOrLater('sent_awaiting_approval')) {
                       await handleJobStageChange(jobId, 'sent_awaiting_approval')
@@ -1480,7 +1440,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                   tenantId,
-                                  status: 'declined_superseded',
+                                  status: 'rejected',
                                   is_locked: true,
                                   approval_notes: rejectionReason,
                                 }),
@@ -1497,7 +1457,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               tenantId,
-                              status: 'declined_claim_declined',
+                              status: 'rejected',
                               is_locked: true,
                               approval_notes: rejectionReason,
                             }),
@@ -1565,8 +1525,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (approveDialogQuoteId) {
-                    await handleStatusChange(approveDialogQuoteId, 'approved_contracts_pending', true)
-                    // Only change job stage if no quote has already reached approved_awaiting_signoff or later
+                    await handleStatusChange(approveDialogQuoteId, 'approved', true)
                     if (!hasQuoteReachedStageOrLater('approved_awaiting_signoff')) {
                       await handleJobStageChange(jobId, 'approved_awaiting_signoff')
                     }
@@ -1897,8 +1856,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         })
                       }
                     }
-                    await handleStatusChange(partialApproveDialogQuoteId, 'approved_contracts_pending', true)
-                    // Only change job stage if no quote has already reached approved_awaiting_signoff or later
+                    await handleStatusChange(partialApproveDialogQuoteId, 'partially_approved', true)
                     if (!hasQuoteReachedStageOrLater('approved_awaiting_signoff')) {
                       await handleJobStageChange(jobId, 'approved_awaiting_signoff')
                     }
@@ -2188,7 +2146,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 )}
 
                 {/* Rejection reason badge */}
-                {(q.status === 'declined_claim_declined' || q.status === 'declined_superseded') && q.approval_notes && (
+                {q.status === 'rejected' && q.approval_notes && (
                   <span
                     style={{
                       padding: '1px 7px',
@@ -2288,7 +2246,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 )}
 
                 {/* Sent: Approve and Reject buttons */}
-                {q.status === 'sent_to_insurer' && (
+                {q.status === 'sent' && (
                   <>
                     <button
                       onClick={e => {
@@ -2340,7 +2298,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 )}
 
                 {/* Approved: Send for Signature button (primary quote only) */}
-                {(q.status === 'approved_contracts_pending' || q.status === 'approved_contracts_sent' || q.status === 'approved_contracts_signed') && (() => {
+                {(q.status === 'approved' || q.status === 'partially_approved') && (() => {
                   const primaryQuote = quotes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0]
                   const isPrimary = primaryQuote && primaryQuote.id === q.id
                   return isPrimary
@@ -2401,8 +2359,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   </>
                 )}
 
-                {/* Superseded: Show Superseded text */}
-                {q.status === 'declined_superseded' && (
+                {/* Rejected/Superseded: Show label */}
+                {q.status === 'rejected' && !q.is_locked && (
                   <span
                     style={{
                       fontFamily: 'DM Sans, sans-serif',
@@ -2413,7 +2371,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       flexShrink: 0,
                     }}
                   >
-                    Superseded
+                    Rejected
                   </span>
                 )}
 
@@ -2600,9 +2558,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         </span>
                       </button>
                       {/* Building Contract - only show for approved quotes */}
-                      {(q.status === 'approved_contracts_pending' ||
-                        q.status === 'approved_contracts_sent' ||
-                        q.status === 'approved_contracts_signed') && (
+                      {(q.status === 'approved' || q.status === 'partially_approved') && (
                         <button
                           onClick={e => {
                             e.stopPropagation()

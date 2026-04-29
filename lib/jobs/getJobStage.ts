@@ -46,11 +46,6 @@ export type JobContext = {
     status: string
     version: number
   }>
-  blueprint: {
-    status: string
-    draft_data: unknown | null
-    id: string | null
-  } | null
   work_order_visits: Array<{ status: string }>
   trade_invoices: Array<{ status: string }>
   outbound_invoices: Array<{ status: string }>
@@ -224,7 +219,7 @@ function buildStage(
 }
 
 export function getJobStage(context: JobContext): JobStage {
-  const { job, insurer_orders, inspections, primary_quote, reports, blueprint,
+  const { job, insurer_orders, inspections, primary_quote, reports,
     work_order_visits, trade_invoices, outbound_invoices, open_loops } = context
 
   // 1. on_hold
@@ -324,10 +319,10 @@ export function getJobStage(context: JobContext): JobStage {
     return buildStage('declined_close_out', open_loops)
   }
 
-  // 9. approved_awaiting_signoff — approved, signoff not yet sent
+  // 9. approved_awaiting_signoff — approved or partially approved, signoff not yet sent
   if (
     primary_quote !== null &&
-    primary_quote.status === 'approved' &&
+    (primary_quote.status === 'approved' || primary_quote.status === 'partially_approved') &&
     job.homeowner_signoff_sent_at === null
   ) {
     return buildStage('approved_awaiting_signoff', open_loops)
@@ -341,18 +336,17 @@ export function getJobStage(context: JobContext): JobStage {
     return buildStage('awaiting_signed_document', open_loops)
   }
 
-  // 11. signed_build_schedule — signoff received, no confirmed blueprint
+  // 11. signed_build_schedule — signoff received, all visits still unscheduled (schedule not yet sent)
   if (
     job.homeowner_signoff_received_at !== null &&
-    (blueprint === null || blueprint.status === 'draft')
+    work_order_visits.every((v) => v.status === 'unscheduled')
   ) {
     return buildStage('signed_build_schedule', open_loops)
   }
 
-  // 12. repairs_in_progress — blueprint confirmed, some visits not complete
+  // 12. repairs_in_progress — signoff received, visits progressed, not all complete
   if (
-    blueprint !== null &&
-    blueprint.status === 'confirmed' &&
+    job.homeowner_signoff_received_at !== null &&
     work_order_visits.some((v) => v.status !== 'complete')
   ) {
     return buildStage('repairs_in_progress', open_loops)

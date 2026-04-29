@@ -17,7 +17,6 @@ function buildContext(overrides: Partial<JobContext> = {}): JobContext {
     inspections: [],
     primary_quote: null,
     reports: [],
-    blueprint: null,
     work_order_visits: [],
     trade_invoices: [],
     outbound_invoices: [],
@@ -176,7 +175,7 @@ describe('getJobStage', () => {
     expect(stage.isWaiting).toBe(true)
   })
 
-  it('signoff received, no blueprint yet', () => {
+  it('signoff received, no work order visits yet', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
@@ -195,14 +194,14 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
       },
-      blueprint: null,
+      work_order_visits: [],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('signed_build_schedule')
     expect(stage.primaryAction?.actionKey).toBe('build_schedule')
   })
 
-  it('blueprint confirmed, visits in progress', () => {
+  it('signoff received, all visits still unscheduled', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
@@ -221,13 +220,63 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
+      work_order_visits: [{ status: 'unscheduled' }, { status: 'unscheduled' }],
+    })
+    const stage = getJobStage(ctx)
+    expect(stage.key).toBe('signed_build_schedule')
+    expect(stage.primaryAction?.actionKey).toBe('build_schedule')
+  })
+
+  it('signoff received, visits in progress', () => {
+    const ctx = buildContext({
+      inspections: [{
+        id: 'insp-1',
+        status: 'complete',
+        form_submitted_at: '2025-06-01T10:00:00Z',
+        no_show_count: 0,
+        last_no_show_at: null,
+      }],
+      primary_quote: { status: 'approved' },
+      job: {
+        id: 'job-1',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
+        homeowner_signoff_sent_at: '2025-06-10T10:00:00Z',
+        homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
+        completion_approved_at: null,
+      },
       work_order_visits: [{ status: 'confirmed' }, { status: 'complete' }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('repairs_in_progress')
     expect(stage.primaryAction).toBeNull()
     expect(stage.isWaiting).toBe(true)
+  })
+
+  it('partially approved quote triggers approved_awaiting_signoff', () => {
+    const ctx = buildContext({
+      inspections: [{
+        id: 'insp-1',
+        status: 'complete',
+        form_submitted_at: '2025-06-01T10:00:00Z',
+        no_show_count: 0,
+        last_no_show_at: null,
+      }],
+      primary_quote: { status: 'partially_approved' },
+      job: {
+        id: 'job-1',
+        override_stage: null,
+        current_stage: null,
+        current_stage_updated_at: null,
+        homeowner_signoff_sent_at: null,
+        homeowner_signoff_received_at: null,
+        completion_approved_at: null,
+      },
+    })
+    const stage = getJobStage(ctx)
+    expect(stage.key).toBe('approved_awaiting_signoff')
+    expect(stage.primaryAction?.actionKey).toBe('send_for_signature')
   })
 
   it('all visits complete, no completion approval', () => {
@@ -249,7 +298,6 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }, { status: 'complete' }],
     })
     const stage = getJobStage(ctx)
@@ -276,7 +324,6 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'received' }],
     })
@@ -304,7 +351,6 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'approved' }, { status: 'approved' }],
       outbound_invoices: [],
@@ -333,7 +379,6 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'approved' }],
       outbound_invoices: [{ status: 'sent' }],
@@ -363,7 +408,6 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: '2025-07-01T10:00:00Z',
       },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'approved' }],
       outbound_invoices: [{ status: 'paid' }],
@@ -394,7 +438,6 @@ describe('getJobStage', () => {
         last_no_show_at: null,
       }],
       primary_quote: { status: 'approved' },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'approved' }],
       outbound_invoices: [{ status: 'sent' }],
@@ -424,7 +467,6 @@ describe('getJobStage', () => {
         last_no_show_at: null,
       }],
       primary_quote: { status: 'approved' },
-      blueprint: { status: 'confirmed', draft_data: null, id: 'bp-1' },
       work_order_visits: [{ status: 'complete' }],
       trade_invoices: [{ status: 'approved' }],
       outbound_invoices: [{ status: 'paid' }],

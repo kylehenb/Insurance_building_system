@@ -219,17 +219,7 @@ export async function PATCH(
     await recomputeAndSaveStage(data.job_id)
 
     // Auto-create unplaced work orders when quote is approved
-    const APPROVED_STATUSES = [
-      'approved_contracts_pending',
-      'approved_contracts_sent',
-      'approved_contracts_signed',
-      'pre_repair',
-      'repairs_in_progress',
-      'repairs_complete_to_invoice',
-      'complete_and_invoiced',
-      'approved',
-      'partially_approved',
-    ]
+    const APPROVED_STATUSES = ['approved', 'partially_approved']
 
     if (APPROVED_STATUSES.includes(safeUpdates.status as string)) {
       await createUnplacedWorkOrdersFromQuote(data.id, data.job_id, tenantId as string)
