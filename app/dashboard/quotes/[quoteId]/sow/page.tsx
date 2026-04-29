@@ -141,23 +141,39 @@ export default async function SowPrintPage({
             <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
-          {/* Column 2: Job details (flex: 1) */}
-          <div style={{ flex: 1, padding: '14px 16px', borderRight: '1px solid #e0dbd4' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>JOB DETAILS</div>
-            {job.insured_name && (
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{job.insured_name}</div>
-            )}
-            {job.property_address && (
-              <div style={{ fontSize: '13px', color: '#9e998f', marginBottom: '10px' }}>{job.property_address}</div>
-            )}
-            {/* Field strip */}
+          {/* Column 2: SOW details (flex: 1) */}
+          <div style={{ flex: 1, padding: '14px 10px', borderRight: '1px solid #e0dbd4' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>SOW DETAILS</div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#9e998f' }}>SOW Reference: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{quote.quote_ref}-SOW</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#9e998f' }}>Authorised for: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{job.insured_name || '—'}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
+              {[
+                { label: 'SOW Date', value: formatDate(quote.created_at) },
+                { label: 'Quote Ref', value: quote.quote_ref },
+              ].filter(f => f.value).map((field, i, arr) => (
+                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
+                  <span style={{ color: '#b0a89e' }}>{field.label}: </span>
+                  <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
+                </span>
+              ))}
+            </div>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginTop: '12px', marginBottom: '7px' }}>JOB DETAILS</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px' }}>
               {[
-                { label: 'Insurer',  value: job.insurer },
+                { label: 'Insurer', value: job.insurer },
+                { label: 'Property Address', value: job.property_address },
+                { label: 'Insured', value: job.insured_name },
                 { label: 'Claim #', value: job.claim_number },
-                { label: 'Adjuster', value: job.adjuster },
-                { label: 'Date',     value: formatDate(quote.created_at) },
-              ].map((field, i, arr) => (
+                { label: 'Job #', value: job.job_number },
+              ].filter(f => f.value).map((field, i, arr) => (
                 <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
                   <span style={{ color: '#b0a89e' }}>{field.label}: </span>
                   <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
@@ -166,18 +182,12 @@ export default async function SowPrintPage({
             </div>
           </div>
 
-          {/* Column 3: Contact (184px fixed) */}
-          <div style={{ width: '184px', minWidth: '184px', padding: '14px 20px 14px 16px' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>CONTACT</div>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', marginBottom: '3px' }}>Kyle Bindon</div>
-            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>kyle@insurancerepairco.com.au</div>
-            <div style={{ fontSize: '12px', color: '#9e998f', marginBottom: '2px' }}>0431 132 077</div>
-            {/* Badge row */}
-            <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-              {['BC105884', 'IICRC Certified'].map(badge => (
-                <span key={badge} style={{ fontSize: '9.5px', background: '#f5f2ee', color: '#6a6460', border: '1px solid #e0dbd4', borderRadius: '3px', padding: '2px 6px', fontWeight: '700' }}>{badge}</span>
-              ))}
-            </div>
+          {/* Column 3: Tenant contact (184px fixed) */}
+          <div style={{ width: '184px', minWidth: '184px', padding: '14px 26px 14px 10px' }}>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>INSURANCE REPAIR CO</div>
+            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.address || '—'}</div>
+            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.contact_email || '—'}</div>
+            <div style={{ fontSize: '10px', color: '#3a3530' }}>{tenant.contact_phone || '—'}</div>
           </div>
         </div>
 
@@ -394,22 +404,22 @@ export default async function SowPrintPage({
 
       {/* Footer */}
       <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Small logo circle */}
-        <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <img src="/logo.png?v=1" alt="IRC" style={{ height: '16px' }} />
-        </div>
-        {/* Company name block */}
+        {tenant.logo_storage_path ? (
+          <img 
+            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`} 
+            alt="Tenant Logo" 
+            style={{ width: '26px', height: '26px', objectFit: 'contain', flexShrink: 0 }} 
+          />
+        ) : (
+          <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: '#c8b89a', fontStyle: 'italic' }}>IRC.</div>
+        )}
         <div>
-          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee', textAlign: 'center' }}>INSURANCE REPAIR CO PTY LTD</div>
-          <div style={{ fontSize: '10px', color: '#c8b89a', textAlign: 'center' }}>Building &amp; Restoration</div>
+          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>{tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}</div>
+          <div style={{ fontSize: '10px', color: '#c8b89a' }}>Building &amp; Restoration</div>
         </div>
-        {/* Vertical divider */}
         <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
-        {/* License text */}
-        <span style={{ fontSize: '12px', color: '#c8b89a' }}>BC105884 · IICRC Certified</span>
-        {/* Spacer */}
+        <span style={{ fontSize: '12px', color: '#c8b89a' }}>{(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}</span>
         <div style={{ flex: 1 }}></div>
-        {/* Right side reserved */}
       </div>
     </div>
   )

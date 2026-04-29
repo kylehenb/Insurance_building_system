@@ -54,6 +54,16 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .order('sort_order', { ascending: true })
 
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', tenantId)
+      .single()
+
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 400 })
+    }
+
     if (!job.insured_email) {
       return NextResponse.json(
         { error: 'No insured email on file. Please add one before sending.' },
@@ -61,7 +71,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const html = generateSowHtml({ quote, job, scopeItems: scopeItems || [] })
+    const html = generateSowHtml({ quote, job, scopeItems: scopeItems || [], tenant })
 
     const puppeteerRes = await fetch(`${process.env.PDF_SERVICE_URL}/generate`, {
       method: 'POST',

@@ -1653,10 +1653,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               <button
                 onClick={async () => {
                   if (sendForSignatureQuoteId) {
-                    // Only change job stage if no quote has already reached awaiting_signed_document or later
-                    if (!hasQuoteReachedStageOrLater('awaiting_signed_document')) {
-                      await handleJobStageChange(jobId, 'awaiting_signed_document')
-                    }
+                    await handleJobStageChange(jobId, 'awaiting_signed_document')
                     setSendForSignatureQuoteId(null)
                   }
                 }}

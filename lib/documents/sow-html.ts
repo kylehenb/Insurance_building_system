@@ -3,13 +3,17 @@ import type { Database } from '@/lib/supabase/database.types'
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
+type Tenant = Database['public']['Tables']['tenants']['Row']
 
 export function generateSowHtml(params: {
   quote: Quote
   job: Job
   scopeItems: ScopeItem[]
+  tenant: Tenant & {
+    building_licence_number?: string | null
+  }
 }): string {
-  const { quote, job, scopeItems } = params
+  const { quote, job, scopeItems, tenant } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -129,25 +133,46 @@ export function generateSowHtml(params: {
   <div style="display:flex;align-items:stretch;background:white;">
     <div style="width:148px;min-width:148px;padding:14px 8px 14px 20px;
       border-right:1px solid #e0dbd4;">
+      <img src="/logo-alt.png" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;
-        color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">
-        INSURANCE REPAIR CO
-      </div>
+        color:#9e998f;font-weight:700;white-space:nowrap;">INSURANCE REPAIR CO</div>
     </div>
-    <div style="flex:1;padding:14px 16px;border-right:1px solid #e0dbd4;">
+    <div style="flex:1;padding:14px 10px;border-right:1px solid #e0dbd4;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:7px;">JOB DETAILS</div>
-      ${job.insured_name ? `<div style="font-size:16px;font-weight:600;color:#1a1a1a;
-        margin-bottom:2px;">${job.insured_name}</div>` : ''}
-      ${job.property_address ? `<div style="font-size:13px;color:#9e998f;
-        margin-bottom:10px;">${job.property_address}</div>` : ''}
+        color:#b0a89e;font-weight:700;margin-bottom:7px;">SOW DETAILS</div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#9e998f;">SOW Reference: </span>
+          <span style="font-size:14px;font-weight:600;color:#1a1a1a;">
+            ${quote.quote_ref}-SOW</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="font-size:11px;color:#9e998f;">Authorised for: </span>
+          <span style="font-size:14px;font-weight:600;color:#1a1a1a;">
+            ${job.insured_name || '—'}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
+        ${[
+          { label: 'SOW Date', value: formatDate(quote.created_at) },
+          { label: 'Quote Ref', value: quote.quote_ref },
+        ].filter(f => f.value).map((field, i, arr) => `
+          <span style="padding-right:8px;margin-right:8px;
+            border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
+            <span style="color:#b0a89e;">${field.label}: </span>
+            <span style="color:#3a3530;">${field.value || '—'}</span>
+          </span>`).join('')}
+      </div>
+      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-top:12px;margin-bottom:7px;">JOB DETAILS</div>
       <div style="display:flex;flex-wrap:wrap;font-size:12px;">
         ${[
           { label: 'Insurer', value: job.insurer },
+          { label: 'Property Address', value: job.property_address },
+          { label: 'Insured', value: job.insured_name },
           { label: 'Claim #', value: job.claim_number },
-          { label: 'Adjuster', value: job.adjuster },
-          { label: 'Date', value: formatDate(quote.created_at) },
-        ].map((field, i, arr) => `
+          { label: 'Job #', value: job.job_number },
+        ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
             border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
             <span style="color:#b0a89e;">${field.label}: </span>
@@ -155,22 +180,12 @@ export function generateSowHtml(params: {
           </span>`).join('')}
       </div>
     </div>
-    <div style="width:184px;min-width:184px;padding:14px 20px 14px 16px;">
-      <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:7px;">CONTACT</div>
-      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px;">
-        Kyle Bindon</div>
-      <div style="font-size:12px;color:#9e998f;margin-bottom:2px;">
-        kyle@insurancerepairco.com.au</div>
-      <div style="font-size:12px;color:#9e998f;margin-bottom:2px;">0431 132 077</div>
-      <div style="display:flex;gap:4px;margin-top:8px;">
-        <span style="font-size:9.5px;background:#f5f2ee;color:#6a6460;
-          border:1px solid #e0dbd4;border-radius:3px;padding:2px 6px;
-          font-weight:700;">BC105884</span>
-        <span style="font-size:9.5px;background:#f5f2ee;color:#6a6460;
-          border:1px solid #e0dbd4;border-radius:3px;padding:2px 6px;
-          font-weight:700;">IICRC Certified</span>
-      </div>
+    <div style="width:184px;min-width:184px;padding:14px 26px 14px 10px;">
+      <div style="font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
+        color:#b0a89e;font-weight:700;margin-bottom:7px;">INSURANCE REPAIR CO</div>
+      <div style="font-size:10px;color:#3a3530;margin-bottom:3px;">${tenant.address || '—'}</div>
+      <div style="font-size:10px;color:#3a3530;margin-bottom:3px;">${tenant.contact_email || '—'}</div>
+      <div style="font-size:10px;color:#3a3530;">${tenant.contact_phone || '—'}</div>
     </div>
   </div>
 
@@ -348,17 +363,22 @@ export function generateSowHtml(params: {
   <!-- FOOTER -->
   <div style="background:#1a1a1a;padding:9px 16px;display:flex;align-items:center;
     gap:10px;">
+    ${tenant.logo_storage_path ? `
+    <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}" 
+      alt="Tenant Logo" style="width:26px;height:26px;object-fit:contain;flex-shrink:0;" />
+    ` : `
     <div style="width:26px;height:26px;border:1.5px solid #c8b89a;border-radius:50%;
       display:flex;align-items:center;justify-content:center;flex-shrink:0;
       font-size:9px;font-weight:800;color:#c8b89a;font-style:italic;">IRC.</div>
+    `}
     <div>
       <div style="font-size:7.5px;font-weight:700;letter-spacing:1.5px;
-        text-transform:uppercase;color:#f5f2ee;">INSURANCE REPAIR CO PTY LTD</div>
+        text-transform:uppercase;color:#f5f2ee;">${tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}</div>
       <div style="font-size:10px;color:#c8b89a;">Building &amp; Restoration</div>
     </div>
     <div style="width:1px;height:22px;background:#c8b89a;margin:0 4px;
       flex-shrink:0;"></div>
-    <span style="font-size:12px;color:#c8b89a;">BC105884 · IICRC Certified</span>
+    <span style="font-size:12px;color:#c8b89a;">${(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN ${tenant.abn || '—'} • BUILDERS LIC. ${tenant.building_licence_number || '—'}</span>
     <div style="flex:1;"></div>
   </div>
 
