@@ -20,6 +20,7 @@ interface ContactsEditorProps {
   contacts: JobContact[]
   onChange: (contacts: JobContact[]) => void
   readOnly?: boolean
+  hideInsured?: boolean
 }
 
 const ROLE_LABELS: Record<ContactRole, string> = {
@@ -42,18 +43,18 @@ const ADDITIONAL_CONTACT_TYPES: { value: AdditionalContactType; label: string }[
 
 const EXCLUSIVE_ROLES: ContactRole[] = ['auth', 'primary_site', 'secondary_site']
 
-export default function ContactsEditor({ contacts, onChange, readOnly = false }: ContactsEditorProps) {
+export default function ContactsEditor({ contacts, onChange, readOnly = false, hideInsured = false }: ContactsEditorProps) {
   const [localContacts, setLocalContacts] = useState<JobContact[]>(contacts)
-  const [showAdditional1, setShowAdditional1] = useState(false)
+  const [showAdditional1, setShowAdditional1] = useState(hideInsured)
   const [showAdditional2, setShowAdditional2] = useState(false)
   const [showNotice, setShowNotice] = useState(false)
 
   useEffect(() => {
     setLocalContacts(contacts)
     // Show additional slots if they have data
-    setShowAdditional1(contacts.some(c => c.slot === 'additional_1'))
+    setShowAdditional1(contacts.some(c => c.slot === 'additional_1') || hideInsured)
     setShowAdditional2(contacts.some(c => c.slot === 'additional_2'))
-  }, [contacts])
+  }, [contacts, hideInsured])
 
   // Validation
   const hasAuth = localContacts.some(c => c.roles.includes('auth'))
@@ -193,88 +194,90 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false }:
       )}
 
       {/* Insured contact card */}
-      <Card style={{ marginBottom: 12, border: '0.5px solid #e4dfd8' }}>
-        <CardContent style={{ padding: '16px' }}>
-          <div style={{ 
-            fontSize: 10, 
-            fontWeight: 600, 
-            color: '#9e998f', 
-            textTransform: 'uppercase', 
-            letterSpacing: '0.07em',
-            marginBottom: 12 
-          }}>
-            Insured
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
-            <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
-              <Input
-                value={localContacts.find(c => c.slot === 'insured')?.name || ''}
-                onChange={e => {
-                  const idx = localContacts.findIndex(c => c.slot === 'insured')
-                  if (idx !== -1) updateContact(idx, { name: e.target.value })
-                }}
-                disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-              />
+      {!hideInsured && (
+        <Card style={{ marginBottom: 12, border: '0.5px solid #e4dfd8' }}>
+          <CardContent style={{ padding: '16px' }}>
+            <div style={{ 
+              fontSize: 10, 
+              fontWeight: 600, 
+              color: '#9e998f', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.07em',
+              marginBottom: 12 
+            }}>
+              Insured
             </div>
-            <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
-              <Input
-                value={localContacts.find(c => c.slot === 'insured')?.phone || ''}
-                onChange={e => {
-                  const idx = localContacts.findIndex(c => c.slot === 'insured')
-                  if (idx !== -1) updateContact(idx, { phone: e.target.value })
-                }}
-                disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-              />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
-              <Input
-                type="email"
-                value={localContacts.find(c => c.slot === 'insured')?.email || ''}
-                onChange={e => {
-                  const idx = localContacts.findIndex(c => c.slot === 'insured')
-                  if (idx !== -1) updateContact(idx, { email: e.target.value })
-                }}
-                disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-              />
-            </div>
-          </div>
-
-          {/* Role pills */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {Object.entries(ROLE_LABELS).map(([role, label]) => {
-              const contact = localContacts.find(c => c.slot === 'insured')
-              const hasRole = contact?.roles.includes(role as ContactRole)
-              const isLocked = role === 'insured'
-              
-              return (
-                <Badge
-                  key={role}
-                  variant={hasRole ? 'default' : 'outline'}
-                  style={{
-                    fontSize: 11,
-                    cursor: readOnly || isLocked ? 'default' : 'pointer',
-                    opacity: isLocked ? 0.7 : 1,
-                    background: hasRole ? '#1a1a1a' : 'transparent',
-                    color: hasRole ? '#f5f2ee' : '#6b6763',
-                    border: hasRole ? 'none' : '0.5px solid #e4dfd8',
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
+              <div>
+                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+                <Input
+                  value={localContacts.find(c => c.slot === 'insured')?.name || ''}
+                  onChange={e => {
+                    const idx = localContacts.findIndex(c => c.slot === 'insured')
+                    if (idx !== -1) updateContact(idx, { name: e.target.value })
                   }}
-                  onClick={() => !readOnly && !isLocked && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role as ContactRole)}
-                >
-                  {label}
-                  {isLocked && ' (locked)'}
-                </Badge>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                  disabled={readOnly}
+                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                />
+              </div>
+              <div>
+                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+                <Input
+                  value={localContacts.find(c => c.slot === 'insured')?.phone || ''}
+                  onChange={e => {
+                    const idx = localContacts.findIndex(c => c.slot === 'insured')
+                    if (idx !== -1) updateContact(idx, { phone: e.target.value })
+                  }}
+                  disabled={readOnly}
+                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+                <Input
+                  type="email"
+                  value={localContacts.find(c => c.slot === 'insured')?.email || ''}
+                  onChange={e => {
+                    const idx = localContacts.findIndex(c => c.slot === 'insured')
+                    if (idx !== -1) updateContact(idx, { email: e.target.value })
+                  }}
+                  disabled={readOnly}
+                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                />
+              </div>
+            </div>
+
+            {/* Role pills */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {Object.entries(ROLE_LABELS).map(([role, label]) => {
+                const contact = localContacts.find(c => c.slot === 'insured')
+                const hasRole = contact?.roles.includes(role as ContactRole)
+                const isLocked = role === 'insured'
+                
+                return (
+                  <Badge
+                    key={role}
+                    variant={hasRole ? 'default' : 'outline'}
+                    style={{
+                      fontSize: 11,
+                      cursor: readOnly || isLocked ? 'default' : 'pointer',
+                      opacity: isLocked ? 0.7 : 1,
+                      background: hasRole ? '#1a1a1a' : 'transparent',
+                      color: hasRole ? '#f5f2ee' : '#6b6763',
+                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
+                    }}
+                    onClick={() => !readOnly && !isLocked && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role as ContactRole)}
+                  >
+                    {label}
+                    {isLocked && ' (locked)'}
+                  </Badge>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Additional contact 1 */}
       {showAdditional1 && (

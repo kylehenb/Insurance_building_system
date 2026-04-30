@@ -486,6 +486,9 @@ function JobDetailsAccordion({
                 { label: 'Claim #', field: 'claim_number' },
                 { label: 'Loss Type', field: 'loss_type' },
                 { label: 'Adjuster', field: 'adjuster' },
+                { label: 'Adjuster Reference', field: 'adjuster_reference' },
+                { label: 'Claim Manager Name', field: 'order_sender_name' },
+                { label: 'Claim Manager Email', field: 'order_sender_email' },
                 { label: 'Assigned To', field: 'assigned_to' },
               ] as { label: string; field: keyof EditFields }[]
             ).map(({ label, field }) => (
@@ -494,6 +497,7 @@ function JobDetailsAccordion({
                 {editing ? (
                   <input
                     className="ov-edit-input"
+                    type={field === 'order_sender_email' ? 'email' : 'text'}
                     value={vals[field]}
                     onChange={e => set(field, e.target.value)}
                   />
@@ -589,42 +593,14 @@ function JobDetailsAccordion({
 
           {/* Right: Contacts */}
           <div>
-            <div style={subLabel()}>Contacts</div>
-            <div style={accentLabel()}>Insured</div>
-
-            {(
-              [
-                { label: 'Name', field: 'insured_name' },
-                { label: 'Phone', field: 'insured_phone' },
-                { label: 'Email', field: 'insured_email' },
-                { label: 'Address', field: 'property_address' },
-              ] as { label: string; field: keyof EditFields }[]
-            ).map(({ label, field }) => (
-              <div key={label} className="ov-detail-row">
-                <span className="ov-detail-label">{label}</span>
-                {editing ? (
-                  <input
-                    className="ov-edit-input"
-                    type={field === 'insured_email' ? 'email' : 'text'}
-                    value={vals[field]}
-                    onChange={e => set(field, e.target.value)}
-                  />
-                ) : (
-                  <span className="ov-detail-value">
-                    {(saved[field as keyof JobDetails] as string) || '—'}
-                  </span>
-                )}
-              </div>
-            ))}
-
-            {/* Contacts Editor */}
-            <div style={accentLabel({ marginTop: 14 })}>Contacts</div>
+            <div style={subLabel()}>Additional Contacts</div>
             {editing ? (
               <ContactsEditor
                 contacts={(job.contacts as unknown as JobContact[]) || []}
                 onChange={(contacts) => {
                   // Will be saved separately
                 }}
+                hideInsured={true}
               />
             ) : (
               <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
@@ -632,22 +608,6 @@ function JobDetailsAccordion({
               </p>
             )}
 
-            {/* Insurer Email Fields */}
-            <div style={accentLabel({ marginTop: 16 })}>Order Sender & Adjuster</div>
-            {editing ? (
-              <InsurerEmailFields
-                orderSenderName={vals.order_sender_name}
-                orderSenderEmail={vals.order_sender_email}
-                adjusterReference={vals.adjuster_reference}
-                onChange={(field, value) => set(field as keyof EditFields, value)}
-              />
-            ) : (
-              <div style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65 }}>
-                <div>Order Sender Name: {saved.order_sender_name || '—'}</div>
-                <div>Order Sender Email: {saved.order_sender_email || '—'}</div>
-                <div>Adjuster Reference: {saved.adjuster_reference || '—'}</div>
-              </div>
-            )}
 
             {/* Notes */}
             <div style={subLabel({ marginTop: 16 })}>Notes</div>
