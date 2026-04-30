@@ -162,7 +162,7 @@ export default function GlobalCalendarPage() {
           // @ts-ignore - tid is guaranteed to be string after the null check above
           .eq('tenant_id', tid!)
           .in('status', ['pending', 'engaged', 'works_complete'])
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })
 
         setWorkOrders((workOrdersData as any) || [])
         setInspections([])
@@ -173,6 +173,37 @@ export default function GlobalCalendarPage() {
 
     loadData()
   }, [tenantId, mode, supabase])
+
+  const reloadInspections = async () => {
+    if (!tenantId) return
+    const tid = tenantId!
+
+    const { data: inspectionsData } = await supabase
+      .from('inspections')
+      .select(`
+        id,
+        job_id,
+        inspection_ref,
+        scheduled_date,
+        scheduled_time,
+        status,
+        inspector_id,
+        jobs (
+          job_number,
+          insured_name,
+          property_address,
+          insurer
+        ),
+        users (
+          name
+        )
+      `)
+      .eq('tenant_id', tid)
+      .in('status', ['unscheduled', 'proposed', 'confirmed', 'awaiting_reschedule'])
+      .order('scheduled_date', { ascending: true, nullsFirst: false })
+
+    setInspections((inspectionsData as any) || [])
+  }
 
   const scheduledInspections = inspections.filter(i => i.scheduled_date)
   const unscheduledInspections = inspections.filter(i => !i.scheduled_date)
@@ -246,6 +277,7 @@ export default function GlobalCalendarPage() {
           tenantId={tenantId}
           supabase={supabase}
           schedulingRules={schedulingRules}
+          onInspectionUpdate={reloadInspections}
         />
       ) : (
         <TradesCalendar workOrders={workOrders} />
@@ -260,12 +292,14 @@ function InspectionsCalendar({
   tenantId,
   supabase,
   schedulingRules,
+  onInspectionUpdate,
 }: {
   scheduledInspections: Inspection[]
   unscheduledInspections: Inspection[]
   tenantId: string | null
   supabase: any
   schedulingRules: SchedulingRules | null
+  onInspectionUpdate: () => void
 }) {
   const [viewType, setViewType] = useState<ViewType>('week')
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
@@ -325,13 +359,23 @@ function InspectionsCalendar({
 
   // Group inspections by date and time
   const inspectionsByDateTime: Record<string, Inspection[]> = {}
+  const inspectionsByDate: Record<string, Inspection[]> = {}
   scheduledInspections.forEach(inspection => {
     if (inspection.scheduled_date) {
+      // Group by date and time for time slots
       const key = `${inspection.scheduled_date}-${inspection.scheduled_time || ''}`
       if (!inspectionsByDateTime[key]) {
         inspectionsByDateTime[key] = []
       }
       inspectionsByDateTime[key].push(inspection)
+      
+      // Also group by date only for inspections without times
+      if (!inspection.scheduled_time) {
+        if (!inspectionsByDate[inspection.scheduled_date]) {
+          inspectionsByDate[inspection.scheduled_date] = []
+        }
+        inspectionsByDate[inspection.scheduled_date].push(inspection)
+      }
     }
   })
 
@@ -344,7 +388,7 @@ function InspectionsCalendar({
 
     const dateStr = date.toISOString().split('T')[0]
     
-    await supabase
+    const { error } = await supabase
       .from('inspections')
       .update({ 
         scheduled_date: dateStr,
@@ -353,8 +397,13 @@ function InspectionsCalendar({
       .eq('id', draggedInspection.id)
       .eq('tenant_id', tenantId)
 
+    if (error) {
+      console.error('Error updating inspection:', error)
+      return
+    }
+
     setDraggedInspection(null)
-    window.location.reload()
+    onInspectionUpdate()
   }
 
   const formatTime = (time: string | null) => {
@@ -515,6 +564,7 @@ function InspectionsCalendar({
               {weekDates.map(date => {
                 const dateStr = date.toISOString().split('T')[0]
                 const isWeekendDay = isWeekend(date)
+                const dayInspectionsNoTime = inspectionsByDate[dateStr] || []
                 return (
                   <div
                     key={dateStr}
@@ -526,7 +576,11 @@ function InspectionsCalendar({
                       background: isWeekendDay ? '#f5f0e8' : '#fff',
                       borderBottom: '1px solid #e0dbd4',
                       borderRight: '1px solid #e0dbd4',
+                      minHeight: 60,
+                      position: 'relative',
                     }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDragEnd(date, null)}
                   >
                     <div style={{ color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
                       {date.toLocaleDateString('en-AU', { weekday: 'short' })}
@@ -534,6 +588,35 @@ function InspectionsCalendar({
                     <div style={{ fontSize: 11, color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
                       {date.getDate()}
                     </div>
+                    {dayInspectionsNoTime.length > 0 && (
+                      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {dayInspectionsNoTime.map(inspection => {
+                          const statusColor = getStatusColor(inspection.status)
+                          return (
+                            <div
+                              key={inspection.id}
+                              draggable
+                              onDragStart={() => handleDragStart(inspection)}
+                              style={{
+                                background: statusColor.bg,
+                                border: `1px solid ${statusColor.border}`,
+                                borderRadius: 3,
+                                padding: '2px 4px',
+                                cursor: 'grab',
+                                fontSize: 9,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                color: statusColor.text,
+                              }}
+                              title={`${inspection.jobs.job_number} - ${inspection.jobs.insured_name}`}
+                            >
+                              {inspection.jobs.job_number}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}

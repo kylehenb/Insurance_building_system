@@ -113,6 +113,12 @@ function InspectionForm({
     tenantId,
   })
 
+  // Save time immediately when changed to prevent loss on unmount
+  const handleTimeChange = (value: string) => {
+    setTime(value)
+    scheduleFieldSave('scheduled_time', value || null)
+  }
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -160,7 +166,7 @@ function InspectionForm({
             type="time"
             value={time}
             style={inputStyle}
-            onChange={e => handleChange('scheduled_time', e.target.value, setTime)}
+            onChange={e => handleTimeChange(e.target.value)}
             onBlur={flushSave}
             onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
           />

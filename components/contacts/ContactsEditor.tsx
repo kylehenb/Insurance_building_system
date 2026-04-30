@@ -47,7 +47,6 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
   const [localContacts, setLocalContacts] = useState<JobContact[]>(contacts)
   const [showAdditional1, setShowAdditional1] = useState(hideInsured)
   const [showAdditional2, setShowAdditional2] = useState(false)
-  const [showNotice, setShowNotice] = useState(false)
 
   useEffect(() => {
     setLocalContacts(contacts)
@@ -55,6 +54,27 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
     setShowAdditional1(contacts.some(c => c.slot === 'additional_1') || hideInsured)
     setShowAdditional2(contacts.some(c => c.slot === 'additional_2'))
   }, [contacts, hideInsured])
+
+  // Ensure insured always has auth and primary_site roles
+  useEffect(() => {
+    const insured = localContacts.find(c => c.slot === 'insured')
+    if (insured) {
+      const hasAuth = insured.roles.includes('auth')
+      const hasPrimarySite = insured.roles.includes('primary_site')
+      
+      // Check if any other contact has these roles
+      const otherHasAuth = localContacts.some(c => c.slot !== 'insured' && c.roles.includes('auth'))
+      const otherHasPrimarySite = localContacts.some(c => c.slot !== 'insured' && c.roles.includes('primary_site'))
+      
+      // If no other contact has these roles, ensure insured has them
+      if (!otherHasAuth && !hasAuth) {
+        updateContact(localContacts.findIndex(c => c.slot === 'insured'), { roles: [...insured.roles, 'auth'] })
+      }
+      if (!otherHasPrimarySite && !hasPrimarySite) {
+        updateContact(localContacts.findIndex(c => c.slot === 'insured'), { roles: [...insured.roles, 'primary_site'] })
+      }
+    }
+  }, [localContacts])
 
   // Validation
   const hasAuth = localContacts.some(c => c.roles.includes('auth'))
@@ -79,10 +99,15 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
     let newRoles: ContactRole[]
 
     if (hasRole) {
-      // Remove role
+      // Remove role - if it's auth or primary_site and being removed from insured, keep it on insured
+      if ((role === 'auth' || role === 'primary_site') && contact.slot === 'insured') {
+        // Don't allow removing these from insured if no one else has them
+        const otherHasRole = localContacts.some((c, i) => i !== contactIndex && c.roles.includes(role))
+        if (!otherHasRole) return // Can't remove - must be assigned to someone
+      }
       newRoles = contact.roles.filter(r => r !== role)
     } else {
-      // Add role - if exclusive, remove from other contacts first
+      // Add role - if exclusive, remove from other contacts first (role stealing)
       if (EXCLUSIVE_ROLES.includes(role)) {
         const updated = localContacts.map((c, i) => {
           if (i === contactIndex) return c
@@ -110,23 +135,8 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
       }
       const updated = [...localContacts, newContact]
       const withDefaults = applyContactDefaults(updated)
-      
-      // Check if we need to show the notice (insured had auto-assigned primary_site)
-      const insured = withDefaults.find(c => c.slot === 'insured')
-      if (insured && insured.roles.includes('primary_site') && withDefaults.length > 1) {
-        // Clear primary_site from insured
-        const cleared = withDefaults.map(c => 
-          c.slot === 'insured' 
-            ? { ...c, roles: c.roles.filter(r => r !== 'primary_site') }
-            : c
-        )
-        setLocalContacts(cleared)
-        onChange(cleared)
-        setShowNotice(true)
-      } else {
-        setLocalContacts(withDefaults)
-        onChange(withDefaults)
-      }
+      setLocalContacts(withDefaults)
+      onChange(withDefaults)
     } else if (!showAdditional2) {
       setShowAdditional2(true)
       const newContact: JobContact = {
@@ -155,140 +165,105 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* Validation warnings */}
-      <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {!hasAuth && (
-          <Badge variant="destructive" style={{ fontSize: 11 }}>
-            Warning: No Auth contact assigned
-          </Badge>
-        )}
-        {!hasPrimarySite && (
-          <Badge variant="destructive" style={{ fontSize: 11 }}>
-            Warning: No Primary Site contact assigned
-          </Badge>
-        )}
-      </div>
 
-      {/* Inline notice */}
-      {showNotice && (
-        <div style={{
-          background: '#fef3c7',
-          border: '0.5px solid #f59e0b',
-          borderRadius: 6,
-          padding: '8px 12px',
-          marginBottom: 12,
-          fontSize: 12,
-          color: '#92400e',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span>Confirm who is the primary site contact</span>
-          <button
-            onClick={() => setShowNotice(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#92400e', padding: 0, lineHeight: 1 }}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Insured contact card */}
+      {/* Insured contact */}
       {!hideInsured && (
-        <Card style={{ marginBottom: 12, border: '0.5px solid #e4dfd8' }}>
-          <CardContent style={{ padding: '16px' }}>
+        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 12 
+          }}>
             <div style={{ 
               fontSize: 10, 
               fontWeight: 600, 
               color: '#9e998f', 
               textTransform: 'uppercase', 
-              letterSpacing: '0.07em',
-              marginBottom: 12 
+              letterSpacing: '0.07em'
             }}>
               Insured
             </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'insured')?.name || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'insured')
-                    if (idx !== -1) updateContact(idx, { name: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'insured')?.phone || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'insured')
-                    if (idx !== -1) updateContact(idx, { phone: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
-                <Input
-                  type="email"
-                  value={localContacts.find(c => c.slot === 'insured')?.email || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'insured')
-                    if (idx !== -1) updateContact(idx, { email: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-            </div>
-
-            {/* Role pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {Object.entries(ROLE_LABELS).map(([role, label]) => {
+            {/* Role checkboxes */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {(['auth', 'primary_site'] as ContactRole[]).map(role => {
                 const contact = localContacts.find(c => c.slot === 'insured')
-                const hasRole = contact?.roles.includes(role as ContactRole)
-                const isLocked = role === 'insured'
-                
+                const hasRole = contact?.roles.includes(role)
                 return (
-                  <Badge
-                    key={role}
-                    variant={hasRole ? 'default' : 'outline'}
-                    style={{
-                      fontSize: 11,
-                      cursor: readOnly || isLocked ? 'default' : 'pointer',
-                      opacity: isLocked ? 0.7 : 1,
-                      background: hasRole ? '#1a1a1a' : 'transparent',
-                      color: hasRole ? '#f5f2ee' : '#6b6763',
-                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                    }}
-                    onClick={() => !readOnly && !isLocked && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role as ContactRole)}
-                  >
-                    {label}
-                    {isLocked && ' (locked)'}
-                  </Badge>
+                  <label key={role} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 4, 
+                    fontSize: 11, 
+                    color: '#7a6a58',
+                    cursor: readOnly ? 'default' : 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={hasRole}
+                      onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role)}
+                      disabled={readOnly}
+                      style={{ accentColor: '#c8b89a' }}
+                    />
+                    {ROLE_LABELS[role]}
+                  </label>
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'insured')?.name || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'insured')
+                  if (idx !== -1) updateContact(idx, { name: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'insured')?.phone || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'insured')
+                  if (idx !== -1) updateContact(idx, { phone: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Input
+                type="email"
+                value={localContacts.find(c => c.slot === 'insured')?.email || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'insured')
+                  if (idx !== -1) updateContact(idx, { email: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Additional contact 1 */}
       {showAdditional1 && (
-        <Card style={{ marginBottom: 12, border: '0.5px solid #e4dfd8' }}>
-          <CardContent style={{ padding: '16px' }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: 12 
-            }}>
+        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: 12 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ 
                 fontSize: 10, 
                 fontWeight: 600, 
@@ -296,128 +271,129 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                 textTransform: 'uppercase', 
                 letterSpacing: '0.07em' 
               }}>
-                Additional Contact 1
+                {localContacts.find(c => c.slot === 'additional_1')?.type 
+                  ? ADDITIONAL_CONTACT_TYPES.find(t => t.value === localContacts.find(c => c.slot === 'additional_1')?.type)?.label || 'Additional Contact 1'
+                  : 'Additional Contact 1'}
               </div>
-              {!readOnly && (
-                <button
-                  onClick={() => removeAdditionalContact('additional_1')}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    fontSize: 18, 
-                    color: '#b0a898',
-                    padding: 0,
-                    lineHeight: 1 
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
-                <Select
-                  value={localContacts.find(c => c.slot === 'additional_1')?.type || ''}
-                  onValueChange={(value) => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_1')
-                    if (idx !== -1) updateContact(idx, { type: value as AdditionalContactType })
-                  }}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ADDITIONAL_CONTACT_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'additional_1')?.name || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_1')
-                    if (idx !== -1) updateContact(idx, { name: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'additional_1')?.phone || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_1')
-                    if (idx !== -1) updateContact(idx, { phone: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
-                <Input
-                  type="email"
-                  value={localContacts.find(c => c.slot === 'additional_1')?.email || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_1')
-                    if (idx !== -1) updateContact(idx, { email: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
+              {/* Role checkboxes */}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {(['auth', 'primary_site', 'secondary_site'] as ContactRole[]).map(role => {
+                  const contact = localContacts.find(c => c.slot === 'additional_1')
+                  const hasRole = contact?.roles.includes(role)
+                  return (
+                    <label key={role} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 4, 
+                      fontSize: 11, 
+                      color: '#7a6a58',
+                      cursor: readOnly ? 'default' : 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={hasRole}
+                        onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_1'), role)}
+                        disabled={readOnly}
+                        style={{ accentColor: '#c8b89a' }}
+                      />
+                      {ROLE_LABELS[role]}
+                    </label>
+                  )
+                })}
               </div>
             </div>
-
-            {/* Role pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {Object.entries(ROLE_LABELS).map(([role, label]) => {
-                const contact = localContacts.find(c => c.slot === 'additional_1')
-                const hasRole = contact?.roles.includes(role as ContactRole)
-                const isLocked = role === 'insured'
-                
-                return (
-                  <Badge
-                    key={role}
-                    variant={hasRole ? 'default' : 'outline'}
-                    style={{
-                      fontSize: 11,
-                      cursor: readOnly || isLocked ? 'default' : 'pointer',
-                      opacity: isLocked ? 0.5 : 1,
-                      background: hasRole ? '#1a1a1a' : 'transparent',
-                      color: hasRole ? '#f5f2ee' : '#6b6763',
-                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                    }}
-                    onClick={() => !readOnly && !isLocked && toggleRole(localContacts.findIndex(c => c.slot === 'additional_1'), role as ContactRole)}
-                  >
-                    {label}
-                  </Badge>
-                )
-              })}
+            {!readOnly && (
+              <button
+                onClick={() => removeAdditionalContact('additional_1')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  fontSize: 18, 
+                  color: '#b0a898',
+                  padding: 0,
+                  lineHeight: 1 
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
+              <Select
+                value={localContacts.find(c => c.slot === 'additional_1')?.type || ''}
+                onValueChange={(value) => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_1')
+                  if (idx !== -1) updateContact(idx, { type: value as AdditionalContactType })
+                }}
+                disabled={readOnly}
+              >
+                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADDITIONAL_CONTACT_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'additional_1')?.name || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_1')
+                  if (idx !== -1) updateContact(idx, { name: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'additional_1')?.phone || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_1')
+                  if (idx !== -1) updateContact(idx, { phone: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Input
+                type="email"
+                value={localContacts.find(c => c.slot === 'additional_1')?.email || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_1')
+                  if (idx !== -1) updateContact(idx, { email: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Additional contact 2 */}
       {showAdditional2 && (
-        <Card style={{ marginBottom: 12, border: '0.5px solid #e4dfd8' }}>
-          <CardContent style={{ padding: '16px' }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: 12 
-            }}>
+        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: 12 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ 
                 fontSize: 10, 
                 fontWeight: 600, 
@@ -425,116 +401,117 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                 textTransform: 'uppercase', 
                 letterSpacing: '0.07em' 
               }}>
-                Additional Contact 2
+                {localContacts.find(c => c.slot === 'additional_2')?.type 
+                  ? ADDITIONAL_CONTACT_TYPES.find(t => t.value === localContacts.find(c => c.slot === 'additional_2')?.type)?.label || 'Additional Contact 2'
+                  : 'Additional Contact 2'}
               </div>
-              {!readOnly && (
-                <button
-                  onClick={() => removeAdditionalContact('additional_2')}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    fontSize: 18, 
-                    color: '#b0a898',
-                    padding: 0,
-                    lineHeight: 1 
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
-                <Select
-                  value={localContacts.find(c => c.slot === 'additional_2')?.type || ''}
-                  onValueChange={(value) => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_2')
-                    if (idx !== -1) updateContact(idx, { type: value as AdditionalContactType })
-                  }}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ADDITIONAL_CONTACT_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'additional_2')?.name || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_2')
-                    if (idx !== -1) updateContact(idx, { name: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
-                <Input
-                  value={localContacts.find(c => c.slot === 'additional_2')?.phone || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_2')
-                    if (idx !== -1) updateContact(idx, { phone: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
-              </div>
-              <div>
-                <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
-                <Input
-                  type="email"
-                  value={localContacts.find(c => c.slot === 'additional_2')?.email || ''}
-                  onChange={e => {
-                    const idx = localContacts.findIndex(c => c.slot === 'additional_2')
-                    if (idx !== -1) updateContact(idx, { email: e.target.value })
-                  }}
-                  disabled={readOnly}
-                  style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
-                />
+              {/* Role checkboxes */}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {(['auth', 'primary_site', 'secondary_site'] as ContactRole[]).map(role => {
+                  const contact = localContacts.find(c => c.slot === 'additional_2')
+                  const hasRole = contact?.roles.includes(role)
+                  return (
+                    <label key={role} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 4, 
+                      fontSize: 11, 
+                      color: '#7a6a58',
+                      cursor: readOnly ? 'default' : 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={hasRole}
+                        onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_2'), role)}
+                        disabled={readOnly}
+                        style={{ accentColor: '#c8b89a' }}
+                      />
+                      {ROLE_LABELS[role]}
+                    </label>
+                  )
+                })}
               </div>
             </div>
-
-            {/* Role pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {Object.entries(ROLE_LABELS).map(([role, label]) => {
-                const contact = localContacts.find(c => c.slot === 'additional_2')
-                const hasRole = contact?.roles.includes(role as ContactRole)
-                const isLocked = role === 'insured'
-                
-                return (
-                  <Badge
-                    key={role}
-                    variant={hasRole ? 'default' : 'outline'}
-                    style={{
-                      fontSize: 11,
-                      cursor: readOnly || isLocked ? 'default' : 'pointer',
-                      opacity: isLocked ? 0.5 : 1,
-                      background: hasRole ? '#1a1a1a' : 'transparent',
-                      color: hasRole ? '#f5f2ee' : '#6b6763',
-                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                    }}
-                    onClick={() => !readOnly && !isLocked && toggleRole(localContacts.findIndex(c => c.slot === 'additional_2'), role as ContactRole)}
-                  >
-                    {label}
-                  </Badge>
-                )
-              })}
+            {!readOnly && (
+              <button
+                onClick={() => removeAdditionalContact('additional_2')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  fontSize: 18, 
+                  color: '#b0a898',
+                  padding: 0,
+                  lineHeight: 1 
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
+              <Select
+                value={localContacts.find(c => c.slot === 'additional_2')?.type || ''}
+                onValueChange={(value) => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_2')
+                  if (idx !== -1) updateContact(idx, { type: value as AdditionalContactType })
+                }}
+                disabled={readOnly}
+              >
+                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADDITIONAL_CONTACT_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'additional_2')?.name || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_2')
+                  if (idx !== -1) updateContact(idx, { name: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Input
+                value={localContacts.find(c => c.slot === 'additional_2')?.phone || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_2')
+                  if (idx !== -1) updateContact(idx, { phone: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+            <div>
+              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Input
+                type="email"
+                value={localContacts.find(c => c.slot === 'additional_2')?.email || ''}
+                onChange={e => {
+                  const idx = localContacts.findIndex(c => c.slot === 'additional_2')
+                  if (idx !== -1) updateContact(idx, { email: e.target.value })
+                }}
+                disabled={readOnly}
+                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Contact button */}
