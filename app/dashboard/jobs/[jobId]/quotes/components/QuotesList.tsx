@@ -124,6 +124,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [fileUploadVisible, setFileUploadVisible] = useState(false)
   const [sowLoading, setSowLoading]       = useState<string | null>(null)
   const [cloningQuoteId, setCloningQuoteId] = useState<string | null>(null)
+  const [showCloneDialog, setShowCloneDialog] = useState<string | null>(null)
   const initialLoadDone = useRef(false)
 
   // New workflow state
@@ -283,14 +284,14 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   )
 
   const handleClone = useCallback(
-    async (quoteId: string) => {
+    async (quoteId: string, cloneType: 'version' | 'new_quote') => {
       setCloningQuoteId(quoteId)
-      setMenuDropdownId(null)
+      setShowCloneDialog(null)
       try {
         const response = await fetch(`/api/quotes/${quoteId}/clone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantId }),
+          body: JSON.stringify({ tenantId, cloneType }),
         })
         if (response.ok) {
           const newQuote = await response.json()
@@ -819,6 +820,118 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clone option dialog */}
+      {showCloneDialog && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+          }}
+          onClick={() => setShowCloneDialog(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '32px 36px',
+              maxWidth: 420,
+              width: '90%',
+              fontFamily: 'DM Sans, sans-serif',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              Duplicate Quote
+            </div>
+            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+              How would you like to duplicate this quote?
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={() => handleClone(showCloneDialog, 'version')}
+                disabled={cloningQuoteId === showCloneDialog}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#ffffff',
+                  background: '#2e7d32',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '10px 20px',
+                  cursor: cloningQuoteId === showCloneDialog ? 'default' : 'pointer',
+                  transition: 'background 0.15s',
+                  opacity: cloningQuoteId === showCloneDialog ? 0.7 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (cloningQuoteId !== showCloneDialog)
+                    e.currentTarget.style.background = '#1b5e20'
+                }}
+                onMouseLeave={e => e.currentTarget.style.background = '#2e7d32'}
+              >
+                {cloningQuoteId === showCloneDialog ? 'Creating...' : 'New Version'}
+              </button>
+              <div style={{ fontSize: 11, color: '#9e998f', marginTop: -8, marginBottom: 4 }}>
+                Creates a new version (V2, V3, etc.) of this quote. The original quote will be marked as rejected.
+              </div>
+
+              <button
+                onClick={() => handleClone(showCloneDialog, 'new_quote')}
+                disabled={cloningQuoteId === showCloneDialog}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#3a3530',
+                  background: '#f5f2ee',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  padding: '10px 20px',
+                  cursor: cloningQuoteId === showCloneDialog ? 'default' : 'pointer',
+                  transition: 'background 0.15s',
+                  opacity: cloningQuoteId === showCloneDialog ? 0.7 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (cloningQuoteId !== showCloneDialog)
+                    e.currentTarget.style.background = '#e0dbd4'
+                }}
+                onMouseLeave={e => e.currentTarget.style.background = '#f5f2ee'}
+              >
+                {cloningQuoteId === showCloneDialog ? 'Creating...' : 'New Quote'}
+              </button>
+              <div style={{ fontSize: 11, color: '#9e998f', marginTop: -8, marginBottom: 4 }}>
+                Creates an entirely new quote with a new quote number. The original quote remains unchanged.
+              </div>
+            </div>
+
+            <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <button
+                onClick={() => setShowCloneDialog(null)}
+                disabled={cloningQuoteId === showCloneDialog}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 13,
+                  color: '#9e998f',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: cloningQuoteId === showCloneDialog ? 'default' : 'pointer',
+                  padding: '4px 12px',
                 }}
               >
                 Cancel
@@ -2479,7 +2592,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       <button
                         onClick={e => {
                           e.stopPropagation()
-                          handleClone(q.id)
+                          setMenuDropdownId(null)
+                          setShowCloneDialog(q.id)
                         }}
                         disabled={cloningQuoteId === q.id}
                         style={{

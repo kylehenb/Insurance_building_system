@@ -7,7 +7,7 @@ export async function POST(
 ) {
   const { quoteId } = await params
   const body = await req.json()
-  const { tenantId } = body as { tenantId: string }
+  const { tenantId, cloneType = 'version' } = body as { tenantId: string; cloneType?: 'version' | 'new_quote' }
 
   if (!tenantId) {
     return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
@@ -39,7 +39,7 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to fetch scope items' }, { status: 500 })
   }
 
-  // Calculate the new version number
+  // Calculate the new version number (only for version clones)
   const newVersion = (originalQuote.version ?? 1) + 1
 
   // Create the new quote (clone)
@@ -50,10 +50,10 @@ export async function POST(
       job_id: originalQuote.job_id,
       inspection_id: originalQuote.inspection_id,
       report_id: originalQuote.report_id,
-      parent_quote_id: originalQuote.id,
-      quote_ref: originalQuote.quote_ref,
+      parent_quote_id: cloneType === 'version' ? originalQuote.id : null,
+      quote_ref: cloneType === 'version' ? originalQuote.quote_ref : null, // Let system generate new ref for new_quote
       quote_type: originalQuote.quote_type,
-      version: newVersion,
+      version: cloneType === 'version' ? newVersion : 1,
       is_active_version: true,
       is_locked: false,
       status: 'draft',
@@ -107,18 +107,20 @@ export async function POST(
     }
   }
 
-  // Update the original quote to rejected and inactive (superseded by new version)
-  const { error: updateError } = await supabase
-    .from('quotes')
-    .update({
-      status: 'rejected',
-      is_active_version: false,
-    })
-    .eq('id', quoteId)
-    .eq('tenant_id', tenantId)
+  // Update the original quote to rejected and inactive (only for version clones)
+  if (cloneType === 'version') {
+    const { error: updateError } = await supabase
+      .from('quotes')
+      .update({
+        status: 'rejected',
+        is_active_version: false,
+      })
+      .eq('id', quoteId)
+      .eq('tenant_id', tenantId)
 
-  if (updateError) {
-    return NextResponse.json({ error: 'Failed to update original quote' }, { status: 500 })
+    if (updateError) {
+      return NextResponse.json({ error: 'Failed to update original quote' }, { status: 500 })
+    }
   }
 
   return NextResponse.json(newQuote, { status: 201 })
