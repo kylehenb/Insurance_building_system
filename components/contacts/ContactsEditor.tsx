@@ -201,29 +201,32 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
             }}>
               Insured
             </div>
-            {/* Role checkboxes */}
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {(['auth', 'primary_site'] as ContactRole[]).map(role => {
+            {/* Role selectors */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {(['auth', 'primary_site', 'secondary_site'] as ContactRole[]).map(role => {
                 const contact = localContacts.find(c => c.slot === 'insured')
                 const hasRole = contact?.roles.includes(role)
                 return (
-                  <label key={role} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 4, 
-                    fontSize: 11, 
-                    color: '#7a6a58',
-                    cursor: readOnly ? 'default' : 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={hasRole}
-                      onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role)}
-                      disabled={readOnly}
-                      style={{ accentColor: '#c8b89a' }}
-                    />
+                  <button
+                    key={role}
+                    onClick={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'insured'), role)}
+                    disabled={readOnly}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      borderRadius: 4,
+                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
+                      background: hasRole ? '#1a1a1a' : '#f5f0e8',
+                      color: hasRole ? '#f5f2ee' : '#7a6a58',
+                      cursor: readOnly ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
                     {ROLE_LABELS[role]}
-                  </label>
+                  </button>
                 )
               })}
             </div>
@@ -292,29 +295,32 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   ? ADDITIONAL_CONTACT_TYPES.find(t => t.value === localContacts.find(c => c.slot === 'additional_1')?.type)?.label || 'Additional Contact 1'
                   : 'Additional Contact 1'}
               </div>
-              {/* Role checkboxes */}
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {/* Role selectors */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {(['auth', 'primary_site', 'secondary_site'] as ContactRole[]).map(role => {
                   const contact = localContacts.find(c => c.slot === 'additional_1')
                   const hasRole = contact?.roles.includes(role)
                   return (
-                    <label key={role} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 4, 
-                      fontSize: 11, 
-                      color: '#7a6a58',
-                      cursor: readOnly ? 'default' : 'pointer'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={hasRole}
-                        onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_1'), role)}
-                        disabled={readOnly}
-                        style={{ accentColor: '#c8b89a' }}
-                      />
+                    <button
+                      key={role}
+                      onClick={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_1'), role)}
+                      disabled={readOnly}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: 10,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        borderRadius: 4,
+                        border: hasRole ? 'none' : '0.5px solid #e4dfd8',
+                        background: hasRole ? '#1a1a1a' : '#f5f0e8',
+                        color: hasRole ? '#f5f2ee' : '#7a6a58',
+                        cursor: readOnly ? 'default' : 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       {ROLE_LABELS[role]}
-                    </label>
+                    </button>
                   )
                 })}
               </div>
@@ -422,29 +428,32 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   ? ADDITIONAL_CONTACT_TYPES.find(t => t.value === localContacts.find(c => c.slot === 'additional_2')?.type)?.label || 'Additional Contact 2'
                   : 'Additional Contact 2'}
               </div>
-              {/* Role checkboxes */}
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {/* Role selectors */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {(['auth', 'primary_site', 'secondary_site'] as ContactRole[]).map(role => {
                   const contact = localContacts.find(c => c.slot === 'additional_2')
                   const hasRole = contact?.roles.includes(role)
                   return (
-                    <label key={role} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 4, 
-                      fontSize: 11, 
-                      color: '#7a6a58',
-                      cursor: readOnly ? 'default' : 'pointer'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={hasRole}
-                        onChange={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_2'), role)}
-                        disabled={readOnly}
-                        style={{ accentColor: '#c8b89a' }}
-                      />
+                    <button
+                      key={role}
+                      onClick={() => !readOnly && toggleRole(localContacts.findIndex(c => c.slot === 'additional_2'), role)}
+                      disabled={readOnly}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: 10,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        borderRadius: 4,
+                        border: hasRole ? 'none' : '0.5px solid #e4dfd8',
+                        background: hasRole ? '#1a1a1a' : '#f5f0e8',
+                        color: hasRole ? '#f5f2ee' : '#7a6a58',
+                        cursor: readOnly ? 'default' : 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
                       {ROLE_LABELS[role]}
-                    </label>
+                    </button>
                   )
                 })}
               </div>

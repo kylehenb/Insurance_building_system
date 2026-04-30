@@ -385,6 +385,14 @@ function InspectionsCalendar({
     }
   })
 
+  // Helper function to format date as YYYY-MM-DD using local timezone
+  const formatDateLocal = (date: Date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const handleDragStart = (inspection: Inspection) => {
     setDraggedInspection(inspection)
   }
@@ -392,11 +400,15 @@ function InspectionsCalendar({
   const handleDragEnd = async (date: Date, time: string | null = null) => {
     if (!draggedInspection || !tenantId) return
 
-    const dateStr = date.toISOString().split('T')[0]
+    // Use local date instead of UTC to avoid timezone issues
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
     
     // Calculate finish time based on duration if time is provided
     let finishTime = null
-    let duration = draggedInspection.duration_minutes || 60
+    let duration = draggedInspection.duration_minutes || 120
     
     if (time) {
       const [hours, minutes] = time.split(':').map(Number)
@@ -582,7 +594,7 @@ function InspectionsCalendar({
               
               {/* Day headers */}
               {weekDates.map(date => {
-                const dateStr = date.toISOString().split('T')[0]
+                const dateStr = formatDateLocal(date)
                 const isWeekendDay = isWeekend(date)
                 const dayInspectionsNoTime = inspectionsByDate[dateStr] || []
                 return (
@@ -667,7 +679,7 @@ function InspectionsCalendar({
                   
                   {/* Day columns */}
                   {weekDates.map(date => {
-                    const dateStr = date.toISOString().split('T')[0]
+                    const dateStr = formatDateLocal(date)
                     const timeStr = `${slot.hour.toString().padStart(2, '0')}:${slot.minute.toString().padStart(2, '0')}`
                     const key = `${dateStr}-${timeStr}`
                     const slotInspections = inspectionsByDateTime[key] || []
@@ -750,7 +762,7 @@ function InspectionsCalendar({
             
             {/* Month grid */}
             {monthDates.map(date => {
-              const dateStr = date.toISOString().split('T')[0]
+              const dateStr = formatDateLocal(date)
               const isWeekendDay = isWeekend(date)
               const isCurrentMonth = date.getMonth() === currentDate.getMonth()
               const dayInspections = scheduledInspections.filter(i => i.scheduled_date === dateStr)

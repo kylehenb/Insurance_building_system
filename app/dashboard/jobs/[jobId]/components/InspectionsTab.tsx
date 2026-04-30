@@ -116,7 +116,7 @@ function InspectionForm({
   const [date, setDate] = useState(inspection.scheduled_date ?? '')
   const [startTime, setStartTime] = useState(inspection.start_time ?? '')
   const [finishTime, setFinishTime] = useState(inspection.finish_time ?? '')
-  const [duration, setDuration] = useState(inspection.duration_minutes?.toString() ?? '60')
+  const [duration, setDuration] = useState(inspection.duration_minutes?.toString() ?? '120')
   const [status, setStatus] = useState(inspection.status)
   const [personMet, setPersonMet] = useState(inspection.person_met ?? '')
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
@@ -132,7 +132,7 @@ function InspectionForm({
   const calculateFinishTime = (start: string, dur: string) => {
     if (!start || !dur) return ''
     const [hours, minutes] = start.split(':').map(Number)
-    const duration = parseInt(dur) || 60
+    const duration = parseInt(dur) || 120
     const totalMinutes = hours * 60 + minutes + duration
     const endHours = Math.floor(totalMinutes / 60) % 24
     const endMinutes = totalMinutes % 60
@@ -141,13 +141,13 @@ function InspectionForm({
 
   // Calculate duration from start and finish time
   const calculateDuration = (start: string, finish: string) => {
-    if (!start || !finish) return '60'
+    if (!start || !finish) return '120'
     const [startHours, startMinutes] = start.split(':').map(Number)
     const [finishHours, finishMinutes] = finish.split(':').map(Number)
     const startTotal = startHours * 60 + startMinutes
     const finishTotal = finishHours * 60 + finishMinutes
     const diff = finishTotal - startTotal
-    return diff > 0 ? diff.toString() : '60'
+    return diff > 0 ? diff.toString() : '120'
   }
 
   // Handle start time change - auto-calculate finish time
@@ -173,8 +173,10 @@ function InspectionForm({
     setDuration(value)
     const newFinishTime = calculateFinishTime(startTime, value)
     setFinishTime(newFinishTime)
+    // Save immediately to prevent loss on unmount
     scheduleFieldSave('duration_minutes', parseInt(value) || null)
     scheduleFieldSave('finish_time', newFinishTime || null)
+    flushSave() // Force immediate save
   }
 
   const supabase = createBrowserClient(

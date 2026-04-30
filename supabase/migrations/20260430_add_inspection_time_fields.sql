@@ -11,7 +11,7 @@ ALTER TABLE inspections
 
 -- Add duration_minutes column
 ALTER TABLE inspections
-  ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 60;
+  ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 120;
 
 -- Update index to use start_time instead of scheduled_time
 DROP INDEX IF EXISTS idx_inpections_scheduled_date_time;
@@ -19,13 +19,13 @@ CREATE INDEX idx_inspections_scheduled_date_time
   ON inspections(scheduled_date, start_time)
   WHERE scheduled_date IS NOT NULL;
 
--- Migrate existing data: if start_time exists but duration doesn't, set default 60 minutes
+-- Migrate existing data: if start_time exists but duration doesn't, set default 120 minutes
 -- If start_time exists, calculate finish_time based on duration
 DO $$
 BEGIN
   -- Set default duration for existing records
   UPDATE inspections 
-  SET duration_minutes = 60 
+  SET duration_minutes = 120 
   WHERE duration_minutes IS NULL AND start_time IS NOT NULL;
   
   -- Calculate finish_time for existing records
