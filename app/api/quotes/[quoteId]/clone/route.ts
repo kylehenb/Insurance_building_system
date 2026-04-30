@@ -42,6 +42,30 @@ export async function POST(
   // Calculate the new version number (only for version clones)
   const newVersion = (originalQuote.version ?? 1) + 1
 
+  // Generate quote_ref for new_quote clones
+  let quoteRef = originalQuote.quote_ref
+  if (cloneType === 'new_quote') {
+    // Get job number to generate new quote_ref
+    const { data: job } = await supabase
+      .from('jobs')
+      .select('job_number')
+      .eq('id', originalQuote.job_id)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (job) {
+      // Count existing quotes for this job to generate sequence number
+      const { count } = await supabase
+        .from('quotes')
+        .select('*', { count: 'exact', head: true })
+        .eq('job_id', originalQuote.job_id)
+        .eq('tenant_id', tenantId)
+
+      const seq = String((count ?? 0) + 1).padStart(3, '0')
+      quoteRef = `Q-${job.job_number}-${seq}`
+    }
+  }
+
   // Create the new quote (clone)
   const { data: newQuote, error: createError } = await supabase
     .from('quotes')
@@ -51,7 +75,7 @@ export async function POST(
       inspection_id: originalQuote.inspection_id,
       report_id: originalQuote.report_id,
       parent_quote_id: cloneType === 'version' ? originalQuote.id : null,
-      quote_ref: cloneType === 'version' ? originalQuote.quote_ref : null, // Let system generate new ref for new_quote
+      quote_ref: quoteRef,
       quote_type: originalQuote.quote_type,
       version: cloneType === 'version' ? newVersion : 1,
       is_active_version: true,
