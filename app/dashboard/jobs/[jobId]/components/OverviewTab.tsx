@@ -593,7 +593,36 @@ function JobDetailsAccordion({
 
           {/* Right: Contacts */}
           <div>
-            <div style={subLabel()}>Additional Contacts</div>
+            <div style={subLabel()}>Contacts</div>
+            <div style={accentLabel()}>Insured</div>
+
+            {(
+              [
+                { label: 'Name', field: 'insured_name' },
+                { label: 'Phone', field: 'insured_phone' },
+                { label: 'Email', field: 'insured_email' },
+                { label: 'Address', field: 'property_address' },
+              ] as { label: string; field: keyof EditFields }[]
+            ).map(({ label, field }) => (
+              <div key={label} className="ov-detail-row">
+                <span className="ov-detail-label">{label}</span>
+                {editing ? (
+                  <input
+                    className="ov-edit-input"
+                    type={field === 'insured_email' ? 'email' : 'text'}
+                    value={vals[field]}
+                    onChange={e => set(field, e.target.value)}
+                  />
+                ) : (
+                  <span className="ov-detail-value">
+                    {(saved[field as keyof JobDetails] as string) || '—'}
+                  </span>
+                )}
+              </div>
+            ))}
+
+            {/* Contacts Editor */}
+            <div style={accentLabel({ marginTop: 14 })}>Additional Contacts</div>
             {editing ? (
               <ContactsEditor
                 contacts={(job.contacts as unknown as JobContact[]) || []}

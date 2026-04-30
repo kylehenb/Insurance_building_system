@@ -6,6 +6,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { Calendar, Clock, Users, Filter } from 'lucide-react'
 
 type CalendarMode = 'inspections' | 'trades'
+type ViewType = 'week' | 'month'
 
 interface Inspection {
   id: string
@@ -266,57 +267,94 @@ function InspectionsCalendar({
   supabase: any
   schedulingRules: SchedulingRules | null
 }) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [viewType, setViewType] = useState<ViewType>('week')
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [draggedInspection, setDraggedInspection] = useState<Inspection | null>(null)
 
-  // Group inspections by date
-  const inspectionsByDate: Record<string, Inspection[]> = {}
-  scheduledInspections.forEach(inspection => {
-    if (inspection.scheduled_date) {
-      const dateKey = inspection.scheduled_date
-      if (!inspectionsByDate[dateKey]) {
-        inspectionsByDate[dateKey] = []
-      }
-      inspectionsByDate[dateKey].push(inspection)
+  // Get week dates (Monday to Sunday)
+  const getWeekDates = (date: Date) => {
+    const d = new Date(date)
+    const day = d.getDay()
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Adjust to make Monday first
+    const monday = new Date(d.setDate(diff))
+    
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(monday)
+      day.setDate(monday.getDate() + i)
+      return day
+    })
+  }
+
+  // Get month dates
+  const getMonthDates = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    
+    const dates: Date[] = []
+    const startDate = new Date(firstDay)
+    startDate.setDate(startDate.getDate() - startDate.getDay() + 1) // Start from Monday
+    
+    const endDate = new Date(lastDay)
+    if (endDate.getDay() !== 0) {
+      endDate.setDate(endDate.getDate() + (7 - endDate.getDay()))
     }
+    
+    let current = new Date(startDate)
+    while (current <= endDate) {
+      dates.push(new Date(current))
+      current.setDate(current.getDate() + 1)
+    }
+    
+    return dates
+  }
+
+  // Generate time slots (30min intervals from 8:00 to 17:00)
+  const timeSlots = Array.from({ length: 19 }, (_, i) => {
+    const hour = 8 + Math.floor(i / 2)
+    const minute = (i % 2) * 30
+    return { hour, minute, label: `${hour}:${minute.toString().padStart(2, '0')}` }
   })
 
-  // Get next 7 days
-  const next7Days = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() + i)
-    return date
+  // Check if date is weekend
+  const isWeekend = (date: Date) => {
+    const day = date.getDay()
+    return day === 0 || day === 6 // Sunday or Saturday
+  }
+
+  // Group inspections by date and time
+  const inspectionsByDateTime: Record<string, Inspection[]> = {}
+  scheduledInspections.forEach(inspection => {
+    if (inspection.scheduled_date) {
+      const key = `${inspection.scheduled_date}-${inspection.scheduled_time || ''}`
+      if (!inspectionsByDateTime[key]) {
+        inspectionsByDateTime[key] = []
+      }
+      inspectionsByDateTime[key].push(inspection)
+    }
   })
 
   const handleDragStart = (inspection: Inspection) => {
     setDraggedInspection(inspection)
   }
 
-  const handleDragEnd = async (date: Date) => {
+  const handleDragEnd = async (date: Date, time: string | null = null) => {
     if (!draggedInspection || !tenantId) return
 
     const dateStr = date.toISOString().split('T')[0]
     
     await supabase
       .from('inspections')
-      .update({ scheduled_date: dateStr })
+      .update({ 
+        scheduled_date: dateStr,
+        scheduled_time: time
+      })
       .eq('id', draggedInspection.id)
       .eq('tenant_id', tenantId)
 
     setDraggedInspection(null)
-    // Reload data
     window.location.reload()
-  }
-
-  const formatDate = (date: Date) => {
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    if (date.toDateString() === today.toDateString()) return 'Today'
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-    
-    return date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
   }
 
   const formatTime = (time: string | null) => {
@@ -341,50 +379,283 @@ function InspectionsCalendar({
     }
   }
 
+  const weekDates = getWeekDates(currentDate)
+  const monthDates = getMonthDates(currentDate)
+
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Calendar Grid */}
+      {/* Calendar */}
       <div style={{ flex: 1 }}>
+        {/* Header with view toggle */}
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Clock size={16} style={{ color: '#9e998f' }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Next 7 Days</span>
+          
+          {/* Navigation buttons */}
+          <button
+            onClick={() => {
+              const newDate = new Date(currentDate)
+              if (viewType === 'week') {
+                newDate.setDate(newDate.getDate() - 7)
+              } else {
+                newDate.setMonth(newDate.getMonth() - 1)
+              }
+              setCurrentDate(newDate)
+            }}
+            style={{
+              padding: '4px 8px',
+              fontSize: 12,
+              background: 'transparent',
+              color: '#1a1a1a',
+              border: '1px solid #e0dbd4',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            ←
+          </button>
+          
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            style={{
+              padding: '4px 8px',
+              fontSize: 12,
+              background: 'transparent',
+              color: '#1a1a1a',
+              border: '1px solid #e0dbd4',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            Today
+          </button>
+          
+          <button
+            onClick={() => {
+              const newDate = new Date(currentDate)
+              if (viewType === 'week') {
+                newDate.setDate(newDate.getDate() + 7)
+              } else {
+                newDate.setMonth(newDate.getMonth() + 1)
+              }
+              setCurrentDate(newDate)
+            }}
+            style={{
+              padding: '4px 8px',
+              fontSize: 12,
+              background: 'transparent',
+              color: '#1a1a1a',
+              border: '1px solid #e0dbd4',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            →
+          </button>
+          
+          <span style={{ fontWeight: 600, fontSize: 14 }}>
+            {viewType === 'week' 
+              ? `${weekDates[0].toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-AU', { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : currentDate.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
+            }
+          </span>
+          
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setViewType('week')}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                background: viewType === 'week' ? '#1a1a1a' : 'transparent',
+                color: viewType === 'week' ? '#f5f0e8' : '#1a1a1a',
+                border: '1px solid #e0dbd4',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+              }}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setViewType('month')}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                background: viewType === 'month' ? '#1a1a1a' : 'transparent',
+                color: viewType === 'month' ? '#f5f0e8' : '#1a1a1a',
+                border: '1px solid #e0dbd4',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'DM Sans, sans-serif',
+              }}
+            >
+              Month
+            </button>
+          </div>
+          
           {schedulingRules && (
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9e998f' }}>
+            <span style={{ marginLeft: 16, fontSize: 11, color: '#9e998f' }}>
               Max: {schedulingRules.max_daily_inspections}/day · {schedulingRules.scheduling_mode} mode
             </span>
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-          {next7Days.map(date => {
-            const dateStr = date.toISOString().split('T')[0]
-            const dayInspections = inspectionsByDate[dateStr] || []
+        {/* Week View */}
+        {viewType === 'week' && (
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', minWidth: 800 }}>
+              {/* Time column header */}
+              <div></div>
+              
+              {/* Day headers */}
+              {weekDates.map(date => {
+                const dateStr = date.toISOString().split('T')[0]
+                const isWeekendDay = isWeekend(date)
+                return (
+                  <div
+                    key={dateStr}
+                    style={{
+                      padding: '8px 4px',
+                      textAlign: 'center',
+                      fontWeight: 600,
+                      fontSize: 12,
+                      background: isWeekendDay ? '#f5f0e8' : '#fff',
+                      borderBottom: '1px solid #e0dbd4',
+                      borderRight: '1px solid #e0dbd4',
+                    }}
+                  >
+                    <div style={{ color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
+                      {date.toLocaleDateString('en-AU', { weekday: 'short' })}
+                    </div>
+                    <div style={{ fontSize: 11, color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
+                      {date.getDate()}
+                    </div>
+                  </div>
+                )
+              })}
 
-            return (
+              {/* Time slots */}
+              {timeSlots.map(slot => (
+                <React.Fragment key={slot.label}>
+                  {/* Time label */}
+                  <div
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: 10,
+                      color: '#9e998f',
+                      textAlign: 'right',
+                      borderBottom: '1px solid #f0ebe4',
+                      height: 30,
+                    }}
+                  >
+                    {slot.label}
+                  </div>
+                  
+                  {/* Day columns */}
+                  {weekDates.map(date => {
+                    const dateStr = date.toISOString().split('T')[0]
+                    const timeStr = `${slot.hour.toString().padStart(2, '0')}:${slot.minute.toString().padStart(2, '0')}`
+                    const key = `${dateStr}-${timeStr}`
+                    const slotInspections = inspectionsByDateTime[key] || []
+                    const isWeekendDay = isWeekend(date)
+                    
+                    return (
+                      <div
+                        key={key}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDragEnd(date, timeStr)}
+                        style={{
+                          padding: 2,
+                          borderBottom: '1px solid #f0ebe4',
+                          borderRight: '1px solid #e0dbd4',
+                          background: isWeekendDay ? '#f9f8f6' : '#fff',
+                          height: 30,
+                          position: 'relative',
+                          ...(draggedInspection ? { background: isWeekendDay ? '#f0ebe4' : '#f5f0e8' } : {}),
+                        }}
+                      >
+                        {slotInspections.map(inspection => {
+                          const statusColor = getStatusColor(inspection.status)
+                          return (
+                            <div
+                              key={inspection.id}
+                              draggable
+                              onDragStart={() => handleDragStart(inspection)}
+                              style={{
+                                background: statusColor.bg,
+                                border: `1px solid ${statusColor.border}`,
+                                borderRadius: 3,
+                                padding: '2px 4px',
+                                cursor: 'grab',
+                                fontSize: 10,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                color: statusColor.text,
+                              }}
+                              title={`${inspection.jobs.job_number} - ${inspection.jobs.insured_name}`}
+                            >
+                              {inspection.jobs.job_number}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Month View */}
+        {viewType === 'month' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+            {/* Day headers */}
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
               <div
-                key={dateStr}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDragEnd(date)}
+                key={day}
                 style={{
-                  background: '#fff',
-                  border: '1px solid #e0dbd4',
-                  borderRadius: 8,
-                  padding: 16,
-                  minHeight: 200,
-                  ...(draggedInspection ? { background: '#f9f8f6' } : {}),
+                  padding: '8px',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  background: '#f5f0e8',
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>
-                  {formatDate(date)}
-                </div>
-
-                {dayInspections.length === 0 ? (
-                  <div style={{ color: '#9e998f', fontSize: 12, fontStyle: 'italic' }}>
-                    No inspections
+                {day}
+              </div>
+            ))}
+            
+            {/* Month grid */}
+            {monthDates.map(date => {
+              const dateStr = date.toISOString().split('T')[0]
+              const isWeekendDay = isWeekend(date)
+              const isCurrentMonth = date.getMonth() === currentDate.getMonth()
+              const dayInspections = scheduledInspections.filter(i => i.scheduled_date === dateStr)
+              
+              return (
+                <div
+                  key={dateStr}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDragEnd(date)}
+                  style={{
+                    minHeight: 80,
+                    padding: 4,
+                    background: isCurrentMonth ? '#fff' : '#f9f8f6',
+                    border: '1px solid #e0dbd4',
+                    ...(isWeekendDay ? { background: isCurrentMonth ? '#f5f0e8' : '#ebe6de' } : {}),
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, color: isCurrentMonth ? '#1a1a1a' : '#9e998f' }}>
+                    {date.getDate()}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {dayInspections.map(inspection => {
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {dayInspections.slice(0, 3).map(inspection => {
                       const statusColor = getStatusColor(inspection.status)
                       return (
                         <div
@@ -394,42 +665,32 @@ function InspectionsCalendar({
                           style={{
                             background: statusColor.bg,
                             border: `1px solid ${statusColor.border}`,
-                            borderRadius: 6,
-                            padding: 10,
+                            borderRadius: 2,
+                            padding: '2px 4px',
                             cursor: 'grab',
-                            fontSize: 12,
+                            fontSize: 9,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            color: statusColor.text,
                           }}
+                          title={`${inspection.jobs.job_number} - ${inspection.jobs.insured_name}`}
                         >
-                          <div style={{ fontWeight: 600, color: statusColor.text, marginBottom: 4 }}>
-                            {inspection.jobs.job_number}
-                          </div>
-                          <div style={{ color: '#1a1a1a', marginBottom: 4 }}>
-                            {inspection.jobs.insured_name}
-                          </div>
-                          <div style={{ color: '#9e998f', fontSize: 11, marginBottom: 4 }}>
-                            {inspection.jobs.property_address}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
-                            {inspection.scheduled_time && (
-                              <span style={{ color: '#1a1a1a' }}>
-                                {formatTime(inspection.scheduled_time)}
-                              </span>
-                            )}
-                            {inspection.users?.name && (
-                              <span style={{ color: '#9e998f' }}>
-                                · {inspection.users.name}
-                              </span>
-                            )}
-                          </div>
+                          {inspection.jobs.job_number}
                         </div>
                       )
                     })}
+                    {dayInspections.length > 3 && (
+                      <div style={{ fontSize: 9, color: '#9e998f' }}>
+                        +{dayInspections.length - 3} more
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Unscheduled */}
@@ -442,7 +703,7 @@ function InspectionsCalendar({
             </span>
           </div>
 
-          <div style={{ background: '#f9f8f6', border: '1px solid #e0dbd4', borderRadius: 8, padding: 16 }}>
+          <div style={{ background: '#f9f8f6', border: '1px solid #e0dbd4', borderRadius: 8, padding: 16, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {unscheduledInspections.map(inspection => (
                 <div
