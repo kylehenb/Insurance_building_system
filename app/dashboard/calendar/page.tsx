@@ -398,16 +398,16 @@ function InspectionsCalendar({
     }
   })
 
-  console.log('Grouped inspections:', { 
-    inspectionsByDateTime, 
-    inspectionsByDate, 
-    scheduledInspections: scheduledInspections.map(i => ({
-      id: i.id,
-      scheduled_date: i.scheduled_date,
-      start_time: i.start_time,
-      job_number: i.jobs.job_number
-    }))
+  console.log('Grouped inspections keys:', { 
+    dateTimeKeys: Object.keys(inspectionsByDateTime),
+    dateKeys: Object.keys(inspectionsByDate),
   })
+  console.log('Scheduled inspections details:', scheduledInspections.map(i => ({
+    id: i.id,
+    scheduled_date: i.scheduled_date,
+    start_time: i.start_time,
+    job_number: i.jobs.job_number
+  })))
 
   // Helper function to format date as YYYY-MM-DD using local timezone
   const formatDateLocal = (date: Date) => {
