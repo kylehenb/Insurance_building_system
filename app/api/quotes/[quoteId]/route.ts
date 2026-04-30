@@ -221,8 +221,8 @@ export async function PATCH(
     // Auto-create unplaced work orders when quote is approved
     const APPROVED_STATUSES = ['approved', 'partially_approved']
 
-    if (APPROVED_STATUSES.includes(safeUpdates.status as string)) {
-      await createUnplacedWorkOrdersFromQuote(data.id, data.job_id, tenantId as string)
+    if (APPROVED_STATUSES.includes(safeUpdates.status as string) && data.job_id) {
+      await createUnplacedWorkOrdersFromQuote(data.id, data.job_id, data.tenant_id ?? (tenantId as string))
     }
   }
 
