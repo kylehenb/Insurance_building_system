@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 export interface FieldConfig {
   name: string
   label: string
-  type: 'text' | 'date' | 'select'
+  type: 'text' | 'date' | 'time' | 'select'
   options?: string[]
 }
 

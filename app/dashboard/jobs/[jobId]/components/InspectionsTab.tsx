@@ -14,6 +14,7 @@ interface Inspection {
   job_id: string
   inspection_ref: string | null
   scheduled_date: string | null
+  scheduled_time: string | null
   status: string
   person_met: string | null
   access_notes: string | null  // repurposed for assessor name
@@ -49,6 +50,15 @@ function StatusPill({ status }: { status: string }) {
 function formatDate(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatTime(t: string | null) {
+  if (!t) return ''
+  const [hours, minutes] = t.split(':')
+  const hour = parseInt(hours)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const hour12 = hour % 12 || 12
+  return `${hour12}:${minutes} ${ampm}`
 }
 
 const INSPECTION_TYPES = [
@@ -91,6 +101,7 @@ function InspectionForm({
   onDelete: (id: string) => void
 }) {
   const [date, setDate] = useState(inspection.scheduled_date ?? '')
+  const [time, setTime] = useState(inspection.scheduled_time ?? '')
   const [status, setStatus] = useState(inspection.status)
   const [personMet, setPersonMet] = useState(inspection.person_met ?? '')
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
@@ -139,6 +150,17 @@ function InspectionForm({
             value={date}
             style={inputStyle}
             onChange={e => handleChange('scheduled_date', e.target.value, setDate)}
+            onBlur={flushSave}
+            onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Time</label>
+          <input
+            type="time"
+            value={time}
+            style={inputStyle}
+            onChange={e => handleChange('scheduled_time', e.target.value, setTime)}
             onBlur={flushSave}
             onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
           />
@@ -226,7 +248,7 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
       setLoading(true)
       const { data } = await supabase
         .from('inspections')
-        .select('id,tenant_id,job_id,inspection_ref,scheduled_date,status,person_met,access_notes,notes,field_draft,created_at')
+        .select('id,tenant_id,job_id,inspection_ref,scheduled_date,scheduled_time,status,person_met,access_notes,notes,field_draft,created_at')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true })
@@ -245,11 +267,12 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
         job_id: jobId,
         status: 'draft',
         scheduled_date: data['Date'] || null,
+        scheduled_time: data['Time'] || null,
         access_notes: data['Assessor'] || null,
         person_met: data['Person Met'] || null,
         field_draft: fieldDraft,
       })
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,status,person_met,access_notes,notes,field_draft,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,scheduled_time,status,person_met,access_notes,notes,field_draft,created_at')
       .single()
     if (error) throw error
     setInspections(prev => [...prev, inserted as Inspection])
@@ -291,6 +314,9 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
                     </span>
                     <span className="text-[13px] text-[#3a3530]">{typeLabel(insp)}</span>
                     <span className="text-[12px] text-[#9e998f]">{formatDate(insp.scheduled_date)}</span>
+                    {insp.scheduled_time && (
+                      <span className="text-[12px] text-[#9e998f]">{formatTime(insp.scheduled_time)}</span>
+                    )}
                     {insp.access_notes && (
                       <span className="text-[12px] text-[#9e998f]">{insp.access_notes}</span>
                     )}
@@ -318,6 +344,7 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
         fields={[
           { name: 'Type', label: 'Type', type: 'select', options: INSPECTION_TYPES },
           { name: 'Date', label: 'Date', type: 'date' },
+          { name: 'Time', label: 'Time', type: 'time' },
           { name: 'Assessor', label: 'Assessor', type: 'text' },
           { name: 'Person Met', label: 'Person Met', type: 'text' },
         ]}
