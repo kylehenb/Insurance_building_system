@@ -51,9 +51,26 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
   useEffect(() => {
     setLocalContacts(contacts)
     // Show additional slots if they have data
-    setShowAdditional1(contacts.some(c => c.slot === 'additional_1') || hideInsured)
-    setShowAdditional2(contacts.some(c => c.slot === 'additional_2'))
-  }, [contacts, hideInsured])
+    const hasAdditional1 = contacts.some(c => c.slot === 'additional_1')
+    const hasAdditional2 = contacts.some(c => c.slot === 'additional_2')
+    setShowAdditional1(hasAdditional1 || hideInsured)
+    setShowAdditional2(hasAdditional2)
+    
+    // If hideInsured is true and no additional_1 exists, create it
+    if (hideInsured && !hasAdditional1) {
+      const newContact: JobContact = {
+        slot: 'additional_1',
+        name: '',
+        phone: '',
+        email: '',
+        roles: [],
+      }
+      const updated = [...contacts, newContact]
+      const withDefaults = applyContactDefaults(updated)
+      setLocalContacts(withDefaults)
+      onChange(withDefaults)
+    }
+  }, [contacts, hideInsured, onChange])
 
   // Ensure insured always has auth and primary_site roles
   useEffect(() => {
@@ -320,7 +337,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
             )}
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
               <Select
@@ -450,7 +467,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
             )}
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
               <Select

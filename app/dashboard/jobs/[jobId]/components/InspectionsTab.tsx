@@ -14,7 +14,9 @@ interface Inspection {
   job_id: string
   inspection_ref: string | null
   scheduled_date: string | null
-  scheduled_time: string | null
+  start_time: string | null
+  finish_time: string | null
+  duration_minutes: number | null
   status: string
   person_met: string | null
   access_notes: string | null  // repurposed for assessor name
@@ -61,6 +63,17 @@ function formatTime(t: string | null) {
   return `${hour12}:${minutes} ${ampm}`
 }
 
+// Helper functions for time calculations
+function calculateFinishTime(start: string, dur: string) {
+  if (!start || !dur) return ''
+  const [hours, minutes] = start.split(':').map(Number)
+  const duration = parseInt(dur) || 60
+  const totalMinutes = hours * 60 + minutes + duration
+  const endHours = Math.floor(totalMinutes / 60) % 24
+  const endMinutes = totalMinutes % 60
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+}
+
 const INSPECTION_TYPES = [
   'Building Assessment',
   'Make Safe',
@@ -101,7 +114,9 @@ function InspectionForm({
   onDelete: (id: string) => void
 }) {
   const [date, setDate] = useState(inspection.scheduled_date ?? '')
-  const [time, setTime] = useState(inspection.scheduled_time ?? '')
+  const [startTime, setStartTime] = useState(inspection.start_time ?? '')
+  const [finishTime, setFinishTime] = useState(inspection.finish_time ?? '')
+  const [duration, setDuration] = useState(inspection.duration_minutes?.toString() ?? '60')
   const [status, setStatus] = useState(inspection.status)
   const [personMet, setPersonMet] = useState(inspection.person_met ?? '')
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
@@ -113,10 +128,53 @@ function InspectionForm({
     tenantId,
   })
 
-  // Save time immediately when changed to prevent loss on unmount
-  const handleTimeChange = (value: string) => {
-    setTime(value)
-    scheduleFieldSave('scheduled_time', value || null)
+  // Calculate finish time from start time and duration
+  const calculateFinishTime = (start: string, dur: string) => {
+    if (!start || !dur) return ''
+    const [hours, minutes] = start.split(':').map(Number)
+    const duration = parseInt(dur) || 60
+    const totalMinutes = hours * 60 + minutes + duration
+    const endHours = Math.floor(totalMinutes / 60) % 24
+    const endMinutes = totalMinutes % 60
+    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+  }
+
+  // Calculate duration from start and finish time
+  const calculateDuration = (start: string, finish: string) => {
+    if (!start || !finish) return '60'
+    const [startHours, startMinutes] = start.split(':').map(Number)
+    const [finishHours, finishMinutes] = finish.split(':').map(Number)
+    const startTotal = startHours * 60 + startMinutes
+    const finishTotal = finishHours * 60 + finishMinutes
+    const diff = finishTotal - startTotal
+    return diff > 0 ? diff.toString() : '60'
+  }
+
+  // Handle start time change - auto-calculate finish time
+  const handleStartTimeChange = (value: string) => {
+    setStartTime(value)
+    scheduleFieldSave('start_time', value || null)
+    const newFinishTime = calculateFinishTime(value, duration)
+    setFinishTime(newFinishTime)
+    scheduleFieldSave('finish_time', newFinishTime || null)
+  }
+
+  // Handle finish time change - auto-calculate duration
+  const handleFinishTimeChange = (value: string) => {
+    setFinishTime(value)
+    const newDuration = calculateDuration(startTime, value)
+    setDuration(newDuration)
+    scheduleFieldSave('finish_time', value || null)
+    scheduleFieldSave('duration_minutes', parseInt(newDuration) || null)
+  }
+
+  // Handle duration change - auto-calculate finish time
+  const handleDurationChange = (value: string) => {
+    setDuration(value)
+    const newFinishTime = calculateFinishTime(startTime, value)
+    setFinishTime(newFinishTime)
+    scheduleFieldSave('duration_minutes', parseInt(value) || null)
+    scheduleFieldSave('finish_time', newFinishTime || null)
   }
 
   const supabase = createBrowserClient(
@@ -161,12 +219,36 @@ function InspectionForm({
           />
         </div>
         <div>
-          <label style={labelStyle}>Time</label>
+          <label style={labelStyle}>Start Time</label>
           <input
             type="time"
-            value={time}
+            value={startTime}
             style={inputStyle}
-            onChange={e => handleTimeChange(e.target.value)}
+            onChange={e => handleStartTimeChange(e.target.value)}
+            onBlur={flushSave}
+            onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Finish Time</label>
+          <input
+            type="time"
+            value={finishTime}
+            style={inputStyle}
+            onChange={e => handleFinishTimeChange(e.target.value)}
+            onBlur={flushSave}
+            onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Duration (min)</label>
+          <input
+            type="number"
+            value={duration}
+            min="15"
+            step="15"
+            style={inputStyle}
+            onChange={e => handleDurationChange(e.target.value)}
             onBlur={flushSave}
             onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
           />
@@ -254,7 +336,7 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
       setLoading(true)
       const { data } = await supabase
         .from('inspections')
-        .select('id,tenant_id,job_id,inspection_ref,scheduled_date,scheduled_time,status,person_met,access_notes,notes,field_draft,created_at')
+        .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,created_at')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true })
@@ -266,6 +348,10 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
 
   async function handleCreate(data: Record<string, string>) {
     const fieldDraft = { type: data['Type'] ?? '' }
+    const startTime = data['Start Time'] || null
+    const duration = parseInt(data['Duration'] || '60') || 60
+    const finishTime = startTime ? calculateFinishTime(startTime, duration.toString()) : null
+    
     const { data: inserted, error } = await supabase
       .from('inspections')
       .insert({
@@ -273,12 +359,14 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
         job_id: jobId,
         status: 'draft',
         scheduled_date: data['Date'] || null,
-        scheduled_time: data['Time'] || null,
+        start_time: startTime,
+        finish_time: finishTime,
+        duration_minutes: duration,
         access_notes: data['Assessor'] || null,
         person_met: data['Person Met'] || null,
         field_draft: fieldDraft,
       })
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,scheduled_time,status,person_met,access_notes,notes,field_draft,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,created_at')
       .single()
     if (error) throw error
     setInspections(prev => [...prev, inserted as Inspection])
@@ -320,8 +408,8 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
                     </span>
                     <span className="text-[13px] text-[#3a3530]">{typeLabel(insp)}</span>
                     <span className="text-[12px] text-[#9e998f]">{formatDate(insp.scheduled_date)}</span>
-                    {insp.scheduled_time && (
-                      <span className="text-[12px] text-[#9e998f]">{formatTime(insp.scheduled_time)}</span>
+                    {insp.start_time && (
+                      <span className="text-[12px] text-[#9e998f]">{formatTime(insp.start_time)}</span>
                     )}
                     {insp.access_notes && (
                       <span className="text-[12px] text-[#9e998f]">{insp.access_notes}</span>
@@ -350,7 +438,8 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
         fields={[
           { name: 'Type', label: 'Type', type: 'select', options: INSPECTION_TYPES },
           { name: 'Date', label: 'Date', type: 'date' },
-          { name: 'Time', label: 'Time', type: 'time' },
+          { name: 'Start Time', label: 'Start Time', type: 'time' },
+          { name: 'Duration', label: 'Duration (min)', type: 'text' },
           { name: 'Assessor', label: 'Assessor', type: 'text' },
           { name: 'Person Met', label: 'Person Met', type: 'text' },
         ]}

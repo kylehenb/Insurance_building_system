@@ -13,7 +13,9 @@ interface Inspection {
   job_id: string
   inspection_ref: string | null
   scheduled_date: string | null
-  scheduled_time: string | null
+  start_time: string | null
+  finish_time: string | null
+  duration_minutes: number | null
   status: string | null
   inspector_id: string | null
   jobs: {
@@ -116,7 +118,9 @@ export default function GlobalCalendarPage() {
             job_id,
             inspection_ref,
             scheduled_date,
-            scheduled_time,
+            start_time,
+            finish_time,
+            duration_minutes,
             status,
             inspector_id,
             jobs (
@@ -185,7 +189,9 @@ export default function GlobalCalendarPage() {
         job_id,
         inspection_ref,
         scheduled_date,
-        scheduled_time,
+        start_time,
+        finish_time,
+        duration_minutes,
         status,
         inspector_id,
         jobs (
@@ -363,14 +369,14 @@ function InspectionsCalendar({
   scheduledInspections.forEach(inspection => {
     if (inspection.scheduled_date) {
       // Group by date and time for time slots
-      const key = `${inspection.scheduled_date}-${inspection.scheduled_time || ''}`
+      const key = `${inspection.scheduled_date}-${inspection.start_time || ''}`
       if (!inspectionsByDateTime[key]) {
         inspectionsByDateTime[key] = []
       }
       inspectionsByDateTime[key].push(inspection)
       
       // Also group by date only for inspections without times
-      if (!inspection.scheduled_time) {
+      if (!inspection.start_time) {
         if (!inspectionsByDate[inspection.scheduled_date]) {
           inspectionsByDate[inspection.scheduled_date] = []
         }
@@ -388,11 +394,25 @@ function InspectionsCalendar({
 
     const dateStr = date.toISOString().split('T')[0]
     
+    // Calculate finish time based on duration if time is provided
+    let finishTime = null
+    let duration = draggedInspection.duration_minutes || 60
+    
+    if (time) {
+      const [hours, minutes] = time.split(':').map(Number)
+      const totalMinutes = hours * 60 + minutes + duration
+      const endHours = Math.floor(totalMinutes / 60) % 24
+      const endMinutes = totalMinutes % 60
+      finishTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+    }
+    
     const { error } = await supabase
       .from('inspections')
       .update({ 
         scheduled_date: dateStr,
-        scheduled_time: time
+        start_time: time,
+        finish_time: finishTime,
+        duration_minutes: duration,
       })
       .eq('id', draggedInspection.id)
       .eq('tenant_id', tenantId)
@@ -579,8 +599,15 @@ function InspectionsCalendar({
                       minHeight: 60,
                       position: 'relative',
                     }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleDragEnd(date, null)}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleDragEnd(date, null)
+                    }}
                   >
                     <div style={{ color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
                       {date.toLocaleDateString('en-AU', { weekday: 'short' })}
@@ -649,8 +676,15 @@ function InspectionsCalendar({
                     return (
                       <div
                         key={key}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDragEnd(date, timeStr)}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDragEnd(date, timeStr)
+                        }}
                         style={{
                           padding: 2,
                           borderBottom: '1px solid #f0ebe4',
@@ -738,7 +772,7 @@ function InspectionsCalendar({
                     {date.getDate()}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {dayInspections.slice(0, 3).map(inspection => {
+                    {dayInspections.map(inspection => {
                       const statusColor = getStatusColor(inspection.status)
                       return (
                         <div
@@ -756,18 +790,19 @@ function InspectionsCalendar({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             color: statusColor.text,
+                            position: 'relative',
                           }}
                           title={`${inspection.jobs.job_number} - ${inspection.jobs.insured_name}`}
                         >
+                          {inspection.start_time && (
+                            <span style={{ fontWeight: 600, marginRight: 4 }}>
+                              {formatTime(inspection.start_time)}
+                            </span>
+                          )}
                           {inspection.jobs.job_number}
                         </div>
                       )
                     })}
-                    {dayInspections.length > 3 && (
-                      <div style={{ fontSize: 9, color: '#9e998f' }}>
-                        +{dayInspections.length - 3} more
-                      </div>
-                    )}
                   </div>
                 </div>
               )
