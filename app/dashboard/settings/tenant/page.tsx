@@ -97,6 +97,8 @@ interface ProfileFormData {
   bank_name: string
   account_name: string
   plan: string
+  invoice_payment_terms: number
+  excess_payment_terms: number
 }
 
 interface TenantApiResponse {
@@ -120,6 +122,8 @@ interface TenantApiResponse {
     bank_name: string | null
     account_name: string | null
     plan: string | null
+    invoice_payment_terms: number | null
+    excess_payment_terms: number | null
     service_area_config: ServiceAreaConfig | null
   }
   job_count: number
@@ -159,6 +163,8 @@ const EMPTY_PROFILE: ProfileFormData = {
   bank_name: '',
   account_name: '',
   plan: '',
+  invoice_payment_terms: 14,
+  excess_payment_terms: 0,
 }
 
 const AUSTRALIAN_STATES = ['WA', 'NSW', 'VIC', 'QLD', 'SA', 'TAS', 'NT', 'ACT']
@@ -285,6 +291,8 @@ export default function TenantSettingsPage() {
           bank_name: t.bank_name ?? '',
           account_name: t.account_name ?? '',
           plan: t.plan ?? '',
+          invoice_payment_terms: t.invoice_payment_terms ?? 14,
+          excess_payment_terms: t.excess_payment_terms ?? 0,
         })
         setServiceAreaConfig(t.service_area_config ?? EMPTY_SERVICE_CONFIG)
       } catch (err) {
@@ -347,6 +355,8 @@ export default function TenantSettingsPage() {
           account_number: profileForm.account_number || null,
           bank_name: profileForm.bank_name || null,
           account_name: profileForm.account_name || null,
+          invoice_payment_terms: profileForm.invoice_payment_terms,
+          excess_payment_terms: profileForm.excess_payment_terms,
         }),
       })
       if (!res.ok) throw new Error('Failed to save')
@@ -999,6 +1009,40 @@ export default function TenantSettingsPage() {
                           placeholder="Account holder name"
                           className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                         />
+                      </div>
+
+                      {/* Invoice Payment Terms */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Invoice Payment Terms (days)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={profileForm.invoice_payment_terms}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, invoice_payment_terms: parseInt(e.target.value) || 0 }))
+                          }
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
+                        <p className="text-xs text-[#9e998f] mt-1">Days for standard invoices</p>
+                      </div>
+
+                      {/* Excess Payment Terms */}
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Excess Payment Terms (days)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={profileForm.excess_payment_terms}
+                          onChange={(e) =>
+                            setProfileForm((prev) => ({ ...prev, excess_payment_terms: parseInt(e.target.value) || 0 }))
+                          }
+                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                        />
+                        <p className="text-xs text-[#9e998f] mt-1">Days for excess invoices (0 = due immediately)</p>
                       </div>
                     </div>
                   </div>

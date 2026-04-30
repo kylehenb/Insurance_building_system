@@ -76,6 +76,8 @@ interface TenantPatchBody {
   account_number?: string | null
   bank_name?: string | null
   account_name?: string | null
+  invoice_payment_terms?: number | null
+  excess_payment_terms?: number | null
   service_area_config?: ServiceAreaConfig | null
 }
 
@@ -154,6 +156,8 @@ export async function PATCH(req: NextRequest) {
       'account_number',
       'bank_name',
       'account_name',
+      'invoice_payment_terms',
+      'excess_payment_terms',
       'service_area_config',
     ]
 
