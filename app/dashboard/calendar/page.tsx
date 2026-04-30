@@ -328,7 +328,7 @@ function InspectionsCalendar({
     return `${hour12}:${minutes} ${ampm}`
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'confirmed':
         return { bg: '#d4edda', text: '#155724', border: '#c3e6cb' }
