@@ -208,18 +208,11 @@ export default function GlobalCalendarPage() {
       .in('status', ['unscheduled', 'proposed', 'confirmed', 'awaiting_reschedule'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
-    console.log('Reloaded inspections:', inspectionsData)
     setInspections((inspectionsData as any) || [])
   }
 
   const scheduledInspections = inspections.filter(i => i.scheduled_date)
   const unscheduledInspections = inspections.filter(i => !i.scheduled_date)
-
-  console.log('Parent component state:', { 
-    totalInspections: inspections.length,
-    scheduled: scheduledInspections.length,
-    unscheduled: unscheduledInspections.length 
-  })
 
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#1a1a1a' }}>
@@ -381,8 +374,10 @@ function InspectionsCalendar({
   const inspectionsByDate: Record<string, Inspection[]> = {}
   scheduledInspections.forEach(inspection => {
     if (inspection.scheduled_date) {
+      // Strip seconds from time to match time slot format
+      const timeWithoutSeconds = inspection.start_time ? inspection.start_time.substring(0, 5) : ''
       // Group by date and time for time slots
-      const key = `${inspection.scheduled_date}-${inspection.start_time || ''}`
+      const key = `${inspection.scheduled_date}-${timeWithoutSeconds}`
       if (!inspectionsByDateTime[key]) {
         inspectionsByDateTime[key] = []
       }
@@ -397,17 +392,6 @@ function InspectionsCalendar({
       }
     }
   })
-
-  console.log('Grouped inspections keys:', JSON.stringify({ 
-    dateTimeKeys: Object.keys(inspectionsByDateTime),
-    dateKeys: Object.keys(inspectionsByDate),
-  }, null, 2))
-  console.log('Scheduled inspections details:', JSON.stringify(scheduledInspections.map(i => ({
-    id: i.id,
-    scheduled_date: i.scheduled_date,
-    start_time: i.start_time,
-    job_number: i.jobs.job_number
-  })), null, 2))
 
   // Helper function to format date as YYYY-MM-DD using local timezone
   const formatDateLocal = (date: Date) => {

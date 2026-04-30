@@ -53,8 +53,24 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
     // Show additional slots if they have data
     const hasAdditional1 = contacts.some(c => c.slot === 'additional_1')
     const hasAdditional2 = contacts.some(c => c.slot === 'additional_2')
+    const hasInsured = contacts.some(c => c.slot === 'insured')
     setShowAdditional1(hasAdditional1 || hideInsured)
     setShowAdditional2(hasAdditional2)
+    
+    // Ensure insured contact exists if not hidden
+    if (!hideInsured && !hasInsured) {
+      const newContact: JobContact = {
+        slot: 'insured',
+        name: '',
+        phone: '',
+        email: '',
+        roles: ['auth', 'primary_site'],
+      }
+      const updated = [...contacts, newContact]
+      const withDefaults = applyContactDefaults(updated)
+      setLocalContacts(withDefaults)
+      onChange(withDefaults)
+    }
     
     // If hideInsured is true and no additional_1 exists, create it
     if (hideInsured && !hasAdditional1) {
