@@ -14,6 +14,7 @@ export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    const abortController = new AbortController()
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,9 +26,12 @@ export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
       .eq('tenant_id', tenantId)
       .single()
       .then(({ data }) => {
-        setJob(data ?? { job_number: '', insurer: null, insured_name: null, property_address: null })
-        setReady(true)
+        if (!abortController.signal.aborted) {
+          setJob(data ?? { job_number: '', insurer: null, insured_name: null, property_address: null })
+          setReady(true)
+        }
       })
+    return () => abortController.abort()
   }, [jobId, tenantId])
 
   if (!ready || !job) {

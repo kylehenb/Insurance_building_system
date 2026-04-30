@@ -155,17 +155,21 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     // Only show the loading spinner on the very first load.
     // Background refreshes (e.g. after a status change inside the inline editor)
     // must not unmount the editor, otherwise pending debounced item saves are killed.
     const isFirst = !initialLoadDone.current
     if (isFirst) setLoading(true)
     try {
-      const res = await fetch(`/api/quotes?jobId=${jobId}&tenantId=${tenantId}`)
+      const res = await fetch(`/api/quotes?jobId=${jobId}&tenantId=${tenantId}`, { signal })
       if (res.ok) {
         const data: QuoteListItem[] = await res.json()
         setQuotes(data)
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error loading quotes:', error)
       }
     } finally {
       if (isFirst) setLoading(false)
@@ -173,11 +177,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
     }
   }, [jobId, tenantId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const abortController = new AbortController()
+    load(abortController.signal)
+    return () => abortController.abort()
+  }, [load])
 
   // ── Fetch current job stage ───────────────────────────────────────────────
 
   useEffect(() => {
+    const abortController = new AbortController()
     const fetchJobStage = async () => {
       try {
         const supabase = createBrowserClient(
@@ -189,14 +198,19 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           .select('current_stage, homeowner_signoff_received_at')
           .eq('id', jobId)
           .single()
-        setCurrentJobStage((data as any)?.current_stage ?? null)
-        const receivedAt = (data as any)?.homeowner_signoff_received_at
-        if (receivedAt) setSignOffFiledDate(new Date(receivedAt))
+        if (!abortController.signal.aborted) {
+          setCurrentJobStage((data as any)?.current_stage ?? null)
+          const receivedAt = (data as any)?.homeowner_signoff_received_at
+          if (receivedAt) setSignOffFiledDate(new Date(receivedAt))
+        }
       } catch (error) {
-        console.error('Error fetching job stage:', error)
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching job stage:', error)
+        }
       }
     }
     fetchJobStage()
+    return () => abortController.abort()
   }, [jobId])
 
   // ── Close dropdown on outside click ──────────────────────────────────────
@@ -216,17 +230,27 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
 
   useEffect(() => {
     if (!showVersions) return
+    const abortController = new AbortController()
     const quoteId = showVersions
     setLoadingVersions(true)
-    fetch(`/api/quotes/${quoteId}/versions?tenantId=${encodeURIComponent(tenantId)}`)
+    fetch(`/api/quotes/${quoteId}/versions?tenantId=${encodeURIComponent(tenantId)}`, { signal: abortController.signal })
       .then(r => r.json())
       .then((data: any[]) => {
-        setVersionsMap(prev => ({ ...prev, [quoteId]: data }))
+        if (!abortController.signal.aborted) {
+          setVersionsMap(prev => ({ ...prev, [quoteId]: data }))
+        }
       })
       .catch(() => {
-        setVersionsMap(prev => ({ ...prev, [quoteId]: [] }))
+        if (!abortController.signal.aborted) {
+          setVersionsMap(prev => ({ ...prev, [quoteId]: [] }))
+        }
       })
-      .finally(() => setLoadingVersions(false))
+      .finally(() => {
+        if (!abortController.signal.aborted) {
+          setLoadingVersions(false)
+        }
+      })
+    return () => abortController.abort()
   }, [showVersions, tenantId])
 
   // ── Version dropdown: close on outside click ────────────────────────────────
@@ -653,17 +677,27 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   useEffect(() => {
     if (!showPreviewModal || !previewQuoteId) return
 
+    const abortController = new AbortController()
     setLoadingPreview(true)
-    fetch(`/api/quotes/${previewQuoteId}?tenantId=${encodeURIComponent(tenantId)}`)
+    fetch(`/api/quotes/${previewQuoteId}?tenantId=${encodeURIComponent(tenantId)}`, { signal: abortController.signal })
       .then(r => r.json())
       .then((data: any) => {
-        setPreviewData(data)
+        if (!abortController.signal.aborted) {
+          setPreviewData(data)
+        }
       })
       .catch(error => {
-        console.error('Error fetching quote for preview:', error)
-        setPreviewData(null)
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching quote for preview:', error)
+          setPreviewData(null)
+        }
       })
-      .finally(() => setLoadingPreview(false))
+      .finally(() => {
+        if (!abortController.signal.aborted) {
+          setLoadingPreview(false)
+        }
+      })
+    return () => abortController.abort()
   }, [showPreviewModal, previewQuoteId, tenantId])
 
   // ── Loading state ─────────────────────────────────────────────────────────
