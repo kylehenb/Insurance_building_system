@@ -39,6 +39,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
   const [dropOpen, setDropOpen] = useState(false)
   const [utilOpen, setUtilOpen] = useState(false)
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0)
+  const [unscheduledInspectionsCount, setUnscheduledInspectionsCount] = useState<number>(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -53,6 +54,19 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
       setPendingOrdersCount(count ?? 0)
     }
     fetchPendingCount()
+  }, [tenantId])
+
+  // Fetch unscheduled inspections count on mount
+  useEffect(() => {
+    async function fetchUnscheduledCount() {
+      const { count } = await supabase
+        .from('inspections')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'unscheduled')
+      setUnscheduledInspectionsCount(count ?? 0)
+    }
+    fetchUnscheduledCount()
   }, [tenantId])
 
   // Debounced fuzzy search
@@ -132,6 +146,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
     {
       label: 'Calendar',
       href: '/dashboard/calendar',
+      badge: unscheduledInspectionsCount > 0 ? unscheduledInspectionsCount : null,
       icon: (
         <svg className="nav-icon" viewBox="0 0 16 16" strokeWidth="1.6" stroke="currentColor" fill="none">
           <rect x="2" y="3" width="12" height="10" rx="1.5" />

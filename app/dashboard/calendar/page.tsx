@@ -208,11 +208,18 @@ export default function GlobalCalendarPage() {
       .in('status', ['unscheduled', 'proposed', 'confirmed', 'awaiting_reschedule'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
+    console.log('Reloaded inspections:', inspectionsData)
     setInspections((inspectionsData as any) || [])
   }
 
   const scheduledInspections = inspections.filter(i => i.scheduled_date)
   const unscheduledInspections = inspections.filter(i => !i.scheduled_date)
+
+  console.log('Parent component state:', { 
+    totalInspections: inspections.length,
+    scheduled: scheduledInspections.length,
+    unscheduled: unscheduledInspections.length 
+  })
 
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#1a1a1a' }}>
@@ -278,6 +285,7 @@ export default function GlobalCalendarPage() {
         </div>
       ) : mode === 'inspections' ? (
         <InspectionsCalendar
+          key={inspections.length} // Force re-render when data changes
           scheduledInspections={scheduledInspections}
           unscheduledInspections={unscheduledInspections}
           tenantId={tenantId}
@@ -310,6 +318,11 @@ function InspectionsCalendar({
   const [viewType, setViewType] = useState<ViewType>('week')
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [draggedInspection, setDraggedInspection] = useState<Inspection | null>(null)
+
+  console.log('InspectionsCalendar props:', {
+    scheduledInspections: scheduledInspections.length,
+    unscheduledInspections: unscheduledInspections.length
+  })
 
   // Get week dates (Monday to Sunday)
   const getWeekDates = (date: Date) => {
@@ -385,6 +398,12 @@ function InspectionsCalendar({
     }
   })
 
+  console.log('Grouped inspections:', { 
+    inspectionsByDateTime, 
+    inspectionsByDate, 
+    scheduledInspections 
+  })
+
   // Helper function to format date as YYYY-MM-DD using local timezone
   const formatDateLocal = (date: Date) => {
     const year = date.getFullYear()
@@ -405,6 +424,8 @@ function InspectionsCalendar({
     const month = (date.getMonth() + 1).toString().padStart(2, '0')
     const day = date.getDate().toString().padStart(2, '0')
     const dateStr = `${year}-${month}-${day}`
+    
+    console.log('handleDragEnd:', { dateStr, time, inspectionId: draggedInspection.id })
     
     // Calculate finish time based on duration if time is provided
     let finishTime = null
@@ -434,8 +455,9 @@ function InspectionsCalendar({
       return
     }
 
+    console.log('Updated inspection successfully, reloading...')
     setDraggedInspection(null)
-    onInspectionUpdate()
+    await onInspectionUpdate()
   }
 
   const formatTime = (time: string | null) => {
