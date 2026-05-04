@@ -1,13 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import { ReportPhotos } from './ReportPhotos'
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 interface LDRReportFormProps {
   data: Record<string, unknown>
@@ -74,6 +68,38 @@ function InlineInput({
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
     />
+  )
+}
+
+function DropdownSelect({
+  value,
+  onChange,
+  locked,
+  options,
+}: {
+  value: string
+  onChange: (v: string) => void
+  locked: boolean
+  options: string[]
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      disabled={locked}
+      className={`
+        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
+        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
+        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        transition-colors appearance-none cursor-pointer
+      `}
+      style={{ fontFamily: 'DM Sans, sans-serif' }}
+    >
+      <option value="">— Select —</option>
+      {options.map(opt => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
   )
 }
 
@@ -231,51 +257,12 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
           />
         </div>
         <div>
-          <FieldLabel label="Assessor Name" />
+          <FieldLabel label="Conducted by" />
           <InlineInput
             value={str('assessor_name')}
             onChange={v => onChange('assessor_name', v)}
             locked={locked}
             placeholder="e.g. Kyle Bindon"
-          />
-        </div>
-      </div>
-
-      {/* — PROPERTY — */}
-      <SectionHeading label="Property" />
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <FieldLabel label="Property Address" />
-          <InlineInput
-            value={str('property_address')}
-            onChange={v => onChange('property_address', v)}
-            locked={locked}
-            placeholder="Full property address"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Insured Name" />
-          <InlineInput
-            value={str('insured_name')}
-            onChange={v => onChange('insured_name', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Claim Number" />
-          <InlineInput
-            value={str('claim_number')}
-            onChange={v => onChange('claim_number', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Loss Type" />
-          <InlineInput
-            value={str('loss_type')}
-            onChange={v => onChange('loss_type', v)}
-            locked={locked}
-            placeholder="e.g. Water Leak, Plumbing"
           />
         </div>
       </div>
@@ -321,37 +308,112 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
         </div>
       </div>
 
-      {/* — INVESTIGATION — */}
-      <SectionHeading label="Investigation" />
+      {/* — PRESSURE TESTS — */}
+      <SectionHeading label="Pressure Tests & Inspections" />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <FieldLabel label="Shower Breach pressure test" />
+          <DropdownSelect
+            value={tsf('shower_breach_test')}
+            onChange={v => handleTsfChange('shower_breach_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Cold Water line pressure test" />
+          <DropdownSelect
+            value={tsf('cold_water_test')}
+            onChange={v => handleTsfChange('cold_water_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Hot water line pressure test" />
+          <DropdownSelect
+            value={tsf('hot_water_test')}
+            onChange={v => handleTsfChange('hot_water_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Flood test to shower base" />
+          <DropdownSelect
+            value={tsf('shower_flood_test')}
+            onChange={v => handleTsfChange('shower_flood_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Spray test to shower walls &amp; screen" />
+          <DropdownSelect
+            value={tsf('shower_spray_test')}
+            onChange={v => handleTsfChange('shower_spray_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Visual inspection to tiles, grout &amp; silicone" />
+          <DropdownSelect
+            value={tsf('tiles_grout_test')}
+            onChange={v => handleTsfChange('tiles_grout_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Inspection to flexi-hose" />
+          <DropdownSelect
+            value={tsf('flexi_hose_test')}
+            onChange={v => handleTsfChange('flexi_hose_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Inspection to water pipe (shower, bath, vanity/kitchen)" />
+          <DropdownSelect
+            value={tsf('water_pipe_test')}
+            onChange={v => handleTsfChange('water_pipe_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Inspection of toilet pan/cistern" />
+          <DropdownSelect
+            value={tsf('toilet_test')}
+            onChange={v => handleTsfChange('toilet_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Thermal Imaging" />
+          <DropdownSelect
+            value={tsf('thermal_imaging_test')}
+            onChange={v => handleTsfChange('thermal_imaging_test', v)}
+            locked={locked}
+            options={['PASS', 'FAIL', 'N/A']}
+          />
+        </div>
+      </div>
+
+      {/* — INVESTIGATION & FINDINGS — */}
+      <SectionHeading label="Investigation and Findings" />
       <div className="space-y-4">
         <div>
-          <FieldLabel label="Investigation Method" />
+          <FieldLabel label="Investigation and Findings" />
           <InlineTextarea
-            value={tsf('investigation_method')}
-            onChange={v => handleTsfChange('investigation_method', v)}
+            value={tsf('investigation_findings')}
+            onChange={v => handleTsfChange('investigation_findings', v)}
             locked={locked}
-            placeholder="Describe how the leak was investigated (e.g. visual inspection, moisture meter, pressure test, camera inspection)..."
-            rows={3}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Findings" />
-          <InlineTextarea
-            value={tsf('findings')}
-            onChange={v => handleTsfChange('findings', v)}
-            locked={locked}
-            placeholder="Detail the findings from the investigation..."
-            rows={4}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Cause of Leak" />
-          <InlineTextarea
-            value={str('cause_of_damage')}
-            onChange={v => onChange('cause_of_damage', v)}
-            locked={locked}
-            placeholder="State the identified cause of the leak..."
-            rows={3}
+            placeholder="Describe the investigation methods used and detail the findings from the investigation..."
+            rows={6}
           />
         </div>
       </div>
@@ -359,16 +421,6 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
       {/* — DAMAGE ASSESSMENT — */}
       <SectionHeading label="Damage Assessment" />
       <div className="space-y-4">
-        <div>
-          <FieldLabel label="Resulting Damage" />
-          <InlineTextarea
-            value={str('resulting_damage')}
-            onChange={v => onChange('resulting_damage', v)}
-            locked={locked}
-            placeholder="List all damage observed from the leak..."
-            rows={5}
-          />
-        </div>
         <div>
           <FieldLabel label="Affected Areas" />
           <InlineTextarea
@@ -389,31 +441,11 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
             rows={3}
           />
         </div>
-        <div>
-          <FieldLabel label="Maintenance Notes" />
-          <InlineTextarea
-            value={str('maintenance_notes')}
-            onChange={v => onChange('maintenance_notes', v)}
-            locked={locked}
-            placeholder="Note any maintenance items observed..."
-            rows={3}
-          />
-        </div>
       </div>
 
       {/* — RECOMMENDATIONS — */}
       <SectionHeading label="Recommendations" />
       <div className="space-y-4">
-        <div>
-          <FieldLabel label="Immediate Actions Required" />
-          <InlineTextarea
-            value={tsf('immediate_actions')}
-            onChange={v => handleTsfChange('immediate_actions', v)}
-            locked={locked}
-            placeholder="List any immediate actions required to mitigate the leak..."
-            rows={3}
-          />
-        </div>
         <div>
           <FieldLabel label="Repair Recommendations" />
           <InlineTextarea
@@ -425,21 +457,12 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
           />
         </div>
         <div>
-          <FieldLabel label="Further Investigation Required" />
+          <FieldLabel label="Further investigation by plumber required" />
           <InlineInput
-            value={tsf('further_investigation_required')}
-            onChange={v => handleTsfChange('further_investigation_required', v)}
+            value={tsf('further_investigation_plumber')}
+            onChange={v => handleTsfChange('further_investigation_plumber', v)}
             locked={locked}
             placeholder="e.g. Yes, No, N/A"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Specialist Report Required" />
-          <InlineInput
-            value={tsf('specialist_report_required')}
-            onChange={v => handleTsfChange('specialist_report_required', v)}
-            locked={locked}
-            placeholder="e.g. Yes - Plumber, No, N/A"
           />
         </div>
       </div>

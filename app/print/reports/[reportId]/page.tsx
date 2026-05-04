@@ -58,8 +58,7 @@ const LDR_TEMPLATE = {
   ] as const,
 
   investigation_fields: [
-    { label: 'Investigation method:', field: 'investigation_method' },
-    { label: 'Findings:', field: 'findings' },
+    { label: 'Investigation and findings:', field: 'investigation_findings' },
   ] as const,
 
   damage_fields: [
@@ -67,18 +66,26 @@ const LDR_TEMPLATE = {
   ] as const,
 
   recommendation_fields: [
-    { label: 'Immediate actions required:', field: 'immediate_actions' },
     { label: 'Repair recommendations:', field: 'repair_recommendations' },
-    { label: 'Further investigation required:', field: 'further_investigation_required' },
-    { label: 'Specialist report required:', field: 'specialist_report_required' },
+    { label: 'Further investigation by plumber required:', field: 'further_investigation_plumber' },
+  ] as const,
+
+  pressure_test_fields: [
+    { label: 'Shower Breach pressure test:', field: 'shower_breach_test' },
+    { label: 'Cold Water line pressure test:', field: 'cold_water_test' },
+    { label: 'Hot water line pressure test:', field: 'hot_water_test' },
+    { label: 'Flood test to shower base:', field: 'shower_flood_test' },
+    { label: 'Spray test to shower walls & screen:', field: 'shower_spray_test' },
+    { label: 'Visual inspection to tiles, grout & silicone:', field: 'tiles_grout_test' },
+    { label: 'Inspection to flexi-hose:', field: 'flexi_hose_test' },
+    { label: 'Inspection to water pipe:', field: 'water_pipe_test' },
+    { label: 'Inspection of toilet pan/cistern:', field: 'toilet_test' },
+    { label: 'Thermal Imaging:', field: 'thermal_imaging_test' },
   ] as const,
 
   narrative_sections: [
-    'cause_of_damage',
-    'resulting_damage',
     'conclusion',
     'pre_existing_conditions',
-    'maintenance_notes',
   ] as const,
 }
 
@@ -152,13 +159,21 @@ const NARRATIVE_SECTION_CONFIG: Record<
     getValue: (r) => r.maintenance_notes,
     leftBorder: '3px solid #e0dbd4',
   },
+  additional_notes: {
+    title: 'Additional notes',
+    getValue: (r) => r.additional_notes,
+  },
+  investigation_findings: {
+    title: 'Investigation and findings',
+    getValue: (r) => tsf(r, 'investigation_findings'),
+  },
 }
 
 const NARRATIVE_GROUPS: Array<{ label: string; keys: string[] }> = [
   { label: 'Property', keys: ['property_description'] },
   { label: 'Incident', keys: ['incident_description', 'cause_of_damage', 'how_damage_occurred'] },
   { label: 'Damage findings', keys: ['resulting_damage'] },
-  { label: 'Assessment', keys: ['conclusion', 'pre_existing_conditions', 'maintenance_notes'] },
+  { label: 'Assessment', keys: ['conclusion', 'pre_existing_conditions', 'maintenance_notes', 'additional_notes'] },
 ]
 
 // Function to preserve text formatting (newlines, bullet points, paragraphs)
@@ -442,7 +457,7 @@ export default async function ReportPrintPage({
               <tr>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Assessor:</span>
+                    <span style={labelStyle}>{report.report_type === 'LDR' ? 'Conducted by:' : 'Assessor:'}</span>
                     <span style={valueStyle}>{report.assessor_name || '—'}</span>
                   </div>
                 </td>
@@ -460,8 +475,8 @@ export default async function ReportPrintPage({
                 </td>
               </tr>
 
-              {/* Block 2 — Property details (conditional) */}
-              {DEFAULT_BAR_TEMPLATE.show_property_table && (
+              {/* Block 2 — Property details (conditional, BAR only) */}
+              {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && (
                 <>
                   {dividerRow('Property details')}
                   {(() => {
@@ -497,6 +512,55 @@ export default async function ReportPrintPage({
                               <div style={cellContentStyle}>
                                 <span style={labelStyle}>{PROPERTY_FIELD_LABELS[key3] ?? key3}</span>
                                 <span style={valueStyle}>{pdText(pd, key3)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
+              {/* Block 2 — Pressure Tests (LDR only) */}
+              {report.report_type === 'LDR' && (
+                <>
+                  {dividerRow('Pressure tests & inspections')}
+                  {(() => {
+                    const fields = LDR_TEMPLATE.pressure_test_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+                      
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
                               </div>
                             </td>
                           ) : (
@@ -581,10 +645,10 @@ export default async function ReportPrintPage({
                 </>
               )}
 
-              {/* Block 4 — Investigation (LDR only) */}
+              {/* Block 4 — Investigation & Findings (LDR only) */}
               {report.report_type === 'LDR' && (
                 <>
-                  {dividerRow('Investigation')}
+                  {dividerRow('Investigation and findings')}
                   {(() => {
                     const fields = LDR_TEMPLATE.investigation_fields
                     const rows: React.ReactNode[] = []
@@ -596,32 +660,12 @@ export default async function ReportPrintPage({
                       
                       rows.push(
                         <tr key={item1.field}>
-                          <td style={isLast ? tdCellLast : tdCell}>
+                          <td style={isLast ? tdCellLast : tdCell} colSpan={3}>
                             <div style={cellContentStyle}>
                               <span style={labelStyle}>{item1.label}</span>
                               <span style={valueStyle}>{tsf(report, item1.field)}</span>
                             </div>
                           </td>
-                          {item2 ? (
-                            <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={cellContentStyle}>
-                                <span style={labelStyle}>{item2.label}</span>
-                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
-                              </div>
-                            </td>
-                          ) : (
-                            <td style={isLast ? tdCellLast : tdCell}></td>
-                          )}
-                          {item3 ? (
-                            <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={cellContentStyle}>
-                                <span style={labelStyle}>{item3.label}</span>
-                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
-                              </div>
-                            </td>
-                          ) : (
-                            <td style={isLast ? tdCellLast : tdCell}></td>
-                          )}
                         </tr>
                       )
                     }
@@ -833,18 +877,6 @@ export default async function ReportPrintPage({
             </div>
             <div style={{ background: '#fafaf8', border: '1px solid #e8e4e0', borderRadius: '5px', padding: '9px 11px', fontSize: '11.5px', color: '#3a3530', lineHeight: '1.65' }}>
               Refer to the separately attached quote for information relating to the proposed repair scope and costs.
-            </div>
-          </div>
-        )}
-
-        {/* Additional Notes Section */}
-        {report.additional_notes && (
-          <div style={{ marginTop: '24px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
-              ADDITIONAL NOTES
-            </div>
-            <div style={{ background: '#fafaf8', border: '1px solid #e8e4e0', borderRadius: '5px', padding: '9px 11px', fontSize: '11.5px', color: '#3a3530', lineHeight: '1.65' }}>
-              {formatTextWithPreservedFormatting(report.additional_notes)}
             </div>
           </div>
         )}
