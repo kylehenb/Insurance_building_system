@@ -7,6 +7,8 @@ import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import ContactsEditor from '@/components/contacts/ContactsEditor'
 import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
+import { InsurerSelect } from '@/components/clients/InsurerSelect'
+import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
 
@@ -824,9 +826,10 @@ export default function InsurerOrdersPage() {
                                       mono
                                       onSave={v => saveField(order.id, 'order_ref', v)}
                                     />
-                                    <FEdit
-                                      label="Insurer" value={order.insurer}
-                                      onSave={v => saveField(order.id, 'insurer', v)}
+                                    <InsurerSelect
+                                      tenantId={tenantId!}
+                                      value={order.insurer}
+                                      onSave={v => saveField(order.id, 'insurer', v || '')}
                                     />
                                     <WoTypeSelect
                                       label="WO Type" value={order.wo_type}
@@ -887,6 +890,15 @@ export default function InsurerOrdersPage() {
                                       <F label="Entry Method">{order.entry_method ?? '—'}</F>
                                       {order.parse_status && <F label="Parse Status">{order.parse_status}</F>}
                                     </div>
+
+                                    {/* Invoice to field */}
+                                    <InvoiceToSelect
+                                      tenantId={tenantId!}
+                                      insurer={order.insurer}
+                                      adjuster={order.adjuster}
+                                      value={order.invoice_to}
+                                      onSave={v => saveField(order.id, 'invoice_to', v || '')}
+                                    />
 
                                     {/* Contacts Editor */}
                                     <ContactsEditor
@@ -1057,18 +1069,11 @@ export default function InsurerOrdersPage() {
                 />
               </div>
 
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                  Insurer
-                </div>
-                <input
-                  type="text"
-                  value={newOrderForm.insurer}
-                  onChange={e => setNewOrderForm(f => ({ ...f, insurer: e.target.value }))}
-                  placeholder="e.g. Allianz, Suncorp"
-                  style={inputStyle}
-                />
-              </div>
+              <InsurerSelect
+                tenantId={tenantId!}
+                value={newOrderForm.insurer}
+                onSave={v => setNewOrderForm(f => ({ ...f, insurer: v || '' }))}
+              />
 
               <div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>

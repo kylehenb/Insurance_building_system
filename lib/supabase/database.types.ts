@@ -842,6 +842,7 @@ export type Database = {
           entry_method: string | null
           excess_building: number | null
           id: string
+          invoice_to: string | null
           insured_email: string | null
           insured_name: string | null
           insured_phone: string | null
@@ -874,6 +875,7 @@ export type Database = {
           entry_method?: string | null
           excess_building?: number | null
           id?: string
+          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
@@ -906,6 +908,7 @@ export type Database = {
           entry_method?: string | null
           excess_building?: number | null
           id?: string
+          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
@@ -1418,6 +1421,7 @@ export type Database = {
           homeowner_signoff_received_at: string | null
           homeowner_signoff_sent_at: string | null
           id: string
+          invoice_to: string | null
           insured_email: string | null
           insured_name: string | null
           insured_phone: string | null
@@ -1464,6 +1468,7 @@ export type Database = {
           homeowner_signoff_received_at?: string | null
           homeowner_signoff_sent_at?: string | null
           id?: string
+          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
@@ -1510,6 +1515,7 @@ export type Database = {
           homeowner_signoff_received_at?: string | null
           homeowner_signoff_sent_at?: string | null
           id?: string
+          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null

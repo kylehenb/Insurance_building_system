@@ -6,6 +6,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import JobSchedule from '@/components/schedule/JobSchedule'
 import ContactsEditor from '@/components/contacts/ContactsEditor'
 import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
+import { InsurerSelect } from '@/components/clients/InsurerSelect'
+import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
 
@@ -35,6 +37,7 @@ interface JobDetails {
   special_instructions: string | null
   notes: string | null
   client_id: string | null
+  invoice_to: string | null
 }
 
 interface ActionCard {
@@ -221,6 +224,7 @@ type EditFields = {
   adjuster_reference: string
   order_sender_name: string
   order_sender_email: string
+  invoice_to: string
 }
 
 function jobToEditFields(job: JobDetails): EditFields {
@@ -243,6 +247,7 @@ function jobToEditFields(job: JobDetails): EditFields {
     adjuster_reference: job.adjuster_reference ?? '',
     order_sender_name: job.order_sender_name ?? '',
     order_sender_email: job.order_sender_email ?? '',
+    invoice_to: job.invoice_to ?? '',
   }
 }
 
@@ -296,6 +301,7 @@ function JobDetailsAccordion({
       adjuster_reference: vals.adjuster_reference || null,
       order_sender_name: vals.order_sender_name || null,
       order_sender_email: vals.order_sender_email || null,
+      invoice_to: vals.invoice_to || null,
     }
     await supabase.from('jobs').update(patch).eq('id', jobId).eq('tenant_id', tenantId)
     setSaved(prev => ({ ...prev, ...patch }))
@@ -479,10 +485,43 @@ function JobDetailsAccordion({
           <div>
             <div style={subLabel()}>Job Information</div>
 
+            {/* Insurer Select */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Insurer</span>
+              {editing ? (
+                <div style={{ flex: 1 }}>
+                  <InsurerSelect
+                    tenantId={tenantId}
+                    value={vals.insurer}
+                    onSave={v => set('insurer', v || '')}
+                  />
+                </div>
+              ) : (
+                <span className="ov-detail-value">{saved.insurer || '—'}</span>
+              )}
+            </div>
+
+            {/* Invoice To Select */}
+            <div className="ov-detail-row">
+              <span className="ov-detail-label">Invoice to</span>
+              {editing ? (
+                <div style={{ flex: 1 }}>
+                  <InvoiceToSelect
+                    tenantId={tenantId}
+                    insurer={vals.insurer}
+                    adjuster={vals.adjuster}
+                    value={vals.invoice_to}
+                    onSave={v => set('invoice_to', v || '')}
+                  />
+                </div>
+              ) : (
+                <span className="ov-detail-value">{saved.invoice_to || '—'}</span>
+              )}
+            </div>
+
             {/* Text fields */}
             {(
               [
-                { label: 'Insurer', field: 'insurer' },
                 { label: 'Claim #', field: 'claim_number' },
                 { label: 'Loss Type', field: 'loss_type' },
                 { label: 'Adjuster', field: 'adjuster' },
