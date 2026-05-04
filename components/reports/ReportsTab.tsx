@@ -33,6 +33,7 @@ interface Report {
   maintenance_notes: string | null
   raw_report_dump: string | null
   damage_template: string | null
+  additional_notes: string | null
   type_specific_fields: Record<string, unknown>
   pdf_storage_path: string | null
   deleted_at: string | null

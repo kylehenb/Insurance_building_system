@@ -351,6 +351,19 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
         />
       </div>
 
+      {/* — ADDITIONAL NOTES — */}
+      <SectionHeading label="Additional Notes" />
+      <div>
+        <FieldLabel label="Additional Notes" />
+        <InlineTextarea
+          value={str('additional_notes')}
+          onChange={v => onChange('additional_notes', v)}
+          locked={locked}
+          placeholder="Any additional notes or comments..."
+          rows={3}
+        />
+      </div>
+
       {/* — PHOTOS — */}
       {reportId && jobId && tenantId && (
         <>

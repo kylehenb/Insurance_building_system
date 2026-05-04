@@ -48,6 +48,7 @@ interface Report {
   maintenance_notes: string | null
   raw_report_dump: string | null
   damage_template: string | null
+  additional_notes: string | null
   type_specific_fields: Record<string, unknown>
   pdf_storage_path: string | null
   deleted_at: string | null
@@ -271,6 +272,7 @@ export function ReportAccordionItem({
     pre_existing_conditions: report.pre_existing_conditions,
     maintenance_notes: report.maintenance_notes,
     raw_report_dump: report.raw_report_dump,
+    additional_notes: report.additional_notes,
     type_specific_fields: report.type_specific_fields,
   }
 
