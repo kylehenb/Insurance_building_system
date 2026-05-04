@@ -67,7 +67,7 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
     const selected = insurers.find(i => i.name === newValue)
     if (selected) {
       onSave(selected.name)
-    } else if (newValue === '') {
+    } else if (newValue === '_none_') {
       onSave(null)
     }
   }
@@ -85,7 +85,7 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
         {label}
       </div>
       <Select
-        value={value || ''}
+        value={value || '_none_'}
         onValueChange={handleChange}
         disabled={loading}
       >
@@ -93,7 +93,7 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
           <SelectValue placeholder={loading ? 'Loading…' : '— Select —'} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">— Select —</SelectItem>
+          <SelectItem value="_none_">— Select —</SelectItem>
           {insurers.map((insurer) => (
             <SelectItem key={insurer.id} value={insurer.name}>
               {insurer.name}

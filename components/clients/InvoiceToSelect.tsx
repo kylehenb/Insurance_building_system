@@ -109,7 +109,7 @@ export function InvoiceToSelect({
   }, [tenantId, insurer, adjuster, supabase])
 
   const handleChange = (newValue: string) => {
-    if (newValue === '') {
+    if (newValue === '_none_') {
       onSave(null)
     } else {
       onSave(newValue)
@@ -138,7 +138,7 @@ export function InvoiceToSelect({
         {label}
       </div>
       <Select
-        value={value || ''}
+        value={value || '_none_'}
         onValueChange={handleChange}
         disabled={loading || options.length === 0}
       >
@@ -146,7 +146,7 @@ export function InvoiceToSelect({
           <SelectValue placeholder={placeholderText} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">— Select —</SelectItem>
+          <SelectItem value="_none_">— Select —</SelectItem>
           {options.map((option) => (
             <SelectItem key={option.trading_name} value={option.trading_name}>
               {option.trading_name}

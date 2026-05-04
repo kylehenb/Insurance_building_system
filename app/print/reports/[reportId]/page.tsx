@@ -305,8 +305,12 @@ export default async function ReportPrintPage({
     allSections.push({ key })
   }
 
-  // Assign sequential section numbers
+  // Assign sequential section numbers for all sections (metadata table + narrative)
   let sectionCounter = 0
+  const getNextSectionNum = () => {
+    sectionCounter++
+    return sectionCounter
+  }
 
   // LDR uses a slightly different color scheme for visual distinction
   const isLDR = report.report_type === 'LDR'
@@ -362,7 +366,7 @@ export default async function ReportPrintPage({
     borderBottom: isLDR ? '1px solid #c8d8e0' : '1px solid #e0dbd4',
   }
 
-  const dividerRow = (label: string) => (
+  const dividerRow = (label: string, sectionNum?: number) => (
     <tr>
       <td
         colSpan={3}
@@ -375,7 +379,26 @@ export default async function ReportPrintPage({
           ...dividerStyle,
         }}
       >
-        {label}
+        {sectionNum !== undefined ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ 
+              width: '16px', 
+              height: '16px', 
+              border: `1px solid ${isLDR ? '#0d2a3d' : '#1a1a1a'}`, 
+              color: isLDR ? '#0d2a3d' : '#1a1a1a',
+              fontSize: '8px', 
+              fontWeight: '700', 
+              borderRadius: '50%', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {sectionNum}
+            </span>
+            <span style={{ color: isLDR ? '#0d2a3d' : undefined }}>{label}</span>
+          </span>
+        ) : label}
       </td>
     </tr>
   )
@@ -444,8 +467,8 @@ export default async function ReportPrintPage({
 
         {/* Form band */}
         <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
-          <span style={{ fontSize: '28px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
-            {report.report_type === 'LDR' ? 'Leak Detection Report' : 'Building Assessment Report'}
+          <span style={{ fontSize: '28px', fontWeight: '700', color: isLDR ? '#0d2a3d' : '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
+            {isLDR ? 'Leak Detection Report' : 'Building Assessment Report'}
           </span>
         </div>
 
@@ -456,7 +479,7 @@ export default async function ReportPrintPage({
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: isLDR ? '1px solid #c8d8e0' : '1px solid #e0dbd4', borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
             <tbody>
               {/* Block 1 — Attendance */}
-              {dividerRow('Attendance')}
+              {dividerRow('Attendance', isLDR ? getNextSectionNum() : undefined)}
               <tr>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
@@ -549,9 +572,9 @@ export default async function ReportPrintPage({
               )}
 
               {/* Block 2 — Leak Details (LDR only) */}
-              {report.report_type === 'LDR' && (
+              {isLDR && (
                 <>
-                  {dividerRow('Leak details')}
+                  {dividerRow('Leak details', getNextSectionNum())}
                   {(() => {
                     const fields = LDR_TEMPLATE.leak_details_fields
                     const rows: React.ReactNode[] = []
@@ -598,9 +621,9 @@ export default async function ReportPrintPage({
               )}
 
               {/* Block 3 — Pressure Tests (LDR only) */}
-              {report.report_type === 'LDR' && (
+              {isLDR && (
                 <>
-                  {dividerRow('Pressure tests & inspections')}
+                  {dividerRow('Pressure tests & inspections', getNextSectionNum())}
                   {(() => {
                     const fields = LDR_TEMPLATE.pressure_test_fields
                     const rows: React.ReactNode[] = []
@@ -718,9 +741,9 @@ export default async function ReportPrintPage({
               )}
 
               {/* Block 4 — Investigation & Findings (LDR only) */}
-              {report.report_type === 'LDR' && (
+              {isLDR && (
                 <>
-                  {dividerRow('Investigation and findings')}
+                  {dividerRow('Investigation and findings', getNextSectionNum())}
                   {(() => {
                     const fields = LDR_TEMPLATE.investigation_fields
                     const rows: React.ReactNode[] = []
@@ -748,9 +771,9 @@ export default async function ReportPrintPage({
               )}
 
               {/* Block 5 — Damage Assessment (LDR only) */}
-              {report.report_type === 'LDR' && (
+              {isLDR && (
                 <>
-                  {dividerRow('Damage assessment')}
+                  {dividerRow('Damage assessment', getNextSectionNum())}
                   {(() => {
                     const fields = LDR_TEMPLATE.damage_fields
                     const rows: React.ReactNode[] = []
@@ -778,9 +801,9 @@ export default async function ReportPrintPage({
               )}
 
               {/* Block 6 — Recommendations (LDR only) */}
-              {report.report_type === 'LDR' && (
+              {isLDR && (
                 <>
-                  {dividerRow('Recommendations')}
+                  {dividerRow('Recommendations', getNextSectionNum())}
                   {(() => {
                     const fields = LDR_TEMPLATE.recommendation_fields
                     const rows: React.ReactNode[] = []
@@ -876,8 +899,7 @@ export default async function ReportPrintPage({
               ].filter(s => activeSections.includes(s.key) || s.key === 'additional_notes')
               
               for (const section of ldrNarrativeSections) {
-                sectionCounter++
-                const num = sectionCounter
+                const num = getNextSectionNum()
                 const config = NARRATIVE_SECTION_CONFIG[section.key]
                 const value = config?.getValue(report) ?? null
                 
@@ -887,10 +909,10 @@ export default async function ReportPrintPage({
                 nodes.push(
                   <div key={section.key} style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
-                      <div style={{ width: '20px', height: '20px', border: `1.5px solid ${isLDR ? '#3a5a6a' : '#1a1a1a'}`, color: isLDR ? '#3a5a6a' : '#1a1a1a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '20px', height: '20px', border: `1.5px solid ${isLDR ? '#0d2a3d' : '#1a1a1a'}`, color: isLDR ? '#0d2a3d' : '#1a1a1a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {num}
                       </div>
-                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: isLDR ? '#4a6a7a' : '#6a6460', fontWeight: '800' }}>
+                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: isLDR ? '#0d2a3d' : '#6a6460', fontWeight: '800' }}>
                         {section.title}
                       </div>
                     </div>
