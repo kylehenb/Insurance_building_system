@@ -2088,6 +2088,7 @@ export type Database = {
           tenant_id: string
           type_specific_fields: Json | null
           version: number | null
+          additional_notes: string | null
         }
         Insert: {
           assessor_name?: string | null
@@ -2127,6 +2128,7 @@ export type Database = {
           tenant_id: string
           type_specific_fields?: Json | null
           version?: number | null
+          additional_notes?: string | null
         }
         Update: {
           assessor_name?: string | null
@@ -2166,6 +2168,7 @@ export type Database = {
           tenant_id?: string
           type_specific_fields?: Json | null
           version?: number | null
+          additional_notes?: string | null
         }
         Relationships: [
           {

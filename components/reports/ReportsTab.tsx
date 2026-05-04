@@ -11,7 +11,7 @@ interface Report {
   tenant_id: string
   job_id: string
   report_ref: string
-  report_type: 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist'
+  report_type: 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
   status: string
   is_locked: boolean
   version: number
@@ -41,7 +41,7 @@ interface Report {
   created_at: string
 }
 
-type NewReportType = 'BAR' | 'make_safe' | 'roof' | 'specialist'
+type NewReportType = 'BAR' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
 
 interface ReportsTabProps {
   jobId: string

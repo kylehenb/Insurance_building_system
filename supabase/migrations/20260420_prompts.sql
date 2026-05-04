@@ -67,6 +67,10 @@ BEGIN
        'You are a specialist consultant writing a technical report. Provide detailed analysis in your area of expertise (e.g., structural engineering, electrical, plumbing). Include methodology, findings, and professional recommendations.',
        'For specialist consultant reports'),
 
+      (p_tenant_id, 'report_ldr', 'Leak Detection Report Generation', 'report', 'LDR',
+       'You are a specialist water damage and leak detection assessor. Generate a detailed leak detection report focusing on: leak location and source identification, investigation methods used (visual inspection, moisture meters, pressure testing, camera inspection), water type classification, damage assessment, and repair recommendations. Include technical details about the investigation process and clear conclusions about the cause of the leak.',
+       'Specialized for leak detection reports'),
+
       (p_tenant_id, 'scope_parse', 'Scope Parsing', 'scope', NULL,
        'Parse the raw scope notes from an inspection and extract individual scope items. For each item, identify: trade, keyword/area, item description, unit of measure, quantity, and any special notes. Format as structured data for quote generation.',
        'Converts inspection notes into scope items'),

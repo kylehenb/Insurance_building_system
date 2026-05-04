@@ -17,6 +17,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { BARReportForm } from './BARReportForm'
 import { RoofReportForm } from './RoofReportForm'
 import { MakeSafeReportForm } from './MakeSafeReportForm'
+import { LDRReportForm } from './LDRReportForm'
 import { useReportAutosave } from './useReportAutosave'
 import { PropertyDetails, parsePropertyDetails } from '@/lib/types/property-details'
 
@@ -26,7 +27,7 @@ interface Report {
   tenant_id: string
   job_id: string
   report_ref: string
-  report_type: 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist'
+  report_type: 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
   status: string
   is_locked: boolean
   version: number
@@ -75,6 +76,7 @@ const TYPE_LABELS: Record<string, string> = {
   make_safe: 'Make Safe',
   roof: 'Roof Report',
   specialist: 'Specialist Report',
+  LDR: 'Leak Detection Report',
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -824,6 +826,16 @@ export function ReportAccordionItem({
                   Specialist report template — coming soon.
                 </p>
               </div>
+            )}
+            {report.report_type === 'LDR' && (
+              <LDRReportForm
+                data={report as unknown as Record<string, unknown>}
+                locked={isLocked}
+                onChange={handleFieldChange}
+                tenantId={report.tenant_id}
+                reportId={report.id}
+                jobId={report.job_id}
+              />
             )}
 
             {/* — Bottom action bar — */}

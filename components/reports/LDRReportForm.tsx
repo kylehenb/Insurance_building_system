@@ -9,7 +9,7 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-interface BARReportFormProps {
+interface LDRReportFormProps {
   data: Record<string, unknown>
   locked: boolean
   onChange: (field: string, value: unknown) => void
@@ -108,9 +108,16 @@ function InlineTextarea({
   )
 }
 
-export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobId }: BARReportFormProps) {
+export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobId }: LDRReportFormProps) {
   const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
+  const tsf = (key: string) => {
+    const fields = data.type_specific_fields as Record<string, unknown> | null
+    if (!fields) return ''
+    const val = fields[key]
+    if (val === null || val === undefined || val === '') return ''
+    return String(val)
+  }
 
   async function handleGenerateReport() {
     const rawDump = str('raw_report_dump')
@@ -131,7 +138,7 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rawReportDump: rawDump,
-          reportType: 'BAR',
+          reportType: 'LDR',
           tenantId,
         }),
       })
@@ -153,6 +160,11 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleTsfChange = (key: string, value: string) => {
+    const current = (data.type_specific_fields as Record<string, unknown>) || {}
+    onChange('type_specific_fields', { ...current, [key]: value })
   }
 
   return (
@@ -263,71 +275,89 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
             value={str('loss_type')}
             onChange={v => onChange('loss_type', v)}
             locked={locked}
-            placeholder="e.g. Storm, Water, Fire"
+            placeholder="e.g. Water Leak, Plumbing"
           />
         </div>
       </div>
 
-      {/* — MAKE SAFE & SPECIALIST — */}
-      <SectionHeading label="Make Safe & Specialist" />
+      {/* — LEAK DETAILS — */}
+      <SectionHeading label="Leak Details" />
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <FieldLabel label="Make Safe Conducted" />
+          <FieldLabel label="Leak Location" />
           <InlineInput
-            value={str('type_specific_fields.make_safe_conducted')}
-            onChange={v => onChange('type_specific_fields', { ...(data.type_specific_fields as Record<string, unknown> || {}), make_safe_conducted: v })}
+            value={tsf('leak_location')}
+            onChange={v => handleTsfChange('leak_location', v)}
             locked={locked}
-            placeholder="e.g. Yes, No, N/A"
+            placeholder="e.g. Bathroom ceiling, Kitchen wall"
           />
         </div>
         <div>
-          <FieldLabel label="Specialist Report Obtained" />
+          <FieldLabel label="Leak Source" />
           <InlineInput
-            value={str('type_specific_fields.specialist_report_obtained')}
-            onChange={v => onChange('type_specific_fields', { ...(data.type_specific_fields as Record<string, unknown> || {}), specialist_report_obtained: v })}
+            value={tsf('leak_source')}
+            onChange={v => handleTsfChange('leak_source', v)}
             locked={locked}
-            placeholder="e.g. Yes, No, N/A"
+            placeholder="e.g. Roof, Plumbing, Shower base"
+          />
+        </div>
+        <div>
+          <FieldLabel label="Water Type" />
+          <InlineInput
+            value={tsf('water_type')}
+            onChange={v => handleTsfChange('water_type', v)}
+            locked={locked}
+            placeholder="e.g. Rainwater, Greywater, Sewage"
+          />
+        </div>
+        <div>
+          <FieldLabel label="Duration of Leak" />
+          <InlineInput
+            value={tsf('leak_duration')}
+            onChange={v => handleTsfChange('leak_duration', v)}
+            locked={locked}
+            placeholder="e.g. 2 days, 1 week, Ongoing"
           />
         </div>
       </div>
 
-      {/* — INCIDENT — */}
-      <SectionHeading label="Incident" />
+      {/* — INVESTIGATION — */}
+      <SectionHeading label="Investigation" />
       <div className="space-y-4">
         <div>
-          <FieldLabel label="Incident / Client Discussion" />
+          <FieldLabel label="Investigation Method" />
           <InlineTextarea
-            value={str('incident_description')}
-            onChange={v => onChange('incident_description', v)}
+            value={tsf('investigation_method')}
+            onChange={v => handleTsfChange('investigation_method', v)}
             locked={locked}
-            placeholder="Describe what the insured reported regarding the incident..."
-            rows={4}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Cause of Damage" />
-          <InlineTextarea
-            value={str('cause_of_damage')}
-            onChange={v => onChange('cause_of_damage', v)}
-            locked={locked}
-            placeholder="State the identified cause of damage..."
+            placeholder="Describe how the leak was investigated (e.g. visual inspection, moisture meter, pressure test, camera inspection)..."
             rows={3}
           />
         </div>
         <div>
-          <FieldLabel label="How Damage Occurred" />
+          <FieldLabel label="Findings" />
           <InlineTextarea
-            value={str('how_damage_occurred')}
-            onChange={v => onChange('how_damage_occurred', v)}
+            value={tsf('findings')}
+            onChange={v => handleTsfChange('findings', v)}
             locked={locked}
-            placeholder="Describe the mechanism of damage in detail..."
+            placeholder="Detail the findings from the investigation..."
             rows={4}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Cause of Leak" />
+          <InlineTextarea
+            value={str('cause_of_damage')}
+            onChange={v => onChange('cause_of_damage', v)}
+            locked={locked}
+            placeholder="State the identified cause of the leak..."
+            rows={3}
           />
         </div>
       </div>
 
-      {/* — DAMAGE FINDINGS — */}
-      <SectionHeading label="Damage Findings" />
+      {/* — DAMAGE ASSESSMENT — */}
+      <SectionHeading label="Damage Assessment" />
       <div className="space-y-4">
         <div>
           <FieldLabel label="Resulting Damage" />
@@ -335,8 +365,18 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
             value={str('resulting_damage')}
             onChange={v => onChange('resulting_damage', v)}
             locked={locked}
-            placeholder="List all damage observed during inspection..."
+            placeholder="List all damage observed from the leak..."
             rows={5}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Affected Areas" />
+          <InlineTextarea
+            value={tsf('affected_areas')}
+            onChange={v => handleTsfChange('affected_areas', v)}
+            locked={locked}
+            placeholder="List all areas affected by the leak..."
+            rows={3}
           />
         </div>
         <div>
@@ -345,18 +385,61 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
             value={str('pre_existing_conditions')}
             onChange={v => onChange('pre_existing_conditions', v)}
             locked={locked}
-            placeholder="Note any pre-existing damage or conditions unrelated to the claim..."
+            placeholder="Note any pre-existing damage or conditions unrelated to the leak..."
             rows={3}
           />
         </div>
         <div>
-          <FieldLabel label="Maintenance" />
+          <FieldLabel label="Maintenance Notes" />
           <InlineTextarea
             value={str('maintenance_notes')}
             onChange={v => onChange('maintenance_notes', v)}
             locked={locked}
             placeholder="Note any maintenance items observed..."
             rows={3}
+          />
+        </div>
+      </div>
+
+      {/* — RECOMMENDATIONS — */}
+      <SectionHeading label="Recommendations" />
+      <div className="space-y-4">
+        <div>
+          <FieldLabel label="Immediate Actions Required" />
+          <InlineTextarea
+            value={tsf('immediate_actions')}
+            onChange={v => handleTsfChange('immediate_actions', v)}
+            locked={locked}
+            placeholder="List any immediate actions required to mitigate the leak..."
+            rows={3}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Repair Recommendations" />
+          <InlineTextarea
+            value={tsf('repair_recommendations')}
+            onChange={v => handleTsfChange('repair_recommendations', v)}
+            locked={locked}
+            placeholder="Detail recommended repairs to address the leak..."
+            rows={4}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Further Investigation Required" />
+          <InlineInput
+            value={tsf('further_investigation_required')}
+            onChange={v => handleTsfChange('further_investigation_required', v)}
+            locked={locked}
+            placeholder="e.g. Yes, No, N/A"
+          />
+        </div>
+        <div>
+          <FieldLabel label="Specialist Report Required" />
+          <InlineInput
+            value={tsf('specialist_report_required')}
+            onChange={v => handleTsfChange('specialist_report_required', v)}
+            locked={locked}
+            placeholder="e.g. Yes - Plumber, No, N/A"
           />
         </div>
       </div>
@@ -369,7 +452,7 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
           value={str('conclusion')}
           onChange={v => onChange('conclusion', v)}
           locked={locked}
-          placeholder="State your professional opinion and conclusions regarding the claim..."
+          placeholder="State your professional opinion and conclusions regarding the leak..."
           rows={5}
         />
       </div>
