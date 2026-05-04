@@ -55,6 +55,7 @@ const REPORT_TYPE_OPTIONS: { value: NewReportType; label: string }[] = [
   { value: 'make_safe', label: 'Make Safe' },
   { value: 'roof', label: 'Roof Report' },
   { value: 'specialist', label: 'Specialist Report' },
+  { value: 'LDR', label: 'Leak Detection Report' },
 ]
 
 // — Component ——————————————————————————————————————————————————————

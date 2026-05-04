@@ -111,6 +111,15 @@ function InlineTextarea({
 export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobId }: BARReportFormProps) {
   const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
+  
+  // Helper to access type_specific_fields
+  const tsf = (key: string) => {
+    const fields = data.type_specific_fields as Record<string, unknown> | null
+    if (!fields) return ''
+    const val = fields[key]
+    if (val === null || val === undefined || val === '') return ''
+    return String(val)
+  }
 
   async function handleGenerateReport() {
     const rawDump = str('raw_report_dump')
@@ -274,7 +283,7 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
         <div>
           <FieldLabel label="Make Safe Conducted" />
           <InlineInput
-            value={str('type_specific_fields.make_safe_conducted')}
+            value={tsf('make_safe_conducted')}
             onChange={v => onChange('type_specific_fields', { ...(data.type_specific_fields as Record<string, unknown> || {}), make_safe_conducted: v })}
             locked={locked}
             placeholder="e.g. Yes, No, N/A"
@@ -283,7 +292,7 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
         <div>
           <FieldLabel label="Specialist Report Obtained" />
           <InlineInput
-            value={str('type_specific_fields.specialist_report_obtained')}
+            value={tsf('specialist_report_obtained')}
             onChange={v => onChange('type_specific_fields', { ...(data.type_specific_fields as Record<string, unknown> || {}), specialist_report_obtained: v })}
             locked={locked}
             placeholder="e.g. Yes, No, N/A"
