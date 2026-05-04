@@ -332,9 +332,6 @@ export default async function ReportPrintPage({
     alignItems: 'baseline',
     flexWrap: 'wrap' as const,
   }
-  const cellContentBlockStyle: React.CSSProperties = {
-    display: 'block',
-  }
   const labelStyle: React.CSSProperties = {
     color: isLDR ? '#5a7a8a' : '#6a6460',
     fontSize: '9px',
@@ -344,21 +341,10 @@ export default async function ReportPrintPage({
     marginRight: '6px',
     flexShrink: 0,
   }
-  const labelBlockStyle: React.CSSProperties = {
-    ...labelStyle,
-    display: 'block',
-    marginBottom: '4px',
-    width: '100%',
-  }
   const valueStyle: React.CSSProperties = {
     color: isLDR ? '#1a2a3a' : '#1a1a1a',
     fontSize: '11px',
     fontWeight: '500',
-  }
-  const valueBlockStyle: React.CSSProperties = {
-    ...valueStyle,
-    display: 'block',
-    width: '100%',
   }
   const dividerStyle: React.CSSProperties = {
     backgroundColor: isLDR ? '#e8eef2' : '#f5f2ee',
@@ -691,156 +677,6 @@ export default async function ReportPrintPage({
                 </>
               )}
 
-              {/* Block 3 — Leak Details (LDR only) */}
-              {report.report_type === 'LDR' && (
-                <>
-                  {dividerRow('Leak details')}
-                  {(() => {
-                    const fields = LDR_TEMPLATE.leak_details_fields
-                    const rows: React.ReactNode[] = []
-                    for (let i = 0; i < fields.length; i += 3) {
-                      const item1 = fields[i]
-                      const item2 = fields[i + 1]
-                      const item3 = fields[i + 2]
-                      const isLast = i + 3 >= fields.length
-                      
-                      rows.push(
-                        <tr key={item1.field}>
-                          <td style={isLast ? tdCellLast : tdCell}>
-                            <div style={cellContentStyle}>
-                              <span style={labelStyle}>{item1.label}</span>
-                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
-                            </div>
-                          </td>
-                          {item2 ? (
-                            <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={cellContentStyle}>
-                                <span style={labelStyle}>{item2.label}</span>
-                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
-                              </div>
-                            </td>
-                          ) : (
-                            <td style={isLast ? tdCellLast : tdCell}></td>
-                          )}
-                          {item3 ? (
-                            <td style={isLast ? tdCellLast : tdCell}>
-                              <div style={cellContentStyle}>
-                                <span style={labelStyle}>{item3.label}</span>
-                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
-                              </div>
-                            </td>
-                          ) : (
-                            <td style={isLast ? tdCellLast : tdCell}></td>
-                          )}
-                        </tr>
-                      )
-                    }
-                    return rows
-                  })()}
-                </>
-              )}
-
-              {/* Block 4 — Investigation & Findings (LDR only) */}
-              {isLDR && (
-                <>
-                  {dividerRow('Investigation and findings', getNextSectionNum())}
-                  {(() => {
-                    const fields = LDR_TEMPLATE.investigation_fields
-                    const rows: React.ReactNode[] = []
-                    for (let i = 0; i < fields.length; i++) {
-                      const item = fields[i]
-                      const isLast = i === fields.length - 1
-                      const value = tsf(report, item.field)
-                      
-                      rows.push(
-                        <tr key={item.field}>
-                          <td style={isLast ? tdCellLast : tdCell} colSpan={3}>
-                            <div style={cellContentBlockStyle}>
-                              <span style={labelBlockStyle}>{item.label}</span>
-                              <div style={{ ...valueBlockStyle, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                                {formatTextWithPreservedFormatting(value)}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    }
-                    return rows
-                  })()}
-                </>
-              )}
-
-              {/* Block 5 — Damage Assessment (LDR only) */}
-              {isLDR && (
-                <>
-                  {dividerRow('Damage assessment', getNextSectionNum())}
-                  {(() => {
-                    const fields = LDR_TEMPLATE.damage_fields
-                    const rows: React.ReactNode[] = []
-                    for (let i = 0; i < fields.length; i++) {
-                      const item = fields[i]
-                      const isLast = i === fields.length - 1
-                      const value = tsf(report, item.field)
-                      
-                      rows.push(
-                        <tr key={item.field}>
-                          <td style={isLast ? tdCellLast : tdCell} colSpan={3}>
-                            <div style={cellContentBlockStyle}>
-                              <span style={labelBlockStyle}>{item.label}</span>
-                              <div style={{ ...valueBlockStyle, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                                {formatTextWithPreservedFormatting(value)}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    }
-                    return rows
-                  })()}
-                </>
-              )}
-
-              {/* Block 6 — Recommendations (LDR only) */}
-              {isLDR && (
-                <>
-                  {dividerRow('Recommendations', getNextSectionNum())}
-                  {(() => {
-                    const fields = LDR_TEMPLATE.recommendation_fields
-                    const rows: React.ReactNode[] = []
-                    for (let i = 0; i < fields.length; i++) {
-                      const item = fields[i]
-                      const isLast = i === fields.length - 1
-                      const value = tsf(report, item.field)
-                      
-                      // Use block layout for repair_recommendations, inline for others
-                      const isTextBlock = item.field === 'repair_recommendations'
-                      
-                      rows.push(
-                        <tr key={item.field}>
-                          <td style={isLast ? tdCellLast : tdCell} colSpan={isTextBlock ? 3 : 1}>
-                            {isTextBlock ? (
-                              <div style={cellContentBlockStyle}>
-                                <span style={labelBlockStyle}>{item.label}</span>
-                                <div style={{ ...valueBlockStyle, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                                  {formatTextWithPreservedFormatting(value)}
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={cellContentStyle}>
-                                <span style={labelStyle}>{item.label}</span>
-                                <span style={valueStyle}>{value}</span>
-                              </div>
-                            )}
-                          </td>
-                          {!isTextBlock && <td style={isLast ? tdCellLast : tdCell} colSpan={2}></td>}
-                        </tr>
-                      )
-                    }
-                    return rows
-                  })()}
-                </>
-              )}
-
               {/* Block 4 — Insurer-specific rows (conditional) */}
               {DEFAULT_BAR_TEMPLATE.insurer_specific_rows.length > 0 && (
                 <>
@@ -890,44 +726,85 @@ export default async function ReportPrintPage({
           {(() => {
             const nodes: React.ReactNode[] = []
 
-            // LDR-specific narrative rendering - simpler without groups
+            // LDR narrative sections - sections 4-8, all rendered with consistent styling
             if (isLDR) {
-              const ldrNarrativeSections = [
-                { key: 'conclusion', title: 'Conclusion' },
-                { key: 'pre_existing_conditions', title: 'Pre-existing conditions' },
-                { key: 'additional_notes', title: 'Additional notes' },
-              ].filter(s => activeSections.includes(s.key) || s.key === 'additional_notes')
-              
-              for (const section of ldrNarrativeSections) {
+              const ldrSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
+                {
+                  key: 'investigation',
+                  title: 'Investigation and Findings',
+                  renderBody: () => (
+                    <div style={{ background: '#f5f8fa', border: '1px solid #d8e4e8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a2a3a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, 'investigation_findings'))}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'damage_assessment',
+                  title: 'Damage Assessment',
+                  renderBody: () => (
+                    <div style={{ background: '#f5f8fa', border: '1px solid #d8e4e8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a2a3a', lineHeight: '1.65' }}>
+                      <div style={{ marginBottom: report.pre_existing_conditions ? '10px' : '0' }}>
+                        <div style={{ fontSize: '8px', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#5a7a8a', marginBottom: '4px' }}>Affected Areas</div>
+                        {formatTextWithPreservedFormatting(tsf(report, 'affected_areas'))}
+                      </div>
+                      {report.pre_existing_conditions && (
+                        <div style={{ borderTop: '1px solid #d8e4e8', paddingTop: '10px', borderLeft: '3px solid #c8d8e0', paddingLeft: '8px' }}>
+                          <div style={{ fontSize: '8px', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#5a7a8a', marginBottom: '4px' }}>Pre-existing Conditions</div>
+                          {formatTextWithPreservedFormatting(report.pre_existing_conditions)}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'recommendations',
+                  title: 'Recommendations',
+                  renderBody: () => (
+                    <div style={{ background: '#f5f8fa', border: '1px solid #d8e4e8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a2a3a', lineHeight: '1.65' }}>
+                      <div style={{ marginBottom: '10px' }}>
+                        <div style={{ fontSize: '8px', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#5a7a8a', marginBottom: '4px' }}>Repair Recommendations</div>
+                        {formatTextWithPreservedFormatting(tsf(report, 'repair_recommendations'))}
+                      </div>
+                      <div style={{ borderTop: '1px solid #d8e4e8', paddingTop: '10px', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                        <span style={{ fontSize: '8px', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#5a7a8a', flexShrink: 0 }}>Further investigation by plumber required:</span>
+                        <span style={{ fontWeight: '600' }}>{tsf(report, 'further_investigation_plumber')}</span>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'conclusion',
+                  title: 'Conclusion',
+                  renderBody: () => (
+                    <div style={{ background: '#f5f8fa', border: '1px solid #d8e4e8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a2a3a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(report.conclusion)}
+                    </div>
+                  ),
+                },
+                ...(report.additional_notes ? [{
+                  key: 'additional_notes',
+                  title: 'Additional Notes',
+                  renderBody: () => (
+                    <div style={{ background: '#f5f8fa', border: '1px solid #d8e4e8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a2a3a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(report.additional_notes)}
+                    </div>
+                  ),
+                }] : []),
+              ]
+
+              for (const section of ldrSections) {
                 const num = getNextSectionNum()
-                const config = NARRATIVE_SECTION_CONFIG[section.key]
-                const value = config?.getValue(report) ?? null
-                
-                // Skip empty sections except additional_notes
-                if (!value && section.key !== 'additional_notes') continue
-                
                 nodes.push(
                   <div key={section.key} style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
-                      <div style={{ width: '20px', height: '20px', border: `1.5px solid ${isLDR ? '#0d2a3d' : '#1a1a1a'}`, color: isLDR ? '#0d2a3d' : '#1a1a1a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '20px', height: '20px', border: '1.5px solid #0d2a3d', color: '#0d2a3d', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {num}
                       </div>
-                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: isLDR ? '#0d2a3d' : '#6a6460', fontWeight: '800' }}>
+                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#0d2a3d', fontWeight: '800' }}>
                         {section.title}
                       </div>
                     </div>
-                    <div style={{ 
-                      background: isLDR ? '#f5f8fa' : '#fafaf8', 
-                      border: isLDR ? '1px solid #d8e4e8' : '1px solid #e8e4e0', 
-                      borderRadius: '5px', 
-                      padding: '10px 12px', 
-                      fontSize: '11.5px', 
-                      color: isLDR ? '#1a2a3a' : '#3a3530', 
-                      lineHeight: '1.65',
-                      ...(section.key === 'pre_existing_conditions' ? { borderLeft: '3px solid #c8d8e0' } : {})
-                    }}>
-                      {formatTextWithPreservedFormatting(value)}
-                    </div>
+                    {section.renderBody()}
                   </div>
                 )
               }
