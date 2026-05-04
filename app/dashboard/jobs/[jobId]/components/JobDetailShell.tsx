@@ -47,6 +47,7 @@ interface JobHeader {
   order_sender_name: string | null
   order_sender_email: string | null
   client_id: string | null
+  invoice_to: string | null
 }
 
 interface JobDetailShellProps {
