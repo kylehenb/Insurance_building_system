@@ -64,6 +64,16 @@ function WoTypeBadge({ type }: { type: string | null }) {
   return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{type ?? 'Other'}</span>
 }
 
+function ParseStatusBadge({ parseStatus, entryMethod }: { parseStatus: string | null; entryMethod: string | null }) {
+  if (parseStatus === 'auto_parsed')
+    return <span style={{ background: '#e6f4ed', color: '#1e5e3c', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Auto-parsed</span>
+  if (parseStatus === 'needs_review')
+    return <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Needs review</span>
+  if (parseStatus === 'manual_entry' || entryMethod === 'manual')
+    return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Manual</span>
+  return null
+}
+
 function StatusBadge({ status }: { status: string | null }) {
   if (status === 'pending')
     return <span style={{ background: '#fdf5e8', color: '#8a6020', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Pending</span>
@@ -642,6 +652,31 @@ export default function InsurerOrdersPage() {
           ))}
         </div>
 
+        {/* Needs-review banner */}
+        {(() => {
+          const needsReviewCount = orders.filter(o => o.parse_status === 'needs_review').length
+          if (!loading && needsReviewCount > 0) {
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 12, padding: '10px 16px',
+                background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6,
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#92400e' }}>
+                  {needsReviewCount} order{needsReviewCount !== 1 ? 's' : ''} need review before lodging
+                </span>
+                <button
+                  onClick={() => setFilter('pending')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#92400e', fontWeight: 600, padding: 0, fontFamily: "'DM Sans', sans-serif" }}
+                >
+                  View pending →
+                </button>
+              </div>
+            )
+          }
+          return null
+        })()}
+
         {/* Search */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ position: 'relative', maxWidth: 360 }}>
@@ -750,8 +785,27 @@ export default function InsurerOrdersPage() {
                               {order.claim_number}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: rowBg }}>
-                            {order.insured_name ?? '—'}
+                          <td style={{ padding: '12px 12px', overflow: 'hidden', background: rowBg }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {order.insured_name ?? '—'}
+                              </span>
+                              <ParseStatusBadge parseStatus={order.parse_status} entryMethod={order.entry_method} />
+                              {order.parse_status === 'needs_review' && (() => {
+                                const missing = [
+                                  !order.claim_number && 'claim #',
+                                  !order.insured_name && 'insured',
+                                  !order.property_address && 'address',
+                                  !order.wo_type && 'type',
+                                ].filter(Boolean) as string[]
+                                if (missing.length === 0) return null
+                                return (
+                                  <span style={{ fontSize: 10, color: '#b0a898' }}>
+                                    Missing: {missing.join(', ')}
+                                  </span>
+                                )
+                              })()}
+                            </div>
                           </td>
                           <td style={{ padding: '12px 12px', overflow: 'hidden', background: rowBg }}>
                             <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
