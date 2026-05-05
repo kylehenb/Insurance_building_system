@@ -129,6 +129,7 @@ export async function parseInsurerOrder(message: ExtractedMessage): Promise<Pars
         order_sender_name: message.fromName || null,
         order_sender_email: message.fromEmail || null,
         insurer: insurerDetected,
+        claim_description: message.subject || null,
       },
       confidence: 0,
       missingFields: ['claim_number', 'insured_name', 'property_address'],

@@ -2,6 +2,29 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 
+export async function writeFallbackOrder(
+  message: ExtractedMessage,
+  tenantId: string
+): Promise<void> {
+  const supabase = createServiceClient()
+  const rawEmailLink = `https://mail.google.com/mail/u/0/#inbox/${message.messageId}`
+  const { error } = await supabase
+    .from('insurer_orders')
+    .insert({
+      tenant_id: tenantId,
+      parse_status: 'needs_review',
+      entry_method: 'email',
+      order_sender_email: message.fromEmail || null,
+      order_sender_name: message.fromName || null,
+      claim_description: message.subject || null,
+      raw_email_link: rawEmailLink,
+      status: 'pending',
+    } as never)
+  if (error) {
+    console.error('[order-writer] fallback insert error:', error)
+  }
+}
+
 export async function writeInsurerOrder(
   parsed: ParsedOrderResult,
   message: ExtractedMessage,

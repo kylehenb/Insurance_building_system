@@ -27,7 +27,7 @@ import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
-import { writeInsurerOrder } from '@/lib/email/order-writer'
+import { writeInsurerOrder, writeFallbackOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
@@ -195,10 +195,17 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       }
 
       if (isOrderEmail(msg.fromEmail, msg.subject)) {
-        // Parse and write insurer order
-        const parsed = await parseInsurerOrder(msg)
-        const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-        await sendOrderNotification(orderId, parsed, msg)
+        let orderId: string | null = null
+        try {
+          const parsed = await parseInsurerOrder(msg)
+          orderId = await writeInsurerOrder(parsed, msg, tenantId)
+          await sendOrderNotification(orderId, parsed, msg)
+        } catch (err) {
+          console.error(`[email-inbound] order pipeline error for ${msgId}:`, err)
+          if (!orderId) {
+            await writeFallbackOrder(msg, tenantId)
+          }
+        }
       } else {
         // Unmatched — write to communications with job_id: null
         await supabase.from('communications').insert({
