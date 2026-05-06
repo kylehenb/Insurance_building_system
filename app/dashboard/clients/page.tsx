@@ -9,6 +9,25 @@ import { ClientsCsvImportDialog, type ClientsImportRow } from './ClientsCsvImpor
 type ClientsRow = Database['public']['Tables']['clients']['Row'];
 type ClientsInsert = Database['public']['Tables']['clients']['Insert'];
 
+type SenderPattern = {
+  type: 'domain' | 'email' | 'display_name'
+  value: string
+  active: boolean
+}
+
+type ClientEmailConfig = {
+  id: string
+  tenant_id: string
+  client_id: string
+  sender_patterns: SenderPattern[]
+  insurer_hint: string | null
+  custom_parsing_notes: string | null
+  default_work_order_type: string | null
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
 const CLIENT_TYPE_OPTIONS = ['insurer', 'adjuster_firm', 'other'] as const;
 const STATUS_OPTIONS = ['active', 'inactive'] as const;
 
@@ -48,6 +67,13 @@ export default function ClientsPage() {
   const [itemToDelete, setItemToDelete] = useState<ClientsRow | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<string>('basic');
+
+  // Email intake state
+  const [emailConfig, setEmailConfig] = useState<ClientEmailConfig | null>(null);
+  const [emailConfigLoading, setEmailConfigLoading] = useState(false);
+  const [emailConfigSaving, setEmailConfigSaving] = useState(false);
+  const [newPatternType, setNewPatternType] = useState<'domain' | 'email' | 'display_name'>('domain');
+  const [newPatternValue, setNewPatternValue] = useState('');
 
   // Form state
   const [formData, setFormData] = useState<Partial<ClientsInsert>>({
@@ -244,8 +270,8 @@ export default function ClientsPage() {
   useEffect(() => {
     if (sortColumn) {
       const sorted = [...filteredItems].sort((a, b) => {
-        let aVal: any, bVal: any;
-        
+        let aVal: string | number, bVal: string | number;
+
         switch (sortColumn) {
           case 'name':
             aVal = a.name || '';
@@ -280,6 +306,16 @@ export default function ClientsPage() {
       setSortColumn(column);
       setSortDirection('asc');
     }
+  };
+
+  const loadEmailConfig = async (clientId: string) => {
+    setEmailConfigLoading(true);
+    const res = await fetch(`/api/clients/${clientId}/email-config`);
+    if (res.ok) {
+      const json = await res.json();
+      setEmailConfig(json.config);
+    }
+    setEmailConfigLoading(false);
   };
 
   const handleAdd = () => {
@@ -335,6 +371,9 @@ export default function ClientsPage() {
       builders_margin_pct: (item as any).builders_margin_pct || null,
     });
     setActiveModalTab('basic');
+    loadEmailConfig(item.id);
+    setNewPatternType('domain');
+    setNewPatternValue('');
     setShowModal(true);
   };
 
@@ -844,6 +883,14 @@ export default function ClientsPage() {
                       active={activeModalTab === 'notes'}
                       onClick={setActiveModalTab}
                     />
+                    {editingItem && (
+                      <ModalTabButton
+                        id="email-intake"
+                        label="Email Intake"
+                        active={activeModalTab === 'email-intake'}
+                        onClick={setActiveModalTab}
+                      />
+                    )}
                   </nav>
                 </div>
 
@@ -1196,6 +1243,227 @@ export default function ClientsPage() {
                           className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
                         />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Email Intake Section */}
+                  {activeModalTab === 'email-intake' && editingItem && (
+                    <div className="space-y-6">
+                      {/* Header */}
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                          Auto Job Lodger
+                        </p>
+                        <h3 className="text-lg font-semibold text-[#1a1a1a]">Email Intake</h3>
+                      </div>
+
+                      {emailConfigLoading ? (
+                        <div className="text-sm text-[#9e998f]">Loading...</div>
+                      ) : emailConfig ? (
+                        <>
+                          {/* Status indicator */}
+                          <div className="flex items-center gap-2 text-sm">
+                            {!emailConfig.active ? (
+                              <><span>⚫</span><span className="text-[#9e998f]">Inactive — auto-detection disabled</span></>
+                            ) : emailConfig.sender_patterns.filter(p => p.active).length === 0 ? (
+                              <><span>🟡</span><span className="text-[#9e998f]">Active — no sender patterns yet</span></>
+                            ) : (
+                              <><span>🟢</span><span className="text-[#9e998f]">Active — {emailConfig.sender_patterns.filter(p => p.active).length} sender pattern(s) configured</span></>
+                            )}
+                          </div>
+
+                          {/* Master toggle */}
+                          <div className="flex items-center justify-between py-3 border-b border-[#e8e4e0]">
+                            <div>
+                              <label className="text-sm font-medium text-[#1a1a1a]">Auto-detect orders from this client</label>
+                              <p className="text-xs text-[#9e998f] mt-0.5">When off, Auto Job Lodger will not process emails from this client</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={emailConfig.active}
+                              onChange={async (e) => {
+                                const newActive = e.target.checked;
+                                const updated = { ...emailConfig, active: newActive };
+                                setEmailConfig(updated);
+                                await fetch(`/api/clients/${editingItem.id}/email-config`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ active: newActive }),
+                                });
+                              }}
+                              className="rounded border-[#e8e4e0] text-[#c9a96e] focus:ring-[#c9a96e] h-4 w-4"
+                            />
+                          </div>
+
+                          {/* Sender Patterns section */}
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                                Sender Patterns
+                              </label>
+                              <p className="text-xs text-[#9e998f]">
+                                Add the email domains and addresses this client sends orders from. IRC Master will match incoming emails against these patterns.
+                              </p>
+                            </div>
+
+                            {/* Pattern list */}
+                            <div className="space-y-2">
+                              {emailConfig.sender_patterns.map((pattern, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    pattern.type === 'domain' ? 'bg-blue-100 text-blue-800' :
+                                    pattern.type === 'email' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-orange-100 text-orange-800'
+                                  }`}>
+                                    {pattern.type.replace('_', ' ')}
+                                  </span>
+                                  <span className="flex-1 text-sm text-[#1a1a1a]">{pattern.value}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={pattern.active}
+                                    onChange={async (e) => {
+                                      const updated = emailConfig.sender_patterns.map((p, i) =>
+                                        i === idx ? { ...p, active: e.target.checked } : p
+                                      );
+                                      const newConfig = { ...emailConfig, sender_patterns: updated };
+                                      setEmailConfig(newConfig);
+                                      await fetch(`/api/clients/${editingItem.id}/email-config`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ sender_patterns: updated }),
+                                      });
+                                    }}
+                                    className="rounded border-[#e8e4e0] text-[#c9a96e] focus:ring-[#c9a96e] h-4 w-4"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      const updated = emailConfig.sender_patterns.filter((_, i) => i !== idx);
+                                      const newConfig = { ...emailConfig, sender_patterns: updated };
+                                      setEmailConfig(newConfig);
+                                      await fetch(`/api/clients/${editingItem.id}/email-config`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ sender_patterns: updated }),
+                                      });
+                                    }}
+                                    className="text-[#9e998f] hover:text-red-600 transition-colors"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Add pattern */}
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={newPatternType}
+                                onChange={(e) => setNewPatternType(e.target.value as 'domain' | 'email' | 'display_name')}
+                                className="border border-[#e8e4e0] rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                              >
+                                <option value="domain">Domain</option>
+                                <option value="email">Email</option>
+                                <option value="display_name">Display Name</option>
+                              </select>
+                              <input
+                                type="text"
+                                value={newPatternValue}
+                                onChange={(e) => setNewPatternValue(e.target.value)}
+                                placeholder={newPatternType === 'domain' ? 'e.g. castleinsurance.com.au' : newPatternType === 'email' ? 'e.g. claims@insurer.com' : 'e.g. Castle Insurance'}
+                                className="flex-1 border border-[#e8e4e0] rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                              />
+                              <button
+                                onClick={async () => {
+                                  const val = newPatternValue.trim();
+                                  if (!val) return;
+                                  const newPattern: SenderPattern = { type: newPatternType, value: val, active: true };
+                                  const updated = [...emailConfig.sender_patterns, newPattern];
+                                  const newConfig = { ...emailConfig, sender_patterns: updated };
+                                  setEmailConfig(newConfig);
+                                  setNewPatternValue('');
+                                  await fetch(`/api/clients/${editingItem.id}/email-config`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ sender_patterns: updated }),
+                                  });
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded hover:bg-[#1a1a1a]/90 transition-colors"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Parsing Configuration section */}
+                          <div className="space-y-4 pt-2">
+                            <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold">
+                              Parsing Configuration
+                            </label>
+
+                            <div>
+                              <label className="block text-xs font-medium text-[#1a1a1a] mb-1">Insurer hint for AI</label>
+                              <textarea
+                                value={emailConfig.insurer_hint ?? ''}
+                                onChange={(e) => setEmailConfig({ ...emailConfig, insurer_hint: e.target.value || null })}
+                                rows={3}
+                                placeholder="Describe how this client's orders are typically formatted e.g. 'Castle Insurance sends a structured list in the email body with a formal PDF attachment. The claim number is labelled Claim Reference.'"
+                                className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-[#1a1a1a] mb-1">Custom parsing notes</label>
+                              <textarea
+                                value={emailConfig.custom_parsing_notes ?? ''}
+                                onChange={(e) => setEmailConfig({ ...emailConfig, custom_parsing_notes: e.target.value || null })}
+                                rows={3}
+                                placeholder="Any specific field quirks e.g. 'Excess amount is only in the PDF, never the body'"
+                                className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-[#1a1a1a] mb-1">Default work order type</label>
+                              <select
+                                value={emailConfig.default_work_order_type ?? ''}
+                                onChange={(e) => setEmailConfig({ ...emailConfig, default_work_order_type: e.target.value || null })}
+                                className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                              >
+                                <option value="">None</option>
+                                <option value="BAR">BAR</option>
+                                <option value="make_safe">Make Safe</option>
+                                <option value="roof_report">Roof Report</option>
+                                <option value="specialist">Specialist Report</option>
+                                <option value="variation">Combination</option>
+                              </select>
+                            </div>
+
+                            <button
+                              onClick={async () => {
+                                setEmailConfigSaving(true);
+                                await fetch(`/api/clients/${editingItem.id}/email-config`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    insurer_hint: emailConfig.insurer_hint,
+                                    custom_parsing_notes: emailConfig.custom_parsing_notes,
+                                    default_work_order_type: emailConfig.default_work_order_type,
+                                  }),
+                                });
+                                setEmailConfigSaving(false);
+                              }}
+                              disabled={emailConfigSaving}
+                              className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded hover:bg-[#1a1a1a]/90 transition-colors disabled:opacity-50"
+                            >
+                              {emailConfigSaving ? 'Saving...' : 'Save parsing config'}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-[#9e998f]">Failed to load email intake config.</div>
+                      )}
                     </div>
                   )}
                 </div>

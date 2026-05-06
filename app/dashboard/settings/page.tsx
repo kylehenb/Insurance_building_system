@@ -12,6 +12,7 @@ import {
   Users,
   BookOpen,
   ChevronRight,
+  Inbox,
 } from 'lucide-react'
 
 interface SettingsCard {
@@ -47,6 +48,12 @@ export default async function SettingsPage() {
       route: null,
       description: 'Defined in code (/lib/automation/rules.ts) — no UI',
       icon: <Code className="w-4 h-4" />,
+    },
+    {
+      name: 'Auto Job Lodger',
+      route: '/dashboard/settings/auto-job-lodger',
+      description: 'Configure automated email order intake — notification settings, keyword rules, and per-client sender patterns',
+      icon: <Inbox className="w-4 h-4" />,
     },
   ]
 

@@ -27,27 +27,112 @@ import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
+import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
 
-const ORDER_KEYWORDS = [
-  'claim', 'loss', 'repair order', 'works order',
-  'new instruction', 'new matter',
-]
+type SenderPattern = {
+  type: 'domain' | 'email' | 'display_name'
+  value: string
+  active: boolean
+}
 
-const KNOWN_INSURER_DOMAINS = ['castle', 'sedgwick']
+type ClientEmailConfigRow = {
+  id: string
+  tenant_id: string
+  client_id: string
+  sender_patterns: SenderPattern[]
+  insurer_hint: string | null
+  custom_parsing_notes: string | null
+  default_work_order_type: string | null
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+type EmailKeywordRuleRow = {
+  id: string
+  tenant_id: string
+  keyword: string
+  active: boolean
+  created_at: string
+}
+
+type RoutingConfig = {
+  clientConfigs: ClientEmailConfigRow[]
+  keywordRules: EmailKeywordRuleRow[]
+  loadedAt: number
+}
+
+const CACHE_TTL_MS = 60_000
+let routingConfigCache: RoutingConfig | null = null
+
+async function getRoutingConfig(tenantId: string): Promise<RoutingConfig> {
+  const now = Date.now()
+  if (routingConfigCache && now - routingConfigCache.loadedAt < CACHE_TTL_MS) {
+    return routingConfigCache
+  }
+
+  const rawDb = createRawClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const [clientConfigsRes, keywordRulesRes] = await Promise.all([
+    rawDb
+      .from('client_email_config')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('active', true),
+    rawDb
+      .from('email_keyword_rules')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('active', true),
+  ])
+
+  const config: RoutingConfig = {
+    clientConfigs: (clientConfigsRes.data as ClientEmailConfigRow[]) ?? [],
+    keywordRules: (keywordRulesRes.data as EmailKeywordRuleRow[]) ?? [],
+    loadedAt: now,
+  }
+  routingConfigCache = config
+  return config
+}
+
+function matchClientConfig(
+  fromEmail: string,
+  fromName: string,
+  clientConfigs: ClientEmailConfigRow[]
+): ClientEmailConfigRow | null {
+  const emailLower = fromEmail.toLowerCase()
+  const nameLower = fromName.toLowerCase()
+  const domainPart = emailLower.split('@')[1] ?? ''
+
+  for (const config of clientConfigs) {
+    const patterns: SenderPattern[] = Array.isArray(config.sender_patterns)
+      ? config.sender_patterns
+      : []
+    for (const pattern of patterns) {
+      if (!pattern.active) continue
+      const val = pattern.value.toLowerCase()
+      if (pattern.type === 'domain' && domainPart.includes(val)) return config
+      if (pattern.type === 'email' && emailLower === val) return config
+      if (pattern.type === 'display_name' && nameLower.includes(val)) return config
+    }
+  }
+  return null
+}
+
+function isOrderEmailByKeywords(subject: string, keywordRules: EmailKeywordRuleRow[]): boolean {
+  const subjectLower = subject.toLowerCase()
+  return keywordRules.some(rule => rule.active && subjectLower.includes(rule.keyword.toLowerCase()))
+}
 
 function isOwnDomain(email: string): boolean {
   return email.toLowerCase().endsWith(`@${OUR_DOMAIN}`)
-}
-
-function isOrderEmail(fromEmail: string, subject: string): boolean {
-  const domainPart = fromEmail.split('@')[1]?.toLowerCase() ?? ''
-  if (KNOWN_INSURER_DOMAINS.some(d => domainPart.includes(d))) return true
-  const subjectLower = subject.toLowerCase()
-  return ORDER_KEYWORDS.some(kw => subjectLower.includes(kw))
 }
 
 type PubSubMessage = {
@@ -62,7 +147,6 @@ type PubSubBody = {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Verify token before doing anything
   const token = req.nextUrl.searchParams.get('token')
   if (token !== process.env.GMAIL_WEBHOOK_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -108,7 +192,6 @@ async function processWebhook(body: PubSubBody): Promise<void> {
     .eq('contact_email', emailAddress)
     .single()
 
-  // Fall back: use the only tenant (IRC single-tenant for now)
   let tenantId: string
   if (tenantRow) {
     tenantId = tenantRow.id
@@ -125,7 +208,10 @@ async function processWebhook(body: PubSubBody): Promise<void> {
     tenantId = firstTenant.id
   }
 
-  // Get last known historyId — use untyped client for new table not yet in DB types
+  // Load routing config from DB (cached 60s)
+  const routingConfig = await getRoutingConfig(tenantId)
+
+  // Get last known historyId
   const { data: syncState } = await rawDb
     .from('gmail_sync_state')
     .select('last_history_id')
@@ -160,7 +246,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   // Process each new message
   for (const msgId of messageIds) {
     try {
-      // Deduplicate — atomically claim this message_id; skip if already processed
+      // Deduplicate
       const { count: claimedCount } = await rawDb
         .from('processed_gmail_messages')
         .upsert(
@@ -183,13 +269,11 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           .from('communications')
           .select('id, job_id')
           .eq('tenant_id', tenantId)
-          // thread_id column added via migration; use type cast
           .eq('thread_id' as never, msg.threadId as never)
           .limit(1)
           .single()
 
         if (existingThread) {
-          // Append to existing thread
           await supabase.from('communications').insert({
             tenant_id: tenantId,
             job_id: existingThread.job_id,
@@ -208,12 +292,25 @@ async function processWebhook(body: PubSubBody): Promise<void> {
         }
       }
 
-      if (isOrderEmail(msg.fromEmail, msg.subject)) {
+      // Match sender against client email configs
+      const matchedClientConfig = matchClientConfig(
+        msg.fromEmail,
+        msg.fromName,
+        routingConfig.clientConfigs
+      )
+
+      const isOrderByPattern = matchedClientConfig !== null
+      const isOrderByKeyword = isOrderEmailByKeywords(msg.subject, routingConfig.keywordRules)
+
+      if (isOrderByPattern || isOrderByKeyword) {
         let orderId: string | null = null
+        const clientConfig: ClientEmailConfig | null = matchedClientConfig
+          ? (matchedClientConfig as unknown as ClientEmailConfig)
+          : null
         try {
-          const parsed = await parseInsurerOrder(msg)
+          const parsed = await parseInsurerOrder(msg, clientConfig)
           orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          await sendOrderNotification(orderId, parsed, msg)
+          await sendOrderNotification(orderId, parsed, msg, tenantId)
         } catch (err) {
           console.error(`[email-inbound] order pipeline error for ${msgId}:`, err)
           if (!orderId) {
@@ -233,7 +330,6 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           }
         }
       } else {
-        // Unmatched — write to communications with job_id: null
         await supabase.from('communications').insert({
           tenant_id: tenantId,
           job_id: null,
@@ -254,7 +350,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
     }
   }
 
-  // Update last processed historyId — use untyped client for new table
+  // Update last processed historyId
   await rawDb.from('gmail_sync_state').upsert(
     {
       tenant_id: tenantId,
