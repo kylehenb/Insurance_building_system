@@ -70,7 +70,7 @@ export async function parseInsurerOrder(message: ExtractedMessage): Promise<Pars
   if (!apiKey) throw new Error('GEMINI_API_KEY not set')
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
   const insurerDetected = detectInsurer(message.fromEmail, message.fromName)
   const pdf = findLargestPdf(message)
