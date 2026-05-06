@@ -27,7 +27,7 @@ import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
-import { writeInsurerOrder, writeFallbackOrder } from '@/lib/email/order-writer'
+import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
@@ -68,13 +68,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Return 200 immediately — Google will retry if it does not receive a fast 200
-  const body = await req.json() as PubSubBody
-
-  // Process asynchronously but still within the request handler (Vercel serverless)
-  processWebhook(body).catch(err => {
-    console.error('[email-inbound] unhandled processing error:', err)
-  })
+  // Always return 200 — Pub/Sub retries on anything else
+  try {
+    const body = await req.json() as PubSubBody
+    processWebhook(body).catch(err => {
+      console.error('[email-inbound] unhandled processing error:', err)
+    })
+  } catch (err) {
+    console.error('[email-inbound] failed to parse pub/sub body:', err)
+  }
 
   return NextResponse.json({ ok: true })
 }
@@ -158,6 +160,18 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   // Process each new message
   for (const msgId of messageIds) {
     try {
+      // Deduplicate — atomically claim this message_id; skip if already processed
+      const { count: claimedCount } = await rawDb
+        .from('processed_gmail_messages')
+        .upsert(
+          { message_id: msgId, processed_at: new Date().toISOString() },
+          { onConflict: 'message_id', ignoreDuplicates: true, count: 'exact' }
+        )
+      if (claimedCount === 0) {
+        console.log(`[email-inbound] skipping duplicate message ${msgId}`)
+        continue
+      }
+
       const raw = await getFullMessage(msgId)
       const msg = extractMessageParts(raw)
 
@@ -203,7 +217,19 @@ async function processWebhook(body: PubSubBody): Promise<void> {
         } catch (err) {
           console.error(`[email-inbound] order pipeline error for ${msgId}:`, err)
           if (!orderId) {
-            await writeFallbackOrder(msg, tenantId)
+            const { error: fbErr } = await supabase.from('insurer_orders').insert({
+              tenant_id: tenantId,
+              parse_status: 'needs_review',
+              entry_method: 'email',
+              order_sender_email: msg.fromEmail || null,
+              order_sender_name: msg.fromName || null,
+              notes: msg.subject || null,
+              raw_email_link: `https://mail.google.com/mail/u/0/#inbox/${msgId}`,
+              status: 'pending',
+            })
+            if (fbErr) {
+              console.error(`[email-inbound] fallback order insert failed for ${msgId}:`, fbErr)
+            }
           }
         }
       } else {
