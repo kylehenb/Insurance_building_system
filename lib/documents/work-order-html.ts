@@ -6,6 +6,16 @@ type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 
+function getDeletedIds(notes: string | null): Set<string> {
+  if (!notes) return new Set()
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    return new Set(Array.isArray(parsed.deleted_scope_item_ids) ? (parsed.deleted_scope_item_ids as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
 export function generateWorkOrderHtml(params: {
   workOrder: WorkOrder
   job: Job
@@ -17,7 +27,12 @@ export function generateWorkOrderHtml(params: {
   otherScopeItems: ScopeItem[]
   generatedDate?: Date
 }): string {
-  const { workOrder, job, tenant, trade, tradeScopeItems, otherScopeItems, generatedDate = new Date() } = params
+  const { workOrder, job, tenant, trade, generatedDate = new Date() } = params
+
+  // Filter out soft-deleted scope items
+  const deletedIds = getDeletedIds(workOrder.notes)
+  const tradeScopeItems = params.tradeScopeItems.filter(i => !deletedIds.has(i.id))
+  const otherScopeItems = params.otherScopeItems.filter(i => !deletedIds.has(i.id))
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -90,6 +105,12 @@ export function generateWorkOrderHtml(params: {
           font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
         <td style="width:44px;padding:6px 4px;text-align:center;
           font-size:10px;color:#3a3530;">${item.unit || '-'}</td>
+        <td style="width:72px;padding:6px 4px;text-align:right;
+          font-family:monospace;font-size:10px;color:#3a3530;">${item.rate_labour != null ? fmt(item.rate_labour) : '-'}</td>
+        <td style="width:72px;padding:6px 4px;text-align:right;
+          font-family:monospace;font-size:10px;color:#3a3530;">${item.rate_materials != null ? fmt(item.rate_materials) : '-'}</td>
+        <td style="width:80px;padding:6px 4px;text-align:right;
+          font-family:monospace;font-size:10px;color:#3a3530;font-weight:600;">${item.line_total != null ? fmt(item.line_total) : '-'}</td>
       </tr>`
     }).join('')
 
@@ -280,6 +301,15 @@ export function generateWorkOrderHtml(params: {
             <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;
               color:#b0a89e;">Unit</th>
+            <th style="width:72px;text-align:right;padding:6px 4px;font-size:8px;
+              font-weight:600;text-transform:uppercase;letter-spacing:1px;
+              color:#b0a89e;">Labour</th>
+            <th style="width:72px;text-align:right;padding:6px 4px;font-size:8px;
+              font-weight:600;text-transform:uppercase;letter-spacing:1px;
+              color:#b0a89e;">Materials</th>
+            <th style="width:80px;text-align:right;padding:6px 4px;font-size:8px;
+              font-weight:600;text-transform:uppercase;letter-spacing:1px;
+              color:#b0a89e;">Subtotal</th>
           </tr>
         </thead>
         <tbody>

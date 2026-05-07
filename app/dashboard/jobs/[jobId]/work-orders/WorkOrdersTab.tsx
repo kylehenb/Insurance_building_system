@@ -24,7 +24,7 @@ export interface WorkOrdersTabProps {
 }
 
 export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
-  const { workOrders, quotes, trades, isLoading, error, mutations, refetch } = useWorkOrders(jobId, tenantId)
+  const { workOrders, scopeItems, quotes, trades, isLoading, error, mutations, refetch } = useWorkOrders(jobId, tenantId)
 
   const [view,         setView]         = useState<View>('blueprint')
   const [expandedIds,  setExpandedIds]  = useState<Set<string>>(new Set())
@@ -307,6 +307,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         {/* ── Bottom panel ────────────────────────────────────────────────── */}
         <BottomPanel
           workOrders={workOrders}
+          scopeItems={scopeItems}
           quotes={quotes}
           trades={trades}
           jobId={jobId}
@@ -314,6 +315,11 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           onAddToQuote={openAddQuote}
           onAddAdditional={openAddAdditional}
           onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
+          onDeleteWorkOrder={mutations.deleteWorkOrder}
+          onUpdateScopeItem={mutations.updateScopeItem}
+          onSoftDeleteScopeItem={mutations.softDeleteScopeItem}
+          onCreateScopeItem={mutations.createScopeItem}
+          onAddWorkOrderForTrade={mutations.addWorkOrderForTrade}
           onRefresh={refetch}
         />
       </div>

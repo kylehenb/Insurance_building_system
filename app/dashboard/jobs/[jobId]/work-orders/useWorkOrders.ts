@@ -14,6 +14,8 @@ import {
   getPlacementState,
   getCushionDays,
   mergeCushionDays,
+  getDeletedScopeItemIds,
+  mergeDeletedScopeItemIds,
   woIsSent,
 } from './types'
 
@@ -31,10 +33,17 @@ export interface WorkOrderMutations {
   addVisit:          (workOrderId: string) => Promise<void>
   deleteVisit:       (workOrderId: string, visitId: string) => Promise<void>
   addWorkOrder:      (quoteId: string | null, workType: string) => Promise<void>
+  // Scope item mutations
+  updateScopeItem:     (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
+  softDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
+  createScopeItem:     (quoteId: string, tradeLabel: string, workOrderId: string, data: { item_description: string; qty: number; rate_labour: number; rate_materials: number; line_total: number }) => Promise<string | null>
+  deleteWorkOrder:     (id: string) => Promise<void>
+  addWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
 }
 
 export interface WorkOrdersData {
   workOrders: WorkOrderWithDetails[]
+  scopeItems: ScopeItemRow[]
   quotes:     QuoteRow[]
   trades:     TradeRow[]
   invoices:   InvoiceRow[]
@@ -56,6 +65,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
   const fetchCount = useRef(0)
 
   const [workOrders, setWorkOrders] = useState<WorkOrderWithDetails[]>([])
+  const [scopeItems, setScopeItems] = useState<ScopeItemRow[]>([])
   const [quotes,     setQuotes]     = useState<QuoteRow[]>([])
   const [trades,     setTrades]     = useState<TradeRow[]>([])
   const [invoices,   setInvoices]   = useState<InvoiceRow[]>([])
@@ -120,6 +130,8 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
 
       if (fetchId !== fetchCount.current) return
 
+      setScopeItems(scopeItems)
+
       // Build lookup maps
       const visitsMap = new Map<string, WorkOrderVisitRow[]>()
       for (const v of visitsData ?? []) {
@@ -166,7 +178,10 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
             : allForQuote
         }
 
-        const quotedAllowance = woScopeItems.reduce((s, si) => s + (si.line_total ?? 0), 0)
+        const deletedIds = new Set(getDeletedScopeItemIds(wo.notes))
+        const quotedAllowance = woScopeItems
+          .filter(si => !deletedIds.has(si.id))
+          .reduce((s, si) => s + (si.line_total ?? 0), 0)
 
         const firstVisit = visits[0]
         const lagDays        = firstVisit?.lag_days_after   ?? 0
@@ -548,9 +563,102 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       })
       fetchData()
     },
+
+    updateScopeItem: async (itemId, updates) => {
+      await supabase
+        .from('scope_items')
+        .update(updates)
+        .eq('id', itemId)
+        .eq('tenant_id', tenantId)
+      fetchData()
+    },
+
+    softDeleteScopeItem: async (workOrderId, scopeItemId) => {
+      const wo = workOrders.find(w => w.id === workOrderId)
+      if (!wo) return
+      const current = getDeletedScopeItemIds(wo.notes)
+      const isDeleted = current.includes(scopeItemId)
+      const newIds = isDeleted
+        ? current.filter(id => id !== scopeItemId)
+        : [...current, scopeItemId]
+      const newNotes = mergeDeletedScopeItemIds(wo.notes, newIds)
+      await supabase
+        .from('work_orders')
+        .update({ notes: newNotes })
+        .eq('id', workOrderId)
+        .eq('tenant_id', tenantId)
+      fetchData()
+    },
+
+    createScopeItem: async (quoteId, tradeLabel, _workOrderId, data) => {
+      const { data: inserted, error } = await supabase
+        .from('scope_items')
+        .insert({
+          tenant_id:        tenantId,
+          quote_id:         quoteId,
+          trade:            tradeLabel,
+          item_description: data.item_description,
+          qty:              data.qty,
+          rate_labour:      data.rate_labour,
+          rate_materials:   data.rate_materials,
+          rate_total:       data.rate_labour + data.rate_materials,
+          line_total:       data.line_total,
+          is_custom:        true,
+        })
+        .select('id')
+        .single()
+      if (!error && inserted) {
+        fetchData()
+        return inserted.id
+      }
+      fetchData()
+      return null
+    },
+
+    deleteWorkOrder: async (id) => {
+      // Clear predecessor/parent references from other work orders
+      await supabase
+        .from('work_orders')
+        .update({ predecessor_work_order_id: null })
+        .eq('predecessor_work_order_id', id)
+        .eq('tenant_id', tenantId)
+      await supabase
+        .from('work_orders')
+        .update({ parent_work_order_id: null, scheduling_offset_days: null })
+        .eq('parent_work_order_id', id)
+        .eq('tenant_id', tenantId)
+      // Delete visits
+      await supabase
+        .from('work_order_visits')
+        .delete()
+        .eq('work_order_id', id)
+        .eq('tenant_id', tenantId)
+      // Delete the work order
+      await supabase
+        .from('work_orders')
+        .delete()
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+      fetchData()
+    },
+
+    addWorkOrderForTrade: async (quoteId, tradeName) => {
+      await supabase.from('work_orders').insert({
+        tenant_id:    tenantId,
+        job_id:       jobId,
+        quote_id:     quoteId,
+        trade_name:   tradeName,
+        work_type:    'repair',
+        status:       'pending',
+        gary_state:   'not_started',
+        total_visits: 1,
+        current_visit: 1,
+      })
+      fetchData()
+    },
   }
 
-  return { workOrders, quotes, trades, invoices, isLoading, error, refetch: fetchData, mutations }
+  return { workOrders, scopeItems, quotes, trades, invoices, isLoading, error, refetch: fetchData, mutations }
 }
 
 // ── Helpers used by mutations (exported for components that need them) ─────────

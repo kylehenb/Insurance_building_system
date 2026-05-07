@@ -116,3 +116,24 @@ export const INVOICE_CHAIN_STEPS = [
   { key: 'irc_invoice_created',    label: 'IRC invoice' },
   { key: 'invoiced',               label: 'Invoiced' },
 ] as const
+
+// ─── Soft-delete helpers for scope items stored in work_order.notes ───────────
+export function getDeletedScopeItemIds(notes: string | null): string[] {
+  if (!notes) return []
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    return Array.isArray(parsed.deleted_scope_item_ids)
+      ? (parsed.deleted_scope_item_ids as string[])
+      : []
+  } catch {
+    return []
+  }
+}
+
+export function mergeDeletedScopeItemIds(notes: string | null, ids: string[]): string {
+  let parsed: Record<string, unknown> = {}
+  if (notes) {
+    try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ }
+  }
+  return JSON.stringify({ ...parsed, deleted_scope_item_ids: ids })
+}
