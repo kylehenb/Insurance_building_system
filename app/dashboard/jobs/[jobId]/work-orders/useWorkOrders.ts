@@ -39,6 +39,7 @@ export interface WorkOrderMutations {
   createScopeItem:     (quoteId: string, tradeLabel: string, workOrderId: string, data: { item_description: string; qty: number; rate_labour: number; rate_materials: number; line_total: number }) => Promise<string | null>
   deleteWorkOrder:     (id: string) => Promise<void>
   addWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
+  lockWorkOrder:       (id: string) => Promise<void>
 }
 
 export interface WorkOrdersData {
@@ -95,6 +96,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           .eq('job_id', jobId)
           .eq('tenant_id', tenantId)
           .eq('is_active_version', true)
+          .in('status', ['approved', 'partially_approved'])
           .order('created_at', { ascending: true }),
         supabase
           .from('invoices')
@@ -565,12 +567,24 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
     },
 
     updateScopeItem: async (itemId, updates) => {
-      await supabase
+      // Optimistic update — patch local state immediately, sync to DB in background
+      setWorkOrders(prev => prev.map(wo => {
+        if (!wo.scopeItems.some(si => si.id === itemId)) return wo
+        const updatedItems = wo.scopeItems.map(si => si.id === itemId ? { ...si, ...updates } : si)
+        const deletedIds = new Set(getDeletedScopeItemIds(wo.notes))
+        const quotedAllowance = updatedItems
+          .filter(si => !deletedIds.has(si.id))
+          .reduce((s, si) => s + (si.line_total ?? 0), 0)
+        return { ...wo, scopeItems: updatedItems, quotedAllowance }
+      }))
+      setScopeItems(prev => prev.map(si => si.id === itemId ? { ...si, ...updates } : si))
+
+      const { error } = await supabase
         .from('scope_items')
         .update(updates)
         .eq('id', itemId)
         .eq('tenant_id', tenantId)
-      fetchData()
+      if (error) fetchData() // rollback on error
     },
 
     softDeleteScopeItem: async (workOrderId, scopeItemId) => {
@@ -653,6 +667,27 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         gary_state:   'not_started',
         total_visits: 1,
         current_visit: 1,
+      })
+      fetchData()
+    },
+
+    lockWorkOrder: async (id) => {
+      const wo = workOrders.find(w => w.id === id)
+      if (!wo) return
+      const newGaryState = wo.predecessor_work_order_id ? 'waiting_on_dependent' : 'waiting_reply'
+      await supabase
+        .from('work_orders')
+        .update({ gary_state: newGaryState, status: 'engaged' })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+      await supabase.from('communications').insert({
+        tenant_id:     tenantId,
+        job_id:        jobId,
+        work_order_id: id,
+        type:          'portal',
+        direction:     'outbound',
+        contact_type:  'trade',
+        content:       'Work order sent and locked',
       })
       fetchData()
     },

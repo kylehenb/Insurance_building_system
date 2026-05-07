@@ -316,6 +316,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           onAddAdditional={openAddAdditional}
           onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
           onDeleteWorkOrder={mutations.deleteWorkOrder}
+          onLockWorkOrder={mutations.lockWorkOrder}
           onUpdateScopeItem={mutations.updateScopeItem}
           onSoftDeleteScopeItem={mutations.softDeleteScopeItem}
           onCreateScopeItem={mutations.createScopeItem}

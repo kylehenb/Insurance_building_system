@@ -83,6 +83,7 @@ function EditCell({
   width,
   isModified,
   isDeleted,
+  isLocked,
   onSave,
 }: {
   value: string
@@ -90,11 +91,27 @@ function EditCell({
   width?: number
   isModified: boolean
   isDeleted: boolean
+  isLocked: boolean
   onSave: (val: string) => void
 }) {
   const [local, setLocal] = useState(value)
 
   React.useEffect(() => { setLocal(value) }, [value])
+
+  if (isLocked) {
+    return (
+      <span style={{
+        fontFamily: type === 'number' ? 'DM Mono, monospace' : 'DM Sans, sans-serif',
+        fontSize: 10,
+        color: '#5a5650',
+        display: 'block',
+        padding: '3px 4px',
+        width: width ? `${width}px` : '100%',
+      }}>
+        {value || '—'}
+      </span>
+    )
+  }
 
   const bg = isDeleted ? 'transparent' : isModified ? '#fef3e2' : '#fff'
   const border = isDeleted ? '1px solid transparent' : isModified ? '1px solid #fcd38d' : '1px solid #e8e4de'
@@ -129,6 +146,7 @@ function ScopeItemEditRow({
   index,
   isDeleted,
   isNew,
+  isLocked,
   modifiedFields,
   onUpdate,
   onToggleDelete,
@@ -137,6 +155,7 @@ function ScopeItemEditRow({
   index: number
   isDeleted: boolean
   isNew: boolean
+  isLocked: boolean
   modifiedFields: Set<string>
   onUpdate: (updates: Partial<ScopeItemRow>, changedField: string) => void
   onToggleDelete: () => void
@@ -156,6 +175,7 @@ function ScopeItemEditRow({
           value={item.item_description ?? ''}
           isModified={modifiedFields.has('item_description')}
           isDeleted={isDeleted}
+          isLocked={isLocked}
           onSave={v => onUpdate({ item_description: v }, 'item_description')}
         />
       </td>
@@ -168,6 +188,7 @@ function ScopeItemEditRow({
           width={60}
           isModified={modifiedFields.has('qty')}
           isDeleted={isDeleted}
+          isLocked={isLocked}
           onSave={v => onUpdate({ qty: parseFloat(v) || 0 }, 'qty')}
         />
       </td>
@@ -180,6 +201,7 @@ function ScopeItemEditRow({
           width={88}
           isModified={modifiedFields.has('rate_labour')}
           isDeleted={isDeleted}
+          isLocked={isLocked}
           onSave={v => onUpdate({ rate_labour: parseFloat(v) || 0 }, 'rate_labour')}
         />
       </td>
@@ -192,6 +214,7 @@ function ScopeItemEditRow({
           width={96}
           isModified={modifiedFields.has('rate_materials')}
           isDeleted={isDeleted}
+          isLocked={isLocked}
           onSave={v => onUpdate({ rate_materials: parseFloat(v) || 0 }, 'rate_materials')}
         />
       </td>
@@ -204,6 +227,7 @@ function ScopeItemEditRow({
           width={88}
           isModified={modifiedFields.has('line_total')}
           isDeleted={isDeleted}
+          isLocked={isLocked}
           onSave={v => onUpdate({ line_total: parseFloat(v) || 0 }, 'line_total')}
         />
       </td>
@@ -227,24 +251,17 @@ function ScopeItemEditRow({
         )}
       </td>
 
-      {/* Delete toggle */}
+      {/* Delete toggle — hidden when locked */}
       <td style={{ padding: '4px 6px', width: 36, textAlign: 'center' }}>
-        <button
-          onClick={onToggleDelete}
-          title={isDeleted ? 'Restore item' : 'Remove item'}
-          style={{
-            fontSize: 12,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: isDeleted ? '#2d6a4f' : '#991b1b',
-            padding: '2px 4px',
-            borderRadius: 3,
-            lineHeight: 1,
-          }}
-        >
-          {isDeleted ? '↩' : '×'}
-        </button>
+        {!isLocked && (
+          <button
+            onClick={onToggleDelete}
+            title={isDeleted ? 'Restore item' : 'Remove item'}
+            style={{ fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: isDeleted ? '#2d6a4f' : '#991b1b', padding: '2px 4px', borderRadius: 3, lineHeight: 1 }}
+          >
+            {isDeleted ? '↩' : '×'}
+          </button>
+        )}
       </td>
     </tr>
   )
@@ -343,11 +360,13 @@ const SCOPE_TH: React.CSSProperties = {
 
 function ScopeItemsEditor({
   wo,
+  isLocked,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
 }: {
   wo: WorkOrderWithDetails
+  isLocked: boolean
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -375,9 +394,7 @@ function ScopeItemsEditor({
   async function handleCreate(data: ScopeItemData) {
     if (!wo.quote_id) return
     const newId = await onCreateScopeItem(wo.quote_id, wo.tradeTypeLabel, wo.id, data)
-    if (newId) {
-      setNewItemIds(prev => new Set([...prev, newId]))
-    }
+    if (newId) setNewItemIds(prev => new Set([...prev, newId]))
   }
 
   const items = wo.scopeItems
@@ -390,8 +407,30 @@ function ScopeItemsEditor({
     )
   }
 
+  // Group items by room
+  const roomOrder: string[] = []
+  const byRoom = new Map<string, ScopeItemRow[]>()
+  for (const item of items) {
+    const room = item.room ?? 'Unassigned'
+    if (!byRoom.has(room)) { byRoom.set(room, []); roomOrder.push(room) }
+    byRoom.get(room)!.push(item)
+  }
+
+  // Flat ordered list with room awareness for index numbering
+  let globalIdx = 0
+
   return (
     <div style={{ background: '#faf8f5', borderTop: '1px solid #e8e4de', overflowX: 'auto' }}>
+      {isLocked && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', background: '#eff4ff', borderBottom: '1px solid #bfdbfe' }}>
+          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', letterSpacing: '.04em' }}>
+            LOCKED
+          </span>
+          <span style={{ fontSize: 10, color: '#1e40af' }}>
+            This work order has been sent and locked — scope items are read-only.
+          </span>
+        </div>
+      )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
         <thead>
           <tr>
@@ -406,19 +445,37 @@ function ScopeItemsEditor({
           </tr>
         </thead>
         <tbody>
-          {items.map((item, i) => (
-            <ScopeItemEditRow
-              key={item.id}
-              item={item}
-              index={i}
-              isDeleted={deletedIds.has(item.id)}
-              isNew={newItemIds.has(item.id)}
-              modifiedFields={modifiedFields.get(item.id) ?? new Set()}
-              onUpdate={(updates, field) => handleUpdate(item.id, updates, field)}
-              onToggleDelete={() => onSoftDeleteScopeItem(wo.id, item.id)}
-            />
-          ))}
-          {wo.quote_id && (
+          {roomOrder.map(room => {
+            const roomItems = byRoom.get(room)!
+            return (
+              <React.Fragment key={room}>
+                <tr>
+                  <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650' }}>
+                      {room}
+                    </span>
+                  </td>
+                </tr>
+                {roomItems.map(item => {
+                  const idx = globalIdx++
+                  return (
+                    <ScopeItemEditRow
+                      key={item.id}
+                      item={item}
+                      index={idx}
+                      isDeleted={deletedIds.has(item.id)}
+                      isNew={newItemIds.has(item.id)}
+                      isLocked={isLocked}
+                      modifiedFields={modifiedFields.get(item.id) ?? new Set()}
+                      onUpdate={(updates, field) => handleUpdate(item.id, updates, field)}
+                      onToggleDelete={() => onSoftDeleteScopeItem(wo.id, item.id)}
+                    />
+                  )
+                })}
+              </React.Fragment>
+            )
+          })}
+          {!isLocked && wo.quote_id && (
             <NewItemRow tradeLabel={wo.tradeTypeLabel} onAdd={handleCreate} />
           )}
         </tbody>
@@ -436,31 +493,29 @@ function ScopeItemsEditor({
 
 function WORow({
   wo,
-  allPlaced,
   trades,
   onUpdate,
   onDelete,
+  onLock,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
 }: {
   wo: WorkOrderWithDetails
-  allPlaced: WorkOrderWithDetails[]
   trades: TradeRow[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
   onDelete: (id: string) => void
+  onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
 }) {
-  const [expanded,         setExpanded]         = useState(false)
-  const [localTradeId,     setLocalTradeId]      = React.useState(wo.trade_id || '')
-  const [localAgreedAmt,   setLocalAgreedAmt]    = React.useState(wo.agreed_amount?.toString() || '')
+  const [expanded,       setExpanded]     = useState(false)
+  const [localTradeId,   setLocalTradeId] = React.useState(wo.trade_id || '')
+  const [localAgreedAmt, setLocalAgreedAmt] = React.useState(wo.agreed_amount?.toString() || '')
 
-  const color   = getTradeColor(wo.tradeTypeLabel)
-  const predWo  = wo.predecessor_work_order_id
-    ? allPlaced.find(p => p.id === wo.predecessor_work_order_id)
-    : null
+  const color    = getTradeColor(wo.tradeTypeLabel)
+  const isLocked = woIsSent(wo)
 
   const xeroStyle =
     wo.invoice?.xero_sync_status === 'synced'
@@ -468,7 +523,7 @@ function WORow({
       : { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' }
 
   const isEditable = wo.status === 'pending'
-  const tradeType = wo.work_type === 'make_safe' ? 'make_safe' : wo.tradeTypeLabel
+  const tradeType  = wo.work_type === 'make_safe' ? 'make_safe' : wo.tradeTypeLabel
   const eligibleTrades = trades.filter(t => t.primary_trade === tradeType || t.primary_trade === tradeType.toLowerCase())
 
   React.useEffect(() => {
@@ -564,12 +619,7 @@ function WORow({
 
         {/* Invoice chain */}
         <td style={{ ...TD }}>
-          <InvoiceChain extStatus={woIsSent(wo) ? (wo.invoice?.external_status ?? 'sent_awaiting_invoice') : null} />
-        </td>
-
-        {/* Depends on */}
-        <td style={{ ...TD, fontSize: 10, color: '#5a5650', whiteSpace: 'nowrap' }}>
-          {predWo ? `${predWo.tradeTypeLabel || predWo.work_type} · ${predWo.trade?.business_name?.split(' ')[0] ?? '?'}` : '—'}
+          <InvoiceChain extStatus={isLocked ? (wo.invoice?.external_status ?? 'sent_awaiting_invoice') : null} />
         </td>
 
         {/* Xero */}
@@ -593,29 +643,52 @@ function WORow({
           </a>
         </td>
 
-        {/* Delete WO */}
+        {/* Actions: Send & Lock + Delete */}
         <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-          <button
-            onClick={() => {
-              if (!confirm(`Delete this ${wo.tradeTypeLabel || wo.work_type} work order? Its scope items will become unallocated.`)) return
-              onDelete(wo.id)
-            }}
-            title="Delete work order"
-            style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#991b1b', border: '1px solid #fca5a5', cursor: 'pointer' }}
-            onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#fee2e2' }}
-            onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#fff' }}
-          >
-            Delete
-          </button>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {!isLocked ? (
+              <button
+                onClick={() => {
+                  if (!confirm(`Send and lock this ${wo.tradeTypeLabel || wo.work_type} work order? Scope items will become read-only.`)) return
+                  onLock(wo.id)
+                }}
+                title="Send and lock work order"
+                style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', border: '1px solid #1e40af', cursor: 'pointer' }}
+                onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#1d3fad' }}
+                onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#1e40af' }}
+              >
+                Send & Lock
+              </button>
+            ) : (
+              <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#eff4ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
+                Locked
+              </span>
+            )}
+            {!isLocked && (
+              <button
+                onClick={() => {
+                  if (!confirm(`Delete this ${wo.tradeTypeLabel || wo.work_type} work order? Its scope items will become unallocated.`)) return
+                  onDelete(wo.id)
+                }}
+                title="Delete work order"
+                style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#991b1b', border: '1px solid #fca5a5', cursor: 'pointer' }}
+                onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#fee2e2' }}
+                onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#fff' }}
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </td>
       </tr>
 
       {/* Expanded scope editor */}
       {expanded && (
         <tr>
-          <td colSpan={16} style={{ padding: 0, borderBottom: '1px solid #e8e4de' }}>
+          <td colSpan={15} style={{ padding: 0, borderBottom: '1px solid #e8e4de' }}>
             <ScopeItemsEditor
               wo={wo}
+              isLocked={isLocked}
               onUpdateScopeItem={onUpdateScopeItem}
               onSoftDeleteScopeItem={onSoftDeleteScopeItem}
               onCreateScopeItem={onCreateScopeItem}
@@ -644,19 +717,19 @@ const TH: React.CSSProperties = {
 
 function WOTable({
   workOrders,
-  allWorkOrders,
   trades,
   onUpdate,
   onDelete,
+  onLock,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
 }: {
   workOrders: WorkOrderWithDetails[]
-  allWorkOrders: WorkOrderWithDetails[]
   trades: TradeRow[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
   onDelete: (id: string) => void
+  onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -677,7 +750,6 @@ function WOTable({
           <th style={TH}>Override</th>
           <th style={TH}>Trade cost</th>
           <th style={TH}>Invoice chain</th>
-          <th style={TH}>Depends on</th>
           <th style={TH}>Xero</th>
           <th style={TH}>Preview</th>
           <th style={TH} />
@@ -688,10 +760,10 @@ function WOTable({
           <WORow
             key={wo.id}
             wo={wo}
-            allPlaced={allWorkOrders}
             trades={trades}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            onLock={onLock}
             onUpdateScopeItem={onUpdateScopeItem}
             onSoftDeleteScopeItem={onSoftDeleteScopeItem}
             onCreateScopeItem={onCreateScopeItem}
@@ -798,6 +870,7 @@ export interface BottomPanelProps {
   onAddAdditional: () => void
   onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
   onDeleteWorkOrder: (id: string) => Promise<void>
+  onLockWorkOrder: (id: string) => Promise<void>
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -816,6 +889,7 @@ export function BottomPanel({
   onAddAdditional,
   onUpdateWorkOrder,
   onDeleteWorkOrder,
+  onLockWorkOrder,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
@@ -906,10 +980,10 @@ export function BottomPanel({
                 {qWOs.length > 0 ? (
                   <WOTable
                     workOrders={qWOs}
-                    allWorkOrders={workOrders}
                     trades={trades}
                     onUpdate={onUpdateWorkOrder}
                     onDelete={onDeleteWorkOrder}
+                    onLock={onLockWorkOrder}
                     onUpdateScopeItem={onUpdateScopeItem}
                     onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                     onCreateScopeItem={onCreateScopeItem}
@@ -950,10 +1024,10 @@ export function BottomPanel({
             {additionalWOs.length > 0 ? (
               <WOTable
                 workOrders={additionalWOs}
-                allWorkOrders={workOrders}
                 trades={trades}
                 onUpdate={onUpdateWorkOrder}
                 onDelete={onDeleteWorkOrder}
+                onLock={onLockWorkOrder}
                 onUpdateScopeItem={onUpdateScopeItem}
                 onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                 onCreateScopeItem={onCreateScopeItem}

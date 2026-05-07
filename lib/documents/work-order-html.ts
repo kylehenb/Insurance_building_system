@@ -105,12 +105,6 @@ export function generateWorkOrderHtml(params: {
           font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
         <td style="width:44px;padding:6px 4px;text-align:center;
           font-size:10px;color:#3a3530;">${item.unit || '-'}</td>
-        <td style="width:72px;padding:6px 4px;text-align:right;
-          font-family:monospace;font-size:10px;color:#3a3530;">${item.rate_labour != null ? fmt(item.rate_labour) : '-'}</td>
-        <td style="width:72px;padding:6px 4px;text-align:right;
-          font-family:monospace;font-size:10px;color:#3a3530;">${item.rate_materials != null ? fmt(item.rate_materials) : '-'}</td>
-        <td style="width:80px;padding:6px 4px;text-align:right;
-          font-family:monospace;font-size:10px;color:#3a3530;font-weight:600;">${item.line_total != null ? fmt(item.line_total) : '-'}</td>
       </tr>`
     }).join('')
 
@@ -301,15 +295,6 @@ export function generateWorkOrderHtml(params: {
             <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;
               color:#b0a89e;">Unit</th>
-            <th style="width:72px;text-align:right;padding:6px 4px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;
-              color:#b0a89e;">Labour</th>
-            <th style="width:72px;text-align:right;padding:6px 4px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;
-              color:#b0a89e;">Materials</th>
-            <th style="width:80px;text-align:right;padding:6px 4px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;
-              color:#b0a89e;">Subtotal</th>
           </tr>
         </thead>
         <tbody>
