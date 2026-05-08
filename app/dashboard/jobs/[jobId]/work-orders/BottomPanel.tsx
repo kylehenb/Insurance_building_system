@@ -7,12 +7,12 @@ import {
   type QuoteRow,
   type TradeRow,
   type ScopeItemRow,
+  type WODisplayItem,
   getTradeColor,
   garyLabel,
   aud,
   INVOICE_CHAIN_STEPS,
   woIsSent,
-  getDeletedScopeItemIds,
 } from './types'
 
 // ─── Status / Gary / InvoiceChain pills ────────────────────────────────────────
@@ -67,83 +67,18 @@ function InvoiceChain({ extStatus }: { extStatus: string | null }) {
 
 type ScopeItemData = { item_description: string; qty: number; rate_labour: number; rate_materials: number; line_total: number }
 
-function EditCell({
-  value,
-  type = 'text',
-  width,
-  isModified,
-  isDeleted,
-  isLocked,
-  onSave,
-}: {
-  value: string
-  type?: 'text' | 'number'
-  width?: number
-  isModified: boolean
-  isDeleted: boolean
-  isLocked: boolean
-  onSave: (val: string) => void
-}) {
-  const [local, setLocal] = useState(value)
-
-  React.useEffect(() => { setLocal(value) }, [value])
-
-  if (isLocked) {
-    return (
-      <span style={{
-        fontFamily: type === 'number' ? 'DM Mono, monospace' : 'DM Sans, sans-serif',
-        fontSize: 10,
-        color: '#5a5650',
-        display: 'block',
-        padding: '3px 4px',
-        width: width ? `${width}px` : '100%',
-      }}>
-        {value || '—'}
-      </span>
-    )
-  }
-
-  const bg = isDeleted ? 'transparent' : isModified ? '#fef3e2' : '#fff'
-  const border = isDeleted ? '1px solid transparent' : isModified ? '1px solid #fcd38d' : '1px solid #e8e4de'
-
-  return (
-    <input
-      type={type}
-      value={local}
-      disabled={isDeleted}
-      onChange={e => setLocal(e.target.value)}
-      onBlur={() => {
-        if (local !== value) onSave(local)
-      }}
-      style={{
-        fontFamily: type === 'number' ? 'DM Mono, monospace' : 'DM Sans, sans-serif',
-        fontSize: 10,
-        padding: '3px 6px',
-        borderRadius: 4,
-        border,
-        background: bg,
-        color: isDeleted ? '#9a9590' : '#1a1a1a',
-        width: width ? `${width}px` : '100%',
-        textDecoration: isDeleted ? 'line-through' : 'none',
-        outline: 'none',
-      }}
-    />
-  )
-}
 
 function ScopeItemEditRow({
   item,
   index,
-  isDeleted,
   isNew,
   isLocked,
   modifiedFields,
   onUpdate,
   onToggleDelete,
 }: {
-  item: ScopeItemRow
+  item: WODisplayItem
   index: number
-  isDeleted: boolean
   isNew: boolean
   isLocked: boolean
   modifiedFields: Set<string>
@@ -170,7 +105,8 @@ function ScopeItemEditRow({
     onUpdate({ qty, rate_labour, rate_materials, line_total })
   }
 
-  const rowBg = isDeleted ? '#fff0f0' : isNew ? '#f0fdf4' : 'transparent'
+  const deleted = item.isDeleted
+  const rowBg = deleted ? '#fff0f0' : isNew ? '#f0fdf4' : 'transparent'
 
   function cellInputStyle(field: string): React.CSSProperties {
     const isMod  = modifiedFields.has(field)
@@ -179,10 +115,10 @@ function ScopeItemEditRow({
       fontSize: 10,
       padding: '3px 6px',
       borderRadius: 4,
-      border: isDeleted ? '1px solid transparent' : isMod ? '1px solid #fcd38d' : '1px solid #e8e4de',
-      background: isDeleted ? 'transparent' : isMod ? '#fef3e2' : '#fff',
-      color: isDeleted ? '#9a9590' : '#1a1a1a',
-      textDecoration: isDeleted ? 'line-through' : 'none',
+      border: deleted ? '1px solid transparent' : isMod ? '1px solid #fcd38d' : '1px solid #e8e4de',
+      background: deleted ? 'transparent' : isMod ? '#fef3e2' : '#fff',
+      color: deleted ? '#9a9590' : '#1a1a1a',
+      textDecoration: deleted ? 'line-through' : 'none',
       outline: 'none',
     }
   }
@@ -198,7 +134,7 @@ function ScopeItemEditRow({
   return (
     <tr style={{ background: rowBg }}>
       {/* Index */}
-      <td style={{ width: 28, padding: '4px 6px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', textAlign: 'center', textDecoration: isDeleted ? 'line-through' : 'none' }}>
+      <td style={{ width: 28, padding: '4px 6px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', textAlign: 'center', textDecoration: deleted ? 'line-through' : 'none' }}>
         {index + 1}
       </td>
 
@@ -207,7 +143,7 @@ function ScopeItemEditRow({
         {isLocked ? readSpan(item.item_description ?? '') : (
           <input
             value={localDesc}
-            disabled={isDeleted}
+            disabled={deleted}
             onChange={e => setLocalDesc(e.target.value)}
             onBlur={() => { if (localDesc !== (item.item_description ?? '')) onUpdate({ item_description: localDesc }) }}
             style={{ ...cellInputStyle('item_description'), width: '100%' }}
@@ -221,7 +157,7 @@ function ScopeItemEditRow({
           <input
             type="number"
             value={localQty}
-            disabled={isDeleted}
+            disabled={deleted}
             onChange={e => setLocalQty(e.target.value)}
             onBlur={saveCalcFields}
             style={{ ...cellInputStyle('qty'), width: 60 }}
@@ -235,7 +171,7 @@ function ScopeItemEditRow({
           <input
             type="number"
             value={localLabour}
-            disabled={isDeleted}
+            disabled={deleted}
             onChange={e => setLocalLabour(e.target.value)}
             onBlur={saveCalcFields}
             style={{ ...cellInputStyle('rate_labour'), width: 88 }}
@@ -249,7 +185,7 @@ function ScopeItemEditRow({
           <input
             type="number"
             value={localMaterials}
-            disabled={isDeleted}
+            disabled={deleted}
             onChange={e => setLocalMaterials(e.target.value)}
             onBlur={saveCalcFields}
             style={{ ...cellInputStyle('rate_materials'), width: 96 }}
@@ -259,7 +195,7 @@ function ScopeItemEditRow({
 
       {/* Subtotal — read-only, auto-calculated */}
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: isDeleted ? '#9a9590' : '#5a5650', display: 'block', padding: '3px 4px', textDecoration: isDeleted ? 'line-through' : 'none' }}>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: deleted ? '#9a9590' : '#5a5650', display: 'block', padding: '3px 4px', textDecoration: deleted ? 'line-through' : 'none' }}>
           {aud.format(computedTotal)}
         </span>
       </td>
@@ -269,10 +205,10 @@ function ScopeItemEditRow({
         {!isLocked && (
           <button
             onClick={onToggleDelete}
-            title={isDeleted ? 'Restore item' : 'Remove item'}
-            style={{ fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: isDeleted ? '#2d6a4f' : '#991b1b', padding: '2px 4px', borderRadius: 3, lineHeight: 1 }}
+            title={deleted ? 'Restore item' : 'Remove item'}
+            style={{ fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: deleted ? '#2d6a4f' : '#991b1b', padding: '2px 4px', borderRadius: 3, lineHeight: 1 }}
           >
-            {isDeleted ? '↩' : '×'}
+            {deleted ? '↩' : '×'}
           </button>
         )}
       </td>
@@ -391,8 +327,6 @@ function ScopeItemsEditor({
   const [newItemIds,     setNewItemIds]     = useState<Set<string>>(new Set())
   const [modifiedFields, setModifiedFields] = useState<Map<string, Set<string>>>(new Map())
 
-  const deletedIds = new Set(getDeletedScopeItemIds(wo.notes))
-
   function markModified(itemId: string, field: string) {
     setModifiedFields(prev => {
       const next = new Map(prev)
@@ -414,7 +348,7 @@ function ScopeItemsEditor({
     if (newId) setNewItemIds(prev => new Set([...prev, newId]))
   }
 
-  const items = wo.scopeItems
+  const items = wo.woDisplayItems
 
   if (items.length === 0 && !wo.quote_id) {
     return (
@@ -426,7 +360,7 @@ function ScopeItemsEditor({
 
   // Group items by room
   const roomOrder: string[] = []
-  const byRoom = new Map<string, ScopeItemRow[]>()
+  const byRoom = new Map<string, WODisplayItem[]>()
   for (const item of items) {
     const room = item.room ?? 'Unassigned'
     if (!byRoom.has(room)) { byRoom.set(room, []); roomOrder.push(room) }
@@ -479,7 +413,6 @@ function ScopeItemsEditor({
                       key={item.id}
                       item={item}
                       index={idx}
-                      isDeleted={deletedIds.has(item.id)}
                       isNew={newItemIds.has(item.id)}
                       isLocked={isLocked}
                       modifiedFields={modifiedFields.get(item.id) ?? new Set()}
@@ -529,7 +462,7 @@ function WORow({
   const [expanded,       setExpanded]     = useState(false)
   const [localTradeId,   setLocalTradeId] = React.useState(wo.trade_id || '')
   const [localAgreedAmt, setLocalAgreedAmt] = React.useState(
-    (wo.agreed_amount ?? wo.quotedAllowance).toString()
+    (wo.agreed_amount ?? wo.lineItemsTotal).toString()
   )
 
   const color    = getTradeColor(wo.tradeTypeLabel)
@@ -546,9 +479,9 @@ function WORow({
 
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')
-    setLocalAgreedAmt((wo.agreed_amount ?? wo.quotedAllowance).toString())
+    setLocalAgreedAmt((wo.agreed_amount ?? wo.lineItemsTotal).toString())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wo.trade_id, wo.agreed_amount])
+  }, [wo.trade_id, wo.agreed_amount, wo.lineItemsTotal])
 
   const TD: React.CSSProperties = { padding: '6px 10px', borderBottom: expanded ? 'none' : '1px solid #e8e4de' }
   const MONO: React.CSSProperties = { ...TD, fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', whiteSpace: 'nowrap' }
@@ -625,20 +558,20 @@ function WORow({
                 onBlur={() => {
                   const parsed = parseFloat(localAgreedAmt)
                   const newValue = isNaN(parsed) ? null : parsed
-                  // Save null when value matches quotedAllowance (auto-track), else save override
-                  const saveValue = (newValue !== null && Math.abs(newValue - wo.quotedAllowance) < 0.01) ? null : newValue
+                  // Save null when value matches lineItemsTotal (auto-tracks WO item sum), else save manual override
+                  const saveValue = (newValue !== null && Math.abs(newValue - wo.lineItemsTotal) < 0.01) ? null : newValue
                   if (saveValue !== wo.agreed_amount) onUpdate(wo.id, { agreed_amount: saveValue })
                 }}
                 style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', width: 80 }}
               />
-              {wo.agreed_amount !== null && Math.abs(wo.agreed_amount - wo.quotedAllowance) > 0.01 && (
+              {wo.agreed_amount !== null && Math.abs(wo.agreed_amount - wo.lineItemsTotal) > 0.01 && (
                 <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
                   Manual
                 </span>
               )}
             </div>
           ) : (
-            aud.format(wo.agreed_amount ?? wo.quotedAllowance)
+            aud.format(wo.agreed_amount ?? wo.lineItemsTotal)
           )}
         </td>
 

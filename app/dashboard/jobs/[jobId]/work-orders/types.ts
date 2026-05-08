@@ -15,16 +15,55 @@ export type ProximityRange   = 'standard' | 'extended'
 export type VisitStatus      = 'unscheduled' | 'gary_sent' | 'proposed' | 'confirmed' | 'complete'
 export type PlacementState   = 'unplaced' | 'placed_unsent' | 'placed_sent' | 'placed_complete'
 
+// ─── WO-specific item types (stored in work_orders.notes JSON) ────────────────
+
+// Overrides for an original scope item's values within a specific work order
+export interface WOItemOverride {
+  item_description?: string | null
+  qty?: number
+  rate_labour?: number
+  rate_materials?: number
+  line_total?: number
+}
+
+// An item added directly to a work order (not from the quote), stored in notes
+export interface WOAddedItem {
+  id: string
+  item_description: string
+  qty: number
+  rate_labour: number
+  rate_materials: number
+  line_total: number
+  room: string | null
+  trade: string | null
+}
+
+// Merged display item for the work order scope editor
+export interface WODisplayItem {
+  id: string
+  item_description: string | null
+  qty: number
+  rate_labour: number
+  rate_materials: number
+  line_total: number
+  room: string | null
+  trade: string | null
+  isAddedInWO: boolean  // true for items added from the work order (not from the quote)
+  isDeleted: boolean    // true for original items soft-deleted in this work order
+}
+
 // ─── Composed type ─────────────────────────────────────────────────────────────
 export interface WorkOrderWithDetails extends WorkOrderRow {
   visits:          WorkOrderVisitRow[]
-  scopeItems:      ScopeItemRow[]
+  scopeItems:      ScopeItemRow[]      // original quote scope items (never modified from WO)
   trade:           TradeRow | null
   invoice:         InvoiceRow | null
   placementState:  PlacementState
   cushionDays:     number
   tradeTypeLabel:  string   // "Electrician" | "Plumber" | "Make Safe" | …
-  quotedAllowance: number   // sum of scopeItems.line_total
+  quotedAllowance: number   // sum of original scopeItems.line_total (read-only, from quote)
+  lineItemsTotal:  number   // sum of WO-specific item totals (changes with WO edits)
+  woDisplayItems:  WODisplayItem[]  // merged items for the editor (overrides + added items)
   lagDays:         number   // first visit lag_days_after
   lagDescription:  string   // first visit lag_description
   parentWorkOrder: WorkOrderWithDetails | null  // parent/child relationship for key trades
@@ -136,4 +175,96 @@ export function mergeDeletedScopeItemIds(notes: string | null, ids: string[]): s
     try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ }
   }
   return JSON.stringify({ ...parsed, deleted_scope_item_ids: ids })
+}
+
+// ─── WO item override helpers ──────────────────────────────────────────────────
+
+export function getItemOverrides(notes: string | null): Record<string, WOItemOverride> {
+  if (!notes) return {}
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    const v = parsed.item_overrides
+    return (typeof v === 'object' && v !== null && !Array.isArray(v))
+      ? (v as Record<string, WOItemOverride>)
+      : {}
+  } catch { return {} }
+}
+
+export function mergeItemOverride(notes: string | null, itemId: string, override: WOItemOverride): string {
+  let parsed: Record<string, unknown> = {}
+  if (notes) { try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ } }
+  const existing = getItemOverrides(notes)
+  return JSON.stringify({ ...parsed, item_overrides: { ...existing, [itemId]: { ...existing[itemId], ...override } } })
+}
+
+// ─── WO added-item helpers ─────────────────────────────────────────────────────
+
+export function getAddedItems(notes: string | null): WOAddedItem[] {
+  if (!notes) return []
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    return Array.isArray(parsed.added_items) ? (parsed.added_items as WOAddedItem[]) : []
+  } catch { return [] }
+}
+
+export function mergeAddedItem(notes: string | null, item: WOAddedItem): string {
+  let parsed: Record<string, unknown> = {}
+  if (notes) { try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ } }
+  const existing = Array.isArray(parsed.added_items) ? (parsed.added_items as WOAddedItem[]) : []
+  return JSON.stringify({ ...parsed, added_items: [...existing, item] })
+}
+
+export function patchAddedItem(notes: string | null, itemId: string, updates: Partial<WOAddedItem>): string {
+  let parsed: Record<string, unknown> = {}
+  if (notes) { try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ } }
+  const existing = Array.isArray(parsed.added_items) ? (parsed.added_items as WOAddedItem[]) : []
+  return JSON.stringify({ ...parsed, added_items: existing.map(item => item.id === itemId ? { ...item, ...updates } : item) })
+}
+
+export function removeAddedItem(notes: string | null, itemId: string): string {
+  let parsed: Record<string, unknown> = {}
+  if (notes) { try { parsed = JSON.parse(notes) as Record<string, unknown> } catch { /* ignore */ } }
+  const existing = Array.isArray(parsed.added_items) ? (parsed.added_items as WOAddedItem[]) : []
+  return JSON.stringify({ ...parsed, added_items: existing.filter(item => item.id !== itemId) })
+}
+
+// ─── Build merged WO display items ────────────────────────────────────────────
+
+export function buildWODisplayItems(
+  scopeItems: ScopeItemRow[],
+  notes: string | null
+): { woDisplayItems: WODisplayItem[]; lineItemsTotal: number } {
+  const itemOverrides = getItemOverrides(notes)
+  const addedItems    = getAddedItems(notes)
+  const deletedIds    = new Set(getDeletedScopeItemIds(notes))
+
+  const fromOriginal: WODisplayItem[] = scopeItems.map(si => {
+    const override  = itemOverrides[si.id]
+    const isDeleted = deletedIds.has(si.id)
+    return {
+      id:              si.id,
+      item_description: isDeleted ? si.item_description : (override?.item_description ?? si.item_description),
+      qty:              isDeleted ? (si.qty ?? 0) : (override?.qty ?? si.qty ?? 0),
+      rate_labour:      isDeleted ? (si.rate_labour ?? 0) : (override?.rate_labour ?? si.rate_labour ?? 0),
+      rate_materials:   isDeleted ? (si.rate_materials ?? 0) : (override?.rate_materials ?? si.rate_materials ?? 0),
+      line_total:       isDeleted ? (si.line_total ?? 0) : (override?.line_total ?? si.line_total ?? 0),
+      room:             si.room,
+      trade:            si.trade,
+      isAddedInWO:      false,
+      isDeleted,
+    }
+  })
+
+  const fromAdded: WODisplayItem[] = addedItems.map(item => ({
+    ...item,
+    isAddedInWO: true,
+    isDeleted:   false,
+  }))
+
+  const woDisplayItems  = [...fromOriginal, ...fromAdded]
+  const lineItemsTotal  = woDisplayItems
+    .filter(item => !item.isDeleted)
+    .reduce((s, item) => s + (item.line_total ?? 0), 0)
+
+  return { woDisplayItems, lineItemsTotal }
 }

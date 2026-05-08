@@ -94,7 +94,7 @@ export default async function WorkOrderPrintPage({
   }
 
   // Fetch all scope items for the quote
-  let allScopeItems: ScopeItem[] = []
+  let rawScopeItems: ScopeItem[] = []
   if (quote) {
     const { data: scopeItems, error: scopeError } = await supabase
       .from('scope_items')
@@ -104,9 +104,68 @@ export default async function WorkOrderPrintPage({
       .order('sort_order', { ascending: true })
 
     if (!scopeError && scopeItems) {
-      allScopeItems = scopeItems
+      rawScopeItems = scopeItems
     }
   }
+
+  // Apply WO-specific overrides from work_order.notes so the PDF reflects
+  // what was actually agreed for this work order, not the original quote prices.
+  function parseWONotes(notes: string | null) {
+    if (!notes) return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[] }
+    try {
+      const p = JSON.parse(notes) as Record<string, unknown>
+      const overrides = (typeof p.item_overrides === 'object' && p.item_overrides && !Array.isArray(p.item_overrides))
+        ? p.item_overrides as Record<string, Partial<ScopeItem>>
+        : {} as Record<string, Partial<ScopeItem>>
+      const addedRaw = Array.isArray(p.added_items) ? p.added_items as Array<{
+        id: string; item_description: string; qty: number;
+        rate_labour: number; rate_materials: number; line_total: number;
+        room: string | null; trade: string | null;
+      }> : []
+      const addedItems: ScopeItem[] = addedRaw.map(item => ({
+        id:                       item.id,
+        quote_id:                 workOrder!.quote_id ?? '',
+        tenant_id:                tenantId,
+        item_description:         item.item_description,
+        qty:                      item.qty,
+        rate_labour:              item.rate_labour,
+        rate_materials:           item.rate_materials,
+        rate_total:               (item.rate_labour || 0) + (item.rate_materials || 0),
+        line_total:               item.line_total,
+        room:                     item.room,
+        trade:                    item.trade,
+        unit:                     null,
+        room_length:              null,
+        room_width:               null,
+        room_height:              null,
+        sort_order:               null,
+        is_custom:                true,
+        approval_status:          null,
+        item_type:                null,
+        keyword:                  null,
+        library_writeback_approved: null,
+        preliminary_formula:      null,
+        scope_library_id:         null,
+        split_type:               null,
+        estimated_hours:          null,
+        created_at:               null,
+      }))
+      return { overrides, addedItems }
+    } catch {
+      return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[] }
+    }
+  }
+
+  const { overrides, addedItems } = parseWONotes(workOrder.notes)
+
+  // Merge: apply overrides to original items, then append WO-added items
+  const allScopeItems: ScopeItem[] = [
+    ...rawScopeItems.map(item => {
+      const override = overrides[item.id]
+      return override ? { ...item, ...override } : item
+    }),
+    ...addedItems,
+  ]
 
   // Separate scope items: trade's items vs other trades' items
   const tradeScopeItems: ScopeItem[] = []

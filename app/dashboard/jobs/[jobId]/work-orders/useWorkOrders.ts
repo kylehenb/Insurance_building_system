@@ -11,11 +11,20 @@ import {
   type TradeRow,
   type WorkOrderVisitRow,
   type ScopeItemRow,
+  type WOItemOverride,
+  type WOAddedItem,
   getPlacementState,
   getCushionDays,
   mergeCushionDays,
   getDeletedScopeItemIds,
   mergeDeletedScopeItemIds,
+  getItemOverrides,
+  mergeItemOverride,
+  getAddedItems,
+  mergeAddedItem,
+  patchAddedItem,
+  removeAddedItem,
+  buildWODisplayItems,
   woIsSent,
 } from './types'
 
@@ -180,10 +189,11 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
             : allForQuote
         }
 
-        const deletedIds = new Set(getDeletedScopeItemIds(wo.notes))
-        const quotedAllowance = woScopeItems
-          .filter(si => !deletedIds.has(si.id))
-          .reduce((s, si) => s + (si.line_total ?? 0), 0)
+        // quotedAllowance = original quote prices, never modified by WO edits
+        const quotedAllowance = woScopeItems.reduce((s, si) => s + (si.line_total ?? 0), 0)
+
+        // lineItemsTotal + woDisplayItems = WO-specific (overrides + added items from notes)
+        const { woDisplayItems, lineItemsTotal } = buildWODisplayItems(woScopeItems, wo.notes)
 
         const firstVisit = visits[0]
         const lagDays        = firstVisit?.lag_days_after   ?? 0
@@ -199,6 +209,8 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           cushionDays:     getCushionDays(wo.notes),
           tradeTypeLabel,
           quotedAllowance,
+          lineItemsTotal,
+          woDisplayItems,
           lagDays,
           lagDescription,
           parentWorkOrder: null,
@@ -567,35 +579,80 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
     },
 
     updateScopeItem: async (itemId, updates) => {
-      // Optimistic update — patch local state immediately, sync to DB in background
-      setWorkOrders(prev => prev.map(wo => {
-        if (!wo.scopeItems.some(si => si.id === itemId)) return wo
-        const updatedItems = wo.scopeItems.map(si => si.id === itemId ? { ...si, ...updates } : si)
-        const deletedIds = new Set(getDeletedScopeItemIds(wo.notes))
-        const quotedAllowance = updatedItems
-          .filter(si => !deletedIds.has(si.id))
-          .reduce((s, si) => s + (si.line_total ?? 0), 0)
-        return { ...wo, scopeItems: updatedItems, quotedAllowance }
-      }))
-      setScopeItems(prev => prev.map(si => si.id === itemId ? { ...si, ...updates } : si))
+      // Find which work order contains this item (original scope item or WO-added item)
+      const wo = workOrders.find(w =>
+        w.scopeItems.some(si => si.id === itemId) ||
+        w.woDisplayItems.some(di => di.id === itemId && di.isAddedInWO)
+      )
+      if (!wo) return
+
+      const isAddedItem = wo.woDisplayItems.some(di => di.id === itemId && di.isAddedInWO)
+
+      let newNotes: string
+      if (isAddedItem) {
+        // Update the item stored in notes.added_items
+        const patch: Partial<WOAddedItem> = {}
+        if ('item_description' in updates) patch.item_description = (updates.item_description ?? '') as string
+        if (updates.qty           !== undefined) patch.qty           = updates.qty as number
+        if (updates.rate_labour   !== undefined) patch.rate_labour   = updates.rate_labour as number
+        if (updates.rate_materials !== undefined) patch.rate_materials = updates.rate_materials as number
+        if (updates.line_total    !== undefined) patch.line_total    = updates.line_total as number
+        newNotes = patchAddedItem(wo.notes, itemId, patch)
+      } else {
+        // Write an override for this scope item into notes — do NOT touch scope_items table
+        const override: WOItemOverride = {}
+        if ('item_description' in updates) override.item_description = updates.item_description ?? null
+        if (updates.qty           !== undefined) override.qty           = updates.qty as number
+        if (updates.rate_labour   !== undefined) override.rate_labour   = updates.rate_labour as number
+        if (updates.rate_materials !== undefined) override.rate_materials = updates.rate_materials as number
+        if (updates.line_total    !== undefined) override.line_total    = updates.line_total as number
+        newNotes = mergeItemOverride(wo.notes, itemId, override)
+      }
+
+      // Recompute display items from the updated notes
+      const { woDisplayItems, lineItemsTotal } = buildWODisplayItems(wo.scopeItems, newNotes)
+
+      // Optimistic update
+      setWorkOrders(prev => prev.map(w =>
+        w.id !== wo.id ? w : { ...w, notes: newNotes, woDisplayItems, lineItemsTotal }
+      ))
 
       const { error } = await supabase
-        .from('scope_items')
-        .update(updates)
-        .eq('id', itemId)
+        .from('work_orders')
+        .update({ notes: newNotes })
+        .eq('id', wo.id)
         .eq('tenant_id', tenantId)
-      if (error) fetchData() // rollback on error
+      if (error) fetchData()
     },
 
     softDeleteScopeItem: async (workOrderId, scopeItemId) => {
       const wo = workOrders.find(w => w.id === workOrderId)
       if (!wo) return
-      const current = getDeletedScopeItemIds(wo.notes)
-      const isDeleted = current.includes(scopeItemId)
-      const newIds = isDeleted
-        ? current.filter(id => id !== scopeItemId)
-        : [...current, scopeItemId]
-      const newNotes = mergeDeletedScopeItemIds(wo.notes, newIds)
+
+      const addedItems  = getAddedItems(wo.notes)
+      const isAddedItem = addedItems.some(ai => ai.id === scopeItemId)
+
+      let newNotes: string
+      if (isAddedItem) {
+        // WO-added items are removed permanently (no undo)
+        newNotes = removeAddedItem(wo.notes, scopeItemId)
+      } else {
+        // Original scope items are soft-deleted (toggleable)
+        const current   = getDeletedScopeItemIds(wo.notes)
+        const isDeleted = current.includes(scopeItemId)
+        const newIds    = isDeleted
+          ? current.filter(id => id !== scopeItemId)
+          : [...current, scopeItemId]
+        newNotes = mergeDeletedScopeItemIds(wo.notes, newIds)
+      }
+
+      const { woDisplayItems, lineItemsTotal } = buildWODisplayItems(wo.scopeItems, newNotes)
+
+      // Optimistic update
+      setWorkOrders(prev => prev.map(w =>
+        w.id !== workOrderId ? w : { ...w, notes: newNotes, woDisplayItems, lineItemsTotal }
+      ))
+
       await supabase
         .from('work_orders')
         .update({ notes: newNotes })
@@ -604,29 +661,36 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       fetchData()
     },
 
-    createScopeItem: async (quoteId, tradeLabel, _workOrderId, data) => {
-      const { data: inserted, error } = await supabase
-        .from('scope_items')
-        .insert({
-          tenant_id:        tenantId,
-          quote_id:         quoteId,
-          trade:            tradeLabel,
-          item_description: data.item_description,
-          qty:              data.qty,
-          rate_labour:      data.rate_labour,
-          rate_materials:   data.rate_materials,
-          rate_total:       data.rate_labour + data.rate_materials,
-          line_total:       data.line_total,
-          is_custom:        true,
-        })
-        .select('id')
-        .single()
-      if (!error && inserted) {
-        fetchData()
-        return inserted.id
+    createScopeItem: async (_quoteId, tradeLabel, workOrderId, data) => {
+      const wo = workOrders.find(w => w.id === workOrderId)
+      if (!wo) return null
+
+      const newId = crypto.randomUUID()
+      const newItem: WOAddedItem = {
+        id:               newId,
+        item_description: data.item_description,
+        qty:              data.qty,
+        rate_labour:      data.rate_labour,
+        rate_materials:   data.rate_materials,
+        line_total:       data.line_total,
+        room:             null,
+        trade:            tradeLabel,
       }
-      fetchData()
-      return null
+      const newNotes = mergeAddedItem(wo.notes, newItem)
+      const { woDisplayItems, lineItemsTotal } = buildWODisplayItems(wo.scopeItems, newNotes)
+
+      // Optimistic update
+      setWorkOrders(prev => prev.map(w =>
+        w.id !== workOrderId ? w : { ...w, notes: newNotes, woDisplayItems, lineItemsTotal }
+      ))
+
+      const { error } = await supabase
+        .from('work_orders')
+        .update({ notes: newNotes })
+        .eq('id', workOrderId)
+        .eq('tenant_id', tenantId)
+      if (error) fetchData()
+      return newId
     },
 
     deleteWorkOrder: async (id) => {
