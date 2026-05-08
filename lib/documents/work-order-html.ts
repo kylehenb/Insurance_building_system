@@ -16,6 +16,19 @@ function getDeletedIds(notes: string | null): Set<string> {
   }
 }
 
+// notes is a structured JSON blob — only surface a dedicated text_notes field if present,
+// otherwise suppress it to avoid leaking raw JSON into the PDF.
+function getDisplayNotes(notes: string | null): string {
+  if (!notes) return ''
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>
+    return typeof parsed.text_notes === 'string' ? parsed.text_notes.trim() : ''
+  } catch {
+    // Treat legacy plain-text notes as-is
+    return notes.trim()
+  }
+}
+
 export function generateWorkOrderHtml(params: {
   workOrder: WorkOrder
   job: Job
@@ -48,11 +61,7 @@ export function generateWorkOrderHtml(params: {
     }).format(v)
   }
 
-  const workTypeDisplay = workOrder.work_type ? 
-    workOrder.work_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'
-  
-  const statusDisplay = workOrder.status ? 
-    workOrder.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'
+  const displayNotes = getDisplayNotes(workOrder.notes)
 
   // Use manual override if set, else sum scope items
   const scopeSum = tradeScopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
@@ -355,7 +364,7 @@ export function generateWorkOrderHtml(params: {
         color:#b0a89e;font-weight:700;margin-bottom:6px;">NOTES</div>
       <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
         <div style="font-size:10px;color:#3a3530;line-height:1.65;white-space:pre-wrap;">
-          ${workOrder.notes || 'No additional notes for this work order.'}
+          ${displayNotes || 'No additional notes for this work order.'}
         </div>
       </div>
     </div>
