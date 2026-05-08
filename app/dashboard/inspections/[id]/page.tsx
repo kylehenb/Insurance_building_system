@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Smartphone } from "lucide-react";
 
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
 
@@ -171,6 +171,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                   <StatusBadge status={insp.status ?? 'unscheduled'} />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#1a1a1a]/70">
+
                   {insp.jobs && (
                     <Link
                       href={`/dashboard/jobs/${insp.jobs.id}`}
@@ -186,6 +187,18 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                     <span>{formatDate(insp.scheduled_date)}</span>
                   )}
                 </div>
+              </div>
+              {/* Open Field App */}
+              <div>
+                <a
+                  href={`/field/${insp.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-[#c8b89a] text-sm font-medium rounded-md hover:bg-[#252520] transition-colors"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  Open Field App
+                </a>
               </div>
             </div>
           </div>
