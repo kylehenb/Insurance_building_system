@@ -34,10 +34,27 @@ export default async function FieldAppPage({ params }: Props) {
     .single()
 
   if (error || !insp) {
-    console.error('Field app error:', error)
-    console.error('Inspection ID:', inspectionId)
-    console.error('Tenant ID:', tenant_id)
-    redirect('/dashboard/inspections')
+    return (
+      <div className="min-h-screen bg-[#f5f0e8] flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg border border-[#1a1a1a]/10 p-8 max-w-md">
+          <h1 className="text-xl font-semibold text-[#1a1a1a] mb-4">Inspection Not Found</h1>
+          <p className="text-sm text-[#1a1a1a]/70 mb-4">
+            The inspection could not be found or you don't have access to it.
+          </p>
+          <div className="bg-[#f5f0e8] rounded p-4 mb-4 text-xs font-mono text-[#1a1a1a]">
+            <div><strong>Inspection ID:</strong> {inspectionId}</div>
+            <div><strong>Tenant ID:</strong> {tenant_id}</div>
+            <div><strong>Error:</strong> {error?.message || 'Inspection not found'}</div>
+          </div>
+          <a
+            href="/dashboard/inspections"
+            className="inline-block px-4 py-2 bg-[#1a1a1a] text-[#c8b89a] rounded-md text-sm"
+          >
+            Back to Inspections
+          </a>
+        </div>
+      </div>
+    )
   }
 
   const { data: userRow } = await service
