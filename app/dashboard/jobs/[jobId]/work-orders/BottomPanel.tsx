@@ -157,10 +157,53 @@ function ScopeItemEditRow({
   isNew: boolean
   isLocked: boolean
   modifiedFields: Set<string>
-  onUpdate: (updates: Partial<ScopeItemRow>, changedField: string) => void
+  onUpdate: (updates: Partial<ScopeItemRow>) => void
   onToggleDelete: () => void
 }) {
+  const [localDesc,      setLocalDesc]      = React.useState(item.item_description ?? '')
+  const [localQty,       setLocalQty]       = React.useState(String(item.qty ?? 0))
+  const [localLabour,    setLocalLabour]     = React.useState(String(item.rate_labour ?? 0))
+  const [localMaterials, setLocalMaterials]  = React.useState(String(item.rate_materials ?? 0))
+
+  React.useEffect(() => { setLocalDesc(item.item_description ?? '') }, [item.item_description])
+  React.useEffect(() => { setLocalQty(String(item.qty ?? 0)) }, [item.qty])
+  React.useEffect(() => { setLocalLabour(String(item.rate_labour ?? 0)) }, [item.rate_labour])
+  React.useEffect(() => { setLocalMaterials(String(item.rate_materials ?? 0)) }, [item.rate_materials])
+
+  const computedTotal = (parseFloat(localQty) || 0) * ((parseFloat(localLabour) || 0) + (parseFloat(localMaterials) || 0))
+
+  function saveCalcFields() {
+    const qty            = parseFloat(localQty) || 0
+    const rate_labour    = parseFloat(localLabour) || 0
+    const rate_materials = parseFloat(localMaterials) || 0
+    const line_total     = qty * (rate_labour + rate_materials)
+    onUpdate({ qty, rate_labour, rate_materials, line_total })
+  }
+
   const rowBg = isDeleted ? '#fff0f0' : isNew ? '#f0fdf4' : 'transparent'
+
+  function cellInputStyle(field: string): React.CSSProperties {
+    const isMod  = modifiedFields.has(field)
+    return {
+      fontFamily: field === 'item_description' ? 'DM Sans, sans-serif' : 'DM Mono, monospace',
+      fontSize: 10,
+      padding: '3px 6px',
+      borderRadius: 4,
+      border: isDeleted ? '1px solid transparent' : isMod ? '1px solid #fcd38d' : '1px solid #e8e4de',
+      background: isDeleted ? 'transparent' : isMod ? '#fef3e2' : '#fff',
+      color: isDeleted ? '#9a9590' : '#1a1a1a',
+      textDecoration: isDeleted ? 'line-through' : 'none',
+      outline: 'none',
+    }
+  }
+
+  function readSpan(value: string, mono = false): React.ReactElement {
+    return (
+      <span style={{ fontFamily: mono ? 'DM Mono, monospace' : 'DM Sans, sans-serif', fontSize: 10, color: '#5a5650', display: 'block', padding: '3px 4px' }}>
+        {value || '—'}
+      </span>
+    )
+  }
 
   return (
     <tr style={{ background: rowBg }}>
@@ -171,65 +214,64 @@ function ScopeItemEditRow({
 
       {/* Description */}
       <td style={{ padding: '4px 6px', minWidth: 160 }}>
-        <EditCell
-          value={item.item_description ?? ''}
-          isModified={modifiedFields.has('item_description')}
-          isDeleted={isDeleted}
-          isLocked={isLocked}
-          onSave={v => onUpdate({ item_description: v }, 'item_description')}
-        />
+        {isLocked ? readSpan(item.item_description ?? '') : (
+          <input
+            value={localDesc}
+            disabled={isDeleted}
+            onChange={e => setLocalDesc(e.target.value)}
+            onBlur={() => { if (localDesc !== (item.item_description ?? '')) onUpdate({ item_description: localDesc }) }}
+            style={{ ...cellInputStyle('item_description'), width: '100%' }}
+          />
+        )}
       </td>
 
       {/* Qty */}
       <td style={{ padding: '4px 6px', width: 70 }}>
-        <EditCell
-          value={String(item.qty ?? '')}
-          type="number"
-          width={60}
-          isModified={modifiedFields.has('qty')}
-          isDeleted={isDeleted}
-          isLocked={isLocked}
-          onSave={v => onUpdate({ qty: parseFloat(v) || 0 }, 'qty')}
-        />
+        {isLocked ? readSpan(String(item.qty ?? 0), true) : (
+          <input
+            type="number"
+            value={localQty}
+            disabled={isDeleted}
+            onChange={e => setLocalQty(e.target.value)}
+            onBlur={saveCalcFields}
+            style={{ ...cellInputStyle('qty'), width: 60 }}
+          />
+        )}
       </td>
 
       {/* Labour Rate */}
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <EditCell
-          value={String(item.rate_labour ?? '')}
-          type="number"
-          width={88}
-          isModified={modifiedFields.has('rate_labour')}
-          isDeleted={isDeleted}
-          isLocked={isLocked}
-          onSave={v => onUpdate({ rate_labour: parseFloat(v) || 0 }, 'rate_labour')}
-        />
+        {isLocked ? readSpan(String(item.rate_labour ?? 0), true) : (
+          <input
+            type="number"
+            value={localLabour}
+            disabled={isDeleted}
+            onChange={e => setLocalLabour(e.target.value)}
+            onBlur={saveCalcFields}
+            style={{ ...cellInputStyle('rate_labour'), width: 88 }}
+          />
+        )}
       </td>
 
       {/* Material Rate */}
       <td style={{ padding: '4px 6px', width: 110 }}>
-        <EditCell
-          value={String(item.rate_materials ?? '')}
-          type="number"
-          width={96}
-          isModified={modifiedFields.has('rate_materials')}
-          isDeleted={isDeleted}
-          isLocked={isLocked}
-          onSave={v => onUpdate({ rate_materials: parseFloat(v) || 0 }, 'rate_materials')}
-        />
+        {isLocked ? readSpan(String(item.rate_materials ?? 0), true) : (
+          <input
+            type="number"
+            value={localMaterials}
+            disabled={isDeleted}
+            onChange={e => setLocalMaterials(e.target.value)}
+            onBlur={saveCalcFields}
+            style={{ ...cellInputStyle('rate_materials'), width: 96 }}
+          />
+        )}
       </td>
 
-      {/* Subtotal */}
+      {/* Subtotal — read-only, auto-calculated */}
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <EditCell
-          value={String(item.line_total ?? '')}
-          type="number"
-          width={88}
-          isModified={modifiedFields.has('line_total')}
-          isDeleted={isDeleted}
-          isLocked={isLocked}
-          onSave={v => onUpdate({ line_total: parseFloat(v) || 0 }, 'line_total')}
-        />
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: isDeleted ? '#9a9590' : '#5a5650', display: 'block', padding: '3px 4px', textDecoration: isDeleted ? 'line-through' : 'none' }}>
+          {aud.format(computedTotal)}
+        </span>
       </td>
 
       {/* Tags */}
@@ -274,16 +316,19 @@ function NewItemRow({
   tradeLabel: string
   onAdd: (data: ScopeItemData) => void
 }) {
-  const blank = { item_description: '', qty: 1, rate_labour: 0, rate_materials: 0, line_total: 0 }
-  const [form, setForm] = useState<ScopeItemData>(blank)
+  type NewForm = Omit<ScopeItemData, 'line_total'>
+  const blank: NewForm = { item_description: '', qty: 1, rate_labour: 0, rate_materials: 0 }
+  const [form, setForm] = useState<NewForm>(blank)
 
-  function field<K extends keyof ScopeItemData>(key: K, val: string) {
+  function field<K extends keyof NewForm>(key: K, val: string) {
     setForm(prev => ({ ...prev, [key]: key === 'item_description' ? val : parseFloat(val) || 0 }))
   }
 
+  const computedTotal = form.qty * (form.rate_labour + form.rate_materials)
+
   function handleAdd() {
     if (!form.item_description.trim()) return
-    onAdd(form)
+    onAdd({ ...form, line_total: computedTotal })
     setForm(blank)
   }
 
@@ -320,7 +365,9 @@ function NewItemRow({
         <input type="number" value={form.rate_materials} onChange={e => field('rate_materials', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 96 }} />
       </td>
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <input type="number" value={form.line_total} onChange={e => field('line_total', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 88 }} />
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#5a5650', display: 'block', padding: '3px 4px' }}>
+          {aud.format(computedTotal)}
+        </span>
       </td>
       <td style={{ padding: '4px 8px' }} />
       <td style={{ padding: '4px 6px', width: 36 }}>
@@ -386,8 +433,8 @@ function ScopeItemsEditor({
     })
   }
 
-  async function handleUpdate(itemId: string, updates: Partial<ScopeItemRow>, changedField: string) {
-    markModified(itemId, changedField)
+  async function handleUpdate(itemId: string, updates: Partial<ScopeItemRow>) {
+    for (const field of Object.keys(updates)) markModified(itemId, field)
     await onUpdateScopeItem(itemId, updates)
   }
 
@@ -467,7 +514,7 @@ function ScopeItemsEditor({
                       isNew={newItemIds.has(item.id)}
                       isLocked={isLocked}
                       modifiedFields={modifiedFields.get(item.id) ?? new Set()}
-                      onUpdate={(updates, field) => handleUpdate(item.id, updates, field)}
+                      onUpdate={(updates) => handleUpdate(item.id, updates)}
                       onToggleDelete={() => onSoftDeleteScopeItem(wo.id, item.id)}
                     />
                   )
@@ -512,7 +559,9 @@ function WORow({
 }) {
   const [expanded,       setExpanded]     = useState(false)
   const [localTradeId,   setLocalTradeId] = React.useState(wo.trade_id || '')
-  const [localAgreedAmt, setLocalAgreedAmt] = React.useState(wo.agreed_amount?.toString() || '')
+  const [localAgreedAmt, setLocalAgreedAmt] = React.useState(
+    (wo.agreed_amount ?? wo.quotedAllowance).toString()
+  )
 
   const color    = getTradeColor(wo.tradeTypeLabel)
   const isLocked = woIsSent(wo)
@@ -528,8 +577,8 @@ function WORow({
 
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')
-    setLocalAgreedAmt(wo.agreed_amount?.toString() || '')
-  }, [wo.trade_id, wo.agreed_amount])
+    setLocalAgreedAmt((wo.agreed_amount ?? wo.quotedAllowance).toString())
+  }, [wo.trade_id, wo.agreed_amount, wo.quotedAllowance])
 
   const TD: React.CSSProperties = { padding: '6px 10px', borderBottom: expanded ? 'none' : '1px solid #e8e4de' }
   const MONO: React.CSSProperties = { ...TD, fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', whiteSpace: 'nowrap' }
@@ -598,19 +647,28 @@ function WORow({
         {/* Override */}
         <td style={{ ...TD, whiteSpace: 'nowrap' }}>
           {isEditable ? (
-            <input
-              type="number"
-              value={localAgreedAmt}
-              onChange={e => setLocalAgreedAmt(e.target.value)}
-              onBlur={() => {
-                const newValue = localAgreedAmt ? parseFloat(localAgreedAmt) : null
-                if (newValue !== wo.agreed_amount) onUpdate(wo.id, { agreed_amount: newValue })
-              }}
-              placeholder="0"
-              style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', width: 80 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                value={localAgreedAmt}
+                onChange={e => setLocalAgreedAmt(e.target.value)}
+                onBlur={() => {
+                  const parsed = parseFloat(localAgreedAmt)
+                  const newValue = isNaN(parsed) ? null : parsed
+                  // Save null when value matches quotedAllowance (auto-track), else save override
+                  const saveValue = (newValue !== null && Math.abs(newValue - wo.quotedAllowance) < 0.01) ? null : newValue
+                  if (saveValue !== wo.agreed_amount) onUpdate(wo.id, { agreed_amount: saveValue })
+                }}
+                style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', width: 80 }}
+              />
+              {wo.agreed_amount !== null && Math.abs(wo.agreed_amount - wo.quotedAllowance) > 0.01 && (
+                <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
+                  Manual
+                </span>
+              )}
+            </div>
           ) : (
-            wo.agreed_amount ? aud.format(wo.agreed_amount) : '—'
+            aud.format(wo.agreed_amount ?? wo.quotedAllowance)
           )}
         </td>
 

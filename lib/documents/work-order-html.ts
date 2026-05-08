@@ -54,8 +54,9 @@ export function generateWorkOrderHtml(params: {
   const statusDisplay = workOrder.status ? 
     workOrder.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '—'
 
-  // Calculate total from trade's scope items
-  const allocatedAmount = tradeScopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+  // Use manual override if set, else sum scope items
+  const scopeSum = tradeScopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+  const allocatedAmount = workOrder.agreed_amount != null ? workOrder.agreed_amount : scopeSum
 
   // Group trade scope items by room (similar to SOW layout)
   const tradeGroupedByRoom = tradeScopeItems.reduce((acc, item) => {
