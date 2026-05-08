@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { Smartphone } from 'lucide-react'
 import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
 import { CreateModal } from './shared/CreateModal'
@@ -432,6 +433,15 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
                       <span className="text-[12px] text-[#9e998f]">{insp.person_met}</span>
                     )}
                     <StatusPill status={insp.status} />
+                    <a
+                      href={`/field/${insp.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a1a1a] text-[#c8b89a] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                      Field App
+                    </a>
                   </div>
                 }
               >
