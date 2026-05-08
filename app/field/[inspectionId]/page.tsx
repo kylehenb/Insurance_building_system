@@ -17,7 +17,7 @@ export default async function FieldAppPage({ params }: Props) {
   const { tenant_id } = userData
 
   const service = createServiceClient()
-  const { data: insp } = await service
+  const { data: insp, error } = await service
     .from('inspections')
     .select(`
       id, inspection_ref, status, scheduled_date, scheduled_time,
@@ -33,7 +33,12 @@ export default async function FieldAppPage({ params }: Props) {
     .eq('tenant_id', tenant_id as string)
     .single()
 
-  if (!insp) redirect('/dashboard/inspections')
+  if (error || !insp) {
+    console.error('Field app error:', error)
+    console.error('Inspection ID:', inspectionId)
+    console.error('Tenant ID:', tenant_id)
+    redirect('/dashboard/inspections')
+  }
 
   const { data: userRow } = await service
     .from('users')
