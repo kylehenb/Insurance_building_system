@@ -54,22 +54,12 @@ function GaryPill({ state }: { state: string | null }) {
 
 function InvoiceChain({ extStatus }: { extStatus: string | null }) {
   if (!extStatus) return <span style={{ fontSize: 10, color: '#9a9590' }}>—</span>
-  const activeIdx = INVOICE_CHAIN_STEPS.findIndex(s => s.key === extStatus)
+  const step = INVOICE_CHAIN_STEPS.find(s => s.key === extStatus)
+  const label = step?.label ?? extStatus
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      {INVOICE_CHAIN_STEPS.map((step, i) => {
-        const isDone = i < activeIdx
-        const isCur  = i === activeIdx
-        return (
-          <React.Fragment key={step.key}>
-            {i > 0 && <span style={{ color: '#ddd8d0', margin: '0 1px', fontSize: 9 }}>›</span>}
-            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: isDone ? '#eaf4ef' : isCur ? '#fef3e2' : '#ede9e3', color: isDone ? '#2d6a4f' : isCur ? '#92400e' : '#9a9590', fontWeight: isCur ? 600 : 400, whiteSpace: 'nowrap' }}>
-              {step.label}
-            </span>
-          </React.Fragment>
-        )
-      })}
-    </div>
+    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
+      {label}
+    </span>
   )
 }
 
@@ -274,25 +264,6 @@ function ScopeItemEditRow({
         </span>
       </td>
 
-      {/* Tags */}
-      <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>
-        {isDeleted && (
-          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' }}>
-            Removed
-          </span>
-        )}
-        {isNew && !isDeleted && (
-          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
-            New
-          </span>
-        )}
-        {!isNew && !isDeleted && modifiedFields.size > 0 && (
-          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d' }}>
-            Modified
-          </span>
-        )}
-      </td>
-
       {/* Delete toggle — hidden when locked */}
       <td style={{ padding: '4px 6px', width: 36, textAlign: 'center' }}>
         {!isLocked && (
@@ -369,7 +340,6 @@ function NewItemRow({
           {aud.format(computedTotal)}
         </span>
       </td>
-      <td style={{ padding: '4px 8px' }} />
       <td style={{ padding: '4px 6px', width: 36 }}>
         <button
           onClick={handleAdd}
@@ -487,7 +457,6 @@ function ScopeItemsEditor({
             <th style={SCOPE_TH}>Labour Rate</th>
             <th style={SCOPE_TH}>Material Rate</th>
             <th style={SCOPE_TH}>Subtotal</th>
-            <th style={SCOPE_TH}>Status</th>
             <th style={SCOPE_TH} />
           </tr>
         </thead>
@@ -497,7 +466,7 @@ function ScopeItemsEditor({
             return (
               <React.Fragment key={room}>
                 <tr>
-                  <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
+                  <td colSpan={7} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650' }}>
                       {room}
                     </span>
@@ -578,7 +547,8 @@ function WORow({
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')
     setLocalAgreedAmt((wo.agreed_amount ?? wo.quotedAllowance).toString())
-  }, [wo.trade_id, wo.agreed_amount, wo.quotedAllowance])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wo.trade_id, wo.agreed_amount])
 
   const TD: React.CSSProperties = { padding: '6px 10px', borderBottom: expanded ? 'none' : '1px solid #e8e4de' }
   const MONO: React.CSSProperties = { ...TD, fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', whiteSpace: 'nowrap' }
@@ -982,7 +952,7 @@ export function BottomPanel({
   const additionalWOs = workOrders.filter(wo => wo.quote_id === null  || wo.work_type === 'make_safe')
 
   function quoteTotal(quoteId: string) {
-    return quotedWOs.filter(wo => wo.quote_id === quoteId).reduce((s, wo) => s + (wo.quotedAllowance || wo.agreed_amount || 0), 0)
+    return quotedWOs.filter(wo => wo.quote_id === quoteId).reduce((s, wo) => s + wo.quotedAllowance, 0)
   }
 
   return (
