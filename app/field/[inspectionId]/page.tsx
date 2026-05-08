@@ -20,7 +20,7 @@ export default async function FieldAppPage({ params }: Props) {
   const { data: insp, error } = await service
     .from('inspections')
     .select(`
-      id, inspection_ref, status, scheduled_date, start_time, finish_time,
+      id, inspection_ref, status, scheduled_date,
       job_id, quote_id, inspector_id, person_met, field_draft,
       safety_confirmed_at, form_submitted_at,
       jobs!job_id (
@@ -67,11 +67,11 @@ export default async function FieldAppPage({ params }: Props) {
   const inspector = (insp as any).users
 
   let quoteRef: string | null = null
-  if (insp.quote_id) {
+  if ((insp as any).quote_id) {
     const { data: quote } = await service
       .from('quotes')
       .select('quote_ref')
-      .eq('id', insp.quote_id)
+      .eq('id', (insp as any).quote_id)
       .single()
     quoteRef = (quote as any)?.quote_ref ?? null
   }
@@ -81,7 +81,7 @@ export default async function FieldAppPage({ params }: Props) {
     inspectionRef: insp.inspection_ref ?? null,
     status: insp.status ?? 'confirmed',
     scheduledDate: insp.scheduled_date ?? null,
-    scheduledTime: insp.start_time ?? null,
+    scheduledTime: null,
     jobId: job?.id ?? null,
     jobNumber: job?.job_number ?? null,
     address: job?.property_address ?? null,
@@ -90,7 +90,7 @@ export default async function FieldAppPage({ params }: Props) {
     lossType: job?.loss_type ?? null,
     dateOfLoss: job?.date_of_loss ?? null,
     claimNumber: job?.claim_number ?? null,
-    quoteId: insp.quote_id ?? null,
+    quoteId: (insp as any).quote_id ?? null,
     quoteRef,
     inspector: inspector?.name ?? userRow?.name ?? null,
     inspectorId: userData.session.user.id,
