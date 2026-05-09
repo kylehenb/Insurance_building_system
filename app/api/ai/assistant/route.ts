@@ -28,7 +28,7 @@ quotes: id, tenant_id, job_id, inspection_id, report_id, parent_quote_id, quote_
 scope_items: id, tenant_id, quote_id, scope_library_id, room, room_length, room_width, room_height, trade, keyword, item_description, unit, qty, rate_labour, rate_materials, rate_total, line_total, split_type, approval_status, is_custom, library_writeback_approved, sort_order, created_at
 NOTE: scope_items links to quotes via quote_id, NOT job_id directly.
 
-inspections: id, tenant_id, job_id, quote_id, report_id, inspection_ref, scheduled_date, scheduled_time, inspector_id, status, insured_notified, scheduling_sms_sent_at, scheduling_sms_response, booking_confirmed_at, access_notes, calendar_event_id, field_draft, form_submitted_at, safety_confirmed_at, person_met, scope_status, report_status, photos_status, send_checklist, notes, created_at
+inspections: id, tenant_id, job_id, quote_id, report_id, inspection_ref, scheduled_date, start_time, finish_time, inspector_id, status, insured_notified, scheduling_sms_sent_at, scheduling_sms_response, booking_confirmed_at, access_notes, calendar_event_id, field_draft, form_submitted_at, safety_confirmed_at, person_met, scope_status, report_status, photos_status, send_checklist, notes, created_at
 
 clients: id, tenant_id, client_type, parent_id, name, trading_name, abn, submission_email, adjuster_submission_email, contact_phone, address, kpi_contact_hours, kpi_booking_hours, kpi_visit_days, kpi_report_days, send_booking_confirmation, notes, status, created_at
 

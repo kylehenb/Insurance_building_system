@@ -236,8 +236,8 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
                     <Field label="Inspection Ref" value={insp.inspection_ref} />
                     <Field label="Scheduled Date" value={formatDate(insp.scheduled_date)} />
                     <Field
-                      label="Scheduled Time"
-                      value={insp.scheduled_time ?? "-"}
+                      label="Start Time"
+                      value={insp.start_time ?? "-"}
                     />
                     <Field label="Inspector" value={insp.users?.name ?? "-"} />
                     <Field
