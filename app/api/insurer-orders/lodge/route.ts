@@ -304,6 +304,21 @@ export async function POST(req: NextRequest) {
       console.log('[lodge] skipping quote creation for wo_type:', wo_type)
     }
 
+    // Step 9: Update inspection with report_id and quote_id for BAR inspections
+    if (wo_type === 'BAR' && inspectionId && reportId && quoteId) {
+      console.log('[lodge] linking inspection to report and quote')
+      const { error: updateError } = await supabase
+        .from('inspections')
+        .update({ report_id: reportId, quote_id: quoteId })
+        .eq('id', inspectionId)
+
+      if (updateError) {
+        console.error('[lodge] inspection update error:', updateError)
+        return NextResponse.json({ error: 'Failed to link inspection to report and quote' }, { status: 500 })
+      }
+      console.log('[lodge] inspection linked to report and quote')
+    }
+
     // Step 9: Update insurer_order
     console.log('[lodge] updating insurer_order')
     const { error: updateError } = await supabase

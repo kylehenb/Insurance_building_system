@@ -414,15 +414,37 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     // Fetch all related data for each inspection
     const inspectionsData: InspectionWithRelations[] = await Promise.all(
       inspections.map(async (inspection: Inspection) => {
-        // Fetch core report (BAR)
-        const { data: coreReport } = inspection.report_id
-          ? await supabase.from('reports').select('*').eq('id', inspection.report_id).single()
-          : { data: null }
+        // Fetch core report (BAR) - try inspection.report_id first, fallback to finding BAR report by inspection_id
+        let coreReport: Report | null = null
+        if (inspection.report_id) {
+          const { data } = await supabase.from('reports').select('*').eq('id', inspection.report_id).single()
+          coreReport = data as Report | null
+        } else {
+          // Fallback: find BAR report linked to this inspection
+          const { data } = await supabase
+            .from('reports')
+            .select('*')
+            .eq('inspection_id', inspection.id)
+            .eq('report_type', 'BAR')
+            .maybeSingle()
+          coreReport = data as Report | null
+        }
 
-        // Fetch core quote
-        const { data: coreQuote } = inspection.quote_id
-          ? await supabase.from('quotes').select('*').eq('id', inspection.quote_id).single()
-          : { data: null }
+        // Fetch core quote - try inspection.quote_id first, fallback to finding inspection quote by inspection_id
+        let coreQuote: Quote | null = null
+        if (inspection.quote_id) {
+          const { data } = await supabase.from('quotes').select('*').eq('id', inspection.quote_id).single()
+          coreQuote = data as Quote | null
+        } else {
+          // Fallback: find inspection quote linked to this inspection
+          const { data } = await supabase
+            .from('quotes')
+            .select('*')
+            .eq('inspection_id', inspection.id)
+            .eq('quote_type', 'inspection')
+            .maybeSingle()
+          coreQuote = data as Quote | null
+        }
 
         // Fetch core invoice (invoice linked to core report)
         const { data: coreInvoice } = coreReport
@@ -430,11 +452,12 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
           : { data: null }
 
         // Fetch additional reports linked to this inspection (not the core BAR)
+        const coreReportId = coreReport?.id || inspection.report_id || ''
         const { data: additionalReports } = await supabase
           .from('reports')
           .select('*')
           .eq('inspection_id', inspection.id)
-          .neq('id', inspection.report_id || '')
+          .neq('id', coreReportId)
           .order('created_at', { ascending: true })
 
         // Fetch invoices for additional reports
@@ -443,19 +466,19 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
           ? await supabase.from('invoices').select('*').in('report_id', additionalReportIds).eq('direction', 'outbound')
           : { data: [] }
 
-        // Fetch trade quote requests (quotes with quote_type = 'trade_request' or similar - need to identify these)
-        // For now, we'll fetch all quotes linked to this inspection that aren't the core quote
+        // Fetch trade quote requests (quotes linked to this inspection that aren't the core quote)
+        const coreQuoteId = coreQuote?.id || inspection.quote_id || ''
         const { data: tradeQuotes } = await supabase
           .from('quotes')
           .select('*')
           .eq('inspection_id', inspection.id)
-          .neq('id', inspection.quote_id || '')
+          .neq('id', coreQuoteId)
           .order('created_at', { ascending: true })
 
         return {
           inspection,
-          coreReport: coreReport as Report | null,
-          coreQuote: coreQuote as Quote | null,
+          coreReport,
+          coreQuote,
           coreInvoice: coreInvoice as Invoice | null,
           additionalReports: (additionalReports || []) as Report[],
           additionalInvoices: (additionalInvoices || []) as Invoice[],
