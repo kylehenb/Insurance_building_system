@@ -2,11 +2,14 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Smartphone, FileText, DollarSign, Plus, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { Smartphone, FileText, DollarSign, Plus, ChevronDown, ChevronRight, ChevronUp, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
 import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
 import { CreateModal } from './shared/CreateModal'
 import { useInspectionAutosave } from '../hooks/useInspectionAutosave'
+import { ReportAccordionItem } from '@/components/reports/ReportAccordionItem'
+import { QuoteEditorClient } from '../quotes/components/QuoteEditorClient'
+import { InvoiceEditor } from './InvoiceEditor'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Inspection {
@@ -30,13 +33,36 @@ interface Inspection {
 
 interface Report {
   id: string
+  tenant_id: string
+  job_id: string
   report_ref: string | null
-  report_type: 'BAR' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
+  report_type: 'BAR' | 'storm_wind' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
   status: string
   is_locked: boolean
+  version: number
   attendance_date: string | null
+  attendance_time: string | null
+  person_met: string | null
   assessor_name: string | null
+  property_address: string | null
+  insured_name: string | null
+  claim_number: string | null
+  loss_type: string | null
+  property_description: string | null
+  incident_description: string | null
+  cause_of_damage: string | null
+  how_damage_occurred: string | null
+  resulting_damage: string | null
+  conclusion: string | null
+  pre_existing_conditions: string | null
+  maintenance_notes: string | null
+  raw_report_dump: string | null
+  damage_template: string | null
+  additional_notes: string | null
+  type_specific_fields: Record<string, unknown>
   pdf_storage_path: string | null
+  deleted_at: string | null
+  delete_reason: string | null
   created_at: string
 }
 
@@ -393,6 +419,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, Set<string>>>({})
+  const [expandedEditors, setExpandedEditors] = useState<Record<string, Set<string>>>({})
   const [submittingInspectionId, setSubmittingInspectionId] = useState<string | null>(null)
 
   const fetchInspectionsWithRelations = useCallback(async () => {
@@ -599,6 +626,23 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     return (expandedSections[inspectionId] || new Set()).has(sectionKey)
   }
 
+  function toggleEditor(inspectionId: string, editorKey: string) {
+    setExpandedEditors(prev => {
+      const current = prev[inspectionId] || new Set()
+      const newSet = new Set(current)
+      if (newSet.has(editorKey)) {
+        newSet.delete(editorKey)
+      } else {
+        newSet.add(editorKey)
+      }
+      return { ...prev, [inspectionId]: newSet }
+    })
+  }
+
+  function isEditorExpanded(inspectionId: string, editorKey: string): boolean {
+    return (expandedEditors[inspectionId] || new Set()).has(editorKey)
+  }
+
   const typeLabel = (insp: Inspection) => {
     const draft = insp.field_draft as Record<string, unknown> | null
     return (draft?.type as string | undefined) || 'Building Assessment'
@@ -654,6 +698,21 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
       setSubmittingInspectionId(null)
     }
   }
+
+  const handleReportUpdate = useCallback((id: string, changes: any) => {
+    // Refresh inspection data after report update
+    fetchInspectionsWithRelations()
+  }, [fetchInspectionsWithRelations])
+
+  const handleQuoteUpdated = useCallback(() => {
+    // Refresh inspection data after quote update
+    fetchInspectionsWithRelations()
+  }, [fetchInspectionsWithRelations])
+
+  const handleInvoiceUpdated = useCallback(() => {
+    // Refresh inspection data after invoice update
+    fetchInspectionsWithRelations()
+  }, [fetchInspectionsWithRelations])
 
   return (
     <>
@@ -735,67 +794,123 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       <div className="p-4 space-y-3">
                         {/* Core BAR Report */}
                         {coreReport ? (
-                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                            <div className="flex items-center gap-3">
-                              <FileText size={14} className="text-blue-600" />
-                              <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{coreReport.report_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(coreReport.report_type)}</div>
+                          <>
+                            <div
+                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                              onClick={() => toggleEditor(inspection.id, 'coreReport')}
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText size={14} className="text-blue-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreReport.report_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(coreReport.report_type)}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={coreReport.status} />
+                                {coreReport.pdf_storage_path && (
+                                  <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
+                                )}
+                                {isEditorExpanded(inspection.id, 'coreReport') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <StatusPill status={coreReport.status} />
-                              {coreReport.pdf_storage_path && (
-                                <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
-                              )}
-                            </div>
-                          </div>
+                            {isEditorExpanded(inspection.id, 'coreReport') && (
+                              <div className="mt-2">
+                                <ReportAccordionItem
+                                  report={coreReport as any}
+                                  currentUserId={tenantId}
+                                  currentUserRole="admin"
+                                  isAdmin={true}
+                                  onReportUpdate={handleReportUpdate}
+                                  onReportDeleted={() => fetchInspectionsWithRelations()}
+                                  onReportDuplicated={() => fetchInspectionsWithRelations()}
+                                  onReportReinstated={() => fetchInspectionsWithRelations()}
+                                  jobId={jobId}
+                                />
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="text-[12px] text-[#9e998f] italic">No BAR report created</div>
                         )}
 
                         {/* Core Quote */}
                         {coreQuote ? (
-                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                            <div className="flex items-center gap-3">
-                              <DollarSign size={14} className="text-green-600" />
-                              <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
+                          <>
+                            <div
+                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                              onClick={() => toggleEditor(inspection.id, 'coreQuote')}
+                            >
+                              <div className="flex items-center gap-3">
+                                <DollarSign size={14} className="text-green-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={coreQuote.status} />
+                                {coreQuote.total_amount && (
+                                  <div className="text-[12px] font-medium text-[#3a3530]">
+                                    ${coreQuote.total_amount.toLocaleString()}
+                                  </div>
+                                )}
+                                {isEditorExpanded(inspection.id, 'coreQuote') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <StatusPill status={coreQuote.status} />
-                              {coreQuote.total_amount && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
-                                  ${coreQuote.total_amount.toLocaleString()}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                            {isEditorExpanded(inspection.id, 'coreQuote') && (
+                              <div className="mt-2">
+                                <QuoteEditorClient
+                                  jobId={jobId}
+                                  quoteId={coreQuote.id}
+                                  tenantId={tenantId}
+                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                  inline={true}
+                                  onQuoteUpdated={handleQuoteUpdated}
+                                />
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="text-[12px] text-[#9e998f] italic">No quote created</div>
                         )}
 
                         {/* Core Invoice */}
                         {coreInvoice ? (
-                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                            <div className="flex items-center gap-3">
-                              <DollarSign size={14} className="text-purple-600" />
-                              <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{coreInvoice.invoice_type}</div>
+                          <>
+                            <div
+                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                              onClick={() => toggleEditor(inspection.id, 'coreInvoice')}
+                            >
+                              <div className="flex items-center gap-3">
+                                <DollarSign size={14} className="text-purple-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{coreInvoice.invoice_type}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={coreInvoice.status} />
+                                {coreInvoice.amount_ex_gst && (
+                                  <div className="text-[12px] font-medium text-[#3a3530]">
+                                    ${coreInvoice.amount_ex_gst.toLocaleString()}
+                                  </div>
+                                )}
+                                {isEditorExpanded(inspection.id, 'coreInvoice') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <StatusPill status={coreInvoice.status} />
-                              {coreInvoice.amount_ex_gst && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
-                                  ${coreInvoice.amount_ex_gst.toLocaleString()}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                            {isEditorExpanded(inspection.id, 'coreInvoice') && (
+                              <div className="mt-2">
+                                <InvoiceEditor
+                                  jobId={jobId}
+                                  invoiceId={coreInvoice.id}
+                                  tenantId={tenantId}
+                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                  onInvoiceUpdated={handleInvoiceUpdated}
+                                />
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="text-[12px] text-[#9e998f] italic">No invoice created</div>
                         )}
@@ -825,20 +940,41 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {isSectionExpanded(inspection.id, 'additional') && (
                         <div className="p-4 space-y-2">
                           {additionalReports.map(report => (
-                            <div key={report.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                              <div className="flex items-center gap-3">
-                                <FileText size={14} className="text-blue-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{report.report_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(report.report_type)}</div>
+                            <div key={report.id}>
+                              <div
+                                className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                                onClick={() => toggleEditor(inspection.id, `additionalReport-${report.id}`)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <FileText size={14} className="text-blue-600" />
+                                  <div>
+                                    <div className="text-[13px] font-medium text-[#3a3530]">{report.report_ref}</div>
+                                    <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(report.report_type)}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <StatusPill status={report.status} />
+                                  {report.pdf_storage_path && (
+                                    <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
+                                  )}
+                                  {isEditorExpanded(inspection.id, `additionalReport-${report.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={report.status} />
-                                {report.pdf_storage_path && (
-                                  <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
-                                )}
-                              </div>
+                              {isEditorExpanded(inspection.id, `additionalReport-${report.id}`) && (
+                                <div className="mt-2">
+                                  <ReportAccordionItem
+                                    report={report as any}
+                                    currentUserId={tenantId}
+                                    currentUserRole="admin"
+                                    isAdmin={true}
+                                    onReportUpdate={handleReportUpdate}
+                                    onReportDeleted={() => fetchInspectionsWithRelations()}
+                                    onReportDuplicated={() => fetchInspectionsWithRelations()}
+                                    onReportReinstated={() => fetchInspectionsWithRelations()}
+                                    jobId={jobId}
+                                  />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -868,41 +1004,75 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {isSectionExpanded(inspection.id, 'invoices') && (
                         <div className="p-4 space-y-2">
                           {coreInvoice && (
-                            <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-purple-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
+                            <div>
+                              <div
+                                className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                                onClick={() => toggleEditor(inspection.id, 'coreInvoice')}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <DollarSign size={14} className="text-purple-600" />
+                                  <div>
+                                    <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
+                                    <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <StatusPill status={coreInvoice.status} />
+                                  {coreInvoice.amount_ex_gst && (
+                                    <div className="text-[12px] font-medium text-[#3a3530]">
+                                      ${coreInvoice.amount_ex_gst.toLocaleString()}
+                                    </div>
+                                  )}
+                                  {isEditorExpanded(inspection.id, 'coreInvoice') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={coreInvoice.status} />
-                                {coreInvoice.amount_ex_gst && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${coreInvoice.amount_ex_gst.toLocaleString()}
-                                  </div>
-                                )}
-                              </div>
+                              {isEditorExpanded(inspection.id, 'coreInvoice') && (
+                                <div className="mt-2">
+                                  <InvoiceEditor
+                                    jobId={jobId}
+                                    invoiceId={coreInvoice.id}
+                                    tenantId={tenantId}
+                                    job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                    onInvoiceUpdated={handleInvoiceUpdated}
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
                           {additionalInvoices.map(invoice => (
-                            <div key={invoice.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-purple-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                            <div key={invoice.id}>
+                              <div
+                                className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                                onClick={() => toggleEditor(inspection.id, `additionalInvoice-${invoice.id}`)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <DollarSign size={14} className="text-purple-600" />
+                                  <div>
+                                    <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
+                                    <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <StatusPill status={invoice.status} />
+                                  {invoice.amount_ex_gst && (
+                                    <div className="text-[12px] font-medium text-[#3a3530]">
+                                      ${invoice.amount_ex_gst.toLocaleString()}
+                                    </div>
+                                  )}
+                                  {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={invoice.status} />
-                                {invoice.amount_ex_gst && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${invoice.amount_ex_gst.toLocaleString()}
-                                  </div>
-                                )}
-                              </div>
+                              {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) && (
+                                <div className="mt-2">
+                                  <InvoiceEditor
+                                    jobId={jobId}
+                                    invoiceId={invoice.id}
+                                    tenantId={tenantId}
+                                    job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                    onInvoiceUpdated={handleInvoiceUpdated}
+                                  />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -932,22 +1102,40 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {isSectionExpanded(inspection.id, 'trade') && (
                         <div className="p-4 space-y-2">
                           {tradeQuotes.map(quote => (
-                            <div key={quote.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-orange-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
+                            <div key={quote.id}>
+                              <div
+                                className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                                onClick={() => toggleEditor(inspection.id, `tradeQuote-${quote.id}`)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <DollarSign size={14} className="text-orange-600" />
+                                  <div>
+                                    <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
+                                    <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <StatusPill status={quote.status} />
+                                  {quote.total_amount && (
+                                    <div className="text-[12px] font-medium text-[#3a3530]">
+                                      ${quote.total_amount.toLocaleString()}
+                                    </div>
+                                  )}
+                                  {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={quote.status} />
-                                {quote.total_amount && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${quote.total_amount.toLocaleString()}
-                                  </div>
-                                )}
-                              </div>
+                              {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) && (
+                                <div className="mt-2">
+                                  <QuoteEditorClient
+                                    jobId={jobId}
+                                    quoteId={quote.id}
+                                    tenantId={tenantId}
+                                    job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                    inline={true}
+                                    onQuoteUpdated={handleQuoteUpdated}
+                                  />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
