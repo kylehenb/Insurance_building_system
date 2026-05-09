@@ -26,7 +26,7 @@ export async function GET(
   const { data: insp, error } = await service
     .from('inspections')
     .select(`
-      id, inspection_ref, status, scheduled_date, scheduled_time,
+      id, inspection_ref, status, scheduled_date, start_time, finish_time,
       job_id, quote_id, inspector_id, person_met, field_draft,
       safety_confirmed_at, form_submitted_at,
       jobs!job_id (
@@ -60,7 +60,8 @@ export async function GET(
     inspectionRef: insp.inspection_ref,
     status: insp.status,
     scheduledDate: insp.scheduled_date,
-    scheduledTime: insp.scheduled_time,
+    startTime: insp.start_time,
+    finishTime: insp.finish_time,
     jobId: job?.id ?? null,
     jobNumber: job?.job_number ?? null,
     address: job?.property_address ?? null,
