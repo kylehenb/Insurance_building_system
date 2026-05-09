@@ -4,13 +4,20 @@ import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { QuotesList } from '../quotes/components/QuotesList'
 
+interface JobInfo {
+  job_number: string
+  insurer: string | null
+  insured_name: string | null
+  property_address: string | null
+}
+
 interface QuotesTabProps {
   jobId: string
   tenantId: string
 }
 
 export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
-  const [job, setJob] = useState<{ job_number: string; insurer: string | null; insured_name: string | null; property_address: string | null } | null>(null)
+  const [job, setJob] = useState<JobInfo | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {

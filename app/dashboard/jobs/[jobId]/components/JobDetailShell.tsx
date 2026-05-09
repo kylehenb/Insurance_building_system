@@ -152,7 +152,7 @@ function TabPanel({
         />
       )
     case 'inspections':
-      return <InspectionsTab jobId={jobId} tenantId={tenantId} />
+      return <InspectionsTab jobId={jobId} tenantId={tenantId} jobNumber={job.job_number} />
     case 'reports':
       return (
         <ReportsTabWrapper

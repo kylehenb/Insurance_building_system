@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Smartphone } from 'lucide-react'
+import { Smartphone, FileText, DollarSign, Plus, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
 import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
 import { CreateModal } from './shared/CreateModal'
@@ -23,12 +23,59 @@ interface Inspection {
   access_notes: string | null  // repurposed for assessor name
   notes: string | null
   field_draft: Record<string, unknown> | null
+  quote_id: string | null
+  report_id: string | null
   created_at: string
+}
+
+interface Report {
+  id: string
+  report_ref: string | null
+  report_type: 'BAR' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
+  status: string
+  is_locked: boolean
+  attendance_date: string | null
+  assessor_name: string | null
+  pdf_storage_path: string | null
+  created_at: string
+}
+
+interface Quote {
+  id: string
+  quote_ref: string | null
+  quote_type: 'inspection' | 'variation' | 'additional_works'
+  status: string
+  is_locked: boolean
+  total_amount: number | null
+  pdf_storage_path: string | null
+  created_at: string
+}
+
+interface Invoice {
+  id: string
+  invoice_ref: string | null
+  invoice_type: string
+  direction: 'inbound' | 'outbound'
+  amount_ex_gst: number | null
+  status: string
+  report_id: string | null
+  created_at: string
+}
+
+interface InspectionWithRelations {
+  inspection: Inspection
+  coreReport: Report | null
+  coreQuote: Quote | null
+  coreInvoice: Invoice | null
+  additionalReports: Report[]
+  additionalInvoices: Invoice[]
+  tradeQuotes: Quote[]
 }
 
 interface InspectionsTabProps {
   jobId: string
   tenantId: string
+  jobNumber: string
 }
 
 // — Status pill ————————————————————————————————————————————————————
@@ -336,30 +383,94 @@ function InspectionForm({
 }
 
 // — InspectionsTab ——————————————————————————————————————————————
-export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
+export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabProps) {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const [inspections, setInspections] = useState<Inspection[]>([])
+  const [inspectionsWithRelations, setInspectionsWithRelations] = useState<InspectionWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Record<string, Set<string>>>({})
+  const [submittingInspectionId, setSubmittingInspectionId] = useState<string | null>(null)
+
+  const fetchInspectionsWithRelations = useCallback(async () => {
+    setLoading(true)
+    
+    // Fetch all inspections for this job
+    const { data: inspections, error: inspError } = await supabase
+      .from('inspections')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,quote_id,report_id,created_at')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true })
+
+    if (inspError || !inspections) {
+      setLoading(false)
+      return
+    }
+
+    // Fetch all related data for each inspection
+    const inspectionsData: InspectionWithRelations[] = await Promise.all(
+      inspections.map(async (inspection: Inspection) => {
+        // Fetch core report (BAR)
+        const { data: coreReport } = inspection.report_id
+          ? await supabase.from('reports').select('*').eq('id', inspection.report_id).single()
+          : { data: null }
+
+        // Fetch core quote
+        const { data: coreQuote } = inspection.quote_id
+          ? await supabase.from('quotes').select('*').eq('id', inspection.quote_id).single()
+          : { data: null }
+
+        // Fetch core invoice (invoice linked to core report)
+        const { data: coreInvoice } = coreReport
+          ? await supabase.from('invoices').select('*').eq('report_id', coreReport.id).eq('direction', 'outbound').maybeSingle()
+          : { data: null }
+
+        // Fetch additional reports linked to this inspection (not the core BAR)
+        const { data: additionalReports } = await supabase
+          .from('reports')
+          .select('*')
+          .eq('inspection_id', inspection.id)
+          .neq('id', inspection.report_id || '')
+          .order('created_at', { ascending: true })
+
+        // Fetch invoices for additional reports
+        const additionalReportIds = (additionalReports || []).map((r: Report) => r.id)
+        const { data: additionalInvoices } = additionalReportIds.length > 0
+          ? await supabase.from('invoices').select('*').in('report_id', additionalReportIds).eq('direction', 'outbound')
+          : { data: [] }
+
+        // Fetch trade quote requests (quotes with quote_type = 'trade_request' or similar - need to identify these)
+        // For now, we'll fetch all quotes linked to this inspection that aren't the core quote
+        const { data: tradeQuotes } = await supabase
+          .from('quotes')
+          .select('*')
+          .eq('inspection_id', inspection.id)
+          .neq('id', inspection.quote_id || '')
+          .order('created_at', { ascending: true })
+
+        return {
+          inspection,
+          coreReport: coreReport as Report | null,
+          coreQuote: coreQuote as Quote | null,
+          coreInvoice: coreInvoice as Invoice | null,
+          additionalReports: (additionalReports || []) as Report[],
+          additionalInvoices: (additionalInvoices || []) as Invoice[],
+          tradeQuotes: (tradeQuotes || []) as Quote[],
+        }
+      })
+    )
+
+    setInspectionsWithRelations(inspectionsData)
+    setLoading(false)
+  }, [jobId, tenantId, supabase])
 
   useEffect(() => {
-    async function fetch() {
-      setLoading(true)
-      const { data } = await supabase
-        .from('inspections')
-        .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,created_at')
-        .eq('job_id', jobId)
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: true })
-      setInspections((data ?? []) as Inspection[])
-      setLoading(false)
-    }
-    fetch()
-  }, [jobId, tenantId]) // eslint-disable-line react-hooks/exhaustive-deps
+    fetchInspectionsWithRelations()
+  }, [fetchInspectionsWithRelations])
 
   async function handleCreate(data: Record<string, string>) {
     const fieldDraft = { type: data['Type'] ?? '' }
@@ -367,7 +478,8 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
     const duration = parseInt(data['Duration'] || '60') || 60
     const finishTime = startTime ? calculateFinishTime(startTime, duration.toString()) : null
     
-    const { data: inserted, error } = await supabase
+    // Create inspection
+    const { data: inserted, error: inspError } = await supabase
       .from('inspections')
       .insert({
         tenant_id: tenantId,
@@ -381,19 +493,143 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
         person_met: data['Person Met'] || null,
         field_draft: fieldDraft,
       })
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,quote_id,report_id,created_at')
       .single()
-    if (error) throw error
-    setInspections(prev => [...prev, inserted as Inspection])
+    
+    if (inspError) throw inspError
+
+    // Create core BAR report for this inspection
+    const inspectionId = inserted.id
+    const existingCount = inspectionsWithRelations.length
+    const newIndex = String(existingCount + 1).padStart(3, '0')
+    const reportRef = `RPT-${jobNumber}-${newIndex}`
+    const quoteRef = `Q-${jobNumber}-${newIndex}`
+
+    const { data: newReport, error: reportError } = await supabase
+      .from('reports')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        inspection_id: inspectionId,
+        report_ref: reportRef,
+        report_type: 'BAR',
+        status: 'draft',
+        is_locked: false,
+        version: 1,
+        type_specific_fields: {},
+      })
+      .select()
+      .single()
+
+    if (reportError) throw reportError
+
+    // Create core quote for this inspection
+    const { data: newQuote, error: quoteError } = await supabase
+      .from('quotes')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        inspection_id: inspectionId,
+        report_id: newReport.id,
+        quote_ref: quoteRef,
+        quote_type: 'inspection',
+        version: 1,
+        is_active_version: true,
+        is_locked: false,
+        status: 'draft',
+      })
+      .select()
+      .single()
+
+    if (quoteError) throw quoteError
+
+    // Link report and quote to inspection
+    const { error: updateError } = await supabase
+      .from('inspections')
+      .update({ report_id: newReport.id, quote_id: newQuote.id })
+      .eq('id', inspectionId)
+
+    if (updateError) throw updateError
+
+    // Refresh data
+    await fetchInspectionsWithRelations()
   }
 
   function handleDelete(id: string) {
-    setInspections(prev => prev.filter(i => i.id !== id))
+    setInspectionsWithRelations(prev => prev.filter(i => i.inspection.id !== id))
+  }
+
+  function toggleSection(inspectionId: string, sectionKey: string) {
+    setExpandedSections(prev => {
+      const current = prev[inspectionId] || new Set()
+      const newSet = new Set(current)
+      if (newSet.has(sectionKey)) {
+        newSet.delete(sectionKey)
+      } else {
+        newSet.add(sectionKey)
+      }
+      return { ...prev, [inspectionId]: newSet }
+    })
+  }
+
+  function isSectionExpanded(inspectionId: string, sectionKey: string): boolean {
+    return (expandedSections[inspectionId] || new Set()).has(sectionKey)
   }
 
   const typeLabel = (insp: Inspection) => {
     const draft = insp.field_draft as Record<string, unknown> | null
-    return (draft?.type as string | undefined) || '—'
+    return (draft?.type as string | undefined) || 'Building Assessment'
+  }
+
+  const getStatusIcon = (status: string) => {
+    const s = status.toLowerCase()
+    if (s === 'complete' || s === 'submitted') return <CheckCircle2 size={14} className="text-green-600" />
+    if (s === 'in_progress') return <Clock size={14} className="text-blue-600" />
+    return <AlertCircle size={14} className="text-amber-600" />
+  }
+
+  const getReportTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'BAR': 'BAR',
+      'make_safe': 'Make Safe',
+      'roof': 'Roof Report',
+      'specialist': 'Specialist Report',
+      'LDR': 'Leak Detection',
+    }
+    return labels[type] || type
+  }
+
+  const getQuoteTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'inspection': 'Inspection Quote',
+      'variation': 'Variation',
+      'additional_works': 'Additional Works',
+    }
+    return labels[type] || type
+  }
+
+  const handleCompileAndSubmit = async (inspectionId: string) => {
+    setSubmittingInspectionId(inspectionId)
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(json.error || 'Failed to submit inspection package')
+        return
+      }
+      // Refresh data to show updated statuses
+      await fetchInspectionsWithRelations()
+      alert('Inspection package submitted successfully')
+    } catch (error) {
+      console.error('Error submitting inspection:', error)
+      alert('Failed to submit inspection package')
+    } finally {
+      setSubmittingInspectionId(null)
+    }
   }
 
   return (
@@ -405,36 +641,39 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
           title="Inspections"
           action={{ label: '+ New inspection', onClick: () => setShowCreate(true) }}
         >
-          {inspections.length === 0 ? (
+          {inspectionsWithRelations.length === 0 ? (
             <div className="px-4 py-8 text-center text-[13px] text-[#9e998f]">
               No inspections yet
             </div>
           ) : (
-            inspections.map(insp => (
+            inspectionsWithRelations.map(({ inspection, coreReport, coreQuote, coreInvoice, additionalReports, additionalInvoices, tradeQuotes }) => (
               <AccordionRow
-                key={insp.id}
+                key={inspection.id}
                 summary={
                   <div className="flex items-center gap-3 flex-wrap">
                     <span
                       className="text-[13px] font-medium"
                       style={{ fontFamily: 'DM Mono, monospace', color: '#c8b89a' }}
                     >
-                      {insp.inspection_ref ?? '—'}
+                      {inspection.inspection_ref ?? '—'}
                     </span>
-                    <span className="text-[13px] text-[#3a3530]">{typeLabel(insp)}</span>
-                    <span className="text-[12px] text-[#9e998f]">{formatDate(insp.scheduled_date)}</span>
-                    {insp.start_time && (
-                      <span className="text-[12px] text-[#9e998f]">{formatTime(insp.start_time)}</span>
+                    <span className="text-[13px] text-[#3a3530]">{typeLabel(inspection)}</span>
+                    <span className="text-[12px] text-[#9e998f]">{formatDate(inspection.scheduled_date)}</span>
+                    {inspection.start_time && (
+                      <span className="text-[12px] text-[#9e998f]">{formatTime(inspection.start_time)}</span>
                     )}
-                    {insp.access_notes && (
-                      <span className="text-[12px] text-[#9e998f]">{insp.access_notes}</span>
+                    {inspection.access_notes && (
+                      <span className="text-[12px] text-[#9e998f]">{inspection.access_notes}</span>
                     )}
-                    {insp.person_met && (
-                      <span className="text-[12px] text-[#9e998f]">{insp.person_met}</span>
+                    {inspection.person_met && (
+                      <span className="text-[12px] text-[#9e998f]">{inspection.person_met}</span>
                     )}
-                    <StatusPill status={insp.status} />
+                    <div className="flex items-center gap-1">
+                      {getStatusIcon(inspection.status)}
+                      <StatusPill status={inspection.status} />
+                    </div>
                     <a
-                      href={`/field/${insp.id}`}
+                      href={`/field/${inspection.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a1a1a] text-[#c8b89a] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors"
@@ -445,11 +684,265 @@ export function InspectionsTab({ jobId, tenantId }: InspectionsTabProps) {
                   </div>
                 }
               >
-                <InspectionForm
-                  inspection={insp}
-                  tenantId={tenantId}
-                  onDelete={handleDelete}
-                />
+                <div className="space-y-4">
+                  {/* Inspection Details */}
+                  <InspectionForm
+                    inspection={inspection}
+                    tenantId={tenantId}
+                    onDelete={handleDelete}
+                  />
+
+                  {/* Core Package Section */}
+                  <div className="border border-[#e4dfd8] rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleSection(inspection.id, 'core')}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-[#faf9f7] hover:bg-[#f5f2ee] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-[#c8b89a]" />
+                        <span className="text-[13px] font-medium text-[#3a3530]">Core Package (BAR + Quote + Invoice)</span>
+                      </div>
+                      {isSectionExpanded(inspection.id, 'core') ? (
+                        <ChevronDown size={16} className="text-[#9e998f]" />
+                      ) : (
+                        <ChevronRight size={16} className="text-[#9e998f]" />
+                      )}
+                    </button>
+                    {isSectionExpanded(inspection.id, 'core') && (
+                      <div className="p-4 space-y-3">
+                        {/* Core BAR Report */}
+                        {coreReport ? (
+                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                            <div className="flex items-center gap-3">
+                              <FileText size={14} className="text-blue-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{coreReport.report_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(coreReport.report_type)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={coreReport.status} />
+                              {coreReport.pdf_storage_path && (
+                                <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-[#9e998f] italic">No BAR report created</div>
+                        )}
+
+                        {/* Core Quote */}
+                        {coreQuote ? (
+                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-green-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={coreQuote.status} />
+                              {coreQuote.total_amount && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${coreQuote.total_amount.toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-[#9e998f] italic">No quote created</div>
+                        )}
+
+                        {/* Core Invoice */}
+                        {coreInvoice ? (
+                          <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-purple-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{coreInvoice.invoice_type}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={coreInvoice.status} />
+                              {coreInvoice.amount_ex_gst && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${coreInvoice.amount_ex_gst.toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-[#9e998f] italic">No invoice created</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Reports Section */}
+                  {additionalReports.length > 0 && (
+                    <div className="border border-[#e4dfd8] rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleSection(inspection.id, 'additional')}
+                        className="w-full px-4 py-3 flex items-center justify-between bg-[#faf9f7] hover:bg-[#f5f2ee] transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText size={16} className="text-[#c8b89a]" />
+                          <span className="text-[13px] font-medium text-[#3a3530]">
+                            Additional Reports ({additionalReports.length})
+                          </span>
+                        </div>
+                        {isSectionExpanded(inspection.id, 'additional') ? (
+                          <ChevronDown size={16} className="text-[#9e998f]" />
+                        ) : (
+                          <ChevronRight size={16} className="text-[#9e998f]" />
+                        )}
+                      </button>
+                      {isSectionExpanded(inspection.id, 'additional') && (
+                        <div className="p-4 space-y-2">
+                          {additionalReports.map(report => (
+                            <div key={report.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                              <div className="flex items-center gap-3">
+                                <FileText size={14} className="text-blue-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{report.report_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{getReportTypeLabel(report.report_type)}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={report.status} />
+                                {report.pdf_storage_path && (
+                                  <button className="text-[11px] text-[#1a73e8] hover:underline">View PDF</button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Linked Invoices Section */}
+                  {(additionalInvoices.length > 0 || coreInvoice) && (
+                    <div className="border border-[#e4dfd8] rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleSection(inspection.id, 'invoices')}
+                        className="w-full px-4 py-3 flex items-center justify-between bg-[#faf9f7] hover:bg-[#f5f2ee] transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={16} className="text-[#c8b89a]" />
+                          <span className="text-[13px] font-medium text-[#3a3530]">
+                            Linked Invoices ({(coreInvoice ? 1 : 0) + additionalInvoices.length})
+                          </span>
+                        </div>
+                        {isSectionExpanded(inspection.id, 'invoices') ? (
+                          <ChevronDown size={16} className="text-[#9e998f]" />
+                        ) : (
+                          <ChevronRight size={16} className="text-[#9e998f]" />
+                        )}
+                      </button>
+                      {isSectionExpanded(inspection.id, 'invoices') && (
+                        <div className="p-4 space-y-2">
+                          {coreInvoice && (
+                            <div className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                              <div className="flex items-center gap-3">
+                                <DollarSign size={14} className="text-purple-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={coreInvoice.status} />
+                                {coreInvoice.amount_ex_gst && (
+                                  <div className="text-[12px] font-medium text-[#3a3530]">
+                                    ${coreInvoice.amount_ex_gst.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {additionalInvoices.map(invoice => (
+                            <div key={invoice.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                              <div className="flex items-center gap-3">
+                                <DollarSign size={14} className="text-purple-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={invoice.status} />
+                                {invoice.amount_ex_gst && (
+                                  <div className="text-[12px] font-medium text-[#3a3530]">
+                                    ${invoice.amount_ex_gst.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Trade Quote Requests Section */}
+                  {tradeQuotes.length > 0 && (
+                    <div className="border border-[#e4dfd8] rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleSection(inspection.id, 'trade')}
+                        className="w-full px-4 py-3 flex items-center justify-between bg-[#faf9f7] hover:bg-[#f5f2ee] transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={16} className="text-[#c8b89a]" />
+                          <span className="text-[13px] font-medium text-[#3a3530]">
+                            Trade Quote Requests ({tradeQuotes.length})
+                          </span>
+                        </div>
+                        {isSectionExpanded(inspection.id, 'trade') ? (
+                          <ChevronDown size={16} className="text-[#9e998f]" />
+                        ) : (
+                          <ChevronRight size={16} className="text-[#9e998f]" />
+                        )}
+                      </button>
+                      {isSectionExpanded(inspection.id, 'trade') && (
+                        <div className="p-4 space-y-2">
+                          {tradeQuotes.map(quote => (
+                            <div key={quote.id} className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md">
+                              <div className="flex items-center gap-3">
+                                <DollarSign size={14} className="text-orange-600" />
+                                <div>
+                                  <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
+                                  <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StatusPill status={quote.status} />
+                                {quote.total_amount && (
+                                  <div className="text-[12px] font-medium text-[#3a3530]">
+                                    ${quote.total_amount.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Compile & Submit Button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      className="px-4 py-2 bg-[#1a1a1a] text-[#f5f0e8] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleCompileAndSubmit(inspection.id)}
+                      disabled={submittingInspectionId === inspection.id}
+                    >
+                      {submittingInspectionId === inspection.id ? 'Submitting…' : 'Compile & Submit Package'}
+                    </button>
+                  </div>
+                </div>
               </AccordionRow>
             ))
           )}
