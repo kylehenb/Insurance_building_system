@@ -3,10 +3,10 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { inspectionId: string } }
+  { params }: { params: Promise<{ inspectionId: string }> }
 ) {
   try {
-    const { inspectionId } = params
+    const { inspectionId } = await params
     const { tenantId } = await req.json()
 
     if (!tenantId) {
