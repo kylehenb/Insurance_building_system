@@ -6,6 +6,12 @@ import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
 
 // — Types ——————————————————————————————————————————————————————————
+interface EmailAttachment {
+  filename: string
+  mimeType: string
+  size: number
+}
+
 interface InsurerOrder {
   id: string
   tenant_id: string
@@ -16,6 +22,10 @@ interface InsurerOrder {
   status: string | null
   notes: string | null
   created_at: string | null
+  order_sender_name: string | null
+  order_sender_email: string | null
+  raw_email_body: string | null
+  email_attachments: EmailAttachment[] | null
 }
 
 interface InsurerOrdersTabProps {
@@ -172,6 +182,60 @@ function OrderForm({
         </div>
       </div>
 
+      {/* Order Sender Fields */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label style={labelStyle}>Order Sender Name</label>
+          <input
+            type="text"
+            value={order.order_sender_name || ''}
+            style={inputStyle}
+            readOnly
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Order Sender Email</label>
+          <input
+            type="email"
+            value={order.order_sender_email || ''}
+            style={inputStyle}
+            readOnly
+          />
+        </div>
+      </div>
+
+      {/* Raw Email Body */}
+      {order.raw_email_body && (
+        <div className="mb-4">
+          <label style={labelStyle}>Raw Email Body</label>
+          <textarea
+            value={order.raw_email_body}
+            rows={6}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+            readOnly
+          />
+        </div>
+      )}
+
+      {/* Email Attachments */}
+      {order.email_attachments && order.email_attachments.length > 0 && (
+        <div className="mb-4">
+          <label style={labelStyle}>Email Attachments ({order.email_attachments.length})</label>
+          <div className="border border-[#e0dbd4] rounded bg-white p-3">
+            {order.email_attachments.map((attachment, index) => (
+              <div key={index} className="flex items-center justify-between py-2 border-b border-[#f5f2ee] last:border-0">
+                <div className="flex-1">
+                  <div className="text-sm text-[#3a3530]">{attachment.filename}</div>
+                  <div className="text-xs text-[#9e998f]">
+                    {attachment.mimeType} • {(attachment.size / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mb-4">
         <label style={labelStyle}>Order Notes</label>
         <textarea
@@ -228,7 +292,7 @@ export function InsurerOrdersTab({ jobId, tenantId }: InsurerOrdersTabProps) {
       setLoading(true)
       const { data } = await supabase
         .from('insurer_orders')
-        .select('id,tenant_id,job_id,order_ref,wo_type,insurer,status,notes,created_at')
+        .select('id,tenant_id,job_id,order_ref,wo_type,insurer,status,notes,created_at,order_sender_name,order_sender_email,raw_email_body,email_attachments')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true })

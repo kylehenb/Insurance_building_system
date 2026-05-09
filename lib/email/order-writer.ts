@@ -8,6 +8,11 @@ export async function writeFallbackOrder(
 ): Promise<void> {
   const supabase = createServiceClient()
   const rawEmailLink = `https://mail.google.com/mail/u/0/#inbox/${message.messageId}`
+  const emailAttachments = message.attachments.map(a => ({
+    filename: a.filename,
+    mimeType: a.mimeType,
+    size: a.size,
+  }))
   const { error } = await supabase
     .from('insurer_orders')
     .insert({
@@ -18,6 +23,8 @@ export async function writeFallbackOrder(
       order_sender_name: message.fromName || null,
       claim_description: message.subject || null,
       raw_email_link: rawEmailLink,
+      raw_email_body: message.bodyText || null,
+      email_attachments: emailAttachments,
       status: 'pending',
     } as never)
   if (error) {
@@ -44,6 +51,8 @@ export async function writeInsurerOrder(
       entry_method: 'email',
       parse_status: parsed.parseStatus,
       raw_email_link: rawEmailLink,
+      raw_email_body: parsed.rawEmailBody,
+      email_attachments: parsed.emailAttachments,
       status: 'pending',
     })
     .select('id')

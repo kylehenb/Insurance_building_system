@@ -31,6 +31,8 @@ export type ParsedOrderResult = {
   parseStatus: 'auto_parsed' | 'needs_review'
   rawEmailLink: string | null
   insurerDetected: string | null
+  rawEmailBody: string | null
+  emailAttachments: Array<{ filename: string; mimeType: string; size: number }>
 }
 
 const FALLBACK_PROMPT = [
@@ -178,6 +180,12 @@ export async function parseInsurerOrder(
       parseStatus: 'needs_review',
       rawEmailLink: null,
       insurerDetected,
+      rawEmailBody: message.bodyText || null,
+      emailAttachments: message.attachments.map(a => ({
+        filename: a.filename,
+        mimeType: a.mimeType,
+        size: a.size,
+      })),
     }
   }
 
@@ -221,5 +229,11 @@ export async function parseInsurerOrder(
     parseStatus,
     rawEmailLink: raw.portal_url ?? null,
     insurerDetected,
+    rawEmailBody: message.bodyText || null,
+    emailAttachments: message.attachments.map(a => ({
+      filename: a.filename,
+      mimeType: a.mimeType,
+      size: a.size,
+    })),
   }
 }

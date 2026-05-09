@@ -803,6 +803,24 @@ export default function TenantSettingsPage() {
                     />
                   </div>
 
+                  {/* Auto Job Lodger monitored email */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                      Auto Job Lodger Monitored Email
+                    </label>
+                    <div className="flex items-center h-9">
+                      <input
+                        type="email"
+                        value="office@insurancerepairco.com.au"
+                        disabled
+                        className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-[#f5f2ee] text-[#9e998f] cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="text-xs text-[#9e998f] mt-1">
+                      Read-only — configured on backend for email parsing
+                    </p>
+                  </div>
+
                   {/* Contact phone */}
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
