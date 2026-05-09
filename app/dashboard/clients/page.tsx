@@ -96,6 +96,8 @@ export default function ClientsPage() {
     bar_amount: null,
     single_storey_roof_report_amount: null,
     double_storey_roof_report_amount: null,
+    leak_detection_report_amount: null,
+    make_safe_amount: null,
     travel_allowance_outside_service_area: null,
     builders_margin_pct: null,
   });
@@ -339,6 +341,8 @@ export default function ClientsPage() {
       bar_amount: null,
       single_storey_roof_report_amount: null,
       double_storey_roof_report_amount: null,
+      leak_detection_report_amount: null,
+      make_safe_amount: null,
       travel_allowance_outside_service_area: null,
       builders_margin_pct: null,
     });
@@ -367,6 +371,8 @@ export default function ClientsPage() {
       bar_amount: (item as any).bar_amount || null,
       single_storey_roof_report_amount: (item as any).single_storey_roof_report_amount || null,
       double_storey_roof_report_amount: (item as any).double_storey_roof_report_amount || null,
+      leak_detection_report_amount: (item as any).leak_detection_report_amount || null,
+      make_safe_amount: (item as any).make_safe_amount || null,
       travel_allowance_outside_service_area: (item as any).travel_allowance_outside_service_area || null,
       builders_margin_pct: (item as any).builders_margin_pct || null,
     });
@@ -1186,6 +1192,36 @@ export default function ClientsPage() {
                             className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                           />
                           <p className="text-xs text-[#9e998f] mt-1">Roof report fee for double-storey</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Leak Detection Report ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={(formData as any).leak_detection_report_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, leak_detection_report_amount: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Leak detection report fee</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                            Make Safe ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={(formData as any).make_safe_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, make_safe_amount: e.target.value ? parseFloat(e.target.value) : null } as any)}
+                            placeholder="0.00"
+                            className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          />
+                          <p className="text-xs text-[#9e998f] mt-1">Make safe report fee</p>
                         </div>
 
                         <div>

@@ -13,6 +13,7 @@ import {
   BookOpen,
   ChevronRight,
   Inbox,
+  FileText,
 } from 'lucide-react'
 
 interface SettingsCard {
@@ -63,6 +64,12 @@ export default async function SettingsPage() {
       route: '/dashboard/settings/rates',
       description: 'Set standard charge-out rates and margins for each report type',
       icon: <DollarSign className="w-4 h-4" />,
+    },
+    {
+      name: 'Invoice Templates',
+      route: '/dashboard/settings/invoice-templates',
+      description: 'Manage standardized invoice descriptions for BAR, roof reports, leak detection, and make safe',
+      icon: <FileText className="w-4 h-4" />,
     },
     {
       name: 'Email Templates',

@@ -192,12 +192,11 @@ function InspectionForm({
   const [finishTime, setFinishTime] = useState(inspection.finish_time ?? '')
   // Only use default for new inspections (duration_minutes is null)
   const [duration, setDuration] = useState(
-    inspection.duration_minutes !== null 
-      ? inspection.duration_minutes.toString() 
+    inspection.duration_minutes !== null
+      ? inspection.duration_minutes.toString()
       : '120'
   )
   const [status, setStatus] = useState(inspection.status)
-  const [personMet, setPersonMet] = useState(inspection.person_met ?? '')
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
   const [notes, setNotes] = useState(inspection.notes ?? '')
   const [deleting, setDeleting] = useState(false)
@@ -273,6 +272,7 @@ function InspectionForm({
   function handleChange(field: string, value: string, setter: (v: string) => void) {
     setter(value)
     scheduleFieldSave(field, value || null)
+    flushSave() // Force immediate save
   }
 
   async function handleDelete() {
@@ -304,14 +304,12 @@ function InspectionForm({
           value={date}
           className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleChange('scheduled_date', e.target.value, setDate)}
-          onBlur={flushSave}
         />
         <input
           type="time"
           value={startTime}
           className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleStartTimeChange(e.target.value)}
-          onBlur={flushSave}
         />
         <span className="text-[12px] text-[#9e998f]">to</span>
         <input
@@ -319,7 +317,6 @@ function InspectionForm({
           value={finishTime}
           className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleFinishTimeChange(e.target.value)}
-          onBlur={flushSave}
         />
         <input
           type="number"
@@ -328,14 +325,12 @@ function InspectionForm({
           step="15"
           className="w-16 px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleDurationChange(e.target.value)}
-          onBlur={flushSave}
         />
         <span className="text-[11px] text-[#9e998f]">min</span>
         <select
           value={status}
           className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleChange('status', e.target.value, setStatus)}
-          onBlur={flushSave}
         >
           <option value="draft">Draft</option>
           <option value="scheduled">Scheduled</option>
@@ -345,19 +340,10 @@ function InspectionForm({
         </select>
         <input
           type="text"
-          value={personMet}
-          placeholder="Person met"
-          className="w-32 px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
-          onChange={e => handleChange('person_met', e.target.value, setPersonMet)}
-          onBlur={flushSave}
-        />
-        <input
-          type="text"
           value={assessor}
           placeholder="Assessor"
           className="w-32 px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleChange('access_notes', e.target.value, setAssessor)}
-          onBlur={flushSave}
         />
         <button
           onClick={handleDelete}
@@ -748,220 +734,208 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                   />
 
                   {/* Inspection Items Section */}
-                  <div className="border border-[#e4dfd8] rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => toggleSection(inspection.id, 'items')}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-[#faf9f7] hover:bg-[#f5f2ee] transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText size={16} className="text-[#c8b89a]" />
-                        <span className="text-[13px] font-medium text-[#3a3530]">
-                          Inspection Items
-                        </span>
-                        <span className="text-[11px] text-[#9e998f]">
-                          ({(coreReport ? 1 : 0) + (coreQuote ? 1 : 0) + (coreInvoice ? 1 : 0) + additionalReports.length + additionalInvoices.length + tradeQuotes.length})
-                        </span>
-                      </div>
-                      {isSectionExpanded(inspection.id, 'items') ? (
-                        <ChevronDown size={16} className="text-[#9e998f]" />
-                      ) : (
-                        <ChevronRight size={16} className="text-[#9e998f]" />
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={16} className="text-[#c8b89a]" />
+                      <span className="text-[13px] font-medium text-[#3a3530]">
+                        Inspection Items
+                      </span>
+                      <span className="text-[11px] text-[#9e998f]">
+                        ({(coreReport ? 1 : 0) + (coreQuote ? 1 : 0) + (coreInvoice ? 1 : 0) + additionalReports.length + additionalInvoices.length + tradeQuotes.length})
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {/* Reports */}
+                      {coreReport && (
+                        <ReportAccordionItem
+                          report={coreReport as any}
+                          currentUserId={tenantId}
+                          currentUserRole="admin"
+                          isAdmin={true}
+                          onReportUpdate={handleReportUpdate}
+                          onReportDeleted={() => fetchInspectionsWithRelations()}
+                          onReportDuplicated={() => fetchInspectionsWithRelations()}
+                          onReportReinstated={() => fetchInspectionsWithRelations()}
+                          jobId={jobId}
+                        />
                       )}
-                    </button>
-                    {isSectionExpanded(inspection.id, 'items') && (
-                      <div className="p-4 space-y-2">
-                        {/* Reports */}
-                        {coreReport && (
-                          <ReportAccordionItem
-                            report={coreReport as any}
-                            currentUserId={tenantId}
-                            currentUserRole="admin"
-                            isAdmin={true}
-                            onReportUpdate={handleReportUpdate}
-                            onReportDeleted={() => fetchInspectionsWithRelations()}
-                            onReportDuplicated={() => fetchInspectionsWithRelations()}
-                            onReportReinstated={() => fetchInspectionsWithRelations()}
-                            jobId={jobId}
-                          />
-                        )}
-                        {additionalReports.map(report => (
-                          <ReportAccordionItem
-                            key={report.id}
-                            report={report as any}
-                            currentUserId={tenantId}
-                            currentUserRole="admin"
-                            isAdmin={true}
-                            onReportUpdate={handleReportUpdate}
-                            onReportDeleted={() => fetchInspectionsWithRelations()}
-                            onReportDuplicated={() => fetchInspectionsWithRelations()}
-                            onReportReinstated={() => fetchInspectionsWithRelations()}
-                            jobId={jobId}
-                          />
-                        ))}
+                      {additionalReports.map(report => (
+                        <ReportAccordionItem
+                          key={report.id}
+                          report={report as any}
+                          currentUserId={tenantId}
+                          currentUserRole="admin"
+                          isAdmin={true}
+                          onReportUpdate={handleReportUpdate}
+                          onReportDeleted={() => fetchInspectionsWithRelations()}
+                          onReportDuplicated={() => fetchInspectionsWithRelations()}
+                          onReportReinstated={() => fetchInspectionsWithRelations()}
+                          jobId={jobId}
+                        />
+                      ))}
 
-                        {/* Quotes */}
-                        {coreQuote && (
-                          <>
-                            <div
-                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
-                              onClick={() => toggleEditor(inspection.id, 'coreQuote')}
-                            >
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-green-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={coreQuote.status} />
-                                {coreQuote.total_amount && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${coreQuote.total_amount.toLocaleString()}
-                                  </div>
-                                )}
-                                {isEditorExpanded(inspection.id, 'coreQuote') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      {/* Quotes */}
+                      {coreQuote && (
+                        <>
+                          <div
+                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            onClick={() => toggleEditor(inspection.id, 'coreQuote')}
+                          >
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-green-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
                               </div>
                             </div>
-                            {isEditorExpanded(inspection.id, 'coreQuote') && (
-                              <div className="mt-2">
-                                <QuoteEditorClient
-                                  jobId={jobId}
-                                  quoteId={coreQuote.id}
-                                  tenantId={tenantId}
-                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
-                                  inline={true}
-                                  onQuoteUpdated={handleQuoteUpdated}
-                                />
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {tradeQuotes.map(quote => (
-                          <div key={quote.id}>
-                            <div
-                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
-                              onClick={() => toggleEditor(inspection.id, `tradeQuote-${quote.id}`)}
-                            >
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-orange-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={coreQuote.status} />
+                              {coreQuote.total_amount && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${coreQuote.total_amount.toLocaleString()}
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={quote.status} />
-                                {quote.total_amount && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${quote.total_amount.toLocaleString()}
-                                  </div>
-                                )}
-                                {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                              </div>
+                              )}
+                              {isEditorExpanded(inspection.id, 'coreQuote') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             </div>
-                            {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) && (
-                              <div className="mt-2">
-                                <QuoteEditorClient
-                                  jobId={jobId}
-                                  quoteId={quote.id}
-                                  tenantId={tenantId}
-                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
-                                  inline={true}
-                                  onQuoteUpdated={handleQuoteUpdated}
-                                />
-                              </div>
-                            )}
                           </div>
-                        ))}
-
-                        {/* Invoices */}
-                        {coreInvoice && (
-                          <>
-                            <div
-                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
-                              onClick={() => toggleEditor(inspection.id, 'coreInvoice')}
-                            >
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-purple-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={coreInvoice.status} />
-                                {coreInvoice.amount_ex_gst && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${coreInvoice.amount_ex_gst.toLocaleString()}
-                                  </div>
-                                )}
-                                {isEditorExpanded(inspection.id, 'coreInvoice') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          {isEditorExpanded(inspection.id, 'coreQuote') && (
+                            <div className="mt-2">
+                              <QuoteEditorClient
+                                jobId={jobId}
+                                quoteId={coreQuote.id}
+                                tenantId={tenantId}
+                                job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                inline={true}
+                                onQuoteUpdated={handleQuoteUpdated}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {tradeQuotes.map(quote => (
+                        <div key={quote.id}>
+                          <div
+                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            onClick={() => toggleEditor(inspection.id, `tradeQuote-${quote.id}`)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-orange-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
                               </div>
                             </div>
-                            {isEditorExpanded(inspection.id, 'coreInvoice') && (
-                              <div className="mt-2">
-                                <InvoiceEditor
-                                  jobId={jobId}
-                                  invoiceId={coreInvoice.id}
-                                  tenantId={tenantId}
-                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
-                                  onInvoiceUpdated={handleInvoiceUpdated}
-                                />
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {additionalInvoices.map(invoice => (
-                          <div key={invoice.id}>
-                            <div
-                              className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
-                              onClick={() => toggleEditor(inspection.id, `additionalInvoice-${invoice.id}`)}
-                            >
-                              <div className="flex items-center gap-3">
-                                <DollarSign size={14} className="text-purple-600" />
-                                <div>
-                                  <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
-                                  <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={quote.status} />
+                              {quote.total_amount && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${quote.total_amount.toLocaleString()}
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <StatusPill status={invoice.status} />
-                                {invoice.amount_ex_gst && (
-                                  <div className="text-[12px] font-medium text-[#3a3530]">
-                                    ${invoice.amount_ex_gst.toLocaleString()}
-                                  </div>
-                                )}
-                                {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                              </div>
+                              )}
+                              {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             </div>
-                            {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) && (
-                              <div className="mt-2">
-                                <InvoiceEditor
-                                  jobId={jobId}
-                                  invoiceId={invoice.id}
-                                  tenantId={tenantId}
-                                  job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
-                                  onInvoiceUpdated={handleInvoiceUpdated}
-                                />
-                              </div>
-                            )}
                           </div>
-                        ))}
+                          {isEditorExpanded(inspection.id, `tradeQuote-${quote.id}`) && (
+                            <div className="mt-2">
+                              <QuoteEditorClient
+                                jobId={jobId}
+                                quoteId={quote.id}
+                                tenantId={tenantId}
+                                job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                inline={true}
+                                onQuoteUpdated={handleQuoteUpdated}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
 
-                        {/* Add Item Button */}
-                        <button
-                          className="w-full px-4 py-2 border border-dashed border-[#c8b89a] rounded text-[12px] text-[#c8b89a] hover:bg-[#f9f7f5] transition-colors flex items-center justify-center gap-2"
-                          onClick={() => {
-                            // TODO: Open modal to add/link items
-                            alert('Add/link items functionality coming soon')
-                          }}
-                        >
-                          <Plus size={14} />
-                          Add or Link Item
-                        </button>
-                      </div>
-                    )}
+                      {/* Invoices */}
+                      {coreInvoice && (
+                        <>
+                          <div
+                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            onClick={() => toggleEditor(inspection.id, 'coreInvoice')}
+                          >
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-purple-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={coreInvoice.status} />
+                              {coreInvoice.amount_ex_gst && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${coreInvoice.amount_ex_gst.toLocaleString()}
+                                </div>
+                              )}
+                              {isEditorExpanded(inspection.id, 'coreInvoice') ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </div>
+                          </div>
+                          {isEditorExpanded(inspection.id, 'coreInvoice') && (
+                            <div className="mt-2">
+                              <InvoiceEditor
+                                jobId={jobId}
+                                invoiceId={coreInvoice.id}
+                                tenantId={tenantId}
+                                job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                onInvoiceUpdated={handleInvoiceUpdated}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {additionalInvoices.map(invoice => (
+                        <div key={invoice.id}>
+                          <div
+                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            onClick={() => toggleEditor(inspection.id, `additionalInvoice-${invoice.id}`)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <DollarSign size={14} className="text-purple-600" />
+                              <div>
+                                <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
+                                <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusPill status={invoice.status} />
+                              {invoice.amount_ex_gst && (
+                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                  ${invoice.amount_ex_gst.toLocaleString()}
+                                </div>
+                              )}
+                              {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </div>
+                          </div>
+                          {isEditorExpanded(inspection.id, `additionalInvoice-${invoice.id}`) && (
+                            <div className="mt-2">
+                              <InvoiceEditor
+                                jobId={jobId}
+                                invoiceId={invoice.id}
+                                tenantId={tenantId}
+                                job={{ job_number: jobNumber, insurer: null, insured_name: null, property_address: null }}
+                                onInvoiceUpdated={handleInvoiceUpdated}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add Item Button */}
+                      <button
+                        className="w-full px-4 py-2 border border-dashed border-[#c8b89a] rounded text-[12px] text-[#c8b89a] hover:bg-[#f9f7f5] transition-colors flex items-center justify-center gap-2"
+                        onClick={() => {
+                          // TODO: Open modal to add/link items
+                          alert('Add/link items functionality coming soon')
+                        }}
+                      >
+                        <Plus size={14} />
+                        Add or Link Item
+                      </button>
+                    </div>
                   </div>
 
                   {/* Compile & Submit Button */}
