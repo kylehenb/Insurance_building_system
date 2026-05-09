@@ -901,6 +901,15 @@ export type Database = {
           email_attachments?: Json | null
         }
         Update: {
+          adjuster?: string | null
+          adjuster_reference?: string | null
+          claim_description?: string | null
+          claim_number?: string | null
+          client_id?: string | null
+          contacts?: Json | null
+          created_at?: string | null
+          date_of_loss?: string | null
+          entry_method?: string | null
           excess_building?: number | null
           id?: string
           invoice_to?: string | null
