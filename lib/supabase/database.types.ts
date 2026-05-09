@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       action_queue: {
@@ -214,6 +189,59 @@ export type Database = {
           },
         ]
       }
+      auto_job_lodger_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          notification_body_template: string | null
+          notification_email: string | null
+          notification_enabled: boolean | null
+          notification_subject_review: string | null
+          notification_subject_success: string | null
+          notify_on_needs_review: boolean | null
+          notify_on_success: boolean | null
+          notify_outside_business_hours: boolean | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notification_body_template?: string | null
+          notification_email?: string | null
+          notification_enabled?: boolean | null
+          notification_subject_review?: string | null
+          notification_subject_success?: string | null
+          notify_on_needs_review?: boolean | null
+          notify_on_success?: boolean | null
+          notify_outside_business_hours?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notification_body_template?: string | null
+          notification_email?: string | null
+          notification_enabled?: boolean | null
+          notification_subject_review?: string | null
+          notification_subject_success?: string | null
+          notify_on_needs_review?: boolean | null
+          notify_on_success?: boolean | null
+          notify_outside_business_hours?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_job_lodger_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_config: {
         Row: {
           description: string | null
@@ -259,6 +287,60 @@ export type Database = {
           },
         ]
       }
+      client_email_config: {
+        Row: {
+          active: boolean | null
+          client_id: string
+          created_at: string | null
+          custom_parsing_notes: string | null
+          default_work_order_type: string | null
+          id: string
+          insurer_hint: string | null
+          sender_patterns: Json | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          client_id: string
+          created_at?: string | null
+          custom_parsing_notes?: string | null
+          default_work_order_type?: string | null
+          id?: string
+          insurer_hint?: string | null
+          sender_patterns?: Json | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          client_id?: string
+          created_at?: string | null
+          custom_parsing_notes?: string | null
+          default_work_order_type?: string | null
+          id?: string
+          insurer_hint?: string | null
+          sender_patterns?: Json | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_email_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_email_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           abn: string | null
@@ -275,6 +357,8 @@ export type Database = {
           kpi_contact_hours: number | null
           kpi_report_days: number | null
           kpi_visit_days: number | null
+          leak_detection_report_amount: number | null
+          make_safe_amount: number | null
           name: string
           notes: string | null
           parent_id: string | null
@@ -301,6 +385,8 @@ export type Database = {
           kpi_contact_hours?: number | null
           kpi_report_days?: number | null
           kpi_visit_days?: number | null
+          leak_detection_report_amount?: number | null
+          make_safe_amount?: number | null
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -327,6 +413,8 @@ export type Database = {
           kpi_contact_hours?: number | null
           kpi_report_days?: number | null
           kpi_visit_days?: number | null
+          leak_detection_report_amount?: number | null
+          make_safe_amount?: number | null
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -360,6 +448,7 @@ export type Database = {
           action_queue_id: string | null
           ai_extracted_notes: string | null
           attachments: Json | null
+          body_text: string | null
           contact_detail: string | null
           contact_name: string | null
           contact_type: string | null
@@ -367,15 +456,20 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           direction: string | null
+          from_email: string | null
           id: string
           inspection_id: string | null
+          insurer_order_id: string | null
           job_id: string | null
           linked_to: string | null
           parse_confidence: string | null
           persona: string | null
           requires_action: boolean | null
+          source: string | null
           subject: string | null
           tenant_id: string
+          thread_id: string | null
+          to_email: string | null
           type: string
           work_order_id: string | null
         }
@@ -383,6 +477,7 @@ export type Database = {
           action_queue_id?: string | null
           ai_extracted_notes?: string | null
           attachments?: Json | null
+          body_text?: string | null
           contact_detail?: string | null
           contact_name?: string | null
           contact_type?: string | null
@@ -390,15 +485,20 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           direction?: string | null
+          from_email?: string | null
           id?: string
           inspection_id?: string | null
+          insurer_order_id?: string | null
           job_id?: string | null
           linked_to?: string | null
           parse_confidence?: string | null
           persona?: string | null
           requires_action?: boolean | null
+          source?: string | null
           subject?: string | null
           tenant_id: string
+          thread_id?: string | null
+          to_email?: string | null
           type: string
           work_order_id?: string | null
         }
@@ -406,6 +506,7 @@ export type Database = {
           action_queue_id?: string | null
           ai_extracted_notes?: string | null
           attachments?: Json | null
+          body_text?: string | null
           contact_detail?: string | null
           contact_name?: string | null
           contact_type?: string | null
@@ -413,15 +514,20 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           direction?: string | null
+          from_email?: string | null
           id?: string
           inspection_id?: string | null
+          insurer_order_id?: string | null
           job_id?: string | null
           linked_to?: string | null
           parse_confidence?: string | null
           persona?: string | null
           requires_action?: boolean | null
+          source?: string | null
           subject?: string | null
           tenant_id?: string
+          thread_id?: string | null
+          to_email?: string | null
           type?: string
           work_order_id?: string | null
         }
@@ -445,6 +551,13 @@ export type Database = {
             columns: ["inspection_id"]
             isOneToOne: false
             referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communications_insurer_order_id_fkey"
+            columns: ["insurer_order_id"]
+            isOneToOne: false
+            referencedRelation: "insurer_orders"
             referencedColumns: ["id"]
           },
           {
@@ -473,6 +586,38 @@ export type Database = {
             columns: ["work_order_id"]
             isOneToOne: false
             referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_keyword_rules: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          keyword: string
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          keyword: string
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          keyword?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_keyword_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -524,6 +669,38 @@ export type Database = {
           },
           {
             foreignKeyName: "email_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_sync_state: {
+        Row: {
+          email_address: string
+          id: string
+          last_history_id: string
+          last_synced_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          email_address: string
+          id?: string
+          last_history_id: string
+          last_synced_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          email_address?: string
+          id?: string
+          last_history_id?: string
+          last_synced_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_sync_state_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -696,7 +873,9 @@ export type Database = {
           booking_confirmed_at: string | null
           calendar_event_id: string | null
           created_at: string | null
+          duration_minutes: number | null
           field_draft: Json | null
+          finish_time: string | null
           form_submitted_at: string | null
           id: string
           inspection_ref: string | null
@@ -714,11 +893,11 @@ export type Database = {
           report_status: string | null
           safety_confirmed_at: string | null
           scheduled_date: string | null
-          scheduled_time: string | null
           scheduling_sms_response: string | null
           scheduling_sms_sent_at: string | null
           scope_status: string | null
           send_checklist: Json | null
+          start_time: string | null
           status: string | null
           tenant_id: string
         }
@@ -727,7 +906,9 @@ export type Database = {
           booking_confirmed_at?: string | null
           calendar_event_id?: string | null
           created_at?: string | null
+          duration_minutes?: number | null
           field_draft?: Json | null
+          finish_time?: string | null
           form_submitted_at?: string | null
           id?: string
           inspection_ref?: string | null
@@ -745,11 +926,11 @@ export type Database = {
           report_status?: string | null
           safety_confirmed_at?: string | null
           scheduled_date?: string | null
-          scheduled_time?: string | null
           scheduling_sms_response?: string | null
           scheduling_sms_sent_at?: string | null
           scope_status?: string | null
           send_checklist?: Json | null
+          start_time?: string | null
           status?: string | null
           tenant_id: string
         }
@@ -758,7 +939,9 @@ export type Database = {
           booking_confirmed_at?: string | null
           calendar_event_id?: string | null
           created_at?: string | null
+          duration_minutes?: number | null
           field_draft?: Json | null
+          finish_time?: string | null
           form_submitted_at?: string | null
           id?: string
           inspection_ref?: string | null
@@ -776,11 +959,11 @@ export type Database = {
           report_status?: string | null
           safety_confirmed_at?: string | null
           scheduled_date?: string | null
-          scheduled_time?: string | null
           scheduling_sms_response?: string | null
           scheduling_sms_sent_at?: string | null
           scope_status?: string | null
           send_checklist?: Json | null
+          start_time?: string | null
           status?: string | null
           tenant_id?: string
         }
@@ -839,14 +1022,15 @@ export type Database = {
           contacts: Json | null
           created_at: string | null
           date_of_loss: string | null
+          email_attachments: Json | null
           entry_method: string | null
           excess_building: number | null
           id: string
-          invoice_to: string | null
           insured_email: string | null
           insured_name: string | null
           insured_phone: string | null
           insurer: string | null
+          invoice_to: string | null
           is_make_safe: boolean | null
           job_id: string | null
           loss_type: string | null
@@ -859,11 +1043,10 @@ export type Database = {
           raw_email_body: string | null
           raw_email_link: string | null
           special_instructions: string | null
+          status: string | null
           sum_insured_building: number | null
           tenant_id: string
           wo_type: string | null
-          status: string | null
-          email_attachments: Json | null
         }
         Insert: {
           adjuster?: string | null
@@ -874,14 +1057,15 @@ export type Database = {
           contacts?: Json | null
           created_at?: string | null
           date_of_loss?: string | null
+          email_attachments?: Json | null
           entry_method?: string | null
           excess_building?: number | null
           id?: string
-          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
           insurer?: string | null
+          invoice_to?: string | null
           is_make_safe?: boolean | null
           job_id?: string | null
           loss_type?: string | null
@@ -891,14 +1075,13 @@ export type Database = {
           order_sender_name?: string | null
           parse_status?: string | null
           property_address?: string | null
-          raw_email_link?: string | null
           raw_email_body?: string | null
+          raw_email_link?: string | null
           special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null
           tenant_id: string
           wo_type?: string | null
-          email_attachments?: Json | null
         }
         Update: {
           adjuster?: string | null
@@ -909,14 +1092,15 @@ export type Database = {
           contacts?: Json | null
           created_at?: string | null
           date_of_loss?: string | null
+          email_attachments?: Json | null
           entry_method?: string | null
           excess_building?: number | null
           id?: string
-          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
           insurer?: string | null
+          invoice_to?: string | null
           is_make_safe?: boolean | null
           job_id?: string | null
           loss_type?: string | null
@@ -926,16 +1110,15 @@ export type Database = {
           order_sender_name?: string | null
           parse_status?: string | null
           property_address?: string | null
-          raw_email_link?: string | null
           raw_email_body?: string | null
+          raw_email_link?: string | null
           special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null
           tenant_id?: string
           wo_type?: string | null
-          email_attachments?: Json | null
         }
-          Relationships: [
+        Relationships: [
           {
             foreignKeyName: "insurer_orders_client_id_fkey"
             columns: ["client_id"]
@@ -1010,6 +1193,47 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_line_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_templates: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          template_code: string
+          template_name: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          template_code: string
+          template_name: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          template_code?: string
+          template_name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1427,11 +1651,11 @@ export type Database = {
           homeowner_signoff_received_at: string | null
           homeowner_signoff_sent_at: string | null
           id: string
-          invoice_to: string | null
           insured_email: string | null
           insured_name: string | null
           insured_phone: string | null
           insurer: string | null
+          invoice_to: string | null
           job_number: string
           kpi_booked_at: string | null
           kpi_booking_due: string | null
@@ -1474,11 +1698,11 @@ export type Database = {
           homeowner_signoff_received_at?: string | null
           homeowner_signoff_sent_at?: string | null
           id?: string
-          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
           insurer?: string | null
+          invoice_to?: string | null
           job_number: string
           kpi_booked_at?: string | null
           kpi_booking_due?: string | null
@@ -1521,11 +1745,11 @@ export type Database = {
           homeowner_signoff_received_at?: string | null
           homeowner_signoff_sent_at?: string | null
           id?: string
-          invoice_to?: string | null
           insured_email?: string | null
           insured_name?: string | null
           insured_phone?: string | null
           insurer?: string | null
+          invoice_to?: string | null
           job_number?: string
           kpi_booked_at?: string | null
           kpi_booking_due?: string | null
@@ -1701,6 +1925,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      processed_gmail_messages: {
+        Row: {
+          message_id: string
+          processed_at: string
+        }
+        Insert: {
+          message_id: string
+          processed_at?: string
+        }
+        Update: {
+          message_id?: string
+          processed_at?: string
+        }
+        Relationships: []
       }
       prompts: {
         Row: {
@@ -2063,6 +2302,7 @@ export type Database = {
       }
       reports: {
         Row: {
+          additional_notes: string | null
           assessor_name: string | null
           attendance_date: string | null
           attendance_time: string | null
@@ -2100,9 +2340,9 @@ export type Database = {
           tenant_id: string
           type_specific_fields: Json | null
           version: number | null
-          additional_notes: string | null
         }
         Insert: {
+          additional_notes?: string | null
           assessor_name?: string | null
           attendance_date?: string | null
           attendance_time?: string | null
@@ -2140,9 +2380,9 @@ export type Database = {
           tenant_id: string
           type_specific_fields?: Json | null
           version?: number | null
-          additional_notes?: string | null
         }
         Update: {
+          additional_notes?: string | null
           assessor_name?: string | null
           attendance_date?: string | null
           attendance_time?: string | null
@@ -2180,7 +2420,6 @@ export type Database = {
           tenant_id?: string
           type_specific_fields?: Json | null
           version?: number | null
-          additional_notes?: string | null
         }
         Relationships: [
           {
@@ -2585,7 +2824,9 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string | null
+          excess_payment_terms: number | null
           id: string
+          invoice_payment_terms: number | null
           job_prefix: string
           job_sequence: number | null
           logo_storage_path: string | null
@@ -2608,7 +2849,9 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          excess_payment_terms?: number | null
           id?: string
+          invoice_payment_terms?: number | null
           job_prefix: string
           job_sequence?: number | null
           logo_storage_path?: string | null
@@ -2631,7 +2874,9 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          excess_payment_terms?: number | null
           id?: string
+          invoice_payment_terms?: number | null
           job_prefix?: string
           job_sequence?: number | null
           logo_storage_path?: string | null
@@ -3311,9 +3556,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

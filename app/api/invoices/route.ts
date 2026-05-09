@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   let processedLineItems = lineItems
   if (templateCode && !lineItems) {
     // Fetch template
-    const { data: template, error: templateError } = await (supabase as any)
+    const { data: template, error: templateError } = await supabase
       .from('invoice_templates')
       .select('*')
       .eq('tenant_id', tenantId)

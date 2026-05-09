@@ -100,7 +100,7 @@ export default function ClientsPage() {
     make_safe_amount: null,
     travel_allowance_outside_service_area: null,
     builders_margin_pct: null,
-  });
+  } as any);
 
   // Sort state
   const [sortColumn, setSortColumn] = useState<string>('name');
@@ -345,7 +345,7 @@ export default function ClientsPage() {
       make_safe_amount: null,
       travel_allowance_outside_service_area: null,
       builders_margin_pct: null,
-    });
+    } as any);
     setActiveModalTab('basic');
     setShowModal(true);
   };

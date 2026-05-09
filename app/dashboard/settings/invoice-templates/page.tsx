@@ -17,8 +17,8 @@ interface InvoiceTemplate {
   template_name: string
   description: string
   notes: string | null
-  is_active: boolean
-  created_at: string
+  is_active: boolean | null
+  created_at: string | null
 }
 
 const TEMPLATE_CODE_DISPLAY: Record<string, string> = {
@@ -79,7 +79,7 @@ export default function InvoiceTemplatesSettingsPage() {
       if (!profile) return
       setTenantId(profile.tenant_id)
 
-      const { data: templatesData, error } = await (supabase as any)
+      const { data: templatesData, error } = await supabase
         .from('invoice_templates')
         .select('*')
         .eq('tenant_id', profile.tenant_id)
@@ -132,7 +132,7 @@ export default function InvoiceTemplatesSettingsPage() {
     }))
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('invoice_templates')
         .update({
           description: editState.description,
