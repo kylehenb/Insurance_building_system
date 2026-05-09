@@ -862,6 +862,7 @@ export type Database = {
           sum_insured_building: number | null
           tenant_id: string
           wo_type: string | null
+          status: string | null
           email_attachments: Json | null
         }
         Insert: {
@@ -891,22 +892,15 @@ export type Database = {
           parse_status?: string | null
           property_address?: string | null
           raw_email_link?: string | null
-          raw_email_body?: string | null          special_instructions?: string | null
+          raw_email_body?: string | null
+          special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null
           tenant_id: string
           wo_type?: string | null
+          email_attachments?: Json | null
         }
-          email_attachments?: Json | null        Update: {
-          adjuster?: string | null
-          adjuster_reference?: string | null
-          claim_description?: string | null
-          claim_number?: string | null
-          client_id?: string | null
-          contacts?: Json | null
-          created_at?: string | null
-          date_of_loss?: string | null
-          entry_method?: string | null
+        Update: {
           excess_building?: number | null
           id?: string
           invoice_to?: string | null
@@ -924,13 +918,15 @@ export type Database = {
           parse_status?: string | null
           property_address?: string | null
           raw_email_link?: string | null
-          raw_email_body?: string | null          special_instructions?: string | null
+          raw_email_body?: string | null
+          special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null
           tenant_id?: string
           wo_type?: string | null
+          email_attachments?: Json | null
         }
-          email_attachments?: Json | null        Relationships: [
+          Relationships: [
           {
             foreignKeyName: "insurer_orders_client_id_fkey"
             columns: ["client_id"]
