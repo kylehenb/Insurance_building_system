@@ -465,7 +465,7 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           />
         </div>
         <div>
-          <FieldLabel label="Claim Damage Caused by Roof Maintenance Issues or Roof Defects?" />
+          <FieldLabel label="Roof Maintenance Issues or Roof Cover Defects contributing to claim damage" />
           <InlineTextarea
             value={tsf('damage_caused_by_maintenance')}
             onChange={v => onTsf('damage_caused_by_maintenance', v)}
@@ -485,7 +485,7 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           />
         </div>
         <div>
-          <FieldLabel label="Non Claim Related Roof Maintenance Issues or Defects (that have potential for future damage)" />
+          <FieldLabel label="Non claim related roof comments" />
           <InlineTextarea
             value={tsf('non_claim_maintenance_issues')}
             onChange={v => onTsf('non_claim_maintenance_issues', v)}

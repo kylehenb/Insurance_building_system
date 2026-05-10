@@ -113,9 +113,9 @@ const ROOF_TEMPLATE = {
   ] as const,
 
   maintenance_fields: [
-    { label: 'Claim damage caused by roof maintenance issues or roof defects?:', field: 'damage_caused_by_maintenance' },
+    { label: 'Roof Maintenance Issues or Roof Cover Defects contributing to claim damage:', field: 'damage_caused_by_maintenance' },
     { label: 'Would the insured have been reasonably aware of the property conditions leading to the claim?:', field: 'insured_aware_of_conditions' },
-    { label: 'Non claim related roof maintenance issues or defects:', field: 'non_claim_maintenance_issues' },
+    { label: 'Non claim related roof comments:', field: 'non_claim_maintenance_issues' },
     { label: 'Maintenance or defects repairs required (insured responsibility):', field: 'maintenance_repairs_required' },
   ] as const,
 
