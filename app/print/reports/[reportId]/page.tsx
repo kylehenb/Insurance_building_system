@@ -129,6 +129,33 @@ const ROOF_TEMPLATE = {
   ] as const,
 }
 
+const MAKE_SAFE_TEMPLATE = {
+  // Make Safe Report specific fields
+  attendance_fields: [
+    { label: 'Date attended:', field: 'attendance_date' },
+    { label: 'Time attended:', field: 'attendance_time' },
+    { label: 'Conducted by:', field: 'assessor_name' },
+  ] as const,
+
+  hazards_fields: [
+    { label: 'Immediate hazards identified:', field: 'immediate_hazards' },
+  ] as const,
+
+  works_fields: [
+    { label: 'Make safe works carried out:', field: 'works_carried_out' },
+    { label: 'Further works required:', field: 'further_works_required' },
+  ] as const,
+
+  property_status_fields: [
+    { label: 'Safe to occupy:', field: 'safe_to_occupy' },
+    { label: 'Occupancy conditions (if conditional):', field: 'occupancy_conditions' },
+  ] as const,
+
+  narrative_sections: [
+    'conclusion',
+  ] as const,
+}
+
 function tsf(report: Report, key: string): string {
   const fields = report.type_specific_fields as Record<string, unknown> | null
   if (!fields) return '—'
@@ -355,15 +382,16 @@ export default async function ReportPrintPage({
   // LDR uses a slightly different color scheme for visual distinction
   const isLDR = report.report_type === 'LDR'
   const isRoof = report.report_type === 'roof'
+  const isMakeSafe = report.report_type === 'make_safe'
 
   // TD cell base style (3-column layout with label + value in same cell)
   const tdBase: React.CSSProperties = {
     padding: '8px 12px',
-    borderBottom: isLDR ? '1px solid #e0ecee' : (isRoof ? '1px solid #e0dcd4' : '1px solid #f0ece6'),
+    borderBottom: isLDR ? '1px solid #e0ecee' : (isRoof ? '1px solid #e0dcd4' : (isMakeSafe ? '1px solid #e8dcd0' : '1px solid #f0ece6')),
     verticalAlign: 'top',
     width: '33.33%',
   }
-  
+
   const tdCell: React.CSSProperties = {
     ...tdBase,
   }
@@ -374,7 +402,7 @@ export default async function ReportPrintPage({
     flexWrap: 'wrap' as const,
   }
   const labelStyle: React.CSSProperties = {
-    color: isLDR ? '#5a7a8a' : (isRoof ? '#7a7a7a' : '#6a6460'),
+    color: isLDR ? '#5a7a8a' : (isRoof ? '#7a7a7a' : (isMakeSafe ? '#8a6a4a' : '#6a6460')),
     fontSize: '9px',
     fontWeight: '700',
     letterSpacing: '0.5px',
@@ -383,14 +411,14 @@ export default async function ReportPrintPage({
     flexShrink: 0,
   }
   const valueStyle: React.CSSProperties = {
-    color: isLDR ? '#1a2a3a' : (isRoof ? '#1a1a1a' : '#1a1a1a'),
+    color: isLDR ? '#1a2a3a' : (isRoof ? '#1a1a1a' : (isMakeSafe ? '#1a1a1a' : '#1a1a1a')),
     fontSize: '11px',
     fontWeight: '500',
   }
   const dividerStyle: React.CSSProperties = {
-    backgroundColor: isLDR ? '#e8eef2' : (isRoof ? '#f5f0e8' : '#f5f2ee'),
-    color: isLDR ? '#4a6a7a' : (isRoof ? '#1a1a1a' : '#7a746e'),
-    borderBottom: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #e0dcd4' : '1px solid #e0dbd4'),
+    backgroundColor: isLDR ? '#e8eef2' : (isRoof ? '#f5f0e8' : (isMakeSafe ? '#faf5f0' : '#f5f2ee')),
+    color: isLDR ? '#4a6a7a' : (isRoof ? '#1a1a1a' : (isMakeSafe ? '#6a5a4a' : '#7a746e')),
+    borderBottom: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #e0dcd4' : (isMakeSafe ? '1px solid #e8dcd0' : '1px solid #e0dbd4')),
   }
 
   const dividerRow = (label: string, sectionNum?: number) => (
@@ -399,7 +427,7 @@ export default async function ReportPrintPage({
         colSpan={3}
         style={{
           padding: '4px 10px',
-          fontSize: isRoof ? '12px' : '8px',
+          fontSize: isRoof || isMakeSafe ? '12px' : '8px',
           letterSpacing: '1.2px',
           textTransform: 'uppercase',
           fontWeight: '800',
@@ -411,8 +439,8 @@ export default async function ReportPrintPage({
             <span style={{
               width: '16px',
               height: '16px',
-              border: `1px solid ${isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : '#1a1a1a')}`,
-              color: isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : '#1a1a1a'),
+              border: `1px solid ${isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : (isMakeSafe ? '#6a5a4a' : '#1a1a1a'))}`,
+              color: isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : (isMakeSafe ? '#6a5a4a' : '#1a1a1a')),
               fontSize: '8px',
               fontWeight: '700',
               borderRadius: '50%',
@@ -423,7 +451,7 @@ export default async function ReportPrintPage({
             }}>
               {sectionNum}
             </span>
-            <span style={{ color: isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : undefined) }}>{label}</span>
+            <span style={{ color: isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : (isMakeSafe ? '#6a5a4a' : undefined)) }}>{label}</span>
           </span>
         ) : label}
       </td>
@@ -494,8 +522,8 @@ export default async function ReportPrintPage({
 
         {/* Form band */}
         <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
-          <span style={{ fontSize: '28px', fontWeight: '700', color: isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : '#9e998f'), textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
-            {isLDR ? 'Leak Detection Report' : (isRoof ? 'Roof Report' : 'Building Assessment Report')}
+          <span style={{ fontSize: '28px', fontWeight: '700', color: isLDR ? '#0d2a3d' : (isRoof ? '#1a1a1a' : (isMakeSafe ? '#6a5a4a' : '#9e998f')), textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
+            {isLDR ? 'Leak Detection Report' : (isRoof ? 'Roof Report' : (isMakeSafe ? 'Make Safe Report' : 'Building Assessment Report'))}
           </span>
         </div>
 
@@ -503,7 +531,7 @@ export default async function ReportPrintPage({
         <div style={{ padding: '0 20px' }}>
 
           {/* Metadata table - 3-column layout */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #e0dcd4' : '1px solid #e0dbd4'), borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #e0dcd4' : (isMakeSafe ? '1px solid #e8dcd0' : '1px solid #e0dbd4')), borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
             <tbody>
               {/* Block 1 — Roof Report Details (Roof only) */}
               {isRoof && (
@@ -538,6 +566,33 @@ export default async function ReportPrintPage({
                     </td>
                     <td style={tdCellLast}></td>
                     <td style={tdCellLast}></td>
+                  </tr>
+                </>
+              )}
+
+              {/* Block 1 — Make Safe Attendance (Make Safe only) */}
+              {isMakeSafe && (
+                <>
+                  {dividerRow('Attendance Details')}
+                  <tr>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Date attended:</span>
+                        <span style={valueStyle}>{formatDate(report.attendance_date)}</span>
+                      </div>
+                    </td>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Time attended:</span>
+                        <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
+                      </div>
+                    </td>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Conducted by:</span>
+                        <span style={valueStyle}>{String(report.assessor_name ?? '—')}</span>
+                      </div>
+                    </td>
                   </tr>
                 </>
               )}
@@ -639,8 +694,65 @@ export default async function ReportPrintPage({
                 </>
               )}
 
+              {/* Block 2 — Hazards (Make Safe only) */}
+              {isMakeSafe && (
+                <>
+                  {dividerRow('Hazards Identified')}
+                  <tr>
+                    <td style={tdCellLast} colSpan={3}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Immediate hazards identified:</span>
+                        <span style={valueStyle}>{tsf(report, 'immediate_hazards') || '—'}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {/* Block 3 — Works (Make Safe only) */}
+              {isMakeSafe && (
+                <>
+                  {dividerRow('Works Carried Out')}
+                  <tr>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Make safe works carried out:</span>
+                        <span style={valueStyle}>{tsf(report, 'works_carried_out') || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={tdCellLast} colSpan={2}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Further works required:</span>
+                        <span style={valueStyle}>{tsf(report, 'further_works_required') || '—'}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {/* Block 4 — Property Status (Make Safe only) */}
+              {isMakeSafe && (
+                <>
+                  {dividerRow('Property Status')}
+                  <tr>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Safe to occupy:</span>
+                        <span style={valueStyle}>{tsf(report, 'safe_to_occupy') || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={tdCellLast} colSpan={2}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Occupancy conditions (if conditional):</span>
+                        <span style={valueStyle}>{tsf(report, 'occupancy_conditions') || '—'}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+
               {/* Block 2 — Property details (conditional, BAR only) */}
-              {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && report.report_type !== 'roof' && (
+              {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && report.report_type !== 'roof' && report.report_type !== 'make_safe' && (
                 <>
                   {dividerRow('Property details')}
                   {(() => {
@@ -946,6 +1058,63 @@ export default async function ReportPrintPage({
                   )
                 }
               }
+            } else if (isMakeSafe) {
+              // Make Safe narrative sections - rendered with warm amber color scheme
+              const makeSafeSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
+                ...MAKE_SAFE_TEMPLATE.hazards_fields.map(f => ({
+                  key: f.field,
+                  title: f.label.replace(':', ''),
+                  renderBody: () => (
+                    <div style={{ background: '#ffffff', border: '1px solid #e8dcd0', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a1a1a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
+                    </div>
+                  ),
+                })),
+                ...MAKE_SAFE_TEMPLATE.works_fields.map(f => ({
+                  key: f.field,
+                  title: f.label.replace(':', ''),
+                  renderBody: () => (
+                    <div style={{ background: '#ffffff', border: '1px solid #e8dcd0', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a1a1a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
+                    </div>
+                  ),
+                })),
+                ...MAKE_SAFE_TEMPLATE.property_status_fields.map(f => ({
+                  key: f.field,
+                  title: f.label.replace(':', ''),
+                  renderBody: () => (
+                    <div style={{ background: '#ffffff', border: '1px solid #e8dcd0', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a1a1a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
+                    </div>
+                  ),
+                })),
+                {
+                  key: 'conclusion',
+                  title: 'Conclusion',
+                  renderBody: () => (
+                    <div style={{ background: '#ffffff', border: '1px solid #e8dcd0', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#1a1a1a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(report.conclusion)}
+                    </div>
+                  ),
+                },
+              ]
+
+              for (const section of makeSafeSections) {
+                const num = getNextSectionNum()
+                nodes.push(
+                  <div key={section.key} style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                      <div style={{ width: '20px', height: '20px', border: '1.5px solid #6a5a4a', color: '#6a5a4a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {num}
+                      </div>
+                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#6a5a4a', fontWeight: '800' }}>
+                        {section.title}
+                      </div>
+                    </div>
+                    {section.renderBody()}
+                  </div>
+                )
+              }
             } else if (isLDR) {
               // LDR narrative sections - sections 4-8, all rendered with consistent styling
               const ldrSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
@@ -1079,7 +1248,7 @@ export default async function ReportPrintPage({
         <div style={{ paddingBottom: '60px' }} />
 
         {/* Quote Section (BAR only) */}
-        {report.report_type !== 'LDR' && report.report_type !== 'roof' && (
+        {report.report_type !== 'LDR' && report.report_type !== 'roof' && report.report_type !== 'make_safe' && (
           <div style={{ marginTop: '24px', marginBottom: '16px' }}>
             <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
               QUOTE
