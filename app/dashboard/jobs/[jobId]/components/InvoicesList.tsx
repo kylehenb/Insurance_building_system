@@ -1,26 +1,20 @@
 'use client'
 
 import React, { useCallback, useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { InvoiceEditor } from './InvoiceEditor'
+import type { JobContext } from './InvoicesTab'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface JobInfo {
-  job_number: string
-  insurer: string | null
-  insured_name: string | null
-  property_address: string | null
-  excess: number | null
-}
 
 interface InvoiceLineItem {
   id: string
   description: string
   quantity: number
+  unit: string | null
   unit_price: number
   line_total: number
-  sort_order: number
+  sort_order: number | null
 }
 
 interface InvoiceListItem {
@@ -28,7 +22,7 @@ interface InvoiceListItem {
   invoice_ref: string | null
   invoice_type: string
   direction: string
-  status: string
+  status: string | null
   amount_ex_gst: number | null
   gst: number | null
   amount_inc_gst: number | null
@@ -39,22 +33,7 @@ interface InvoiceListItem {
   item_count: number
 }
 
-interface ActionConfig {
-  label: string
-  inactive?: boolean
-  action: 'send_invoice' | 'record_payment' | 'void_invoice' | 'not_yet_built' | 'inactive'
-}
-
-// ─── Status constants ─────────────────────────────────────────────────────────
-
-const STATUS_ORDER = ['draft', 'sent', 'paid', 'voided']
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  sent: 'Sent',
-  paid: 'Paid',
-  voided: 'Voided',
-}
+// ─── Constants ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   draft: { bg: '#fff8e1', text: '#b45309' },
@@ -63,14 +42,15 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   voided: { bg: '#fce8e6', text: '#c5221f' },
 }
 
-const STATUS_ACTIONS: Record<string, ActionConfig> = {
-  draft: { label: 'Send to client/insurer', action: 'send_invoice' },
-  sent: { label: 'Record payment received', action: 'record_payment' },
-  paid: { label: 'Invoice paid', action: 'inactive', inactive: true },
-  voided: { label: 'Invoice voided', action: 'inactive', inactive: true },
+const TYPE_LABELS: Record<string, string> = {
+  assessment: 'Assessment',
+  repair: 'Repair',
+  make_safe: 'Make Safe',
+  excess: 'Excess',
+  balance: 'Balance',
+  progress: 'Progress',
+  standard: 'Standard',
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(v: number) {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
@@ -81,22 +61,21 @@ function fmt(v: number) {
 interface InvoicesListProps {
   jobId: string
   tenantId: string
-  job: JobInfo
+  ctx: JobContext
   onInvoiceUpdated?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: InvoicesListProps) {
+export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: InvoicesListProps) {
+  const router = useRouter()
+  const { job, barReport, makeSafeWorkOrder, approvedQuote } = ctx
+
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [createDropdownOpen, setCreateDropdownOpen] = useState(false)
-  const createDropdownRef = useRef<HTMLDivElement>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [menuDropdownId, setMenuDropdownId] = useState<string | null>(null)
-  const [notBuiltVisible, setNotBuiltVisible] = useState(false)
-  const [notBuiltAction, setNotBuiltAction] = useState<string | null>(null)
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null)
   const initialLoadDone = useRef(false)
 
@@ -109,7 +88,8 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
       const res = await fetch(`/api/invoices?jobId=${jobId}&tenantId=${tenantId}`)
       if (res.ok) {
         const data: InvoiceListItem[] = await res.json()
-        setInvoices(data)
+        // Only show outbound invoices in this panel
+        setInvoices(data.filter(i => i.direction === 'outbound'))
       }
     } finally {
       if (isFirst) setLoading(false)
@@ -119,18 +99,7 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
 
   useEffect(() => { load() }, [load])
 
-  // ── Close dropdowns on outside click ──────────────────────────────────────
-
-  useEffect(() => {
-    if (!createDropdownOpen) return
-    const handler = (e: MouseEvent) => {
-      if (createDropdownRef.current && !createDropdownRef.current.contains(e.target as Node)) {
-        setCreateDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [createDropdownOpen])
+  // ── Close menu dropdown on outside click ──────────────────────────────────
 
   useEffect(() => {
     if (!menuDropdownId) return
@@ -143,676 +112,341 @@ export function InvoicesList({ jobId, tenantId, job, onInvoiceUpdated }: Invoice
     return () => document.removeEventListener('mousedown', handler)
   }, [menuDropdownId])
 
-  // ── Create invoice handlers ───────────────────────────────────────────────
+  // ── Running totals ────────────────────────────────────────────────────────
 
-  const handleCreateExcessInvoice = useCallback(async () => {
-    if (!job.excess) {
-      alert('This job has no excess amount configured.')
-      return
-    }
+  const activeInvoices = invoices.filter(i => i.status !== 'voided')
+  const totalInvoiced = activeInvoices.reduce((s, i) => s + (i.amount_inc_gst ?? 0), 0)
+  const approvedAmount = approvedQuote?.approved_amount ?? 0
+  const balance = approvedAmount - totalInvoiced
 
+  // ── Check which invoice types already exist ────────────────────────────────
+
+  const hasAssessment = invoices.some(i => i.invoice_type === 'assessment' && i.status !== 'voided')
+  const hasExcess = invoices.some(i => i.invoice_type === 'excess' && i.status !== 'voided')
+
+  // ── Create handlers ───────────────────────────────────────────────────────
+
+  const createInvoice = useCallback(async (type: string, extra?: Record<string, unknown>) => {
     setCreating(true)
-    setCreateDropdownOpen(false)
+    setCreateModalOpen(false)
     try {
-      const res = await fetch('/api/invoices', {
+      const res = await fetch('/api/invoices/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          tenantId,
-          invoiceType: 'excess',
-          direction: 'outbound',
-          lineItems: [
-            {
-              description: 'Payment of applicable excess as requested by your insurer.',
-              quantity: 1,
-              unit_price: job.excess,
-            },
-          ],
-        }),
+        body: JSON.stringify({ type, jobId, tenantId, ...extra }),
       })
-      if (!res.ok) throw new Error('Failed')
-      const invoice: InvoiceListItem = await res.json()
-      setInvoices(prev => [...prev, invoice])
-      setExpandedId(invoice.id)
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        alert(err.error ?? 'Failed to create invoice')
+        return
+      }
+      await load()
       onInvoiceUpdated?.()
     } catch {
       alert('Failed to create invoice. Please try again.')
     } finally {
       setCreating(false)
     }
-  }, [jobId, tenantId, job.excess, onInvoiceUpdated])
+  }, [jobId, tenantId, load, onInvoiceUpdated])
 
-  const handleCreateProgressInvoice = useCallback(async () => {
-    setCreating(true)
-    setCreateDropdownOpen(false)
+  // ── Status change handler ─────────────────────────────────────────────────
+
+  const handleStatusChange = useCallback(async (invoiceId: string, newStatus: string) => {
+    setStatusChangingId(invoiceId)
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          tenantId,
-          invoiceType: 'progress',
-          direction: 'outbound',
-          lineItems: [],
-        }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      const invoice: InvoiceListItem = await res.json()
-      setInvoices(prev => [...prev, invoice])
-      setExpandedId(invoice.id)
-      onInvoiceUpdated?.()
-    } catch {
-      alert('Failed to create invoice. Please try again.')
-    } finally {
-      setCreating(false)
-    }
-  }, [jobId, tenantId, onInvoiceUpdated])
-
-  const handleCreateBalanceInvoice = useCallback(async () => {
-    setCreating(true)
-    setCreateDropdownOpen(false)
-    try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          tenantId,
-          invoiceType: 'balance',
-          direction: 'outbound',
-          lineItems: [],
-        }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      const invoice: InvoiceListItem = await res.json()
-      setInvoices(prev => [...prev, invoice])
-      setExpandedId(invoice.id)
-      onInvoiceUpdated?.()
-    } catch {
-      alert('Failed to create invoice. Please try again.')
-    } finally {
-      setCreating(false)
-    }
-  }, [jobId, tenantId, onInvoiceUpdated])
-
-  const handleCreateStandardInvoice = useCallback(async () => {
-    setCreating(true)
-    setCreateDropdownOpen(false)
-    try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          tenantId,
-          invoiceType: 'standard',
-          direction: 'outbound',
-          lineItems: [],
-        }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      const invoice: InvoiceListItem = await res.json()
-      setInvoices(prev => [...prev, invoice])
-      setExpandedId(invoice.id)
-      onInvoiceUpdated?.()
-    } catch {
-      alert('Failed to create invoice. Please try again.')
-    } finally {
-      setCreating(false)
-    }
-  }, [jobId, tenantId, onInvoiceUpdated])
-
-  // ── Delete handler ───────────────────────────────────────────────────────
-
-  const handleDelete = useCallback(
-    async (invoiceId: string, invoiceRef: string | null) => {
-      if (!window.confirm(`Delete invoice ${invoiceRef ?? 'this invoice'}? This cannot be undone.`)) return
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
-      const { error } = await supabase
+      await supabase
         .from('invoices')
-        .delete()
+        .update({ status: newStatus })
         .eq('id', invoiceId)
         .eq('tenant_id', tenantId)
-      if (error) {
-        alert('Failed to delete invoice')
-        return
-      }
-      setInvoices(prev => prev.filter(i => i.id !== invoiceId))
-      if (expandedId === invoiceId) setExpandedId(null)
-      onInvoiceUpdated?.()
-    },
-    [tenantId, expandedId, onInvoiceUpdated]
-  )
-
-  // ── Status change handler ─────────────────────────────────────────────────
-
-  const handleStatusChange = useCallback(
-    async (invoiceId: string, newStatus: string) => {
-      setStatusChangingId(invoiceId)
-      try {
-        const supabase = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
-        const { error } = await supabase
-          .from('invoices')
-          .update({ status: newStatus })
-          .eq('id', invoiceId)
-          .eq('tenant_id', tenantId)
-        if (error) {
-          alert('Failed to update invoice status')
-          return
-        }
-        load()
-      } finally {
-        setStatusChangingId(null)
-      }
-    },
-    [tenantId, load]
-  )
-
-  // ── Action button handler ─────────────────────────────────────────────────
-
-  const handleAction = useCallback(
-    (invoice: InvoiceListItem, cfg: ActionConfig) => {
-      switch (cfg.action) {
-        case 'inactive':
-          return
-        case 'send_invoice':
-          setNotBuiltAction('send_invoice')
-          setNotBuiltVisible(true)
-          break
-        case 'record_payment':
-          setNotBuiltAction('record_payment')
-          setNotBuiltVisible(true)
-          break
-        case 'void_invoice':
-          setNotBuiltAction('void_invoice')
-          setNotBuiltVisible(true)
-          break
-        default:
-          setNotBuiltVisible(true)
-      }
-    },
-    []
-  )
-
-  // ── Confirm not-yet-built action ─────────────────────────────────────────
-
-  const handleConfirmNotBuilt = useCallback(() => {
-    if (!notBuiltAction) return
-
-    // Determine next status based on action
-    let nextStatus = 'draft'
-    if (notBuiltAction === 'send_invoice') {
-      nextStatus = 'sent'
-    } else if (notBuiltAction === 'record_payment') {
-      nextStatus = 'paid'
-    } else if (notBuiltAction === 'void_invoice') {
-      nextStatus = 'voided'
+      load()
+    } finally {
+      setStatusChangingId(null)
     }
+  }, [tenantId, load])
 
-    // Find the invoice that triggered this action
-    const invoice = invoices.find(i => i.id === statusChangingId)
-    if (invoice) {
-      handleStatusChange(invoice.id, nextStatus)
-    }
+  // ── Delete handler (hard delete for draft invoices) ───────────────────────
 
-    setNotBuiltVisible(false)
-    setNotBuiltAction(null)
-  }, [notBuiltAction, statusChangingId, invoices, handleStatusChange])
-
-  // ── Loading state ─────────────────────────────────────────────────────────
+  const handleDelete = useCallback(async (invoiceId: string, invoiceRef: string | null) => {
+    if (!window.confirm(`Delete invoice ${invoiceRef ?? 'this invoice'}? This cannot be undone.`)) return
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    await supabase.from('invoices').delete().eq('id', invoiceId).eq('tenant_id', tenantId)
+    setInvoices(prev => prev.filter(i => i.id !== invoiceId))
+    onInvoiceUpdated?.()
+  }, [tenantId, onInvoiceUpdated])
 
   if (loading) {
     return (
-      <div
-        style={{
-          padding: '32px 0',
-          textAlign: 'center',
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: 13,
-          color: '#9e998f',
-        }}
-      >
+      <div style={{ padding: '32px 0', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
         Loading…
       </div>
     )
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      {/* "Not yet built" modal */}
-      {notBuiltVisible && (
+      {/* Create Invoice Modal */}
+      {createModalOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.42)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9000,
-          }}
-          onClick={() => setNotBuiltVisible(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.42)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
+          onClick={() => setCreateModalOpen(false)}
         >
           <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 12,
-              padding: '32px 36px',
-              maxWidth: 480,
-              width: '90%',
-              textAlign: 'center',
-              fontFamily: 'DM Sans, sans-serif',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            }}
+            style={{ background: '#fff', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', fontFamily: 'DM Sans, sans-serif', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 34, marginBottom: 12 }}>🚧</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
-              Not yet built
-            </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
-              {notBuiltAction === 'pdf_preview' && 'PDF Preview will generate a downloadable PDF of this invoice.'}
-              {notBuiltAction === 'send_invoice' && 'Sending invoice will email the invoice to the client/insurer.'}
-              {notBuiltAction === 'record_payment' && 'Recording payment will mark the invoice as paid and update payment date.'}
-              {notBuiltAction === 'void_invoice' && 'Voiding will cancel this invoice and remove it from outstanding balances.'}
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530', marginBottom: 20 }}>Create Invoice</div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Assessment */}
               <button
-                onClick={() => setNotBuiltVisible(false)}
+                disabled={!barReport || hasAssessment}
+                onClick={() => createInvoice('assessment', { reportId: barReport?.id })}
                 style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #e0dbd4',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: (!barReport || hasAssessment) ? '#f5f2ee' : '#fff',
+                  cursor: (!barReport || hasAssessment) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                Cancel
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!barReport || hasAssessment) ? '#9e998f' : '#3a3530' }}>
+                  Assessment (BAR)
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!barReport ? 'No BAR report exists for this job' : hasAssessment ? 'Assessment invoice already exists' : 'Single charge from rate config'}
+                </div>
               </button>
+
+              {/* Make Safe */}
               <button
-                onClick={handleConfirmNotBuilt}
+                disabled={!makeSafeWorkOrder}
+                onClick={() => {
+                  if (!makeSafeWorkOrder) return
+                  // Make safe needs line items — navigate to generate with empty lines
+                  // For now, create with a placeholder line so user can edit
+                  createInvoice('make_safe', {
+                    workOrderId: makeSafeWorkOrder.id,
+                    lineItems: [{ description: 'Make safe works', quantity: 1, unitPrice: 0 }],
+                  })
+                }}
                 style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#3a3530',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: !makeSafeWorkOrder ? '#f5f2ee' : '#fff',
+                  cursor: !makeSafeWorkOrder ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                Confirm
+                <div style={{ fontSize: 13, fontWeight: 500, color: !makeSafeWorkOrder ? '#9e998f' : '#3a3530' }}>
+                  Make Safe
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!makeSafeWorkOrder ? 'No make safe work order on this job' : 'Opens with editable line items'}
+                </div>
+              </button>
+
+              {/* Excess */}
+              <button
+                disabled={!job.excess || hasExcess}
+                onClick={() => createInvoice('excess', { excessAmountIncGst: job.excess! })}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: (!job.excess || hasExcess) ? '#f5f2ee' : '#fff',
+                  cursor: (!job.excess || hasExcess) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!job.excess || hasExcess) ? '#9e998f' : '#3a3530' }}>
+                  Excess
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!job.excess ? 'No excess amount on this job' : hasExcess ? 'Excess invoice already exists' : `${fmt(job.excess)} (inc GST)`}
+                </div>
+              </button>
+
+              {/* Balance */}
+              <button
+                onClick={() => createInvoice('balance')}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: '#fff',
+                  cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Balance / Final</div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {approvedAmount > 0
+                    ? `${fmt(Math.max(0, balance))} remaining of ${fmt(approvedAmount)}`
+                    : 'No approved quote — balance will be $0.00'}
+                </div>
               </button>
             </div>
+
+            <button
+              onClick={() => setCreateModalOpen(false)}
+              style={{ marginTop: 20, fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#9e998f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {/* Header with create button */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530' }}>
-          Invoices ({invoices?.length ?? 0})
+          Invoices ({invoices.length})
         </div>
-        <div style={{ position: 'relative' }} ref={createDropdownRef}>
-          <button
-            onClick={() => setCreateDropdownOpen(!createDropdownOpen)}
-            disabled={creating}
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 13,
-              fontWeight: 500,
-              color: '#ffffff',
-              background: '#3a3530',
-              border: 'none',
-              borderRadius: 6,
-              padding: '8px 16px',
-              cursor: creating ? 'not-allowed' : 'pointer',
-              opacity: creating ? 0.6 : 1,
-            }}
-          >
-            {creating ? 'Creating...' : '+ Create Invoice'}
-          </button>
-
-          {/* Dropdown menu */}
-          {createDropdownOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: 8,
-                background: '#ffffff',
-                border: '1px solid #e0dbd4',
-                borderRadius: 8,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                zIndex: 100,
-                minWidth: 200,
-              }}
-            >
-              <button
-                onClick={handleCreateStandardInvoice}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 16px',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  color: '#3a3530',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f5f2ee',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                Standard Invoice
-              </button>
-              <button
-                onClick={handleCreateExcessInvoice}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 16px',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  color: '#3a3530',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f5f2ee',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                Excess Invoice
-              </button>
-              <button
-                onClick={handleCreateProgressInvoice}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 16px',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  color: '#3a3530',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f5f2ee',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                Progress Payment
-              </button>
-              <button
-                onClick={handleCreateBalanceInvoice}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 16px',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  color: '#3a3530',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                Balance / Final Payment
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => setCreateModalOpen(true)}
+          disabled={creating}
+          style={{
+            fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 500,
+            color: '#ffffff', background: '#3a3530', border: 'none', borderRadius: 6,
+            padding: '8px 16px', cursor: creating ? 'not-allowed' : 'pointer',
+            opacity: creating ? 0.6 : 1,
+          }}
+        >
+          {creating ? 'Creating…' : '+ Create Invoice'}
+        </button>
       </div>
 
       {/* Empty state */}
-      {(!invoices || invoices.length === 0) && (
-        <div
-          style={{
-            padding: '48px 24px',
-            textAlign: 'center',
-            background: '#f5f2ee',
-            borderRadius: 8,
-          }}
-        >
+      {invoices.length === 0 && (
+        <div style={{ padding: '48px 24px', textAlign: 'center', background: '#f5f2ee', borderRadius: 8 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
-          <div style={{ fontSize: 14, color: '#3a3530', marginBottom: 4 }}>
-            No invoices yet
-          </div>
-          <div style={{ fontSize: 12, color: '#9e998f' }}>
-            Create an invoice to track payments for this job
-          </div>
+          <div style={{ fontSize: 14, color: '#3a3530', marginBottom: 4 }}>No invoices yet</div>
+          <div style={{ fontSize: 12, color: '#9e998f' }}>Create an invoice to track payments for this job</div>
         </div>
       )}
 
       {/* Invoice list */}
       {invoices.map((invoice) => {
-        const statusStyle = STATUS_STYLES[invoice.status] || STATUS_STYLES.draft
-        const statusLabel = STATUS_LABELS[invoice.status] || invoice.status
-        const actionCfg = STATUS_ACTIONS[invoice.status] || STATUS_ACTIONS.draft
+        const statusStyle = STATUS_STYLES[invoice.status ?? 'draft'] ?? STATUS_STYLES.draft
+        const statusLabel = (invoice.status ?? 'draft').charAt(0).toUpperCase() + (invoice.status ?? 'draft').slice(1)
 
         return (
           <div
             key={invoice.id}
             style={{
-              background: '#ffffff',
-              border: '1px solid #e0dbd4',
-              borderRadius: 8,
-              marginBottom: 12,
-              overflow: 'hidden',
+              background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 8,
+              marginBottom: 10, overflow: 'hidden',
             }}
           >
-            {/* Summary header */}
             <div
               style={{
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                background: expandedId === invoice.id ? '#f5f2ee' : '#ffffff',
+                padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                cursor: 'pointer',
               }}
+              onClick={() => router.push(`/dashboard/invoices/${invoice.id}`)}
             >
-              {/* Chevron */}
-              <div
-                onClick={() => setExpandedId(expandedId === invoice.id ? null : invoice.id)}
-                style={{
-                  fontSize: 12,
-                  color: '#9e998f',
-                  cursor: 'pointer',
-                  padding: '4px',
-                }}
-              >
-                {expandedId === invoice.id ? '▼' : '▶'}
-              </div>
-
               {/* Invoice ref */}
-              <div
-                onClick={() => setExpandedId(expandedId === invoice.id ? null : invoice.id)}
-                style={{
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  cursor: 'pointer',
-                  flex: 1,
-                }}
-              >
-                {invoice.invoice_ref || 'Draft Invoice'}
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', flex: 1 }}>
+                {invoice.invoice_ref ?? 'Draft Invoice'}
               </div>
 
               {/* Type badge */}
-              <div
-                style={{
-                  fontSize: 11,
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  background: '#e8e0d0',
-                  color: '#3a3530',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {invoice.invoice_type}
+              <div style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: '#e8e0d0', color: '#3a3530' }}>
+                {TYPE_LABELS[invoice.invoice_type] ?? invoice.invoice_type}
               </div>
 
               {/* Status badge */}
-              <div
-                style={{
-                  fontSize: 11,
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  background: statusStyle.bg,
-                  color: statusStyle.text,
-                }}
-              >
+              <div style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: statusStyle.bg, color: statusStyle.text }}>
                 {statusLabel}
               </div>
 
               {/* Amount */}
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530' }}>
-                {fmt(invoice.amount_inc_gst || 0)}
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530', minWidth: 90, textAlign: 'right' }}>
+                {fmt(invoice.amount_inc_gst ?? 0)}
               </div>
 
-              {/* Action button */}
-              {!actionCfg.inactive && (
+              {/* Quick send button for drafts */}
+              {invoice.status === 'draft' && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setStatusChangingId(invoice.id)
-                    handleAction(invoice, actionCfg)
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleStatusChange(invoice.id, 'sent') }}
                   disabled={statusChangingId === invoice.id}
                   style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#ffffff',
-                    background: '#3a3530',
-                    border: 'none',
-                    borderRadius: 4,
-                    padding: '6px 12px',
+                    fontSize: 11, fontWeight: 500, color: '#fff', background: '#3a3530',
+                    border: 'none', borderRadius: 4, padding: '5px 10px',
                     cursor: statusChangingId === invoice.id ? 'not-allowed' : 'pointer',
                     opacity: statusChangingId === invoice.id ? 0.6 : 1,
                   }}
                 >
-                  {statusChangingId === invoice.id ? '...' : actionCfg.label}
+                  {statusChangingId === invoice.id ? '…' : 'Send'}
                 </button>
               )}
 
-              {/* 3 dots menu */}
+              {/* 3-dot menu */}
               <div style={{ position: 'relative' }} data-menu-dropdown>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMenuDropdownId(menuDropdownId === invoice.id ? null : invoice.id)
-                  }}
-                  style={{
-                    fontSize: 16,
-                    color: '#9e998f',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px 8px',
-                  }}
+                  onClick={(e) => { e.stopPropagation(); setMenuDropdownId(menuDropdownId === invoice.id ? null : invoice.id) }}
+                  style={{ fontSize: 16, color: '#9e998f', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
                 >
                   •••
                 </button>
 
                 {menuDropdownId === invoice.id && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: 4,
-                      background: '#ffffff',
-                      border: '1px solid #e0dbd4',
-                      borderRadius: 6,
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                      zIndex: 100,
-                      minWidth: 150,
-                    }}
-                  >
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                    background: '#fff', border: '1px solid #e0dbd4', borderRadius: 6,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150,
+                  }}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(`/print/invoices/${invoice.id}`, '_blank')
-                        setMenuDropdownId(null)
-                      }}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '8px 12px',
-                        fontSize: 13,
-                        color: '#3a3530',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
+                      onClick={(e) => { e.stopPropagation(); window.open(`/print/invoices/${invoice.id}`, '_blank'); setMenuDropdownId(null) }}
+                      style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#3a3530', background: 'none', border: 'none', cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       PDF Preview
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(invoice.id, invoice.invoice_ref)
-                        setMenuDropdownId(null)
-                      }}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '8px 12px',
-                        fontSize: 13,
-                        color: '#c5221f',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        borderTop: '1px solid #e0dbd4',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#fce8e6')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      Delete
-                    </button>
+                    {invoice.status === 'draft' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(invoice.id, invoice.invoice_ref); setMenuDropdownId(null) }}
+                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#c5221f', background: 'none', border: 'none', cursor: 'pointer', borderTop: '1px solid #e0dbd4' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#fce8e6')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Expanded content */}
-            {expandedId === invoice.id && (
-              <div style={{ padding: '20px', borderTop: '1px solid #e0dbd4', background: '#f5f2ee' }}>
-                <InvoiceEditor
-                  jobId={jobId}
-                  invoiceId={invoice.id}
-                  tenantId={tenantId}
-                  job={job}
-                  onInvoiceUpdated={load}
-                />
-              </div>
-            )}
           </div>
         )
       })}
+
+      {/* Running totals */}
+      {invoices.length > 0 && (
+        <div style={{
+          marginTop: 20, background: '#fafaf8', border: '1px solid #e0dbd4', borderRadius: 8,
+          padding: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16,
+        }}>
+          <div>
+            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Approved Quote</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>
+              {approvedAmount > 0 ? fmt(approvedAmount) : '—'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Total Invoiced</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(totalInvoiced)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Balance Remaining</div>
+            <div style={{
+              fontSize: 15, fontWeight: 600,
+              color: balance < 0 ? '#c5221f' : balance === 0 ? '#2e7d32' : '#3a3530',
+            }}>
+              {approvedAmount > 0 ? fmt(balance) : '—'}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

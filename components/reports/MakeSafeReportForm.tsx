@@ -227,53 +227,6 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId }: MakeSaf
             locked={locked}
           />
         </div>
-        <div>
-          <FieldLabel label="Assessor Name" />
-          <InlineInput
-            value={str('assessor_name')}
-            onChange={v => onChange('assessor_name', v)}
-            locked={locked}
-            placeholder="e.g. Kyle Bindon"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Person Met" />
-          <InlineInput
-            value={str('person_met')}
-            onChange={v => onChange('person_met', v)}
-            locked={locked}
-            placeholder="e.g. Karen Nowell (Owner)"
-          />
-        </div>
-      </div>
-
-      {/* — PROPERTY — */}
-      <SectionHeading label="Property" />
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <FieldLabel label="Property Address" />
-          <InlineInput
-            value={str('property_address')}
-            onChange={v => onChange('property_address', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Insured Name" />
-          <InlineInput
-            value={str('insured_name')}
-            onChange={v => onChange('insured_name', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Claim Number" />
-          <InlineInput
-            value={str('claim_number')}
-            onChange={v => onChange('claim_number', v)}
-            locked={locked}
-          />
-        </div>
       </div>
 
       {/* — IMMEDIATE HAZARDS — */}
@@ -333,19 +286,6 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId }: MakeSaf
             placeholder="e.g. Avoid affected rooms until repairs complete"
           />
         </div>
-      </div>
-
-      {/* — FEE SCHEDULE — */}
-      <SectionHeading label="Fee Schedule" />
-      <div>
-        <FieldLabel label="Fee Schedule / Materials Used" />
-        <InlineTextarea
-          value={tsf('fee_schedule')}
-          onChange={v => onTsf('fee_schedule', v)}
-          locked={locked}
-          placeholder="List materials and labour charges for make safe works..."
-          rows={4}
-        />
       </div>
 
       {/* — FIELD NOTES — */}

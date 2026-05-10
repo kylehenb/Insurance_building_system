@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface RoofReportFormProps {
   data: Record<string, unknown>
@@ -50,18 +50,34 @@ function InlineInput({
   locked,
   placeholder,
   type = 'text',
+  defaultValue = '',
 }: {
   value: string
   onChange: (v: string) => void
   locked: boolean
   placeholder?: string
   type?: string
+  defaultValue?: string
 }) {
+  const [localValue, setLocalValue] = useState(value || defaultValue)
+
+  useEffect(() => {
+    if (value) {
+      setLocalValue(value)
+    }
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    onChange(newValue)
+  }
+
   return (
     <input
       type={type}
-      value={value}
-      onChange={e => onChange(e.target.value)}
+      value={localValue}
+      onChange={handleChange}
       disabled={locked}
       placeholder={placeholder}
       className={`
@@ -81,17 +97,33 @@ function InlineTextarea({
   locked,
   placeholder,
   rows = 3,
+  defaultValue = '',
 }: {
   value: string
   onChange: (v: string) => void
   locked: boolean
   placeholder?: string
   rows?: number
+  defaultValue?: string
 }) {
+  const [localValue, setLocalValue] = useState(value || defaultValue)
+
+  useEffect(() => {
+    if (value) {
+      setLocalValue(value)
+    }
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    onChange(newValue)
+  }
+
   return (
     <textarea
-      value={value}
-      onChange={e => onChange(e.target.value)}
+      value={localValue}
+      onChange={handleChange}
       disabled={locked}
       placeholder={placeholder}
       rows={rows}
@@ -106,16 +138,163 @@ function InlineTextarea({
   )
 }
 
+function DropdownSelect({
+  value,
+  onChange,
+  locked,
+  options,
+  placeholder,
+  defaultValue = '',
+}: {
+  value: string
+  onChange: (v: string) => void
+  locked: boolean
+  options: string[]
+  placeholder?: string
+  defaultValue?: string
+}) {
+  const [localValue, setLocalValue] = useState(value || defaultValue)
+
+  useEffect(() => {
+    if (value) {
+      setLocalValue(value)
+    }
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    onChange(newValue)
+  }
+
+  return (
+    <select
+      value={localValue}
+      onChange={handleChange}
+      disabled={locked}
+      className={`
+        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
+        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
+        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        transition-colors
+      `}
+      style={{ fontFamily: 'DM Sans, sans-serif' }}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map(opt => (
+        <option key={opt} value={opt}>
+          {opt}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function MultiSelectDropdown({
+  value,
+  onChange,
+  locked,
+  options,
+  placeholder,
+}: {
+  value: string[]
+  onChange: (v: string[]) => void
+  locked: boolean
+  options: string[]
+  placeholder?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const toggleOption = (option: string) => {
+    if (value.includes(option)) {
+      onChange(value.filter(v => v !== option))
+    } else {
+      onChange([...value, option])
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !locked && setIsOpen(!isOpen)}
+        disabled={locked}
+        className={`
+          w-full px-3 py-2 rounded-md border text-[13px] text-left
+          border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
+          disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+          transition-colors
+        `}
+        style={{ fontFamily: 'DM Sans, sans-serif' }}
+      >
+        {value.length > 0 ? value.join(', ') : (placeholder || 'Select options...')}
+      </button>
+      {isOpen && !locked && (
+        <div className="absolute z-10 w-full mt-1 bg-white border border-[#e4dfd8] rounded-md shadow-lg max-h-60 overflow-auto">
+          {options.map(option => (
+            <label
+              key={option}
+              className="flex items-center px-3 py-2 hover:bg-[#f5f2ee] cursor-pointer text-[13px]"
+              style={{ fontFamily: 'DM Sans, sans-serif' }}
+            >
+              <input
+                type="checkbox"
+                checked={value.includes(option)}
+                onChange={() => toggleOption(option)}
+                className="mr-2 accent-[#c8b89a]"
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) {
   const str = (key: string) => String(data[key] ?? '')
   const tsf = (key: string) => {
     const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
     return String(tsFields[key] ?? '')
   }
+  const tsfArray = (key: string): string[] => {
+    const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
+    const val = tsFields[key]
+    if (Array.isArray(val)) return val as string[]
+    if (typeof val === 'string' && val) return val.split(',').map(v => v.trim())
+    return []
+  }
   const onTsf = (key: string, value: string) => {
     const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
     onChange('type_specific_fields', { ...tsFields, [key]: value })
   }
+  const onTsfArray = (key: string, value: string[]) => {
+    const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
+    onChange('type_specific_fields', { ...tsFields, [key]: value })
+  }
+
+  const roofTypeOptions = [
+    'Metal',
+    'Concrete tile',
+    'Terracotta tile',
+    'Metal and concrete tile',
+    'Metal and terracotta tile',
+    'Asbestos sheet',
+    'Insulated panel',
+    'Decramastic roof tile',
+    'Sheet membrane',
+    'Other',
+  ]
+
+  const roofInsulationOptions = [
+    'Anticon (foil backed blanket)',
+    'Sarking/WRB',
+    'Insulated panel',
+    'Air cell',
+    'None',
+    'Other',
+  ]
 
   return (
     <div>
@@ -140,31 +319,13 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
             locked={locked}
           />
         </div>
-        <div>
+        <div className="col-span-2">
           <FieldLabel label="Roofer's Name & Qualifications" />
           <InlineInput
             value={str('assessor_name')}
             onChange={v => onChange('assessor_name', v)}
             locked={locked}
-            placeholder="e.g. Kyle Bindon — Roof plumber, registered builder"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Roofer Met With" />
-          <InlineInput
-            value={str('person_met')}
-            onChange={v => onChange('person_met', v)}
-            locked={locked}
-            placeholder="e.g. Jimmy (tenant)"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Time on Site" />
-          <InlineInput
-            value={tsf('time_on_site')}
-            onChange={v => onTsf('time_on_site', v)}
-            locked={locked}
-            placeholder="e.g. 30 mins"
+            defaultValue="Kyle B - Roof plumber, Registered Builder"
           />
         </div>
       </div>
@@ -174,50 +335,52 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           value={tsf('scope_of_report')}
           onChange={v => onTsf('scope_of_report', v)}
           locked={locked}
-          placeholder="Describe the scope and purpose of this roof report..."
+          defaultValue="Carry out a roof inspection and provide a report relating to the claim."
           rows={3}
         />
       </div>
 
-      {/* — PROPERTY DETAILS — */}
-      <SectionHeading
-        label="Property Details"
-        subtitle="Pre-filled from AI parse after field app submit"
-      />
+      {/* — ROOF DETAILS — */}
+      <SectionHeading label="Roof Details" />
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <FieldLabel label="Property Address" />
-          <InlineInput
-            value={str('property_address')}
-            onChange={v => onChange('property_address', v)}
+          <FieldLabel label="Roof Type" />
+          <MultiSelectDropdown
+            value={tsfArray('roof_type')}
+            onChange={v => onTsfArray('roof_type', v)}
             locked={locked}
+            options={roofTypeOptions}
+            placeholder="Select roof type(s)..."
           />
         </div>
         <div>
-          <FieldLabel label="Approximate Age" />
-          <InlineInput
-            value={tsf('approximate_age')}
-            onChange={v => onTsf('approximate_age', v)}
+          <FieldLabel label="General Condition of Roof" />
+          <DropdownSelect
+            value={tsf('roof_general_condition')}
+            onChange={v => onTsf('roof_general_condition', v)}
             locked={locked}
-            placeholder="e.g. 60 years"
+            options={['Good', 'Fair', 'Poor']}
+            placeholder="Select condition..."
           />
         </div>
         <div>
-          <FieldLabel label="Property Type" />
+          <FieldLabel label="Roof Pitch (Degrees)" />
           <InlineInput
-            value={tsf('property_type')}
-            onChange={v => onTsf('property_type', v)}
+            value={tsf('pitch_degrees')}
+            onChange={v => onTsf('pitch_degrees', v)}
             locked={locked}
-            placeholder="e.g. Residential, freestanding"
+            placeholder="e.g. 26"
+            type="number"
           />
         </div>
         <div>
-          <FieldLabel label="Property Condition" />
+          <FieldLabel label="Number of Penetrations" />
           <InlineInput
-            value={tsf('property_condition')}
-            onChange={v => onTsf('property_condition', v)}
+            value={tsf('number_of_penetrations')}
+            onChange={v => onTsf('number_of_penetrations', v)}
             locked={locked}
-            placeholder="e.g. Fair, Poor, Good"
+            placeholder="e.g. 4"
+            type="number"
           />
         </div>
         <div>
@@ -229,49 +392,8 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
             placeholder="e.g. Single Storey"
           />
         </div>
-      </div>
-
-      {/* — ROOF DETAILS — */}
-      <SectionHeading label="Roof Details" />
-      <div className="grid grid-cols-2 gap-4">
         <div>
-          <FieldLabel label="Roof Type" />
-          <InlineInput
-            value={tsf('roof_type')}
-            onChange={v => onTsf('roof_type', v)}
-            locked={locked}
-            placeholder="e.g. Terracotta Tile, Colorbond Metal"
-          />
-        </div>
-        <div>
-          <FieldLabel label="General Condition" />
-          <InlineInput
-            value={tsf('roof_general_condition')}
-            onChange={v => onTsf('roof_general_condition', v)}
-            locked={locked}
-            placeholder="e.g. Poor, Fair, Good"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Pitch (Degrees)" />
-          <InlineInput
-            value={tsf('pitch_degrees')}
-            onChange={v => onTsf('pitch_degrees', v)}
-            locked={locked}
-            placeholder="e.g. 26"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Number of Penetrations" />
-          <InlineInput
-            value={tsf('number_of_penetrations')}
-            onChange={v => onTsf('number_of_penetrations', v)}
-            locked={locked}
-            placeholder="e.g. 4"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Ridge / Hip Capping Condition" />
+          <FieldLabel label="Ridge / Hip Capping and Flashings Condition" />
           <InlineInput
             value={tsf('ridge_hip_condition')}
             onChange={v => onTsf('ridge_hip_condition', v)}
@@ -280,7 +402,7 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           />
         </div>
         <div>
-          <FieldLabel label="Gutter Condition" />
+          <FieldLabel label="Gutter and Valley Condition" />
           <InlineInput
             value={tsf('gutter_condition')}
             onChange={v => onTsf('gutter_condition', v)}
@@ -288,38 +410,88 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
             placeholder="e.g. Debris blocking valleys and gutters"
           />
         </div>
+        <div>
+          <FieldLabel label="Roof Insulation (roof cover only, excludes ceiling insulation)" />
+          <MultiSelectDropdown
+            value={tsfArray('roof_insulation')}
+            onChange={v => onTsfArray('roof_insulation', v)}
+            locked={locked}
+            options={roofInsulationOptions}
+            placeholder="Select insulation type(s)..."
+          />
+        </div>
       </div>
 
-      {/* — STORM DAMAGE FINDINGS — */}
-      <SectionHeading label="Storm Damage Findings" />
+      {/* — CLAIM DAMAGE FINDINGS — */}
+      <SectionHeading label="Claim Damage Findings" />
       <div className="space-y-4">
         <div>
-          <FieldLabel label="Storm Damage Found" />
+          <FieldLabel label="Specific Cause of Damage" />
           <InlineTextarea
-            value={tsf('storm_damage_found')}
-            onChange={v => onTsf('storm_damage_found', v)}
+            value={tsf('specific_cause_of_damage')}
+            onChange={v => onTsf('specific_cause_of_damage', v)}
             locked={locked}
-            placeholder="Describe all storm damage observed on the roof..."
+            placeholder="Describe the specific cause of damage..."
+            rows={6}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Internal Damage (Claim Related)" />
+          <InlineTextarea
+            value={tsf('internal_damage')}
+            onChange={v => onTsf('internal_damage', v)}
+            locked={locked}
+            placeholder="Describe internal damage related to the claim..."
             rows={4}
           />
         </div>
         <div>
-          <FieldLabel label="Maintenance / Pre-Existing Issues" />
+          <FieldLabel label="Roof Damage (Claim Related)" />
           <InlineTextarea
-            value={tsf('maintenance_issues')}
-            onChange={v => onTsf('maintenance_issues', v)}
+            value={tsf('roof_damage')}
+            onChange={v => onTsf('roof_damage', v)}
             locked={locked}
-            placeholder="Describe maintenance items and pre-existing conditions unrelated to storm..."
+            placeholder="Describe roof damage related to the claim..."
             rows={4}
           />
         </div>
         <div>
-          <FieldLabel label="Maintenance Repairs Required" />
+          <FieldLabel label="Claim Damage Caused by Roof Maintenance Issues or Roof Defects?" />
           <InlineTextarea
-            value={str('maintenance_notes')}
-            onChange={v => onChange('maintenance_notes', v)}
+            value={tsf('damage_caused_by_maintenance')}
+            onChange={v => onTsf('damage_caused_by_maintenance', v)}
             locked={locked}
-            placeholder="List recommended maintenance repairs..."
+            placeholder="Describe if damage was caused by maintenance issues or defects..."
+            rows={3}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Would the Insured Have Been Reasonably Aware of the Property Conditions Leading to the Claim?" />
+          <InlineTextarea
+            value={tsf('insured_aware_of_conditions')}
+            onChange={v => onTsf('insured_aware_of_conditions', v)}
+            locked={locked}
+            placeholder="Describe insured awareness of property conditions..."
+            rows={3}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Non Claim Related Roof Maintenance Issues or Defects (that have potential for future damage)" />
+          <InlineTextarea
+            value={tsf('non_claim_maintenance_issues')}
+            onChange={v => onTsf('non_claim_maintenance_issues', v)}
+            locked={locked}
+            placeholder="Describe non-claim related maintenance issues or defects..."
+            rows={4}
+          />
+        </div>
+        <div>
+          <FieldLabel label="Maintenance or Defects Repairs Required (Insured Responsibility)" />
+          <InlineTextarea
+            value={tsf('maintenance_repairs_required')}
+            onChange={v => onTsf('maintenance_repairs_required', v)}
+            locked={locked}
+            placeholder="List maintenance or defect repairs required by insured..."
             rows={3}
           />
         </div>
@@ -329,17 +501,17 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
             value={tsf('conditions_preventing_repairs')}
             onChange={v => onTsf('conditions_preventing_repairs', v)}
             locked={locked}
-            placeholder="e.g. No / Describe any conditions..."
+            placeholder="Describe conditions preventing warrantable repairs..."
             rows={2}
           />
         </div>
         <div>
-          <FieldLabel label="Prior Repairs (Claim Related)" />
+          <FieldLabel label="Prior Repairs to Roof (Claim Related)" />
           <InlineTextarea
             value={tsf('prior_repairs')}
             onChange={v => onTsf('prior_repairs', v)}
             locked={locked}
-            placeholder="e.g. No / Describe any prior claim-related repairs..."
+            placeholder="Describe prior claim-related repairs to the roof..."
             rows={2}
           />
         </div>

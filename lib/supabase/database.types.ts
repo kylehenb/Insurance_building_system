@@ -1149,16 +1149,65 @@ export type Database = {
           },
         ]
       }
+      invoice_line_item_library: {
+        Row: {
+          created_at: string | null
+          default_quantity: number | null
+          default_unit_price: number | null
+          description: string
+          id: string
+          invoice_type: string
+          is_active: boolean | null
+          sort_order: number | null
+          tenant_id: string
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_quantity?: number | null
+          default_unit_price?: number | null
+          description: string
+          id?: string
+          invoice_type: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          tenant_id: string
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_quantity?: number | null
+          default_unit_price?: number | null
+          description?: string
+          id?: string
+          invoice_type?: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          tenant_id?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_item_library_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_line_items: {
         Row: {
           created_at: string | null
           description: string
           id: string
           invoice_id: string
+          library_item_id: string | null
           line_total: number
           quantity: number
           sort_order: number | null
           tenant_id: string
+          unit: string | null
           unit_price: number
         }
         Insert: {
@@ -1166,10 +1215,12 @@ export type Database = {
           description: string
           id?: string
           invoice_id: string
+          library_item_id?: string | null
           line_total: number
           quantity?: number
           sort_order?: number | null
           tenant_id: string
+          unit?: string | null
           unit_price: number
         }
         Update: {
@@ -1177,10 +1228,12 @@ export type Database = {
           description?: string
           id?: string
           invoice_id?: string
+          library_item_id?: string | null
           line_total?: number
           quantity?: number
           sort_order?: number | null
           tenant_id?: string
+          unit?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -1249,6 +1302,7 @@ export type Database = {
           direction: string
           external_status: string | null
           gst: number | null
+          gst_treatment: string | null
           id: string
           invoice_ref: string | null
           invoice_type: string
@@ -1278,6 +1332,7 @@ export type Database = {
           direction: string
           external_status?: string | null
           gst?: number | null
+          gst_treatment?: string | null
           id?: string
           invoice_ref?: string | null
           invoice_type: string
@@ -1307,6 +1362,7 @@ export type Database = {
           direction?: string
           external_status?: string | null
           gst?: number | null
+          gst_treatment?: string | null
           id?: string
           invoice_ref?: string | null
           invoice_type?: string

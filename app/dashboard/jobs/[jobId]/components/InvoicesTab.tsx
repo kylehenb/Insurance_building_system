@@ -9,28 +9,79 @@ interface InvoicesTabProps {
   tenantId: string
 }
 
+interface JobMeta {
+  job_number: string
+  insurer: string | null
+  insured_name: string | null
+  property_address: string | null
+  excess: number | null
+  claim_number: string | null
+}
+
+interface ReportRow { id: string; report_type: string }
+interface WorkOrderRow { id: string; work_order_type: string }
+interface QuoteRow { approved_amount: number | null; gst_pct: number | null }
+
+export interface JobContext {
+  job: JobMeta
+  barReport: ReportRow | null
+  makeSafeWorkOrder: WorkOrderRow | null
+  approvedQuote: QuoteRow | null
+}
+
 export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
-  const [job, setJob] = useState<{ job_number: string; insurer: string | null; insured_name: string | null; property_address: string | null; excess: number | null } | null>(null)
-  const [ready, setReady] = useState(false)
+  const [ctx, setCtx] = useState<JobContext | null>(null)
 
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-    void supabase
-      .from('jobs')
-      .select('job_number, insurer, insured_name, property_address, excess')
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId)
-      .single()
-      .then(({ data }) => {
-        setJob(data ?? { job_number: '', insurer: null, insured_name: null, property_address: null, excess: null })
-        setReady(true)
+
+    void Promise.all([
+      supabase
+        .from('jobs')
+        .select('job_number, insurer, insured_name, property_address, excess, claim_number')
+        .eq('id', jobId)
+        .eq('tenant_id', tenantId)
+        .single(),
+      supabase
+        .from('reports')
+        .select('id, report_type')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('report_type', 'BAR')
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('work_orders')
+        .select('id, work_order_type')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('work_order_type', 'make_safe')
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('quotes')
+        .select('approved_amount, gst_pct')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]).then(([jobRes, reportRes, woRes, quoteRes]) => {
+      if (!jobRes.data) return
+      setCtx({
+        job: jobRes.data as JobMeta,
+        barReport: reportRes.data as ReportRow | null,
+        makeSafeWorkOrder: woRes.data as WorkOrderRow | null,
+        approvedQuote: quoteRes.data as QuoteRow | null,
       })
+    })
   }, [jobId, tenantId])
 
-  if (!ready || !job) {
+  if (!ctx) {
     return (
       <div
         style={{
@@ -46,5 +97,5 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
     )
   }
 
-  return <InvoicesList jobId={jobId} tenantId={tenantId} job={job} />
+  return <InvoicesList jobId={jobId} tenantId={tenantId} ctx={ctx} />
 }
