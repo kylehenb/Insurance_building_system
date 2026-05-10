@@ -525,7 +525,7 @@ export default async function ReportPrintPage({
                     <td style={tdCell}>
                       <div style={cellContentStyle}>
                         <span style={labelStyle}>Roofer's Name & Qualifications:</span>
-                        <span style={valueStyle}>{report.assessor_name || '—'}</span>
+                        <span style={valueStyle}>{String(report.assessor_name ?? tsf(report, 'assessor_name') ?? '—')}</span>
                       </div>
                     </td>
                   </tr>
@@ -921,10 +921,10 @@ export default async function ReportPrintPage({
 
               for (const section of roofSections) {
                 if (section.isHeader) {
-                  // Render as subheading without numbering
+                  // Render as subheading without numbering using red banner style
                   nodes.push(
                     <div key={section.key} style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '12px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5a2a2a', fontWeight: '800', paddingBottom: '4px', borderBottom: '1px solid #d8b8b8' }}>
+                      <div style={{ fontSize: '12px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5a2a2a', fontWeight: '800', padding: '4px 10px', backgroundColor: '#f0e8e8', borderBottom: '1px solid #d8b8b8' }}>
                         {section.title}
                       </div>
                     </div>
