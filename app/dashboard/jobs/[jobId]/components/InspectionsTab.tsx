@@ -486,7 +486,8 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     const startTime = data['Start Time'] || null
     const duration = parseInt(data['Duration'] || '60') || 60
     const finishTime = startTime ? calculateFinishTime(startTime, duration.toString()) : null
-    
+    const inspectionType = data['Type'] ?? ''
+
     // Create inspection
     const { data: inserted, error: inspError } = await supabase
       .from('inspections')
@@ -504,15 +505,24 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
       })
       .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,quote_id,report_id,created_at')
       .single()
-    
+
     if (inspError) throw inspError
 
-    // Create core BAR report for this inspection
+    // Create core report for this inspection
     const inspectionId = inserted.id
     const existingCount = inspectionsWithRelations.length
     const newIndex = String(existingCount + 1).padStart(3, '0')
     const reportRef = `RPT-${jobNumber}-${newIndex}`
     const quoteRef = `Q-${jobNumber}-${newIndex}`
+
+    // Determine report type based on inspection type
+    const reportType = inspectionType === 'Roof Inspection' ? 'roof' : 'BAR'
+
+    // Set default type_specific_fields for roof reports
+    const defaultTypeSpecificFields = reportType === 'roof' ? {
+      assessor_name: 'Kyle B - Roof plumber, Registered Builder',
+      scope_of_report: 'Carry out a roof inspection and provide a report relating to the claim.',
+    } : {}
 
     const { data: newReport, error: reportError } = await supabase
       .from('reports')
@@ -521,11 +531,11 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
         job_id: jobId,
         inspection_id: inspectionId,
         report_ref: reportRef,
-        report_type: 'BAR',
+        report_type: reportType,
         status: 'draft',
         is_locked: false,
         version: 1,
-        type_specific_fields: {},
+        type_specific_fields: defaultTypeSpecificFields,
       })
       .select()
       .single()
