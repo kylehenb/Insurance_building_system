@@ -411,6 +411,15 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           />
         </div>
         <div>
+          <FieldLabel label="Gutter Overflows" />
+          <InlineInput
+            value={tsf('gutter_overflows')}
+            onChange={v => onTsf('gutter_overflows', v)}
+            locked={locked}
+            placeholder="e.g. Yes, at downpipes"
+          />
+        </div>
+        <div>
           <FieldLabel label="Roof Insulation (roof cover only, excludes ceiling insulation)" />
           <MultiSelectDropdown
             value={tsfArray('roof_insulation')}
