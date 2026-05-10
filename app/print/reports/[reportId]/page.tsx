@@ -89,6 +89,45 @@ const LDR_TEMPLATE = {
   ] as const,
 }
 
+const ROOF_TEMPLATE = {
+  // Roof Report specific fields
+  roof_details_fields: [
+    { label: 'Roof type:', field: 'roof_type' },
+    { label: 'General condition of roof:', field: 'roof_general_condition' },
+    { label: 'Roof pitch (degrees):', field: 'pitch_degrees' },
+    { label: 'Number of penetrations:', field: 'number_of_penetrations' },
+    { label: 'Number of storeys:', field: 'number_of_storeys' },
+  ] as const,
+
+  roof_condition_fields: [
+    { label: 'Ridge / hip capping and flashings condition:', field: 'ridge_hip_condition' },
+    { label: 'Gutter and valley condition:', field: 'gutter_condition' },
+    { label: 'Roof insulation:', field: 'roof_insulation' },
+  ] as const,
+
+  damage_cause_fields: [
+    { label: 'Specific cause of damage:', field: 'specific_cause_of_damage' },
+    { label: 'Internal damage (claim related):', field: 'internal_damage' },
+    { label: 'Roof damage (claim related):', field: 'roof_damage' },
+  ] as const,
+
+  maintenance_fields: [
+    { label: 'Claim damage caused by roof maintenance issues or roof defects?:', field: 'damage_caused_by_maintenance' },
+    { label: 'Would the insured have been reasonably aware of the property conditions leading to the claim?:', field: 'insured_aware_of_conditions' },
+    { label: 'Non claim related roof maintenance issues or defects:', field: 'non_claim_maintenance_issues' },
+    { label: 'Maintenance or defects repairs required (insured responsibility):', field: 'maintenance_repairs_required' },
+  ] as const,
+
+  additional_fields: [
+    { label: 'Conditions preventing warrantable repairs:', field: 'conditions_preventing_repairs' },
+    { label: 'Prior repairs to roof (claim related):', field: 'prior_repairs' },
+  ] as const,
+
+  narrative_sections: [
+    'conclusion',
+  ] as const,
+}
+
 function tsf(report: Report, key: string): string {
   const fields = report.type_specific_fields as Record<string, unknown> | null
   if (!fields) return '—'
@@ -292,8 +331,8 @@ export default async function ReportPrintPage({
   }
 
   // Build narrative sections list based on report type
-  const activeSections = (report.report_type === 'LDR' 
-    ? LDR_TEMPLATE.narrative_sections 
+  const activeSections = (report.report_type === 'LDR' || report.report_type === 'roof'
+    ? (report.report_type === 'LDR' ? LDR_TEMPLATE.narrative_sections : ROOF_TEMPLATE.narrative_sections)
     : DEFAULT_BAR_TEMPLATE.narrative_sections) as readonly string[]
 
   // If show_property_table is false, prepend property_description as section 1
@@ -314,11 +353,12 @@ export default async function ReportPrintPage({
 
   // LDR uses a slightly different color scheme for visual distinction
   const isLDR = report.report_type === 'LDR'
+  const isRoof = report.report_type === 'roof'
 
   // TD cell base style (3-column layout with label + value in same cell)
   const tdBase: React.CSSProperties = {
     padding: '8px 12px',
-    borderBottom: isLDR ? '1px solid #e0ecee' : '1px solid #f0ece6',
+    borderBottom: isLDR ? '1px solid #e0ecee' : (isRoof ? '1px solid #e8d4d4' : '1px solid #f0ece6'),
     verticalAlign: 'top',
     width: '33.33%',
   }
@@ -333,7 +373,7 @@ export default async function ReportPrintPage({
     flexWrap: 'wrap' as const,
   }
   const labelStyle: React.CSSProperties = {
-    color: isLDR ? '#5a7a8a' : '#6a6460',
+    color: isLDR ? '#5a7a8a' : (isRoof ? '#8a5a5a' : '#6a6460'),
     fontSize: '9px',
     fontWeight: '700',
     letterSpacing: '0.5px',
@@ -342,14 +382,14 @@ export default async function ReportPrintPage({
     flexShrink: 0,
   }
   const valueStyle: React.CSSProperties = {
-    color: isLDR ? '#1a2a3a' : '#1a1a1a',
+    color: isLDR ? '#1a2a3a' : (isRoof ? '#3a2a2a' : '#1a1a1a'),
     fontSize: '11px',
     fontWeight: '500',
   }
   const dividerStyle: React.CSSProperties = {
-    backgroundColor: isLDR ? '#e8eef2' : '#f5f2ee',
-    color: isLDR ? '#4a6a7a' : '#7a746e',
-    borderBottom: isLDR ? '1px solid #c8d8e0' : '1px solid #e0dbd4',
+    backgroundColor: isLDR ? '#e8eef2' : (isRoof ? '#f0e8e8' : '#f5f2ee'),
+    color: isLDR ? '#4a6a7a' : (isRoof ? '#7a5a5a' : '#7a746e'),
+    borderBottom: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #d8b8b8' : '1px solid #e0dbd4'),
   }
 
   const dividerRow = (label: string, sectionNum?: number) => (
@@ -367,22 +407,22 @@ export default async function ReportPrintPage({
       >
         {sectionNum !== undefined ? (
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ 
-              width: '16px', 
-              height: '16px', 
-              border: `1px solid ${isLDR ? '#0d2a3d' : '#1a1a1a'}`, 
-              color: isLDR ? '#0d2a3d' : '#1a1a1a',
-              fontSize: '8px', 
-              fontWeight: '700', 
-              borderRadius: '50%', 
-              display: 'inline-flex', 
-              alignItems: 'center', 
+            <span style={{
+              width: '16px',
+              height: '16px',
+              border: `1px solid ${isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : '#1a1a1a')}`,
+              color: isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : '#1a1a1a'),
+              fontSize: '8px',
+              fontWeight: '700',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
             }}>
               {sectionNum}
             </span>
-            <span style={{ color: isLDR ? '#0d2a3d' : undefined }}>{label}</span>
+            <span style={{ color: isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : undefined) }}>{label}</span>
           </span>
         ) : label}
       </td>
@@ -453,8 +493,8 @@ export default async function ReportPrintPage({
 
         {/* Form band */}
         <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
-          <span style={{ fontSize: '28px', fontWeight: '700', color: isLDR ? '#0d2a3d' : '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
-            {isLDR ? 'Leak Detection Report' : 'Building Assessment Report'}
+          <span style={{ fontSize: '28px', fontWeight: '700', color: isLDR ? '#0d2a3d' : (isRoof ? '#5a2a2a' : '#9e998f'), textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>
+            {isLDR ? 'Leak Detection Report' : (isRoof ? 'Roof Report' : 'Building Assessment Report')}
           </span>
         </div>
 
@@ -462,10 +502,10 @@ export default async function ReportPrintPage({
         <div style={{ padding: '0 20px' }}>
 
           {/* Metadata table - 3-column layout */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: isLDR ? '1px solid #c8d8e0' : '1px solid #e0dbd4', borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', border: isLDR ? '1px solid #c8d8e0' : (isRoof ? '1px solid #d8b8b8' : '1px solid #e0dbd4'), borderRadius: '6px', overflow: 'hidden', fontSize: '11px' }}>
             <tbody>
               {/* Block 1 — Attendance */}
-              {dividerRow('Attendance', isLDR ? getNextSectionNum() : undefined)}
+              {dividerRow('Attendance', (isLDR || isRoof) ? getNextSectionNum() : undefined)}
               <tr>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
@@ -481,18 +521,12 @@ export default async function ReportPrintPage({
                 </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
-                    <span style={labelStyle}>Person met:</span>
-                    <span style={valueStyle}>{report.person_met || '—'}</span>
+                    <span style={labelStyle}>{report.report_type === 'LDR' ? 'Conducted by:' : (isRoof ? 'Roofer:' : 'Assessor:')}</span>
+                    <span style={valueStyle}>{report.assessor_name || '—'}</span>
                   </div>
                 </td>
               </tr>
               <tr>
-                <td style={tdCell}>
-                  <div style={cellContentStyle}>
-                    <span style={labelStyle}>{report.report_type === 'LDR' ? 'Conducted by:' : 'Assessor:'}</span>
-                    <span style={valueStyle}>{report.assessor_name || '—'}</span>
-                  </div>
-                </td>
                 <td style={tdCell}>
                   <div style={cellContentStyle}>
                     <span style={labelStyle}>Email:</span>
@@ -505,10 +539,114 @@ export default async function ReportPrintPage({
                     <span style={valueStyle}>{tenant.contact_phone || '—'}</span>
                   </div>
                 </td>
+                <td style={tdCell}>
+                  <div style={cellContentStyle}>
+                    <span style={labelStyle}>Scope of report:</span>
+                    <span style={valueStyle}>{tsf(report, 'scope_of_report') || '—'}</span>
+                  </div>
+                </td>
               </tr>
 
+              {/* Block 2 — Roof Details (Roof only) */}
+              {isRoof && (
+                <>
+                  {dividerRow('Roof details', getNextSectionNum())}
+                  {(() => {
+                    const fields = ROOF_TEMPLATE.roof_details_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
+              {/* Block 2 — Roof Condition (Roof only) */}
+              {isRoof && (
+                <>
+                  {dividerRow('Roof condition', getNextSectionNum())}
+                  {(() => {
+                    const fields = ROOF_TEMPLATE.roof_condition_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
               {/* Block 2 — Property details (conditional, BAR only) */}
-              {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && (
+              {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && report.report_type !== 'roof' && (
                 <>
                   {dividerRow('Property details')}
                   {(() => {
@@ -655,8 +793,155 @@ export default async function ReportPrintPage({
                 </>
               )}
 
+              {/* Block 3 — Damage Cause (Roof only) */}
+              {isRoof && (
+                <>
+                  {dividerRow('Claim damage findings', getNextSectionNum())}
+                  {(() => {
+                    const fields = ROOF_TEMPLATE.damage_cause_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
+              {/* Block 4 — Maintenance (Roof only) */}
+              {isRoof && (
+                <>
+                  {dividerRow('Maintenance assessment', getNextSectionNum())}
+                  {(() => {
+                    const fields = ROOF_TEMPLATE.maintenance_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
+              {/* Block 5 — Additional (Roof only) */}
+              {isRoof && (
+                <>
+                  {dividerRow('Additional information', getNextSectionNum())}
+                  {(() => {
+                    const fields = ROOF_TEMPLATE.additional_fields
+                    const rows: React.ReactNode[] = []
+                    for (let i = 0; i < fields.length; i += 3) {
+                      const item1 = fields[i]
+                      const item2 = fields[i + 1]
+                      const item3 = fields[i + 2]
+                      const isLast = i + 3 >= fields.length
+
+                      rows.push(
+                        <tr key={item1.field}>
+                          <td style={isLast ? tdCellLast : tdCell}>
+                            <div style={cellContentStyle}>
+                              <span style={labelStyle}>{item1.label}</span>
+                              <span style={valueStyle}>{tsf(report, item1.field)}</span>
+                            </div>
+                          </td>
+                          {item2 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item2.label}</span>
+                                <span style={valueStyle}>{tsf(report, item2.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                          {item3 ? (
+                            <td style={isLast ? tdCellLast : tdCell}>
+                              <div style={cellContentStyle}>
+                                <span style={labelStyle}>{item3.label}</span>
+                                <span style={valueStyle}>{tsf(report, item3.field)}</span>
+                              </div>
+                            </td>
+                          ) : (
+                            <td style={isLast ? tdCellLast : tdCell}></td>
+                          )}
+                        </tr>
+                      )
+                    }
+                    return rows
+                  })()}
+                </>
+              )}
+
               {/* Block 3 — Make safe & specialist (BAR only) */}
-              {report.report_type !== 'LDR' && (
+              {report.report_type !== 'LDR' && report.report_type !== 'roof' && (
                 <>
                   {dividerRow('Make safe & specialist')}
                   <tr>
@@ -726,8 +1011,38 @@ export default async function ReportPrintPage({
           {(() => {
             const nodes: React.ReactNode[] = []
 
-            // LDR narrative sections - sections 4-8, all rendered with consistent styling
-            if (isLDR) {
+            // Roof narrative sections - rendered with earthy deep red color scheme
+            if (isRoof) {
+              const roofSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
+                {
+                  key: 'conclusion',
+                  title: 'Conclusion',
+                  renderBody: () => (
+                    <div style={{ background: '#f8e8e8', border: '1px solid #d8b8b8', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#3a2a2a', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, 'conclusion'))}
+                    </div>
+                  ),
+                },
+              ]
+
+              for (const section of roofSections) {
+                const num = getNextSectionNum()
+                nodes.push(
+                  <div key={section.key} style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                      <div style={{ width: '20px', height: '20px', border: '1.5px solid #5a2a2a', color: '#5a2a2a', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {num}
+                      </div>
+                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5a2a2a', fontWeight: '800' }}>
+                        {section.title}
+                      </div>
+                    </div>
+                    {section.renderBody()}
+                  </div>
+                )
+              }
+            } else if (isLDR) {
+              // LDR narrative sections - sections 4-8, all rendered with consistent styling
               const ldrSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
                 {
                   key: 'investigation',

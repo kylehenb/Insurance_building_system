@@ -517,61 +517,17 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
         </div>
       </div>
 
-      {/* — RECOMMENDATION — */}
-      <SectionHeading label="Recommendation" />
+      {/* — CONCLUSION — */}
+      <SectionHeading label="Conclusion" />
       <div>
-        <FieldLabel label="Recommendation" />
+        <FieldLabel label="Conclusion" />
         <InlineTextarea
-          value={tsf('recommendation')}
-          onChange={v => onTsf('recommendation', v)}
+          value={tsf('conclusion')}
+          onChange={v => onTsf('conclusion', v)}
           locked={locked}
-          placeholder="State your professional recommendation regarding the roof and the claim..."
+          placeholder="State your professional conclusion regarding the roof and the claim..."
           rows={4}
         />
-      </div>
-
-      {/* — ON-SITE SAFETY — */}
-      <SectionHeading
-        label="On-Site Safety"
-        subtitle="From field app roof safety section"
-      />
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <FieldLabel label="Fall Prevention Control" />
-          <InlineInput
-            value={tsf('fall_prevention_control')}
-            onChange={v => onTsf('fall_prevention_control', v)}
-            locked={locked}
-            placeholder="e.g. Harness used, ladder secured"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Person Present / Lone Worker" />
-          <InlineInput
-            value={tsf('person_present_lone_worker')}
-            onChange={v => onTsf('person_present_lone_worker', v)}
-            locked={locked}
-            placeholder="e.g. Lone worker — check-in active"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Non-Slip Footwear" />
-          <InlineInput
-            value={tsf('non_slip_footwear')}
-            onChange={v => onTsf('non_slip_footwear', v)}
-            locked={locked}
-            placeholder="e.g. Yes — steel cap boots"
-          />
-        </div>
-        <div>
-          <FieldLabel label="Surface Assessed Safe" />
-          <InlineInput
-            value={tsf('surface_assessed_safe')}
-            onChange={v => onTsf('surface_assessed_safe', v)}
-            locked={locked}
-            placeholder="e.g. Yes / No — reason"
-          />
-        </div>
       </div>
 
       {/* — FIELD NOTES — */}
