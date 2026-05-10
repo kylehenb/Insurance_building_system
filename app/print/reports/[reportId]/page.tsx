@@ -374,7 +374,7 @@ export default async function ReportPrintPage({
     flexWrap: 'wrap' as const,
   }
   const labelStyle: React.CSSProperties = {
-    color: isLDR ? '#5a7a8a' : (isRoof ? '#4a4a4a' : '#6a6460'),
+    color: isLDR ? '#5a7a8a' : (isRoof ? '#7a7a7a' : '#6a6460'),
     fontSize: '9px',
     fontWeight: '700',
     letterSpacing: '0.5px',
