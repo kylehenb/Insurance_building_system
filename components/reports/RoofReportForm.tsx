@@ -1,11 +1,15 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { ReportPhotos } from './ReportPhotos'
 
 interface RoofReportFormProps {
   data: Record<string, unknown>
   locked: boolean
   onChange: (field: string, value: unknown) => void
+  tenantId?: string
+  reportId?: string
+  jobId?: string
 }
 
 function SectionHeading({ label, subtitle }: { label: string; subtitle?: string }) {
@@ -252,7 +256,7 @@ function MultiSelectDropdown({
   )
 }
 
-export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) {
+export function RoofReportForm({ data, locked, onChange, tenantId, reportId, jobId }: RoofReportFormProps) {
   const str = (key: string) => String(data[key] ?? '')
   const tsf = (key: string) => {
     const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
@@ -551,6 +555,19 @@ export function RoofReportForm({ data, locked, onChange }: RoofReportFormProps) 
           rows={4}
         />
       </div>
+
+      {/* — PHOTOS — */}
+      {reportId && jobId && tenantId && (
+        <>
+          <SectionHeading label="Photos" />
+          <ReportPhotos
+            reportId={reportId}
+            jobId={jobId}
+            tenantId={tenantId}
+            locked={locked}
+          />
+        </>
+      )}
     </div>
   )
 }

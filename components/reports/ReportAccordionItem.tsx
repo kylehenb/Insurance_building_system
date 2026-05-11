@@ -807,6 +807,9 @@ export function ReportAccordionItem({
                 data={report as unknown as Record<string, unknown>}
                 locked={isLocked}
                 onChange={handleFieldChange}
+                tenantId={report.tenant_id}
+                reportId={report.id}
+                jobId={report.job_id}
               />
             )}
             {report.report_type === 'make_safe' && (
