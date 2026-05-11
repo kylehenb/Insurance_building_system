@@ -19,14 +19,16 @@ interface JobMeta {
 }
 
 interface ReportRow { id: string; report_type: string }
-interface WorkOrderRow { id: string; work_order_type: string }
 interface QuoteRow { approved_amount: number | null; gst_pct: number | null }
 
 export interface JobContext {
   job: JobMeta
   barReport: ReportRow | null
-  makeSafeWorkOrder: WorkOrderRow | null
+  makeSafeReport: ReportRow | null
+  roofReport: ReportRow | null
+  leakDetectionReport: ReportRow | null
   approvedQuote: QuoteRow | null
+  invoicedReportTypes: string[]
 }
 
 export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
@@ -54,11 +56,27 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         .limit(1)
         .maybeSingle(),
       supabase
-        .from('work_orders')
-        .select('id, work_order_type')
+        .from('reports')
+        .select('id, report_type')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
-        .eq('work_order_type', 'make_safe')
+        .eq('report_type', 'make_safe')
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('reports')
+        .select('id, report_type')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .in('report_type', ['roof', 'storm_wind'])
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('reports')
+        .select('id, report_type')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('report_type', 'leak_detection')
         .limit(1)
         .maybeSingle(),
       supabase
@@ -70,13 +88,23 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
-    ]).then(([jobRes, reportRes, woRes, quoteRes]) => {
+      supabase
+        .from('invoices')
+        .select('invoice_type')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .neq('status', 'voided'),
+    ]).then(([jobRes, barRes, makeSafeRes, roofRes, leakRes, quoteRes, invoicesRes]) => {
       if (!jobRes.data) return
+      const invoicedTypes = (invoicesRes.data ?? []).map((i: any) => i.invoice_type)
       setCtx({
         job: jobRes.data as JobMeta,
-        barReport: reportRes.data as ReportRow | null,
-        makeSafeWorkOrder: woRes.data as WorkOrderRow | null,
+        barReport: barRes.data as ReportRow | null,
+        makeSafeReport: makeSafeRes.data as ReportRow | null,
+        roofReport: roofRes.data as ReportRow | null,
+        leakDetectionReport: leakRes.data as ReportRow | null,
         approvedQuote: quoteRes.data as QuoteRow | null,
+        invoicedReportTypes: invoicedTypes,
       })
     })
   }, [jobId, tenantId])

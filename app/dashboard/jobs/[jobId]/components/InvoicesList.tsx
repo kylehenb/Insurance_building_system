@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useCallback, useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { JobContext } from './InvoicesTab'
+import { InvoiceEditor } from './InvoiceEditor'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,8 +68,8 @@ interface InvoicesListProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: InvoicesListProps) {
-  const router = useRouter()
-  const { job, barReport, makeSafeWorkOrder, approvedQuote } = ctx
+  const { job, barReport, makeSafeReport, roofReport, leakDetectionReport, approvedQuote, invoicedReportTypes } = ctx
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
 
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,6 +77,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [menuDropdownId, setMenuDropdownId] = useState<string | null>(null)
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null)
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null)
   const initialLoadDone = useRef(false)
 
   // ── Data loading ─────────────────────────────────────────────────────────
@@ -121,8 +122,11 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
   // ── Check which invoice types already exist ────────────────────────────────
 
-  const hasAssessment = invoices.some(i => i.invoice_type === 'assessment' && i.status !== 'voided')
-  const hasExcess = invoices.some(i => i.invoice_type === 'excess' && i.status !== 'voided')
+  const hasAssessment = invoicedReportTypes.includes('assessment')
+  const hasMakeSafe = invoicedReportTypes.includes('make_safe')
+  const hasRoof = invoicedReportTypes.includes('roof')
+  const hasLeakDetection = invoicedReportTypes.includes('leak_detection')
+  const hasExcess = invoicedReportTypes.includes('excess')
 
   // ── Create handlers ───────────────────────────────────────────────────────
 
@@ -205,7 +209,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
             <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530', marginBottom: 20 }}>Create Invoice</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Assessment */}
+              {/* Assessment (BAR) */}
               <button
                 disabled={!barReport || hasAssessment}
                 onClick={() => createInvoice('assessment', { reportId: barReport?.id })}
@@ -225,27 +229,55 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
               {/* Make Safe */}
               <button
-                disabled={!makeSafeWorkOrder}
-                onClick={() => {
-                  if (!makeSafeWorkOrder) return
-                  // Make safe needs line items — navigate to generate with empty lines
-                  // For now, create with a placeholder line so user can edit
-                  createInvoice('make_safe', {
-                    workOrderId: makeSafeWorkOrder.id,
-                    lineItems: [{ description: 'Make safe works', quantity: 1, unitPrice: 0 }],
-                  })
-                }}
+                disabled={!makeSafeReport || hasMakeSafe}
+                onClick={() => createInvoice('make_safe', { reportId: makeSafeReport?.id })}
                 style={{
                   textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: !makeSafeWorkOrder ? '#f5f2ee' : '#fff',
-                  cursor: !makeSafeWorkOrder ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
+                  borderRadius: 8, background: (!makeSafeReport || hasMakeSafe) ? '#f5f2ee' : '#fff',
+                  cursor: (!makeSafeReport || hasMakeSafe) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: !makeSafeWorkOrder ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!makeSafeReport || hasMakeSafe) ? '#9e998f' : '#3a3530' }}>
                   Make Safe
                 </div>
                 <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
-                  {!makeSafeWorkOrder ? 'No make safe work order on this job' : 'Opens with editable line items'}
+                  {!makeSafeReport ? 'No make safe report exists for this job' : hasMakeSafe ? 'Make safe invoice already exists' : 'Single charge from rate config'}
+                </div>
+              </button>
+
+              {/* Roof Report */}
+              <button
+                disabled={!roofReport || hasRoof}
+                onClick={() => createInvoice('roof', { reportId: roofReport?.id })}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: (!roofReport || hasRoof) ? '#f5f2ee' : '#fff',
+                  cursor: (!roofReport || hasRoof) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!roofReport || hasRoof) ? '#9e998f' : '#3a3530' }}>
+                  Roof Report
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!roofReport ? 'No roof report exists for this job' : hasRoof ? 'Roof invoice already exists' : 'Single charge from rate config'}
+                </div>
+              </button>
+
+              {/* Leak Detection Report */}
+              <button
+                disabled={!leakDetectionReport || hasLeakDetection}
+                onClick={() => createInvoice('leak_detection', { reportId: leakDetectionReport?.id })}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: (!leakDetectionReport || hasLeakDetection) ? '#f5f2ee' : '#fff',
+                  cursor: (!leakDetectionReport || hasLeakDetection) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!leakDetectionReport || hasLeakDetection) ? '#9e998f' : '#3a3530' }}>
+                  Leak Detection Report
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!leakDetectionReport ? 'No leak detection report exists for this job' : hasLeakDetection ? 'Leak detection invoice already exists' : 'Single charge from rate config'}
                 </div>
               </button>
 
@@ -341,7 +373,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
                 cursor: 'pointer',
               }}
-              onClick={() => router.push(`/dashboard/invoices/${invoice.id}`)}
+              onClick={() => setExpandedInvoiceId(expandedInvoiceId === invoice.id ? null : invoice.id)}
             >
               {/* Invoice ref */}
               <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', flex: 1 }}>
@@ -361,6 +393,11 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               {/* Amount */}
               <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530', minWidth: 90, textAlign: 'right' }}>
                 {fmt(invoice.amount_inc_gst ?? 0)}
+              </div>
+
+              {/* Expand/collapse icon */}
+              <div style={{ fontSize: 12, color: '#9e998f', transition: 'transform 0.2s', transform: expandedInvoiceId === invoice.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                ▼
               </div>
 
               {/* Quick send button for drafts */}
@@ -416,6 +453,100 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 )}
               </div>
             </div>
+
+            {/* Accordion content - inline invoice editor */}
+            {expandedInvoiceId === invoice.id && (
+              <div style={{ borderTop: '1px solid #e0dbd4', padding: '16px' }}>
+                <div onClick={(e) => e.stopPropagation()}>
+                  {editingInvoiceId === invoice.id ? (
+                    <InvoiceEditor
+                      jobId={jobId}
+                      invoiceId={invoice.id}
+                      tenantId={tenantId}
+                      job={{
+                        job_number: job.job_number,
+                        insurer: job.insurer,
+                        insured_name: job.insured_name,
+                        property_address: job.property_address,
+                      }}
+                      onInvoiceUpdated={() => {
+                        load()
+                        onInvoiceUpdated?.()
+                      }}
+                    />
+                  ) : (
+                    <div>
+                      {/* Line items preview */}
+                      {invoice.line_items.length > 0 ? (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
+                          {invoice.line_items.map((item) => (
+                            <div
+                              key={item.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                padding: '8px 0',
+                                fontSize: 13,
+                                color: '#3a3530',
+                                borderBottom: '1px solid #e8e0d0',
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>{item.description}</div>
+                              <div style={{ minWidth: 60, textAlign: 'right' }}>{item.quantity}</div>
+                              <div style={{ minWidth: 80, textAlign: 'right' }}>{fmt(item.unit_price)}</div>
+                              <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: '#9e998f', marginBottom: 16 }}>No line items</div>
+                      )}
+
+                      {/* Totals */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                        <span>Subtotal (ex GST)</span>
+                        <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.amount_ex_gst ?? 0)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                        <span>GST (10%)</span>
+                        <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.gst ?? 0)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
+                      </div>
+
+                      {/* Edit button */}
+                      {invoice.status === 'draft' && (
+                        <button
+                          onClick={() => setEditingInvoiceId(invoice.id)}
+                          style={{
+                            marginTop: 16,
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontSize: 13,
+                            color: '#3a3530',
+                            background: '#ffffff',
+                            border: '1px solid #e0dbd4',
+                            borderRadius: 6,
+                            padding: '8px 16px',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#c8b89a'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#e0dbd4'
+                          }}
+                        >
+                          Edit Invoice
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )
       })}
