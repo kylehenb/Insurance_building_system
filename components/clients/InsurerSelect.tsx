@@ -16,7 +16,7 @@ type Client = Database['public']['Tables']['clients']['Row']
 interface InsurerSelectProps {
   tenantId: string
   value: string | null
-  onSave: (value: string | null) => void
+  onSave: (value: string | null, clientId: string | null) => void
   label?: string
 }
 
@@ -63,12 +63,12 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
   }, [tenantId, supabase])
 
   const handleChange = (newValue: string) => {
-    // Find the selected insurer to get its name
+    // Find the selected insurer to get its name and id
     const selected = insurers.find(i => i.name === newValue)
     if (selected) {
-      onSave(selected.name)
+      onSave(selected.name, selected.id)
     } else if (newValue === '_none_') {
-      onSave(null)
+      onSave(null, null)
     }
   }
 

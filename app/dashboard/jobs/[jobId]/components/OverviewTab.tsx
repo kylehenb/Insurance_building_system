@@ -207,6 +207,7 @@ const OVERVIEW_CSS = `
 
 type EditFields = {
   insurer: string
+  client_id: string | null
   claim_number: string
   loss_type: string
   date_of_loss: string
@@ -230,6 +231,7 @@ type EditFields = {
 function jobToEditFields(job: JobDetails): EditFields {
   return {
     insurer: job.insurer ?? '',
+    client_id: job.client_id,
     claim_number: job.claim_number ?? '',
     loss_type: job.loss_type ?? '',
     date_of_loss: job.date_of_loss ?? '',
@@ -271,7 +273,7 @@ function JobDetailsAccordion({
   const [vals, setVals] = useState<EditFields>(() => jobToEditFields(job))
   const [saved, setSaved] = useState<JobDetails>(job)
 
-  function set(field: keyof EditFields, value: string) {
+  function set(field: keyof EditFields, value: string | null) {
     setVals(prev => ({ ...prev, [field]: value }))
   }
 
@@ -284,6 +286,7 @@ function JobDetailsAccordion({
     setSaving(true)
     const patch = {
       insurer: vals.insurer || null,
+      client_id: vals.client_id,
       claim_number: vals.claim_number || null,
       loss_type: vals.loss_type || null,
       date_of_loss: vals.date_of_loss || null,
@@ -493,7 +496,10 @@ function JobDetailsAccordion({
                   <InsurerSelect
                     tenantId={tenantId}
                     value={vals.insurer}
-                    onSave={v => set('insurer', v || '')}
+                    onSave={(name, clientId) => {
+                      set('insurer', name || '')
+                      set('client_id', clientId)
+                    }}
                   />
                 </div>
               ) : (
@@ -537,7 +543,7 @@ function JobDetailsAccordion({
                   <input
                     className="ov-edit-input"
                     type={field === 'order_sender_email' ? 'email' : 'text'}
-                    value={vals[field]}
+                    value={vals[field] || ''}
                     onChange={e => set(field, e.target.value)}
                   />
                 ) : (
@@ -649,7 +655,7 @@ function JobDetailsAccordion({
                   <input
                     className="ov-edit-input"
                     type={field === 'insured_email' ? 'email' : 'text'}
-                    value={vals[field]}
+                    value={vals[field] || ''}
                     onChange={e => set(field, e.target.value)}
                   />
                 ) : (
