@@ -536,16 +536,11 @@ export default async function ReportPrintPage({
                     </td>
                     <td style={tdCell}>
                       <div style={cellContentStyle}>
-                        <span style={labelStyle}>Time arrived:</span>
-                        <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
-                      </div>
-                    </td>
-                    <td style={tdCell}>
-                      <div style={cellContentStyle}>
                         <span style={labelStyle}>Roofer's Name & Qualifications:</span>
                         <span style={valueStyle}>{String(report.assessor_name ?? tsf(report, 'assessor_name') ?? '—')}</span>
                       </div>
                     </td>
+                    <td style={tdCell}></td>
                   </tr>
                   <tr>
                     <td style={tdCellLast}>
