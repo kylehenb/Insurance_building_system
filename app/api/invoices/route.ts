@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     .eq('job_id', jobId)
     .eq('tenant_id', tenantId)
 
-  const seq = String((count ?? 0) + 1).padStart(3, '0')
+  const seq = String((count ?? 0) + 1)
   const invoiceRef = `INV-${job.job_number}-${seq}`
 
   // Calculate totals from line items

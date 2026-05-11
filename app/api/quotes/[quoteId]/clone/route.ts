@@ -61,7 +61,7 @@ export async function POST(
         .eq('job_id', originalQuote.job_id)
         .eq('tenant_id', tenantId)
 
-      const seq = String((count ?? 0) + 1).padStart(3, '0')
+      const seq = String((count ?? 0) + 1)
       quoteRef = `Q-${job.job_number}-${seq}`
     }
   }

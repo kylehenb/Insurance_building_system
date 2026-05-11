@@ -13,6 +13,6 @@ export async function generateInvoiceRef(
     .eq('job_id', jobId)
     .eq('direction', 'outbound')
 
-  const sequence = String((count ?? 0) + 1).padStart(3, '0')
+  const sequence = String((count ?? 0) + 1)
   return `INV-${jobNumber}-${sequence}`
 }
