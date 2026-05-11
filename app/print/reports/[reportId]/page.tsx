@@ -130,29 +130,23 @@ const ROOF_TEMPLATE = {
 }
 
 const MAKE_SAFE_TEMPLATE = {
-  // Make Safe Report specific fields
+  // Make Safe Report specific fields - matching editor structure
   attendance_fields: [
-    { label: 'Date attended:', field: 'attendance_date' },
-    { label: 'Time attended:', field: 'attendance_time' },
-    { label: 'Conducted by:', field: 'assessor_name' },
+    { label: 'Date of Attendance:', field: 'attendance_date' },
   ] as const,
 
   hazards_fields: [
-    { label: 'Immediate hazards identified:', field: 'immediate_hazards' },
+    { label: 'Hazards Identified', field: 'immediate_hazards' },
   ] as const,
 
   works_fields: [
-    { label: 'Make safe works carried out:', field: 'works_carried_out' },
-    { label: 'Further works required:', field: 'further_works_required' },
+    { label: 'Make Safe Works Carried Out', field: 'works_carried_out' },
+    { label: 'Further Works Required', field: 'further_works_required' },
   ] as const,
 
   property_status_fields: [
-    { label: 'Safe to occupy:', field: 'safe_to_occupy' },
-    { label: 'Occupancy conditions (if conditional):', field: 'occupancy_conditions' },
-  ] as const,
-
-  narrative_sections: [
-    'conclusion',
+    { label: 'Safe to Occupy', field: 'safe_to_occupy' },
+    { label: 'Occupancy Conditions (if conditional)', field: 'occupancy_conditions' },
   ] as const,
 }
 
@@ -573,24 +567,12 @@ export default async function ReportPrintPage({
               {/* Block 1 — Make Safe Attendance (Make Safe only) */}
               {isMakeSafe && (
                 <>
-                  {dividerRow('Attendance Details')}
+                  {dividerRow('Attendance')}
                   <tr>
-                    <td style={tdCell}>
+                    <td style={tdCellLast}>
                       <div style={cellContentStyle}>
-                        <span style={labelStyle}>Date attended:</span>
+                        <span style={labelStyle}>Date of Attendance:</span>
                         <span style={valueStyle}>{formatDate(report.attendance_date)}</span>
-                      </div>
-                    </td>
-                    <td style={tdCell}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Time attended:</span>
-                        <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
-                      </div>
-                    </td>
-                    <td style={tdCell}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Conducted by:</span>
-                        <span style={valueStyle}>{String(report.assessor_name ?? '—')}</span>
                       </div>
                     </td>
                   </tr>
@@ -694,62 +676,6 @@ export default async function ReportPrintPage({
                 </>
               )}
 
-              {/* Block 2 — Hazards (Make Safe only) */}
-              {isMakeSafe && (
-                <>
-                  {dividerRow('Hazards Identified')}
-                  <tr>
-                    <td style={tdCellLast} colSpan={3}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Immediate hazards identified:</span>
-                        <span style={valueStyle}>{tsf(report, 'immediate_hazards') || '—'}</span>
-                      </div>
-                    </td>
-                  </tr>
-                </>
-              )}
-
-              {/* Block 3 — Works (Make Safe only) */}
-              {isMakeSafe && (
-                <>
-                  {dividerRow('Works Carried Out')}
-                  <tr>
-                    <td style={tdCell}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Make safe works carried out:</span>
-                        <span style={valueStyle}>{tsf(report, 'works_carried_out') || '—'}</span>
-                      </div>
-                    </td>
-                    <td style={tdCellLast} colSpan={2}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Further works required:</span>
-                        <span style={valueStyle}>{tsf(report, 'further_works_required') || '—'}</span>
-                      </div>
-                    </td>
-                  </tr>
-                </>
-              )}
-
-              {/* Block 4 — Property Status (Make Safe only) */}
-              {isMakeSafe && (
-                <>
-                  {dividerRow('Property Status')}
-                  <tr>
-                    <td style={tdCell}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Safe to occupy:</span>
-                        <span style={valueStyle}>{tsf(report, 'safe_to_occupy') || '—'}</span>
-                      </div>
-                    </td>
-                    <td style={tdCellLast} colSpan={2}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Occupancy conditions (if conditional):</span>
-                        <span style={valueStyle}>{tsf(report, 'occupancy_conditions') || '—'}</span>
-                      </div>
-                    </td>
-                  </tr>
-                </>
-              )}
 
               {/* Block 2 — Property details (conditional, BAR only) */}
               {DEFAULT_BAR_TEMPLATE.show_property_table && report.report_type !== 'LDR' && report.report_type !== 'roof' && report.report_type !== 'make_safe' && (
@@ -1059,29 +985,17 @@ export default async function ReportPrintPage({
                 }
               }
             } else if (isMakeSafe) {
-              // Make Safe narrative sections - rendered with new color scheme
-              const makeSafeSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode }> = [
+              // Make Safe narrative sections - rendered with new color scheme, matching editor structure
+              const makeSafeSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode; isHeader?: boolean }> = [
+                {
+                  key: 'immediate_hazards_header',
+                  title: 'Immediate Hazards',
+                  renderBody: () => null,
+                  isHeader: true,
+                },
                 ...MAKE_SAFE_TEMPLATE.hazards_fields.map(f => ({
                   key: f.field,
-                  title: f.label.replace(':', ''),
-                  renderBody: () => (
-                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
-                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
-                    </div>
-                  ),
-                })),
-                ...MAKE_SAFE_TEMPLATE.works_fields.map(f => ({
-                  key: f.field,
-                  title: f.label.replace(':', ''),
-                  renderBody: () => (
-                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
-                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
-                    </div>
-                  ),
-                })),
-                ...MAKE_SAFE_TEMPLATE.property_status_fields.map(f => ({
-                  key: f.field,
-                  title: f.label.replace(':', ''),
+                  title: f.label,
                   renderBody: () => (
                     <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
                       {formatTextWithPreservedFormatting(tsf(report, f.field))}
@@ -1089,31 +1003,63 @@ export default async function ReportPrintPage({
                   ),
                 })),
                 {
-                  key: 'conclusion',
-                  title: 'Conclusion',
+                  key: 'works_carried_out_header',
+                  title: 'Works Carried Out',
+                  renderBody: () => null,
+                  isHeader: true,
+                },
+                ...MAKE_SAFE_TEMPLATE.works_fields.map(f => ({
+                  key: f.field,
+                  title: f.label,
                   renderBody: () => (
                     <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
-                      {formatTextWithPreservedFormatting(report.conclusion)}
+                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
                     </div>
                   ),
+                })),
+                {
+                  key: 'property_status_header',
+                  title: 'Property Status',
+                  renderBody: () => null,
+                  isHeader: true,
                 },
+                ...MAKE_SAFE_TEMPLATE.property_status_fields.map(f => ({
+                  key: f.field,
+                  title: f.label,
+                  renderBody: () => (
+                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
+                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
+                    </div>
+                  ),
+                })),
               ]
 
               for (const section of makeSafeSections) {
-                const num = getNextSectionNum()
-                nodes.push(
-                  <div key={section.key} style={{ marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
-                      <div style={{ width: '20px', height: '20px', border: '1.5px solid #5B4B35', color: '#5B4B35', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {num}
-                      </div>
-                      <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5B4B35', fontWeight: '800' }}>
+                if (section.isHeader) {
+                  // Render as subheading without numbering using IRC color scheme
+                  nodes.push(
+                    <div key={section.key} style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '12px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5B4B35', fontWeight: '800', padding: '4px 10px', backgroundColor: '#E9E1D2', borderBottom: '1px solid #5B4B35' }}>
                         {section.title}
                       </div>
                     </div>
-                    {section.renderBody()}
-                  </div>
-                )
+                  )
+                } else {
+                  const num = getNextSectionNum()
+                  nodes.push(
+                    <div key={section.key} style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                        <div style={{ width: '20px', height: '20px', border: '1.5px solid #5B4B35', color: '#5B4B35', fontSize: '9px', fontWeight: '700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {num}
+                        </div>
+                        <div style={{ fontSize: '9px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#5B4B35', fontWeight: '800' }}>
+                          {section.title}
+                        </div>
+                      </div>
+                      {section.renderBody()}
+                    </div>
+                  )
+                }
               }
             } else if (isLDR) {
               // LDR narrative sections - sections 4-8, all rendered with consistent styling
