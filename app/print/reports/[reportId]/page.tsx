@@ -135,10 +135,6 @@ const MAKE_SAFE_TEMPLATE = {
     { label: 'Date of Attendance:', field: 'attendance_date' },
   ] as const,
 
-  hazards_fields: [
-    { label: 'Hazards Identified', field: 'immediate_hazards' },
-  ] as const,
-
   works_fields: [
     { label: 'Make Safe Works Carried Out', field: 'works_carried_out' },
     { label: 'Further Works Required', field: 'further_works_required' },
@@ -833,27 +829,6 @@ export default async function ReportPrintPage({
 
               {/* Block 6 — Conclusion (Roof only) - REMOVED, moved to narrative sections */}
 
-              {/* Block 3 — Make safe & specialist (BAR only) */}
-              {report.report_type !== 'LDR' && report.report_type !== 'roof' && (
-                <>
-                  {dividerRow('Make safe & specialist')}
-                  <tr>
-                    <td style={tdCellLast}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Make safe conducted:</span>
-                        <span style={valueStyle}>{tsf(report, 'make_safe_conducted')}</span>
-                      </div>
-                    </td>
-                    <td style={tdCellLast}>
-                      <div style={cellContentStyle}>
-                        <span style={labelStyle}>Specialist report obtained:</span>
-                        <span style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</span>
-                      </div>
-                    </td>
-                    <td style={tdCellLast}></td>
-                  </tr>
-                </>
-              )}
 
               {/* Block 4 — Insurer-specific rows (conditional) */}
               {DEFAULT_BAR_TEMPLATE.insurer_specific_rows.length > 0 && (
@@ -988,21 +963,6 @@ export default async function ReportPrintPage({
               // Make Safe narrative sections - rendered with new color scheme, matching editor structure
               const makeSafeSections: Array<{ key: string; title: string; renderBody: () => React.ReactNode; isHeader?: boolean }> = [
                 {
-                  key: 'immediate_hazards_header',
-                  title: 'Immediate Hazards',
-                  renderBody: () => null,
-                  isHeader: true,
-                },
-                ...MAKE_SAFE_TEMPLATE.hazards_fields.map(f => ({
-                  key: f.field,
-                  title: f.label,
-                  renderBody: () => (
-                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
-                      {formatTextWithPreservedFormatting(tsf(report, f.field))}
-                    </div>
-                  ),
-                })),
-                {
                   key: 'works_carried_out_header',
                   title: 'Works Carried Out',
                   renderBody: () => null,
@@ -1012,7 +972,7 @@ export default async function ReportPrintPage({
                   key: f.field,
                   title: f.label,
                   renderBody: () => (
-                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
+                    <div style={{ background: 'transparent', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
                       {formatTextWithPreservedFormatting(tsf(report, f.field))}
                     </div>
                   ),
@@ -1027,7 +987,7 @@ export default async function ReportPrintPage({
                   key: f.field,
                   title: f.label,
                   renderBody: () => (
-                    <div style={{ background: '#E9E1D2', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
+                    <div style={{ background: 'transparent', border: '1px solid #5B4B35', borderRadius: '5px', padding: '10px 12px', fontSize: '11.5px', color: '#111111', lineHeight: '1.65' }}>
                       {formatTextWithPreservedFormatting(tsf(report, f.field))}
                     </div>
                   ),

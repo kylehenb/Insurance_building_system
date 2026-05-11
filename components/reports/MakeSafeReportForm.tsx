@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { ReportPhotos } from './ReportPhotos'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,8 @@ interface MakeSafeReportFormProps {
   locked: boolean
   onChange: (field: string, value: unknown) => void
   tenantId?: string
+  reportId?: string
+  jobId?: string
 }
 
 function SectionHeading({ label }: { label: string }) {
@@ -144,7 +147,7 @@ function RadioGroup({
   )
 }
 
-export function MakeSafeReportForm({ data, locked, onChange, tenantId }: MakeSafeReportFormProps) {
+export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId, jobId }: MakeSafeReportFormProps) {
   const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
   const tsf = (key: string) => {
@@ -229,19 +232,6 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId }: MakeSaf
         </div>
       </div>
 
-      {/* — IMMEDIATE HAZARDS — */}
-      <SectionHeading label="Immediate Hazards" />
-      <div>
-        <FieldLabel label="Hazards Identified" />
-        <InlineTextarea
-          value={tsf('immediate_hazards')}
-          onChange={v => onTsf('immediate_hazards', v)}
-          locked={locked}
-          placeholder="Describe all immediate safety hazards identified at the property..."
-          rows={4}
-        />
-      </div>
-
       {/* — WORKS CARRIED OUT — */}
       <SectionHeading label="Works Carried Out" />
       <div className="space-y-4">
@@ -318,6 +308,19 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId }: MakeSaf
           rows={4}
         />
       </div>
+
+      {/* — PHOTOS — */}
+      {reportId && jobId && tenantId && (
+        <>
+          <SectionHeading label="Photos" />
+          <ReportPhotos
+            reportId={reportId}
+            jobId={jobId}
+            tenantId={tenantId}
+            locked={locked}
+          />
+        </>
+      )}
     </div>
   )
 }
