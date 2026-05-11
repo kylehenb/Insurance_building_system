@@ -1304,6 +1304,7 @@ export type Database = {
           gst: number | null
           gst_treatment: string | null
           id: string
+          inspection_id: string | null
           invoice_ref: string | null
           invoice_type: string
           issued_date: string | null
@@ -1334,6 +1335,7 @@ export type Database = {
           gst?: number | null
           gst_treatment?: string | null
           id?: string
+          inspection_id?: string | null
           invoice_ref?: string | null
           invoice_type: string
           issued_date?: string | null
@@ -1364,6 +1366,7 @@ export type Database = {
           gst?: number | null
           gst_treatment?: string | null
           id?: string
+          inspection_id?: string | null
           invoice_ref?: string | null
           invoice_type?: string
           issued_date?: string | null

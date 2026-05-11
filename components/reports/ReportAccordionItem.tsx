@@ -107,11 +107,14 @@ function formatDate(d: string | null) {
 function DeleteModal({
   onConfirm,
   onCancel,
+  hasInvoice,
 }: {
-  onConfirm: (reason: string) => void
+  onConfirm: (reason: string, deleteInvoice: boolean) => void
   onCancel: () => void
+  hasInvoice: boolean
 }) {
   const [reason, setReason] = useState('')
+  const [deleteInvoice, setDeleteInvoice] = useState(true)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div
@@ -131,6 +134,36 @@ function DeleteModal({
           >
             The report will be soft-deleted and remain visible in the list. An admin can reinstate it.
           </p>
+          
+          {hasInvoice && (
+            <div
+              className="mb-4 p-3 rounded-md bg-amber-50 border border-amber-200"
+            >
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteInvoice}
+                  onChange={e => setDeleteInvoice(e.target.checked)}
+                  className="mt-0.5 accent-[#c8b89a]"
+                />
+                <div>
+                  <span
+                    className="text-[12px] font-medium text-[#3a3530]"
+                    style={{ fontFamily: 'DM Sans, sans-serif' }}
+                  >
+                    Also delete the corresponding invoice
+                  </span>
+                  <p
+                    className="text-[11px] text-[#b0a898] mt-1"
+                    style={{ fontFamily: 'DM Sans, sans-serif' }}
+                  >
+                    When a report is deleted, the corresponding invoice should be deleted too. Only keep the invoice if there is a special circumstance.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
           <label
             className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -155,7 +188,7 @@ function DeleteModal({
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(reason)}
+            onClick={() => onConfirm(reason, deleteInvoice)}
             className="flex-1 py-3 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors border-l border-[#e4dfd8]"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
@@ -189,6 +222,7 @@ export function ReportAccordionItem({
   const [menuOpen, setMenuOpen] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isActioning, setIsActioning] = useState(false)
+  const [hasInvoice, setHasInvoice] = useState(false)
 
   // Property details state
   const [propertyDetails, setPropertyDetails] = useState<PropertyDetails>({})
@@ -218,6 +252,24 @@ export function ReportAccordionItem({
 
     fetchJobPropertyDetails()
   }, [isOpen, report.job_id, report.tenant_id, supabase, propertyDetailsLoading])
+
+  // Check if report has an invoice when delete modal opens
+  useEffect(() => {
+    if (!showDeleteModal) return
+
+    const checkForInvoice = async () => {
+      const { data: invoice } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('report_id', report.id)
+        .eq('tenant_id', report.tenant_id)
+        .single()
+
+      setHasInvoice(!!invoice)
+    }
+
+    checkForInvoice()
+  }, [showDeleteModal, report.id, report.tenant_id, supabase])
 
   // Save property details to jobs table
   const savePropertyDetails = async (updates: PropertyDetails) => {
@@ -365,9 +417,12 @@ export function ReportAccordionItem({
     <>
       {showDeleteModal && (
         <DeleteModal
-          onConfirm={async reason => {
+          hasInvoice={hasInvoice}
+          onConfirm={async (reason, deleteInvoice) => {
             setShowDeleteModal(false)
             setIsActioning(true)
+            
+            // Delete report
             await fetch(`/api/reports/${report.id}`, {
               method: 'DELETE',
               headers: { 'Content-Type': 'application/json' },
@@ -377,6 +432,24 @@ export function ReportAccordionItem({
                 reason,
               }),
             })
+            
+            // Delete invoice if requested
+            if (deleteInvoice && hasInvoice) {
+              const { data: invoice } = await supabase
+                .from('invoices')
+                .select('id')
+                .eq('report_id', report.id)
+                .eq('tenant_id', report.tenant_id)
+                .single()
+              
+              if (invoice) {
+                await supabase
+                  .from('invoices')
+                  .delete()
+                  .eq('id', invoice.id)
+              }
+            }
+            
             onReportDeleted(report.id)
             setIsActioning(false)
           }}

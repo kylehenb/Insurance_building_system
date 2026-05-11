@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
+import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -278,6 +279,42 @@ export async function POST(req: NextRequest) {
 
       reportId = newReport.id
       console.log('[lodge] report created:', reportId)
+
+      // Step 7b: Auto-create invoice for the report
+      // Fetch property_details from job (may be null at this point, invoice will use default pricing)
+      const { data: jobWithProperty } = await supabase
+        .from('jobs')
+        .select('property_details')
+        .eq('id', jobId)
+        .single()
+
+      // Extract storeys from property_details JSONB if available
+      const propertyDetails = jobWithProperty?.property_details as Record<string, unknown> | null
+      const storeys = propertyDetails?.storeys as string | null
+      let propertyType: string | null = null
+      if (storeys === '2' || storeys === 'double') {
+        propertyType = 'double_storey'
+      } else if (storeys === '1' || storeys === 'single') {
+        propertyType = 'single_storey'
+      }
+
+      const invoiceResult = await createInvoiceForReport(supabase, {
+        tenantId,
+        jobId,
+        reportId,
+        inspectionId: wo_type === 'BAR' ? inspectionId : null,
+        reportType: wo_type,
+        propertyType,
+        propertyAddress: order.property_address,
+        claimNumber: order.claim_number,
+        jobNumber,
+      })
+
+      if (invoiceResult) {
+        console.log('[lodge] auto-created invoice:', invoiceResult.invoiceRef)
+      } else {
+        console.warn('[lodge] failed to auto-create invoice for report')
+      }
     } else {
       console.log('[lodge] skipping report creation for wo_type:', wo_type)
     }
