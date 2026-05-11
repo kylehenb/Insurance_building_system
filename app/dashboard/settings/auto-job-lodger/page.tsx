@@ -23,6 +23,17 @@ type AutoJobLodgerConfig = {
   notification_body_template: string
 }
 
+type GmailSyncState = {
+  id: string
+  tenant_id: string
+  email_address: string
+  last_history_id: string | null
+  last_synced_at: string | null
+  last_poll_timestamp: string | null
+  polling_enabled: boolean
+  polling_interval_minutes: number
+}
+
 type EmailKeywordRule = {
   id: string
   keyword: string
@@ -98,9 +109,13 @@ export default function AutoJobLodgerPage() {
   const [config, setConfig] = useState<AutoJobLodgerConfig | null>(null)
   const [keywords, setKeywords] = useState<EmailKeywordRule[]>([])
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [gmailSyncState, setGmailSyncState] = useState<GmailSyncState | null>(null)
 
   // Notification save state
   const [saving, setSaving] = useState(false)
+
+  // Polling save state
+  const [savingPolling, setSavingPolling] = useState(false)
 
   // Keyword add form state
   const [newKeyword, setNewKeyword] = useState('')
@@ -159,12 +174,23 @@ export default function AutoJobLodgerPage() {
     setOrdersLoading(false)
   }, [supabase])
 
+  // ── loadGmailSyncState ────────────────────────────────────────
+  const loadGmailSyncState = useCallback(async (tid: string) => {
+    const { data } = await supabase
+      .from('gmail_sync_state')
+      .select('*')
+      .eq('tenant_id', tid)
+      .single()
+    setGmailSyncState(data as GmailSyncState | null)
+  }, [supabase])
+
   // ── Effect 2: load data once tenantId is set ───────────────────
   useEffect(() => {
     if (!tenantId) return
     loadData()
     loadOrders(tenantId)
-  }, [tenantId, loadData, loadOrders])
+    loadGmailSyncState(tenantId)
+  }, [tenantId, loadData, loadOrders, loadGmailSyncState])
 
   // ── Save notification settings ─────────────────────────────────
   const handleSaveNotifications = async () => {
@@ -227,6 +253,22 @@ export default function AutoJobLodgerPage() {
     }
   }
 
+  // ── Toggle polling enabled ─────────────────────────────────────
+  const handleTogglePolling = async (enabled: boolean) => {
+    if (!gmailSyncState || !tenantId) return
+    setSavingPolling(true)
+    try {
+      await supabase
+        .from('gmail_sync_state')
+        .update({ polling_enabled: enabled } as never)
+        .eq('tenant_id', tenantId)
+        .eq('email_address', 'office@insurancerepairco.com.au')
+      await loadGmailSyncState(tenantId)
+    } finally {
+      setSavingPolling(false)
+    }
+  }
+
   // ── Loading state ──────────────────────────────────────────────
   if (loading || config === null) {
     return (
@@ -260,6 +302,67 @@ export default function AutoJobLodgerPage() {
         </div>
 
         <div className="space-y-6">
+
+          {/* ══════════════════════════════════════════════════════
+              SECTION 0 — GMAIL POLLING STATUS
+          ══════════════════════════════════════════════════════ */}
+          <div className="bg-white border border-[#e8e4e0] rounded-lg p-6">
+            <div className="mb-6">
+              <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-1">
+                Gmail Polling
+              </h2>
+              <p className="text-sm text-[#1a1a1a] font-medium">
+                Poll Gmail for new insurer emails every 2 minutes (replaces Gmail Watch).
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {/* Polling enabled toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-0.5">
+                    Enable polling
+                  </label>
+                  <p className="text-xs text-[#9e998f] mt-1">
+                    When enabled, Gmail is polled every 2 minutes for new emails
+                  </p>
+                </div>
+                <Switch
+                  checked={gmailSyncState?.polling_enabled ?? false}
+                  onCheckedChange={handleTogglePolling}
+                  disabled={savingPolling}
+                />
+              </div>
+
+              {/* Polling status */}
+              {gmailSyncState && (
+                <div className="bg-[#f5f2ee] rounded p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#9e998f]">Status</span>
+                    <span className={`text-xs font-medium ${
+                      gmailSyncState.polling_enabled ? 'text-green-700' : 'text-gray-600'
+                    }`}>
+                      {gmailSyncState.polling_enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  {gmailSyncState.last_poll_timestamp && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#9e998f]">Last poll</span>
+                      <span className="text-xs text-[#1a1a1a]">
+                        {timeAgo(gmailSyncState.last_poll_timestamp)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#9e998f]">Interval</span>
+                    <span className="text-xs text-[#1a1a1a]">
+                      {gmailSyncState.polling_interval_minutes ?? 2} minutes
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* ══════════════════════════════════════════════════════
               SECTION 1 — NOTIFICATION SETTINGS
