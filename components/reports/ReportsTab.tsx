@@ -58,6 +58,16 @@ const REPORT_TYPE_OPTIONS: { value: NewReportType; label: string }[] = [
   { value: 'LDR', label: 'Leak Detection Report' },
 ]
 
+// Mapping of report types to reference prefixes
+const REPORT_TYPE_PREFIXES: Record<string, string> = {
+  BAR: 'BAR',
+  storm_wind: 'SW',
+  make_safe: 'MS',
+  roof: 'RR',
+  specialist: 'SPR',
+  LDR: 'LDR',
+}
+
 // — Component ——————————————————————————————————————————————————————
 export function ReportsTab({
   jobId,
@@ -113,8 +123,9 @@ export function ReportsTab({
 
     const jobNumber = jobRow?.job_number ?? 'UNKNOWN'
     const existingCount = reports.length
-    const newIndex = String(existingCount + 1).padStart(3, '0')
-    const newRef = `RPT-${jobNumber}-${newIndex}`
+    const newIndex = String(existingCount + 1)
+    const prefix = REPORT_TYPE_PREFIXES[type] || 'RPT'
+    const newRef = `${prefix}-${jobNumber}-${newIndex}`
 
     const { data: newReport, error } = await supabase
       .from('reports')

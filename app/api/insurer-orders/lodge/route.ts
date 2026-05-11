@@ -4,6 +4,17 @@ import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 
+// Mapping of report types to reference prefixes
+const REPORT_TYPE_PREFIXES: Record<string, string> = {
+  BAR: 'BAR',
+  storm_wind: 'SW',
+  make_safe: 'MS',
+  roof: 'RR',
+  roof_report: 'RR',
+  specialist: 'SPR',
+  LDR: 'LDR',
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { orderId } = await req.json()
@@ -239,6 +250,7 @@ export async function POST(req: NextRequest) {
 
     if (wo_type === 'BAR' || wo_type === 'make_safe' || wo_type === 'roof_report' || wo_type === 'specialist') {
       console.log('[lodge] creating report for wo_type:', wo_type)
+      const prefix = REPORT_TYPE_PREFIXES[wo_type] || 'RPT'
       const { data: newReport, error: reportError } = await supabase
         .from('reports')
         .insert({
@@ -246,7 +258,7 @@ export async function POST(req: NextRequest) {
           job_id: jobId,
           inspection_id: wo_type === 'BAR' ? inspectionId : null,
           report_type: wo_type,
-          report_ref: `${jobNumber}-R01`,
+          report_ref: `${prefix}-${jobNumber}-1`,
           version: 1,
           is_locked: false,
           status: 'draft',

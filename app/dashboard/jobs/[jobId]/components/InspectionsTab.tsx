@@ -11,6 +11,16 @@ import { ReportAccordionItem } from '@/components/reports/ReportAccordionItem'
 import { QuoteEditorClient } from '../quotes/components/QuoteEditorClient'
 import { InvoiceEditor } from './InvoiceEditor'
 
+// Mapping of report types to reference prefixes
+const REPORT_TYPE_PREFIXES: Record<string, string> = {
+  BAR: 'BAR',
+  storm_wind: 'SW',
+  make_safe: 'MS',
+  roof: 'RR',
+  specialist: 'SPR',
+  LDR: 'LDR',
+}
+
 // — Types ——————————————————————————————————————————————————————————
 interface Inspection {
   id: string
@@ -511,12 +521,13 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     // Create core report for this inspection
     const inspectionId = inserted.id
     const existingCount = inspectionsWithRelations.length
-    const newIndex = String(existingCount + 1).padStart(3, '0')
-    const reportRef = `RPT-${jobNumber}-${newIndex}`
-    const quoteRef = `Q-${jobNumber}-${newIndex}`
+    const newIndex = String(existingCount + 1)
 
     // Determine report type based on inspection type
     const reportType = inspectionType === 'Roof Inspection' ? 'roof' : 'BAR'
+    const prefix = REPORT_TYPE_PREFIXES[reportType] || 'RPT'
+    const reportRef = `${prefix}-${jobNumber}-${newIndex}`
+    const quoteRef = `Q-${jobNumber}-${newIndex}`
 
     // Set default type_specific_fields for roof reports
     const defaultTypeSpecificFields = reportType === 'roof' ? {

@@ -4,6 +4,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+// Mapping of report types to reference prefixes
+const REPORT_TYPE_PREFIXES: Record<string, string> = {
+  BAR: 'BAR',
+  storm_wind: 'SW',
+  make_safe: 'MS',
+  roof: 'RR',
+  specialist: 'SPR',
+  LDR: 'LDR',
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -118,9 +128,10 @@ export async function POST(
     .eq('job_id', source.job_id)
     .eq('tenant_id', tenantId)
 
-  const newIndex = String((count ?? 0) + 1).padStart(3, '0')
+  const newIndex = String((count ?? 0) + 1)
   const jobPart = source.report_ref?.split('-')[1] ?? 'UNKNOWN'
-  const newRef = `RPT-${jobPart}-${newIndex}`
+  const prefix = REPORT_TYPE_PREFIXES[source.report_type] || 'RPT'
+  const newRef = `${prefix}-${jobPart}-${newIndex}`
 
   const { id: _id, created_at: _ca, report_ref: _ref, ...rest } = source
   const { data: newReport, error: insertError } = await supabase
