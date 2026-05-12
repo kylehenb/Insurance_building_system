@@ -281,7 +281,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             ? (matchedClientConfig as unknown as ClientEmailConfig)
             : null
           try {
-            const parsed = await parseInsurerOrder(msg, clientConfig)
+            const parsed = await parseInsurerOrder(msg, clientConfig, tenantId)
             orderId = await writeInsurerOrder(parsed, msg, tenantId)
             await sendOrderNotification(orderId, parsed, msg, tenantId)
             orderCount++

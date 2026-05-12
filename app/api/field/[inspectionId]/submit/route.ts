@@ -21,7 +21,7 @@ interface ScopeItem {
   unit: string
 }
 
-async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: string; lossType: string }): Promise<ScopeItem[]> {
+async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: string; lossType: string }, tenantId: string, service: any): Promise<ScopeItem[]> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   const scopeText = scopeRooms.map(r => {
@@ -31,31 +31,27 @@ async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: 
     return `${r.room || 'General'}${dimStr}:\n${items || '  (no items)'}`
   }).join('\n\n')
 
-  const prompt = `You are a building insurance scope parser. Parse the following field inspection scope notes into structured scope items.
+  // Fetch the scope parsing prompt from the database
+  let systemPrompt = 'You are a building insurance scope parser. Parse the following field inspection scope notes into structured scope items.'
+  try {
+    const { data: promptData } = await service
+      .from('prompts')
+      .select('system_prompt')
+      .eq('tenant_id', tenantId)
+      .eq('key', 'scope_field_parse')
+      .single()
+    if (promptData?.system_prompt) {
+      systemPrompt = promptData.system_prompt
+    }
+  } catch (e) {
+    console.error('Failed to fetch scope parsing prompt, using default:', e)
+  }
 
-Job Context:
-- Insurer: ${jobContext.insurer || 'Unknown'}
-- Loss Type: ${jobContext.lossType || 'Unknown'}
-
-Scope Notes:
-${scopeText}
-
-Return a JSON array of scope items. Each item must have:
-- room: room name from the notes
-- trade: trade category (e.g. "Carpentry", "Painting", "Tiling", "Plumbing", "Electrical", "Roofing", "Plastering", "Flooring", "General")
-- keyword: short keyword (e.g. "replace-ceiling", "paint-walls", "replace-tiles")
-- item_description: clear, professional description of the work
-- qty: quantity as a number (null if not determinable)
-- unit: unit of measure (e.g. "m2", "lm", "ea", "hrs", "m3") or null
-
-Rules:
-- One entry per scope item
-- If an item mentions dimensions from the room (L×W), calculate m2 for area items
-- Use professional trade terminology
-- Return ONLY the JSON array, no other text
-
-Example:
-[{"room":"Living Room","trade":"Plastering","keyword":"replace-ceiling","item_description":"Supply and replace water-damaged plasterboard ceiling lining","qty":24,"unit":"m2"}]`
+  // Replace placeholders in the prompt with actual values
+  const prompt = systemPrompt
+    .replace('{insurer}', jobContext.insurer || 'Unknown')
+    .replace('{loss_type}', jobContext.lossType || 'Unknown')
+    .replace('{scope_notes}', scopeText)
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -97,7 +93,7 @@ export async function POST(
 
   const { data: insp } = await service
     .from('inspections')
-    .select('id, job_id, quote_id, status')
+    .select('id, job_id, quote_id, report_id, status')
     .eq('id', inspectionId)
     .eq('tenant_id', tenantId)
     .single()
@@ -107,7 +103,7 @@ export async function POST(
     personMet,
     safetyData,
     scopeRooms,
-    reportNotes,
+    rawReportDump,
     propDesc,
     photoContext,
     insurer,
@@ -126,7 +122,7 @@ export async function POST(
       signedBy: string
     }
     scopeRooms: ScopeRoom[]
-    reportNotes: string
+    rawReportDump: string
     propDesc: string
     photoContext: string
     insurer: string
@@ -160,9 +156,51 @@ export async function POST(
     form_submitted_at: now,
     safety_confirmed_at: safetyData ? now : null,
     person_met: personMet ?? null,
-    notes: reportNotes ?? null,
+    raw_report_dump: rawReportDump ?? null,
     field_draft: null, // clear draft on submit
   }).eq('id', inspectionId).eq('tenant_id', tenantId)
+
+  // 2.5. Generate AI report if inspection has a report and raw_report_dump exists
+  let reportGenerated = false
+  if (insp.report_id && rawReportDump && rawReportDump.trim()) {
+    try {
+      // First, copy raw_report_dump to the report
+      await service.from('reports').update({
+        raw_report_dump: rawReportDump,
+      }).eq('id', insp.report_id).eq('tenant_id', tenantId)
+
+      // Then call AI generate report endpoint
+      const aiRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/api/ai/generate-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawReportDump: rawReportDump,
+          reportType: 'BAR',
+          tenantId,
+        }),
+      })
+      if (aiRes.ok) {
+        const aiData = await aiRes.json()
+        // Update the report with AI-generated content using the same fields as the web app
+        const updateData: Record<string, unknown> = {}
+        if (aiData.reportData.property_address) updateData.property_address = aiData.reportData.property_address
+        if (aiData.reportData.property_description) updateData.property_description = aiData.reportData.property_description
+        if (aiData.reportData.damage_description) updateData.damage_description = aiData.reportData.damage_description
+        if (aiData.reportData.cause_of_damage) updateData.cause_of_damage = aiData.reportData.cause_of_damage
+        if (aiData.reportData.pre_existing_conditions) updateData.pre_existing_conditions = aiData.reportData.pre_existing_conditions
+        if (aiData.reportData.maintenance_notes) updateData.maintenance_notes = aiData.reportData.maintenance_notes
+        if (aiData.reportData.conclusion) updateData.conclusion = aiData.reportData.conclusion
+        if (aiData.reportData.recommendations) updateData.recommendations = aiData.reportData.recommendations
+
+        if (Object.keys(updateData).length > 0) {
+          await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
+        }
+        reportGenerated = true
+      }
+    } catch (e) {
+      console.error('AI report generation error:', e)
+    }
+  }
 
   // 3. Parse and write scope items if quote exists
   let parsedCount = 0
@@ -170,7 +208,7 @@ export async function POST(
     const validRooms = scopeRooms.filter(r => r.items && r.items.some(i => i.trim()))
     if (validRooms.length > 0) {
       try {
-        const parsedItems = await parseScopeWithAI(validRooms, { insurer, lossType })
+        const parsedItems = await parseScopeWithAI(validRooms, { insurer, lossType }, tenantId, service)
 
         if (parsedItems.length > 0) {
           // Get current max sort order

@@ -282,7 +282,7 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
       <SectionHeading label="Field Notes (Internal)" />
       <div>
         <div className="flex items-center justify-between mb-1">
-          <FieldLabel label="Raw Report Dump" />
+          <FieldLabel label="Raw Report Notes" />
           <button
             type="button"
             onClick={handleGenerateReport}

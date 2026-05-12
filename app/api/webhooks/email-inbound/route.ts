@@ -308,7 +308,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           ? (matchedClientConfig as unknown as ClientEmailConfig)
           : null
         try {
-          const parsed = await parseInsurerOrder(msg, clientConfig)
+          const parsed = await parseInsurerOrder(msg, clientConfig, tenantId)
           orderId = await writeInsurerOrder(parsed, msg, tenantId)
           await sendOrderNotification(orderId, parsed, msg, tenantId)
         } catch (err) {

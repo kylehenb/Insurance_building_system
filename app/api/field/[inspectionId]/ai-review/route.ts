@@ -14,10 +14,10 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { reportNotes, propDesc, scopeItemCount, photoCount } = await req.json()
+  const { rawReportDump, propDesc, scopeItemCount, photoCount } = await req.json()
 
-  if (!reportNotes?.trim()) {
-    return NextResponse.json({ ok: true, score: 5, summary: 'No report notes to review.', flags: [] })
+  if (!rawReportDump?.trim()) {
+    return NextResponse.json({ ok: true, score: 5, summary: 'No raw report notes to review.', flags: [] })
   }
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -26,8 +26,8 @@ export async function POST(
 
 Property Description: ${propDesc || '(not provided)'}
 
-Report Notes:
-${reportNotes}
+Raw Report Notes:
+${rawReportDump}
 
 Additional context:
 - Scope items entered: ${scopeItemCount}

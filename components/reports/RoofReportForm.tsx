@@ -546,7 +546,7 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
       {/* — FIELD NOTES — */}
       <SectionHeading label="Field Notes (Internal)" />
       <div>
-        <FieldLabel label="Raw Report Dump" />
+        <FieldLabel label="Raw Report Notes" />
         <InlineTextarea
           value={str('raw_report_dump')}
           onChange={v => onChange('raw_report_dump', v)}

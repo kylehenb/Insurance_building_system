@@ -24,6 +24,21 @@ type JobHit = {
   claim_number: string | null
 }
 
+type LearningPromptState = {
+  orderId: string
+  fieldsCorrected: string[]
+  insurerName: string | null
+  confirmedError: boolean
+  saving: boolean
+}
+
+const TRACKED_FIELDS = [
+  'claim_number', 'insured_name', 'insured_phone', 'insured_email',
+  'property_address', 'date_of_loss', 'loss_type', 'claim_description',
+  'special_instructions', 'sum_insured_building', 'excess_building',
+  'adjuster_reference', 'wo_type', 'order_sender_name', 'order_sender_email',
+] as const
+
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -272,6 +287,17 @@ export default function InsurerOrdersPage() {
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Learning prompt
+  const [learningPrompt, setLearningPrompt] = useState<LearningPromptState | null>(null)
+  const [saveToast, setSaveToast] = useState<string | null>(null)
+  const learningDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Snapshots of gemini_output per order (keyed by orderId), taken once on accordion open
+  const originalValuesRef = useRef<Record<string, Record<string, unknown>>>({})
+  // Accumulated changed fields per order
+  const changedFieldsRef = useRef<Record<string, Set<string>>>({})
+  // Track whether prompt has been shown for this accordion session per order
+  const promptShownRef = useRef<Record<string, boolean>>({})
+
   // Auth bootstrap
   useEffect(() => {
     async function bootstrap() {
@@ -360,6 +386,24 @@ export default function InsurerOrdersPage() {
 
       // Initialize contacts and email fields for this order
       const order = orders.find(o => o.id === id)
+
+      // Snapshot original values from gemini_output for change detection
+      if (order) {
+        const geminiOutput = order.gemini_output as Record<string, unknown> | null
+        if (!originalValuesRef.current[id]) {
+          if (geminiOutput && typeof geminiOutput === 'object') {
+            originalValuesRef.current[id] = geminiOutput
+          } else {
+            const snapshot: Record<string, unknown> = {}
+            for (const field of TRACKED_FIELDS) {
+              snapshot[field] = order[field as keyof InsurerOrder] ?? null
+            }
+            originalValuesRef.current[id] = snapshot
+          }
+        }
+        changedFieldsRef.current[id] = new Set()
+        promptShownRef.current[id] = false
+      }
       if (order) {
         // Initialize contacts from insured fields if empty
         let contacts: JobContact[] = (order.contacts as unknown as JobContact[]) || []
@@ -411,18 +455,69 @@ export default function InsurerOrdersPage() {
     }
   }
 
+  function maybeShowLearningPrompt(orderId: string, updatedOrder: InsurerOrder) {
+    if (updatedOrder.entry_method !== 'email') return
+    if (
+      updatedOrder.parse_status !== 'auto_parsed' &&
+      updatedOrder.parse_status !== 'needs_review'
+    ) return
+    if (promptShownRef.current[orderId]) return
+
+    const original = originalValuesRef.current[orderId]
+    if (!original) return
+
+    const fieldsCorrected: string[] = []
+    for (const field of TRACKED_FIELDS) {
+      const originalVal = original[field] ?? null
+      const currentVal = updatedOrder[field as keyof InsurerOrder] ?? null
+      const originalStr = originalVal == null ? '' : String(originalVal)
+      const currentStr = currentVal == null ? '' : String(currentVal)
+      if (originalStr !== currentStr) {
+        fieldsCorrected.push(field)
+      }
+    }
+
+    if (fieldsCorrected.length === 0) return
+
+    promptShownRef.current[orderId] = true
+
+    if (learningDismissTimer.current) clearTimeout(learningDismissTimer.current)
+
+    setLearningPrompt({
+      orderId,
+      fieldsCorrected,
+      insurerName: updatedOrder.insurer ?? null,
+      confirmedError: false,
+      saving: false,
+    })
+
+    learningDismissTimer.current = setTimeout(() => {
+      setLearningPrompt(prev => (prev?.orderId === orderId ? null : prev))
+    }, 30000)
+  }
+
   // Save a text field on blur
   async function saveField(orderId: string, field: keyof InsurerOrder, raw: string) {
     const value = raw.trim() || null
     await supabase.from('insurer_orders').update({ [field]: value } as never).eq('id', orderId)
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o))
+    setOrders(prev => {
+      const updated = prev.map(o => o.id === orderId ? { ...o, [field]: value } : o)
+      const updatedOrder = updated.find(o => o.id === orderId)
+      if (updatedOrder) maybeShowLearningPrompt(orderId, updatedOrder)
+      return updated
+    })
   }
 
   // Save a numeric field on blur
   async function saveNumberField(orderId: string, field: keyof InsurerOrder, raw: string) {
     const value = raw.trim() ? parseFloat(raw.trim()) : null
     await supabase.from('insurer_orders').update({ [field]: value } as never).eq('id', orderId)
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o))
+    setOrders(prev => {
+      const updated = prev.map(o => o.id === orderId ? { ...o, [field]: value } : o)
+      const updatedOrder = updated.find(o => o.id === orderId)
+      if (updatedOrder) maybeShowLearningPrompt(orderId, updatedOrder)
+      return updated
+    })
   }
 
   // Save contacts array
@@ -437,7 +532,12 @@ export default function InsurerOrdersPage() {
         insured_phone: insured.phone || null,
         insured_email: insured.email || null,
       } as never).eq('id', orderId)
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, insured_name: insured.name, insured_phone: insured.phone, insured_email: insured.email } : o))
+      setOrders(prev => {
+        const updated = prev.map(o => o.id === orderId ? { ...o, insured_name: insured.name, insured_phone: insured.phone, insured_email: insured.email } : o)
+        const updatedOrder = updated.find(o => o.id === orderId)
+        if (updatedOrder) maybeShowLearningPrompt(orderId, updatedOrder)
+        return updated
+      })
     }
   }
 
@@ -447,13 +547,18 @@ export default function InsurerOrdersPage() {
     if (field === 'orderSenderName') update.order_sender_name = value || null
     if (field === 'orderSenderEmail') update.order_sender_email = value || null
     if (field === 'adjusterReference') update.adjuster_reference = value || null
-    
+
     await supabase.from('insurer_orders').update(update as never).eq('id', orderId)
     setOrderEmailFields(prev => ({
       ...prev,
       [orderId]: { ...prev[orderId], [field]: value }
     }))
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...update } : o))
+    setOrders(prev => {
+      const updated = prev.map(o => o.id === orderId ? { ...o, ...update } : o)
+      const updatedOrder = updated.find(o => o.id === orderId)
+      if (updatedOrder) maybeShowLearningPrompt(orderId, updatedOrder)
+      return updated
+    })
   }
 
   async function handleLodge(order: InsurerOrder) {
@@ -545,6 +650,59 @@ export default function InsurerOrdersPage() {
       setCreateError(err.message || 'Failed to create order')
     } finally {
       setCreatingOrder(false)
+    }
+  }
+
+  async function handleSaveLearningExample() {
+    if (!learningPrompt) return
+    const { orderId, fieldsCorrected, insurerName } = learningPrompt
+
+    setLearningPrompt(prev => prev ? { ...prev, saving: true } : null)
+
+    try {
+      const order = orders.find(o => o.id === orderId)
+      if (!order) return
+
+      // Fetch the inbound communication for this order
+      const { data: comm } = await supabase
+        .from('communications')
+        .select('body_text, subject')
+        .eq('insurer_order_id' as never, orderId)
+        .eq('direction', 'inbound')
+        .limit(1)
+        .single()
+
+      const rawEmailText = (comm as { body_text: string | null } | null)?.body_text ?? order.raw_email_body ?? ''
+      const rawEmailSubject = (comm as { subject: string | null } | null)?.subject ?? order.raw_email_subject ?? null
+
+      const correctOutput: Record<string, unknown> = {}
+      const originalOutput = originalValuesRef.current[orderId] ?? {}
+      for (const field of TRACKED_FIELDS) {
+        correctOutput[field] = order[field as keyof InsurerOrder] ?? null
+      }
+
+      const res = await fetch(`/api/insurer-orders/${orderId}/parser-example`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawEmailText,
+          rawEmailSubject,
+          correctOutput,
+          originalOutput,
+          fieldsCorrected,
+          confirmedGeminiError: true,
+          clientId: order.client_id ?? null,
+        }),
+      })
+
+      if (res.ok) {
+        const label = insurerName ? `${insurerName} orders` : 'future orders'
+        setSaveToast(`Saved. Auto Job Lodger will use this for future ${label}.`)
+        setTimeout(() => setSaveToast(null), 4000)
+      }
+    } finally {
+      if (learningDismissTimer.current) clearTimeout(learningDismissTimer.current)
+      setLearningPrompt(null)
     }
   }
 
@@ -1183,6 +1341,77 @@ export default function InsurerOrdersPage() {
           </div>
         </div>
       </div>
+
+      {/* Learning prompt bar */}
+      {learningPrompt && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 60,
+          background: '#1a1a1a', color: '#f5f2ee',
+          padding: '14px 24px',
+          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          boxShadow: '0 -4px 16px rgba(0,0,0,0.18)',
+          animation: 'slideUp 0.25s ease-out',
+          fontFamily: "'DM Sans', sans-serif",
+        }}>
+          <style>{`@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+          <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
+            You changed {learningPrompt.fieldsCorrected.length} field{learningPrompt.fieldsCorrected.length !== 1 ? 's' : ''} from the original parse
+            {' '}— {learningPrompt.fieldsCorrected.join(', ')}.
+            {' '}Was this because the Auto Job Lodger extracted something incorrectly?
+          </span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input
+              type="checkbox"
+              checked={learningPrompt.confirmedError}
+              onChange={e => setLearningPrompt(prev => prev ? { ...prev, confirmedError: e.target.checked } : null)}
+              style={{ width: 14, height: 14, cursor: 'pointer' }}
+            />
+            Yes, Gemini got these fields wrong
+          </label>
+          <button
+            onClick={handleSaveLearningExample}
+            disabled={!learningPrompt.confirmedError || learningPrompt.saving}
+            style={{
+              background: learningPrompt.confirmedError ? '#2a6b50' : '#3a3a3a',
+              color: '#ffffff', border: 'none', borderRadius: 6,
+              padding: '7px 14px', fontSize: 12, fontWeight: 600,
+              cursor: learningPrompt.confirmedError ? 'pointer' : 'not-allowed',
+              fontFamily: "'DM Sans', sans-serif",
+              opacity: learningPrompt.saving ? 0.7 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {learningPrompt.saving ? 'Saving…' : 'Save as learning example'}
+          </button>
+          <button
+            onClick={() => {
+              if (learningDismissTimer.current) clearTimeout(learningDismissTimer.current)
+              setLearningPrompt(null)
+            }}
+            style={{
+              background: 'transparent', color: '#a0a098', border: '1px solid #3a3a3a',
+              borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", whiteSpace: 'nowrap',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Save toast */}
+      {saveToast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 70,
+          background: '#2a6b50', color: '#ffffff', borderRadius: 8,
+          padding: '10px 20px', fontSize: 13, fontWeight: 500,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+          fontFamily: "'DM Sans', sans-serif",
+          pointerEvents: 'none',
+        }}>
+          {saveToast}
+        </div>
+      )}
 
       {/* New Order panel */}
       {newOrderOpen && (

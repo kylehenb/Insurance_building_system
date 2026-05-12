@@ -117,7 +117,8 @@ async function fetchPrompt(): Promise<string> {
 
 export async function parseInsurerOrder(
   message: ExtractedMessage,
-  clientConfig: ClientEmailConfig | null = null
+  clientConfig: ClientEmailConfig | null = null,
+  tenantId: string | null = null
 ): Promise<ParsedOrderResult> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY not set')
@@ -141,6 +142,40 @@ export async function parseInsurerOrder(
     }
     if (clientConfig.custom_parsing_notes != null) {
       systemInstruction += `\n\nParsing notes: ${clientConfig.custom_parsing_notes}`
+    }
+  }
+
+  // Inject confirmed learning examples for this client
+  if (tenantId && clientConfig?.client_id) {
+    try {
+      const supabase = createServiceClient()
+      const { data: examples } = await supabase
+        .from('parser_examples')
+        .select('raw_email_text, correct_output, fields_corrected')
+        .eq('tenant_id', tenantId)
+        .eq('client_id', clientConfig.client_id)
+        .eq('confirmed_gemini_error', true)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (examples && examples.length > 0) {
+        const exampleLines = examples.map((ex, i) => {
+          const emailPreview = ex.raw_email_text.slice(0, 800)
+          const fieldsStr = (ex.fields_corrected as string[]).join(', ')
+          return [
+            `Example ${i + 1}:`,
+            `Email: ${emailPreview}`,
+            `Correct extraction: ${JSON.stringify(ex.correct_output, null, 2)}`,
+            `Fields that were wrong initially: ${fieldsStr}`,
+          ].join('\n')
+        })
+
+        systemInstruction +=
+          '\n\nLEARNING EXAMPLES — previous corrections for this client:\n\n' +
+          exampleLines.join('\n\n')
+      }
+    } catch (err) {
+      console.error('[order-parser] failed to fetch learning examples:', err)
     }
   }
 

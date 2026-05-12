@@ -885,7 +885,7 @@ export type Database = {
           last_no_show_at: string | null
           no_show_count: number | null
           no_show_notes: string | null
-          notes: string | null
+          raw_report_dump: string | null
           person_met: string | null
           photos_status: string | null
           quote_id: string | null
@@ -918,7 +918,7 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          notes?: string | null
+          raw_report_dump?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
@@ -951,7 +951,7 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          notes?: string | null
+          raw_report_dump?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
@@ -1025,6 +1025,7 @@ export type Database = {
           email_attachments: Json | null
           entry_method: string | null
           excess_building: number | null
+          gemini_output: Json | null
           id: string
           insured_email: string | null
           insured_name: string | null
@@ -1061,6 +1062,7 @@ export type Database = {
           email_attachments?: Json | null
           entry_method?: string | null
           excess_building?: number | null
+          gemini_output?: Json | null
           id?: string
           insured_email?: string | null
           insured_name?: string | null
@@ -1097,6 +1099,7 @@ export type Database = {
           email_attachments?: Json | null
           entry_method?: string | null
           excess_building?: number | null
+          gemini_output?: Json | null
           id?: string
           insured_email?: string | null
           insured_name?: string | null
@@ -1148,6 +1151,70 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parser_examples: {
+        Row: {
+          id: string
+          tenant_id: string
+          client_id: string | null
+          raw_email_text: string
+          raw_email_subject: string | null
+          correct_output: Json
+          original_output: Json
+          fields_corrected: string[]
+          confirmed_gemini_error: boolean | null
+          created_at: string | null
+          insurer_order_id: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          client_id?: string | null
+          raw_email_text: string
+          raw_email_subject?: string | null
+          correct_output: Json
+          original_output: Json
+          fields_corrected: string[]
+          confirmed_gemini_error?: boolean | null
+          created_at?: string | null
+          insurer_order_id?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          client_id?: string | null
+          raw_email_text?: string
+          raw_email_subject?: string | null
+          correct_output?: Json
+          original_output?: Json
+          fields_corrected?: string[]
+          confirmed_gemini_error?: boolean | null
+          created_at?: string | null
+          insurer_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parser_examples_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parser_examples_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parser_examples_insurer_order_id_fkey"
+            columns: ["insurer_order_id"]
+            isOneToOne: false
+            referencedRelation: "insurer_orders"
             referencedColumns: ["id"]
           },
         ]
