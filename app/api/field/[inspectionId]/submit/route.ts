@@ -160,17 +160,17 @@ export async function POST(
     form_submitted_at: now,
     safety_confirmed_at: safetyData ? now : null,
     person_met: personMet ?? null,
-    raw_report_dump: rawReportDump ?? null,
+    raw_report_notes: rawReportDump ?? null,
     field_draft: null, // clear draft on submit
   }).eq('id', inspectionId).eq('tenant_id', tenantId)
 
-  // 2.5. Generate AI report if inspection has a report and raw_report_dump exists
+  // 2.5. Generate AI report if inspection has a report and raw_report_notes exists
   let reportGenerated = false
   if (insp.report_id && rawReportDump && rawReportDump.trim()) {
     try {
-      // First, copy raw_report_dump to the report
+      // First, copy raw_report_notes to the report
       await service.from('reports').update({
-        raw_report_dump: rawReportDump,
+        raw_report_notes: rawReportDump,
       }).eq('id', insp.report_id).eq('tenant_id', tenantId)
 
       // Then call AI generate report endpoint
@@ -234,7 +234,7 @@ export async function POST(
             inspection_id: inspectionId,
             report_type: 'roof',
             status: 'draft',
-            raw_report_dump: roofRawNotes,
+            raw_report_notes: roofRawNotes,
             attendance_date: now.split('T')[0],
             attendance_time: now.split('T')[1]?.split('.')[0] || null,
             assessor_name: userRow.name,
@@ -250,7 +250,7 @@ export async function POST(
       if (roofReportId) {
         // Update the roof report with raw notes
         await service.from('reports').update({
-          raw_report_dump: roofRawNotes,
+          raw_report_notes: roofRawNotes,
         }).eq('id', roofReportId).eq('tenant_id', tenantId)
 
         // Call AI generate report endpoint for roof report

@@ -160,7 +160,7 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
   }
 
   async function handleGenerateReport() {
-    const rawDump = str('raw_report_dump')
+    const rawDump = str('raw_report_notes')
     if (!rawDump.trim()) {
       alert('Please enter some raw notes first')
       return
@@ -286,11 +286,11 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
           <button
             type="button"
             onClick={handleGenerateReport}
-            disabled={locked || generating || !str('raw_report_dump').trim()}
+            disabled={locked || generating || !str('raw_report_notes').trim()}
             className={`
               px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
               transition-all duration-200
-              ${locked || generating || !str('raw_report_dump').trim()
+              ${locked || generating || !str('raw_report_notes').trim()
                 ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
                 : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
               }
@@ -301,8 +301,8 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
           </button>
         </div>
         <InlineTextarea
-          value={str('raw_report_dump')}
-          onChange={v => onChange('raw_report_dump', v)}
+          value={str('raw_report_notes')}
+          onChange={v => onChange('raw_report_notes', v)}
           locked={locked}
           placeholder="Raw dictation or field notes (internal only, not included in PDF)..."
           rows={4}

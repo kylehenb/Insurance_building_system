@@ -32,7 +32,7 @@ interface Report {
   conclusion: string | null
   pre_existing_conditions: string | null
   maintenance_notes: string | null
-  raw_report_dump: string | null
+  raw_report_notes: string | null
   damage_template: string | null
   additional_notes: string | null
   type_specific_fields: Record<string, unknown>

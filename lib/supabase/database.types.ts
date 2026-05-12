@@ -885,7 +885,7 @@ export type Database = {
           last_no_show_at: string | null
           no_show_count: number | null
           no_show_notes: string | null
-          raw_report_dump: string | null
+          raw_report_notes: string | null
           person_met: string | null
           photos_status: string | null
           quote_id: string | null
@@ -918,7 +918,7 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          raw_report_dump?: string | null
+          raw_report_notes?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
@@ -951,7 +951,7 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          raw_report_dump?: string | null
+          raw_report_notes?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
@@ -2461,7 +2461,7 @@ export type Database = {
           property_address: string | null
           property_description: string | null
           quote_id: string | null
-          raw_report_dump: string | null
+          raw_report_notes: string | null
           report_ref: string | null
           report_type: string
           resulting_damage: string | null
@@ -2501,7 +2501,7 @@ export type Database = {
           property_address?: string | null
           property_description?: string | null
           quote_id?: string | null
-          raw_report_dump?: string | null
+          raw_report_notes?: string | null
           report_ref?: string | null
           report_type: string
           resulting_damage?: string | null
@@ -2541,7 +2541,7 @@ export type Database = {
           property_address?: string | null
           property_description?: string | null
           quote_id?: string | null
-          raw_report_dump?: string | null
+          raw_report_notes?: string | null
           report_ref?: string | null
           report_type?: string
           resulting_damage?: string | null

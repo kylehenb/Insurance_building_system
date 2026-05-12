@@ -398,8 +398,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
                     <Field
                       label="Notes"
                       value={
-                        inspection.notes ? (
-                          <span className="whitespace-pre-wrap">{inspection.notes}</span>
+                        inspection.raw_report_notes ? (
+                          <span className="whitespace-pre-wrap">{inspection.raw_report_notes}</span>
                         ) : null
                       }
                     />

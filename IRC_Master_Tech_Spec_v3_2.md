@@ -577,7 +577,7 @@ CREATE TABLE reports (
   conclusion TEXT,
   pre_existing_conditions TEXT,
   maintenance_notes TEXT,
-  raw_report_dump TEXT,                -- raw combined dictation/text dump from field app
+  raw_report_notes TEXT,                -- raw combined dictation/text dump from field app
   damage_template TEXT,                -- selected scenario template name
   damage_template_saved BOOLEAN DEFAULT true, -- whether to persist as a reusable template
   -- Type-specific fields stored as JSONB

@@ -548,8 +548,8 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
       <div>
         <FieldLabel label="Raw Report Notes" />
         <InlineTextarea
-          value={str('raw_report_dump')}
-          onChange={v => onChange('raw_report_dump', v)}
+          value={str('raw_report_notes')}
+          onChange={v => onChange('raw_report_notes', v)}
           locked={locked}
           placeholder="Raw dictation or field notes (internal only, not included in PDF)..."
           rows={4}

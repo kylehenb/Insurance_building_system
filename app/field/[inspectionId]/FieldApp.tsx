@@ -119,7 +119,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
 
   // ─── Notes ────────────────────────────────────────────────────────────────
-  const [rawReportDump, setRawReportDump] = useState('')
+  const [raw_report_notes, setRawReportNotes] = useState('')
 
   // ─── Photos ───────────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<PhotoEntry[]>([])
@@ -226,7 +226,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
-    personMet, relation, propDesc, rawReportDump, photoContext,
+    personMet, relation, propDesc, raw_report_notes, photoContext,
     hospitalName, customSafetyNotes, chips, safetyDone, commenceTime,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     roofRawNotes, roofPhotoContext,
@@ -234,7 +234,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
     restType, restExtent, restRooms, restEquip, restNotes,
     extTrades, extTradeNotes,
-  }), [personMet, relation, propDesc, rawReportDump, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
+  }), [personMet, relation, propDesc, raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -255,7 +255,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.personMet) setPersonMet(d.personMet as string)
     if (d.relation) setRelation(d.relation as string)
     if (d.propDesc) setPropDesc(d.propDesc as string)
-    if (d.rawReportDump) setRawReportDump(d.rawReportDump as string)
+    if (d.raw_report_notes) setRawReportNotes(d.raw_report_notes as string)
     if (d.photoContext) setPhotoContext(d.photoContext as string)
     if (d.hospitalName) setHospitalName(d.hospitalName as string)
     if (d.customSafetyNotes) setCustomSafetyNotes(d.customSafetyNotes as string)
@@ -406,7 +406,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (totalItems === 0) { flags.push({ type: 'warn', msg: 'No scope items entered — add rooms and items' }); score -= 2 }
     else flags.push({ type: 'ok', msg: `Scope — ${totalItems} item${totalItems > 1 ? 's' : ''} across ${scopeRooms.length} room(s)` })
 
-    const noteLen = rawReportDump.trim().length
+    const noteLen = raw_report_notes.trim().length
     if (noteLen < 80) { flags.push({ type: 'warn', msg: `Raw report notes are brief — aim for 200+ characters (currently ${noteLen})` }); score -= 2 }
     else flags.push({ type: 'ok', msg: `Raw report notes — ${noteLen} characters` })
 
@@ -427,7 +427,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         const res = await fetch(`${base}/ai-review`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rawReportDump, propDesc, scopeItemCount: totalItems, photoCount: photos.length }),
+          body: JSON.stringify({ raw_report_notes, propDesc, scopeItemCount: totalItems, photoCount: photos.length }),
         })
         const data = await res.json()
         if (data.ok) {
@@ -493,7 +493,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             signedBy: personMet,
           },
           scopeRooms: scopeRoomsPayload,
-          rawReportDump,
+          raw_report_notes,
           propDesc,
           photoContext,
           insurer: initialData.insurer ?? '',
@@ -804,8 +804,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                 className="fa-ai-dark-ta"
                 placeholder="Describe the damage, cause, and your findings in plain language. AI will structure this into a professional report…"
                 style={{ minHeight: 130 }}
-                value={rawReportDump}
-                onChange={e => { setRawReportDump(e.target.value); armDraft() }}
+                value={raw_report_notes}
+                onChange={e => { setRawReportNotes(e.target.value); armDraft() }}
               />
             </div>
           </div>

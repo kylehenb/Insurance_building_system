@@ -34,7 +34,7 @@ interface Inspection {
   status: string
   person_met: string | null
   access_notes: string | null  // repurposed for assessor name
-  notes: string | null
+  raw_report_notes: string | null
   field_draft: Record<string, unknown> | null
   quote_id: string | null
   report_id: string | null
@@ -66,7 +66,7 @@ interface Report {
   conclusion: string | null
   pre_existing_conditions: string | null
   maintenance_notes: string | null
-  raw_report_dump: string | null
+  raw_report_notes: string | null
   damage_template: string | null
   additional_notes: string | null
   type_specific_fields: Record<string, unknown>
@@ -208,7 +208,7 @@ function InspectionForm({
   )
   const [status, setStatus] = useState(inspection.status)
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
-  const [notes, setNotes] = useState(inspection.notes ?? '')
+  const [notes, setNotes] = useState(inspection.raw_report_notes ?? '')
   const [deleting, setDeleting] = useState(false)
 
   const { scheduleFieldSave, flushSave, saveState } = useInspectionAutosave({
@@ -401,7 +401,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     // Fetch all inspections for this job
     const { data: inspections, error: inspError } = await supabase
       .from('inspections')
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,quote_id,report_id,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,quote_id,report_id,created_at')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true })
