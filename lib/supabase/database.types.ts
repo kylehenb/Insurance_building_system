@@ -1042,6 +1042,7 @@ export type Database = {
           property_address: string | null
           raw_email_body: string | null
           raw_email_link: string | null
+          raw_email_subject: string | null
           special_instructions: string | null
           status: string | null
           sum_insured_building: number | null
@@ -1077,6 +1078,7 @@ export type Database = {
           property_address?: string | null
           raw_email_body?: string | null
           raw_email_link?: string | null
+          raw_email_subject?: string | null
           special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null
@@ -1112,6 +1114,7 @@ export type Database = {
           property_address?: string | null
           raw_email_body?: string | null
           raw_email_link?: string | null
+          raw_email_subject?: string | null
           special_instructions?: string | null
           status?: string | null
           sum_insured_building?: number | null

@@ -173,10 +173,10 @@ export async function parseInsurerOrder(
         order_sender_name: message.fromName || null,
         order_sender_email: message.fromEmail || null,
         insurer: insurerDetected,
-        claim_description: message.subject || null,
+        claim_description: null, // Let Gemini extract from body, don't fall back to subject
       },
       confidence: 0,
-      missingFields: ['claim_number', 'insured_name', 'property_address'],
+      missingFields: ['claim_number', 'insured_name', 'property_address', 'claim_description'],
       parseStatus: 'needs_review',
       rawEmailLink: null,
       insurerDetected,

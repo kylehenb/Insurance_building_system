@@ -976,6 +976,97 @@ export default function InsurerOrdersPage() {
                                     label="Notes" value={order.notes}
                                     onSave={v => saveField(order.id, 'notes', v)}
                                   />
+                                  
+                                  {/* Raw Email Fields */}
+                                  <div style={{ border: '1px solid #e4dfd8', borderRadius: 6, padding: 12, background: '#faf9f7' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 600, color: '#b0a898', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                      Raw Email Data
+                                    </div>
+                                    
+                                    {/* Raw Email Subject */}
+                                    {order.raw_email_subject && (
+                                      <div style={{ marginBottom: 12 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 3 }}>
+                                          Email Subject
+                                        </div>
+                                        <div style={{
+                                          padding: '8px 10px',
+                                          background: '#ffffff',
+                                          border: '0.5px solid #e4dfd8',
+                                          borderRadius: 4,
+                                          fontSize: 13,
+                                          color: '#1a1a1a',
+                                          fontFamily: "'DM Sans', sans-serif",
+                                          whiteSpace: 'pre-wrap'
+                                        }}>
+                                          {order.raw_email_subject}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Raw Email Body */}
+                                    {order.raw_email_body && (
+                                      <div style={{ marginBottom: 12 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 3 }}>
+                                          Email Body
+                                        </div>
+                                        <textarea
+                                          value={order.raw_email_body}
+                                          rows={8}
+                                          readOnly
+                                          style={{
+                                            width: '100%',
+                                            padding: '8px 10px',
+                                            background: '#ffffff',
+                                            border: '0.5px solid #e4dfd8',
+                                            borderRadius: 4,
+                                            fontSize: 12,
+                                            color: '#1a1a1a',
+                                            fontFamily: "'DM Mono', monospace",
+                                            resize: 'vertical',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: 1.4,
+                                            boxSizing: 'border-box'
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                    
+                                    {/* Email Attachments */}
+                                    {order.email_attachments && Array.isArray(order.email_attachments) && order.email_attachments.length > 0 && (
+                                      <div>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 6 }}>
+                                          Attachments ({order.email_attachments.length})
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                          {order.email_attachments.map((attachment: any, index: number) => (
+                                            <div key={index} style={{
+                                              padding: '6px 10px',
+                                              background: '#ffffff',
+                                              border: '0.5px solid #e4dfd8',
+                                              borderRadius: 4,
+                                              fontSize: 12,
+                                              color: '#3a3530',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 8
+                                            }}>
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0a898" strokeWidth="1.5">
+                                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                                                <polyline points="14,2 14,8 20,8"/>
+                                              </svg>
+                                              <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 500 }}>{attachment.filename}</div>
+                                                <div style={{ fontSize: 10, color: '#b0a898' }}>
+                                                  {attachment.mimeType} • {Math.round(attachment.size / 1024)}KB
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {/* Action buttons */}
