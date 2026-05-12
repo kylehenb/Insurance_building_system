@@ -101,6 +101,29 @@ For Make Safe reports:
   "fee_schedule": "string"
 }
 
+For Roof reports:
+{
+  "roof_type": "string or array of strings",
+  "roof_general_condition": "Good|Fair|Poor",
+  "pitch_degrees": "number",
+  "number_of_penetrations": "number",
+  "number_of_storeys": "string",
+  "ridge_hip_condition": "string",
+  "gutter_condition": "string",
+  "gutter_overflows": "string",
+  "roof_insulation": "string or array of strings",
+  "specific_cause_of_damage": "string",
+  "internal_damage": "string",
+  "roof_damage": "string",
+  "damage_caused_by_maintenance": "string",
+  "insured_aware_of_conditions": "string",
+  "non_claim_maintenance_issues": "string",
+  "maintenance_repairs_required": "string",
+  "conditions_preventing_repairs": "string",
+  "prior_repairs": "string",
+  "conclusion": "string"
+}
+
 Guidelines:
 - Extract all available information from the raw notes
 - If a field cannot be determined from the notes, set it to an empty string

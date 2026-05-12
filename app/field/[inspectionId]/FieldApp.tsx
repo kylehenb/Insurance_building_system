@@ -135,19 +135,12 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [msTempFixes, setMsTempFixes] = useState('')
   const [msHours, setMsHours] = useState('')
   // Roof Report
-  const [rfType, setRfType] = useState('')
-  const [rfCondition, setRfCondition] = useState('')
-  const [rfPitch, setRfPitch] = useState('')
-  const [rfPenetrations, setRfPenetrations] = useState('')
-  const [rfInsulation, setRfInsulation] = useState('')
-  const [rfDamage, setRfDamage] = useState('')
-  const [rfCause, setRfCause] = useState('')
-  const [rfPreExist, setRfPreExist] = useState('')
-  const [rfAware, setRfAware] = useState('')
-  const [rfOtherCond, setRfOtherCond] = useState('')
-  const [rfMaintenance, setRfMaintenance] = useState('')
-  const [rfPrevents, setRfPrevents] = useState('')
-  const [rfPrior, setRfPrior] = useState('')
+  const [roofRawNotes, setRoofRawNotes] = useState('')
+  const [roofPhotos, setRoofPhotos] = useState<PhotoEntry[]>([])
+  const [roofPhotoContext, setRoofPhotoContext] = useState('')
+  const [roofAiLabeling, setRoofAiLabeling] = useState(false)
+  const [roofAiLabelDone, setRoofAiLabelDone] = useState(false)
+  const roofPhotoInputRef = useRef<HTMLInputElement>(null)
   // Leak Detection
   const [ldMethod, setLdMethod] = useState('')
   const [ldSource, setLdSource] = useState('')
@@ -236,14 +229,12 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     personMet, relation, propDesc, rawReportDump, photoContext,
     hospitalName, customSafetyNotes, chips, safetyDone, commenceTime,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
-    rfType, rfCondition, rfPitch, rfPenetrations, rfInsulation,
-    rfDamage, rfCause, rfPreExist, rfAware, rfOtherCond,
-    rfMaintenance, rfPrevents, rfPrior,
+    roofRawNotes, roofPhotoContext,
     msWorksCompleted, msTempFixes, msHours,
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
     restType, restExtent, restRooms, restEquip, restNotes,
     extTrades, extTradeNotes,
-  }), [personMet, relation, propDesc, rawReportDump, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, scopeRooms, rfType, rfCondition, rfPitch, rfPenetrations, rfInsulation, rfDamage, rfCause, rfPreExist, rfAware, rfOtherCond, rfMaintenance, rfPrevents, rfPrior, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
+  }), [personMet, relation, propDesc, rawReportDump, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -275,19 +266,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
     }
-    if (d.rfType) setRfType(d.rfType as string)
-    if (d.rfCondition) setRfCondition(d.rfCondition as string)
-    if (d.rfPitch) setRfPitch(d.rfPitch as string)
-    if (d.rfPenetrations) setRfPenetrations(d.rfPenetrations as string)
-    if (d.rfInsulation) setRfInsulation(d.rfInsulation as string)
-    if (d.rfDamage) setRfDamage(d.rfDamage as string)
-    if (d.rfCause) setRfCause(d.rfCause as string)
-    if (d.rfPreExist) setRfPreExist(d.rfPreExist as string)
-    if (d.rfAware) setRfAware(d.rfAware as string)
-    if (d.rfOtherCond) setRfOtherCond(d.rfOtherCond as string)
-    if (d.rfMaintenance) setRfMaintenance(d.rfMaintenance as string)
-    if (d.rfPrevents) setRfPrevents(d.rfPrevents as string)
-    if (d.rfPrior) setRfPrior(d.rfPrior as string)
+    if (d.roofRawNotes) setRoofRawNotes(d.roofRawNotes as string)
+    if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
     if (d.msWorksCompleted) setMsWorksCompleted(d.msWorksCompleted as string)
     if (d.msTempFixes) setMsTempFixes(d.msTempFixes as string)
     if (d.msHours) setMsHours(d.msHours as string)
@@ -487,6 +467,15 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         items: r.items.map(i => i.text).filter(Boolean),
       }))
 
+      // Upload roof photos first if any
+      for (const photo of roofPhotos) {
+        const fd = new FormData()
+        fd.append('file', photo.file)
+        fd.append('label', photo.label)
+        fd.append('isRoofPhoto', 'true')
+        await fetch(`${base}/photos`, { method: 'POST', body: fd })
+      }
+
       const res = await fetch(`${base}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -509,6 +498,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           photoContext,
           insurer: initialData.insurer ?? '',
           lossType: initialData.lossType ?? '',
+          roofRawNotes,
+          roofPhotoContext,
         }),
       })
 
@@ -950,47 +941,132 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                 {/* Roof Report Panel */}
                 {key === 'roof-report' && activePanel === 'roof-report' && (
                   <div className="fa-internal-panel fa-panel-rr">
-                    <div className="fa-panel-title">🏠 Roof Report <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400 }}>Fields</span></div>
-                    <div className="fa-rr-section">Roof Type</div>
-                    <div className="fa-qs-row">
-                      {['Tiled — concrete', 'Tiled — terracotta', 'Metal — Colorbond', 'Metal — corrugated', 'Flat / membrane', 'Other'].map(opt => (
-                        <button key={opt} className={`fa-qs-btn${rfType === opt ? ' qs-green' : ''}`} style={rfType === opt ? { borderColor: 'var(--green)', background: 'var(--green-light)', color: 'var(--green)', fontWeight: 500 } : {}} onClick={() => { setRfType(opt); armDraft() }}>{opt}</button>
-                      ))}
+                    <div className="fa-panel-title">🏠 Roof Report <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400 }}>AI Generation</span></div>
+                    {/* Roof Report Raw Notes */}
+                    <div className="fa-ai-dark" style={{ marginBottom: 0 }}>
+                      <div className="fa-ai-dark-head">
+                        <span style={{ fontSize: 14 }}>✦</span>
+                        <span className="fa-ai-dark-title">Roof Report Raw Notes</span>
+                      </div>
+                      <div className="fa-ai-hints">
+                        {['Roof type', 'Roof condition', 'Roof pitch', 'Penetrations count', 'Storeys count', 'Ridge condition', 'Gutter condition', 'Gutter overflows', 'Roof insulation', 'Damage cause', 'Internal damage', 'Roof damage', 'Maintenance issues', 'Insured aware', 'Non-claim issues', 'Repairs required', 'Repair blockers', 'Prior repairs', 'Conclusion'].map(hint => (
+                          <div key={hint} className="fa-ai-hint">{hint}</div>
+                        ))}
+                      </div>
+                      <div className="fa-ai-dark-body">
+                        <textarea
+                          className="fa-ai-dark-ta"
+                          placeholder="Dictate roof inspection details covering all fields above. AI will generate the full roof report…"
+                          style={{ minHeight: 130 }}
+                          value={roofRawNotes}
+                          onChange={e => { setRoofRawNotes(e.target.value); armDraft() }}
+                        />
+                      </div>
                     </div>
-                    <div className="fa-rr-section">Condition &amp; Pitch</div>
-                    <div className="fa-qs-row">
-                      {['Good', 'Fair', 'Poor', 'End of life'].map(opt => (
-                        <button key={opt} className={`fa-qs-btn${rfCondition === opt ? ' qs-green' : ''}`} style={rfCondition === opt ? { borderColor: 'var(--green)', background: 'var(--green-light)', color: 'var(--green)', fontWeight: 500 } : {}} onClick={() => { setRfCondition(opt); armDraft() }}>{opt}</button>
-                      ))}
+                    {/* Roof Photos */}
+                    <div className="fa-ai-dark" style={{ marginTop: 16, marginBottom: 0 }}>
+                      <div className="fa-ai-dark-head">
+                        <span style={{ fontSize: 14 }}>📷</span>
+                        <span className="fa-ai-dark-title">Roof Photo Context</span>
+                      </div>
+                      <div className="fa-ai-dark-body">
+                        <textarea
+                          className="fa-ai-dark-ta"
+                          placeholder="Describe your roof photos in order. e.g. 'First shows the damaged ridge capping, second is the valley with debris, third shows the gutter overflow…'"
+                          style={{ minHeight: 80 }}
+                          value={roofPhotoContext}
+                          onChange={e => { setRoofPhotoContext(e.target.value); armDraft() }}
+                        />
+                        <button
+                          className={`fa-ai-label-btn${roofAiLabelDone ? ' done' : ''}`}
+                          onClick={() => {
+                            if (!roofPhotoContext.trim()) { alert('Add a photo description first.'); return }
+                            if (!roofPhotos.length) { alert('No photos to label.'); return }
+                            setRoofAiLabeling(true)
+                            fetch(`${base}/ai-label-roof`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ context: roofPhotoContext, photoCount: roofPhotos.length, jobContext: { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address } }),
+                            }).then(res => res.json()).then(data => {
+                              if (data.ok && data.labels?.length) {
+                                setRoofPhotos(prev => prev.map((p, i) => ({ ...p, label: data.labels[i] ?? p.label })))
+                                setRoofAiLabelDone(true)
+                              }
+                              setRoofAiLabeling(false)
+                            }).catch(() => setRoofAiLabeling(false))
+                          }}
+                          disabled={roofAiLabeling || roofPhotos.some(p => p.processing)}
+                        >
+                          {roofPhotos.some(p => p.processing) ? <><span className="fa-spinner" /> Converting photos…</> : roofAiLabeling ? <><span className="fa-spinner" /> Labelling…</> : roofAiLabelDone ? '✓ Labels Applied' : '✦ AI Label All Photos'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="fa-qs-row">
-                      {['Low pitch', 'Medium pitch', 'Steep pitch'].map(opt => (
-                        <button key={opt} className={`fa-qs-btn${rfPitch === opt ? ' qs-green' : ''}`} style={rfPitch === opt ? { borderColor: 'var(--green)', background: 'var(--green-light)', color: 'var(--green)', fontWeight: 500 } : {}} onClick={() => { setRfPitch(opt); armDraft() }}>{opt}</button>
-                      ))}
-                    </div>
-                    {([
-                      ['rf-penetrations', 'Penetrations', rfPenetrations, setRfPenetrations, 'Skylights, vents, ridge caps, valleys…'],
-                      ['rf-insulation', 'Insulation', rfInsulation, setRfInsulation, 'Type and condition of insulation'],
-                      ['rf-damage', 'Damage Description', rfDamage, setRfDamage, 'Describe damage to roof components…'],
-                      ['rf-cause', 'Cause of Damage', rfCause, setRfCause, '• Primary Cause\n'],
-                      ['rf-pre-exist', 'Pre-existing Conditions', rfPreExist, setRfPreExist, 'Yes / No — describe if yes'],
-                      ['rf-other-cond', 'Other Conditions Noted', rfOtherCond, setRfOtherCond, 'Any other observations…'],
-                      ['rf-maintenance', 'Maintenance Notes', rfMaintenance, setRfMaintenance, 'Unrelated maintenance items noted…'],
-                    ] as [string, string, string, (v: string) => void, string][]).map(([id, label, val, setter, ph]) => (
-                      <div key={id}>
-                        <div className="fa-rr-section">{label}</div>
-                        <div className="fa-rr-row">
-                          <div className="fa-rr-value" style={{ padding: '10px 18px' }}>
+                    {/* Roof Photo Grid */}
+                    <div className="fa-photo-grid" style={{ marginTop: 16 }}>
+                      {roofPhotos.map(photo => (
+                        <div key={photo.id} className="fa-photo-card">
+                          <img className="fa-photo-thumb" src={photo.previewUrl} alt="roof inspection" />
+                          {photo.processing && (
+                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,26,26,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
+                              <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>Converting…</span>
+                            </div>
+                          )}
+                          {!photo.processing && <button className="fa-photo-del" onClick={() => {
+                            setRoofPhotos(prev => {
+                              const p = prev.find(x => x.id === photo.id)
+                              if (p) URL.revokeObjectURL(p.previewUrl)
+                              return prev.filter(x => x.id !== photo.id)
+                            })
+                            armDraft()
+                          }}>×</button>}
+                          <div className="fa-photo-label-area">
                             <textarea
-                              placeholder={ph}
-                              style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.6, color: 'var(--text)', resize: 'vertical', minHeight: 40 }}
-                              value={val}
-                              onChange={e => { setter(e.target.value); armDraft() }}
+                              className="fa-photo-label-ta"
+                              rows={1}
+                              placeholder={photo.processing ? 'Processing…' : 'Add label'}
+                              value={photo.label}
+                              disabled={photo.processing}
+                              onChange={e => {
+                                setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label: e.target.value } : p))
+                                armDraft()
+                              }}
                             />
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                      {/* Upload Slot */}
+                      <label className="fa-upload-slot" htmlFor="roof-photo-file-input">
+                        <span style={{ fontSize: 24 }}>📷</span>
+                        <span>Add Roof Photo</span>
+                      </label>
+                      <input
+                        id="roof-photo-file-input"
+                        ref={roofPhotoInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          if (!e.target.files) return
+                          setRoofAiLabelDone(false)
+                          Array.from(e.target.files).forEach(file => {
+                            const id = uid()
+                            const rawPreview = URL.createObjectURL(file)
+                            setRoofPhotos(prev => [...prev, { id, file, previewUrl: rawPreview, label: '', processing: true }])
+                            processPhotoForUpload(file).then(processed => {
+                              const processedPreview = URL.createObjectURL(processed)
+                              setRoofPhotos(prev => prev.map(p => {
+                                if (p.id !== id) return p
+                                URL.revokeObjectURL(p.previewUrl)
+                                return { ...p, file: processed, previewUrl: processedPreview, processing: false }
+                              }))
+                              armDraft()
+                            })
+                          })
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
 

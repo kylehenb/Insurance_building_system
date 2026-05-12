@@ -108,6 +108,8 @@ export async function POST(
     photoContext,
     insurer,
     lossType,
+    roofRawNotes,
+    roofPhotoContext,
   }: {
     personMet: string
     safetyData: {
@@ -127,6 +129,8 @@ export async function POST(
     photoContext: string
     insurer: string
     lossType: string
+    roofRawNotes?: string
+    roofPhotoContext?: string
   } = body
 
   const now = new Date().toISOString()
@@ -199,6 +203,105 @@ export async function POST(
       }
     } catch (e) {
       console.error('AI report generation error:', e)
+    }
+  }
+
+  // 2.6. Generate roof report if roofRawNotes exists
+  let roofReportGenerated = false
+  if (roofRawNotes && roofRawNotes.trim()) {
+    try {
+      // Check if a roof report already exists for this inspection
+      const { data: existingRoofReport } = await service
+        .from('reports')
+        .select('id')
+        .eq('inspection_id', inspectionId)
+        .eq('report_type', 'roof')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+
+      let roofReportId: string | null = null
+
+      if (existingRoofReport) {
+        // Use existing roof report
+        roofReportId = existingRoofReport.id
+      } else {
+        // Create new roof report
+        const { data: newRoofReport } = await service
+          .from('reports')
+          .insert({
+            tenant_id: tenantId,
+            job_id: insp.job_id,
+            inspection_id: inspectionId,
+            report_type: 'roof',
+            status: 'draft',
+            raw_report_dump: roofRawNotes,
+            attendance_date: now.split('T')[0],
+            attendance_time: now.split('T')[1]?.split('.')[0] || null,
+            assessor_name: userRow.name,
+          })
+          .select('id')
+          .single()
+
+        if (newRoofReport) {
+          roofReportId = newRoofReport.id
+        }
+      }
+
+      if (roofReportId) {
+        // Update the roof report with raw notes
+        await service.from('reports').update({
+          raw_report_dump: roofRawNotes,
+        }).eq('id', roofReportId).eq('tenant_id', tenantId)
+
+        // Call AI generate report endpoint for roof report
+        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/api/ai/generate-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rawReportDump: roofRawNotes,
+            reportType: 'roof',
+            tenantId,
+          }),
+        })
+        if (aiRes.ok) {
+          const aiData = await aiRes.json()
+          // Update the roof report with AI-generated content using type_specific_fields
+          const updateData: Record<string, unknown> = {
+            type_specific_fields: {},
+          }
+          if (aiData.reportData) {
+            const tsFields: Record<string, unknown> = {}
+            if (aiData.reportData.roof_type) tsFields.roof_type = aiData.reportData.roof_type
+            if (aiData.reportData.roof_general_condition) tsFields.roof_general_condition = aiData.reportData.roof_general_condition
+            if (aiData.reportData.pitch_degrees) tsFields.pitch_degrees = aiData.reportData.pitch_degrees
+            if (aiData.reportData.number_of_penetrations) tsFields.number_of_penetrations = aiData.reportData.number_of_penetrations
+            if (aiData.reportData.number_of_storeys) tsFields.number_of_storeys = aiData.reportData.number_of_storeys
+            if (aiData.reportData.ridge_hip_condition) tsFields.ridge_hip_condition = aiData.reportData.ridge_hip_condition
+            if (aiData.reportData.gutter_condition) tsFields.gutter_condition = aiData.reportData.gutter_condition
+            if (aiData.reportData.gutter_overflows) tsFields.gutter_overflows = aiData.reportData.gutter_overflows
+            if (aiData.reportData.roof_insulation) tsFields.roof_insulation = aiData.reportData.roof_insulation
+            if (aiData.reportData.specific_cause_of_damage) tsFields.specific_cause_of_damage = aiData.reportData.specific_cause_of_damage
+            if (aiData.reportData.internal_damage) tsFields.internal_damage = aiData.reportData.internal_damage
+            if (aiData.reportData.roof_damage) tsFields.roof_damage = aiData.reportData.roof_damage
+            if (aiData.reportData.damage_caused_by_maintenance) tsFields.damage_caused_by_maintenance = aiData.reportData.damage_caused_by_maintenance
+            if (aiData.reportData.insured_aware_of_conditions) tsFields.insured_aware_of_conditions = aiData.reportData.insured_aware_of_conditions
+            if (aiData.reportData.non_claim_maintenance_issues) tsFields.non_claim_maintenance_issues = aiData.reportData.non_claim_maintenance_issues
+            if (aiData.reportData.maintenance_repairs_required) tsFields.maintenance_repairs_required = aiData.reportData.maintenance_repairs_required
+            if (aiData.reportData.conditions_preventing_repairs) tsFields.conditions_preventing_repairs = aiData.reportData.conditions_preventing_repairs
+            if (aiData.reportData.prior_repairs) tsFields.prior_repairs = aiData.reportData.prior_repairs
+            if (aiData.reportData.conclusion) tsFields.conclusion = aiData.reportData.conclusion
+
+            updateData.type_specific_fields = tsFields
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await service.from('reports').update(updateData as any).eq('id', roofReportId).eq('tenant_id', tenantId)
+          }
+          roofReportGenerated = true
+        }
+      }
+    } catch (e) {
+      console.error('Roof report generation error:', e)
     }
   }
 
