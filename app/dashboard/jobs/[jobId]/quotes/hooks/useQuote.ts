@@ -440,32 +440,40 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
         room_height?: number | null
       }
     ) => {
-      setItems(prev => prev.map(item => (item.room === room ? { ...item, ...dims } : item)))
-      const roomItems = items.filter(i => i.room === room)
-      for (const item of roomItems) {
-        scheduleItemSave(item.id, dims as Record<string, unknown>)
-      }
+      setItems(prev => {
+        const updated = prev.map(item => (item.room === room ? { ...item, ...dims } : item))
+        const roomItems = updated.filter(i => i.room === room)
+        for (const item of roomItems) {
+          scheduleItemSave(item.id, dims as Record<string, unknown>)
+        }
+        return updated
+      })
     },
-    [items, scheduleItemSave]
+    [scheduleItemSave]
   )
 
   const renameRoom = useCallback(
     async (oldName: string, newName: string) => {
       const trimmed = newName.trim()
       if (!trimmed || trimmed === oldName) return
-      setItems(prev => prev.map(item => (item.room === oldName ? { ...item, room: trimmed } : item)))
-      const roomItems = items.filter(i => i.room === oldName && !i.id.startsWith('temp-'))
-      await Promise.all(
-        roomItems.map(item =>
-          fetch(`/api/quotes/${quoteId}/items/${item.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tenantId, room: trimmed }),
-          })
-        )
-      )
+      setItems(prev => {
+        const updated = prev.map(item => (item.room === oldName ? { ...item, room: trimmed } : item))
+        const roomItems = updated.filter(i => i.room === oldName && !i.id.startsWith('temp-'))
+        Promise.all(
+          roomItems.map(item =>
+            fetch(`/api/quotes/${quoteId}/items/${item.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tenantId, room: trimmed }),
+            })
+          )
+        ).catch(() => {
+          // Handle error silently - UI will revert on next load
+        })
+        return updated
+      })
     },
-    [items, quoteId, tenantId]
+    [quoteId, tenantId]
   )
 
   const updateQuoteMeta = useCallback(
