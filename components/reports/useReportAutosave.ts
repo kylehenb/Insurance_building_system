@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 const DEBOUNCE_MS = 1500
@@ -25,10 +25,10 @@ export function useReportAutosave({
   currentSnapshot,
   onVersionCreated,
 }: UseReportAutosaveOptions) {
-  const supabase = createBrowserClient(
+  const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  ), [])
 
   const [saveState, setSaveState] = useState<SaveState>({
     status: 'idle',
@@ -123,11 +123,12 @@ export function useReportAutosave({
     [save]
   )
 
-  const flushSave = useCallback(() => {
+  const flushSave = useCallback((): Promise<void> => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (Object.keys(pendingChangesRef.current).length > 0) {
-      save({ ...pendingChangesRef.current })
+      return save({ ...pendingChangesRef.current })
     }
+    return Promise.resolve()
   }, [save])
 
   return { scheduleFieldSave, flushSave, saveState }

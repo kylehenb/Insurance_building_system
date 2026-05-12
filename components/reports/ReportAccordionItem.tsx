@@ -330,12 +330,28 @@ export function ReportAccordionItem({
     type_specific_fields: report.type_specific_fields,
   }
 
-  const { scheduleFieldSave, saveState } = useReportAutosave({
+  const { scheduleFieldSave, flushSave, saveState } = useReportAutosave({
     reportId: report.id,
     tenantId: report.tenant_id,
     userId: currentUserId,
     currentSnapshot,
   })
+
+  // Flush any pending debounced save when the component unmounts (Next.js navigation)
+  useEffect(() => {
+    return () => { flushSave() }
+  }, [flushSave])
+
+  // Flush when the tab goes to background or the window is about to close
+  useEffect(() => {
+    const flush = () => flushSave()
+    document.addEventListener('visibilitychange', flush)
+    window.addEventListener('beforeunload', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', flush)
+      window.removeEventListener('beforeunload', flush)
+    }
+  }, [flushSave])
 
   const handleFieldChange = useCallback(
     (field: string, value: unknown) => {
@@ -922,8 +938,12 @@ export function ReportAccordionItem({
               style={{ borderTop: '0.5px solid #e4dfd8' }}
             >
               <button
-                onClick={() => {
-                  window.open(`/print/reports/${report.id}`, '_blank')
+                onClick={async () => {
+                  // Open the tab immediately (must be in synchronous user-gesture context)
+                  const win = window.open('about:blank', '_blank')
+                  // Flush any pending field edits so the print page sees up-to-date data
+                  await flushSave()
+                  if (win) win.location.href = `/print/reports/${report.id}`
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-[12px] font-medium text-white transition-colors"
                 style={{ background: '#c8b89a', fontFamily: 'DM Sans, sans-serif' }}
