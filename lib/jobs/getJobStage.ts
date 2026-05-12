@@ -281,7 +281,7 @@ export function getJobStage(context: JobContext): JobStage {
 
   // BAR path inspection checks
   // 4. awaiting_schedule — no inspection or unscheduled
-  const unscheduledStatuses = ['unscheduled', 'proposed', 'awaiting_reschedule']
+  const unscheduledStatuses = ['unscheduled', 'appointment_proposed', 'reschedule_required']
   if (primaryInspection === null || unscheduledStatuses.includes(primaryInspection.status)) {
     let warning: JobStage['contextualWarning']
     if (primaryInspection !== null && primaryInspection.no_show_count > 0) {
@@ -294,7 +294,7 @@ export function getJobStage(context: JobContext): JobStage {
   }
 
   // 5. inspection_scheduled
-  if (primaryInspection.status === 'confirmed') {
+  if (primaryInspection.status === 'appointment_confirmed') {
     return buildStage('inspection_scheduled', open_loops)
   }
 

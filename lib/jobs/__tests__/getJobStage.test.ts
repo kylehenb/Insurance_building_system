@@ -61,7 +61,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'confirmed',
+        status: 'appointment_confirmed',
         form_submitted_at: null,
         no_show_count: 0,
         last_no_show_at: null,
@@ -77,7 +77,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -93,7 +93,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -111,7 +111,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -128,7 +128,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -153,7 +153,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -179,7 +179,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -205,7 +205,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -231,7 +231,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -246,7 +246,7 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
       },
-      work_order_visits: [{ status: 'confirmed' }, { status: 'complete' }],
+      work_order_visits: [{ status: 'appointment_confirmed' }, { status: 'sent_and_locked' }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('repairs_in_progress')
@@ -258,7 +258,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -283,7 +283,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -298,7 +298,7 @@ describe('getJobStage', () => {
         homeowner_signoff_received_at: '2025-06-12T10:00:00Z',
         completion_approved_at: null,
       },
-      work_order_visits: [{ status: 'complete' }, { status: 'complete' }],
+      work_order_visits: [{ status: 'sent_and_locked' }, { status: 'sent_and_locked' }],
     })
     const stage = getJobStage(ctx)
     expect(stage.key).toBe('awaiting_completion_signoff')
@@ -309,7 +309,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -336,7 +336,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -364,7 +364,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -393,7 +393,7 @@ describe('getJobStage', () => {
     const ctx = buildContext({
       inspections: [{
         id: 'insp-1',
-        status: 'complete',
+        status: 'sent_and_locked',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -432,7 +432,7 @@ describe('getJobStage', () => {
       insurer_orders: [{ status: 'pending' }],
       inspections: [{
         id: 'insp-1',
-        status: 'confirmed',
+        status: 'appointment_confirmed',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,
@@ -461,7 +461,7 @@ describe('getJobStage', () => {
       insurer_orders: [{ status: 'pending' }],
       inspections: [{
         id: 'insp-1',
-        status: 'confirmed',
+        status: 'appointment_confirmed',
         form_submitted_at: '2025-06-01T10:00:00Z',
         no_show_count: 0,
         last_no_show_at: null,

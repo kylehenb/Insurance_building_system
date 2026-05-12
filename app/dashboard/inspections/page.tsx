@@ -14,24 +14,26 @@ type InspectionWithRelations = InspectionRow & {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     unscheduled: "bg-gray-100 text-gray-700",
-    urgent_awaiting_assignment: "bg-red-100 text-red-800",
-    proposed: "bg-blue-100 text-blue-800",
-    awaiting_reschedule: "bg-orange-100 text-orange-800",
-    confirmed: "bg-green-100 text-green-800",
-    in_progress: "bg-indigo-100 text-indigo-800",
-    submitted: "bg-purple-100 text-purple-800",
-    complete: "bg-gray-100 text-gray-800",
+    make_safe_awaiting_assignment: "bg-red-100 text-red-800",
+    appointment_proposed: "bg-blue-100 text-blue-800",
+    reschedule_required: "bg-orange-100 text-orange-800",
+    appointment_confirmed: "bg-green-100 text-green-800",
+    inspection_started: "bg-indigo-100 text-indigo-800",
+    appointment_passed_not_started: "bg-yellow-100 text-yellow-800",
+    review_and_send_all_docs: "bg-purple-100 text-purple-800",
+    sent_and_locked: "bg-gray-100 text-gray-800",
   };
 
   const labels: Record<string, string> = {
     unscheduled: "Unscheduled",
-    urgent_awaiting_assignment: "Urgent — Awaiting Assignment",
-    proposed: "Proposed",
-    awaiting_reschedule: "Awaiting Reschedule",
-    confirmed: "Confirmed",
-    in_progress: "In Progress",
-    submitted: "Submitted",
-    complete: "Complete",
+    make_safe_awaiting_assignment: "Make Safe Awaiting Assignment",
+    appointment_proposed: "Appointment Proposed",
+    reschedule_required: "Reschedule Required",
+    appointment_confirmed: "Appointment Confirmed",
+    inspection_started: "Inspection Started",
+    appointment_passed_not_started: "Appointment Passed, Inspection Not Started",
+    review_and_send_all_docs: "Review and Send All Docs",
+    sent_and_locked: "Sent and Locked",
   };
 
   return (

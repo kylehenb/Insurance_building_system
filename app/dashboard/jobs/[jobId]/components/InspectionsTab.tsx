@@ -342,11 +342,15 @@ function InspectionForm({
           className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
           onChange={e => handleChange('status', e.target.value, setStatus)}
         >
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="in_progress">In Progress</option>
-          <option value="complete">Complete</option>
-          <option value="submitted">Submitted</option>
+          <option value="unscheduled">Unscheduled</option>
+          <option value="make_safe_awaiting_assignment">Make Safe Awaiting Assignment</option>
+          <option value="appointment_proposed">Appointment Proposed</option>
+          <option value="reschedule_required">Reschedule Required</option>
+          <option value="appointment_confirmed">Appointment Confirmed</option>
+          <option value="inspection_started">Inspection Started</option>
+          <option value="appointment_passed_not_started">Appointment Passed, Inspection Not Started</option>
+          <option value="review_and_send_all_docs">Review and Send All Docs</option>
+          <option value="sent_and_locked">Sent and Locked</option>
         </select>
         <input
           type="text"
@@ -630,8 +634,10 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
 
   const getStatusIcon = (status: string) => {
     const s = status.toLowerCase()
-    if (s === 'complete' || s === 'submitted') return <CheckCircle2 size={14} className="text-green-600" />
-    if (s === 'in_progress') return <Clock size={14} className="text-blue-600" />
+    if (s === 'sent_and_locked' || s === 'review_and_send_all_docs') return <CheckCircle2 size={14} className="text-green-600" />
+    if (s === 'inspection_started') return <Clock size={14} className="text-blue-600" />
+    if (s === 'appointment_confirmed') return <Clock size={14} className="text-blue-600" />
+    if (s === 'appointment_passed_not_started') return <AlertCircle size={14} className="text-yellow-600" />
     return <AlertCircle size={14} className="text-amber-600" />
   }
 

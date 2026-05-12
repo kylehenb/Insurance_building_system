@@ -21,24 +21,26 @@ interface InspectionDetailClientProps {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     unscheduled: "bg-gray-100 text-gray-700",
-    urgent_awaiting_assignment: "bg-red-100 text-red-800",
-    proposed: "bg-blue-100 text-blue-800",
-    awaiting_reschedule: "bg-orange-100 text-orange-800",
-    confirmed: "bg-green-100 text-green-800",
-    in_progress: "bg-indigo-100 text-indigo-800",
-    submitted: "bg-purple-100 text-purple-800",
-    complete: "bg-gray-100 text-gray-800",
+    make_safe_awaiting_assignment: "bg-red-100 text-red-800",
+    appointment_proposed: "bg-blue-100 text-blue-800",
+    reschedule_required: "bg-orange-100 text-orange-800",
+    appointment_confirmed: "bg-green-100 text-green-800",
+    inspection_started: "bg-indigo-100 text-indigo-800",
+    appointment_passed_not_started: "bg-yellow-100 text-yellow-800",
+    review_and_send_all_docs: "bg-purple-100 text-purple-800",
+    sent_and_locked: "bg-gray-100 text-gray-800",
   };
 
   const labels: Record<string, string> = {
     unscheduled: "Unscheduled",
-    urgent_awaiting_assignment: "Urgent — Awaiting Assignment",
-    proposed: "Proposed",
-    awaiting_reschedule: "Awaiting Reschedule",
-    confirmed: "Confirmed",
-    in_progress: "In Progress",
-    submitted: "Submitted",
-    complete: "Complete",
+    make_safe_awaiting_assignment: "Make Safe Awaiting Assignment",
+    appointment_proposed: "Appointment Proposed",
+    reschedule_required: "Reschedule Required",
+    appointment_confirmed: "Appointment Confirmed",
+    inspection_started: "Inspection Started",
+    appointment_passed_not_started: "Appointment Passed, Inspection Not Started",
+    review_and_send_all_docs: "Review and Send All Docs",
+    sent_and_locked: "Sent and Locked",
   };
 
   return (
@@ -134,6 +136,35 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  const checkMissedAppointment = async () => {
+    // Check if this inspection should be marked as missed
+    // Only check 'appointment_confirmed' status - exclude 'inspection_started'
+    if (inspection.status === 'appointment_confirmed' && !inspection.safety_confirmed_at && inspection.scheduled_date && inspection.finish_time) {
+      const scheduledDateTime = new Date(`${inspection.scheduled_date}T${inspection.finish_time || '23:59:59'}`);
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      
+      if (scheduledDateTime < fourHoursAgo) {
+        try {
+          const { error } = await supabase
+            .from('inspections')
+            .update({ status: 'appointment_passed_not_started' })
+            .eq('id', inspection.id)
+            .eq('tenant_id', tenantId);
+
+          if (error) {
+            console.error('Error updating missed appointment status:', error);
+          } else {
+            console.log('Updated inspection to missed appointment status');
+            // Refresh to show updated status
+            refreshInspection();
+          }
+        } catch (error) {
+          console.error('Error checking missed appointment:', error);
+        }
+      }
+    }
+  };
+
   const refreshInspection = async () => {
     setRefreshing(true);
     try {
@@ -158,6 +189,11 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
       setRefreshing(false);
     }
   };
+
+  // Check for missed appointments on component load
+  useEffect(() => {
+    checkMissedAppointment();
+  }, []);
 
   // Real-time subscription to inspection changes
   useEffect(() => {
