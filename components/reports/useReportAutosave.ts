@@ -51,7 +51,11 @@ export function useReportAutosave({
           .eq('id', reportId)
           .eq('tenant_id', tenantId)
 
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('[ReportAutosave] Update failed - changes keys:', JSON.stringify(Object.keys(changes)))
+          console.error('[ReportAutosave] Update error details:', JSON.stringify({ message: updateError.message, code: updateError.code, details: updateError.details, hint: updateError.hint }))
+          throw updateError
+        }
 
         // 2. Determine changed fields for version snapshot
         const changedFields = Object.keys(changes).filter(
