@@ -373,7 +373,7 @@ function InspectionForm({
           rows={1}
           placeholder="Inspection notes..."
           className="w-full px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none resize-none"
-          onChange={e => handleChange('notes', e.target.value, setNotes)}
+          onChange={e => handleChange('raw_report_notes', e.target.value, setNotes)}
           onBlur={flushSave}
         />
       )}
@@ -508,7 +508,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
       .insert({
         tenant_id: tenantId,
         job_id: jobId,
-        status: 'draft',
+        status: 'unscheduled',
         scheduled_date: data['Date'] || null,
         start_time: startTime,
         finish_time: finishTime,
@@ -517,7 +517,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
         person_met: data['Person Met'] || null,
         field_draft: fieldDraft,
       })
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,notes,field_draft,quote_id,report_id,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,quote_id,report_id,created_at')
       .single()
 
     if (inspError) throw inspError
