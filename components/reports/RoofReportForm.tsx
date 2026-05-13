@@ -319,6 +319,10 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
         return
       }
 
+      // Accumulate all changes before applying
+      const regularFieldUpdates: Record<string, string> = {}
+      const typeSpecificFieldUpdates: Record<string, string> = {}
+
       // Handle regular fields
       Object.entries(result.reportData).forEach(([key, value]) => {
         console.log(`Processing field: ${key} = ${value}`)
@@ -339,12 +343,11 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
           if (regularFields.includes(key)) {
             // This is a regular field (not in type_specific_fields)
             console.log(`Setting regular field: ${key}`)
-            onChange(key, value)
+            regularFieldUpdates[key] = value
           } else if (roofSpecificKeys.includes(key)) {
             // This goes in type_specific_fields
             console.log(`Setting type_specific field: ${key}`)
-            const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
-            onChange('type_specific_fields', { ...tsFields, [key]: value })
+            typeSpecificFieldUpdates[key] = value
           } else {
             console.log(`Skipping unknown field: ${key}`)
           }
@@ -352,6 +355,15 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
           console.log(`Skipping empty or non-string field: ${key}`)
         }
       })
+
+      // Apply all regular field updates
+      Object.entries(regularFieldUpdates).forEach(([key, value]) => {
+        onChange(key, value)
+      })
+
+      // Apply all type_specific field updates in one batch
+      const currentTsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
+      onChange('type_specific_fields', { ...currentTsFields, ...typeSpecificFieldUpdates })
     } catch (error) {
       console.error('Error generating report:', error)
       alert('Failed to generate report. Please try again.')
