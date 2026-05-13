@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { X, Upload } from 'lucide-react'
 
@@ -131,6 +131,7 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
   const [groups, setGroups] = useState<PhotoGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [lightbox, setLightbox] = useState<{ path: string; label: string | null } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const buildGroups = useCallback(
     async (photos: Photo[]) => {
@@ -198,11 +199,21 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       {/* Upload button (stub) */}
       <div className="flex justify-end mb-5">
-        <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors"
+        >
           <Upload className="h-4 w-4" />
           Upload photos
-          <input type="file" multiple accept="image/*" className="sr-only" />
-        </label>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          className="sr-only"
+        />
       </div>
 
       {groups.length === 0 ? (

@@ -869,13 +869,17 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
               </div>
             ))}
             {/* Upload Slot */}
-            <label className="fa-upload-slot" htmlFor="photo-file-input">
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="fa-upload-slot"
+            >
               <span style={{ fontSize: 24 }}>📷</span>
               <span>Add Photo</span>
-            </label>
+            </button>
             <input
-              id="photo-file-input"
               ref={photoInputRef}
+              id="photo-file-input"
               type="file"
               accept="image/*"
               multiple
@@ -1036,13 +1040,17 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                         </div>
                       ))}
                       {/* Upload Slot */}
-                      <label className="fa-upload-slot" htmlFor="roof-photo-file-input">
+                      <button
+                        type="button"
+                        onClick={() => roofPhotoInputRef.current?.click()}
+                        className="fa-upload-slot"
+                      >
                         <span style={{ fontSize: 24 }}>📷</span>
                         <span>Add Roof Photo</span>
-                      </label>
+                      </button>
                       <input
-                        id="roof-photo-file-input"
                         ref={roofPhotoInputRef}
+                        id="roof-photo-file-input"
                         type="file"
                         accept="image/*"
                         multiple
