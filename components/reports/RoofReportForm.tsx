@@ -314,7 +314,7 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
         if (value && typeof value === 'string') {
           // Check if this is a type_specific_fields key for roof reports
           const roofSpecificKeys = [
-            'scope_of_report', 'roof_type', 'roof_general_condition', 'pitch_degrees',
+            'roof_type', 'roof_general_condition', 'pitch_degrees',
             'number_of_penetrations', 'number_of_storeys', 'ridge_hip_condition',
             'gutter_condition', 'gutter_overflows', 'roof_insulation', 'specific_cause_of_damage',
             'internal_damage', 'roof_damage', 'damage_caused_by_maintenance',
@@ -322,13 +322,16 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
             'conditions_preventing_repairs', 'prior_repairs', 'conclusion'
           ]
           
-          if (roofSpecificKeys.includes(key)) {
+          // Regular fields (not in type_specific_fields)
+          const regularFields = ['scope_of_report']
+          
+          if (regularFields.includes(key)) {
+            // This is a regular field (not in type_specific_fields)
+            onChange(key, value)
+          } else if (roofSpecificKeys.includes(key)) {
             // This goes in type_specific_fields
             const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
             onChange('type_specific_fields', { ...tsFields, [key]: value })
-          } else {
-            // This is a regular field
-            onChange(key, value)
           }
         }
       })
