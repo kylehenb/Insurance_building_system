@@ -308,9 +308,20 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
         throw new Error(result.error || 'Failed to generate report')
       }
 
+      // Debug: Log what AI returned
+      console.log('AI Response:', result.reportData)
+      console.log('AI Response keys:', Object.keys(result.reportData || {}))
+      console.log('Full result object:', result)
+
       // Populate form fields with AI response
+      if (!result.reportData || typeof result.reportData !== 'object') {
+        console.error('Invalid reportData structure:', result.reportData)
+        return
+      }
+
       // Handle regular fields
       Object.entries(result.reportData).forEach(([key, value]) => {
+        console.log(`Processing field: ${key} = ${value}`)
         if (value && typeof value === 'string') {
           // Check if this is a type_specific_fields key for roof reports
           const roofSpecificKeys = [
@@ -323,16 +334,22 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
           ]
           
           // Regular fields (not in type_specific_fields)
-          const regularFields = ['scope_of_report']
+          const regularFields = ['scope_of_report', 'attendance_date', 'attendance_time', 'assessor_name']
           
           if (regularFields.includes(key)) {
             // This is a regular field (not in type_specific_fields)
+            console.log(`Setting regular field: ${key}`)
             onChange(key, value)
           } else if (roofSpecificKeys.includes(key)) {
             // This goes in type_specific_fields
+            console.log(`Setting type_specific field: ${key}`)
             const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
             onChange('type_specific_fields', { ...tsFields, [key]: value })
+          } else {
+            console.log(`Skipping unknown field: ${key}`)
           }
+        } else {
+          console.log(`Skipping empty or non-string field: ${key}`)
         }
       })
     } catch (error) {
