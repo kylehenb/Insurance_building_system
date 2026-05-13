@@ -302,6 +302,19 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
 
   return (
     <div>
+      {/* — FIELD NOTES — */}
+      <SectionHeading label="Field Notes (Internal)" />
+      <div>
+        <FieldLabel label="Raw Report Notes" />
+        <InlineTextarea
+          value={str('raw_report_notes')}
+          onChange={v => onChange('raw_report_notes', v)}
+          locked={locked}
+          placeholder="Raw dictation or field notes (internal only, not included in PDF)..."
+          rows={4}
+        />
+      </div>
+
       {/* — ROOF REPORT DETAILS — */}
       <SectionHeading label="Roof Report Details" />
       <div className="grid grid-cols-2 gap-4">
@@ -533,18 +546,6 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
         />
       </div>
 
-      {/* — FIELD NOTES — */}
-      <SectionHeading label="Field Notes (Internal)" />
-      <div>
-        <FieldLabel label="Raw Report Notes" />
-        <InlineTextarea
-          value={str('raw_report_notes')}
-          onChange={v => onChange('raw_report_notes', v)}
-          locked={locked}
-          placeholder="Raw dictation or field notes (internal only, not included in PDF)..."
-          rows={4}
-        />
-      </div>
 
       {/* — PHOTOS — */}
       {reportId && jobId && tenantId && (
