@@ -182,8 +182,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? new Date(syncState.last_poll_timestamp).getTime()
       : Date.now() - 120000 // Default: 2 minutes ago
 
-    // Fetch messages since last poll
-    const searchQuery = `after:${Math.floor(lastPollTimestamp / 1000)} in:inbox`
+    // Ensure we don't go back more than 7 days to prevent picking up very old messages
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+    const effectiveTimestamp = Math.max(lastPollTimestamp, sevenDaysAgo)
+
+    // Fetch messages since last poll, but not older than 7 days
+    const searchQuery = `after:${Math.floor(effectiveTimestamp / 1000)} in:inbox`
     const messagesRes = await gmail.users.messages.list({
       userId: 'me',
       q: searchQuery,

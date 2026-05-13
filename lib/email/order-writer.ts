@@ -43,6 +43,22 @@ export async function writeInsurerOrder(
     parsed.rawEmailLink ??
     `https://mail.google.com/mail/u/0/#inbox/${message.messageId}`
 
+  // Deduplication check: prevent duplicate orders with same claim_number + tenant_id
+  if (parsed.data.claim_number) {
+    const { data: existingOrder } = await supabase
+      .from('insurer_orders')
+      .select('id, status, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('claim_number', parsed.data.claim_number)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingOrder) {
+      console.log(`[order-writer] duplicate claim_number ${parsed.data.claim_number} detected, skipping insert`)
+      return existingOrder.id
+    }
+  }
+
   const { data: order, error: orderError } = await supabase
     .from('insurer_orders')
     .insert({

@@ -48,6 +48,7 @@ const FALLBACK_PROMPT = [
   '  excess_building (numeric, strip $ and commas), order_sender_name, order_sender_email,',
   '  adjuster_reference, portal_url (any URL linking to an external portal),',
   '  work_order_type (one of: BAR | Make Safe | Roof Report | Specialist Report | Combination),',
+  '  insurer (extract the actual insurer name from the email content, e.g., "Castle", "Allianz", "Suncorp"),',
   '  confidence (0.0–1.0 decimal), missing_fields (array of field names you could not find).',
   'Return only valid JSON, no markdown, no explanation.',
 ].join('\n')
@@ -76,6 +77,7 @@ type GeminiRawResult = {
   adjuster_reference?: string | null
   portal_url?: string | null
   work_order_type?: string | null
+  insurer?: string | null
   confidence?: number | null
   missing_fields?: string[] | null
 }
@@ -126,7 +128,6 @@ export async function parseInsurerOrder(
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
-  const insurerDetected = clientConfig?.insurer_hint ?? null
   const pdf = findLargestPdf(message)
 
   let systemInstruction = await fetchPrompt()
@@ -144,6 +145,9 @@ export async function parseInsurerOrder(
       systemInstruction += `\n\nParsing notes: ${clientConfig.custom_parsing_notes}`
     }
   }
+
+  // Add insurer name extraction instruction
+  systemInstruction += '\n\nIMPORTANT: Extract the actual insurer name from the email content (e.g., "Castle", "Allianz", "Suncorp"). Do NOT use the client context/hint text as the insurer name.'
 
   // Inject confirmed learning examples for this client
   if (tenantId && clientConfig?.client_id) {
@@ -207,14 +211,14 @@ export async function parseInsurerOrder(
       data: {
         order_sender_name: message.fromName || null,
         order_sender_email: message.fromEmail || null,
-        insurer: insurerDetected,
+        insurer: clientConfig?.insurer_hint || null, // Fallback to hint on error
         claim_description: null, // Let Gemini extract from body, don't fall back to subject
       },
       confidence: 0,
       missingFields: ['claim_number', 'insured_name', 'property_address', 'claim_description'],
       parseStatus: 'needs_review',
       rawEmailLink: null,
-      insurerDetected,
+      insurerDetected: clientConfig?.insurer_hint || null,
       rawEmailBody: message.bodyText || null,
       emailAttachments: message.attachments.map(a => ({
         filename: a.filename,
@@ -249,7 +253,7 @@ export async function parseInsurerOrder(
     order_sender_email: raw.order_sender_email ?? message.fromEmail ?? null,
     adjuster_reference: raw.adjuster_reference ?? null,
     wo_type,
-    insurer: insurerDetected,
+    insurer: raw.insurer ?? clientConfig?.insurer_hint ?? null, // Use AI-extracted insurer, fallback to hint
   }
 
   const keyFields = [data.claim_number, data.insured_name, data.property_address]
@@ -263,7 +267,7 @@ export async function parseInsurerOrder(
     missingFields,
     parseStatus,
     rawEmailLink: raw.portal_url ?? null,
-    insurerDetected,
+    insurerDetected: raw.insurer ?? clientConfig?.insurer_hint ?? null,
     rawEmailBody: message.bodyText || null,
     emailAttachments: message.attachments.map(a => ({
       filename: a.filename,

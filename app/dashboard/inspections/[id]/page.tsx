@@ -7,7 +7,7 @@ import InspectionDetailClient from "./InspectionDetailClient";
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
 
 type InspectionWithRelations = InspectionRow & {
-  jobs: { id: string; job_number: string } | null;
+  jobs: { id: string; job_number: string; property_address: string | null; insured_name: string | null; insured_phone: string | null } | null;
   users: { name: string } | null;
 };
 
@@ -35,7 +35,7 @@ async function InspectionDetailPage({ params }: InspectionDetailPageProps) {
     .from("inspections")
     .select(
       `*,
-       jobs!job_id(id, job_number),
+       jobs!job_id(id, job_number, property_address, insured_name, insured_phone),
        users!inspector_id(name)`
     )
     .eq("id", id)
