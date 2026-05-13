@@ -284,7 +284,6 @@ export async function POST(
             if (aiData.reportData.internal_damage) tsFields.internal_damage = aiData.reportData.internal_damage
             if (aiData.reportData.roof_damage) tsFields.roof_damage = aiData.reportData.roof_damage
             if (aiData.reportData.damage_caused_by_maintenance) tsFields.damage_caused_by_maintenance = aiData.reportData.damage_caused_by_maintenance
-            if (aiData.reportData.insured_aware_of_conditions) tsFields.insured_aware_of_conditions = aiData.reportData.insured_aware_of_conditions
             if (aiData.reportData.non_claim_maintenance_issues) tsFields.non_claim_maintenance_issues = aiData.reportData.non_claim_maintenance_issues
             if (aiData.reportData.maintenance_repairs_required) tsFields.maintenance_repairs_required = aiData.reportData.maintenance_repairs_required
             if (aiData.reportData.conditions_preventing_repairs) tsFields.conditions_preventing_repairs = aiData.reportData.conditions_preventing_repairs

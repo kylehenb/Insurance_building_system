@@ -478,17 +478,7 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
             rows={3}
           />
         </div>
-        <div>
-          <FieldLabel label="Would the Insured Have Been Reasonably Aware of the Property Conditions Leading to the Claim?" />
-          <InlineTextarea
-            value={tsf('insured_aware_of_conditions')}
-            onChange={v => onTsf('insured_aware_of_conditions', v)}
-            locked={locked}
-            placeholder="Describe insured awareness of property conditions..."
-            rows={3}
-          />
-        </div>
-        <div>
+                <div>
           <FieldLabel label="Non claim related roof comments" />
           <InlineTextarea
             value={tsf('non_claim_maintenance_issues')}

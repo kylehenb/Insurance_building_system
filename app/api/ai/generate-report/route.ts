@@ -116,7 +116,6 @@ For Roof reports:
   "internal_damage": "string",
   "roof_damage": "string",
   "damage_caused_by_maintenance": "string",
-  "insured_aware_of_conditions": "string",
   "non_claim_maintenance_issues": "string",
   "maintenance_repairs_required": "string",
   "conditions_preventing_repairs": "string",

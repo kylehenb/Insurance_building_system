@@ -114,7 +114,6 @@ const ROOF_TEMPLATE = {
 
   maintenance_fields: [
     { label: 'Roof Maintenance Issues or Roof Cover Defects contributing to claim damage:', field: 'damage_caused_by_maintenance' },
-    { label: 'Would the insured have been reasonably aware of the property conditions leading to the claim?:', field: 'insured_aware_of_conditions' },
     { label: 'Non claim related roof comments:', field: 'non_claim_maintenance_issues' },
     { label: 'Maintenance or defects repairs required (insured responsibility):', field: 'maintenance_repairs_required' },
   ] as const,
@@ -201,6 +200,9 @@ const NARRATIVE_SECTION_CONFIG: Record<
   }
 > = {
   property_description: { title: 'Property description', getValue: (r) => r.property_description },
+  attendance_date: { title: 'Date attended', getValue: (r) => formatDate(r.attendance_date) },
+  attendance_time: { title: 'Time attended', getValue: (r) => formatTime(r.attendance_time) },
+  person_met: { title: 'Person met', getValue: (r) => r.person_met },
   incident_description: { title: 'Incident description', getValue: (r) => r.incident_description },
   cause_of_damage: { title: 'Cause of damage', getValue: (r) => r.cause_of_damage },
   how_damage_occurred: { title: 'How damage occurred', getValue: (r) => r.how_damage_occurred },
@@ -227,10 +229,13 @@ const NARRATIVE_SECTION_CONFIG: Record<
 }
 
 const NARRATIVE_GROUPS: Array<{ label: string; keys: string[] }> = [
-  { label: 'Property', keys: ['property_description'] },
+  { label: 'Property details', keys: ['property_description'] },
+  { label: 'Attendance', keys: ['attendance_date', 'attendance_time', 'person_met'] },
+  { label: 'Make Safe & Specialist', keys: [] },
   { label: 'Incident', keys: ['incident_description', 'cause_of_damage', 'how_damage_occurred'] },
-  { label: 'Damage findings', keys: ['resulting_damage'] },
-  { label: 'Assessment', keys: ['conclusion', 'pre_existing_conditions', 'maintenance_notes', 'additional_notes'] },
+  { label: 'Damage Findings', keys: ['resulting_damage'] },
+  { label: 'Conclusion', keys: ['conclusion'] },
+  { label: 'Additional Notes', keys: ['pre_existing_conditions', 'maintenance_notes', 'additional_notes'] },
 ]
 
 // Function to preserve text formatting (newlines, bullet points, paragraphs)
@@ -718,6 +723,58 @@ export default async function ReportPrintPage({
                 </>
               )}
 
+              {/* Block 3 — Attendance (BAR only) */}
+              {report.report_type !== 'LDR' && report.report_type !== 'roof' && report.report_type !== 'make_safe' && (
+                <>
+                  {dividerRow('Attendance')}
+                  <tr>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Date attended:</span>
+                        <span style={valueStyle}>{formatDate(report.attendance_date)}</span>
+                      </div>
+                    </td>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Time attended:</span>
+                        <span style={valueStyle}>{formatTime(report.attendance_time)}</span>
+                      </div>
+                    </td>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Person met:</span>
+                        <span style={valueStyle}>{report.person_met || '—'}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={tdCellLast}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Conducted by:</span>
+                        <span style={valueStyle}>{report.assessor_name || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={tdCellLast}></td>
+                    <td style={tdCellLast}></td>
+                  </tr>
+                </>
+              )}
+
+              {/* Block 4 — Make Safe & Specialist (BAR only) */}
+              {report.report_type !== 'LDR' && report.report_type !== 'roof' && report.report_type !== 'make_safe' && (
+                <>
+                  {dividerRow('Make Safe & Specialist')}
+                  <tr>
+                    <td style={tdCellLast}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Make Safe & Specialist:</span>
+                        <span style={valueStyle}>—</span>
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+
               {/* Block 2 — Leak Details (LDR only) */}
               {isLDR && (
                 <>
@@ -1099,8 +1156,13 @@ export default async function ReportPrintPage({
                 )
               }
             } else {
-              // BAR-style narrative groups
+              // BAR-style narrative groups with new structure
               for (const group of NARRATIVE_GROUPS) {
+                // Skip Property details, Attendance, and Make Safe & Specialist as they're handled in table
+                if (group.label === 'Property details' || group.label === 'Attendance' || group.label === 'Make Safe & Specialist') {
+                  continue
+                }
+                
                 const visibleKeys = group.keys.filter(k => {
                   // Only show property_description if show_property_table is false
                   if (k === 'property_description' && DEFAULT_BAR_TEMPLATE.show_property_table) {
