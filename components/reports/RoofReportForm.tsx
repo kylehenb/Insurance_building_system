@@ -257,6 +257,7 @@ function MultiSelectDropdown({
 }
 
 export function RoofReportForm({ data, locked, onChange, tenantId, reportId, jobId }: RoofReportFormProps) {
+  const [generating, setGenerating] = useState(false)
   const str = (key: string) => String(data[key] ?? '')
   const tsf = (key: string) => {
     const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
@@ -276,6 +277,67 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
   const onTsfArray = (key: string, value: string[]) => {
     const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
     onChange('type_specific_fields', { ...tsFields, [key]: value })
+  }
+
+  async function handleGenerateReport() {
+    const rawDump = str('raw_report_notes')
+    if (!rawDump.trim()) {
+      alert('Please enter some raw notes first')
+      return
+    }
+
+    if (!tenantId) {
+      alert('Tenant ID is required')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/ai/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawReportDump: rawDump,
+          reportType: 'roof',
+          tenantId,
+        }),
+      })
+
+      const result = await res.json()
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to generate report')
+      }
+
+      // Populate form fields with AI response
+      // Handle regular fields
+      Object.entries(result.reportData).forEach(([key, value]) => {
+        if (value && typeof value === 'string') {
+          // Check if this is a type_specific_fields key for roof reports
+          const roofSpecificKeys = [
+            'scope_of_report', 'roof_type', 'roof_general_condition', 'pitch_degrees',
+            'number_of_penetrations', 'number_of_storeys', 'ridge_hip_condition',
+            'gutter_condition', 'gutter_overflows', 'roof_insulation', 'specific_cause_of_damage',
+            'internal_damage', 'roof_damage', 'damage_caused_by_maintenance',
+            'non_claim_maintenance_issues', 'maintenance_repairs_required',
+            'conditions_preventing_repairs', 'prior_repairs', 'conclusion'
+          ]
+          
+          if (roofSpecificKeys.includes(key)) {
+            // This goes in type_specific_fields
+            const tsFields = (data.type_specific_fields as Record<string, unknown>) ?? {}
+            onChange('type_specific_fields', { ...tsFields, [key]: value })
+          } else {
+            // This is a regular field
+            onChange(key, value)
+          }
+        }
+      })
+    } catch (error) {
+      console.error('Error generating report:', error)
+      alert('Failed to generate report. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const roofTypeOptions = [
@@ -305,12 +367,30 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
       {/* — FIELD NOTES — */}
       <SectionHeading label="Field Notes (Internal)" />
       <div>
-        <FieldLabel label="Raw Report Notes" />
+        <div className="flex items-center justify-between mb-1">
+          <FieldLabel label="Raw Report Notes" />
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={locked || generating || !str('raw_report_notes').trim()}
+            className={`
+              px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
+              transition-all duration-200
+              ${locked || generating || !str('raw_report_notes').trim()
+                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
+                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
+              }
+            `}
+            style={{ fontFamily: 'DM Sans, sans-serif' }}
+          >
+            {generating ? 'Generating...' : 'AI Generate'}
+          </button>
+        </div>
         <InlineTextarea
           value={str('raw_report_notes')}
           onChange={v => onChange('raw_report_notes', v)}
           locked={locked}
-          placeholder="Raw dictation or field notes (internal only, not included in PDF)..."
+          placeholder="Raw dictation or field notes used to generate this report (internal only, not included in PDF)..."
           rows={4}
         />
       </div>

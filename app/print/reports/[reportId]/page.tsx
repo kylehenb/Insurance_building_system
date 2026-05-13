@@ -765,12 +765,24 @@ export default async function ReportPrintPage({
                 <>
                   {dividerRow('Make Safe & Specialist')}
                   <tr>
-                    <td style={tdCellLast}>
+                    <td style={tdCell}>
                       <div style={cellContentStyle}>
-                        <span style={labelStyle}>Make Safe & Specialist:</span>
-                        <span style={valueStyle}>—</span>
+                        <span style={labelStyle}>Make Safe Conducted:</span>
+                        <span style={valueStyle}>{tsf(report, 'make_safe_conducted')}</span>
                       </div>
                     </td>
+                    <td style={tdCell}>
+                      <div style={cellContentStyle}>
+                        <span style={labelStyle}>Specialist Report Obtained:</span>
+                        <span style={valueStyle}>{tsf(report, 'specialist_report_obtained')}</span>
+                      </div>
+                    </td>
+                    <td style={tdCell}></td>
+                  </tr>
+                  <tr>
+                    <td style={tdCellLast}></td>
+                    <td style={tdCellLast}></td>
+                    <td style={tdCellLast}></td>
                   </tr>
                 </>
               )}
