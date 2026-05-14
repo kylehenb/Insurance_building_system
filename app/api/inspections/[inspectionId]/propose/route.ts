@@ -6,6 +6,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ inspectionId: string }> }
 ) {
+  // Temporary diagnostic — remove after debugging
+  console.log('[propose] ENV CHECK:', {
+    GOOGLE_CALENDAR_REFRESH_TOKEN: (process.env.GOOGLE_CALENDAR_REFRESH_TOKEN ?? 'MISSING').slice(0, 10),
+    GMAIL_REFRESH_TOKEN: (process.env.GMAIL_REFRESH_TOKEN ?? 'MISSING').slice(0, 10),
+    GOOGLE_CALENDAR_CLIENT_SECRET: (process.env.GOOGLE_CALENDAR_CLIENT_SECRET ?? 'MISSING').slice(0, 8),
+    GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID ?? 'MISSING',
+  })
+
   try {
     const { inspectionId } = await params
 
