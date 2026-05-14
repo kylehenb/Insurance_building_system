@@ -6,14 +6,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ inspectionId: string }> }
 ) {
-  // Temporary diagnostic — remove after debugging
-  console.log('[propose] ENV CHECK:', {
-    GOOGLE_CALENDAR_REFRESH_TOKEN: (process.env.GOOGLE_CALENDAR_REFRESH_TOKEN ?? 'MISSING').slice(0, 10),
-    GMAIL_REFRESH_TOKEN: (process.env.GMAIL_REFRESH_TOKEN ?? 'MISSING').slice(0, 10),
-    GOOGLE_CALENDAR_CLIENT_SECRET: (process.env.GOOGLE_CALENDAR_CLIENT_SECRET ?? 'MISSING').slice(0, 8),
-    GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID ?? 'MISSING',
-  })
-
   try {
     const { inspectionId } = await params
 
@@ -85,8 +77,10 @@ export async function POST(
       `Field App: ${fieldAppUrl}`,
     ].filter(Boolean).join('\n')
 
-    const startDateTime = `${date}T${start}`
-    const endDateTime = `${date}T${finish}`
+    // Ensure HH:MM times get :00 seconds appended — Google Calendar requires full RFC3339
+    const toFullTime = (t: string) => t.length === 5 ? `${t}:00` : t
+    const startDateTime = `${date}T${toFullTime(start)}`
+    const endDateTime = `${date}T${toFullTime(finish)}`
 
     const title = [
       'Inspection',
