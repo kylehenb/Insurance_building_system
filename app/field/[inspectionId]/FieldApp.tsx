@@ -32,7 +32,6 @@ interface InitialData {
 interface ScopeItem { id: string; text: string }
 interface ScopeRoom { id: string; name: string; l: string; w: string; h: string; items: ScopeItem[] }
 interface PhotoEntry { id: string; file: File; previewUrl: string; label: string; processing: boolean }
-interface ReviewFlag { type: 'ok' | 'warn'; msg: string }
 
 function uid() { return Math.random().toString(36).slice(2) }
 
@@ -160,10 +159,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [extTradeNotes, setExtTradeNotes] = useState<Record<string, string>>({})
 
   // ─── Review / Submit ─────────────────────────────────────────────────────
-  const [reviewScore, setReviewScore] = useState<number | null>(null)
-  const [reviewFlags, setReviewFlags] = useState<ReviewFlag[]>([])
-  const [reviewSummary, setReviewSummary] = useState('')
-  const [isReviewing, setIsReviewing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(!!initialData.formSubmittedAt)
   const [submitTime, setSubmitTime] = useState(initialData.formSubmittedAt ? new Date(initialData.formSubmittedAt).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
@@ -197,22 +192,26 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   // ─── Signature Canvas ─────────────────────────────────────────────────────
+  // ctx is scaled by dpr, so draw-coordinates are CSS pixels — no extra scaling needed
   const getCanvasPos = (canvas: HTMLCanvasElement, e: MouseEvent | Touch) => {
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
     const clientX = 'clientX' in e ? e.clientX : (e as Touch).clientX
     const clientY = 'clientY' in e ? e.clientY : (e as Touch).clientY
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY }
+    return { x: clientX - rect.left, y: clientY - rect.top }
   }
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    canvas.width = canvas.offsetWidth * window.devicePixelRatio || canvas.offsetWidth
-    canvas.height = 90 * (window.devicePixelRatio || 1)
+    const dpr = window.devicePixelRatio || 1
+    // Use actual layout dimensions so physical ↔ CSS mapping is exact
+    const rect = canvas.getBoundingClientRect()
+    const cssW = rect.width || canvas.offsetWidth || 300
+    const cssH = rect.height || canvas.offsetHeight || 90
+    canvas.width = Math.round(cssW * dpr)
+    canvas.height = Math.round(cssH * dpr)
     const ctx = canvas.getContext('2d')!
-    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1)
+    ctx.scale(dpr, dpr)
     ctx.strokeStyle = '#1a1a1a'
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
@@ -250,14 +249,14 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
     personMet, relation, propDesc, raw_report_notes, photoContext,
-    hospitalName, customSafetyNotes, chips, safetyDone, commenceTime,
+    hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     roofRawNotes, roofPhotoContext,
     msWorksCompleted, msTempFixes, msHours,
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
     restType, restExtent, restRooms, restEquip, restNotes,
     extTrades, extTradeNotes,
-  }), [personMet, relation, propDesc, raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
+  }), [personMet, relation, propDesc, raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -269,6 +268,20 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         setTimeout(() => setSaveStatus(''), 2000)
       } catch { setSaveStatus('Save failed') }
     }, 3000)
+  }, [base, collectDraft, submitted])
+
+  // Flush draft immediately when the user navigates away or closes the tab
+  useEffect(() => {
+    if (submitted) return
+    const flush = () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      const draft = collectDraft()
+      // navigator.sendBeacon keeps the request alive after unload
+      const blob = new Blob([JSON.stringify({ draft })], { type: 'application/json' })
+      navigator.sendBeacon(`${base}/draft`, blob)
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => window.removeEventListener('beforeunload', flush)
   }, [base, collectDraft, submitted])
 
   // Restore draft
@@ -285,6 +298,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.chips) setChips(d.chips as typeof chips)
     if (d.commenceTime) setCommenceTime(d.commenceTime as string)
     if (d.safetyDone) setSafetyDone(true)
+    if (typeof d.step === 'number' && d.step > 1) setStep(d.step as number)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
@@ -414,62 +428,9 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   // ─── Submit Flow ──────────────────────────────────────────────────────────
-  const runPreLeaveReview = async () => {
-    setIsReviewing(true)
-    setStep(7)
-    document.getElementById('sec-review')?.scrollIntoView({ behavior: 'smooth' })
-
-    // Client-side checks
-    const flags: ReviewFlag[] = []
-    let score = 10
-
-    if (!safetyDone) { flags.push({ type: 'warn', msg: 'Safety section not confirmed' }); score -= 2 }
-
-    const totalItems = scopeRooms.reduce((n, r) => n + r.items.filter(i => i.text.trim()).length, 0)
-    if (totalItems === 0) { flags.push({ type: 'warn', msg: 'No scope items entered — add rooms and items' }); score -= 2 }
-    else flags.push({ type: 'ok', msg: `Scope — ${totalItems} item${totalItems > 1 ? 's' : ''} across ${scopeRooms.length} room(s)` })
-
-    const noteLen = raw_report_notes.trim().length
-    if (noteLen < 80) { flags.push({ type: 'warn', msg: `Raw report notes are brief — aim for 200+ characters (currently ${noteLen})` }); score -= 2 }
-    else flags.push({ type: 'ok', msg: `Raw report notes — ${noteLen} characters` })
-
-    if (!photos.length) { flags.push({ type: 'warn', msg: 'No photos attached — add at least one site photo' }); score -= 1 }
-    else flags.push({ type: 'ok', msg: `Photos — ${photos.length} attached` })
-
-    if (propDesc.trim().length < 20) { flags.push({ type: 'warn', msg: 'Property description not filled — add in Section 02' }); score -= 1 }
-    if (!personMet.trim()) flags.push({ type: 'warn', msg: 'Person met on site not filled' })
-
-    score = Math.max(1, Math.min(10, score))
-    setReviewScore(score)
-    setReviewFlags(flags)
-    setReviewSummary('Reviewing your notes…')
-
-    // AI review
-    if (noteLen > 0) {
-      try {
-        const res = await fetch(`${base}/ai-review`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ raw_report_notes, propDesc, scopeItemCount: totalItems, photoCount: photos.length }),
-        })
-        const data = await res.json()
-        if (data.ok) {
-          const blended = Math.round((score + (data.score ?? score)) / 2)
-          setReviewScore(blended)
-          setReviewFlags([...flags, ...(data.flags ?? [])])
-          setReviewSummary(data.summary ?? '')
-        }
-      } catch { /* use client-side score */ }
-    } else {
-      setReviewSummary('Add report notes for AI quality analysis.')
-    }
-
-    setIsReviewing(false)
-  }
-
   const handleSubmit = () => {
     if (!safetyDone) return
-    runPreLeaveReview()
+    finalSubmit()
   }
 
   const finalSubmit = async () => {
@@ -554,7 +515,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
-  const stepLabels = ['', 'Safety', 'Details', 'Scope', 'Notes', 'Photos', 'Reports', 'Review']
+  const stepLabels = ['', 'Safety', 'Details', 'Scope', 'Notes', 'Photos', 'Reports']
 
   return (
     <div className="fa-root">
@@ -577,7 +538,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
       {/* PROGRESS */}
       <div className="fa-prog-bar">
-        {[1, 2, 3, 4, 5, 6, 7].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className={`fa-prog${step > i ? ' done' : step === i ? ' active' : ''}`} />
         ))}
         <div className="fa-prog-lbl">{stepLabels[step]}</div>
@@ -590,11 +551,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           <div className="fa-bf"><label>Insured</label><span>{initialData.insuredName ?? '—'}</span></div>
           <div className="fa-bf"><label>Insurer</label><span>{initialData.insurer ?? '—'}</span></div>
           <div className="fa-bf"><label>Inspector</label><span>{initialData.inspector ?? '—'}</span></div>
-          <div className="fa-bf"><label>Quote #</label><span>{initialData.quoteRef ?? '—'}</span></div>
-          <div className="fa-bf"><label>Report #</label><span>{initialData.reportRef ?? '—'}</span></div>
           <div className="fa-bf"><label>Loss Type</label><span>{initialData.lossType ?? '—'}</span></div>
           <div className="fa-bf"><label>Date of Loss</label><span>{formatDate(initialData.dateOfLoss)}</span></div>
-          <div className="fa-bf"><label>Inspection</label><span>{initialData.inspectionRef ?? initialData.inspectionId}</span></div>
         </div>
         <div className="fa-type-badge">{initialData.lossType?.toUpperCase() ?? 'INSPECTION'}</div>
       </div>
@@ -1237,58 +1195,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
       </div>
 
-      {/* ── 07 AI PRE-LEAVE REVIEW ───────────────────────────────────────── */}
-      <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-review">
-        <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>07</div>
-          <div className="fa-sc-meta"><h3>AI Pre-Leave Review</h3><p>Runs on submit · stay on site</p></div>
-          <span className="fa-badge opt">On Submit</span>
-        </div>
-        <div className="fa-sc-body">
-          {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
-          {isReviewing && (
-            <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--muted)' }}>
-              <span className="fa-spinner" style={{ borderColor: 'var(--muted)' }} /> Reviewing your inspection…
-            </div>
-          )}
-          {!isReviewing && reviewScore === null && (
-            <div style={{ padding: '16px 18px', textAlign: 'center', fontFamily: 'var(--font-dm-mono)', fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
-              Review runs automatically on submit — stay on site until results appear (15–30 sec).
-            </div>
-          )}
-          {!isReviewing && reviewScore !== null && !submitted && (
-            <>
-              {/* Score display */}
-              <div style={{ background: 'var(--black)', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                  <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: 52, letterSpacing: 2, color: 'var(--beige)', lineHeight: 1 }}>{reviewScore}</div>
-                  <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--beige-dark)', letterSpacing: 1, marginTop: 1 }}>OUT OF 10</div>
-                </div>
-                <div style={{ flex: 1, borderLeft: '1px solid rgba(200,184,154,.15)', paddingLeft: 16 }}>
-                  <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: 14, letterSpacing: 2, color: 'var(--beige)', marginBottom: 6 }}>AI Input Quality</div>
-                  <div style={{ background: 'rgba(200,184,154,.12)', borderRadius: 2, height: 4, overflow: 'hidden', marginBottom: 8 }}>
-                    <div style={{ height: '100%', background: reviewScore >= 8 ? 'var(--green)' : reviewScore >= 5 ? 'var(--beige-dark)' : 'var(--red)', borderRadius: 2, width: `${reviewScore * 10}%`, transition: 'width .8s' }} />
-                  </div>
-                  {reviewSummary && <p style={{ fontSize: 11, color: 'var(--beige-dark)', lineHeight: 1.5 }}>{reviewSummary}</p>}
-                </div>
-              </div>
-              {/* Flags */}
-              <div style={{ paddingTop: 12 }}>
-                {reviewFlags.map((f, i) => (
-                  <div key={i} className={`fa-ai-flag ${f.type}`}>{f.type === 'ok' ? '✓ ' : '⚠ '}{f.msg}</div>
-                ))}
-              </div>
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px' }}>
-                <button className="fa-action-btn back" onClick={() => document.getElementById('sec-notes')?.scrollIntoView({ behavior: 'smooth' })}>← Go Back</button>
-                <button className="fa-action-btn confirm" onClick={finalSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? <><span className="fa-spinner" style={{ borderColor: 'white' }} /> Submitting…</> : 'Looks Good ✓'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
 
       <div style={{ height: 16 }} />
 

@@ -80,11 +80,11 @@ export async function POST(
     // Ensure HH:MM times get :00 seconds appended — Google Calendar requires full RFC3339
     const toFullTime = (t: string) => t.length === 5 ? `${t}:00` : t
 
-    // Get the UTC offset for Australia/Sydney on the scheduled date (handles DST correctly)
-    function getSydneyOffset(dateStr: string): string {
+    // Get the UTC offset for Australia/Perth on the scheduled date (handles DST correctly)
+    function getPerthOffset(dateStr: string): string {
       const refDate = new Date(`${dateStr}T12:00:00Z`)
       const parts = new Intl.DateTimeFormat('en-AU', {
-        timeZone: 'Australia/Sydney',
+        timeZone: 'Australia/Perth',
         timeZoneName: 'longOffset',
       }).formatToParts(refDate)
       const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+10:00'
@@ -92,7 +92,7 @@ export async function POST(
       return match ? match[1] : '+10:00'
     }
 
-    const tzOffset = getSydneyOffset(date)
+    const tzOffset = getPerthOffset(date)
     const startDateTime = `${date}T${toFullTime(start)}${tzOffset}`
     const endDateTime = `${date}T${toFullTime(finish)}${tzOffset}`
 
@@ -118,11 +118,11 @@ export async function POST(
           location: job?.property_address ?? undefined,
           start: {
             dateTime: startDateTime,
-            timeZone: 'Australia/Sydney',
+            timeZone: 'Australia/Perth',
           },
           end: {
             dateTime: endDateTime,
-            timeZone: 'Australia/Sydney',
+            timeZone: 'Australia/Perth',
           },
           reminders: {
             useDefault: false,

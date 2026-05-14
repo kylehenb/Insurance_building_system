@@ -168,37 +168,72 @@ export async function POST(
   let reportGenerated = false
   if (insp.report_id && rawReportDump && rawReportDump.trim()) {
     try {
-      // First, copy raw_report_notes to the report
+      // Save raw notes to the report first
       await service.from('reports').update({
         raw_report_notes: rawReportDump,
+        person_met: personMet ?? null,
+        attendance_date: now.split('T')[0],
       }).eq('id', insp.report_id).eq('tenant_id', tenantId)
 
-      // Then call AI generate report endpoint
-      const aiRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/api/ai/generate-report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawReportDump: rawReportDump,
-          reportType: 'BAR',
-          tenantId,
-        }),
-      })
-      if (aiRes.ok) {
-        const aiData = await aiRes.json()
-        // Update the report with AI-generated content using the same fields as the web app
-        const updateData: Record<string, unknown> = {}
-        if (aiData.reportData.property_address) updateData.property_address = aiData.reportData.property_address
-        if (aiData.reportData.property_description) updateData.property_description = aiData.reportData.property_description
-        if (aiData.reportData.damage_description) updateData.damage_description = aiData.reportData.damage_description
-        if (aiData.reportData.cause_of_damage) updateData.cause_of_damage = aiData.reportData.cause_of_damage
-        if (aiData.reportData.pre_existing_conditions) updateData.pre_existing_conditions = aiData.reportData.pre_existing_conditions
-        if (aiData.reportData.maintenance_notes) updateData.maintenance_notes = aiData.reportData.maintenance_notes
-        if (aiData.reportData.conclusion) updateData.conclusion = aiData.reportData.conclusion
-        if (aiData.reportData.recommendations) updateData.recommendations = aiData.reportData.recommendations
+      // Fetch BAR prompt from DB (fall back to a sensible default)
+      let barSystemPrompt = 'You are an expert building insurance assessor writing professional BAR reports.'
+      try {
+        const { data: pd } = await service
+          .from('prompts')
+          .select('system_prompt')
+          .eq('tenant_id', tenantId)
+          .eq('key', 'report_bar')
+          .single()
+        if (pd?.system_prompt) barSystemPrompt = pd.system_prompt
+      } catch { /* use default */ }
 
-        if (Object.keys(updateData).length > 0) {
-          await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const barMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        system: barSystemPrompt,
+        messages: [{
+          role: 'user',
+          content: `Generate a structured BAR report from the following inspection notes.
+
+Raw Report Notes:
+${rawReportDump}
+
+Property Description (inspector's notes):
+${propDesc || ''}
+
+Person Met on Site: ${personMet || ''}
+
+Return ONLY a JSON object with these exact keys (empty string if unknown):
+{
+  "property_description": "",
+  "incident_description": "",
+  "cause_of_damage": "",
+  "how_damage_occurred": "",
+  "resulting_damage": "",
+  "pre_existing_conditions": "",
+  "maintenance_notes": "",
+  "conclusion": ""
+}`,
+        }],
+      })
+
+      const barText = barMsg.content[0]?.type === 'text' ? barMsg.content[0].text : '{}'
+      const barMatch = barText.match(/\{[\s\S]*\}/)
+      if (barMatch) {
+        const ai = JSON.parse(barMatch[0]) as Record<string, string>
+        const updateData: Record<string, unknown> = {
+          // Inspector's typed property description takes priority; AI fills if blank
+          property_description: propDesc?.trim() || ai.property_description || null,
+          incident_description: ai.incident_description || null,
+          cause_of_damage: ai.cause_of_damage || null,
+          how_damage_occurred: ai.how_damage_occurred || null,
+          resulting_damage: ai.resulting_damage || null,
+          pre_existing_conditions: ai.pre_existing_conditions || null,
+          maintenance_notes: ai.maintenance_notes || null,
+          conclusion: ai.conclusion || null,
         }
+        await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
         reportGenerated = true
       }
     } catch (e) {

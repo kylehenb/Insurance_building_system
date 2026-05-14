@@ -29,7 +29,7 @@ export async function POST(
   // Verify inspection belongs to tenant
   const { data: insp } = await service
     .from('inspections')
-    .select('id, job_id')
+    .select('id, job_id, report_id')
     .eq('id', inspectionId)
     .eq('tenant_id', tenantId)
     .single()
@@ -72,6 +72,7 @@ export async function POST(
       tenant_id: tenantId,
       job_id: insp.job_id,
       inspection_id: inspectionId,
+      report_id: (insp as any).report_id ?? null,
       storage_path: storagePath,
       file_name: file.name,
       mime_type: mimeType,
