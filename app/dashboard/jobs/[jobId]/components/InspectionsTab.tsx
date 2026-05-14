@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Smartphone, FileText, DollarSign, Plus, ChevronDown, ChevronRight, ChevronUp, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { Smartphone, FileText, DollarSign, Plus, ChevronDown, ChevronRight, ChevronUp, CheckCircle2, Clock, AlertCircle, Calendar, CheckCircle, RotateCcw } from 'lucide-react'
 import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
 import { CreateModal } from './shared/CreateModal'
@@ -187,15 +187,19 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 5,
 }
 
+const SCHEDULABLE_STATUSES = ['unscheduled', 'reschedule_required', 'appointment_proposed', 'appointment_confirmed']
+
 // — Inspection row form —————————————————————————————————————————
 function InspectionForm({
   inspection,
   tenantId,
   onDelete,
+  onRefresh,
 }: {
   inspection: Inspection
   tenantId: string
   onDelete: (id: string) => void
+  onRefresh?: () => void
 }) {
   const [date, setDate] = useState(inspection.scheduled_date ?? '')
   const [startTime, setStartTime] = useState(inspection.start_time ?? '')
@@ -210,6 +214,18 @@ function InspectionForm({
   const [assessor, setAssessor] = useState(inspection.access_notes ?? '')
   const [notes, setNotes] = useState(inspection.raw_report_notes ?? '')
   const [deleting, setDeleting] = useState(false)
+
+  // Action states
+  const [proposing, setProposing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [rescheduling, setRescheduling] = useState(false)
+  const [followingUp, setFollowingUp] = useState(false)
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Sync status when parent refreshes
+  useEffect(() => {
+    setStatus(inspection.status)
+  }, [inspection.status])
 
   const { scheduleFieldSave, flushSave, saveState } = useInspectionAutosave({
     inspectionId: inspection.id,
@@ -302,6 +318,82 @@ function InspectionForm({
     : saveState.status === 'error' ? 'Error'
     : ''
 
+  function showMessage(type: 'success' | 'error', text: string) {
+    setActionMessage({ type, text })
+    setTimeout(() => setActionMessage(null), 4000)
+  }
+
+  async function handlePropose() {
+    if (!date || !startTime || !finishTime) {
+      showMessage('error', 'Set a date, start time, and finish time first.')
+      return
+    }
+    setProposing(true)
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledDate: date, startTime, finishTime }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? 'Failed to propose appointment.')
+      } else {
+        const calNote = data.calendarCreated ? ' Calendar event created.' : ' (Calendar not configured.)'
+        showMessage('success', `Appointment proposed. SMS mock sent.${calNote}`)
+        onRefresh?.()
+      }
+    } catch {
+      showMessage('error', 'Network error. Please try again.')
+    } finally {
+      setProposing(false)
+    }
+  }
+
+  async function handleConfirm() {
+    setConfirming(true)
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/confirm`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? 'Failed to confirm appointment.')
+      } else {
+        showMessage('success', 'Appointment confirmed.')
+        onRefresh?.()
+      }
+    } catch {
+      showMessage('error', 'Network error. Please try again.')
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  async function handleFollowUp() {
+    setFollowingUp(true)
+    await new Promise(r => setTimeout(r, 600))
+    console.log(`[follow-up] MOCK: Follow up on inspection ${inspection.inspection_ref}`)
+    showMessage('success', 'Follow-up logged. (SMS coming in a future release.)')
+    setFollowingUp(false)
+  }
+
+  async function handleReschedule() {
+    setRescheduling(true)
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/reschedule`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? 'Failed to mark for reschedule.')
+      } else {
+        showMessage('success', 'Marked as reschedule required. Calendar event removed.')
+        onRefresh?.()
+      }
+    } catch {
+      showMessage('error', 'Network error. Please try again.')
+    } finally {
+      setRescheduling(false)
+    }
+  }
+
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <div className="flex items-center gap-2 mb-2">
@@ -376,6 +468,71 @@ function InspectionForm({
           onChange={e => handleChange('raw_report_notes', e.target.value, setNotes)}
           onBlur={flushSave}
         />
+      )}
+
+      {/* Action buttons */}
+      {SCHEDULABLE_STATUSES.includes(status) && (
+        <div className="pt-2 border-t border-[#e0dbd4] mt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {(status === 'unscheduled' || status === 'reschedule_required') && (
+              <button
+                onClick={handlePropose}
+                disabled={proposing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] text-[#c8b89a] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50"
+              >
+                <Calendar size={13} />
+                {proposing ? 'Proposing…' : 'Propose Appointment'}
+              </button>
+            )}
+            {status === 'appointment_proposed' && (
+              <>
+                <button
+                  onClick={handleConfirm}
+                  disabled={confirming}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-[12px] font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  <CheckCircle size={13} />
+                  {confirming ? 'Confirming…' : 'Confirm'}
+                </button>
+                <button
+                  onClick={handleFollowUp}
+                  disabled={followingUp}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 text-[12px] font-medium rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50"
+                >
+                  <Clock size={13} />
+                  {followingUp ? 'Logging…' : 'Follow Up'}
+                </button>
+                <button
+                  onClick={handleReschedule}
+                  disabled={rescheduling}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-[12px] font-medium rounded-md hover:bg-orange-100 transition-colors disabled:opacity-50"
+                >
+                  <RotateCcw size={13} />
+                  {rescheduling ? 'Processing…' : 'Re-schedule'}
+                </button>
+              </>
+            )}
+            {status === 'appointment_confirmed' && (
+              <button
+                onClick={handleReschedule}
+                disabled={rescheduling}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-[12px] font-medium rounded-md hover:bg-orange-100 transition-colors disabled:opacity-50"
+              >
+                <RotateCcw size={13} />
+                {rescheduling ? 'Processing…' : 'Re-schedule'}
+              </button>
+            )}
+          </div>
+          {actionMessage && (
+            <div className={`mt-2 px-3 py-1.5 rounded text-[11px] font-medium ${
+              actionMessage.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {actionMessage.text}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -758,6 +915,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                     inspection={inspection}
                     tenantId={tenantId}
                     onDelete={handleDelete}
+                    onRefresh={fetchInspectionsWithRelations}
                   />
 
                   {/* Inspection Items Section */}
