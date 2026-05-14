@@ -34,7 +34,7 @@ export async function POST(
         job_id, inspector_id,
         jobs!job_id (
           id, job_number, property_address, insured_name, insured_phone,
-          insurer, loss_type, claim_number
+          insurer, loss_type, claim_number, claim_description
         ),
         users!inspector_id (name)
       `)
@@ -65,13 +65,13 @@ export async function POST(
 
     // Build calendar event description
     const descriptionLines = [
-      `Inspection Ref: ${inspection.inspection_ref ?? inspectionId}`,
       `Job: ${job?.job_number ?? '-'}`,
       `Insured: ${job?.insured_name ?? '-'}`,
       job?.insured_phone ? `Contact: ${job.insured_phone}` : null,
       `Insurer: ${job?.insurer ?? '-'}`,
       `Loss Type: ${job?.loss_type ?? '-'}`,
       job?.claim_number ? `Claim #: ${job.claim_number}` : null,
+      job?.claim_description ? `Claim Description: ${job.claim_description}` : null,
       `Inspector: ${inspector?.name ?? userRow.name}`,
       '',
       `Field App: ${fieldAppUrl}`,
@@ -79,8 +79,26 @@ export async function POST(
 
     // Ensure HH:MM times get :00 seconds appended — Google Calendar requires full RFC3339
     const toFullTime = (t: string) => t.length === 5 ? `${t}:00` : t
-    const startDateTime = `${date}T${toFullTime(start)}`
-    const endDateTime = `${date}T${toFullTime(finish)}`
+
+    // Get the UTC offset for Australia/Sydney on the scheduled date (handles DST correctly)
+    function getSydneyOffset(dateStr: string): string {
+      const refDate = new Date(`${dateStr}T12:00:00Z`)
+      const parts = new Intl.DateTimeFormat('en-AU', {
+        timeZone: 'Australia/Sydney',
+        timeZoneName: 'longOffset',
+      }).formatToParts(refDate)
+      const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+10:00'
+      const match = offsetPart.match(/GMT([+-]\d+:\d+)/)
+      return match ? match[1] : '+10:00'
+    }
+
+    const tzOffset = getSydneyOffset(date)
+    const startDateTime = `${date}T${toFullTime(start)}${tzOffset}`
+    const endDateTime = `${date}T${toFullTime(finish)}${tzOffset}`
+
+    // Calculate alarm minutes so it fires at 7:00 AM on the day of the inspection
+    const [startH, startM] = toFullTime(start).split(':').map(Number)
+    const alarmMinutesBefore = startH * 60 + startM - 7 * 60
 
     const title = [
       'Inspection',
@@ -105,6 +123,10 @@ export async function POST(
           end: {
             dateTime: endDateTime,
             timeZone: 'Australia/Sydney',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: alarmMinutesBefore > 0 ? [{ method: 'popup', minutes: alarmMinutesBefore }] : [],
           },
         },
       })

@@ -18,6 +18,8 @@ interface InitialData {
   claimNumber: string | null
   quoteId: string | null
   quoteRef: string | null
+  reportId: string | null
+  reportRef: string | null
   inspector: string | null
   inspectorId: string
   tenantId: string
@@ -172,6 +174,27 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [saveStatus, setSaveStatus] = useState('')
 
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingFocusRoomRef = useRef<string | null>(null)
+
+  // After a scope item is added, focus the last input in that room
+  useEffect(() => {
+    if (!pendingFocusRoomRef.current) return
+    const roomId = pendingFocusRoomRef.current
+    pendingFocusRoomRef.current = null
+    setTimeout(() => {
+      const inputs = document.querySelectorAll(`[data-room-id="${roomId}"] .fa-scope-input`)
+      ;(inputs[inputs.length - 1] as HTMLInputElement | undefined)?.focus()
+    }, 0)
+  }, [scopeRooms])
+
+  // Move focus to the next input/textarea in the page (used for iOS Return key navigation)
+  function focusNextInput(current: HTMLElement) {
+    const all = Array.from(document.querySelectorAll<HTMLElement>(
+      'input:not([disabled]):not([type="file"]):not([type="hidden"]), textarea:not([disabled])'
+    ))
+    const idx = all.indexOf(current)
+    if (idx >= 0 && idx < all.length - 1) all[idx + 1].focus()
+  }
 
   // ─── Signature Canvas ─────────────────────────────────────────────────────
   const getCanvasPos = (canvas: HTMLCanvasElement, e: MouseEvent | Touch) => {
@@ -493,7 +516,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             signedBy: personMet,
           },
           scopeRooms: scopeRoomsPayload,
-          raw_report_notes,
+          rawReportDump: raw_report_notes,
           propDesc,
           photoContext,
           insurer: initialData.insurer ?? '',
@@ -568,6 +591,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           <div className="fa-bf"><label>Insurer</label><span>{initialData.insurer ?? '—'}</span></div>
           <div className="fa-bf"><label>Inspector</label><span>{initialData.inspector ?? '—'}</span></div>
           <div className="fa-bf"><label>Quote #</label><span>{initialData.quoteRef ?? '—'}</span></div>
+          <div className="fa-bf"><label>Report #</label><span>{initialData.reportRef ?? '—'}</span></div>
           <div className="fa-bf"><label>Loss Type</label><span>{initialData.lossType ?? '—'}</span></div>
           <div className="fa-bf"><label>Date of Loss</label><span>{formatDate(initialData.dateOfLoss)}</span></div>
           <div className="fa-bf"><label>Inspection</label><span>{initialData.inspectionRef ?? initialData.inspectionId}</span></div>
@@ -626,6 +650,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                   placeholder="Not built yet — enter manually"
                   value={hospitalName}
                   onChange={e => { setHospitalName(e.target.value); armDraft() }}
+                  enterKeyHint="next"
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
                 />
               </div>
               {/* Custom Notes */}
@@ -695,7 +721,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           <div style={{ padding: '16px 0' }}>
             <div className="fa-fg">
               <label className="fa-fl">Person Met On Site <span className="req">*</span></label>
-              <input className="fa-input" type="text" value={personMet} onChange={e => { setPersonMet(e.target.value); armDraft() }} placeholder="Full name" />
+              <input className="fa-input" type="text" value={personMet} onChange={e => { setPersonMet(e.target.value); armDraft() }} placeholder="Full name" enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
             </div>
             <div className="fa-fg">
               <label className="fa-fl">Relation to Property</label>
@@ -730,7 +756,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
           <div style={{ paddingTop: 12 }}>
             {scopeRooms.map(room => (
-              <div key={room.id} className="fa-room-block">
+              <div key={room.id} className="fa-room-block" data-room-id={room.id}>
                 <div className="fa-room-head">
                   <input
                     className="fa-room-name"
@@ -738,16 +764,18 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                     placeholder="Room name"
                     value={room.name}
                     onChange={e => updateRoom(room.id, 'name', e.target.value)}
+                    enterKeyHint="next"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, marginLeft: 4 }}>
                     <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>L</span>
-                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.l} onChange={e => updateRoom(room.id, 'l', e.target.value)} />
+                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.l} onChange={e => updateRoom(room.id, 'l', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
                     <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
                     <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>W</span>
-                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.w} onChange={e => updateRoom(room.id, 'w', e.target.value)} />
+                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.w} onChange={e => updateRoom(room.id, 'w', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
                     <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
                     <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>H</span>
-                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.h} onChange={e => updateRoom(room.id, 'h', e.target.value)} />
+                    <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.h} onChange={e => updateRoom(room.id, 'h', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
                   </div>
                   <button style={{ background: 'none', border: 'none', color: 'var(--border)', fontSize: 16, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }} onClick={() => removeRoom(room.id)}>×</button>
                 </div>
@@ -760,6 +788,15 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                         placeholder="Scope item"
                         value={item.text}
                         onChange={e => updateScopeItem(room.id, item.id, e.target.value)}
+                        enterKeyHint="done"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            pendingFocusRoomRef.current = room.id
+                            addScopeItem(room.id)
+                            armDraft()
+                          }
+                        }}
                       />
                       <button className="fa-scope-del" onClick={() => removeScopeItem(room.id, item.id)}>×</button>
                     </div>

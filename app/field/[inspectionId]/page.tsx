@@ -21,7 +21,7 @@ export default async function FieldAppPage({ params }: Props) {
     .from('inspections')
     .select(`
       id, inspection_ref, status, scheduled_date,
-      job_id, quote_id, inspector_id, person_met, field_draft,
+      job_id, quote_id, report_id, inspector_id, person_met, field_draft,
       safety_confirmed_at, form_submitted_at,
       jobs!job_id (
         id, job_number, property_address, insured_name, insured_phone,
@@ -76,6 +76,16 @@ export default async function FieldAppPage({ params }: Props) {
     quoteRef = (quote as any)?.quote_ref ?? null
   }
 
+  let reportRef: string | null = null
+  if ((insp as any).report_id) {
+    const { data: report } = await service
+      .from('reports')
+      .select('report_ref')
+      .eq('id', (insp as any).report_id)
+      .single()
+    reportRef = (report as any)?.report_ref ?? null
+  }
+
   const initialData = {
     inspectionId: insp.id,
     inspectionRef: insp.inspection_ref ?? null,
@@ -92,6 +102,8 @@ export default async function FieldAppPage({ params }: Props) {
     claimNumber: job?.claim_number ?? null,
     quoteId: (insp as any).quote_id ?? null,
     quoteRef,
+    reportId: (insp as any).report_id ?? null,
+    reportRef,
     inspector: inspector?.name ?? userRow?.name ?? null,
     inspectorId: userData.session.user.id,
     tenantId: tenant_id as string,
