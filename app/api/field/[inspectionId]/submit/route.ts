@@ -32,7 +32,23 @@ async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: 
   }).join('\n\n')
 
   // Fetch the scope parsing prompt from the database
-  let systemPrompt = 'You are a building insurance scope parser. Parse the following field inspection scope notes into structured scope items.'
+  let systemPrompt = `You are a building insurance scope parser. Parse the following field inspection scope notes into structured scope items.
+
+Insurer: {insurer}
+Loss Type: {loss_type}
+
+Scope Notes:
+{scope_notes}
+
+Return ONLY a valid JSON array with no additional text. Each object must have these exact keys:
+- room: room name (string)
+- trade: trade type e.g. "Plastering", "Carpentry", "Painting", "Tiling" (string)
+- keyword: short item keyword (string)
+- item_description: full description of work required (string)
+- qty: quantity as a number, or null if not quantifiable
+- unit: unit of measure e.g. "m2", "lm", "item", "hr" (string)
+
+Example: [{"room":"Living Room","trade":"Plastering","keyword":"ceiling","item_description":"Replaster damaged ceiling","qty":12,"unit":"m2"}]`
   try {
     const { data: promptData } = await service
       .from('prompts')
@@ -166,35 +182,38 @@ export async function POST(
 
   // 2.5. Generate AI report if inspection has a report and raw_report_notes exists
   let reportGenerated = false
-  if (insp.report_id && rawReportDump && rawReportDump.trim()) {
+  if (insp.report_id) {
     try {
-      // Save raw notes to the report first
+      // Always save basic fields to the report when they are available
       await service.from('reports').update({
-        raw_report_notes: rawReportDump,
+        ...(rawReportDump ? { raw_report_notes: rawReportDump } : {}),
         person_met: personMet ?? null,
         attendance_date: now.split('T')[0],
+        ...(propDesc?.trim() ? { property_description: propDesc.trim() } : {}),
       }).eq('id', insp.report_id).eq('tenant_id', tenantId)
 
-      // Fetch BAR prompt from DB (fall back to a sensible default)
-      let barSystemPrompt = 'You are an expert building insurance assessor writing professional BAR reports.'
-      try {
-        const { data: pd } = await service
-          .from('prompts')
-          .select('system_prompt')
-          .eq('tenant_id', tenantId)
-          .eq('key', 'report_bar')
-          .single()
-        if (pd?.system_prompt) barSystemPrompt = pd.system_prompt
-      } catch { /* use default */ }
+      // Only run AI generation if there are raw report notes to work from
+      if (rawReportDump && rawReportDump.trim()) {
+        // Fetch BAR prompt from DB (fall back to a sensible default)
+        let barSystemPrompt = 'You are an expert building insurance assessor writing professional BAR reports.'
+        try {
+          const { data: pd } = await service
+            .from('prompts')
+            .select('system_prompt')
+            .eq('tenant_id', tenantId)
+            .eq('key', 'report_bar')
+            .single()
+          if (pd?.system_prompt) barSystemPrompt = pd.system_prompt
+        } catch { /* use default */ }
 
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-      const barMsg = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        system: barSystemPrompt,
-        messages: [{
-          role: 'user',
-          content: `Generate a structured BAR report from the following inspection notes.
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const barMsg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          system: barSystemPrompt,
+          messages: [{
+            role: 'user',
+            content: `Generate a structured BAR report from the following inspection notes.
 
 Raw Report Notes:
 ${rawReportDump}
@@ -215,26 +234,27 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
   "maintenance_notes": "",
   "conclusion": ""
 }`,
-        }],
-      })
+          }],
+        })
 
-      const barText = barMsg.content[0]?.type === 'text' ? barMsg.content[0].text : '{}'
-      const barMatch = barText.match(/\{[\s\S]*\}/)
-      if (barMatch) {
-        const ai = JSON.parse(barMatch[0]) as Record<string, string>
-        const updateData: Record<string, unknown> = {
-          // Inspector's typed property description takes priority; AI fills if blank
-          property_description: propDesc?.trim() || ai.property_description || null,
-          incident_description: ai.incident_description || null,
-          cause_of_damage: ai.cause_of_damage || null,
-          how_damage_occurred: ai.how_damage_occurred || null,
-          resulting_damage: ai.resulting_damage || null,
-          pre_existing_conditions: ai.pre_existing_conditions || null,
-          maintenance_notes: ai.maintenance_notes || null,
-          conclusion: ai.conclusion || null,
+        const barText = barMsg.content[0]?.type === 'text' ? barMsg.content[0].text : '{}'
+        const barMatch = barText.match(/\{[\s\S]*\}/)
+        if (barMatch) {
+          const ai = JSON.parse(barMatch[0]) as Record<string, string>
+          const updateData: Record<string, unknown> = {
+            // Inspector's typed property description takes priority; AI fills if blank
+            property_description: propDesc?.trim() || ai.property_description || null,
+            incident_description: ai.incident_description || null,
+            cause_of_damage: ai.cause_of_damage || null,
+            how_damage_occurred: ai.how_damage_occurred || null,
+            resulting_damage: ai.resulting_damage || null,
+            pre_existing_conditions: ai.pre_existing_conditions || null,
+            maintenance_notes: ai.maintenance_notes || null,
+            conclusion: ai.conclusion || null,
+          }
+          await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
+          reportGenerated = true
         }
-        await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
-        reportGenerated = true
       }
     } catch (e) {
       console.error('AI report generation error:', e)
