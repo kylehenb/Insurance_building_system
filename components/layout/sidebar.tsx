@@ -266,7 +266,6 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
         {/* Brand */}
         <div className="sb-brand">
           <img src="/logo.png" alt="Insurance Repair Co." className="sb-logo" />
-          <div className="sb-wordmark">Insurance Repair Co.</div>
         </div>
 
         {/* AI Assistant toggle */}
