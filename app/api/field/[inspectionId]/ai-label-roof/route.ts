@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +30,7 @@ export async function POST(
 
   const tenantId = userRow.tenant_id
 
-  // Fetch the roof photo labelling prompt from the database
-  let systemPrompt = 'You are labelling roof inspection photos for a building insurance report. Generate specialized labels identifying roof section, covering material, pitch, flashing details, drainage elements, and any storm damage. Use roofing industry terminology.'
+  let systemInstruction = 'You are labelling roof inspection photos for a building insurance report. Generate specialized labels identifying roof section, covering material, pitch, flashing details, drainage elements, and any storm damage. Use roofing industry terminology.'
   try {
     const { data: promptData } = await service
       .from('prompts')
@@ -40,17 +39,16 @@ export async function POST(
       .eq('key', 'photo_label_roof')
       .single()
     if (promptData?.system_prompt) {
-      systemPrompt = promptData.system_prompt
+      systemInstruction = promptData.system_prompt
     }
   } catch (e) {
     console.error('Failed to fetch roof photo labelling prompt, using default:', e)
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash', systemInstruction })
 
-  const prompt = `${systemPrompt}
-
-Job context:
+  const prompt = `Job context:
 - Loss type: ${jobContext?.lossType || 'Unknown'}
 - Insurer: ${jobContext?.insurer || 'Unknown'}
 - Address: ${jobContext?.address || 'Unknown'}
@@ -71,13 +69,8 @@ Return ONLY a JSON array of strings, one per photo, in order:
 ["label 1", "label 2", ...]`
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const text = message.content[0]?.type === 'text' ? message.content[0].text : '[]'
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) return NextResponse.json({ ok: false, labels: [] })
 

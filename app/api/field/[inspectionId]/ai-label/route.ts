@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,8 @@ export async function POST(
     return NextResponse.json({ ok: false, labels: [] })
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
 
   const prompt = `You are labelling photos for a building insurance inspection report.
 
@@ -44,13 +45,8 @@ Return ONLY a JSON array of strings, one per photo, in order:
 ["label 1", "label 2", ...]`
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const text = message.content[0]?.type === 'text' ? message.content[0].text : '[]'
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) return NextResponse.json({ ok: false, labels: [] })
 
