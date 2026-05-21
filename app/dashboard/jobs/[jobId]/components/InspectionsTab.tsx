@@ -22,6 +22,27 @@ const REPORT_TYPE_PREFIXES: Record<string, string> = {
 }
 
 // — Types ——————————————————————————————————————————————————————————
+interface FieldDraftSnapshot {
+  personMet?: string
+  relation?: string
+  propDesc?: string
+  raw_report_notes?: string
+  photoContext?: string
+  hospitalName?: string
+  customSafetyNotes?: string
+  chips?: Record<string, boolean>
+  commenceTime?: string
+  scopeRooms?: Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>
+  roofRawNotes?: string
+  msWorksCompleted?: string
+  msTempFixes?: string
+  msHours?: string
+  ldMethod?: string; ldSource?: string; ldLocation?: string; ldFindings?: string
+  restType?: string; restExtent?: string; restRooms?: string; restNotes?: string
+  extTrades?: Record<string, boolean>
+  extTradeNotes?: Record<string, string>
+}
+
 interface Inspection {
   id: string
   tenant_id: string
@@ -35,7 +56,8 @@ interface Inspection {
   person_met: string | null
   access_notes: string | null  // repurposed for assessor name
   raw_report_notes: string | null
-  field_draft: Record<string, unknown> | null
+  field_draft: FieldDraftSnapshot | null
+  form_submitted_at: string | null
   quote_id: string | null
   report_id: string | null
   created_at: string
@@ -538,6 +560,204 @@ function InspectionForm({
   )
 }
 
+// — FieldAppSnapshotPanel ——————————————————————————————————————
+function FieldAppSnapshotPanel({
+  snapshot,
+  submittedAt,
+  inspectionId,
+  isExpanded,
+  onToggle,
+}: {
+  snapshot: FieldDraftSnapshot
+  submittedAt: string
+  inspectionId: string
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  const submittedDate = new Date(submittedAt).toLocaleString('en-AU', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
+  const chips = snapshot.chips ?? {}
+  const safetyLabels: Record<string, string> = {
+    general: 'No immediate hazards', ppe: 'PPE worn', asbestos: 'Asbestos acknowledged',
+    structural: 'No structural hazards', roofPower: 'Power hazards managed', weather: 'Weather suitable',
+  }
+
+  const hasRoof = !!snapshot.roofRawNotes?.trim()
+  const hasMakeSafe = !!snapshot.msWorksCompleted?.trim() || !!snapshot.msTempFixes?.trim()
+  const hasLeakDetection = !!snapshot.ldFindings?.trim()
+  const hasRestoration = !!snapshot.restType?.trim()
+
+  const snapshotRowStyle: React.CSSProperties = {
+    display: 'grid', gridTemplateColumns: '140px 1fr',
+    gap: '4px 12px', fontSize: 12, lineHeight: 1.5, color: '#3a3530',
+    fontFamily: 'DM Sans, sans-serif',
+  }
+  const snapshotLabelStyle: React.CSSProperties = {
+    color: '#9e998f', fontWeight: 500, textTransform: 'uppercase',
+    fontSize: 10, letterSpacing: '0.07em', paddingTop: 2,
+  }
+
+  return (
+    <div style={{ border: '1px solid #e4dfd8', borderRadius: 8, overflow: 'hidden' }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', background: '#f9f7f5', border: 'none', cursor: 'pointer',
+          fontFamily: 'DM Sans, sans-serif',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Smartphone size={14} style={{ color: '#c8b89a' }} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Field App Submission</span>
+          <span style={{ fontSize: 11, color: '#9e998f' }}>{submittedDate}</span>
+        </div>
+        {isExpanded ? <ChevronUp size={14} style={{ color: '#9e998f' }} /> : <ChevronDown size={14} style={{ color: '#9e998f' }} />}
+      </button>
+
+      {isExpanded && (
+        <div style={{ padding: '16px 16px 20px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Safety */}
+          <div>
+            <div style={{ ...snapshotLabelStyle, marginBottom: 8 }}>Safety</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              {Object.entries(safetyLabels).map(([key, label]) => (
+                <span key={key} style={{
+                  padding: '3px 8px', borderRadius: 12, fontSize: 11,
+                  background: chips[key] ? '#e8f5e9' : '#f5f2ee',
+                  color: chips[key] ? '#2e7d32' : '#9e998f',
+                }}>
+                  {chips[key] ? '✓ ' : '— '}{label}
+                </span>
+              ))}
+            </div>
+            {snapshot.hospitalName && (
+              <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Nearest hospital</span><span>{snapshot.hospitalName}</span></div>
+            )}
+            {snapshot.customSafetyNotes && (
+              <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Safety notes</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.customSafetyNotes}</span></div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div>
+            <div style={{ ...snapshotLabelStyle, marginBottom: 8 }}>Details</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {snapshot.personMet && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Person met</span><span>{snapshot.personMet}{snapshot.relation ? ` (${snapshot.relation})` : ''}</span></div>}
+              {snapshot.propDesc && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Property description</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.propDesc}</span></div>}
+            </div>
+          </div>
+
+          {/* Scope */}
+          {snapshot.scopeRooms && snapshot.scopeRooms.length > 0 && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 8 }}>Scope of works</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {snapshot.scopeRooms.map((room, i) => {
+                  const dims = [room.l, room.w, room.h].filter(Boolean).join('×')
+                  return (
+                    <div key={i} style={{ background: '#f9f7f5', borderRadius: 6, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3a3530', marginBottom: 4, fontFamily: 'DM Sans, sans-serif' }}>
+                        {room.name || 'Unnamed room'}{dims ? <span style={{ fontWeight: 400, color: '#9e998f', marginLeft: 6 }}>{dims}m</span> : null}
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {room.items.filter(Boolean).map((item, j) => (
+                          <li key={j} style={{ fontSize: 12, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Report notes */}
+          {snapshot.raw_report_notes && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Raw report notes</div>
+              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: '#f9f7f5', borderRadius: 6, padding: '10px 12px' }}>
+                {snapshot.raw_report_notes}
+              </div>
+            </div>
+          )}
+
+          {/* Photo context */}
+          {snapshot.photoContext && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Photo context</div>
+              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif' }}>{snapshot.photoContext}</div>
+            </div>
+          )}
+
+          {/* Roof report notes */}
+          {hasRoof && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Roof report notes</div>
+              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: '#f9f7f5', borderRadius: 6, padding: '10px 12px' }}>
+                {snapshot.roofRawNotes}
+              </div>
+            </div>
+          )}
+
+          {/* Make safe */}
+          {hasMakeSafe && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Make safe</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {snapshot.msWorksCompleted && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Works completed</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.msWorksCompleted}</span></div>}
+                {snapshot.msTempFixes && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Temp fixes</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.msTempFixes}</span></div>}
+                {snapshot.msHours && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Hours on site</span><span>{snapshot.msHours}</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Leak detection */}
+          {hasLeakDetection && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Leak detection</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {snapshot.ldMethod && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Method</span><span>{snapshot.ldMethod}</span></div>}
+                {snapshot.ldSource && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Source</span><span>{snapshot.ldSource}</span></div>}
+                {snapshot.ldLocation && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Location</span><span>{snapshot.ldLocation}</span></div>}
+                {snapshot.ldFindings && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Findings</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.ldFindings}</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Restoration */}
+          {hasRestoration && (
+            <div>
+              <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Restoration</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {snapshot.restType && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Type</span><span>{snapshot.restType}</span></div>}
+                {snapshot.restExtent && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Extent</span><span>{snapshot.restExtent}</span></div>}
+                {snapshot.restRooms && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Rooms affected</span><span>{snapshot.restRooms}</span></div>}
+                {snapshot.restNotes && <div style={snapshotRowStyle}><span style={snapshotLabelStyle}>Notes</span><span style={{ whiteSpace: 'pre-wrap' }}>{snapshot.restNotes}</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Photos link */}
+          <div style={{ paddingTop: 4, borderTop: '1px solid #f0ece6' }}>
+            <a
+              href={`/field/${inspectionId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 12, color: '#c8b89a', fontFamily: 'DM Sans, sans-serif' }}
+            >
+              View full field app (read-only) →
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // — InspectionsTab ——————————————————————————————————————————————
 export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabProps) {
   const supabase = createBrowserClient(
@@ -558,7 +778,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     // Fetch all inspections for this job
     const { data: inspections, error: inspError } = await supabase
       .from('inspections')
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,quote_id,report_id,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,form_submitted_at,quote_id,report_id,created_at')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true })
@@ -674,7 +894,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
         person_met: data['Person Met'] || null,
         field_draft: fieldDraft,
       })
-      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,quote_id,report_id,created_at')
+      .select('id,tenant_id,job_id,inspection_ref,scheduled_date,start_time,finish_time,duration_minutes,status,person_met,access_notes,raw_report_notes,field_draft,form_submitted_at,quote_id,report_id,created_at')
       .single()
 
     if (inspError) throw inspError
@@ -917,6 +1137,17 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                     onDelete={handleDelete}
                     onRefresh={fetchInspectionsWithRelations}
                   />
+
+                  {/* Field App Submission Snapshot */}
+                  {inspection.form_submitted_at && inspection.field_draft && (
+                    <FieldAppSnapshotPanel
+                      snapshot={inspection.field_draft}
+                      submittedAt={inspection.form_submitted_at}
+                      inspectionId={inspection.id}
+                      isExpanded={isSectionExpanded(inspection.id, 'fieldSnapshot')}
+                      onToggle={() => toggleSection(inspection.id, 'fieldSnapshot')}
+                    />
+                  )}
 
                   {/* Inspection Items Section */}
                   <div>

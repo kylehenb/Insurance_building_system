@@ -115,6 +115,36 @@ export async function POST(
     .single()
   if (!insp) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
 
+  // Resolve quote_id — inspection may not have it set (e.g. non-lodge flow), fall back to job's active quote
+  let resolvedQuoteId: string | null = insp.quote_id ?? null
+  if (!resolvedQuoteId && insp.job_id) {
+    const { data: activeQuote } = await service
+      .from('quotes')
+      .select('id')
+      .eq('job_id', insp.job_id)
+      .eq('tenant_id', tenantId)
+      .eq('is_active_version', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    resolvedQuoteId = activeQuote?.id ?? null
+  }
+
+  // Resolve report_id — fall back to the job's latest BAR/storm_wind report
+  let resolvedReportId: string | null = insp.report_id ?? null
+  if (!resolvedReportId && insp.job_id) {
+    const { data: activeReport } = await service
+      .from('reports')
+      .select('id')
+      .eq('job_id', insp.job_id)
+      .eq('tenant_id', tenantId)
+      .in('report_type', ['BAR', 'storm_wind'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    resolvedReportId = activeReport?.id ?? null
+  }
+
   const {
     personMet,
     safetyData,
@@ -170,19 +200,18 @@ export async function POST(
     type: 'field_inspection',
   })
 
-  // 2. Update inspection record
+  // 2. Update inspection record — keep field_draft as the submitted snapshot (cleared just before this by the client)
   await service.from('inspections').update({
     status: 'submitted',
     form_submitted_at: now,
     safety_confirmed_at: safetyData ? now : null,
     person_met: personMet ?? null,
     raw_report_notes: rawReportDump ?? null,
-    field_draft: null, // clear draft on submit
   }).eq('id', inspectionId).eq('tenant_id', tenantId)
 
   // 2.5. Generate AI report if inspection has a report and raw_report_notes exists
   let reportGenerated = false
-  if (insp.report_id) {
+  if (resolvedReportId) {
     try {
       // Always save basic fields to the report when they are available
       await service.from('reports').update({
@@ -190,7 +219,7 @@ export async function POST(
         person_met: personMet ?? null,
         attendance_date: now.split('T')[0],
         ...(propDesc?.trim() ? { property_description: propDesc.trim() } : {}),
-      }).eq('id', insp.report_id).eq('tenant_id', tenantId)
+      }).eq('id', resolvedReportId).eq('tenant_id', tenantId)
 
       // Only run AI generation if there are raw report notes to work from
       if (rawReportDump && rawReportDump.trim()) {
@@ -252,7 +281,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
             maintenance_notes: ai.maintenance_notes || null,
             conclusion: ai.conclusion || null,
           }
-          await service.from('reports').update(updateData as any).eq('id', insp.report_id).eq('tenant_id', tenantId)
+          await service.from('reports').update(updateData as any).eq('id', resolvedReportId).eq('tenant_id', tenantId)
           reportGenerated = true
         }
       }
@@ -361,7 +390,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
 
   // 3. Parse and write scope items if quote exists
   let parsedCount = 0
-  if (insp.quote_id && scopeRooms && scopeRooms.length > 0) {
+  if (resolvedQuoteId && scopeRooms && scopeRooms.length > 0) {
     const validRooms = scopeRooms.filter(r => r.items && r.items.some(i => i.trim()))
     if (validRooms.length > 0) {
       try {
@@ -372,7 +401,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
           const { data: maxSort } = await service
             .from('scope_items')
             .select('sort_order')
-            .eq('quote_id', insp.quote_id)
+            .eq('quote_id', resolvedQuoteId)
             .eq('tenant_id', tenantId)
             .order('sort_order', { ascending: false })
             .limit(1)
@@ -382,7 +411,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
 
           const inserts = parsedItems.map(item => ({
             tenant_id: tenantId,
-            quote_id: insp.quote_id as string,
+            quote_id: resolvedQuoteId as string,
             room: item.room || null,
             trade: item.trade || null,
             keyword: item.keyword || null,

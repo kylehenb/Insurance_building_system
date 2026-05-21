@@ -436,6 +436,14 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const finalSubmit = async () => {
     setIsSubmitting(true)
     try {
+      // Flush the current draft immediately so the snapshot is preserved post-submission
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      await fetch(`${base}/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft: collectDraft() }),
+      })
+
       // Upload photos first
       for (const photo of photos) {
         const fd = new FormData()

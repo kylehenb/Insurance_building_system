@@ -250,6 +250,16 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
             placeholder="Full property address"
           />
         </div>
+        <div className="col-span-2">
+          <FieldLabel label="Property Description" />
+          <InlineTextarea
+            value={str('property_description')}
+            onChange={v => onChange('property_description', v)}
+            locked={locked}
+            placeholder="e.g. Single storey brick veneer, tiled roof, circa 1985…"
+            rows={3}
+          />
+        </div>
         <div>
           <FieldLabel label="Insured Name" />
           <InlineInput
