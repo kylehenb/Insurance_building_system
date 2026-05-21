@@ -263,12 +263,7 @@ function SortableRoomSection({
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={{ ...style, cursor: isLocked ? 'default' : 'grab' }}
-      {...attributes}
-      {...(listeners as React.DOMAttributes<HTMLDivElement>)}
-    >
+    <div ref={setNodeRef} style={style}>
       <RoomSection
         name={room.name}
         items={room.items}
@@ -284,6 +279,8 @@ function SortableRoomSection({
         trades={trades}
         startingIndex={startingIndex}
         tenantId={tenantId}
+        dragHandleListeners={isLocked ? undefined : (listeners as React.DOMAttributes<HTMLElement>)}
+        dragHandleAttributes={isLocked ? undefined : (attributes as React.HTMLAttributes<HTMLElement>)}
       />
     </div>
   )

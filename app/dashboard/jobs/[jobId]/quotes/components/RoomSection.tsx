@@ -45,6 +45,8 @@ interface RoomSectionProps {
   trades: Trade[]
   autoFocusName?: boolean
   tenantId: string
+  dragHandleListeners?: React.DOMAttributes<HTMLElement>
+  dragHandleAttributes?: React.HTMLAttributes<HTMLElement>
 }
 
 // ──────────────────────────────────────────────
@@ -352,7 +354,9 @@ export function RoomSection({
   trades,
   autoFocusName,
   tenantId,
-  startingIndex, // New prop for sequential numbering
+  startingIndex,
+  dragHandleListeners,
+  dragHandleAttributes,
 }: RoomSectionProps & { startingIndex: number }) {
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -513,6 +517,26 @@ export function RoomSection({
           gap: 12,
         }}
       >
+        {/* Drag handle — only rendered when drag props are provided */}
+        {dragHandleListeners && !isLocked && (
+          <div
+            {...dragHandleAttributes}
+            {...dragHandleListeners}
+            style={{
+              cursor: 'grab',
+              color: '#b0a89e',
+              fontSize: 14,
+              lineHeight: 1,
+              padding: '2px 2px',
+              flexShrink: 0,
+              userSelect: 'none',
+              touchAction: 'none',
+            }}
+            title="Drag to reorder room"
+          >
+            ⠿
+          </div>
+        )}
         {/* Name */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
           {editingName ? (
