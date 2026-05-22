@@ -48,6 +48,7 @@ interface JobHeader {
   order_sender_email: string | null
   client_id: string | null
   invoice_to: string | null
+  job_type: string | null
 }
 
 interface JobDetailShellProps {
@@ -303,6 +304,14 @@ export function JobDetailShell({
                   {job.job_number}
                 </h1>
                 <StatusBadge override_stage={job.override_stage} />
+                {job.job_type === 'private' && (
+                  <span
+                    className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium"
+                    style={{ background: '#eef4ff', color: '#3a5faa', border: '1px solid #c5d8f5' }}
+                  >
+                    Private
+                  </span>
+                )}
                 <FlagButton
                   isFlagged={flagged}
                   onToggle={toggleFlag}

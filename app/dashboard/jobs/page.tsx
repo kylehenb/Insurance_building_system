@@ -15,6 +15,7 @@ type JobRow = {
   insured_name: string | null
   property_address: string | null
   insurer: string | null
+  job_type: string | null
   override_stage: 'on_hold' | 'cancelled' | null
   current_stage: string | null
   created_at: string | null
@@ -141,7 +142,7 @@ export default function JobsListPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const SELECT_FIELDS = 'id, job_number, insured_name, property_address, insurer, override_stage, current_stage, created_at'
+  const SELECT_FIELDS = 'id, job_number, insured_name, property_address, insurer, job_type, override_stage, current_stage, created_at'
 
   async function fetchJobs(tid: string, filter: StageFilter) {
     let query = supabase
@@ -340,9 +341,25 @@ export default function JobsListPage() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <span className="text-xs text-[#1a1a1a]/70">
-                            {job.insurer || "-"}
-                          </span>
+                          {job.job_type === 'private' ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: '2px 7px',
+                                borderRadius: 4,
+                                background: '#eef4ff',
+                                color: '#3a5faa',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Private
+                            </span>
+                          ) : (
+                            <span className="text-xs text-[#1a1a1a]/70">
+                              {job.insurer || "-"}
+                            </span>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
                           <StagePill currentStage={job.current_stage} />

@@ -38,6 +38,7 @@ interface JobDetails {
   notes: string | null
   client_id: string | null
   invoice_to: string | null
+  job_type: string | null
 }
 
 interface ActionCard {

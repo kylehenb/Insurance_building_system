@@ -1786,6 +1786,7 @@ export type Database = {
           insurer: string | null
           invoice_to: string | null
           job_number: string
+          job_type: string
           kpi_booked_at: string | null
           kpi_booking_due: string | null
           kpi_contact_due: string | null
@@ -1833,6 +1834,7 @@ export type Database = {
           insurer?: string | null
           invoice_to?: string | null
           job_number: string
+          job_type?: string
           kpi_booked_at?: string | null
           kpi_booking_due?: string | null
           kpi_contact_due?: string | null
@@ -1880,6 +1882,7 @@ export type Database = {
           insurer?: string | null
           invoice_to?: string | null
           job_number?: string
+          job_type?: string
           kpi_booked_at?: string | null
           kpi_booking_due?: string | null
           kpi_contact_due?: string | null
