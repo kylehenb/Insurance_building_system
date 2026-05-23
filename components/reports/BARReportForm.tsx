@@ -1,13 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { useState } from 'react'
 import { ReportPhotos } from './ReportPhotos'
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 interface BARReportFormProps {
   data: Record<string, unknown>
@@ -234,55 +228,6 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
             onChange={v => onChange('assessor_name', v)}
             locked={locked}
             placeholder="e.g. Kyle Bindon"
-          />
-        </div>
-      </div>
-
-      {/* — PROPERTY — */}
-      <SectionHeading label="Property" />
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <FieldLabel label="Property Address" />
-          <InlineInput
-            value={str('property_address')}
-            onChange={v => onChange('property_address', v)}
-            locked={locked}
-            placeholder="Full property address"
-          />
-        </div>
-        <div className="col-span-2">
-          <FieldLabel label="Property Description" />
-          <InlineTextarea
-            value={str('property_description')}
-            onChange={v => onChange('property_description', v)}
-            locked={locked}
-            placeholder="e.g. Single storey brick veneer, tiled roof, circa 1985…"
-            rows={3}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Insured Name" />
-          <InlineInput
-            value={str('insured_name')}
-            onChange={v => onChange('insured_name', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Claim Number" />
-          <InlineInput
-            value={str('claim_number')}
-            onChange={v => onChange('claim_number', v)}
-            locked={locked}
-          />
-        </div>
-        <div>
-          <FieldLabel label="Loss Type" />
-          <InlineInput
-            value={str('loss_type')}
-            onChange={v => onChange('loss_type', v)}
-            locked={locked}
-            placeholder="e.g. Storm, Water, Fire"
           />
         </div>
       </div>

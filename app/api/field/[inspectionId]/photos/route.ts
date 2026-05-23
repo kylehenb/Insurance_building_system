@@ -38,6 +38,20 @@ export async function POST(
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   const label = (formData.get('label') as string) ?? ''
+  const isRoofPhoto = formData.get('isRoofPhoto') === 'true'
+
+  // Determine the correct report_id for this photo
+  let photoReportId: string | null = (insp as any).report_id ?? null
+  if (isRoofPhoto) {
+    const { data: roofReport } = await service
+      .from('reports')
+      .select('id')
+      .eq('inspection_id', inspectionId)
+      .eq('report_type', 'roof')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    photoReportId = roofReport?.id ?? null
+  }
 
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
@@ -72,7 +86,7 @@ export async function POST(
       tenant_id: tenantId,
       job_id: insp.job_id,
       inspection_id: inspectionId,
-      report_id: (insp as any).report_id ?? null,
+      report_id: photoReportId,
       storage_path: storagePath,
       file_name: file.name,
       mime_type: mimeType,

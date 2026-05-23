@@ -315,7 +315,6 @@ export function ReportAccordionItem({
     person_met: report.person_met,
     assessor_name: report.assessor_name,
     property_address: report.property_address,
-    property_description: report.property_description,
     insured_name: report.insured_name,
     claim_number: report.claim_number,
     loss_type: report.loss_type,

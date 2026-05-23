@@ -56,7 +56,9 @@ Example: [{"room":"Living Room","trade":"Plastering","keyword":"ceiling","item_d
       .eq('tenant_id', tenantId)
       .eq('key', 'scope_field_parse')
       .single()
-    if (promptData?.system_prompt) {
+    // Only use the DB prompt if it contains the scope_notes placeholder; otherwise the
+    // scope text would never be included in the message sent to Claude
+    if (promptData?.system_prompt?.includes('{scope_notes}')) {
       systemPrompt = promptData.system_prompt
     }
   } catch (e) {
@@ -213,12 +215,11 @@ export async function POST(
   let reportGenerated = false
   if (resolvedReportId) {
     try {
-      // Always save basic fields to the report when they are available
+      // Save basic attendance fields to the report
       await service.from('reports').update({
         ...(rawReportDump ? { raw_report_notes: rawReportDump } : {}),
         person_met: personMet ?? null,
         attendance_date: now.split('T')[0],
-        ...(propDesc?.trim() ? { property_description: propDesc.trim() } : {}),
       }).eq('id', resolvedReportId).eq('tenant_id', tenantId)
 
       // Only run AI generation if there are raw report notes to work from
@@ -271,8 +272,6 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
         if (barMatch) {
           const ai = JSON.parse(barMatch[0]) as Record<string, string>
           const updateData: Record<string, unknown> = {
-            // Inspector's typed property description takes priority; AI fills if blank
-            property_description: propDesc?.trim() || ai.property_description || null,
             incident_description: ai.incident_description || null,
             cause_of_damage: ai.cause_of_damage || null,
             how_damage_occurred: ai.how_damage_occurred || null,
@@ -290,11 +289,63 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
     }
   }
 
-  // 2.6. Generate roof report if roofRawNotes exists
-  let roofReportGenerated = false
+  // 2.6. Extract structured property details from propDesc via AI → jobs.property_details
+  if (propDesc?.trim() && insp.job_id) {
+    try {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const pdMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{
+          role: 'user',
+          content: `Extract structured property details from the following description. Return ONLY a JSON object — only include keys where the value can be clearly identified. Omit keys you are uncertain about.
+
+Property Description:
+${propDesc.trim()}
+
+JSON keys and types:
+{
+  "building_age": "string e.g. 'Circa 1985' or '~30 years'",
+  "condition": "string: 'Good', 'Fair', or 'Poor'",
+  "roof_type": "string e.g. 'Concrete tile — hip'",
+  "wall_type": "string e.g. 'Brick veneer'",
+  "storeys": "string: '1' or '2'",
+  "foundation": "string e.g. 'Concrete slab'",
+  "fence": "string e.g. 'Colorbond' or 'None'",
+  "pool": "boolean",
+  "detached_garage": "boolean",
+  "granny_flat": "boolean"
+}`,
+        }],
+      })
+      const pdText = pdMsg.content[0]?.type === 'text' ? pdMsg.content[0].text : '{}'
+      const pdMatch = pdText.match(/\{[\s\S]*\}/)
+      if (pdMatch) {
+        const extracted = JSON.parse(pdMatch[0]) as Record<string, unknown>
+        if (Object.keys(extracted).length > 0) {
+          // Merge with existing property_details so manual edits are not overwritten
+          const { data: jobRow } = await service
+            .from('jobs')
+            .select('property_details')
+            .eq('id', insp.job_id)
+            .eq('tenant_id', tenantId)
+            .single()
+          const existing = (jobRow?.property_details as Record<string, unknown>) ?? {}
+          await service
+            .from('jobs')
+            .update({ property_details: { ...existing, ...extracted } as any })
+            .eq('id', insp.job_id)
+            .eq('tenant_id', tenantId)
+        }
+      }
+    } catch (e) {
+      console.error('Property details extraction error:', e)
+    }
+  }
+
+  // 2.7. Generate roof report if roofRawNotes exists
   if (roofRawNotes && roofRawNotes.trim()) {
     try {
-      // Check if a roof report already exists for this inspection
       const { data: existingRoofReport } = await service
         .from('reports')
         .select('id')
@@ -306,10 +357,8 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
       let roofReportId: string | null = null
 
       if (existingRoofReport) {
-        // Use existing roof report
         roofReportId = existingRoofReport.id
       } else {
-        // Create new roof report
         const { data: newRoofReport } = await service
           .from('reports')
           .insert({
@@ -325,62 +374,79 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
           })
           .select('id')
           .single()
-
-        if (newRoofReport) {
-          roofReportId = newRoofReport.id
-        }
+        if (newRoofReport) roofReportId = newRoofReport.id
       }
 
       if (roofReportId) {
-        // Update the roof report with raw notes
-        await service.from('reports').update({
-          raw_report_notes: roofRawNotes,
-        }).eq('id', roofReportId).eq('tenant_id', tenantId)
+        await service.from('reports').update({ raw_report_notes: roofRawNotes })
+          .eq('id', roofReportId).eq('tenant_id', tenantId)
 
-        // Call AI generate report endpoint for roof report
-        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/api/ai/generate-report`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rawReportDump: roofRawNotes,
-            reportType: 'roof',
-            tenantId,
-          }),
+        // Inline AI generation — avoids the wrong-URL fetch that previously silently failed
+        let roofSystemPrompt = 'You are an expert building insurance roof assessor writing professional roof inspection reports.'
+        try {
+          const { data: pd } = await service
+            .from('prompts')
+            .select('system_prompt')
+            .eq('tenant_id', tenantId)
+            .eq('key', 'report_roof')
+            .single()
+          if (pd?.system_prompt) roofSystemPrompt = pd.system_prompt
+        } catch { /* use default */ }
+
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const roofMsg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          system: roofSystemPrompt,
+          messages: [{
+            role: 'user',
+            content: `Generate a structured roof inspection report from the following notes.
+
+Raw Notes:
+${roofRawNotes}
+
+Return ONLY a JSON object with these exact keys (empty string or null if unknown):
+{
+  "roof_type": "",
+  "roof_general_condition": "",
+  "pitch_degrees": null,
+  "number_of_penetrations": null,
+  "number_of_storeys": "",
+  "ridge_hip_condition": "",
+  "gutter_condition": "",
+  "gutter_overflows": "",
+  "roof_insulation": "",
+  "specific_cause_of_damage": "",
+  "internal_damage": "",
+  "roof_damage": "",
+  "damage_caused_by_maintenance": "",
+  "non_claim_maintenance_issues": "",
+  "maintenance_repairs_required": "",
+  "conditions_preventing_repairs": "",
+  "prior_repairs": "",
+  "conclusion": ""
+}`,
+          }],
         })
-        if (aiRes.ok) {
-          const aiData = await aiRes.json()
-          // Update the roof report with AI-generated content using type_specific_fields
-          const updateData: Record<string, unknown> = {
-            type_specific_fields: {},
-          }
-          if (aiData.reportData) {
-            const tsFields: Record<string, unknown> = {}
-            if (aiData.reportData.roof_type) tsFields.roof_type = aiData.reportData.roof_type
-            if (aiData.reportData.roof_general_condition) tsFields.roof_general_condition = aiData.reportData.roof_general_condition
-            if (aiData.reportData.pitch_degrees) tsFields.pitch_degrees = aiData.reportData.pitch_degrees
-            if (aiData.reportData.number_of_penetrations) tsFields.number_of_penetrations = aiData.reportData.number_of_penetrations
-            if (aiData.reportData.number_of_storeys) tsFields.number_of_storeys = aiData.reportData.number_of_storeys
-            if (aiData.reportData.ridge_hip_condition) tsFields.ridge_hip_condition = aiData.reportData.ridge_hip_condition
-            if (aiData.reportData.gutter_condition) tsFields.gutter_condition = aiData.reportData.gutter_condition
-            if (aiData.reportData.gutter_overflows) tsFields.gutter_overflows = aiData.reportData.gutter_overflows
-            if (aiData.reportData.roof_insulation) tsFields.roof_insulation = aiData.reportData.roof_insulation
-            if (aiData.reportData.specific_cause_of_damage) tsFields.specific_cause_of_damage = aiData.reportData.specific_cause_of_damage
-            if (aiData.reportData.internal_damage) tsFields.internal_damage = aiData.reportData.internal_damage
-            if (aiData.reportData.roof_damage) tsFields.roof_damage = aiData.reportData.roof_damage
-            if (aiData.reportData.damage_caused_by_maintenance) tsFields.damage_caused_by_maintenance = aiData.reportData.damage_caused_by_maintenance
-            if (aiData.reportData.non_claim_maintenance_issues) tsFields.non_claim_maintenance_issues = aiData.reportData.non_claim_maintenance_issues
-            if (aiData.reportData.maintenance_repairs_required) tsFields.maintenance_repairs_required = aiData.reportData.maintenance_repairs_required
-            if (aiData.reportData.conditions_preventing_repairs) tsFields.conditions_preventing_repairs = aiData.reportData.conditions_preventing_repairs
-            if (aiData.reportData.prior_repairs) tsFields.prior_repairs = aiData.reportData.prior_repairs
-            if (aiData.reportData.conclusion) tsFields.conclusion = aiData.reportData.conclusion
 
-            updateData.type_specific_fields = tsFields
+        const roofText = roofMsg.content[0]?.type === 'text' ? roofMsg.content[0].text : '{}'
+        const roofMatch = roofText.match(/\{[\s\S]*\}/)
+        if (roofMatch) {
+          const ai = JSON.parse(roofMatch[0]) as Record<string, unknown>
+          const tsFields: Record<string, unknown> = {}
+          const roofFields = ['roof_type','roof_general_condition','pitch_degrees','number_of_penetrations',
+            'number_of_storeys','ridge_hip_condition','gutter_condition','gutter_overflows','roof_insulation',
+            'specific_cause_of_damage','internal_damage','roof_damage','damage_caused_by_maintenance',
+            'non_claim_maintenance_issues','maintenance_repairs_required','conditions_preventing_repairs',
+            'prior_repairs','conclusion']
+          for (const f of roofFields) {
+            if (ai[f] !== undefined && ai[f] !== null && ai[f] !== '') tsFields[f] = ai[f]
           }
-
-          if (Object.keys(updateData).length > 0) {
-            await service.from('reports').update(updateData as any).eq('id', roofReportId).eq('tenant_id', tenantId)
+          if (Object.keys(tsFields).length > 0) {
+            await service.from('reports')
+              .update({ type_specific_fields: tsFields } as any)
+              .eq('id', roofReportId).eq('tenant_id', tenantId)
           }
-          roofReportGenerated = true
         }
       }
     } catch (e) {
@@ -394,10 +460,23 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
     const validRooms = scopeRooms.filter(r => r.items && r.items.some(i => i.trim()))
     if (validRooms.length > 0) {
       try {
-        const parsedItems = await parseScopeWithAI(validRooms, { insurer, lossType }, tenantId, service)
+        let itemsToInsert: ScopeItem[] = await parseScopeWithAI(validRooms, { insurer, lossType }, tenantId, service)
 
-        if (parsedItems.length > 0) {
-          // Get current max sort order
+        // Fallback: if AI returned nothing, create basic items directly from scope rooms
+        if (itemsToInsert.length === 0) {
+          itemsToInsert = validRooms.flatMap(room =>
+            room.items.filter(i => i.trim()).map(item => ({
+              room: room.room || 'General',
+              trade: '',
+              keyword: '',
+              item_description: item,
+              qty: null,
+              unit: 'item',
+            }))
+          )
+        }
+
+        if (itemsToInsert.length > 0) {
           const { data: maxSort } = await service
             .from('scope_items')
             .select('sort_order')
@@ -409,7 +488,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
 
           let sortOrder = (maxSort?.sort_order ?? 0) + 1
 
-          const inserts = parsedItems.map(item => ({
+          const inserts = itemsToInsert.map(item => ({
             tenant_id: tenantId,
             quote_id: resolvedQuoteId as string,
             room: item.room || null,
@@ -424,7 +503,11 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
           }))
 
           const { error: insertErr } = await service.from('scope_items').insert(inserts)
-          if (!insertErr) parsedCount = inserts.length
+          if (insertErr) {
+            console.error('Scope items insert error:', insertErr)
+          } else {
+            parsedCount = inserts.length
+          }
         }
       } catch (e) {
         console.error('Scope parse error:', e)
