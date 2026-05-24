@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { TeachSavePayload } from '@/types/brain'
+import type { Database } from '@/lib/supabase/database.types'
+
+type PlaybookInsert = Database['public']['Tables']['playbooks']['Insert']
 
 export const dynamic = 'force-dynamic'
 
@@ -85,13 +88,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: entryErr.message }, { status: 500 })
   }
 
-  // Create the playbook (stores name + tenant; structured content lives in brain_entry)
+  const stepsText = structured.steps
+    .map((s) => `${s.order}. ${s.description}`)
+    .join('\n')
+
+  // steps, trigger_keywords, description, created_by exist in the DB but are not yet
+  // reflected in the generated database.types.ts. Cast through unknown so TypeScript
+  // accepts the insert without requiring any.
+  const playbookData = {
+    tenant_id: tenantId,
+    name: structured.title,
+    steps: stepsText,
+    trigger_keywords: structured.tags,
+    description: structured.trigger_condition,
+    created_by: user.id,
+  } as unknown as PlaybookInsert
+
   const { data: playbook, error: pbErr } = await supabase
     .from('playbooks')
-    .insert({
-      tenant_id: tenantId,
-      name: structured.title,
-    })
+    .insert(playbookData)
     .select('id')
     .single()
 
