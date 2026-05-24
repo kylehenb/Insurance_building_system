@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getBrainContext } from '@/lib/brain/getBrainContext'
+import { formatBrainContext } from '@/lib/brain/formatBrainContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,16 +48,35 @@ export async function POST(req: NextRequest) {
         promptKey = 'report_bar'
     }
 
-    // Get the prompt from the prompts table
-    const { data: promptData } = await supabase
-      .from('prompts')
-      .select('system_prompt')
-      .eq('tenant_id', tenantId)
-      .eq('key', promptKey)
-      .single()
+    // Fetch the configured system prompt and brain context in parallel
+    const [promptResult, brainEntries] = await Promise.all([
+      supabase
+        .from('prompts')
+        .select('system_prompt')
+        .eq('tenant_id', tenantId)
+        .eq('key', promptKey)
+        .single(),
+      getBrainContext({ tenantId, promptKey }),
+    ])
 
-    const systemPrompt = promptData?.system_prompt || 
+    const basePrompt = promptResult.data?.system_prompt ||
       'You are an expert building insurance assessor. Generate a professional, detailed report based on the inspection notes provided.'
+
+    const brainBlock = formatBrainContext(brainEntries)
+    const systemPrompt = brainBlock ? `${basePrompt}\n\n${brainBlock}` : basePrompt
+
+    // Fire and forget — increment times_applied for every injected entry
+    if (brainEntries.length > 0) {
+      void Promise.all(
+        brainEntries.map((entry) =>
+          supabase
+            .from('brain_entries')
+            .update({ times_applied: entry.times_applied + 1 })
+            .eq('id', entry.id)
+            .eq('tenant_id', tenantId)
+        )
+      )
+    }
 
     // Build the user message with field-specific instructions
     let userMessage = `Generate a structured report based on the following raw inspection notes.
@@ -157,9 +178,9 @@ Guidelines:
       reportData = JSON.parse(jsonMatch[0])
     } catch (e) {
       console.error('Failed to parse Claude response:', content.text)
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Failed to parse AI response',
-        details: content.text 
+        details: content.text
       }, { status: 500 })
     }
 
@@ -169,7 +190,7 @@ Guidelines:
     })
   } catch (error) {
     console.error('Error generating report:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to generate report',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 })

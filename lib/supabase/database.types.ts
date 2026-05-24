@@ -3526,6 +3526,215 @@ export type Database = {
           },
         ]
       }
+      brain_entries: {
+        Row: {
+          category: string
+          confidence: string
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_reviewed_at: string | null
+          persona: string | null
+          previous_content: string | null
+          prompt_keys: string[]
+          review_due_at: string | null
+          source_ref_id: string | null
+          source_ref_table: string | null
+          source_type: string
+          status: string
+          tags: string[]
+          tenant_id: string
+          times_applied: number
+          times_contradicted: number
+          times_validated: number
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          category: string
+          confidence?: string
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          persona?: string | null
+          previous_content?: string | null
+          prompt_keys?: string[]
+          review_due_at?: string | null
+          source_ref_id?: string | null
+          source_ref_table?: string | null
+          source_type: string
+          status?: string
+          tags?: string[]
+          tenant_id: string
+          times_applied?: number
+          times_contradicted?: number
+          times_validated?: number
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          category?: string
+          confidence?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          persona?: string | null
+          previous_content?: string | null
+          prompt_keys?: string[]
+          review_due_at?: string | null
+          source_ref_id?: string | null
+          source_ref_table?: string | null
+          source_type?: string
+          status?: string
+          tags?: string[]
+          tenant_id?: string
+          times_applied?: number
+          times_contradicted?: number
+          times_validated?: number
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_entries_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playbooks: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbooks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playbook_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          field_snapshots: Json | null
+          id: string
+          job_id: string | null
+          playbook_id: string
+          status: string
+          step_log: Json | null
+          tenant_id: string
+          triggered_by: string | null
+          triggered_via: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          field_snapshots?: Json | null
+          id?: string
+          job_id?: string | null
+          playbook_id: string
+          status?: string
+          step_log?: Json | null
+          tenant_id: string
+          triggered_by?: string | null
+          triggered_via?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          field_snapshots?: Json | null
+          id?: string
+          job_id?: string | null
+          playbook_id?: string
+          status?: string
+          step_log?: Json | null
+          tenant_id?: string
+          triggered_by?: string | null
+          triggered_via?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbook_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       job_margin_summary: {
