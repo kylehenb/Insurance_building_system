@@ -77,3 +77,38 @@ export interface PlaybookRun {
   created_at: string
   completed_at: string | null
 }
+
+export interface TeachSessionInput {
+  dictation: string
+  trigger: string
+}
+
+export interface StructuredTeachStep {
+  order: number
+  description: string
+}
+
+export interface StructuredTeachOutput {
+  title: string
+  trigger_condition: string
+  steps: StructuredTeachStep[]
+  variables: string[]
+  tags: string[]
+  prompt_keys: string[]
+  category: BrainEntryCategory
+  confidence: BrainEntryConfidence
+}
+
+export interface SimilarityMatch {
+  id: string
+  title: string
+  category: string
+  similarity: 'high' | 'medium'
+}
+
+export interface TeachSavePayload {
+  structured: StructuredTeachOutput
+  tenantId: string
+  saveMode?: 'new' | 'example' | 'variant'
+  sourceRefId?: string
+}

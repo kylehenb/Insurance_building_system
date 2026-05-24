@@ -1,8 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import type {
+  StructuredTeachOutput,
+  SimilarityMatch,
+  BrainEntryCategory,
+} from '@/types/brain'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +39,11 @@ interface Props {
   tenantId: string
 }
 
+type ActiveMode = 'chat' | 'doit' | 'teach'
+type TeachSubMode = 'entry' | 'quick' | 'process'
+type ProcessStep = 'record' | 'structuring' | 'review' | 'saved'
+type TeachPersona = 'all' | 'gary' | 'client-comms' | 'internal'
+
 export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -43,6 +53,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [size, setSize] = useState({ w: DEFAULT_W, h: DEFAULT_H })
   const [mounted, setMounted] = useState(false)
 
+  // ── Chat state ──
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -69,6 +80,33 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   // Action checklist state
   const [actionChecklist, setActionChecklist] = useState<{ id: string; text: string; completed: boolean }[]>([])
   const [thinkingText, setThinkingText] = useState('Thinking')
+
+  // ── Mode selector ──
+  const [activeMode, setActiveMode] = useState<ActiveMode>('chat')
+
+  // ── Teach mode state ──
+  const [teachSubMode, setTeachSubMode] = useState<TeachSubMode>('entry')
+  const [processStep, setProcessStep] = useState<ProcessStep>('record')
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingElapsed, setRecordingElapsed] = useState(0)
+  const [dictationText, setDictationText] = useState('')
+  const [triggerText, setTriggerText] = useState('')
+  const [structuredOutput, setStructuredOutput] = useState<StructuredTeachOutput | null>(null)
+  const [editedOutput, setEditedOutput] = useState<StructuredTeachOutput | null>(null)
+  const [isEditingReview, setIsEditingReview] = useState(false)
+  const [similarityMatches, setSimilarityMatches] = useState<SimilarityMatch[]>([])
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedResult, setSavedResult] = useState<{ brainEntryId: string; playbookId: string | null } | null>(null)
+  const [structureError, setStructureError] = useState<string | null>(null)
+  const [newTagInput, setNewTagInput] = useState('')
+
+  // Quick note state
+  const [quickNoteText, setQuickNoteText] = useState('')
+  const [quickPersona, setQuickPersona] = useState<TeachPersona>('all')
+  const [quickCategory, setQuickCategory] = useState<BrainEntryCategory>('rule')
+  const [quickNoteSaving, setQuickNoteSaving] = useState(false)
+  const [quickNoteSaved, setQuickNoteSaved] = useState(false)
+  const [quickNoteError, setQuickNoteError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -158,15 +196,12 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       setActionChecklist([])
       return
     }
-
     const texts = ['Thinking', 'Thinking..', 'Thinking...', 'Thinking...and doing', 'Thinking...and doing.', 'Thinking...and doing..']
     let index = 0
-
     const interval = setInterval(() => {
       index = (index + 1) % texts.length
       setThinkingText(texts[index])
     }, 500)
-
     return () => clearInterval(interval)
   }, [loading])
 
@@ -185,6 +220,161 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setSlashSelectedIdx(0)
   }, [slashQuery, templates, showSlashPopover])
 
+  // Recording timer
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingElapsed(0)
+      return
+    }
+    const start = Date.now()
+    const interval = setInterval(() => {
+      setRecordingElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isRecording])
+
+  // Reset teach state when navigating away from teach mode (auto-dismiss)
+  useEffect(() => {
+    if (activeMode !== 'teach') {
+      resetTeachState()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode])
+
+  // ── Teach helpers ──
+  function resetTeachState() {
+    setTeachSubMode('entry')
+    setProcessStep('record')
+    setIsRecording(false)
+    setDictationText('')
+    setTriggerText('')
+    setStructuredOutput(null)
+    setEditedOutput(null)
+    setIsEditingReview(false)
+    setSimilarityMatches([])
+    setIsSaving(false)
+    setSavedResult(null)
+    setStructureError(null)
+    setNewTagInput('')
+    setQuickNoteText('')
+    setQuickPersona('all')
+    setQuickCategory('rule')
+    setQuickNoteSaving(false)
+    setQuickNoteSaved(false)
+    setQuickNoteError(null)
+  }
+
+  function formatElapsed(secs: number): string {
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  async function saveQuickNote() {
+    if (!quickNoteText.trim()) return
+    setQuickNoteSaving(true)
+    setQuickNoteError(null)
+    try {
+      const res = await fetch('/api/brain/teach/quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: quickNoteText, persona: quickPersona, category: quickCategory, tenantId }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setQuickNoteSaved(true)
+    } catch {
+      setQuickNoteError('Failed to save. Please try again.')
+    } finally {
+      setQuickNoteSaving(false)
+    }
+  }
+
+  async function stopRecordingAndStructure() {
+    setIsRecording(false)
+    setProcessStep('structuring')
+    setStructureError(null)
+    try {
+      const structureRes = await fetch('/api/brain/teach/structure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dictation: dictationText, trigger: triggerText, tenantId }),
+      })
+      if (!structureRes.ok) throw new Error('Structure failed')
+      const structured = await structureRes.json() as StructuredTeachOutput
+      setStructuredOutput(structured)
+
+      // Similarity check (non-blocking if it fails)
+      try {
+        const simRes = await fetch('/api/brain/teach/similarity-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: structured.title, trigger_condition: structured.trigger_condition, tags: structured.tags, tenantId }),
+        })
+        if (simRes.ok) {
+          const { matches } = await simRes.json() as { matches: SimilarityMatch[] }
+          setSimilarityMatches(matches)
+        }
+      } catch {
+        // non-fatal
+      }
+
+      setProcessStep('review')
+    } catch {
+      setStructureError('Failed to structure your teaching. Please try again.')
+      setProcessStep('record')
+    }
+  }
+
+  async function approveSave(saveMode: 'new' | 'example' | 'variant' = 'new', sourceRefId?: string) {
+    const output = isEditingReview ? editedOutput : structuredOutput
+    if (!output) return
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/brain/teach/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structured: output, tenantId, saveMode, sourceRefId }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      const result = await res.json() as { brainEntryId: string; playbookId: string | null }
+      setSavedResult(result)
+      setProcessStep('saved')
+    } catch {
+      // keep form open on error
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  function enterEditMode() {
+    if (!structuredOutput) return
+    setEditedOutput(JSON.parse(JSON.stringify(structuredOutput)) as StructuredTeachOutput)
+    setIsEditingReview(true)
+  }
+
+  function updateEditedStep(index: number, value: string) {
+    if (!editedOutput) return
+    const steps = editedOutput.steps.map((s, i) =>
+      i === index ? { ...s, description: value } : s
+    )
+    setEditedOutput({ ...editedOutput, steps })
+  }
+
+  function removeEditedTag(tag: string) {
+    if (!editedOutput) return
+    setEditedOutput({ ...editedOutput, tags: editedOutput.tags.filter((t) => t !== tag) })
+  }
+
+  function addEditedTag(tag: string) {
+    if (!editedOutput || !tag.trim()) return
+    const clean = tag.trim().toLowerCase().replace(/\s+/g, '-')
+    if (!editedOutput.tags.includes(clean)) {
+      setEditedOutput({ ...editedOutput, tags: [...editedOutput.tags, clean] })
+    }
+    setNewTagInput('')
+  }
+
+  // ── Chat helpers ──
   async function loadTemplates() {
     setTemplatesLoading(true)
     try {
@@ -205,7 +395,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     if (!formTitle.trim() || !formBody.trim()) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     if (editingTemplate) {
       await supabase
         .from('assistant_templates')
@@ -216,7 +405,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .from('assistant_templates')
         .insert({ title: formTitle.trim(), body: formBody.trim(), tenant_id: tenantId, user_id: user.id })
     }
-
     setEditingTemplate(null)
     setIsCreating(false)
     setFormTitle('')
@@ -251,10 +439,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setFormBody('')
   }
 
-  function openTemplates() {
-    setShowTemplates(true)
-  }
-
+  function openTemplates() { setShowTemplates(true) }
   function closeTemplates() {
     setShowTemplates(false)
     setIsCreating(false)
@@ -270,30 +455,20 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   }
 
   function handleDragStart(e: React.MouseEvent) {
-    // Only allow drag from non-interactive elements
     const target = e.target as HTMLElement
-    if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('button') || target.closest('input') || target.closest('textarea')) {
-      return
-    }
-
-    // Don't drag if user is selecting text in message bubbles
+    if (
+      target.tagName === 'BUTTON' || target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' ||
+      target.closest('button') || target.closest('input') ||
+      target.closest('textarea') || target.closest('select')
+    ) return
     const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) {
-      return
-    }
-
-    // Don't drag if clicking on selectable text in message bubbles
-    if (target.closest('.fai-bubble-text')) {
-      return
-    }
-
+    if (selection && selection.toString().length > 0) return
+    if (target.closest('.fai-bubble-text')) return
     e.preventDefault()
     dragState.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startPosX: posRef.current.x,
-      startPosY: posRef.current.y,
+      active: true, startX: e.clientX, startY: e.clientY,
+      startPosX: posRef.current.x, startPosY: posRef.current.y,
     }
   }
 
@@ -301,11 +476,8 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     e.preventDefault()
     e.stopPropagation()
     resizeState.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startW: sizeRef.current.w,
-      startH: sizeRef.current.h,
+      active: true, startX: e.clientX, startY: e.clientY,
+      startW: sizeRef.current.w, startH: sizeRef.current.h,
     }
   }
 
@@ -348,33 +520,22 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   async function sendMessage() {
     const val = input.trim()
     if (!val || loading) return
-
     const userMsg: ChatMessage = { role: 'user', content: val, fileName: attachedFile?.name }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-
-    // Capture file before clearing attachment state
     const fileToSend = attachedFile
     const isBinaryFile = fileToSend
       ? /^image\/(jpeg|png|webp|gif)$/.test(fileToSend.type) || fileToSend.type === 'application/pdf'
       : false
-
-    // For non-binary files (CSV, Excel, Word, etc.) read as text on client
     let textFileContent: string | null = null
-    if (fileToSend && !isBinaryFile) {
-      textFileContent = await fileToText(fileToSend)
-    }
-
+    if (fileToSend && !isBinaryFile) textFileContent = await fileToText(fileToSend)
     removeAttachment()
     setLoading(true)
-
     try {
       let res: Response
-
       if (fileToSend && isBinaryFile) {
-        // Use FormData for images and PDFs — avoids base64-in-JSON body size limits
         const fd = new FormData()
         fd.append('messages', JSON.stringify(newMessages.map((m) => ({ role: m.role, content: m.content }))))
         fd.append('pageContext', pathname || '')
@@ -392,34 +553,23 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-            pageContext: pathname,
-            activeTab,
-            tenantId,
+            pageContext: pathname, activeTab, tenantId,
             ...(fileAttachment ? { fileAttachment } : {}),
           }),
         })
       }
-
       const data = await res.json()
       let text: string = data.text ?? 'Sorry, I encountered an error.'
-      
-      // Filter out tool calls from the response
       text = text.replace(/\n?\n?\s*\{"name":\s*"[^"]+",\s*"parameters":\s*\{[^}]*\}\}\s*\n?/g, '')
       text = text.replace(/\n?\n?\s*\[\]\s*\n?/g, '')
       text = text.replace(/\n?\n?\s*Let me read[^\n]*\n?/g, '')
       text = text.replace(/\n?\n?\s*Let me check[^\n]*\n?/g, '')
       text = text.replace(/\n?\n?\s*Let me get[^\n]*\n?/g, '')
       text = text.trim()
-      
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
-      
-      // Dispatch custom event to trigger page refreshes
       window.dispatchEvent(new CustomEvent('ai-action-complete', { detail: { success: true } }))
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.' },
-      ])
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
     } finally {
       setLoading(false)
     }
@@ -427,34 +577,12 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (showSlashPopover) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSlashSelectedIdx((i) => Math.min(i + 1, filteredTemplates.length - 1))
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSlashSelectedIdx((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        if (filteredTemplates[slashSelectedIdx]) {
-          insertTemplate(filteredTemplates[slashSelectedIdx])
-        }
-        return
-      }
-      if (e.key === 'Escape') {
-        setShowSlashPopover(false)
-        setSlashQuery('')
-        return
-      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSelectedIdx((i) => Math.min(i + 1, filteredTemplates.length - 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSelectedIdx((i) => Math.max(i - 1, 0)); return }
+      if (e.key === 'Enter') { e.preventDefault(); if (filteredTemplates[slashSelectedIdx]) insertTemplate(filteredTemplates[slashSelectedIdx]); return }
+      if (e.key === 'Escape') { setShowSlashPopover(false); setSlashQuery(''); return }
     }
-
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
   function handleTextareaInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -462,8 +590,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setInput(val)
     e.target.style.height = 'auto'
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-
-    // Detect slash trigger
     const slashIdx = val.lastIndexOf('/')
     if (slashIdx !== -1 && (slashIdx === 0 || val[slashIdx - 1] === ' ' || val[slashIdx - 1] === '\n')) {
       const afterSlash = val.slice(slashIdx + 1)
@@ -477,102 +603,70 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setSlashQuery('')
   }
 
+  // Suppress unused warning for fileToBase64 (used via side-effect pattern)
+  void fileToBase64
+
   if (!mounted || !visible) return null
 
   const isFormOpen = isCreating || editingTemplate !== null
+  const displayOutput = isEditingReview ? editedOutput : structuredOutput
 
   return (
     <>
       <style>{`
         .fai-widget {
-          position: fixed;
-          z-index: 1000;
-          display: flex;
-          flex-direction: column;
-          background: #fff;
-          border: 0.5px solid #e4dfd8;
-          border-radius: 10px;
+          position: fixed; z-index: 1000; display: flex; flex-direction: column;
+          background: #fff; border: 0.5px solid #e4dfd8; border-radius: 10px;
           box-shadow: 0 8px 40px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.07);
-          overflow: hidden;
-          font-family: 'DM Sans', -apple-system, sans-serif;
+          overflow: hidden; font-family: 'DM Sans', -apple-system, sans-serif;
         }
         .fai-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 11px 14px 10px;
-          border-bottom: 0.5px solid #f0ece6;
-          background: #fdfdfc;
-          cursor: grab;
-          user-select: none;
-          flex-shrink: 0;
+          display: flex; align-items: center; gap: 8px;
+          padding: 11px 14px 10px; border-bottom: 0.5px solid #f0ece6;
+          background: #fdfdfc; cursor: grab; user-select: none; flex-shrink: 0;
         }
         .fai-header:active { cursor: grabbing; }
-        .fai-drag-dots {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          opacity: 0.35;
-          margin-right: 2px;
-          flex-shrink: 0;
-        }
+        .fai-drag-dots { display: flex; flex-direction: column; gap: 3px; opacity: 0.35; margin-right: 2px; flex-shrink: 0; }
         .fai-drag-row { display: flex; gap: 3px; }
         .fai-drag-dot { width: 2.5px; height: 2.5px; border-radius: 50%; background: #9a9088; }
         .fai-pip { width: 6px; height: 6px; border-radius: 50%; background: #c8b89a; flex-shrink: 0; }
         .fai-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #c8b89a; font-weight: 700; flex: 1; }
         .fai-header-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #c8b89a;
-          padding: 3px 4px;
-          line-height: 1;
-          font-size: 16px;
-          border-radius: 4px;
-          transition: color 0.15s, background 0.15s;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          background: none; border: none; cursor: pointer; color: #c8b89a;
+          padding: 3px 4px; line-height: 1; font-size: 16px; border-radius: 4px;
+          transition: color 0.15s, background 0.15s; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
         }
         .fai-header-btn:hover { color: #7a6a58; background: #f5f0e8; }
         .fai-header-btn.active { color: #9a7a50; background: #f5f0e8; }
         .fai-close-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #c8b89a;
-          padding: 3px 4px;
-          line-height: 1;
-          font-size: 16px;
-          border-radius: 4px;
-          transition: color 0.15s, background 0.15s;
-          flex-shrink: 0;
+          background: none; border: none; cursor: pointer; color: #c8b89a;
+          padding: 3px 4px; line-height: 1; font-size: 16px; border-radius: 4px;
+          transition: color 0.15s, background 0.15s; flex-shrink: 0;
         }
         .fai-close-btn:hover { color: #7a6a58; background: #f5f0e8; }
 
+        /* Mode selector */
+        .fai-mode-selector {
+          display: flex; border-bottom: 0.5px solid #f0ece6;
+          background: #fdfdfc; flex-shrink: 0;
+        }
+        .fai-mode-btn {
+          flex: 1; padding: 7px 0; border: none; background: transparent;
+          font-family: inherit; font-size: 10.5px; font-weight: 600;
+          letter-spacing: 0.4px; cursor: pointer; transition: all 0.15s; color: #b8b0a8;
+        }
+        .fai-mode-btn.active { background: #1a1a1a; color: #f5f0e8; }
+        .fai-mode-btn:not(.active):hover { color: #7a6a58; background: #f5f0e8; }
+
         .fai-messages {
-          flex: 1;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-          padding: 16px 18px;
-          background: #fff;
-          min-height: 0;
+          flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+          gap: 14px; padding: 16px 18px; background: #fff; min-height: 0;
         }
         .fai-messages::-webkit-scrollbar { width: 3px; }
         .fai-messages::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
 
-        .fai-empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          flex: 1;
-          gap: 8px;
-          padding: 24px 0;
-        }
+        .fai-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 8px; padding: 24px 0; }
         .fai-empty-icon { font-size: 24px; opacity: 0.2; }
         .fai-empty-text { font-size: 13px; color: #9a9088; font-weight: 400; text-align: center; }
         .fai-empty-sub { font-size: 11px; color: #c0b8b0; font-weight: 300; text-align: center; line-height: 1.5; }
@@ -591,30 +685,15 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
         .fai-bubble-inner { display: flex; flex-direction: column; max-width: 100%; gap: 8px; }
         .fai-bubble-text {
-          padding: 9px 13px;
-          border-radius: 10px;
-          font-size: 13px;
-          line-height: 1.65;
-          font-weight: 400;
-          white-space: pre-wrap;
-          word-break: break-word;
+          padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.65;
+          font-weight: 400; white-space: pre-wrap; word-break: break-word;
         }
-        .fai-bubble.user .fai-bubble-text {
-          background: #1a1a1a; color: #e8e0d5;
-          border-radius: 10px 10px 3px 10px;
-        }
-        .fai-bubble.assistant .fai-bubble-text {
-          background: #f7f5f2; color: #2a2520;
-          border-radius: 10px 10px 10px 3px;
-          border: 0.5px solid #e8e3dc;
-        }
+        .fai-bubble.user .fai-bubble-text { background: #1a1a1a; color: #e8e0d5; border-radius: 10px 10px 3px 10px; }
+        .fai-bubble.assistant .fai-bubble-text { background: #f7f5f2; color: #2a2520; border-radius: 10px 10px 10px 3px; border: 0.5px solid #e8e3dc; }
 
         .fai-input-wrap {
-          padding: 12px 14px 14px;
-          border-top: 0.5px solid #f0ece6;
-          background: #fdfdfc;
-          flex-shrink: 0;
-          position: relative;
+          padding: 12px 14px 14px; border-top: 0.5px solid #f0ece6;
+          background: #fdfdfc; flex-shrink: 0; position: relative;
         }
         .fai-input-row {
           display: flex; align-items: flex-end; gap: 0;
@@ -642,27 +721,16 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-resize-handle {
           position: absolute; bottom: 0; right: 0;
           width: 16px; height: 16px; cursor: nwse-resize;
-          display: flex; align-items: flex-end; justify-content: flex-end;
-          padding: 3px;
+          display: flex; align-items: flex-end; justify-content: flex-end; padding: 3px;
         }
         .fai-resize-icon { opacity: 0.3; }
         .fai-resize-handle:hover .fai-resize-icon { opacity: 0.6; }
 
         /* Templates panel */
-        .fai-templates-panel {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-          background: #fff;
-        }
+        .fai-templates-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; }
         .fai-templates-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px 10px;
-          border-bottom: 0.5px solid #f0ece6;
-          flex-shrink: 0;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px 10px; border-bottom: 0.5px solid #f0ece6; flex-shrink: 0;
         }
         .fai-templates-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #9a9088; font-weight: 700; }
         .fai-new-btn {
@@ -671,13 +739,9 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           background: transparent; color: #7a6a58; transition: all 0.15s;
         }
         .fai-new-btn:hover { background: #f5f0e8; }
-
-        .fai-templates-list {
-          flex: 1; overflow-y: auto; padding: 8px 0; min-height: 0;
-        }
+        .fai-templates-list { flex: 1; overflow-y: auto; padding: 8px 0; min-height: 0; }
         .fai-templates-list::-webkit-scrollbar { width: 3px; }
         .fai-templates-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
-
         .fai-template-item {
           display: flex; align-items: flex-start; gap: 8px;
           padding: 10px 16px; border-bottom: 0.5px solid #f5f2ee;
@@ -696,7 +760,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         }
         .fai-tpl-icon-btn:hover { color: #7a6a58; background: #f0ece6; }
         .fai-tpl-icon-btn.danger:hover { color: #a0524a; background: #fdf0ee; }
-
         .fai-delete-confirm {
           display: flex; align-items: center; gap: 8px;
           padding: 6px 16px 10px; font-size: 11px; color: #7a6a58;
@@ -710,10 +773,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-delete-confirm-btn.confirm:hover { background: #8a4440; }
         .fai-delete-confirm-btn.cancel { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
         .fai-delete-confirm-btn.cancel:hover { border-color: #9a9088; }
-
         .fai-templates-empty { padding: 32px 16px; text-align: center; color: #b8b0a8; font-size: 12px; line-height: 1.6; }
-
-        /* Inline template form */
         .fai-template-form { padding: 14px 16px; border-bottom: 0.5px solid #f0ece6; background: #faf8f5; flex-shrink: 0; }
         .fai-form-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 5px; display: block; }
         .fai-form-input {
@@ -749,10 +809,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-slash-list { overflow-y: auto; }
         .fai-slash-list::-webkit-scrollbar { width: 3px; }
         .fai-slash-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
-        .fai-slash-item {
-          padding: 8px 12px; cursor: pointer; transition: background 0.1s;
-          border-bottom: 0.5px solid #f5f2ee;
-        }
+        .fai-slash-item { padding: 8px 12px; cursor: pointer; transition: background 0.1s; border-bottom: 0.5px solid #f5f2ee; }
         .fai-slash-item:last-child { border-bottom: none; }
         .fai-slash-item:hover, .fai-slash-item.selected { background: #f5f0e8; }
         .fai-slash-item-title { font-size: 12px; font-weight: 600; color: #2a2520; }
@@ -760,14 +817,8 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-slash-empty { padding: 12px; font-size: 12px; color: #b8b0a8; text-align: center; }
 
         /* File attachment */
-        .fai-file-preview {
-          display: flex; align-items: center; gap: 6px;
-          margin-bottom: 7px;
-        }
-        .fai-file-thumb {
-          width: 40px; height: 40px; border-radius: 6px; object-fit: cover;
-          border: 0.5px solid #e4dfd8; flex-shrink: 0;
-        }
+        .fai-file-preview { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+        .fai-file-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 0.5px solid #e4dfd8; flex-shrink: 0; }
         .fai-file-pill {
           display: flex; align-items: center; gap: 6px;
           background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 20px;
@@ -775,11 +826,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           max-width: calc(100% - 28px); overflow: hidden;
         }
         .fai-file-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .fai-file-remove {
-          background: none; border: none; cursor: pointer; color: #b8b0a8;
-          padding: 0; line-height: 1; font-size: 13px; flex-shrink: 0;
-          transition: color 0.15s;
-        }
+        .fai-file-remove { background: none; border: none; cursor: pointer; color: #b8b0a8; padding: 0; line-height: 1; font-size: 13px; flex-shrink: 0; transition: color 0.15s; }
         .fai-file-remove:hover { color: #7a6a58; }
         .fai-attach-btn {
           background: none; border: none; cursor: pointer; color: #c8b89a;
@@ -795,298 +842,713 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           margin-top: 4px; max-width: 180px; overflow: hidden;
         }
         .fai-file-bubble-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Teach mode */
+        .fai-coming-soon {
+          flex: 1; display: flex; align-items: center; justify-content: center;
+          font-size: 13px; color: #b8b0a8; background: #fff;
+        }
+        .fai-teach-panel {
+          flex: 1; overflow-y: auto; background: #fff; min-height: 0;
+        }
+        .fai-teach-panel::-webkit-scrollbar { width: 3px; }
+        .fai-teach-panel::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+
+        .fai-teach-entry { padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+        .fai-teach-heading { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 2px; }
+        .fai-teach-card {
+          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 14px;
+          cursor: pointer; transition: all 0.15s; background: #fdfdfc;
+        }
+        .fai-teach-card:hover { background: #f5f0e8; border-color: #c8b89a; }
+        .fai-teach-card-title { font-size: 13px; font-weight: 600; color: #2a2520; margin-bottom: 4px; }
+        .fai-teach-card-desc { font-size: 11px; color: #9a9088; line-height: 1.5; }
+
+        .fai-teach-section { padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .fai-teach-back {
+          background: none; border: none; cursor: pointer; font-family: inherit;
+          font-size: 11px; color: #9a9088; padding: 0; display: flex; align-items: center;
+          gap: 4px; transition: color 0.15s; align-self: flex-start;
+        }
+        .fai-teach-back:hover { color: #2a2520; }
+
+        .fai-teach-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 4px; display: block; }
+        .fai-teach-textarea {
+          width: 100%; box-sizing: border-box; background: #f7f5f2;
+          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 10px 12px;
+          font-size: 13px; font-family: inherit; color: #1a1a1a; outline: none;
+          transition: border-color 0.2s; resize: vertical; line-height: 1.55;
+          min-height: 90px;
+        }
+        .fai-teach-textarea:focus { border-color: #c8b89a; background: #fff; }
+        .fai-teach-textarea::placeholder { color: #b8b0a8; }
+        .fai-teach-input {
+          width: 100%; box-sizing: border-box; background: #f7f5f2;
+          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 8px 12px;
+          font-size: 12px; font-family: inherit; color: #1a1a1a; outline: none;
+          transition: border-color 0.2s;
+        }
+        .fai-teach-input:focus { border-color: #c8b89a; background: #fff; }
+        .fai-teach-input::placeholder { color: #b8b0a8; }
+        .fai-teach-select {
+          width: 100%; box-sizing: border-box; background: #f7f5f2;
+          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 7px 10px;
+          font-size: 12px; font-family: inherit; color: #1a1a1a; outline: none;
+          transition: border-color 0.2s; cursor: pointer;
+        }
+        .fai-teach-select:focus { border-color: #c8b89a; }
+
+        .fai-teach-row { display: flex; gap: 8px; }
+        .fai-teach-row > * { flex: 1; }
+
+        .fai-teach-btn {
+          font-family: inherit; font-size: 12px; font-weight: 600;
+          border-radius: 8px; border: none; cursor: pointer; padding: 9px 16px;
+          transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .fai-teach-btn.primary { background: #1a1a1a; color: #f5f0e8; }
+        .fai-teach-btn.primary:hover { background: #2a2a2a; }
+        .fai-teach-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+        .fai-teach-btn.success { background: #2a6b50; color: #fff; }
+        .fai-teach-btn.success:hover { background: #235a42; }
+        .fai-teach-btn.success:disabled { opacity: 0.45; cursor: not-allowed; }
+        .fai-teach-btn.outline { background: transparent; color: #7a6a58; border: 1px solid #d4cfc8; }
+        .fai-teach-btn.outline:hover { border-color: #9a9088; }
+        .fai-teach-btn.danger-outline { background: transparent; color: #a0524a; border: 1px solid #d4cfc8; }
+        .fai-teach-btn.danger-outline:hover { border-color: #a0524a; }
+        .fai-teach-btn.sm { font-size: 11px; padding: 5px 10px; border-radius: 6px; }
+
+        .fai-record-indicator {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 11px; color: #9a9088; margin-bottom: 4px;
+        }
+        .fai-record-pulse {
+          width: 8px; height: 8px; border-radius: 50%; background: #a0524a;
+          animation: fai-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes fai-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.85); }
+        }
+        .fai-record-timer { font-weight: 700; font-variant-numeric: tabular-nums; color: #2a2520; }
+
+        /* Review card */
+        .fai-review-card {
+          border: 0.5px solid #e4dfd8; border-radius: 8px; background: #fdfdfc;
+          overflow: hidden;
+        }
+        .fai-review-header { padding: 12px 14px; border-bottom: 0.5px solid #f0ece6; }
+        .fai-review-title { font-size: 13px; font-weight: 700; color: #2a2520; }
+        .fai-review-trigger { font-size: 11px; color: #7a6a58; margin-top: 4px; line-height: 1.5; }
+        .fai-review-section { padding: 10px 14px; border-bottom: 0.5px solid #f0ece6; }
+        .fai-review-section:last-child { border-bottom: none; }
+        .fai-review-section-label { font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; color: #b8b0a8; font-weight: 700; margin-bottom: 6px; }
+        .fai-review-step { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; color: #2a2520; line-height: 1.5; }
+        .fai-review-step-num { color: #c8b89a; font-weight: 700; flex-shrink: 0; min-width: 16px; }
+        .fai-review-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+        .fai-review-chip {
+          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 20px;
+          padding: 2px 8px; font-size: 10px; color: #7a6a58; font-weight: 500;
+          display: inline-flex; align-items: center; gap: 4px;
+        }
+        .fai-chip-remove {
+          background: none; border: none; cursor: pointer; color: #b8b0a8;
+          padding: 0; line-height: 1; font-size: 11px; transition: color 0.15s;
+        }
+        .fai-chip-remove:hover { color: #a0524a; }
+        .fai-review-vars { font-size: 11px; color: #9a9088; font-family: 'DM Mono', monospace; }
+
+        .fai-similar-header { font-size: 11px; color: #c8844a; font-weight: 600; margin: 4px 0; display: flex; align-items: center; gap: 6px; }
+        .fai-similar-card {
+          border: 0.5px solid #f0ece6; border-radius: 6px; padding: 10px 12px;
+          background: #fdf9f4; margin-bottom: 6px;
+        }
+        .fai-similar-title { font-size: 12px; font-weight: 600; color: #2a2520; margin-bottom: 2px; }
+        .fai-similar-meta { font-size: 10px; color: #9a9088; margin-bottom: 6px; }
+        .fai-similar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .fai-review-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+        .fai-teach-confirm {
+          border: 0.5px solid #c8e6d8; border-radius: 8px; background: #f0faf5;
+          padding: 14px; text-align: center;
+        }
+        .fai-teach-confirm-icon { font-size: 22px; margin-bottom: 6px; }
+        .fai-teach-confirm-text { font-size: 13px; font-weight: 600; color: #2a6b50; margin-bottom: 4px; }
+        .fai-teach-confirm-sub { font-size: 11px; color: #4a8a68; }
+
+        .fai-teach-error { font-size: 11px; color: #a0524a; background: #fdf0ee; border: 0.5px solid #e8c8c4; border-radius: 6px; padding: 8px 10px; }
+
+        .fai-structuring { padding: 24px 16px; text-align: center; }
+        .fai-structuring-text { font-size: 13px; color: #7a6a58; font-style: italic; }
+        .fai-structuring-sub { font-size: 11px; color: #b8b0a8; margin-top: 4px; }
       `}</style>
 
       <div
         className="fai-widget"
         onMouseDown={handleDragStart}
-        style={{
-          left: pos.x,
-          top: pos.y,
-          width: size.w,
-          height: size.h,
-        }}
+        style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
       >
         {/* Header / drag handle */}
         <div className="fai-header">
           <div className="fai-drag-dots">
-            <div className="fai-drag-row">
-              <div className="fai-drag-dot" /><div className="fai-drag-dot" />
-            </div>
-            <div className="fai-drag-row">
-              <div className="fai-drag-dot" /><div className="fai-drag-dot" />
-            </div>
-            <div className="fai-drag-row">
-              <div className="fai-drag-dot" /><div className="fai-drag-dot" />
-            </div>
+            {[0, 1, 2].map((r) => (
+              <div key={r} className="fai-drag-row">
+                <div className="fai-drag-dot" /><div className="fai-drag-dot" />
+              </div>
+            ))}
           </div>
           <div className="fai-pip" />
           <span className="fai-label">IRC Assistant</span>
-          {/* Templates toggle button */}
-          <button
-            className={`fai-header-btn${showTemplates ? ' active' : ''}`}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={showTemplates ? closeTemplates : openTemplates}
-            title={showTemplates ? 'Back to chat' : 'Prompt templates'}
-          >
-            {/* List/bookmark icon */}
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="12" height="12" rx="2" />
-              <path d="M5 6h6M5 9h4" />
-            </svg>
-          </button>
-          <button
-            className="fai-close-btn"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={onClose}
-            title="Hide assistant"
-          >
+          {activeMode === 'chat' && (
+            <button
+              className={`fai-header-btn${showTemplates ? ' active' : ''}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={showTemplates ? closeTemplates : openTemplates}
+              title={showTemplates ? 'Back to chat' : 'Prompt templates'}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="12" height="12" rx="2" />
+                <path d="M5 6h6M5 9h4" />
+              </svg>
+            </button>
+          )}
+          <button className="fai-close-btn" onMouseDown={(e) => e.stopPropagation()} onClick={onClose} title="Hide assistant">
             &#x2715;
           </button>
         </div>
 
-        {/* Templates panel */}
-        {showTemplates && (
-          <div className="fai-templates-panel">
-            <div className="fai-templates-header">
-              <span className="fai-templates-title">Prompt Templates</span>
-              {!isFormOpen && (
-                <button className="fai-new-btn" onClick={startCreate}>
-                  + New Template
-                </button>
-              )}
-            </div>
-
-            {isFormOpen && (
-              <div className="fai-template-form">
-                <label className="fai-form-label">Title</label>
-                <input
-                  className="fai-form-input"
-                  placeholder="Short display name"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                />
-                <label className="fai-form-label">Body</label>
-                <textarea
-                  className="fai-form-textarea"
-                  placeholder="Full template text"
-                  value={formBody}
-                  onChange={(e) => setFormBody(e.target.value)}
-                />
-                <div className="fai-form-btns">
-                  <button className="fai-form-btn primary" onClick={saveTemplate}>
-                    Save
-                  </button>
-                  <button className="fai-form-btn secondary" onClick={cancelForm}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="fai-templates-list">
-              {templatesLoading ? (
-                <div className="fai-templates-empty">Loading…</div>
-              ) : templates.length === 0 ? (
-                <div className="fai-templates-empty">
-                  No templates yet. Create one to get started.
-                  <br />
-                  Type <strong>/</strong> in the chat to use templates quickly.
-                </div>
-              ) : (
-                templates.map((t) => (
-                  <div key={t.id}>
-                    <div className="fai-template-item">
-                      <div className="fai-template-text">
-                        <div className="fai-template-title">{t.title}</div>
-                        <div className="fai-template-preview">{t.body.slice(0, 80)}{t.body.length > 80 ? '…' : ''}</div>
-                      </div>
-                      <div className="fai-template-actions">
-                        <button
-                          className="fai-tpl-icon-btn"
-                          title="Edit"
-                          onClick={() => startEdit(t)}
-                        >
-                          {/* Pencil icon */}
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 2l3 3-9 9H2v-3L11 2z" />
-                          </svg>
-                        </button>
-                        <button
-                          className="fai-tpl-icon-btn danger"
-                          title="Delete"
-                          onClick={() => setDeleteConfirmId(t.id)}
-                        >
-                          {/* Trash icon */}
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    {deleteConfirmId === t.id && (
-                      <div className="fai-delete-confirm">
-                        <span>Delete this template?</span>
-                        <button
-                          className="fai-delete-confirm-btn confirm"
-                          onClick={() => deleteTemplate(t.id)}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="fai-delete-confirm-btn cancel"
-                          onClick={() => setDeleteConfirmId(null)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Messages (hidden when templates panel is open) */}
-        {!showTemplates && (
-          <div className="fai-messages">
-            {messages.length === 0 && (
-              <div className="fai-empty">
-                <div className="fai-empty-icon">⬡</div>
-                <div className="fai-empty-text">What do you need help with?</div>
-                <div className="fai-empty-sub">
-                  Ask about jobs, quotes, scope — or ask me to take action on your behalf.
-                </div>
-              </div>
-            )}
-
-            {messages.map((msg, i) => (
-              <div key={i} className={`fai-bubble ${msg.role}`}>
-                <div className={`fai-avatar ${msg.role}`}>
-                  {msg.role === 'user' ? 'Me' : '⬡'}
-                </div>
-                <div className="fai-bubble-inner">
-                  {msg.fileName && (
-                    <div className="fai-file-bubble-pill">
-                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" />
-                      </svg>
-                      <span className="fai-file-bubble-name">{msg.fileName}</span>
-                    </div>
-                  )}
-                  {msg.content && (
-                    <div className="fai-bubble-text">{msg.content}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {loading && (
-              <div className="fai-bubble assistant">
-                <div className="fai-avatar assistant">⬡</div>
-                <div className="fai-bubble-inner">
-                  <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>
-                    {thinkingText}
-                  </div>
-                  {actionChecklist.length > 0 && (
-                    <div style={{ marginTop: '8px', padding: '8px 0' }}>
-                      {actionChecklist.map((item) => (
-                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7a6a58', marginBottom: '4px' }}>
-                          <span style={{ color: item.completed ? '#2a6b50' : '#c8b89a' }}>
-                            {item.completed ? '✓' : '○'}
-                          </span>
-                          <span style={{ textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.6 : 1 }}>
-                            {item.text}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="fai-input-wrap">
-          <input
-            ref={fileInputRef}
-            type="file"
-            style={{ display: 'none' }}
-            onChange={handleFileSelect}
-          />
-          {/* File preview */}
-          {attachedFile && (
-            <div className="fai-file-preview">
-              {attachedPreviewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={attachedPreviewUrl} alt={attachedFile.name} className="fai-file-thumb" />
-              ) : (
-                <div className="fai-file-pill">
-                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" />
-                  </svg>
-                  <span className="fai-file-pill-name">{attachedFile.name}</span>
-                </div>
-              )}
-              <button className="fai-file-remove" onClick={removeAttachment} title="Remove file">&#x2715;</button>
-            </div>
-          )}
-          {/* Slash popover */}
-          {showSlashPopover && (
-            <div className="fai-slash-popover" ref={slashPopoverRef}>
-              <div className="fai-slash-list">
-                {filteredTemplates.length === 0 ? (
-                  <div className="fai-slash-empty">No templates match</div>
-                ) : (
-                  filteredTemplates.map((t, idx) => (
-                    <div
-                      key={t.id}
-                      className={`fai-slash-item${idx === slashSelectedIdx ? ' selected' : ''}`}
-                      onMouseDown={(e) => { e.preventDefault(); insertTemplate(t) }}
-                    >
-                      <div className="fai-slash-item-title">{t.title}</div>
-                      <div className="fai-slash-item-preview">{t.body.slice(0, 60)}{t.body.length > 60 ? '…' : ''}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="fai-input-row">
+        {/* Mode selector */}
+        <div className="fai-mode-selector">
+          {(['chat', 'doit', 'teach'] as ActiveMode[]).map((mode) => (
             <button
-              className="fai-attach-btn"
-              title="Attach file"
-              onClick={() => fileInputRef.current?.click()}
-              type="button"
+              key={mode}
+              className={`fai-mode-btn${activeMode === mode ? ' active' : ''}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setActiveMode(mode)}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
+              {mode === 'chat' ? 'Chat' : mode === 'doit' ? 'Do It' : 'Teach'}
             </button>
-            <textarea
-              ref={textareaRef}
-              className="fai-textarea"
-              placeholder="Ask anything or say what you'd like to do… (type / for templates)"
-              rows={1}
-              value={input}
-              onChange={handleTextareaInput}
-              onKeyDown={handleKeyDown}
-            />
-            <button className="fai-send-btn" onClick={sendMessage} disabled={loading}>
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#e8e0d5" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M2 14L14 8 2 2v4.5l7 1.5-7 1.5V14z" />
-              </svg>
-            </button>
-          </div>
-          <div className="fai-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
+          ))}
         </div>
 
-        {/* Resize handle */}
+        {/* ── Chat mode ── */}
+        {activeMode === 'chat' && (
+          <>
+            {/* Templates panel */}
+            {showTemplates && (
+              <div className="fai-templates-panel">
+                <div className="fai-templates-header">
+                  <span className="fai-templates-title">Prompt Templates</span>
+                  {!isFormOpen && (
+                    <button className="fai-new-btn" onClick={startCreate}>+ New Template</button>
+                  )}
+                </div>
+                {isFormOpen && (
+                  <div className="fai-template-form">
+                    <label className="fai-form-label">Title</label>
+                    <input className="fai-form-input" placeholder="Short display name" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+                    <label className="fai-form-label">Body</label>
+                    <textarea className="fai-form-textarea" placeholder="Full template text" value={formBody} onChange={(e) => setFormBody(e.target.value)} />
+                    <div className="fai-form-btns">
+                      <button className="fai-form-btn primary" onClick={saveTemplate}>Save</button>
+                      <button className="fai-form-btn secondary" onClick={cancelForm}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                <div className="fai-templates-list">
+                  {templatesLoading ? (
+                    <div className="fai-templates-empty">Loading…</div>
+                  ) : templates.length === 0 ? (
+                    <div className="fai-templates-empty">
+                      No templates yet. Create one to get started.<br />
+                      Type <strong>/</strong> in the chat to use templates quickly.
+                    </div>
+                  ) : (
+                    templates.map((t) => (
+                      <div key={t.id}>
+                        <div className="fai-template-item">
+                          <div className="fai-template-text">
+                            <div className="fai-template-title">{t.title}</div>
+                            <div className="fai-template-preview">{t.body.slice(0, 80)}{t.body.length > 80 ? '…' : ''}</div>
+                          </div>
+                          <div className="fai-template-actions">
+                            <button className="fai-tpl-icon-btn" title="Edit" onClick={() => startEdit(t)}>
+                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2l3 3-9 9H2v-3L11 2z" /></svg>
+                            </button>
+                            <button className="fai-tpl-icon-btn danger" title="Delete" onClick={() => setDeleteConfirmId(t.id)}>
+                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                        {deleteConfirmId === t.id && (
+                          <div className="fai-delete-confirm">
+                            <span>Delete this template?</span>
+                            <button className="fai-delete-confirm-btn confirm" onClick={() => deleteTemplate(t.id)}>Delete</button>
+                            <button className="fai-delete-confirm-btn cancel" onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Messages */}
+            {!showTemplates && (
+              <div className="fai-messages">
+                {messages.length === 0 && (
+                  <div className="fai-empty">
+                    <div className="fai-empty-icon">⬡</div>
+                    <div className="fai-empty-text">What do you need help with?</div>
+                    <div className="fai-empty-sub">Ask about jobs, quotes, scope — or ask me to take action on your behalf.</div>
+                  </div>
+                )}
+                {messages.map((msg, i) => (
+                  <div key={i} className={`fai-bubble ${msg.role}`}>
+                    <div className={`fai-avatar ${msg.role}`}>{msg.role === 'user' ? 'Me' : '⬡'}</div>
+                    <div className="fai-bubble-inner">
+                      {msg.fileName && (
+                        <div className="fai-file-bubble-pill">
+                          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" /></svg>
+                          <span className="fai-file-bubble-name">{msg.fileName}</span>
+                        </div>
+                      )}
+                      {msg.content && <div className="fai-bubble-text">{msg.content}</div>}
+                    </div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="fai-bubble assistant">
+                    <div className="fai-avatar assistant">⬡</div>
+                    <div className="fai-bubble-inner">
+                      <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>{thinkingText}</div>
+                      {actionChecklist.length > 0 && (
+                        <div style={{ marginTop: '8px', padding: '8px 0' }}>
+                          {actionChecklist.map((item) => (
+                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7a6a58', marginBottom: '4px' }}>
+                              <span style={{ color: item.completed ? '#2a6b50' : '#c8b89a' }}>{item.completed ? '✓' : '○'}</span>
+                              <span style={{ textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.6 : 1 }}>{item.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="fai-input-wrap">
+              <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileSelect} />
+              {attachedFile && (
+                <div className="fai-file-preview">
+                  {attachedPreviewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={attachedPreviewUrl} alt={attachedFile.name} className="fai-file-thumb" />
+                  ) : (
+                    <div className="fai-file-pill">
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2z" /><path d="M9 2v4h4" /></svg>
+                      <span className="fai-file-pill-name">{attachedFile.name}</span>
+                    </div>
+                  )}
+                  <button className="fai-file-remove" onClick={removeAttachment} title="Remove file">&#x2715;</button>
+                </div>
+              )}
+              {showSlashPopover && (
+                <div className="fai-slash-popover" ref={slashPopoverRef}>
+                  <div className="fai-slash-list">
+                    {filteredTemplates.length === 0 ? (
+                      <div className="fai-slash-empty">No templates match</div>
+                    ) : (
+                      filteredTemplates.map((t, idx) => (
+                        <div
+                          key={t.id}
+                          className={`fai-slash-item${idx === slashSelectedIdx ? ' selected' : ''}`}
+                          onMouseDown={(e) => { e.preventDefault(); insertTemplate(t) }}
+                        >
+                          <div className="fai-slash-item-title">{t.title}</div>
+                          <div className="fai-slash-item-preview">{t.body.slice(0, 60)}{t.body.length > 60 ? '…' : ''}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="fai-input-row">
+                <button className="fai-attach-btn" title="Attach file" onClick={() => fileInputRef.current?.click()} type="button">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </button>
+                <textarea
+                  ref={textareaRef}
+                  className="fai-textarea"
+                  placeholder="Ask anything or say what you'd like to do… (type / for templates)"
+                  rows={1}
+                  value={input}
+                  onChange={handleTextareaInput}
+                  onKeyDown={handleKeyDown}
+                />
+                <button className="fai-send-btn" onClick={sendMessage} disabled={loading}>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#e8e0d5" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M2 14L14 8 2 2v4.5l7 1.5-7 1.5V14z" />
+                  </svg>
+                </button>
+              </div>
+              <div className="fai-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
+            </div>
+          </>
+        )}
+
+        {/* ── Do It mode ── */}
+        {activeMode === 'doit' && (
+          <div className="fai-coming-soon">Coming soon</div>
+        )}
+
+        {/* ── Teach mode ── */}
+        {activeMode === 'teach' && (
+          <div className="fai-teach-panel">
+
+            {/* Entry — two option cards */}
+            {teachSubMode === 'entry' && (
+              <div className="fai-teach-entry">
+                <div className="fai-teach-heading">What would you like to teach?</div>
+                <div className="fai-teach-card" onClick={() => setTeachSubMode('quick')}>
+                  <div className="fai-teach-card-title">Quick note or rule</div>
+                  <div className="fai-teach-card-desc">Add a short instruction, preference, or rule IRC should follow — e.g. tone, naming conventions, what to avoid.</div>
+                </div>
+                <div className="fai-teach-card" onClick={() => setTeachSubMode('process')}>
+                  <div className="fai-teach-card-title">⚡ Teach a process</div>
+                  <div className="fai-teach-card-desc">Walk through a workflow step by step. IRC will structure it into a reusable playbook.</div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick note form */}
+            {teachSubMode === 'quick' && (
+              <div className="fai-teach-section">
+                <button className="fai-teach-back" onClick={() => setTeachSubMode('entry')}>
+                  ← Back
+                </button>
+                <div>
+                  <span className="fai-teach-label">Note or rule</span>
+                  <textarea
+                    className="fai-teach-textarea"
+                    placeholder="e.g. Don't use formal legal language in reports — write plainly instead"
+                    value={quickNoteText}
+                    onChange={(e) => setQuickNoteText(e.target.value)}
+                    style={{ minHeight: 100 }}
+                  />
+                </div>
+                <div className="fai-teach-row">
+                  <div>
+                    <span className="fai-teach-label">Persona</span>
+                    <select className="fai-teach-select" value={quickPersona} onChange={(e) => setQuickPersona(e.target.value as TeachPersona)}>
+                      <option value="all">All</option>
+                      <option value="gary">Gary</option>
+                      <option value="client-comms">Client Comms</option>
+                      <option value="internal">Internal</option>
+                    </select>
+                  </div>
+                  <div>
+                    <span className="fai-teach-label">Category</span>
+                    <select className="fai-teach-select" value={quickCategory} onChange={(e) => setQuickCategory(e.target.value as BrainEntryCategory)}>
+                      <option value="rule">Rule</option>
+                      <option value="tone">Tone</option>
+                      <option value="workflow">Workflow</option>
+                      <option value="classification">Classification</option>
+                      <option value="example">Example</option>
+                      <option value="correction">Correction</option>
+                    </select>
+                  </div>
+                </div>
+
+                {quickNoteSaved ? (
+                  <div className="fai-teach-confirm">
+                    <div className="fai-teach-confirm-icon">✅</div>
+                    <div className="fai-teach-confirm-text">Saved to brain</div>
+                    <div className="fai-teach-confirm-sub">
+                      Review it in the Brain Library.{' '}
+                      <button
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2a6b50', fontWeight: 600, padding: 0, fontSize: 'inherit', fontFamily: 'inherit' }}
+                        onClick={() => { setQuickNoteSaved(false); setQuickNoteText('') }}
+                      >
+                        Add another
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {quickNoteError && <div className="fai-teach-error">{quickNoteError}</div>}
+                    <button
+                      className="fai-teach-btn primary"
+                      onClick={saveQuickNote}
+                      disabled={quickNoteSaving || !quickNoteText.trim()}
+                    >
+                      {quickNoteSaving ? 'Saving…' : 'Save to brain'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Process flow */}
+            {teachSubMode === 'process' && (
+              <>
+                {/* Step 1: Record */}
+                {processStep === 'record' && (
+                  <div className="fai-teach-section">
+                    <button className="fai-teach-back" onClick={() => setTeachSubMode('entry')}>
+                      ← Back
+                    </button>
+
+                    {structureError && (
+                      <div className="fai-teach-error">{structureError}</div>
+                    )}
+
+                    {!isRecording ? (
+                      <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                        <div style={{ fontSize: 12, color: '#9a9088', marginBottom: 14, lineHeight: 1.6 }}>
+                          Describe a process you run regularly — step by step, in plain English. Don&apos;t worry about being precise.
+                        </div>
+                        <button
+                          className="fai-teach-btn primary"
+                          style={{ fontSize: 14, padding: '11px 24px' }}
+                          onClick={() => setIsRecording(true)}
+                        >
+                          ⚡ Start Teaching
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="fai-record-indicator">
+                          <div className="fai-record-pulse" />
+                          <span>Recording</span>
+                          <span className="fai-record-timer">{formatElapsed(recordingElapsed)}</span>
+                        </div>
+                        <div>
+                          <span className="fai-teach-label">Describe what you&apos;re doing — step by step</span>
+                          <textarea
+                            className="fai-teach-textarea"
+                            placeholder="Describe what you're doing as you go — step by step, plain English. Don't worry about being precise."
+                            value={dictationText}
+                            onChange={(e) => setDictationText(e.target.value)}
+                            style={{ minHeight: 120 }}
+                            autoFocus
+                          />
+                        </div>
+                        <div>
+                          <span className="fai-teach-label">What triggers this process?</span>
+                          <input
+                            className="fai-teach-input"
+                            placeholder="e.g. When a job is cash settled and the homeowner still wants the work done"
+                            value={triggerText}
+                            onChange={(e) => setTriggerText(e.target.value)}
+                          />
+                        </div>
+                        <button
+                          className="fai-teach-btn success"
+                          onClick={stopRecordingAndStructure}
+                          disabled={!dictationText.trim()}
+                        >
+                          Done Teaching
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 2: Structuring */}
+                {processStep === 'structuring' && (
+                  <div className="fai-structuring">
+                    <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>⬡</div>
+                    <div className="fai-structuring-text">Structuring what you taught…</div>
+                    <div className="fai-structuring-sub">This takes a few seconds</div>
+                  </div>
+                )}
+
+                {/* Step 4: Review */}
+                {processStep === 'review' && displayOutput && (
+                  <div className="fai-teach-section">
+                    <div className="fai-review-card">
+                      <div className="fai-review-header">
+                        {isEditingReview && editedOutput ? (
+                          <input
+                            className="fai-teach-input"
+                            value={editedOutput.title}
+                            onChange={(e) => setEditedOutput({ ...editedOutput, title: e.target.value })}
+                            style={{ fontWeight: 700, fontSize: 13 }}
+                          />
+                        ) : (
+                          <div className="fai-review-title">📋 {displayOutput.title}</div>
+                        )}
+                        {isEditingReview && editedOutput ? (
+                          <textarea
+                            className="fai-teach-textarea"
+                            value={editedOutput.trigger_condition}
+                            onChange={(e) => setEditedOutput({ ...editedOutput, trigger_condition: e.target.value })}
+                            style={{ marginTop: 6, minHeight: 48, fontSize: 11 }}
+                          />
+                        ) : (
+                          <div className="fai-review-trigger">Triggers when: {displayOutput.trigger_condition}</div>
+                        )}
+                      </div>
+
+                      <div className="fai-review-section">
+                        <div className="fai-review-section-label">Steps</div>
+                        {displayOutput.steps.map((step, i) => (
+                          <div key={i} className="fai-review-step">
+                            <span className="fai-review-step-num">{step.order}.</span>
+                            {isEditingReview ? (
+                              <input
+                                className="fai-teach-input"
+                                value={editedOutput?.steps[i]?.description ?? step.description}
+                                onChange={(e) => updateEditedStep(i, e.target.value)}
+                                style={{ flex: 1 }}
+                              />
+                            ) : (
+                              <span>{step.description}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {displayOutput.variables.length > 0 && (
+                        <div className="fai-review-section">
+                          <div className="fai-review-section-label">Variables</div>
+                          <div className="fai-review-vars">{displayOutput.variables.join(', ')}</div>
+                        </div>
+                      )}
+
+                      <div className="fai-review-section">
+                        <div className="fai-review-section-label">Tags</div>
+                        <div className="fai-review-chips">
+                          {displayOutput.tags.map((tag) => (
+                            <span key={tag} className="fai-review-chip">
+                              {tag}
+                              {isEditingReview && (
+                                <button className="fai-chip-remove" onClick={() => removeEditedTag(tag)} title="Remove tag">×</button>
+                              )}
+                            </span>
+                          ))}
+                          {isEditingReview && (
+                            <input
+                              className="fai-teach-input"
+                              style={{ width: 100, padding: '2px 8px', fontSize: 10, borderRadius: 20, minHeight: 'unset' }}
+                              placeholder="+ add tag"
+                              value={newTagInput}
+                              onChange={(e) => setNewTagInput(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditedTag(newTagInput) } }}
+                              onBlur={() => { if (newTagInput.trim()) addEditedTag(newTagInput) }}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="fai-review-section">
+                        <div className="fai-review-section-label">Category</div>
+                        {isEditingReview && editedOutput ? (
+                          <select
+                            className="fai-teach-select"
+                            value={editedOutput.category}
+                            onChange={(e) => setEditedOutput({ ...editedOutput, category: e.target.value as BrainEntryCategory })}
+                          >
+                            <option value="workflow">Workflow</option>
+                            <option value="rule">Rule</option>
+                            <option value="tone">Tone</option>
+                            <option value="classification">Classification</option>
+                            <option value="example">Example</option>
+                            <option value="correction">Correction</option>
+                          </select>
+                        ) : (
+                          <div style={{ fontSize: 12, color: '#7a6a58', textTransform: 'capitalize' }}>{displayOutput.category}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Similarity matches */}
+                    {similarityMatches.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div className="fai-similar-header">
+                          ⚠ Similar existing entries found
+                        </div>
+                        {similarityMatches.map((match) => (
+                          <div key={match.id} className="fai-similar-card">
+                            <div className="fai-similar-title">{match.title}</div>
+                            <div className="fai-similar-meta">{match.category} · {match.similarity} similarity</div>
+                            <div className="fai-similar-actions">
+                              <button
+                                className="fai-teach-btn outline sm"
+                                onClick={() => approveSave('example', match.id)}
+                                disabled={isSaving}
+                              >
+                                Add as example to this
+                              </button>
+                              <button
+                                className="fai-teach-btn outline sm"
+                                onClick={() => approveSave('variant', match.id)}
+                                disabled={isSaving}
+                              >
+                                Save as variant
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 11, color: '#9a9088', marginTop: 4 }}>Or save as a new workflow below ↓</div>
+                      </div>
+                    )}
+
+                    <div className="fai-review-actions">
+                      {!isEditingReview && (
+                        <button className="fai-teach-btn outline" onClick={enterEditMode}>
+                          ✏️ Edit
+                        </button>
+                      )}
+                      <button
+                        className="fai-teach-btn success"
+                        onClick={() => approveSave('new')}
+                        disabled={isSaving}
+                        style={{ flex: 1 }}
+                      >
+                        {isSaving ? 'Saving…' : '✅ Approve'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 5: Saved */}
+                {processStep === 'saved' && (
+                  <div className="fai-teach-section">
+                    <div className="fai-teach-confirm">
+                      <div className="fai-teach-confirm-icon">✅</div>
+                      <div className="fai-teach-confirm-text">Workflow saved to brain</div>
+                      <div className="fai-teach-confirm-sub">IRC will use this next time.</div>
+                    </div>
+                    {savedResult && (
+                      <div style={{ fontSize: 10, color: '#b8b0a8', textAlign: 'center' }}>
+                        Entry ID: {savedResult.brainEntryId.slice(0, 8)}…
+                        {savedResult.playbookId && ` · Playbook: ${savedResult.playbookId.slice(0, 8)}…`}
+                      </div>
+                    )}
+                    <button
+                      className="fai-teach-btn outline"
+                      style={{ alignSelf: 'center' }}
+                      onClick={resetTeachState}
+                    >
+                      Teach something else
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Resize handle (always visible) */}
         <div className="fai-resize-handle" onMouseDown={handleResizeStart}>
           <svg className="fai-resize-icon" width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M9 1L1 9M9 5L5 9M9 9" stroke="#9a9088" strokeWidth="1.2" strokeLinecap="round" />
