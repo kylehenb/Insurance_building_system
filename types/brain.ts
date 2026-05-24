@@ -112,3 +112,30 @@ export interface TeachSavePayload {
   saveMode?: 'new' | 'example' | 'variant'
   sourceRefId?: string
 }
+
+export interface FieldCorrection<T = unknown> {
+  fieldName: string
+  before: T
+  after: T
+  sourceType: 'playbook' | 'ai'
+  playbookRunId?: string
+  aiAuditId?: string
+  detectedAt: string
+}
+
+export interface BrainReviewQueue {
+  draft: BrainEntry[]
+  stale: BrainEntry[]
+  contradicted: BrainEntry[]
+  total: number
+}
+
+export interface CorrectionSavePayload {
+  fieldName: string
+  before: unknown
+  after: unknown
+  sourceType: 'playbook' | 'ai'
+  playbookRunId?: string
+  aiAuditId?: string
+  detectedAt: string
+}
