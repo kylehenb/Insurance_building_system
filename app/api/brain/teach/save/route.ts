@@ -9,6 +9,11 @@ export const dynamic = 'force-dynamic'
 
 function formatContent(payload: TeachSavePayload): string {
   const { structured } = payload
+  if (structured.type === 'note') {
+    const lines = [structured.title]
+    if (structured.trigger_condition) lines.push(`Context: ${structured.trigger_condition}`)
+    return lines.join('\n').trim()
+  }
   const lines: string[] = [
     `Triggers when: ${structured.trigger_condition}`,
     '',
@@ -36,7 +41,6 @@ export async function POST(req: NextRequest) {
   const content = formatContent(payload)
 
   if (saveMode === 'example') {
-    // Link dictation as an additional example to an existing brain entry
     const { data: exEntry, error: exErr } = await supabase
       .from('brain_entries')
       .insert({
@@ -63,7 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ brainEntryId: exEntry.id, playbookId: null })
   }
 
-  // 'new' or 'variant' — create a brain entry + playbook
+  // Create the brain entry
   const { data: entry, error: entryErr } = await supabase
     .from('brain_entries')
     .insert({
@@ -88,13 +92,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: entryErr.message }, { status: 500 })
   }
 
+  // Skip playbook creation for note-type entries
+  if (structured.type === 'note') {
+    return NextResponse.json({ brainEntryId: entry.id, playbookId: null })
+  }
+
   const stepsText = structured.steps
     .map((s) => `${s.order}. ${s.description}`)
     .join('\n')
 
-  // steps, trigger_keywords, description, created_by exist in the DB but are not yet
-  // reflected in the generated database.types.ts. Cast through unknown so TypeScript
-  // accepts the insert without requiring any.
   const playbookData = {
     tenant_id: tenantId,
     name: structured.title,

@@ -23,12 +23,25 @@ export function DashboardShell({ user, tenantId, children }: Props) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('fai-visible')
-      // Default to visible if no preference saved yet
       setAssistantVisible(saved !== null ? JSON.parse(saved) : true)
     } catch {
       setAssistantVisible(true)
     }
     setHydrated(true)
+  }, [])
+
+  // Global hotkey: Cmd+Shift+T (Mac) / Ctrl+Shift+T (Windows/Linux)
+  useEffect(() => {
+    function handleHotkey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault()
+        setAssistantVisible(true)
+        try { localStorage.setItem('fai-visible', 'true') } catch {}
+        window.dispatchEvent(new CustomEvent('fai-open-teach'))
+      }
+    }
+    document.addEventListener('keydown', handleHotkey)
+    return () => document.removeEventListener('keydown', handleHotkey)
   }, [])
 
   function toggleAssistant() {

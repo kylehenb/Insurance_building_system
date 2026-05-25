@@ -9,6 +9,44 @@ import type {
   BrainEntryCategory,
 } from '@/types/brain'
 
+// Web Speech API inline type declarations (no external package required)
+interface SpeechRecognitionAlternative {
+  readonly transcript: string
+  readonly confidence: number
+}
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean
+  readonly length: number
+  item(index: number): SpeechRecognitionAlternative
+  [index: number]: SpeechRecognitionAlternative
+}
+interface SpeechRecognitionResultList {
+  readonly length: number
+  item(index: number): SpeechRecognitionResult
+  [index: number]: SpeechRecognitionResult
+}
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number
+  readonly results: SpeechRecognitionResultList
+}
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+}
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognition
+    webkitSpeechRecognition?: new () => SpeechRecognition
+  }
+}
+
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -40,9 +78,7 @@ interface Props {
 }
 
 type ActiveMode = 'chat' | 'doit' | 'teach'
-type TeachSubMode = 'entry' | 'quick' | 'process'
-type ProcessStep = 'record' | 'structuring' | 'review' | 'saved'
-type TeachPersona = 'all' | 'gary' | 'client-comms' | 'internal'
+type ProcessStep = 'form' | 'structuring' | 'review' | 'saved'
 
 export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const pathname = usePathname()
@@ -85,10 +121,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [activeMode, setActiveMode] = useState<ActiveMode>('chat')
 
   // ── Teach mode state ──
-  const [teachSubMode, setTeachSubMode] = useState<TeachSubMode>('entry')
-  const [processStep, setProcessStep] = useState<ProcessStep>('record')
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingElapsed, setRecordingElapsed] = useState(0)
+  const [processStep, setProcessStep] = useState<ProcessStep>('form')
   const [dictationText, setDictationText] = useState('')
   const [triggerText, setTriggerText] = useState('')
   const [structuredOutput, setStructuredOutput] = useState<StructuredTeachOutput | null>(null)
@@ -100,16 +133,18 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const [structureError, setStructureError] = useState<string | null>(null)
   const [newTagInput, setNewTagInput] = useState('')
 
-  // Quick note state
-  const [quickNoteText, setQuickNoteText] = useState('')
-  const [quickPersona, setQuickPersona] = useState<TeachPersona>('all')
-  const [quickCategory, setQuickCategory] = useState<BrainEntryCategory>('rule')
-  const [quickNoteSaving, setQuickNoteSaving] = useState(false)
-  const [quickNoteSaved, setQuickNoteSaved] = useState(false)
-  const [quickNoteError, setQuickNoteError] = useState<string | null>(null)
+  // Dictation / Web Speech API state
+  const [isListening, setIsListening] = useState(false)
+  const [interimTranscript, setInterimTranscript] = useState('')
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  // Permission gate
+  const [userCanTeach, setUserCanTeach] = useState<boolean | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const teachTextareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPopoverRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -120,6 +155,9 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const sizeRef = useRef(size)
   posRef.current = pos
   sizeRef.current = size
+
+  // Stable ref for the open-teach event handler (avoids stale closures in effect)
+  const handleOpenTeachRef = useRef<() => void>(() => {})
 
   // Initialise from localStorage after mount
   useEffect(() => {
@@ -136,6 +174,31 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       setPos({ x: window.innerWidth - DEFAULT_W - 24, y: window.innerHeight - DEFAULT_H - 24 })
     }
     setMounted(true)
+  }, [])
+
+  // Detect Web Speech API support
+  useEffect(() => {
+    setSpeechSupported(
+      typeof window !== 'undefined' &&
+      !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    )
+  }, [])
+
+  // Load permission once on mount
+  useEffect(() => {
+    async function checkPermission() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setUserCanTeach(false); return }
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role, can_edit_settings')
+        .eq('id', user.id)
+        .single()
+      if (!profile) { setUserCanTeach(false); return }
+      const p = profile as { role: string; can_edit_settings: boolean | null }
+      setUserCanTeach(p.role === 'admin' || p.can_edit_settings === true)
+    }
+    checkPermission()
   }, [])
 
   // Persist position
@@ -220,20 +283,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setSlashSelectedIdx(0)
   }, [slashQuery, templates, showSlashPopover])
 
-  // Recording timer
-  useEffect(() => {
-    if (!isRecording) {
-      setRecordingElapsed(0)
-      return
-    }
-    const start = Date.now()
-    const interval = setInterval(() => {
-      setRecordingElapsed(Math.floor((Date.now() - start) / 1000))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [isRecording])
-
-  // Reset teach state when navigating away from teach mode (auto-dismiss)
+  // Reset teach state when leaving teach mode
   useEffect(() => {
     if (activeMode !== 'teach') {
       resetTeachState()
@@ -241,11 +291,34 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode])
 
+  // Keep open-teach handler current (avoids stale closures)
+  handleOpenTeachRef.current = () => {
+    if (!userCanTeach) return
+    setActiveMode('teach')
+    setProcessStep('form')
+    setTimeout(() => teachTextareaRef.current?.focus(), 100)
+  }
+
+  // Listen for global fai-open-teach event (fired by dashboard hotkey)
+  useEffect(() => {
+    function handler() { handleOpenTeachRef.current() }
+    window.addEventListener('fai-open-teach', handler)
+    return () => window.removeEventListener('fai-open-teach', handler)
+  }, [])
+
   // ── Teach helpers ──
+  function stopListening() {
+    if (recognitionRef.current) {
+      recognitionRef.current.abort()
+      recognitionRef.current = null
+    }
+    setIsListening(false)
+    setInterimTranscript('')
+  }
+
   function resetTeachState() {
-    setTeachSubMode('entry')
-    setProcessStep('record')
-    setIsRecording(false)
+    stopListening()
+    setProcessStep('form')
     setDictationText('')
     setTriggerText('')
     setStructuredOutput(null)
@@ -256,41 +329,56 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setSavedResult(null)
     setStructureError(null)
     setNewTagInput('')
-    setQuickNoteText('')
-    setQuickPersona('all')
-    setQuickCategory('rule')
-    setQuickNoteSaving(false)
-    setQuickNoteSaved(false)
-    setQuickNoteError(null)
+    setInterimTranscript('')
   }
 
-  function formatElapsed(secs: number): string {
-    const m = Math.floor(secs / 60)
-    const s = secs % 60
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
-  async function saveQuickNote() {
-    if (!quickNoteText.trim()) return
-    setQuickNoteSaving(true)
-    setQuickNoteError(null)
-    try {
-      const res = await fetch('/api/brain/teach/quick', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: quickNoteText, persona: quickPersona, category: quickCategory, tenantId }),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      setQuickNoteSaved(true)
-    } catch {
-      setQuickNoteError('Failed to save. Please try again.')
-    } finally {
-      setQuickNoteSaving(false)
+  function toggleListening() {
+    if (isListening) {
+      stopListening()
+      return
     }
+
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognitionCtor) return
+
+    const recognition = new SpeechRecognitionCtor()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-AU'
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          const finalWord = result[0].transcript
+          setDictationText((prev) => prev + (prev ? ' ' : '') + finalWord.trim())
+          interim = ''
+        } else {
+          interim += result[0].transcript
+        }
+      }
+      setInterimTranscript(interim)
+    }
+
+    recognition.onerror = () => {
+      stopListening()
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      setInterimTranscript('')
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
   }
 
-  async function stopRecordingAndStructure() {
-    setIsRecording(false)
+  async function handleTeachSubmit() {
+    if (!dictationText.trim()) return
+    stopListening()
     setProcessStep('structuring')
     setStructureError(null)
     try {
@@ -303,7 +391,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       const structured = await structureRes.json() as StructuredTeachOutput
       setStructuredOutput(structured)
 
-      // Similarity check (non-blocking if it fails)
+      // Similarity check (non-blocking)
       try {
         const simRes = await fetch('/api/brain/teach/similarity-check', {
           method: 'POST',
@@ -321,7 +409,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       setProcessStep('review')
     } catch {
       setStructureError('Failed to structure your teaching. Please try again.')
-      setProcessStep('record')
+      setProcessStep('form')
     }
   }
 
@@ -340,7 +428,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       setSavedResult(result)
       setProcessStep('saved')
     } catch {
-      // keep form open on error
+      // keep review open on error
     } finally {
       setIsSaving(false)
     }
@@ -603,13 +691,14 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     setSlashQuery('')
   }
 
-  // Suppress unused warning for fileToBase64 (used via side-effect pattern)
+  // Suppress unused warning
   void fileToBase64
 
   if (!mounted || !visible) return null
 
   const isFormOpen = isCreating || editingTemplate !== null
   const displayOutput = isEditingReview ? editedOutput : structuredOutput
+  const visibleModes: ActiveMode[] = userCanTeach ? ['chat', 'doit', 'teach'] : ['chat', 'doit']
 
   return (
     <>
@@ -854,23 +943,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-teach-panel::-webkit-scrollbar { width: 3px; }
         .fai-teach-panel::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
 
-        .fai-teach-entry { padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
-        .fai-teach-heading { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 2px; }
-        .fai-teach-card {
-          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 14px;
-          cursor: pointer; transition: all 0.15s; background: #fdfdfc;
-        }
-        .fai-teach-card:hover { background: #f5f0e8; border-color: #c8b89a; }
-        .fai-teach-card-title { font-size: 13px; font-weight: 600; color: #2a2520; margin-bottom: 4px; }
-        .fai-teach-card-desc { font-size: 11px; color: #9a9088; line-height: 1.5; }
-
         .fai-teach-section { padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 12px; }
-        .fai-teach-back {
-          background: none; border: none; cursor: pointer; font-family: inherit;
-          font-size: 11px; color: #9a9088; padding: 0; display: flex; align-items: center;
-          gap: 4px; transition: color 0.15s; align-self: flex-start;
-        }
-        .fai-teach-back:hover { color: #2a2520; }
 
         .fai-teach-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 4px; display: block; }
         .fai-teach-textarea {
@@ -898,9 +971,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         }
         .fai-teach-select:focus { border-color: #c8b89a; }
 
-        .fai-teach-row { display: flex; gap: 8px; }
-        .fai-teach-row > * { flex: 1; }
-
         .fai-teach-btn {
           font-family: inherit; font-size: 12px; font-weight: 600;
           border-radius: 8px; border: none; cursor: pointer; padding: 9px 16px;
@@ -914,23 +984,23 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-teach-btn.success:disabled { opacity: 0.45; cursor: not-allowed; }
         .fai-teach-btn.outline { background: transparent; color: #7a6a58; border: 1px solid #d4cfc8; }
         .fai-teach-btn.outline:hover { border-color: #9a9088; }
-        .fai-teach-btn.danger-outline { background: transparent; color: #a0524a; border: 1px solid #d4cfc8; }
-        .fai-teach-btn.danger-outline:hover { border-color: #a0524a; }
         .fai-teach-btn.sm { font-size: 11px; padding: 5px 10px; border-radius: 6px; }
 
-        .fai-record-indicator {
-          display: flex; align-items: center; gap: 8px;
-          font-size: 11px; color: #9a9088; margin-bottom: 4px;
+        /* Mic button */
+        .fai-mic-btn {
+          position: absolute; top: 8px; right: 8px;
+          width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          background: #f0ece6; color: #9a9088; transition: all 0.15s;
+          font-size: 13px;
         }
-        .fai-record-pulse {
-          width: 8px; height: 8px; border-radius: 50%; background: #a0524a;
-          animation: fai-pulse 1.2s ease-in-out infinite;
+        .fai-mic-btn:hover { background: #e8e3dc; color: #7a6a58; }
+        .fai-mic-btn.listening { background: #fdf0ee; color: #a0524a; animation: fai-mic-pulse 1.4s ease-in-out infinite; }
+        @keyframes fai-mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(160,82,74,0.4); }
+          50% { box-shadow: 0 0 0 5px rgba(160,82,74,0); }
         }
-        @keyframes fai-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.85); }
-        }
-        .fai-record-timer { font-weight: 700; font-variant-numeric: tabular-nums; color: #2a2520; }
+        .fai-interim { font-size: 11px; color: #b8b0a8; font-style: italic; min-height: 16px; line-height: 1.4; }
 
         /* Review card */
         .fai-review-card {
@@ -1020,7 +1090,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
         {/* Mode selector */}
         <div className="fai-mode-selector">
-          {(['chat', 'doit', 'teach'] as ActiveMode[]).map((mode) => (
+          {visibleModes.map((mode) => (
             <button
               key={mode}
               className={`fai-mode-btn${activeMode === mode ? ' active' : ''}`}
@@ -1035,7 +1105,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         {/* ── Chat mode ── */}
         {activeMode === 'chat' && (
           <>
-            {/* Templates panel */}
             {showTemplates && (
               <div className="fai-templates-panel">
                 <div className="fai-templates-header">
@@ -1095,7 +1164,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
               </div>
             )}
 
-            {/* Messages */}
             {!showTemplates && (
               <div className="fai-messages">
                 {messages.length === 0 && (
@@ -1141,7 +1209,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
               </div>
             )}
 
-            {/* Input */}
             <div className="fai-input-wrap">
               <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileSelect} />
               {attachedFile && (
@@ -1213,342 +1280,257 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         {activeMode === 'teach' && (
           <div className="fai-teach-panel">
 
-            {/* Entry — two option cards */}
-            {teachSubMode === 'entry' && (
-              <div className="fai-teach-entry">
-                <div className="fai-teach-heading">What would you like to teach?</div>
-                <div className="fai-teach-card" onClick={() => setTeachSubMode('quick')}>
-                  <div className="fai-teach-card-title">Quick note or rule</div>
-                  <div className="fai-teach-card-desc">Add a short instruction, preference, or rule IRC should follow — e.g. tone, naming conventions, what to avoid.</div>
-                </div>
-                <div className="fai-teach-card" onClick={() => setTeachSubMode('process')}>
-                  <div className="fai-teach-card-title">⚡ Teach a process</div>
-                  <div className="fai-teach-card-desc">Walk through a workflow step by step. IRC will structure it into a reusable playbook.</div>
-                </div>
-              </div>
-            )}
-
-            {/* Quick note form */}
-            {teachSubMode === 'quick' && (
+            {/* Unified form */}
+            {processStep === 'form' && (
               <div className="fai-teach-section">
-                <button className="fai-teach-back" onClick={() => setTeachSubMode('entry')}>
-                  ← Back
-                </button>
+                {structureError && (
+                  <div className="fai-teach-error">{structureError}</div>
+                )}
+
                 <div>
-                  <span className="fai-teach-label">Note or rule</span>
-                  <textarea
-                    className="fai-teach-textarea"
-                    placeholder="e.g. Don't use formal legal language in reports — write plainly instead"
-                    value={quickNoteText}
-                    onChange={(e) => setQuickNoteText(e.target.value)}
-                    style={{ minHeight: 100 }}
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      ref={teachTextareaRef}
+                      className="fai-teach-textarea"
+                      placeholder="Teach IRC something — a rule, a tone note, or walk through a process step by step..."
+                      value={dictationText}
+                      onChange={(e) => setDictationText(e.target.value)}
+                      style={{ minHeight: 110, paddingRight: speechSupported ? 44 : 12 }}
+                    />
+                    {speechSupported && (
+                      <button
+                        className={`fai-mic-btn${isListening ? ' listening' : ''}`}
+                        onClick={toggleListening}
+                        title={isListening ? 'Stop dictation' : 'Dictate with microphone'}
+                        type="button"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="5" y="1" width="6" height="9" rx="3" />
+                          <path d="M2 8a6 6 0 0 0 12 0M8 14v2M5 16h6" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {isListening && (
+                    <div className="fai-interim">
+                      {interimTranscript || 'Listening…'}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <span className="fai-teach-label">What triggers this? (optional)</span>
+                  <input
+                    className="fai-teach-input"
+                    placeholder="e.g. when a job is cash settled"
+                    value={triggerText}
+                    onChange={(e) => setTriggerText(e.target.value)}
                   />
                 </div>
-                <div className="fai-teach-row">
-                  <div>
-                    <span className="fai-teach-label">Persona</span>
-                    <select className="fai-teach-select" value={quickPersona} onChange={(e) => setQuickPersona(e.target.value as TeachPersona)}>
-                      <option value="all">All</option>
-                      <option value="gary">Gary</option>
-                      <option value="client-comms">Client Comms</option>
-                      <option value="internal">Internal</option>
-                    </select>
-                  </div>
-                  <div>
-                    <span className="fai-teach-label">Category</span>
-                    <select className="fai-teach-select" value={quickCategory} onChange={(e) => setQuickCategory(e.target.value as BrainEntryCategory)}>
-                      <option value="rule">Rule</option>
-                      <option value="tone">Tone</option>
-                      <option value="workflow">Workflow</option>
-                      <option value="classification">Classification</option>
-                      <option value="example">Example</option>
-                      <option value="correction">Correction</option>
-                    </select>
-                  </div>
-                </div>
 
-                {quickNoteSaved ? (
-                  <div className="fai-teach-confirm">
-                    <div className="fai-teach-confirm-icon">✅</div>
-                    <div className="fai-teach-confirm-text">Saved to brain</div>
-                    <div className="fai-teach-confirm-sub">
-                      Review it in the Brain Library.{' '}
-                      <button
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2a6b50', fontWeight: 600, padding: 0, fontSize: 'inherit', fontFamily: 'inherit' }}
-                        onClick={() => { setQuickNoteSaved(false); setQuickNoteText('') }}
-                      >
-                        Add another
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {quickNoteError && <div className="fai-teach-error">{quickNoteError}</div>}
-                    <button
-                      className="fai-teach-btn primary"
-                      onClick={saveQuickNote}
-                      disabled={quickNoteSaving || !quickNoteText.trim()}
-                    >
-                      {quickNoteSaving ? 'Saving…' : 'Save to brain'}
-                    </button>
-                  </>
-                )}
+                <button
+                  className="fai-teach-btn primary"
+                  onClick={handleTeachSubmit}
+                  disabled={!dictationText.trim()}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  ⚡ Teach
+                </button>
               </div>
             )}
 
-            {/* Process flow */}
-            {teachSubMode === 'process' && (
-              <>
-                {/* Step 1: Record */}
-                {processStep === 'record' && (
-                  <div className="fai-teach-section">
-                    <button className="fai-teach-back" onClick={() => setTeachSubMode('entry')}>
-                      ← Back
-                    </button>
+            {/* Structuring */}
+            {processStep === 'structuring' && (
+              <div className="fai-structuring">
+                <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>⬡</div>
+                <div className="fai-structuring-text">Structuring what you taught…</div>
+                <div className="fai-structuring-sub">This takes a few seconds</div>
+              </div>
+            )}
 
-                    {structureError && (
-                      <div className="fai-teach-error">{structureError}</div>
-                    )}
-
-                    {!isRecording ? (
-                      <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                        <div style={{ fontSize: 12, color: '#9a9088', marginBottom: 14, lineHeight: 1.6 }}>
-                          Describe a process you run regularly — step by step, in plain English. Don&apos;t worry about being precise.
-                        </div>
-                        <button
-                          className="fai-teach-btn primary"
-                          style={{ fontSize: 14, padding: '11px 24px' }}
-                          onClick={() => setIsRecording(true)}
-                        >
-                          ⚡ Start Teaching
-                        </button>
-                      </div>
+            {/* Review */}
+            {processStep === 'review' && displayOutput && (
+              <div className="fai-teach-section">
+                <div className="fai-review-card">
+                  <div className="fai-review-header">
+                    {isEditingReview && editedOutput ? (
+                      <input
+                        className="fai-teach-input"
+                        value={editedOutput.title}
+                        onChange={(e) => setEditedOutput({ ...editedOutput, title: e.target.value })}
+                        style={{ fontWeight: 700, fontSize: 13 }}
+                      />
                     ) : (
-                      <>
-                        <div className="fai-record-indicator">
-                          <div className="fai-record-pulse" />
-                          <span>Recording</span>
-                          <span className="fai-record-timer">{formatElapsed(recordingElapsed)}</span>
-                        </div>
-                        <div>
-                          <span className="fai-teach-label">Describe what you&apos;re doing — step by step</span>
-                          <textarea
-                            className="fai-teach-textarea"
-                            placeholder="Describe what you're doing as you go — step by step, plain English. Don't worry about being precise."
-                            value={dictationText}
-                            onChange={(e) => setDictationText(e.target.value)}
-                            style={{ minHeight: 120 }}
-                            autoFocus
-                          />
-                        </div>
-                        <div>
-                          <span className="fai-teach-label">What triggers this process?</span>
-                          <input
-                            className="fai-teach-input"
-                            placeholder="e.g. When a job is cash settled and the homeowner still wants the work done"
-                            value={triggerText}
-                            onChange={(e) => setTriggerText(e.target.value)}
-                          />
-                        </div>
-                        <button
-                          className="fai-teach-btn success"
-                          onClick={stopRecordingAndStructure}
-                          disabled={!dictationText.trim()}
-                        >
-                          Done Teaching
-                        </button>
-                      </>
+                      <div className="fai-review-title">
+                        {displayOutput.type === 'note' ? '📝' : '📋'} {displayOutput.title}
+                      </div>
+                    )}
+                    {displayOutput.trigger_condition && (
+                      isEditingReview && editedOutput ? (
+                        <textarea
+                          className="fai-teach-textarea"
+                          value={editedOutput.trigger_condition}
+                          onChange={(e) => setEditedOutput({ ...editedOutput, trigger_condition: e.target.value })}
+                          style={{ marginTop: 6, minHeight: 48, fontSize: 11 }}
+                        />
+                      ) : (
+                        <div className="fai-review-trigger">Triggers when: {displayOutput.trigger_condition}</div>
+                      )
                     )}
                   </div>
-                )}
 
-                {/* Step 2: Structuring */}
-                {processStep === 'structuring' && (
-                  <div className="fai-structuring">
-                    <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>⬡</div>
-                    <div className="fai-structuring-text">Structuring what you taught…</div>
-                    <div className="fai-structuring-sub">This takes a few seconds</div>
-                  </div>
-                )}
-
-                {/* Step 4: Review */}
-                {processStep === 'review' && displayOutput && (
-                  <div className="fai-teach-section">
-                    <div className="fai-review-card">
-                      <div className="fai-review-header">
-                        {isEditingReview && editedOutput ? (
-                          <input
-                            className="fai-teach-input"
-                            value={editedOutput.title}
-                            onChange={(e) => setEditedOutput({ ...editedOutput, title: e.target.value })}
-                            style={{ fontWeight: 700, fontSize: 13 }}
-                          />
-                        ) : (
-                          <div className="fai-review-title">📋 {displayOutput.title}</div>
-                        )}
-                        {isEditingReview && editedOutput ? (
-                          <textarea
-                            className="fai-teach-textarea"
-                            value={editedOutput.trigger_condition}
-                            onChange={(e) => setEditedOutput({ ...editedOutput, trigger_condition: e.target.value })}
-                            style={{ marginTop: 6, minHeight: 48, fontSize: 11 }}
-                          />
-                        ) : (
-                          <div className="fai-review-trigger">Triggers when: {displayOutput.trigger_condition}</div>
-                        )}
-                      </div>
-
-                      <div className="fai-review-section">
-                        <div className="fai-review-section-label">Steps</div>
-                        {displayOutput.steps.map((step, i) => (
-                          <div key={i} className="fai-review-step">
-                            <span className="fai-review-step-num">{step.order}.</span>
-                            {isEditingReview ? (
-                              <input
-                                className="fai-teach-input"
-                                value={editedOutput?.steps[i]?.description ?? step.description}
-                                onChange={(e) => updateEditedStep(i, e.target.value)}
-                                style={{ flex: 1 }}
-                              />
-                            ) : (
-                              <span>{step.description}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {displayOutput.variables.length > 0 && (
-                        <div className="fai-review-section">
-                          <div className="fai-review-section-label">Variables</div>
-                          <div className="fai-review-vars">{displayOutput.variables.join(', ')}</div>
-                        </div>
-                      )}
-
-                      <div className="fai-review-section">
-                        <div className="fai-review-section-label">Tags</div>
-                        <div className="fai-review-chips">
-                          {displayOutput.tags.map((tag) => (
-                            <span key={tag} className="fai-review-chip">
-                              {tag}
-                              {isEditingReview && (
-                                <button className="fai-chip-remove" onClick={() => removeEditedTag(tag)} title="Remove tag">×</button>
-                              )}
-                            </span>
-                          ))}
-                          {isEditingReview && (
+                  {displayOutput.steps.length > 0 && (
+                    <div className="fai-review-section">
+                      <div className="fai-review-section-label">Steps</div>
+                      {displayOutput.steps.map((step, i) => (
+                        <div key={i} className="fai-review-step">
+                          <span className="fai-review-step-num">{step.order}.</span>
+                          {isEditingReview ? (
                             <input
                               className="fai-teach-input"
-                              style={{ width: 100, padding: '2px 8px', fontSize: 10, borderRadius: 20, minHeight: 'unset' }}
-                              placeholder="+ add tag"
-                              value={newTagInput}
-                              onChange={(e) => setNewTagInput(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditedTag(newTagInput) } }}
-                              onBlur={() => { if (newTagInput.trim()) addEditedTag(newTagInput) }}
+                              value={editedOutput?.steps[i]?.description ?? step.description}
+                              onChange={(e) => updateEditedStep(i, e.target.value)}
+                              style={{ flex: 1 }}
                             />
+                          ) : (
+                            <span>{step.description}</span>
                           )}
                         </div>
-                      </div>
-
-                      <div className="fai-review-section">
-                        <div className="fai-review-section-label">Category</div>
-                        {isEditingReview && editedOutput ? (
-                          <select
-                            className="fai-teach-select"
-                            value={editedOutput.category}
-                            onChange={(e) => setEditedOutput({ ...editedOutput, category: e.target.value as BrainEntryCategory })}
-                          >
-                            <option value="workflow">Workflow</option>
-                            <option value="rule">Rule</option>
-                            <option value="tone">Tone</option>
-                            <option value="classification">Classification</option>
-                            <option value="example">Example</option>
-                            <option value="correction">Correction</option>
-                          </select>
-                        ) : (
-                          <div style={{ fontSize: 12, color: '#7a6a58', textTransform: 'capitalize' }}>{displayOutput.category}</div>
-                        )}
-                      </div>
+                      ))}
                     </div>
+                  )}
 
-                    {/* Similarity matches */}
-                    {similarityMatches.length > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div className="fai-similar-header">
-                          ⚠ Similar existing entries found
-                        </div>
-                        {similarityMatches.map((match) => (
-                          <div key={match.id} className="fai-similar-card">
-                            <div className="fai-similar-title">{match.title}</div>
-                            <div className="fai-similar-meta">{match.category} · {match.similarity} similarity</div>
-                            <div className="fai-similar-actions">
-                              <button
-                                className="fai-teach-btn outline sm"
-                                onClick={() => approveSave('example', match.id)}
-                                disabled={isSaving}
-                              >
-                                Add as example to this
-                              </button>
-                              <button
-                                className="fai-teach-btn outline sm"
-                                onClick={() => approveSave('variant', match.id)}
-                                disabled={isSaving}
-                              >
-                                Save as variant
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{ fontSize: 11, color: '#9a9088', marginTop: 4 }}>Or save as a new workflow below ↓</div>
-                      </div>
-                    )}
+                  {displayOutput.variables.length > 0 && (
+                    <div className="fai-review-section">
+                      <div className="fai-review-section-label">Variables</div>
+                      <div className="fai-review-vars">{displayOutput.variables.join(', ')}</div>
+                    </div>
+                  )}
 
-                    <div className="fai-review-actions">
-                      {!isEditingReview && (
-                        <button className="fai-teach-btn outline" onClick={enterEditMode}>
-                          ✏️ Edit
-                        </button>
+                  <div className="fai-review-section">
+                    <div className="fai-review-section-label">Tags</div>
+                    <div className="fai-review-chips">
+                      {displayOutput.tags.map((tag) => (
+                        <span key={tag} className="fai-review-chip">
+                          {tag}
+                          {isEditingReview && (
+                            <button className="fai-chip-remove" onClick={() => removeEditedTag(tag)} title="Remove tag">×</button>
+                          )}
+                        </span>
+                      ))}
+                      {isEditingReview && (
+                        <input
+                          className="fai-teach-input"
+                          style={{ width: 100, padding: '2px 8px', fontSize: 10, borderRadius: 20, minHeight: 'unset' }}
+                          placeholder="+ add tag"
+                          value={newTagInput}
+                          onChange={(e) => setNewTagInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditedTag(newTagInput) } }}
+                          onBlur={() => { if (newTagInput.trim()) addEditedTag(newTagInput) }}
+                        />
                       )}
-                      <button
-                        className="fai-teach-btn success"
-                        onClick={() => approveSave('new')}
-                        disabled={isSaving}
-                        style={{ flex: 1 }}
-                      >
-                        {isSaving ? 'Saving…' : '✅ Approve'}
-                      </button>
                     </div>
+                  </div>
+
+                  <div className="fai-review-section">
+                    <div className="fai-review-section-label">Category</div>
+                    {isEditingReview && editedOutput ? (
+                      <select
+                        className="fai-teach-select"
+                        value={editedOutput.category}
+                        onChange={(e) => setEditedOutput({ ...editedOutput, category: e.target.value as BrainEntryCategory })}
+                      >
+                        <option value="workflow">Workflow</option>
+                        <option value="rule">Rule</option>
+                        <option value="tone">Tone</option>
+                        <option value="classification">Classification</option>
+                        <option value="example">Example</option>
+                        <option value="correction">Correction</option>
+                      </select>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#7a6a58', textTransform: 'capitalize' }}>{displayOutput.category}</div>
+                    )}
+                  </div>
+                </div>
+
+                {similarityMatches.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="fai-similar-header">
+                      ⚠ Similar existing entries found
+                    </div>
+                    {similarityMatches.map((match) => (
+                      <div key={match.id} className="fai-similar-card">
+                        <div className="fai-similar-title">{match.title}</div>
+                        <div className="fai-similar-meta">{match.category} · {match.similarity} similarity</div>
+                        <div className="fai-similar-actions">
+                          <button
+                            className="fai-teach-btn outline sm"
+                            onClick={() => approveSave('example', match.id)}
+                            disabled={isSaving}
+                          >
+                            Add as example to this
+                          </button>
+                          <button
+                            className="fai-teach-btn outline sm"
+                            onClick={() => approveSave('variant', match.id)}
+                            disabled={isSaving}
+                          >
+                            Save as variant
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 11, color: '#9a9088', marginTop: 4 }}>Or save as new below ↓</div>
                   </div>
                 )}
 
-                {/* Step 5: Saved */}
-                {processStep === 'saved' && (
-                  <div className="fai-teach-section">
-                    <div className="fai-teach-confirm">
-                      <div className="fai-teach-confirm-icon">✅</div>
-                      <div className="fai-teach-confirm-text">Workflow saved to brain</div>
-                      <div className="fai-teach-confirm-sub">IRC will use this next time.</div>
-                    </div>
-                    {savedResult && (
-                      <div style={{ fontSize: 10, color: '#b8b0a8', textAlign: 'center' }}>
-                        Entry ID: {savedResult.brainEntryId.slice(0, 8)}…
-                        {savedResult.playbookId && ` · Playbook: ${savedResult.playbookId.slice(0, 8)}…`}
-                      </div>
-                    )}
-                    <button
-                      className="fai-teach-btn outline"
-                      style={{ alignSelf: 'center' }}
-                      onClick={resetTeachState}
-                    >
-                      Teach something else
+                <div className="fai-review-actions">
+                  {!isEditingReview && (
+                    <button className="fai-teach-btn outline" onClick={enterEditMode}>
+                      ✏️ Edit
                     </button>
+                  )}
+                  <button
+                    className="fai-teach-btn success"
+                    onClick={() => approveSave('new')}
+                    disabled={isSaving}
+                    style={{ flex: 1 }}
+                  >
+                    {isSaving ? 'Saving…' : '✅ Approve'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Saved */}
+            {processStep === 'saved' && (
+              <div className="fai-teach-section">
+                <div className="fai-teach-confirm">
+                  <div className="fai-teach-confirm-icon">✅</div>
+                  <div className="fai-teach-confirm-text">
+                    {savedResult?.playbookId ? 'Workflow saved to brain' : 'Note saved to brain'}
+                  </div>
+                  <div className="fai-teach-confirm-sub">IRC will use this next time.</div>
+                </div>
+                {savedResult && (
+                  <div style={{ fontSize: 10, color: '#b8b0a8', textAlign: 'center' }}>
+                    Entry ID: {savedResult.brainEntryId.slice(0, 8)}…
+                    {savedResult.playbookId && ` · Playbook: ${savedResult.playbookId.slice(0, 8)}…`}
                   </div>
                 )}
-              </>
+                <button
+                  className="fai-teach-btn outline"
+                  style={{ alignSelf: 'center' }}
+                  onClick={resetTeachState}
+                >
+                  Teach something else
+                </button>
+              </div>
             )}
           </div>
         )}
 
-        {/* Resize handle (always visible) */}
+        {/* Resize handle */}
         <div className="fai-resize-handle" onMouseDown={handleResizeStart}>
           <svg className="fai-resize-icon" width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M9 1L1 9M9 5L5 9M9 9" stroke="#9a9088" strokeWidth="1.2" strokeLinecap="round" />

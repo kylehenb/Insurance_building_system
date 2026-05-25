@@ -15,3 +15,10 @@ Read that file at the start of every session before doing anything else.
 - Follow the App Router structure exactly as defined in the spec (Section 7)
 - Use shadcn/ui for all UI components
 - Tailwind only for styling — black (#1a1a1a) and beige (#f5f0e8) palette
+
+## Brain Module — Field Tracking
+When creating or editing any form field that receives its value from an AI API call,
+a playbook run, or any other automated/generated source, wrap it with the
+useTrackedField hook from hooks/useTrackedField.ts.
+Never leave AI-generated or playbook-generated field values unwrapped.
+Import: import { useTrackedField } from '@/hooks/useTrackedField'

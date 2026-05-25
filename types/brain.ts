@@ -89,6 +89,7 @@ export interface StructuredTeachStep {
 }
 
 export interface StructuredTeachOutput {
+  type?: 'note' | 'workflow'
   title: string
   trigger_condition: string
   steps: StructuredTeachStep[]

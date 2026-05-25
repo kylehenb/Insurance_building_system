@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
-import { BrainReviewWidget } from '@/components/brain/BrainReviewWidget'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1065,9 +1064,6 @@ export default function DashboardPage() {
             })}
           </div>
         </div>
-
-        {/* ── BRAIN REVIEW ── */}
-        <BrainReviewWidget />
 
       </div>
 

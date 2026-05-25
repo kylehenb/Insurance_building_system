@@ -48,17 +48,14 @@ export async function getBrainContext(params: {
     entries = entries.filter((e) => tags.some((tag) => e.tags.includes(tag)))
   }
 
+  // Newest entries first (so newer instructions take priority over older ones),
+  // then by confidence as tiebreaker.
   entries.sort((a, b) => {
-    const confDiff =
-      (CONFIDENCE_RANK[a.confidence] ?? 1) - (CONFIDENCE_RANK[b.confidence] ?? 1)
-    if (confDiff !== 0) return confDiff
+    const aTime = new Date(a.created_at).getTime()
+    const bTime = new Date(b.created_at).getTime()
+    if (bTime !== aTime) return bTime - aTime
 
-    const valDiff = b.times_validated - a.times_validated
-    if (valDiff !== 0) return valDiff
-
-    const aTime = a.last_reviewed_at ? new Date(a.last_reviewed_at).getTime() : 0
-    const bTime = b.last_reviewed_at ? new Date(b.last_reviewed_at).getTime() : 0
-    return bTime - aTime
+    return (CONFIDENCE_RANK[a.confidence] ?? 1) - (CONFIDENCE_RANK[b.confidence] ?? 1)
   })
 
   return entries.slice(0, limit)
