@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_account_map: {
+        Row: {
+          accounting_account_id: string
+          accounting_account_name: string
+          created_at: string
+          id: string
+          irc_category: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          accounting_account_id: string
+          accounting_account_name: string
+          created_at?: string
+          id?: string
+          irc_category: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          accounting_account_id?: string
+          accounting_account_name?: string
+          created_at?: string
+          id?: string
+          irc_category?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      accounting_credentials: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          provider: string
+          realm_id: string
+          refresh_expires_at: string
+          refresh_token: string
+          tenant_id: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          provider: string
+          realm_id: string
+          refresh_expires_at: string
+          refresh_token: string
+          tenant_id: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          provider?: string
+          realm_id?: string
+          refresh_expires_at?: string
+          refresh_token?: string
+          tenant_id?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       action_queue: {
         Row: {
           ai_draft: Json | null
@@ -287,6 +356,109 @@ export type Database = {
           },
         ]
       }
+      brain_entries: {
+        Row: {
+          category: string
+          confidence: string | null
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          last_reviewed_at: string | null
+          persona: string | null
+          previous_content: string | null
+          prompt_keys: string[] | null
+          review_due_at: string | null
+          source_ref_id: string | null
+          source_ref_table: string | null
+          source_type: string
+          status: string | null
+          tags: string[] | null
+          tenant_id: string
+          times_applied: number | null
+          times_contradicted: number | null
+          times_validated: number | null
+          title: string
+          updated_at: string | null
+          updated_by: string | null
+          version: number | null
+        }
+        Insert: {
+          category: string
+          confidence?: string | null
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          persona?: string | null
+          previous_content?: string | null
+          prompt_keys?: string[] | null
+          review_due_at?: string | null
+          source_ref_id?: string | null
+          source_ref_table?: string | null
+          source_type: string
+          status?: string | null
+          tags?: string[] | null
+          tenant_id: string
+          times_applied?: number | null
+          times_contradicted?: number | null
+          times_validated?: number | null
+          title: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          category?: string
+          confidence?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          persona?: string | null
+          previous_content?: string | null
+          prompt_keys?: string[] | null
+          review_due_at?: string | null
+          source_ref_id?: string | null
+          source_ref_table?: string | null
+          source_type?: string
+          status?: string | null
+          tags?: string[] | null
+          tenant_id?: string
+          times_applied?: number | null
+          times_contradicted?: number | null
+          times_validated?: number | null
+          title?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_entries_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_email_config: {
         Row: {
           active: boolean | null
@@ -344,6 +516,7 @@ export type Database = {
       clients: {
         Row: {
           abn: string | null
+          accounting_contact_id: string | null
           address: string | null
           adjuster_submission_email: string | null
           bar_amount: number | null
@@ -372,6 +545,7 @@ export type Database = {
         }
         Insert: {
           abn?: string | null
+          accounting_contact_id?: string | null
           address?: string | null
           adjuster_submission_email?: string | null
           bar_amount?: number | null
@@ -400,6 +574,7 @@ export type Database = {
         }
         Update: {
           abn?: string | null
+          accounting_contact_id?: string | null
           address?: string | null
           adjuster_submission_email?: string | null
           bar_amount?: number | null
@@ -681,21 +856,30 @@ export type Database = {
           email_address: string
           id: string
           last_history_id: string
+          last_poll_timestamp: string | null
           last_synced_at: string | null
+          polling_enabled: boolean | null
+          polling_interval_minutes: number | null
           tenant_id: string
         }
         Insert: {
           email_address: string
           id?: string
           last_history_id: string
+          last_poll_timestamp?: string | null
           last_synced_at?: string | null
+          polling_enabled?: boolean | null
+          polling_interval_minutes?: number | null
           tenant_id: string
         }
         Update: {
           email_address?: string
           id?: string
           last_history_id?: string
+          last_poll_timestamp?: string | null
           last_synced_at?: string | null
+          polling_enabled?: boolean | null
+          polling_interval_minutes?: number | null
           tenant_id?: string
         }
         Relationships: [
@@ -885,10 +1069,10 @@ export type Database = {
           last_no_show_at: string | null
           no_show_count: number | null
           no_show_notes: string | null
-          raw_report_notes: string | null
           person_met: string | null
           photos_status: string | null
           quote_id: string | null
+          raw_report_notes: string | null
           report_id: string | null
           report_status: string | null
           safety_confirmed_at: string | null
@@ -918,10 +1102,10 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          raw_report_notes?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
+          raw_report_notes?: string | null
           report_id?: string | null
           report_status?: string | null
           safety_confirmed_at?: string | null
@@ -951,10 +1135,10 @@ export type Database = {
           last_no_show_at?: string | null
           no_show_count?: number | null
           no_show_notes?: string | null
-          raw_report_notes?: string | null
           person_met?: string | null
           photos_status?: string | null
           quote_id?: string | null
+          raw_report_notes?: string | null
           report_id?: string | null
           report_status?: string | null
           safety_confirmed_at?: string | null
@@ -1155,70 +1339,6 @@ export type Database = {
           },
         ]
       }
-      parser_examples: {
-        Row: {
-          id: string
-          tenant_id: string
-          client_id: string | null
-          raw_email_text: string
-          raw_email_subject: string | null
-          correct_output: Json
-          original_output: Json
-          fields_corrected: string[]
-          confirmed_gemini_error: boolean | null
-          created_at: string | null
-          insurer_order_id: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          client_id?: string | null
-          raw_email_text: string
-          raw_email_subject?: string | null
-          correct_output: Json
-          original_output: Json
-          fields_corrected: string[]
-          confirmed_gemini_error?: boolean | null
-          created_at?: string | null
-          insurer_order_id?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          client_id?: string | null
-          raw_email_text?: string
-          raw_email_subject?: string | null
-          correct_output?: Json
-          original_output?: Json
-          fields_corrected?: string[]
-          confirmed_gemini_error?: boolean | null
-          created_at?: string | null
-          insurer_order_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "parser_examples_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "parser_examples_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "parser_examples_insurer_order_id_fkey"
-            columns: ["insurer_order_id"]
-            isOneToOne: false
-            referencedRelation: "insurer_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invoice_line_item_library: {
         Row: {
           created_at: string | null
@@ -1315,6 +1435,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoice_line_items_library_item_id_fkey"
+            columns: ["library_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_line_item_library"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoice_line_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1366,6 +1493,11 @@ export type Database = {
       }
       invoices: {
         Row: {
+          accounting_bill_id: string | null
+          accounting_last_synced_at: string | null
+          accounting_ref_id: string | null
+          accounting_sync_error: string | null
+          accounting_sync_status: string | null
           amount_ex_gst: number | null
           amount_inc_gst: number | null
           created_at: string | null
@@ -1391,12 +1523,13 @@ export type Database = {
           trade_invoice_number: string | null
           trade_pdf_storage_path: string | null
           work_order_id: string | null
-          xero_invoice_id: string | null
-          xero_last_synced_at: string | null
-          xero_sync_error: string | null
-          xero_sync_status: string | null
         }
         Insert: {
+          accounting_bill_id?: string | null
+          accounting_last_synced_at?: string | null
+          accounting_ref_id?: string | null
+          accounting_sync_error?: string | null
+          accounting_sync_status?: string | null
           amount_ex_gst?: number | null
           amount_inc_gst?: number | null
           created_at?: string | null
@@ -1422,12 +1555,13 @@ export type Database = {
           trade_invoice_number?: string | null
           trade_pdf_storage_path?: string | null
           work_order_id?: string | null
-          xero_invoice_id?: string | null
-          xero_last_synced_at?: string | null
-          xero_sync_error?: string | null
-          xero_sync_status?: string | null
         }
         Update: {
+          accounting_bill_id?: string | null
+          accounting_last_synced_at?: string | null
+          accounting_ref_id?: string | null
+          accounting_sync_error?: string | null
+          accounting_sync_status?: string | null
           amount_ex_gst?: number | null
           amount_inc_gst?: number | null
           created_at?: string | null
@@ -1453,12 +1587,15 @@ export type Database = {
           trade_invoice_number?: string | null
           trade_pdf_storage_path?: string | null
           work_order_id?: string | null
-          xero_invoice_id?: string | null
-          xero_last_synced_at?: string | null
-          xero_sync_error?: string | null
-          xero_sync_status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_job_id_fkey"
             columns: ["job_id"]
@@ -1775,6 +1912,7 @@ export type Database = {
           current_stage_updated_at: string | null
           date_of_loss: string | null
           excess: number | null
+          homeowner_accounting_contact_id: string | null
           homeowner_signoff_method: string | null
           homeowner_signoff_notes: string | null
           homeowner_signoff_received_at: string | null
@@ -1823,6 +1961,7 @@ export type Database = {
           current_stage_updated_at?: string | null
           date_of_loss?: string | null
           excess?: number | null
+          homeowner_accounting_contact_id?: string | null
           homeowner_signoff_method?: string | null
           homeowner_signoff_notes?: string | null
           homeowner_signoff_received_at?: string | null
@@ -1871,6 +2010,7 @@ export type Database = {
           current_stage_updated_at?: string | null
           date_of_loss?: string | null
           excess?: number | null
+          homeowner_accounting_contact_id?: string | null
           homeowner_signoff_method?: string | null
           homeowner_signoff_notes?: string | null
           homeowner_signoff_received_at?: string | null
@@ -1919,6 +2059,70 @@ export type Database = {
           },
           {
             foreignKeyName: "jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parser_examples: {
+        Row: {
+          client_id: string | null
+          confirmed_gemini_error: boolean | null
+          correct_output: Json
+          created_at: string | null
+          fields_corrected: string[]
+          id: string
+          insurer_order_id: string | null
+          original_output: Json
+          raw_email_subject: string | null
+          raw_email_text: string
+          tenant_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          confirmed_gemini_error?: boolean | null
+          correct_output: Json
+          created_at?: string | null
+          fields_corrected: string[]
+          id?: string
+          insurer_order_id?: string | null
+          original_output: Json
+          raw_email_subject?: string | null
+          raw_email_text: string
+          tenant_id: string
+        }
+        Update: {
+          client_id?: string | null
+          confirmed_gemini_error?: boolean | null
+          correct_output?: Json
+          created_at?: string | null
+          fields_corrected?: string[]
+          id?: string
+          insurer_order_id?: string | null
+          original_output?: Json
+          raw_email_subject?: string | null
+          raw_email_text?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parser_examples_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parser_examples_insurer_order_id_fkey"
+            columns: ["insurer_order_id"]
+            isOneToOne: false
+            referencedRelation: "insurer_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parser_examples_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2003,6 +2207,169 @@ export type Database = {
           },
           {
             foreignKeyName: "photos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playbook_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error: string | null
+          field_snapshots: Json | null
+          id: string
+          job_id: string | null
+          playbook_id: string
+          status: string | null
+          step_log: Json | null
+          tenant_id: string
+          triggered_by: string | null
+          triggered_via: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          field_snapshots?: Json | null
+          id?: string
+          job_id?: string | null
+          playbook_id: string
+          status?: string | null
+          step_log?: Json | null
+          tenant_id: string
+          triggered_by?: string | null
+          triggered_via?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          field_snapshots?: Json | null
+          id?: string
+          job_id?: string | null
+          playbook_id?: string
+          status?: string | null
+          step_log?: Json | null
+          tenant_id?: string
+          triggered_by?: string | null
+          triggered_via?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbook_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_margin_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playbooks: {
+        Row: {
+          client_id: string | null
+          corrections: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          is_temporary: boolean | null
+          job_type: string | null
+          name: string
+          promoted_rule_key: string | null
+          steps: string | null
+          tenant_id: string
+          tier: number | null
+          trigger_keywords: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          corrections?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_temporary?: boolean | null
+          job_type?: string | null
+          name: string
+          promoted_rule_key?: string | null
+          steps?: string | null
+          tenant_id: string
+          tier?: number | null
+          trigger_keywords?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          corrections?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_temporary?: boolean | null
+          job_type?: string | null
+          name?: string
+          promoted_rule_key?: string | null
+          steps?: string | null
+          tenant_id?: string
+          tier?: number | null
+          trigger_keywords?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbooks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbooks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbooks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2464,6 +2831,7 @@ export type Database = {
           property_address: string | null
           property_description: string | null
           quote_id: string | null
+          raw_report_dump: string | null
           raw_report_notes: string | null
           report_ref: string | null
           report_type: string
@@ -2504,6 +2872,7 @@ export type Database = {
           property_address?: string | null
           property_description?: string | null
           quote_id?: string | null
+          raw_report_dump?: string | null
           raw_report_notes?: string | null
           report_ref?: string | null
           report_type: string
@@ -2544,6 +2913,7 @@ export type Database = {
           property_address?: string | null
           property_description?: string | null
           quote_id?: string | null
+          raw_report_dump?: string | null
           raw_report_notes?: string | null
           report_ref?: string | null
           report_type?: string
@@ -2723,6 +3093,7 @@ export type Database = {
           estimated_hours: number | null
           id: string
           is_custom: boolean | null
+          is_reference: boolean | null
           item_description: string | null
           item_type: string | null
           keyword: string | null
@@ -2734,7 +3105,6 @@ export type Database = {
           rate_labour: number | null
           rate_materials: number | null
           rate_total: number | null
-          trade_rate_total: number | null
           room: string | null
           room_height: number | null
           room_length: number | null
@@ -2744,6 +3114,7 @@ export type Database = {
           split_type: string | null
           tenant_id: string
           trade: string | null
+          trade_rate_total: number | null
           unit: string | null
         }
         Insert: {
@@ -2752,6 +3123,7 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           is_custom?: boolean | null
+          is_reference?: boolean | null
           item_description?: string | null
           item_type?: string | null
           keyword?: string | null
@@ -2763,7 +3135,6 @@ export type Database = {
           rate_labour?: number | null
           rate_materials?: number | null
           rate_total?: number | null
-          trade_rate_total?: number | null
           room?: string | null
           room_height?: number | null
           room_length?: number | null
@@ -2773,6 +3144,7 @@ export type Database = {
           split_type?: string | null
           tenant_id: string
           trade?: string | null
+          trade_rate_total?: number | null
           unit?: string | null
         }
         Update: {
@@ -2781,6 +3153,7 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           is_custom?: boolean | null
+          is_reference?: boolean | null
           item_description?: string | null
           item_type?: string | null
           keyword?: string | null
@@ -2792,7 +3165,6 @@ export type Database = {
           rate_labour?: number | null
           rate_materials?: number | null
           rate_total?: number | null
-          trade_rate_total?: number | null
           room?: string | null
           room_height?: number | null
           room_length?: number | null
@@ -2802,6 +3174,7 @@ export type Database = {
           split_type?: string | null
           tenant_id?: string
           trade?: string | null
+          trade_rate_total?: number | null
           unit?: string | null
         }
         Relationships: [
@@ -2831,65 +3204,90 @@ export type Database = {
       scope_library: {
         Row: {
           approval_status: string | null
+          draft_source_job_ref: string | null
+          draft_source_quote_id: string | null
           estimated_hours: number | null
           estimated_hours_overridden: boolean | null
           id: string
           insurer_specific: string | null
+          is_draft: boolean | null
           item_description: string | null
           keyword: string | null
           labour_per_unit: number | null
           labour_rate_per_hour: number | null
           materials_per_unit: number | null
           pair_id: string | null
+          price_updated_at: string | null
+          pricing_tiers: Json | null
+          site_notes: string | null
           split_type: string | null
           tenant_id: string
           total_per_unit: number | null
-          trade_rate_total: number | null
           trade: string | null
+          trade_rate_total: number | null
           unit: string | null
           updated_at: string | null
         }
         Insert: {
           approval_status?: string | null
+          draft_source_job_ref?: string | null
+          draft_source_quote_id?: string | null
           estimated_hours?: number | null
           estimated_hours_overridden?: boolean | null
           id?: string
           insurer_specific?: string | null
+          is_draft?: boolean | null
           item_description?: string | null
           keyword?: string | null
           labour_per_unit?: number | null
           labour_rate_per_hour?: number | null
           materials_per_unit?: number | null
           pair_id?: string | null
+          price_updated_at?: string | null
+          pricing_tiers?: Json | null
+          site_notes?: string | null
           split_type?: string | null
           tenant_id: string
           total_per_unit?: number | null
-          trade_rate_total?: number | null
           trade?: string | null
+          trade_rate_total?: number | null
           unit?: string | null
           updated_at?: string | null
         }
         Update: {
           approval_status?: string | null
+          draft_source_job_ref?: string | null
+          draft_source_quote_id?: string | null
           estimated_hours?: number | null
           estimated_hours_overridden?: boolean | null
           id?: string
           insurer_specific?: string | null
+          is_draft?: boolean | null
           item_description?: string | null
           keyword?: string | null
           labour_per_unit?: number | null
           labour_rate_per_hour?: number | null
           materials_per_unit?: number | null
           pair_id?: string | null
+          price_updated_at?: string | null
+          pricing_tiers?: Json | null
+          site_notes?: string | null
           split_type?: string | null
           tenant_id?: string
           total_per_unit?: number | null
-          trade_rate_total?: number | null
           trade?: string | null
+          trade_rate_total?: number | null
           unit?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "scope_library_draft_source_quote_id_fkey"
+            columns: ["draft_source_quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scope_library_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -2941,6 +3339,85 @@ export type Database = {
           },
           {
             foreignKeyName: "scope_library_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scope_library_overrides: {
+        Row: {
+          created_at: string | null
+          id: string
+          import_source: string | null
+          imported_at: string | null
+          insurer_id: string
+          labour_per_unit: number | null
+          materials_per_unit: number | null
+          pricing_tiers: Json | null
+          scope_library_id: string
+          split_format: boolean | null
+          tenant_id: string
+          total_per_unit: number | null
+          updated_at: string | null
+          wording_labour: string | null
+          wording_materials: string | null
+          wording_single: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          import_source?: string | null
+          imported_at?: string | null
+          insurer_id: string
+          labour_per_unit?: number | null
+          materials_per_unit?: number | null
+          pricing_tiers?: Json | null
+          scope_library_id: string
+          split_format?: boolean | null
+          tenant_id: string
+          total_per_unit?: number | null
+          updated_at?: string | null
+          wording_labour?: string | null
+          wording_materials?: string | null
+          wording_single?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          import_source?: string | null
+          imported_at?: string | null
+          insurer_id?: string
+          labour_per_unit?: number | null
+          materials_per_unit?: number | null
+          pricing_tiers?: Json | null
+          scope_library_id?: string
+          split_format?: boolean | null
+          tenant_id?: string
+          total_per_unit?: number | null
+          updated_at?: string | null
+          wording_labour?: string | null
+          wording_materials?: string | null
+          wording_single?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_library_overrides_insurer_id_fkey"
+            columns: ["insurer_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_library_overrides_scope_library_id_fkey"
+            columns: ["scope_library_id"]
+            isOneToOne: false
+            referencedRelation: "scope_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_library_overrides_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -3091,6 +3568,7 @@ export type Database = {
       trades: {
         Row: {
           abn: string | null
+          accounting_contact_id: string | null
           address: string | null
           availability: string | null
           business_name: string | null
@@ -3120,6 +3598,7 @@ export type Database = {
         }
         Insert: {
           abn?: string | null
+          accounting_contact_id?: string | null
           address?: string | null
           availability?: string | null
           business_name?: string | null
@@ -3149,6 +3628,7 @@ export type Database = {
         }
         Update: {
           abn?: string | null
+          accounting_contact_id?: string | null
           address?: string | null
           availability?: string | null
           business_name?: string | null
@@ -3528,215 +4008,6 @@ export type Database = {
             columns: ["trade_id"]
             isOneToOne: false
             referencedRelation: "trades"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      brain_entries: {
-        Row: {
-          category: string
-          confidence: string
-          content: string
-          created_at: string
-          created_by: string | null
-          id: string
-          last_reviewed_at: string | null
-          persona: string | null
-          previous_content: string | null
-          prompt_keys: string[]
-          review_due_at: string | null
-          source_ref_id: string | null
-          source_ref_table: string | null
-          source_type: string
-          status: string
-          tags: string[]
-          tenant_id: string
-          times_applied: number
-          times_contradicted: number
-          times_validated: number
-          title: string
-          updated_at: string
-          updated_by: string | null
-          version: number
-        }
-        Insert: {
-          category: string
-          confidence?: string
-          content: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_reviewed_at?: string | null
-          persona?: string | null
-          previous_content?: string | null
-          prompt_keys?: string[]
-          review_due_at?: string | null
-          source_ref_id?: string | null
-          source_ref_table?: string | null
-          source_type: string
-          status?: string
-          tags?: string[]
-          tenant_id: string
-          times_applied?: number
-          times_contradicted?: number
-          times_validated?: number
-          title: string
-          updated_at?: string
-          updated_by?: string | null
-          version?: number
-        }
-        Update: {
-          category?: string
-          confidence?: string
-          content?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_reviewed_at?: string | null
-          persona?: string | null
-          previous_content?: string | null
-          prompt_keys?: string[]
-          review_due_at?: string | null
-          source_ref_id?: string | null
-          source_ref_table?: string | null
-          source_type?: string
-          status?: string
-          tags?: string[]
-          tenant_id?: string
-          times_applied?: number
-          times_contradicted?: number
-          times_validated?: number
-          title?: string
-          updated_at?: string
-          updated_by?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "brain_entries_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brain_entries_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brain_entries_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      playbooks: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playbooks_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      playbook_runs: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          error: string | null
-          field_snapshots: Json | null
-          id: string
-          job_id: string | null
-          playbook_id: string
-          status: string
-          step_log: Json | null
-          tenant_id: string
-          triggered_by: string | null
-          triggered_via: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          error?: string | null
-          field_snapshots?: Json | null
-          id?: string
-          job_id?: string | null
-          playbook_id: string
-          status?: string
-          step_log?: Json | null
-          tenant_id: string
-          triggered_by?: string | null
-          triggered_via?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          error?: string | null
-          field_snapshots?: Json | null
-          id?: string
-          job_id?: string | null
-          playbook_id?: string
-          status?: string
-          step_log?: Json | null
-          tenant_id?: string
-          triggered_by?: string | null
-          triggered_via?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playbook_runs_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playbook_runs_playbook_id_fkey"
-            columns: ["playbook_id"]
-            isOneToOne: false
-            referencedRelation: "playbooks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playbook_runs_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playbook_runs_triggered_by_fkey"
-            columns: ["triggered_by"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
