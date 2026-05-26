@@ -1,0 +1,84 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AccountingInvoice } from '../../types'
+import { qboFetch } from './client'
+
+interface QboInvoiceLine {
+  DetailType: 'SalesItemLineDetail'
+  Amount: number
+  Description: string
+  SalesItemLineDetail: {
+    ItemRef: {
+      value: string
+      name: string
+    }
+    Qty: number
+    UnitPrice: number
+  }
+}
+
+interface QboInvoicePayload {
+  CustomerRef: {
+    value: string
+  }
+  DocNumber: string
+  TxnDate: string
+  DueDate: string
+  CurrencyRef: {
+    value: string
+  }
+  Line: QboInvoiceLine[]
+}
+
+interface QboInvoiceCreateResponse {
+  Invoice: {
+    Id: string
+    DocNumber: string
+  }
+}
+
+export async function createQboInvoice(
+  supabase: SupabaseClient,
+  tenantId: string,
+  invoice: AccountingInvoice,
+  contactId: string
+): Promise<string> {
+  const lines: QboInvoiceLine[] = invoice.lineItems.map((item) => ({
+    DetailType: 'SalesItemLineDetail',
+    Amount: item.lineTotal,
+    Description: item.description,
+    SalesItemLineDetail: {
+      ItemRef: {
+        value: item.accountId,
+        name: item.accountName,
+      },
+      Qty: item.quantity,
+      UnitPrice: item.unitPrice,
+    },
+  }))
+
+  const payload: QboInvoicePayload = {
+    CustomerRef: {
+      value: contactId,
+    },
+    DocNumber: invoice.ircInvoiceRef,
+    TxnDate: invoice.issuedDate,
+    DueDate: invoice.dueDate,
+    CurrencyRef: {
+      value: invoice.currency,
+    },
+    Line: lines,
+  }
+
+  const res = await qboFetch(supabase, tenantId, '/invoice', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Failed to create QBO invoice: ${res.status} ${errBody}`)
+  }
+
+  const data = (await res.json()) as QboInvoiceCreateResponse
+  return data.Invoice.Id
+}

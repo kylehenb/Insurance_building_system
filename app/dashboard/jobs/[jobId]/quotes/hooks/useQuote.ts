@@ -24,6 +24,7 @@ export interface ScopeItem {
   rate_labour: number | null
   rate_materials: number | null
   rate_total: number | null
+  trade_rate_total: number | null
   line_total: number | null
   labour_total: number | null
   materials_total: number | null
@@ -104,6 +105,7 @@ function makeTempItem(
     rate_labour: null,
     rate_materials: null,
     rate_total: null,
+    trade_rate_total: null,
     line_total: null,
     labour_total: null,
     materials_total: null,

@@ -13,6 +13,7 @@ export interface LibraryItem {
   labour_per_unit: number | null
   materials_per_unit: number | null
   total_per_unit: number | null
+  trade_rate_total: number | null
   estimated_hours: number | null
 }
 

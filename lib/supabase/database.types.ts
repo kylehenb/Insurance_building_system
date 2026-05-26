@@ -2734,6 +2734,7 @@ export type Database = {
           rate_labour: number | null
           rate_materials: number | null
           rate_total: number | null
+          trade_rate_total: number | null
           room: string | null
           room_height: number | null
           room_length: number | null
@@ -2762,6 +2763,7 @@ export type Database = {
           rate_labour?: number | null
           rate_materials?: number | null
           rate_total?: number | null
+          trade_rate_total?: number | null
           room?: string | null
           room_height?: number | null
           room_length?: number | null
@@ -2790,6 +2792,7 @@ export type Database = {
           rate_labour?: number | null
           rate_materials?: number | null
           rate_total?: number | null
+          trade_rate_total?: number | null
           room?: string | null
           room_height?: number | null
           room_length?: number | null
@@ -2841,6 +2844,7 @@ export type Database = {
           split_type: string | null
           tenant_id: string
           total_per_unit: number | null
+          trade_rate_total: number | null
           trade: string | null
           unit: string | null
           updated_at: string | null
@@ -2860,6 +2864,7 @@ export type Database = {
           split_type?: string | null
           tenant_id: string
           total_per_unit?: number | null
+          trade_rate_total?: number | null
           trade?: string | null
           unit?: string | null
           updated_at?: string | null
@@ -2879,6 +2884,7 @@ export type Database = {
           split_type?: string | null
           tenant_id?: string
           total_per_unit?: number | null
+          trade_rate_total?: number | null
           trade?: string | null
           unit?: string | null
           updated_at?: string | null

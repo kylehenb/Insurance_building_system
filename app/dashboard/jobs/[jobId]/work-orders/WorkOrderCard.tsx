@@ -444,6 +444,29 @@ function CardDetail({
               </span>
             </div>
           ))}
+
+          {/* Trade Payment */}
+          {(() => {
+            const hasNullRate = wo.scopeItems.some(si => si.trade_rate_total == null)
+            const tradePayment = hasNullRate
+              ? null
+              : wo.scopeItems.reduce((s, si) => s + (si.trade_rate_total ?? 0) * (si.qty ?? 0), 0)
+            return (
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e8e4de' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#5a5650' }}>Trade Payment</span>
+                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>
+                    {tradePayment != null ? aud.format(tradePayment) : '—'}
+                  </span>
+                </div>
+                {hasNullRate && (
+                  <div style={{ fontSize: 10, color: '#b45309', marginTop: 3 }}>
+                    ⚠ Some items have no trade rate set
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>

@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/lib/supabase/database.types'
 import { useQuote } from '../hooks/useQuote'
 import type { ScopeItem } from '../hooks/useQuote'
 import { useScopeLibrary } from '../hooks/useScopeLibrary'
@@ -230,6 +232,7 @@ interface SortableRoomSectionProps {
   trades: Trade[]
   startingIndex: number
   tenantId: string
+  isAdmin?: boolean
 }
 
 function SortableRoomSection({
@@ -246,6 +249,7 @@ function SortableRoomSection({
   trades,
   startingIndex,
   tenantId,
+  isAdmin,
 }: SortableRoomSectionProps) {
   const {
     attributes,
@@ -279,6 +283,7 @@ function SortableRoomSection({
         trades={trades}
         startingIndex={startingIndex}
         tenantId={tenantId}
+        isAdmin={isAdmin}
         dragHandleListeners={isLocked ? undefined : (listeners as React.DOMAttributes<HTMLElement>)}
         dragHandleAttributes={isLocked ? undefined : (attributes as React.HTMLAttributes<HTMLElement>)}
       />
@@ -289,6 +294,25 @@ function SortableRoomSection({
 // ── Main editor ──────────────────────────────────────────────────────────────
 
 export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuoteUpdated }: QuoteEditorClientProps) {
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    const supabase = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .eq('tenant_id', tenantId)
+        .single()
+      if (profile?.role === 'admin') setIsAdmin(true)
+    })
+  }, [tenantId])
+
   const {
     quote,
     rooms,
@@ -600,6 +624,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
                     trades={trades}
                     startingIndex={startIndex}
                     tenantId={tenantId}
+                    isAdmin={isAdmin}
                   />
                 )
               })
@@ -630,6 +655,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               autoFocusName={true}
               startingIndex={totalItemsInRooms + 1}
               tenantId={tenantId}
+              isAdmin={isAdmin}
             />
           ))
         })()}
@@ -724,6 +750,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         onShowLockedDialog={setShowLockedDialog}
         isCloning={isCloning}
         onSetIsCloning={setIsCloning}
+        isAdmin={isAdmin}
       />
 
       {/* CSV Import Dialog */}

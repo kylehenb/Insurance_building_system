@@ -34,6 +34,7 @@ interface QuoteFooterProps {
   onShowLockedDialog?: (show: boolean) => void
   isCloning?: boolean
   onSetIsCloning?: (cloning: boolean) => void
+  isAdmin?: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -228,17 +229,30 @@ function NotesArea({
 
 // ── Trade cost summary ────────────────────────────────────────────────────────
 
-function TradeSummary({ items }: { items: ScopeItem[] }) {
-  type Row = { trade: string; count: number; subtotal: number }
+function marginColor(margin: number | null): string {
+  if (margin == null) return '#9e998f'
+  if (margin < 0) return '#dc2626'
+  if (margin === 0) return '#d97706'
+  return '#16a34a'
+}
+
+function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolean }) {
+  type Row = { trade: string; count: number; subtotal: number; tradeCost: number | null; hasNullRate: boolean }
   const rows: Row[] = []
   const map = new Map<string, Row>()
 
   for (const item of items) {
     const trade = item.trade || 'Unassigned'
-    if (!map.has(trade)) map.set(trade, { trade, count: 0, subtotal: 0 })
+    if (!map.has(trade)) map.set(trade, { trade, count: 0, subtotal: 0, tradeCost: 0, hasNullRate: false })
     const row = map.get(trade)!
     row.count++
     row.subtotal += item.line_total ?? 0
+    if (item.trade_rate_total == null) {
+      row.hasNullRate = true
+      row.tradeCost = null
+    } else if (row.tradeCost != null) {
+      row.tradeCost += item.trade_rate_total * (item.qty ?? 0)
+    }
   }
 
   map.forEach(r => rows.push(r))
@@ -252,69 +266,118 @@ function TradeSummary({ items }: { items: ScopeItem[] }) {
     )
   }
 
+  const totalInsurer = rows.reduce((s, r) => s + r.subtotal, 0)
+  const totalTradeCost = rows.some(r => r.tradeCost == null)
+    ? null
+    : rows.reduce((s, r) => s + (r.tradeCost ?? 0), 0)
+  const grossMargin = totalTradeCost != null ? totalInsurer - totalTradeCost : null
+  const grossMarginPct = grossMargin != null && totalInsurer > 0 ? (grossMargin / totalInsurer) * 100 : null
+
+  const headers = isAdmin
+    ? ['Trade', 'Items', 'Insurer Total', 'Trade Cost', 'Margin $']
+    : ['Trade', 'Items', 'Subtotal (ex GST)']
+
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          {['Trade', 'Items', 'Subtotal (ex GST)'].map(h => (
-            <th
-              key={h}
-              style={{
-                textAlign: h === 'Trade' ? 'left' : 'right',
-                padding: '3px 6px',
-                fontSize: 9,
-                fontWeight: 500,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#b0a89e',
-                fontFamily: 'DM Sans, sans-serif',
-                borderBottom: '1px solid #e8e4e0',
-              }}
-            >
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(r => (
-          <tr key={r.trade}>
-            <td
-              style={{
-                padding: '4px 6px',
-                fontSize: 12,
-                color: '#3a3530',
-                fontFamily: 'DM Sans, sans-serif',
-              }}
-            >
-              {r.trade}
-            </td>
-            <td
-              style={{
-                padding: '4px 6px',
-                fontSize: 12,
-                color: '#9e998f',
-                fontFamily: 'DM Sans, sans-serif',
-                textAlign: 'right',
-              }}
-            >
-              {r.count}
-            </td>
-            <td
-              style={{
-                padding: '4px 6px',
-                fontSize: 12,
-                color: '#3a3530',
-                fontFamily: 'DM Mono, monospace',
-                textAlign: 'right',
-              }}
-            >
-              {fmt(r.subtotal)}
-            </td>
+    <div>
+      {isAdmin && (
+        <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: '#9e998f',
+              fontFamily: 'DM Sans, sans-serif',
+              border: '1px dashed #d8d0c8',
+              borderRadius: 4,
+              padding: '2px 8px',
+            }}
+          >
+            Internal — not sent to insurer
+          </span>
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {headers.map(h => (
+              <th
+                key={h}
+                style={{
+                  textAlign: h === 'Trade' ? 'left' : 'right',
+                  padding: '3px 6px',
+                  fontSize: 9,
+                  fontWeight: 500,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: '#b0a89e',
+                  fontFamily: 'DM Sans, sans-serif',
+                  borderBottom: '1px solid #e8e4e0',
+                }}
+              >
+                {h}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map(r => {
+            const rowMargin = r.tradeCost != null ? r.subtotal - r.tradeCost : null
+            return (
+              <tr key={r.trade}>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>
+                  {r.trade}
+                </td>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: '#9e998f', fontFamily: 'DM Sans, sans-serif', textAlign: 'right' }}>
+                  {r.count}
+                </td>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                  {fmt(r.subtotal)}
+                </td>
+                {isAdmin && (
+                  <>
+                    <td style={{ padding: '4px 6px', fontSize: 12, color: '#9e998f', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                      {r.tradeCost != null ? fmt(r.tradeCost) : '—'}
+                    </td>
+                    <td style={{ padding: '4px 6px', fontSize: 12, fontFamily: 'DM Mono, monospace', textAlign: 'right', color: marginColor(rowMargin) }}>
+                      {rowMargin != null ? fmt(rowMargin) : '—'}
+                    </td>
+                  </>
+                )}
+              </tr>
+            )
+          })}
+        </tbody>
+        {isAdmin && (
+          <tfoot>
+            <tr style={{ borderTop: '2px solid #e8e4e0' }}>
+              <td colSpan={2} style={{ padding: '6px 6px', fontSize: 12, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>
+                Total
+              </td>
+              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                {fmt(totalInsurer)}
+              </td>
+              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                {totalTradeCost != null ? fmt(totalTradeCost) : '—'}
+              </td>
+              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, fontFamily: 'DM Mono, monospace', textAlign: 'right', color: marginColor(grossMargin) }}>
+                {grossMargin != null ? (
+                  <>
+                    {fmt(grossMargin)}
+                    {grossMarginPct != null && (
+                      <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600 }}>
+                        ({grossMarginPct.toFixed(1)}%)
+                      </span>
+                    )}
+                  </>
+                ) : '—'}
+              </td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
   )
 }
 
@@ -343,6 +406,7 @@ export function QuoteFooter({
   onShowLockedDialog,
   isCloning = false,
   onSetIsCloning,
+  isAdmin,
 }: QuoteFooterProps) {
   const [markupLocal, setMarkupLocal] = useState(
     quote.markup_pct != null ? (quote.markup_pct * 100).toFixed(0) : '20'
@@ -425,7 +489,7 @@ export function QuoteFooter({
             padding: '10px 12px',
           }}
         >
-          <TradeSummary items={items} />
+          <TradeSummary items={items} isAdmin={isAdmin} />
         </div>
       )}
 

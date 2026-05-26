@@ -76,6 +76,7 @@ export default function ScopeLibraryPage() {
     materials_per_unit: null,
     total_per_unit: null,
     estimated_hours: null,
+    trade_rate_total: null,
     has_lag: false,
     lag_days: null,
     lag_description: null,
@@ -118,6 +119,7 @@ export default function ScopeLibraryPage() {
       materials_per_unit: 120,
       total_per_unit: 100,
       estimated_hours: 100,
+      trade_rate_total: 100,
       actions: 80,
     };
   });
@@ -344,6 +346,7 @@ export default function ScopeLibraryPage() {
       materials_per_unit: null,
       total_per_unit: null,
       estimated_hours: null,
+      trade_rate_total: null,
       has_lag: false,
       lag_days: null,
       lag_description: null,
@@ -368,6 +371,7 @@ export default function ScopeLibraryPage() {
       materials_per_unit: item.materials_per_unit,
       total_per_unit: item.total_per_unit,
       estimated_hours: item.estimated_hours,
+      trade_rate_total: item.trade_rate_total,
       has_lag: (item as any).has_lag || false,
       lag_days: (item as any).lag_days || null,
       lag_description: (item as any).lag_description || null,
@@ -792,6 +796,17 @@ export default function ScopeLibraryPage() {
                     </th>
                     <th
                       scope="col"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      style={{ position: 'relative', width: columnWidths.trade_rate_total, borderRightWidth: '0.5px' }}
+                    >
+                      Trade Rate ($/unit)
+                      <div
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        onMouseDown={(e) => handleResizeStart('trade_rate_total', e)}
+                      />
+                    </th>
+                    <th
+                      scope="col"
                       className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
                       style={{ width: columnWidths.actions }}
                     >
@@ -916,6 +931,15 @@ export default function ScopeLibraryPage() {
                           defaultValue={item.estimated_hours || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'estimated_hours', e.target.value ? parseFloat(e.target.value) : null)}
                           className={`w-full rounded border px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${(item as any).estimated_hours_overridden ? 'bg-amber-50 border-amber-300' : 'bg-white border-[#e0dbd4]'}`}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.trade_rate_total }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={item.trade_rate_total || ''}
+                          onBlur={(e) => handleInlineEdit(item.id, 'trade_rate_total', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-right font-mono text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.actions }}>
@@ -1145,6 +1169,23 @@ export default function ScopeLibraryPage() {
                     ...formData,
                     estimated_hours: e.target.value ? parseFloat(e.target.value) : null
                   })}
+                  className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">
+                  Trade Rate ($/unit)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.trade_rate_total || ''}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    trade_rate_total: e.target.value ? parseFloat(e.target.value) : null
+                  })}
+                  placeholder="Internal — not sent to insurer"
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                 />
               </div>

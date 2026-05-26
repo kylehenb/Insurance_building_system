@@ -45,6 +45,7 @@ interface RoomSectionProps {
   trades: Trade[]
   autoFocusName?: boolean
   tenantId: string
+  isAdmin?: boolean
   dragHandleListeners?: React.DOMAttributes<HTMLElement>
   dragHandleAttributes?: React.HTMLAttributes<HTMLElement>
 }
@@ -246,6 +247,7 @@ function SortableLineItemRow({
   descRef,
   activeId,
   tenantId,
+  isAdmin,
 }: {
   item: ScopeItem
   itemIndex: number
@@ -258,6 +260,7 @@ function SortableLineItemRow({
   descRef: React.RefObject<HTMLTextAreaElement | null>
   activeId: string | null
   tenantId: string
+  isAdmin?: boolean
 }) {
   // Use the stable key (_key if available, otherwise id) for dnd-kit to prevent remounts
   const sortableId = item._key ?? item.id
@@ -313,6 +316,7 @@ function SortableLineItemRow({
         descRef={descRef}
         tenantId={tenantId}
         isDragging={isDragging}
+        isAdmin={isAdmin}
       />
     </div>
   )
@@ -321,19 +325,14 @@ function SortableLineItemRow({
 // ──────────────────────────────────────────────
 // Grid / column constants
 // ──────────────────────────────────────────────
-const GRID = '1% 43.4% 5% 5.8% 9% 9% 10.5% 5% 8.3% 5%'
+const GRID_BASE  = '1% 43.4% 5% 5.8% 9% 9% 10.5% 5% 8.3% 5%'
+const GRID_ADMIN = '1% 32% 4.5% 5.5% 8% 8% 9% 5% 7% 7% 8% 5%'
 
-const COL_HEADERS = [
-  '#',
-  'DESCRIPTION',
-  'QTY',
-  'UNIT',
-  'LABOUR',
-  'MATERIALS',
-  'TRADE',
-  'EST. HRS',
-  'LINE TOTAL',
-  '',
+const COL_HEADERS_BASE = [
+  '#', 'DESCRIPTION', 'QTY', 'UNIT', 'LABOUR', 'MATERIALS', 'TRADE', 'EST. HRS', 'LINE TOTAL', '',
+]
+const COL_HEADERS_ADMIN = [
+  '#', 'DESCRIPTION', 'QTY', 'UNIT', 'LABOUR', 'MATERIALS', 'TRADE', 'EST. HRS', 'LINE TOTAL', 'TRADE RATE', 'MARGIN $', '',
 ]
 
 // ──────────────────────────────────────────────
@@ -354,10 +353,13 @@ export function RoomSection({
   trades,
   autoFocusName,
   tenantId,
+  isAdmin,
   startingIndex,
   dragHandleListeners,
   dragHandleAttributes,
 }: RoomSectionProps & { startingIndex: number }) {
+  const GRID = isAdmin ? GRID_ADMIN : GRID_BASE
+  const COL_HEADERS = isAdmin ? COL_HEADERS_ADMIN : COL_HEADERS_BASE
   const [collapsed, setCollapsed] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState(name)
@@ -688,8 +690,8 @@ export function RoomSection({
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   color: '#b0a89e',
-                  textAlign: i === 0 ? 'center' : i > 0 && i < 9 ? 'right' : 'left',
-                  borderRight: i < 9 ? '1px solid #f0ece6' : 'none',
+                  textAlign: i === 0 ? 'center' : i === COL_HEADERS.length - 1 ? 'left' : 'right',
+                  borderRight: i < COL_HEADERS.length - 1 ? '1px solid #f0ece6' : 'none',
                 }}
               >
                 {h}
@@ -738,6 +740,7 @@ export function RoomSection({
                     descRef={dRef}
                     activeId={activeId}
                     tenantId={tenantId}
+                    isAdmin={isAdmin}
                   />
                 )
               })}
@@ -765,6 +768,7 @@ export function RoomSection({
                     isLocked
                     trades={trades}
                     tenantId={tenantId}
+                    isAdmin={isAdmin}
                   />
                 </div>
               ) : null}

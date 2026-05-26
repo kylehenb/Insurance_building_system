@@ -148,6 +148,7 @@ export default async function WorkOrderPrintPage({
         scope_library_id:         null,
         split_type:               null,
         estimated_hours:          null,
+        trade_rate_total:         null,
         created_at:               null,
       }))
       return { overrides, addedItems }

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('scope_library')
     .select(
-      'id, insurer_specific, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, total_per_unit, estimated_hours'
+      'id, insurer_specific, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, total_per_unit, trade_rate_total, estimated_hours'
     )
     .eq('tenant_id', tenantId)
 

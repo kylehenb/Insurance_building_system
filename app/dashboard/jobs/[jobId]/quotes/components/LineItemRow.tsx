@@ -27,6 +27,7 @@ interface LineItemRowProps {
   descRef?: React.RefObject<HTMLTextAreaElement | null>
   isDragging?: boolean
   tenantId: string
+  isAdmin?: boolean
 }
 
 function fmt(v: number) {
@@ -497,6 +498,7 @@ export function LineItemRow({
   descRef,
   isDragging,
   tenantId,
+  isAdmin,
 }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -536,6 +538,7 @@ export function LineItemRow({
         scope_library_id: lib.id,
         is_custom: false,
         library_writeback_approved: false,
+        trade_rate_total: lib.trade_rate_total ?? null,
       }
       setEstHours(lib.estimated_hours)
       setShowMenu(false)
@@ -587,7 +590,9 @@ export function LineItemRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1% 43.4% 5% 5.8% 9% 9% 10.5% 5% 8.3% 5%',
+          gridTemplateColumns: isAdmin
+            ? '1% 32% 4.5% 5.5% 8% 8% 9% 5% 7% 7% 8% 5%'
+            : '1% 43.4% 5% 5.8% 9% 9% 10.5% 5% 8.3% 5%',
           minHeight: 60,
         }}
       >
@@ -734,7 +739,7 @@ export function LineItemRow({
         </div>
 
         {/* Line Total */}
-        <div style={{ ...col, justifyContent: 'flex-end', borderRight: 'none' }}>
+        <div style={{ ...col, justifyContent: 'flex-end', borderRight: isAdmin ? '1px solid #f0ece6' : 'none' }}>
           {typeInfo && (
             <span
               style={{
@@ -762,6 +767,38 @@ export function LineItemRow({
             {hasLineTotal ? fmt(item.line_total!) : '—'}
           </span>
         </div>
+
+        {/* Trade Rate (admin only) */}
+        {isAdmin && (
+          <div style={{ ...col, justifyContent: 'flex-end' }}>
+            <NumericCell
+              value={item.trade_rate_total}
+              onChange={v => onUpdate(item.id, { trade_rate_total: v })}
+              disabled={isLocked}
+              onNavigateNext={onNavigateNext}
+            />
+          </div>
+        )}
+
+        {/* Line Margin $ (admin only) */}
+        {isAdmin && (() => {
+          const margin =
+            item.trade_rate_total != null && item.rate_total != null
+              ? (item.rate_total - item.trade_rate_total) * (item.qty ?? 0)
+              : null
+          const marginColor =
+            margin == null ? '#9e998f'
+            : margin < 0 ? '#dc2626'
+            : margin === 0 ? '#d97706'
+            : '#16a34a'
+          return (
+            <div style={{ ...col, justifyContent: 'flex-end', borderRight: 'none' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: marginColor }}>
+                {margin == null ? '—' : fmt(margin)}
+              </span>
+            </div>
+          )
+        })()}
 
         {/* Actions: ••• + × */}
         <div

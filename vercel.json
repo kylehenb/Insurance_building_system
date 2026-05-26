@@ -3,6 +3,10 @@
     {
       "path": "/api/gmail/poll",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/accounting/poll-payments",
+      "schedule": "0 22 * * *"
     }
   ]
 }

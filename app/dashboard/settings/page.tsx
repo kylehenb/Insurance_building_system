@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Inbox,
   FileText,
+  Link2,
 } from 'lucide-react'
 
 interface SettingsCard {
@@ -91,6 +92,15 @@ export default async function SettingsPage() {
     },
   ]
 
+  const integrationsCards: SettingsCard[] = [
+    {
+      name: 'Accounting & QuickBooks',
+      route: '/dashboard/settings/accounting',
+      description: 'Connect QuickBooks Online, map chart of accounts, and sync invoices and bills',
+      icon: <Link2 className="w-4 h-4" />,
+    },
+  ]
+
   const accountCards: SettingsCard[] = [
     {
       name: 'Tenant Settings',
@@ -145,7 +155,19 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      {/* Section 3 — Account & Tenancy */}
+      {/* Section 3 — Integrations */}
+      <div className="mb-8">
+        <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+          Integrations
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {integrationsCards.map((card) => (
+            <SettingsCard key={card.name} card={card} />
+          ))}
+        </div>
+      </div>
+
+      {/* Section 4 — Account & Tenancy */}
       <div className="mb-8">
         <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
           Account & Tenancy
