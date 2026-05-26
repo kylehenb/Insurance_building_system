@@ -469,7 +469,7 @@ function WORow({
   const isLocked = woIsSent(wo)
 
   const xeroStyle =
-    wo.invoice?.xero_sync_status === 'synced'
+    wo.invoice?.accounting_sync_status === 'synced'
       ? { bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Synced' }
       : { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' }
 
