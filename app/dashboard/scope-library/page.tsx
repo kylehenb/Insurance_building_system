@@ -860,9 +860,9 @@ export default function ScopeLibraryPage() {
                           className={`w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 ${isDraft ? 'pl-8' : ''}`}
                         >
                           <option value="">—</option>
-                          {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
-                            <option key={t.id} value={t.primary_trade}>
-                              {t.primary_trade}
+                          {uniqueTrades.map((trade) => (
+                            <option key={trade} value={trade}>
+                              {trade}
                             </option>
                           ))}
                         </select>
@@ -1070,9 +1070,9 @@ export default function ScopeLibraryPage() {
                   className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
                 >
                   <option value="">—</option>
-                  {trades.map((t: { id: string; primary_trade: string; trade_code: string | null }) => (
-                    <option key={t.id} value={t.primary_trade}>
-                      {t.primary_trade}
+                  {uniqueTrades.map((trade) => (
+                    <option key={trade} value={trade}>
+                      {trade}
                     </option>
                   ))}
                 </select>
