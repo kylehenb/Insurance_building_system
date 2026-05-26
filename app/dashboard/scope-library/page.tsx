@@ -222,8 +222,7 @@ export default function ScopeLibraryPage() {
       const { data } = await supabase
         .from('scope_library')
         .select('*')
-        .eq('tenant_id', tenantId!)
-        .order('created_at', { ascending: true });
+        .eq('tenant_id', tenantId!);
       setItems((data as ScopeLibraryRow[]) ?? []);
       setLoading(false);
     }
