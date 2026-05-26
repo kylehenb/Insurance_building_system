@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { ScopeItem } from '../hooks/useQuote'
-import type { LibraryItem } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
 import type { Trade } from '../hooks/useTrades'
 import { LineItemRow } from './LineItemRow'
 
@@ -40,7 +40,7 @@ interface RoomSectionProps {
   onRenameRoom: (oldName: string, newName: string) => void
   onDeleteRoom: (room: string) => void
   onReorderItems: (room: string, orderedIds: string[]) => void
-  search: (q: string) => LibraryItem[]
+  search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
   autoFocusName?: boolean
@@ -253,7 +253,7 @@ function SortableLineItemRow({
   itemIndex: number
   onUpdate: (itemId: string, changes: Record<string, unknown>) => void
   onDelete: (itemId: string) => void
-  search: (q: string) => LibraryItem[]
+  search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
   onNavigateNext: () => void

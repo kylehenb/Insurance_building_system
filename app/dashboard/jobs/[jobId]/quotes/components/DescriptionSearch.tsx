@@ -1,17 +1,22 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { LibraryItem } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
 
 interface DescriptionSearchProps {
   value: string
   onChange: (value: string) => void
-  onSelect: (item: LibraryItem) => void
+  onSelect: (item: ScopeSearchResult) => void
   onBlur?: () => void
   onNavigateNext?: () => void
-  search: (q: string) => LibraryItem[]
+  search: (q: string) => ScopeSearchResult[]
   disabled?: boolean
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
+}
+
+function fmtRate(rate: number | null): string | null {
+  if (rate == null) return null
+  return `$${Math.round(rate).toLocaleString('en-AU')}`
 }
 
 export function DescriptionSearch({
@@ -25,21 +30,19 @@ export function DescriptionSearch({
   inputRef,
 }: DescriptionSearchProps) {
   const [local, setLocal] = useState(value ?? '')
-  const [results, setResults] = useState<LibraryItem[]>([])
+  const [results, setResults] = useState<ScopeSearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [noMatch, setNoMatch] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const internalRef = useRef<HTMLTextAreaElement>(null)
   const textareaRef = inputRef ?? internalRef
-  const [matchedLibraryId, setMatchedLibraryId] = useState<string | null>(null)
   const isFocusedRef = useRef(false)
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const v = e.target.value
       setLocal(v)
-      setMatchedLibraryId(null)
 
       if (v.length >= 2) {
         const r = search(v)
@@ -57,9 +60,8 @@ export function DescriptionSearch({
   )
 
   const handleSelect = useCallback(
-    (item: LibraryItem) => {
+    (item: ScopeSearchResult) => {
       setLocal(item.item_description ?? '')
-      setMatchedLibraryId(item.id)
       setOpen(false)
       setResults([])
       setNoMatch(false)
@@ -92,7 +94,6 @@ export function DescriptionSearch({
           setActiveIdx(-1)
           return
         }
-        // Fall through for Enter with no active suggestion → navigate next
       }
 
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -130,19 +131,19 @@ export function DescriptionSearch({
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [])
 
-  // Sync local state with value prop when it changes from outside (e.g., library selection)
-  // But only when not focused to avoid interfering with typing
   useEffect(() => {
     if (!isFocusedRef.current) {
       setLocal(value ?? '')
     }
   }, [value])
 
-  // Auto-resize textarea
   const rows = Math.max(2, Math.ceil((value?.length ?? 0) / 52))
 
-  // Suppress unused var warning — matchedLibraryId used for future badge
-  void matchedLibraryId
+  const libraryResults = results.filter(r => r.result_type === 'library')
+  const referenceResults = results.filter(r => r.result_type === 'reference')
+
+  // Flat index → result mapping for keyboard navigation
+  const flatResults = results
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
@@ -171,7 +172,6 @@ export function DescriptionSearch({
         placeholder="Description…"
       />
 
-      {/* No-match hint shown inline below textarea */}
       {open && noMatch && (
         <div
           style={{
@@ -202,54 +202,147 @@ export function DescriptionSearch({
             overflowY: 'auto',
           }}
         >
-          {results.map((item, idx) => (
-            <button
-              key={item.id}
-              onMouseDown={e => {
-                e.preventDefault()
-                handleSelect(item)
-              }}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                padding: '8px 12px',
-                background: idx === activeIdx ? '#f5f2ee' : 'transparent',
-                border: 'none',
-                borderBottom: idx < results.length - 1 ? '1px solid #f5f2ee' : 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <div
+          {/* Library results */}
+          {libraryResults.map(item => {
+            const idx = flatResults.indexOf(item)
+            return (
+              <button
+                key={item.id}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  handleSelect(item)
+                }}
                 style={{
-                  fontSize: 12,
-                  color: '#3a3530',
-                  fontFamily: 'DM Sans, sans-serif',
-                  lineHeight: 1.4,
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  background: idx === activeIdx ? '#f5f2ee' : 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid #f5f2ee',
+                  cursor: 'pointer',
                 }}
               >
-                {item.item_description}
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#3a3530',
+                    fontFamily: 'DM Sans, sans-serif',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {item.item_description}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                  {item.trade && (
+                    <span style={{ fontSize: 11, color: '#9e998f' }}>{item.trade}</span>
+                  )}
+                  {item.insurer_specific && (
+                    <span style={{ fontSize: 11, color: '#c8b89a' }}>· {item.insurer_specific}</span>
+                  )}
+                  {item.rate_labour != null && (
+                    <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
+                      L: {item.rate_labour}
+                    </span>
+                  )}
+                  {item.rate_materials != null && (
+                    <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
+                      M: {item.rate_materials}
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+
+          {/* Reference results section */}
+          {referenceResults.length > 0 && (
+            <>
+              {libraryResults.length > 0 && (
+                <div style={{ height: 1, background: '#e0dbd4', margin: '0' }} />
+              )}
+              <div
+                style={{
+                  padding: '4px 12px 2px',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#b45309',
+                  fontFamily: 'DM Sans, sans-serif',
+                  background: '#fef9ec',
+                }}
+              >
+                Prior quotes
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                {item.trade && (
-                  <span style={{ fontSize: 11, color: '#9e998f' }}>{item.trade}</span>
-                )}
-                {item.insurer_specific && (
-                  <span style={{ fontSize: 11, color: '#c8b89a' }}>· {item.insurer_specific}</span>
-                )}
-                {item.labour_per_unit != null && (
-                  <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
-                    L: {item.labour_per_unit}
-                  </span>
-                )}
-                {item.materials_per_unit != null && (
-                  <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
-                    M: {item.materials_per_unit}
-                  </span>
-                )}
-              </div>
-            </button>
-          ))}
+              {referenceResults.map(item => {
+                const idx = flatResults.indexOf(item)
+                const metaParts = [
+                  item.quote_ref,
+                  fmtRate(item.rate_total),
+                  item.reference_date,
+                ].filter(Boolean)
+                return (
+                  <button
+                    key={item.id}
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      handleSelect(item)
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      background: idx === activeIdx ? '#fef3c7' : '#fef9ec',
+                      border: 'none',
+                      borderBottom: '1px solid #fde68a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#3a3530',
+                        fontFamily: 'DM Sans, sans-serif',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {item.item_description}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 3, alignItems: 'center' }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: '1px 6px',
+                          borderRadius: 10,
+                          background: '#fef9ec',
+                          color: '#b45309',
+                          border: '1px solid #f0d080',
+                          fontFamily: 'DM Sans, sans-serif',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Prior quote
+                      </span>
+                      {metaParts.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#9e998f',
+                            fontFamily: 'DM Mono, monospace',
+                          }}
+                        >
+                          {metaParts.join(' · ')}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

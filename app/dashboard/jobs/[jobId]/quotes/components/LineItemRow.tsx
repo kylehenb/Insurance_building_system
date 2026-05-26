@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { LibraryItem } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
 import type { ScopeItem, ItemType } from '../hooks/useQuote'
 import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
@@ -20,7 +20,7 @@ interface LineItemRowProps {
   itemIndex: number
   onUpdate: (itemId: string, changes: Record<string, unknown>) => void
   onDelete: (itemId: string) => void
-  search: (q: string) => LibraryItem[]
+  search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
   onNavigateNext?: () => void
@@ -388,7 +388,7 @@ function ItemTypeMenu({
       })
       const data = await response.json()
       if (response.ok) {
-        onUpdate(item.id, { scope_library_id: data.id, library_writeback_approved: true })
+        onUpdate(item.id, { scope_library_id: data.id, library_writeback_approved: true, is_reference: false })
         onClose()
       } else {
         alert(data.error || 'Failed to save to scope library')
@@ -440,16 +440,39 @@ function ItemTypeMenu({
       // Prevent drag activation from menu
       onPointerDown={e => e.stopPropagation()}
     >
-      {/* Save to scope library */}
+      {/* Save to scope library / Save as price reference (mutually exclusive) */}
       {item.is_custom && !item.scope_library_id && (
         <>
-          <button
-            onClick={handleSaveToScopeLibrary}
-            disabled={isSaving}
-            style={menuItemStyle(false)}
-          >
-            {isSaving ? 'Saving...' : 'Save to scope library'}
-          </button>
+          {!item.is_reference && (
+            <button
+              onClick={handleSaveToScopeLibrary}
+              disabled={isSaving}
+              style={menuItemStyle(false)}
+            >
+              {isSaving ? 'Saving...' : 'Save to scope library'}
+            </button>
+          )}
+          {!item.is_reference ? (
+            <button
+              onClick={() => {
+                onUpdate(item.id, { is_reference: true })
+                onClose()
+              }}
+              style={menuItemStyle(false)}
+            >
+              Save as price reference
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                onUpdate(item.id, { is_reference: false })
+                onClose()
+              }}
+              style={{ ...menuItemStyle(true), color: '#b45309' }}
+            >
+              ✓ Price reference — remove
+            </button>
+          )}
           <div style={{ height: 1, background: '#f0ece6', margin: '3px 0' }} />
         </>
       )}
@@ -527,20 +550,40 @@ export function LineItemRow({
   const leftBorderColor = typeInfo?.border ?? 'transparent'
 
   const handleLibrarySelect = useCallback(
-    (lib: LibraryItem) => {
-      const changes: Record<string, unknown> = {
-        item_description: lib.item_description ?? '',
-        rate_labour: lib.labour_per_unit,
-        rate_materials: lib.materials_per_unit,
-        trade: lib.trade ?? '',
-        keyword: lib.keyword ?? '',
-        unit: lib.unit ?? '',
-        scope_library_id: lib.id,
-        is_custom: false,
-        library_writeback_approved: false,
-        trade_rate_total: lib.trade_rate_total ?? null,
+    (result: ScopeSearchResult) => {
+      let changes: Record<string, unknown>
+      if (result.result_type === 'library') {
+        changes = {
+          item_description: result.item_description ?? '',
+          rate_labour: result.rate_labour,
+          rate_materials: result.rate_materials,
+          trade: result.trade ?? '',
+          keyword: result.keyword ?? '',
+          unit: result.unit ?? '',
+          scope_library_id: result.id,
+          is_custom: false,
+          is_reference: false,
+          library_writeback_approved: false,
+          trade_rate_total: result.trade_rate_total ?? null,
+        }
+        setEstHours(result.estimated_hours)
+      } else {
+        // Reference item — copy rates but keep as a fresh custom item
+        changes = {
+          item_description: result.item_description ?? '',
+          rate_labour: result.rate_labour,
+          rate_materials: result.rate_materials,
+          trade: result.trade ?? '',
+          keyword: '',
+          unit: result.unit ?? '',
+          scope_library_id: null,
+          is_custom: true,
+          is_reference: false,
+          library_writeback_approved: false,
+          trade_rate_total: null,
+        }
+        setEstHours(null)
       }
-      setEstHours(lib.estimated_hours)
       setShowMenu(false)
       onUpdate(item.id, changes)
     },

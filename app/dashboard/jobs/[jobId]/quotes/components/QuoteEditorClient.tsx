@@ -7,7 +7,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { useQuote } from '../hooks/useQuote'
 import type { ScopeItem } from '../hooks/useQuote'
 import { useScopeLibrary } from '../hooks/useScopeLibrary'
-import type { LibraryItem } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
 import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
@@ -228,7 +228,7 @@ interface SortableRoomSectionProps {
   onRenameRoom: (oldName: string, newName: string) => void
   onDeleteRoom: (roomName: string) => void
   onReorderItems: (room: string, orderedIds: string[]) => void
-  search: (q: string) => LibraryItem[]
+  search: (q: string) => ScopeSearchResult[]
   trades: Trade[]
   startingIndex: number
   tenantId: string

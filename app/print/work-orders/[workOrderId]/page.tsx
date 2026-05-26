@@ -140,6 +140,7 @@ export default async function WorkOrderPrintPage({
         room_height:              null,
         sort_order:               null,
         is_custom:                true,
+        is_reference:             null,
         approval_status:          null,
         item_type:                null,
         keyword:                  null,

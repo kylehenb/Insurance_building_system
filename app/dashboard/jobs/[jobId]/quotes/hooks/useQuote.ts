@@ -32,6 +32,7 @@ export interface ScopeItem {
   item_type: ItemType
   approval_status: string
   is_custom: boolean
+  is_reference: boolean
   library_writeback_approved: boolean
   preliminary_formula: string | null
   sort_order: number
@@ -113,6 +114,7 @@ function makeTempItem(
     item_type: null,
     approval_status: 'pending',
     is_custom: true,
+    is_reference: false,
     library_writeback_approved: false,
     preliminary_formula: null,
     sort_order: sortHint,
