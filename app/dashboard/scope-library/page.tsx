@@ -120,7 +120,7 @@ export default function ScopeLibraryPage() {
       total_per_unit: 100,
       estimated_hours: 100,
       trade_rate_total: 100,
-      actions: 80,
+      actions: 100,
     };
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
@@ -222,7 +222,8 @@ export default function ScopeLibraryPage() {
       const { data } = await supabase
         .from('scope_library')
         .select('*')
-        .eq('tenant_id', tenantId!);
+        .eq('tenant_id', tenantId!)
+        .order('created_at', { ascending: true });
       setItems((data as ScopeLibraryRow[]) ?? []);
       setLoading(false);
     }
@@ -317,8 +318,7 @@ export default function ScopeLibraryPage() {
         }
       });
     } else {
-      // Maintain stable order by id when no sort column is selected
-      filtered = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
+      filtered = [...filtered];
     }
 
     setFilteredItems(filtered);
@@ -388,6 +388,30 @@ export default function ScopeLibraryPage() {
     setShowDeleteConfirm(true);
   };
 
+  const handleDuplicate = async (item: ScopeLibraryRow) => {
+    if (!tenantId) return;
+
+    const { id, created_at, updated_at, ...rest } = item as any;
+
+    const { data: inserted } = await supabase
+      .from('scope_library')
+      .insert({
+        ...rest,
+        tenant_id: tenantId,
+        approval_status: 'pending',
+        updated_at: new Date().toISOString(),
+      } as ScopeLibraryInsert)
+      .select()
+      .single();
+
+    if (inserted) {
+      const idx = items.findIndex(i => i.id === item.id);
+      const newItems = [...items];
+      newItems.splice(idx + 1, 0, inserted as ScopeLibraryRow);
+      setItems(newItems);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!itemToDelete || !tenantId || !userId) return;
 
@@ -405,11 +429,11 @@ export default function ScopeLibraryPage() {
     // Delete the item
     await supabase.from('scope_library').delete().eq('id', itemToDelete.id);
 
-    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
     setItems((data as ScopeLibraryRow[]) ?? []);
 
     setShowDeleteConfirm(false);
@@ -451,11 +475,11 @@ export default function ScopeLibraryPage() {
       } as ScopeLibraryInsert);
     }
 
-    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
     setItems((data as ScopeLibraryRow[]) ?? []);
 
     setShowModal(false);
@@ -473,11 +497,11 @@ export default function ScopeLibraryPage() {
 
     await supabase.from('scope_library').insert(records);
 
-    // Refresh - don't apply database ordering, let client-side sort handle it
     const { data } = await supabase
       .from('scope_library')
       .select('*')
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
     setItems((data as ScopeLibraryRow[]) ?? []);
   };
 
@@ -955,6 +979,15 @@ export default function ScopeLibraryPage() {
                               </svg>
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDuplicate(item)}
+                            className="text-[#1a1a1a]/60 hover:text-[#c9a96e] transition-colors"
+                            title="Duplicate"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
                           <button
                             onClick={() => handleDelete(item)}
                             className="text-[#1a1a1a]/60 hover:text-red-600 transition-colors"
