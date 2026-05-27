@@ -39,7 +39,8 @@ export function generateInvoiceHtml(params: {
   const issueDateDisplay = formatDate(invoice.issued_date || invoice.created_at)
   const baseDate = invoice.issued_date || invoice.created_at || ''
   // Use tenant-configured payment terms, defaulting to 14 for standard invoices and 0 for excess
-  const paymentDays = invoice.invoice_type === 'excess'
+  const isExcess = invoice.invoice_type === 'excess' || (invoice.invoice_type === 'repair' && invoice.gst_treatment === 'inclusive')
+  const paymentDays = isExcess
     ? (tenant.excess_payment_terms ?? 0)
     : (tenant.invoice_payment_terms ?? 14)
   const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + paymentDays * 24 * 60 * 60 * 1000).toISOString())
@@ -87,7 +88,7 @@ export function generateInvoiceHtml(params: {
         <div style="display:flex;align-items:center;gap:4px;">
           <span style="font-size:11px;color:#9e998f;">Invoice to: </span>
           <span style="font-size:14px;font-weight:600;color:#1a1a1a;">
-            ${invoice.invoice_type === 'excess' ? (job.insured_name || '—') : (job.invoice_to || '—')}</span>
+            ${isExcess ? (job.insured_name || '—') : (job.invoice_to || '—')}</span>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">

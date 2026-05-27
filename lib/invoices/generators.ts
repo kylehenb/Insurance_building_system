@@ -63,7 +63,7 @@ export function generateExcessInvoice(params: {
     invoiceData: {
       tenant_id: params.tenantId,
       job_id: params.jobId,
-      invoice_type: 'repair',
+      invoice_type: 'excess',
       direction: 'outbound',
       gst_treatment: 'inclusive',
       amount_ex_gst: amountExGst,
