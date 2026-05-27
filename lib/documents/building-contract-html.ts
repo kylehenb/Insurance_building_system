@@ -495,7 +495,7 @@ export function generateBuildingContractHtml(params: {
       <tr><td colspan="2" class="section-header">Item 2 - CONTRACTOR</td></tr>
       <tr><td class="label">CONTRACTOR NAME:</td><td class="value">Insurance Repair Co Pty Ltd</td></tr>
       <tr><td class="label">ABN No:</td><td class="value">12 686 067 881 &nbsp;&nbsp; Licence No: BC105884</td></tr>
-      <tr><td class="label">Postal Address:</td><td class="value">Level 28, 140 St Georges Terrace, Perth, WA 6000</td></tr>
+      <tr><td class="label">Postal Address:</td><td class="value">20 Roche Road Duncraig</td></tr>
       <tr><td class="label">Phone:</td><td class="value">0431 132 077</td></tr>
       <tr><td class="label">Email:</td><td class="value">office@insurancerepairco.com.au</td></tr>
     </table>
@@ -631,7 +631,6 @@ export function generateBuildingContractHtml(params: {
         SCOPE OF WORKS (Approved by Insurer)
       </div>
 
-      {/* Table header */}
       <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
         <thead>
           <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
@@ -644,7 +643,6 @@ export function generateBuildingContractHtml(params: {
         </thead>
       </table>
 
-      {/* Rooms and items */}
       ${scopeRowsHtml}
     </div>
 
