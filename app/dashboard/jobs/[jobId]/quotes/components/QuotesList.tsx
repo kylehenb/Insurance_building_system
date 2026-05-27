@@ -2779,6 +2779,34 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           </span>
                         </button>
                       )}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setMenuDropdownId(null)
+                          window.open(`/print/quotes/${q.id}/tcc`, '_blank')
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: '#3a3530',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+                      >
+                        <span style={{ fontSize: 10, color: '#c8b89a' }}>☎️</span>
+                        <span>Telephone Clearance Certificate</span>
+                      </button>
                     </div>
                   )}
                 </div>
