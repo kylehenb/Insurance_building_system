@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     // Fetch approved quote amount
     const { data: quote } = await supabase
       .from('quotes')
-      .select('approved_amount, gst_pct')
+      .select('approved_amount, total_amount, gst_pct')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .eq('status', 'approved')
@@ -166,7 +166,8 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    const approvedQuoteAmountIncGst = quote?.approved_amount ?? 0
+    // Fall back to total_amount for quotes approved before approved_amount was auto-set
+    const approvedQuoteAmountIncGst = quote?.approved_amount ?? quote?.total_amount ?? 0
     const gstPct = quote?.gst_pct ?? DEFAULT_GST_PCT
 
     // Sum of all non-voided outbound invoices for this job

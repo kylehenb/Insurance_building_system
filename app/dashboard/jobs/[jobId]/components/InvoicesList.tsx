@@ -117,7 +117,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
   const activeInvoices = invoices.filter(i => i.status !== 'voided')
   const totalInvoiced = activeInvoices.reduce((s, i) => s + (i.amount_inc_gst ?? 0), 0)
-  const approvedAmount = approvedQuote?.approved_amount ?? 0
+  const approvedAmount = approvedQuote?.approved_amount ?? approvedQuote?.total_amount ?? 0
   const balance = approvedAmount - totalInvoiced
 
   // ── Check which invoice types already exist ────────────────────────────────

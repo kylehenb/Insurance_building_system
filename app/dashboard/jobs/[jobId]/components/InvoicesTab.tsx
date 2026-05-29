@@ -19,7 +19,7 @@ interface JobMeta {
 }
 
 interface ReportRow { id: string; report_type: string }
-interface QuoteRow { approved_amount: number | null; gst_pct: number | null }
+interface QuoteRow { approved_amount: number | null; total_amount: number | null; gst_pct: number | null }
 
 export interface JobContext {
   job: JobMeta
@@ -81,7 +81,7 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         .maybeSingle(),
       supabase
         .from('quotes')
-        .select('approved_amount, gst_pct')
+        .select('approved_amount, total_amount, gst_pct')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .eq('status', 'approved')

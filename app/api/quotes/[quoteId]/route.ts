@@ -218,11 +218,40 @@ export async function PATCH(
   if ('status' in safeUpdates && data.job_id) {
     await recomputeAndSaveStage(data.job_id)
 
-    // Auto-create unplaced work orders when quote is approved
+    const newStatus = safeUpdates.status as string
     const APPROVED_STATUSES = ['approved', 'partially_approved']
 
-    if (APPROVED_STATUSES.includes(safeUpdates.status as string) && data.job_id) {
+    if (APPROVED_STATUSES.includes(newStatus)) {
       await createUnplacedWorkOrdersFromQuote(data.id, data.job_id, data.tenant_id ?? (tenantId as string))
+
+      // Auto-set approved_amount if not already set
+      if (!data.approved_amount) {
+        if (newStatus === 'approved') {
+          await supabase
+            .from('quotes')
+            .update({ approved_amount: data.total_amount })
+            .eq('id', quoteId)
+            .eq('tenant_id', tenantId as string)
+        } else if (newStatus === 'partially_approved') {
+          const { data: approvedItems } = await supabase
+            .from('scope_items')
+            .select('line_total')
+            .eq('quote_id', quoteId)
+            .eq('tenant_id', tenantId as string)
+            .eq('approval_status', 'approved')
+
+          const subtotal = (approvedItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+          const markupPct = data.markup_pct ?? 0
+          const gstPct = data.gst_pct ?? 0.10
+          const approvedAmount = Math.round(subtotal * (1 + markupPct) * (1 + gstPct) * 100) / 100
+
+          await supabase
+            .from('quotes')
+            .update({ approved_amount: approvedAmount })
+            .eq('id', quoteId)
+            .eq('tenant_id', tenantId as string)
+        }
+      }
     }
   }
 
