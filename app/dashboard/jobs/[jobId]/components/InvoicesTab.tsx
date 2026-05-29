@@ -19,7 +19,7 @@ interface JobMeta {
 }
 
 interface ReportRow { id: string; report_type: string }
-interface QuoteRow { approved_amount: number | null; total_amount: number | null; gst_pct: number | null }
+interface QuoteRow { approved_amount: number | null; total_amount: number; gst_pct: number | null }
 
 export interface JobContext {
   job: JobMeta
@@ -79,23 +79,17 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         .eq('report_type', 'leak_detection')
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from('quotes')
-        .select('approved_amount, total_amount, gst_pct')
-        .eq('job_id', jobId)
-        .eq('tenant_id', tenantId)
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      fetch(`/api/quotes?jobId=${encodeURIComponent(jobId)}&tenantId=${encodeURIComponent(tenantId)}`).then(r => r.ok ? r.json() : []),
       supabase
         .from('invoices')
         .select('invoice_type')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .neq('status', 'voided'),
-    ]).then(([jobRes, barRes, makeSafeRes, roofRes, leakRes, quoteRes, invoicesRes]) => {
+    ]).then(([jobRes, barRes, makeSafeRes, roofRes, leakRes, quotesData, invoicesRes]) => {
       if (!jobRes.data) return
+      const quotes: any[] = Array.isArray(quotesData) ? quotesData : []
+      const approvedQuote = quotes.find((q: any) => q.status === 'approved' || q.status === 'partially_approved') ?? null
       const invoicedTypes = (invoicesRes.data ?? []).map((i: any) => i.invoice_type)
       setCtx({
         job: jobRes.data as JobMeta,
@@ -103,7 +97,7 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         makeSafeReport: makeSafeRes.data as ReportRow | null,
         roofReport: roofRes.data as ReportRow | null,
         leakDetectionReport: leakRes.data as ReportRow | null,
-        approvedQuote: quoteRes.data as QuoteRow | null,
+        approvedQuote: approvedQuote as QuoteRow | null,
         invoicedReportTypes: invoicedTypes,
       })
     })

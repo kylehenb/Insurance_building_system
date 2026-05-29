@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     // Fetch approved quote amount
     const { data: quote } = await supabase
       .from('quotes')
-      .select('approved_amount, total_amount, gst_pct')
+      .select('id, approved_amount, gst_pct, markup_pct')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .eq('status', 'approved')
@@ -166,9 +166,20 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    // Fall back to total_amount for quotes approved before approved_amount was auto-set
-    const approvedQuoteAmountIncGst = quote?.approved_amount ?? quote?.total_amount ?? 0
+    let approvedQuoteAmountIncGst = quote?.approved_amount ?? 0
     const gstPct = quote?.gst_pct ?? DEFAULT_GST_PCT
+
+    // For quotes approved before approved_amount was auto-set, compute from scope items
+    if (!approvedQuoteAmountIncGst && quote?.id) {
+      const { data: scopeItems } = await supabase
+        .from('scope_items')
+        .select('line_total')
+        .eq('quote_id', quote.id)
+        .eq('tenant_id', tenantId)
+      const subtotal = (scopeItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+      const markupPct = quote.markup_pct ?? 0
+      approvedQuoteAmountIncGst = Math.round(subtotal * (1 + markupPct) * (1 + gstPct) * 100) / 100
+    }
 
     // Sum of all non-voided outbound invoices for this job
     const { data: priorInvoices } = await supabase
