@@ -298,37 +298,18 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
       {/* HEADER */}
       <div className="fa-header">
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="fa-logo"><span>MC</span></div>
-          <div className="fa-job-pill">{initialData.jobNumber ?? '—'}</div>
+        <a href="/midcity" className="mc-home-btn">← Home</a>
+        <div className="mc-hdr-body">
+          <div className="mc-hdr-address">{initialData.address ?? '—'}</div>
+          <div className="mc-hdr-sub">
+            {[
+              initialData.jobNumber,
+              initialData.lossType,
+              initialData.dateOfLoss ? formatDate(initialData.dateOfLoss) : null,
+            ].filter(Boolean).join(' · ')}
+          </div>
         </div>
-        <div className="fa-hdr-right">
-          Midcity · {initialData.jobNumber ?? '—'}
-          <br />
-          <span style={{ fontSize: 9 }}>
-            {initialData.inspectionRef ?? initialData.inspectionId} · {formatDate(initialData.scheduledDate)}
-          </span>
-          {saveStatus && <div className="fa-save-indicator">{saveStatus}</div>}
-        </div>
-      </div>
-
-      {/* JOB BANNER */}
-      <div className="fa-banner">
-        <div className="fa-bgrid">
-          <div className="fa-bf full"><label>Property</label><span>{initialData.address ?? '—'}</span></div>
-          <div className="fa-bf"><label>Client</label><span>Midcity</span></div>
-          <div className="fa-bf"><label>Inspector</label><span>{initialData.inspector ?? '—'}</span></div>
-          {initialData.scheduledTime && (
-            <div className="fa-bf"><label>Time</label><span>{initialData.scheduledTime}</span></div>
-          )}
-          {initialData.lossType && (
-            <div className="fa-bf"><label>Loss Type</label><span>{initialData.lossType}</span></div>
-          )}
-          {initialData.dateOfLoss && (
-            <div className="fa-bf"><label>Date of Loss</label><span>{formatDate(initialData.dateOfLoss)}</span></div>
-          )}
-        </div>
-        <div className="fa-type-badge">Midcity</div>
+        {saveStatus && <div className="fa-save-indicator">{saveStatus}</div>}
       </div>
 
       {/* ── 01 SITE DETAILS ───────────────────────────────────────────────── */}
