@@ -33,6 +33,66 @@ interface ScopeItem { id: string; text: string }
 interface ScopeRoom { id: string; name: string; l: string; w: string; h: string; items: ScopeItem[] }
 interface PhotoEntry { id: string; file: File; previewUrl: string; label: string; processing: boolean }
 
+interface RoofReportData {
+  // Assessment Report Details
+  attendanceDate: string; timeAttended: string; rooferName: string
+  rooferQualification: string; rooferMetWith: string; timeOnSite: string; scopeOfAssessment: string
+  // Property Details
+  propertyAge: string; wallConstruction: string; propertyType: string
+  propertyCondition: string; numberOfStoreys: string
+  // Roof Details
+  roofType: string; roofGeneralCondition: string; roofPitch: string
+  numberOfPenetrations: string; roofInsulationType: string
+  solarPV: string; roofMountedSolarHWS: string; numberOfSkylights: string
+  skylightFlashingsWatertight: string; skylightFlashingsNotes: string
+  guttersCompliant: string; guttersNotes: string
+  downpipesCompliant: string; corrosionIronizedWater: string; downpipeSize: string
+  roofStructureTiedDown: string; battenSizeCompliant: string; trussRafterCompliant: string
+  // Cause of Damage
+  claimType: string; specificCause: string
+  // Client Discussion
+  clientDiscussion: string
+  // Roof Conditions
+  propertyConditionsContributed: string; propertyConditionsDetails: string
+  damageWithoutConditions: string; damageWithoutConditionsDetails: string
+  customerAwareOfConditions: string; customerAwareDetails: string
+  otherPropertyConditionIssues: string; otherPropertyConditionDetails: string
+  maintenanceRepairsRequired: string; requiredMaintenanceDetails: string; recommendedMaintenanceDetails: string
+  conditionsPreventRepairs: string; conditionsPreventRepairsDetails: string
+  previousRepairs: string; previousRepairsDetails: string
+  buildingCodeViolations: string; buildingCodeViolationsDetails: string
+  // Access and Safety
+  accessConcerns: string; healthSafetyConcerns: string
+  // Additional Information
+  makeSafeCompleted: string; makeSafeCompletedDetails: string; makeSafeRequired: string
+}
+
+function emptyRoofReport(): RoofReportData {
+  return {
+    attendanceDate: '', timeAttended: '', rooferName: '', rooferQualification: '',
+    rooferMetWith: '', timeOnSite: '', scopeOfAssessment: '',
+    propertyAge: '', wallConstruction: '', propertyType: '', propertyCondition: '', numberOfStoreys: '',
+    roofType: '', roofGeneralCondition: '', roofPitch: '', numberOfPenetrations: '',
+    roofInsulationType: '', solarPV: '', roofMountedSolarHWS: '', numberOfSkylights: '',
+    skylightFlashingsWatertight: '', skylightFlashingsNotes: '',
+    guttersCompliant: '', guttersNotes: '',
+    downpipesCompliant: '', corrosionIronizedWater: '', downpipeSize: '',
+    roofStructureTiedDown: '', battenSizeCompliant: '', trussRafterCompliant: '',
+    claimType: '', specificCause: '',
+    clientDiscussion: '',
+    propertyConditionsContributed: '', propertyConditionsDetails: '',
+    damageWithoutConditions: '', damageWithoutConditionsDetails: '',
+    customerAwareOfConditions: '', customerAwareDetails: '',
+    otherPropertyConditionIssues: '', otherPropertyConditionDetails: '',
+    maintenanceRepairsRequired: '', requiredMaintenanceDetails: '', recommendedMaintenanceDetails: '',
+    conditionsPreventRepairs: '', conditionsPreventRepairsDetails: '',
+    previousRepairs: '', previousRepairsDetails: '',
+    buildingCodeViolations: '', buildingCodeViolationsDetails: '',
+    accessConcerns: '', healthSafetyConcerns: '',
+    makeSafeCompleted: '', makeSafeCompletedDetails: '', makeSafeRequired: '',
+  }
+}
+
 function uid() { return Math.random().toString(36).slice(2) }
 
 async function processPhotoForUpload(file: File): Promise<File> {
@@ -107,6 +167,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [roofAiLabelDone, setRoofAiLabelDone] = useState(false)
   const roofPhotoInputRef = useRef<HTMLInputElement>(null)
 
+  // ─── Roof Report structured fields ───────────────────────────────────────
+  const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
+  const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
+  const [roofReportGenerating, setRoofReportGenerating] = useState(false)
+
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
   const [barExporting, setBarExporting] = useState(false)
@@ -142,7 +207,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     rawReportNotes,
     msWorksCompleted, msTempFixes, msHours,
     roofRawNotes, roofPhotoContext,
-  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext])
+    roofReportFields, roofFieldsOpen,
+  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -180,6 +246,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.msHours) setMsHours(d.msHours as string)
     if (d.roofRawNotes) setRoofRawNotes(d.roofRawNotes as string)
     if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
+    if (d.roofReportFields) setRoofReportFields(d.roofReportFields as RoofReportData)
+    if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
@@ -266,7 +334,37 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     setRoofAiLabeling(false)
   }
 
-  // ─── Export handlers (wired up separately) ────────────────────────────────
+  // ─── Roof report field helper ─────────────────────────────────────────────
+  const setRoofField = (key: keyof RoofReportData, value: string) => {
+    setRoofReportFields(prev => ({ ...prev, [key]: value }))
+    armDraft()
+  }
+
+  // ─── Generate Roof Report from raw notes ──────────────────────────────────
+  const generateRoofReport = async () => {
+    if (!roofRawNotes.trim()) { alert('Add raw notes first.'); return }
+    setRoofReportGenerating(true)
+    try {
+      const res = await fetch('/api/midcity/generate-roof-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawNotes: roofRawNotes, inspectorName: initialData.inspector }),
+      })
+      const data = await res.json()
+      if (data.ok && data.reportData) {
+        setRoofReportFields(prev => ({ ...prev, ...data.reportData }))
+        setRoofFieldsOpen(true)
+        armDraft()
+      } else {
+        alert('Failed to generate report. Please try again.')
+      }
+    } catch {
+      alert('Error generating report. Check your connection.')
+    }
+    setRoofReportGenerating(false)
+  }
+
+  // ─── Export handlers ──────────────────────────────────────────────────────
   const handleExportBAR = async () => {
     setBarExporting(true)
     // TODO: wire up BAR export
@@ -281,7 +379,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   const handleExportRoof = async () => {
     setRoofExporting(true)
-    // TODO: wire up Roof Report export — upload roof photos first
     for (const photo of roofPhotos) {
       const fd = new FormData()
       fd.append('file', photo.file)
@@ -556,7 +653,368 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         value={roofRawNotes}
                         onChange={e => { setRoofRawNotes(e.target.value); armDraft() }}
                       />
+                      <button
+                        className={`fa-ai-label-btn${roofReportGenerating ? '' : ''}`}
+                        onClick={generateRoofReport}
+                        disabled={roofReportGenerating}
+                        style={{ marginTop: 10 }}
+                      >
+                        {roofReportGenerating
+                          ? <><span className="fa-spinner" /> Generating Report…</>
+                          : '✦ Generate Roof Report'}
+                      </button>
                     </div>
+                  </div>
+
+                  {/* ── ROOF REPORT FIELDS ACCORDION ── */}
+                  <div className="mc-rrf-accordion">
+                    <div className="mc-rrf-head" onClick={() => setRoofFieldsOpen(p => !p)}>
+                      <span className="mc-rrf-head-label">📋 Roof Report Fields</span>
+                      <span className="mc-rrf-arrow">{roofFieldsOpen ? '▾' : '›'}</span>
+                    </div>
+                    {roofFieldsOpen && (
+                      <div className="mc-rrf-body">
+
+                        {/* ── Assessment Report Details ── */}
+                        <div className="mc-rrf-sub">Assessment Report Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Attendance Date</label>
+                          <input className="fa-input" type="text" placeholder="DD.MM.YYYY" value={roofReportFields.attendanceDate} onChange={e => setRoofField('attendanceDate', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Time Attended</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 11:00 AWST" value={roofReportFields.timeAttended} onChange={e => setRoofField('timeAttended', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roofer's Name</label>
+                          <input className="fa-input" type="text" value={roofReportFields.rooferName} onChange={e => setRoofField('rooferName', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roofer's Qualification</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Roof Plumber, Registered Builder BC103561" value={roofReportFields.rooferQualification} onChange={e => setRoofField('rooferQualification', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roofer Met With</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Mrs De Silva" value={roofReportFields.rooferMetWith} onChange={e => setRoofField('rooferMetWith', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Time on Site</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 30 mins" value={roofReportFields.timeOnSite} onChange={e => setRoofField('timeOnSite', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Scope of Assessment</label>
+                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="e.g. Carry out a roof inspection and provide a roof report relating to the claim." value={roofReportFields.scopeOfAssessment} onChange={e => setRoofField('scopeOfAssessment', e.target.value)} />
+                        </div>
+
+                        {/* ── Property Details ── */}
+                        <div className="mc-rrf-sub">Property Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Approximate Age of Property</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 50+ Years" value={roofReportFields.propertyAge} onChange={e => setRoofField('propertyAge', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Wall Construction Type</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Double brick, Brick veneer" value={roofReportFields.wallConstruction} onChange={e => setRoofField('wallConstruction', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Property Type</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Residential, Commercial" value={roofReportFields.propertyType} onChange={e => setRoofField('propertyType', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Property Condition</label>
+                          <div className="fa-rg inline">
+                            {(['Good', 'Fair', 'Poor'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.propertyCondition === o ? ' sel' : ''}`} onClick={() => setRoofField('propertyCondition', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Number of Storeys</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 1" value={roofReportFields.numberOfStoreys} onChange={e => setRoofField('numberOfStoreys', e.target.value)} />
+                        </div>
+
+                        {/* ── Roof Details ── */}
+                        <div className="mc-rrf-sub">Roof Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roof Type</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Terracotta Tile, Colorbond" value={roofReportFields.roofType} onChange={e => setRoofField('roofType', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">General Condition of Roof</label>
+                          <div className="fa-rg inline">
+                            {(['Good', 'Fair', 'Poor'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.roofGeneralCondition === o ? ' sel' : ''}`} onClick={() => setRoofField('roofGeneralCondition', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roof Pitch (degrees)</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 18" value={roofReportFields.roofPitch} onChange={e => setRoofField('roofPitch', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Number of Penetrations</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 6" value={roofReportFields.numberOfPenetrations} onChange={e => setRoofField('numberOfPenetrations', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roof Insulation Type</label>
+                          <input className="fa-input" type="text" placeholder="e.g. None, Sarking, Anticon, Air-cell" value={roofReportFields.roofInsulationType} onChange={e => setRoofField('roofInsulationType', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Solar PV</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.solarPV === o ? ' sel' : ''}`} onClick={() => setRoofField('solarPV', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roof Mounted Solar HWS</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.roofMountedSolarHWS === o ? ' sel' : ''}`} onClick={() => setRoofField('roofMountedSolarHWS', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Number of Skylights</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 2" value={roofReportFields.numberOfSkylights} onChange={e => setRoofField('numberOfSkylights', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Skylight Flashings — Watertight &amp; Flashed Correctly?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.skylightFlashingsWatertight === o ? ' sel' : ''}`} onClick={() => setRoofField('skylightFlashingsWatertight', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Skylight Flashing Notes</label>
+                          <textarea className="fa-ta" style={{ minHeight: 60 }} placeholder="e.g. Leak through 1 x skylight dome" value={roofReportFields.skylightFlashingsNotes} onChange={e => setRoofField('skylightFlashingsNotes', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Gutters Compliant with Current Building Codes?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.guttersCompliant === o ? ' sel' : ''}`} onClick={() => setRoofField('guttersCompliant', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Gutter Notes</label>
+                          <textarea className="fa-ta" style={{ minHeight: 60 }} placeholder="e.g. No overflow provisions" value={roofReportFields.guttersNotes} onChange={e => setRoofField('guttersNotes', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Number of Downpipes Compliant?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.downpipesCompliant === o ? ' sel' : ''}`} onClick={() => setRoofField('downpipesCompliant', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Corrosion Due to Ironized Water?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.corrosionIronizedWater === o ? ' sel' : ''}`} onClick={() => setRoofField('corrosionIronizedWater', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Downpipe Size</label>
+                          <input className="fa-input" type="text" placeholder="e.g. 95x45mm / 75mm round" value={roofReportFields.downpipeSize} onChange={e => setRoofField('downpipeSize', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Roof Structure Tied Down / Compliant?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No', 'N/A'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.roofStructureTiedDown === o ? ' sel' : ''}`} onClick={() => setRoofField('roofStructureTiedDown', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Batten Size &amp; Spacing Compliant?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No', 'N/A'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.battenSizeCompliant === o ? ' sel' : ''}`} onClick={() => setRoofField('battenSizeCompliant', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Truss/Rafter Size &amp; Spacing Compliant?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No', 'N/A'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.trussRafterCompliant === o ? ' sel' : ''}`} onClick={() => setRoofField('trussRafterCompliant', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ── Cause of Damage ── */}
+                        <div className="mc-rrf-sub">Cause of Damage</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Claim Type</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Storm, Accidental damage, Flood" value={roofReportFields.claimType} onChange={e => setRoofField('claimType', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Specific Cause</label>
+                          <textarea className="fa-ta" style={{ minHeight: 100 }} placeholder="Describe the specific cause and water entry points…" value={roofReportFields.specificCause} onChange={e => setRoofField('specificCause', e.target.value)} />
+                        </div>
+
+                        {/* ── Client Discussion ── */}
+                        <div className="mc-rrf-sub">Client Discussion</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Client Stated</label>
+                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="What did the insured/client state about the loss…" value={roofReportFields.clientDiscussion} onChange={e => setRoofField('clientDiscussion', e.target.value)} />
+                        </div>
+
+                        {/* ── Roof Conditions ── */}
+                        <div className="mc-rrf-sub">Roof Conditions</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Property Conditions Contributed to Claim Damage?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.propertyConditionsContributed === o ? ' sel' : ''}`} onClick={() => setRoofField('propertyConditionsContributed', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Contributing Conditions Details</label>
+                          <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List contributing property conditions…" value={roofReportFields.propertyConditionsDetails} onChange={e => setRoofField('propertyConditionsDetails', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">If in Good Condition Prior, Would Damage Still Have Occurred?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.damageWithoutConditions === o ? ' sel' : ''}`} onClick={() => setRoofField('damageWithoutConditions', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Would Customer Have Been Reasonably Aware of Property Conditions?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.customerAwareOfConditions === o ? ' sel' : ''}`} onClick={() => setRoofField('customerAwareOfConditions', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Any Other Issues Relating to Property Conditions?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.otherPropertyConditionIssues === o ? ' sel' : ''}`} onClick={() => setRoofField('otherPropertyConditionIssues', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {roofReportFields.otherPropertyConditionIssues === 'Yes' && (
+                          <div className="fa-fg">
+                            <label className="fa-fl">Other Condition Issue Details</label>
+                            <textarea className="fa-ta" style={{ minHeight: 70 }} value={roofReportFields.otherPropertyConditionDetails} onChange={e => setRoofField('otherPropertyConditionDetails', e.target.value)} />
+                          </div>
+                        )}
+                        <div className="fa-fg">
+                          <label className="fa-fl">Maintenance Repairs Required?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.maintenanceRepairsRequired === o ? ' sel' : ''}`} onClick={() => setRoofField('maintenanceRepairsRequired', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Required / Urgent Maintenance</label>
+                          <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List urgent maintenance items…" value={roofReportFields.requiredMaintenanceDetails} onChange={e => setRoofField('requiredMaintenanceDetails', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Recommended / Other Maintenance</label>
+                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="List recommended maintenance items…" value={roofReportFields.recommendedMaintenanceDetails} onChange={e => setRoofField('recommendedMaintenanceDetails', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Conditions / Maintenance Items Prevent Warrantable Claim Repairs?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.conditionsPreventRepairs === o ? ' sel' : ''}`} onClick={() => setRoofField('conditionsPreventRepairs', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {roofReportFields.conditionsPreventRepairs === 'Yes' && (
+                          <div className="fa-fg">
+                            <label className="fa-fl">Details</label>
+                            <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.conditionsPreventRepairsDetails} onChange={e => setRoofField('conditionsPreventRepairsDetails', e.target.value)} />
+                          </div>
+                        )}
+                        <div className="fa-fg">
+                          <label className="fa-fl">Previous Repairs Revealed?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.previousRepairs === o ? ' sel' : ''}`} onClick={() => setRoofField('previousRepairs', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {roofReportFields.previousRepairs === 'Yes' && (
+                          <div className="fa-fg">
+                            <label className="fa-fl">Previous Repair Details</label>
+                            <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.previousRepairsDetails} onChange={e => setRoofField('previousRepairsDetails', e.target.value)} />
+                          </div>
+                        )}
+                        <div className="fa-fg">
+                          <label className="fa-fl">Building Code Violations Revealed?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.buildingCodeViolations === o ? ' sel' : ''}`} onClick={() => setRoofField('buildingCodeViolations', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {roofReportFields.buildingCodeViolations === 'Yes' && (
+                          <div className="fa-fg">
+                            <label className="fa-fl">Violation Details</label>
+                            <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.buildingCodeViolationsDetails} onChange={e => setRoofField('buildingCodeViolationsDetails', e.target.value)} />
+                          </div>
+                        )}
+
+                        {/* ── Access and Safety ── */}
+                        <div className="mc-rrf-sub">Access and Safety</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Access Concerns Preventing Repairs?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.accessConcerns === o ? ' sel' : ''}`} onClick={() => setRoofField('accessConcerns', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Health &amp; Safety Concerns Preventing Repairs?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.healthSafetyConcerns === o ? ' sel' : ''}`} onClick={() => setRoofField('healthSafetyConcerns', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ── Additional Information ── */}
+                        <div className="mc-rrf-sub">Additional Information</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Has a Make Safe Been Completed?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.makeSafeCompleted === o ? ' sel' : ''}`} onClick={() => setRoofField('makeSafeCompleted', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {roofReportFields.makeSafeCompleted === 'Yes' && (
+                          <div className="fa-fg">
+                            <label className="fa-fl">Make Safe Works Completed</label>
+                            <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List make safe works carried out on site…" value={roofReportFields.makeSafeCompletedDetails} onChange={e => setRoofField('makeSafeCompletedDetails', e.target.value)} />
+                          </div>
+                        )}
+                        <div className="fa-fg" style={{ paddingBottom: 16 }}>
+                          <label className="fa-fl">Is a Make Safe Required?</label>
+                          <div className="fa-rg inline">
+                            {(['Yes', 'No'] as const).map(o => (
+                              <button key={o} className={`fa-ro${roofReportFields.makeSafeRequired === o ? ' sel' : ''}`} onClick={() => setRoofField('makeSafeRequired', o)}>{o}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
                   </div>
 
                   {/* Photo Context */}
