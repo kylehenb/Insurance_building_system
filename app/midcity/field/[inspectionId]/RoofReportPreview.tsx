@@ -38,6 +38,9 @@ type JobInfo = {
   jobNumber: string | null
 }
 
+const ROOFER_NAME = 'Kyle Bindon'
+const ROOFER_QUAL = 'Roof Plumber, Registered Builder BP103432'
+
 const v = (val: string) => val || '—'
 
 const SH = ({ title }: { title: string }) => (
@@ -115,7 +118,14 @@ export function RoofReportPreview({
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  const rooferName = fields.rooferName || 'Kyle Bindon'
+  const handlePrint = () => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = ''
+    window.print()
+    window.addEventListener('afterprint', () => {
+      document.body.style.overflow = prev || 'hidden'
+    }, { once: true })
+  }
 
   const jobLine = [
     jobInfo.insuredName,
@@ -133,10 +143,12 @@ export function RoofReportPreview({
     <>
       <style>{`
         @media print {
-          .mc-rrp-controls { display: none !important; }
+          body { overflow: visible !important; }
           .fa-root { display: none !important; }
+          .mc-rrp-controls { display: none !important; }
           .mc-rrp-overlay {
-            position: static !important;
+            position: absolute !important;
+            top: 0 !important; left: 0 !important; right: 0 !important;
             overflow: visible !important;
             height: auto !important;
             background: white !important;
@@ -145,6 +157,11 @@ export function RoofReportPreview({
           .mc-rrp-scroll {
             overflow: visible !important;
             padding: 0 !important;
+          }
+          .mc-rrp-doc {
+            max-width: 100% !important;
+            box-shadow: none !important;
+            margin: 0 !important;
           }
           @page { margin: 10mm 12mm; size: A4 portrait; }
         }
@@ -169,7 +186,7 @@ export function RoofReportPreview({
           </button>
           <span style={{ flex: 1 }} />
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ background: '#c8b89a', border: 'none', color: '#1a1a1a', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
           >
             Print / Download PDF
@@ -178,25 +195,31 @@ export function RoofReportPreview({
 
         {/* Report body */}
         <div className="mc-rrp-scroll" style={{ padding: '28px 16px 60px' }}>
-          <div style={{
+          <div className="mc-rrp-doc" style={{
             maxWidth: 794, margin: '0 auto', background: 'white',
             boxShadow: '0 2px 20px rgba(0,0,0,0.14)',
             fontFamily: 'system-ui, -apple-system, Arial, sans-serif',
           }}>
 
             {/* Header */}
-            <div style={{ padding: '22px 24px 18px', borderBottom: '3px solid #1a1a1a' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.5px', marginBottom: 3 }}>
-                Roof Inspection Report
-              </div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>
-                OCS Building Maintenance Pty Ltd T/A Midcity Group &nbsp;·&nbsp; Private &amp; Confidential
-              </div>
-              {jobLine && (
-                <div style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500, padding: '7px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0' }}>
-                  {jobLine}
+            <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #1a1a1a', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.3px', marginBottom: 6 }}>
+                  Roof Inspection Report
                 </div>
-              )}
+                {jobLine && (
+                  <div style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
+                    {jobLine}
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' as const, flexShrink: 0, fontSize: 11, color: '#444', lineHeight: 1.7 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a1a', marginBottom: 2 }}>Bindi Co</div>
+                <div>Contact: {ROOFER_NAME}</div>
+                <div>Ph: 0431 132 077</div>
+                <div>E: kyle@binditrades.com.au</div>
+                <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>BC103561 &nbsp; BP103432</div>
+              </div>
             </div>
 
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
@@ -210,8 +233,8 @@ export function RoofReportPreview({
                 <SH title="Assessment Report Details" />
                 <R label="Attendance Date" val={fields.attendanceDate} />
                 <R label="Time Attended" val={fields.timeAttended} />
-                <R label="Roofer's Name" val={fields.rooferName} />
-                <R label="Roofer's Qualification" val={fields.rooferQualification} />
+                <R label="Roofer's Name" val={ROOFER_NAME} />
+                <R label="Roofer's Qualification" val={ROOFER_QUAL} />
                 <R label="Roofer Met With" val={fields.rooferMetWith} />
                 <R label="Amount of Time on Site" val={fields.timeOnSite} />
                 <FR label="Scope of Assessment" val={fields.scopeOfAssessment} />
@@ -327,22 +350,22 @@ export function RoofReportPreview({
               </div>
               <div style={{ fontSize: 11, color: '#333', lineHeight: 1.65 }}>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
-                  I {rooferName} have prepared this expert report for OCS Building Maintenance Pty Ltd T/A Midcity Group. I confirm the following:
+                  I {ROOFER_NAME} have prepared this expert report for Bindi Co. I confirm the following:
                 </p>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
                   <strong>1. Independence:</strong> I am an independent expert, and I am not employed by nor have any financial or other interest in the outcome of this claim.
                 </p>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
-                  <strong>2. Preparation:</strong> I have prepared this expert report without influence or direction from the insured, Midcity Group or other expert or supplier as is relevant. I have used plain and clear language, free from inconsistencies or contradictions. This expert report includes the supporting information relied upon, relevant issues, reasoning, evidence relied upon and conclusions.
+                  <strong>2. Preparation:</strong> I have prepared this expert report without influence or direction from the insured, Bindi Co or other expert or supplier as is relevant. I have used plain and clear language, free from inconsistencies or contradictions. This expert report includes the supporting information relied upon, relevant issues, reasoning, evidence relied upon and conclusions.
                 </p>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
                   <strong>3. Objectivity:</strong> Where I have provided an assumption or an opinion, I have done so within the scope of my professional expertise and qualifications, as set out in this expert report and substantiated with facts. Where I have expressed an opinion, I have included whether such opinion is tentative or firm. The information contained in this expert report is factually objective, neutral and all references have been explained.
                 </p>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
-                  <strong>4. Comprehensive Findings:</strong> Where I have considered multiple questions, I have included the extent each cause, if more than one, contributes to the loss. Where necessary, I have stated if further issues outside Midcity&apos;s briefing need to be investigated to provide a comprehensive report.
+                  <strong>4. Comprehensive Findings:</strong> Where I have considered multiple questions, I have included the extent each cause, if more than one, contributes to the loss. Where necessary, I have stated if further issues outside Bindi Co&apos;s briefing need to be investigated to provide a comprehensive report.
                 </p>
                 <p style={{ marginTop: 0, marginBottom: 0 }}>
-                  <strong>5. Unbiased Findings:</strong> I confirm that my findings remain independent of my relationship with the insured / Midcity and any other expert or supplier as is relevant.
+                  <strong>5. Unbiased Findings:</strong> I confirm that my findings remain independent of my relationship with the insured / Bindi Co and any other expert or supplier as is relevant.
                 </p>
               </div>
             </div>
@@ -376,7 +399,7 @@ export function RoofReportPreview({
             {/* Footer */}
             <div style={{ padding: '11px 24px', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 9, color: '#c8b89a', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
-                OCS Building Maintenance Pty Ltd T/A Midcity Group
+                Bindi Co
               </div>
               <div style={{ fontSize: 9, color: '#777' }}>
                 Roof Inspection Report · Private &amp; Confidential

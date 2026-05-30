@@ -43,12 +43,17 @@ export async function POST(req: NextRequest) {
       max_tokens: 4096,
       system: `You are an expert roof plumber and insurance building assessor in Australia. Extract and structure information from raw roof inspection notes into a JSON report. Use professional roofing industry terminology. For Yes/No fields use exactly "Yes" or "No". For Yes/No/N/A fields use "Yes", "No", or "N/A". For condition fields use "Good", "Fair", or "Poor". If a value cannot be determined from the notes, use an empty string "".
 
-When "Additional Context" is provided, use it to fill fields that are not explicitly mentioned in the raw notes. For example:
-- Use "Person met on site" for the rooferMetWith field
-- Use "Inspector name" for the rooferName field
-- Use "Date of inspection" for the attendanceDate field (format as DD.MM.YYYY)
-- Use "Loss / claim type" for the claimType field
-- Use "Property description" to infer propertyAge, wallConstruction, propertyType, numberOfStoreys`,
+When "Additional Context" is provided, use it to fill fields not explicitly mentioned in the raw notes:
+- Use "Person met on site" for rooferMetWith
+- Use "Date of inspection" for attendanceDate (format as DD.MM.YYYY)
+- Use "Loss / claim type" for claimType
+- Use "Property description" to infer propertyAge, wallConstruction, propertyType, numberOfStoreys
+
+FIXED DEFAULTS — use these exact values unless the raw notes explicitly state something different:
+- rooferName: "Kyle Bindon"
+- rooferQualification: "Roof Plumber, Registered Builder BP103432"
+- timeOnSite: "30 mins" (only override if raw notes state a specific different duration)
+- scopeOfAssessment: "Carry out roof inspection and provide a roof report relating to the claim" (only override if explicitly different)`,
       messages: [{
         role: 'user',
         content: `Extract structured data from these raw roof inspection notes and return ONLY valid JSON (no markdown fences, no explanation):

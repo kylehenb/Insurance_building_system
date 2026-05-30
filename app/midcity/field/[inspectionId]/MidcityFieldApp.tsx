@@ -71,7 +71,7 @@ interface RoofReportData {
 function emptyRoofReport(): RoofReportData {
   return {
     attendanceDate: '', timeAttended: '', rooferName: '', rooferQualification: '',
-    rooferMetWith: '', timeOnSite: '', scopeOfAssessment: '',
+    rooferMetWith: '', timeOnSite: '30 mins', scopeOfAssessment: 'Carry out roof inspection and provide a roof report relating to the claim',
     propertyAge: '', wallConstruction: '', propertyType: '', propertyCondition: '', numberOfStoreys: '',
     roofType: '', roofGeneralCondition: '', roofPitch: '', numberOfPenetrations: '',
     roofInsulationType: '', solarPV: '', roofMountedSolarHWS: '', numberOfSkylights: '',
@@ -366,7 +366,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       })
       const data = await res.json()
       if (data.ok && data.reportData) {
-        setRoofReportFields(prev => ({ ...prev, ...data.reportData }))
+        const rd = data.reportData as Record<string, string>
+        setRoofReportFields(prev => ({
+          ...prev,
+          ...rd,
+          rooferName: '',
+          rooferQualification: '',
+          timeOnSite: rd.timeOnSite || prev.timeOnSite,
+          scopeOfAssessment: rd.scopeOfAssessment || prev.scopeOfAssessment,
+        }))
         setRoofFieldsOpen(true)
         armDraft()
       } else {
@@ -397,6 +405,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="fa-root">
 
       {/* HEADER */}
@@ -647,7 +656,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <span className="fa-ai-dark-title">Roof Report Raw Notes</span>
                     </div>
                     <div className="fa-ai-hints">
-                      {['Roof type', 'Roof condition', 'Roof pitch', 'Penetrations count', 'Storeys count', 'Ridge condition', 'Gutter condition', 'Gutter overflows', 'Roof insulation', 'Damage cause', 'Internal damage', 'Roof damage', 'Maintenance issues', 'Insured aware', 'Non-claim issues', 'Repairs required', 'Repair blockers', 'Prior repairs', 'Conclusion'].map(hint => (
+                      {['Roof type', 'Roof condition', 'Roof pitch', 'Penetrations', 'Insulation', 'Solar PV', 'Solar HWS', 'Skylights', 'Gutters', 'Downpipes', 'Batten size', 'Claim type', 'Damage cause', 'Entry points', 'Client stated', 'Conditions contributed', 'Insured aware', 'Maintenance items', 'Prior repairs', 'Code violations', 'Make safe'].map(hint => (
                         <div key={hint} className="fa-ai-hint">{hint}</div>
                       ))}
                     </div>
@@ -690,14 +699,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         <div className="fa-fg">
                           <label className="fa-fl">Time Attended</label>
                           <input className="fa-input" type="text" placeholder="e.g. 11:00 AWST" value={roofReportFields.timeAttended} onChange={e => setRoofField('timeAttended', e.target.value)} />
-                        </div>
-                        <div className="fa-fg">
-                          <label className="fa-fl">Roofer's Name</label>
-                          <input className="fa-input" type="text" value={roofReportFields.rooferName} onChange={e => setRoofField('rooferName', e.target.value)} />
-                        </div>
-                        <div className="fa-fg">
-                          <label className="fa-fl">Roofer's Qualification</label>
-                          <input className="fa-input" type="text" placeholder="e.g. Roof Plumber, Registered Builder BC103561" value={roofReportFields.rooferQualification} onChange={e => setRoofField('rooferQualification', e.target.value)} />
                         </div>
                         <div className="fa-fg">
                           <label className="fa-fl">Roofer Met With</label>
@@ -1113,21 +1114,22 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       </div>
 
       <div style={{ height: 24 }} />
-
-      {roofPreviewOpen && (
-        <RoofReportPreview
-          fields={roofReportFields}
-          photos={roofPhotos}
-          jobInfo={{
-            address: initialData.address,
-            insuredName: initialData.insuredName,
-            insurer: initialData.insurer,
-            claimNumber: initialData.claimNumber,
-            jobNumber: initialData.jobNumber,
-          }}
-          onClose={() => setRoofPreviewOpen(false)}
-        />
-      )}
     </div>
+
+    {roofPreviewOpen && (
+      <RoofReportPreview
+        fields={roofReportFields}
+        photos={roofPhotos}
+        jobInfo={{
+          address: initialData.address,
+          insuredName: initialData.insuredName,
+          insurer: initialData.insurer,
+          claimNumber: initialData.claimNumber,
+          jobNumber: initialData.jobNumber,
+        }}
+        onClose={() => setRoofPreviewOpen(false)}
+      />
+    )}
+    </>
   )
 }
