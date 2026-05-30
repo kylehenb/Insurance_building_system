@@ -7,7 +7,7 @@ import type { Database } from "@/lib/supabase/database.types";
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
 
 type InspectionWithRelations = InspectionRow & {
-  jobs: { job_number: string } | null;
+  jobs: { job_number: string; insurer: string | null } | null;
   users: { name: string } | null;
 };
 
@@ -102,7 +102,7 @@ async function InspectionsListPage() {
     .from("inspections")
     .select(
       `id, inspection_ref, scheduled_date, status, scope_status, report_status, created_at,
-       jobs!job_id(job_number),
+       jobs!job_id(job_number, insurer),
        users!inspector_id(name)`
     )
     .eq("tenant_id", tenant_id as string)
@@ -112,7 +112,8 @@ async function InspectionsListPage() {
     console.error("Error fetching inspections:", error);
   }
 
-  const typedInspections = (inspections as unknown as InspectionWithRelations[]) ?? [];
+  const typedInspections = ((inspections as unknown as InspectionWithRelations[]) ?? [])
+    .filter(i => i.jobs?.insurer !== 'Midcity');
 
   return (
     <div className="p-6 lg:p-8">

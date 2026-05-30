@@ -138,7 +138,7 @@ export default function GlobalCalendarPage() {
           .in('status', ['unscheduled', 'proposed', 'confirmed', 'awaiting_reschedule'])
           .order('scheduled_date', { ascending: true, nullsFirst: false })
 
-        setInspections((inspectionsData as any) || [])
+        setInspections(((inspectionsData as any) || []).filter((i: any) => i.jobs?.insurer !== 'Midcity'))
         setWorkOrders([])
       } else {
         const { data: workOrdersData } = await supabase

@@ -149,6 +149,7 @@ export default function JobsListPage() {
       .from('jobs')
       .select(SELECT_FIELDS)
       .eq('tenant_id', tid)
+      .neq('insurer', 'Midcity')
       .order('created_at', { ascending: false })
 
     if (filter !== 'all') {
