@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RoofReportPreview } from './RoofReportPreview'
 
 interface InitialData {
   inspectionId: string
@@ -177,6 +178,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [barExporting, setBarExporting] = useState(false)
   const [makeSafeExporting, setMakeSafeExporting] = useState(false)
   const [roofExporting, setRoofExporting] = useState(false)
+  const [roofPreviewOpen, setRoofPreviewOpen] = useState(false)
 
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingFocusRoomRef = useRef<string | null>(null)
@@ -348,7 +350,19 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       const res = await fetch('/api/midcity/generate-roof-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawNotes: roofRawNotes, inspectorName: initialData.inspector }),
+        body: JSON.stringify({
+          rawNotes: roofRawNotes,
+          inspectorName: initialData.inspector,
+          personMet,
+          relation,
+          propDesc,
+          address: initialData.address,
+          insuredName: initialData.insuredName,
+          claimNumber: initialData.claimNumber,
+          insurer: initialData.insurer,
+          scheduledDate: initialData.scheduledDate,
+          lossType: initialData.lossType,
+        }),
       })
       const data = await res.json()
       if (data.ok && data.reportData) {
@@ -377,16 +391,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     setMakeSafeExporting(false)
   }
 
-  const handleExportRoof = async () => {
-    setRoofExporting(true)
-    for (const photo of roofPhotos) {
-      const fd = new FormData()
-      fd.append('file', photo.file)
-      fd.append('label', photo.label)
-      fd.append('isRoofPhoto', 'true')
-      await fetch(`${base}/photos`, { method: 'POST', body: fd })
-    }
-    setRoofExporting(false)
+  const handleExportRoof = () => {
+    setRoofPreviewOpen(true)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1107,6 +1113,21 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       </div>
 
       <div style={{ height: 24 }} />
+
+      {roofPreviewOpen && (
+        <RoofReportPreview
+          fields={roofReportFields}
+          photos={roofPhotos}
+          jobInfo={{
+            address: initialData.address,
+            insuredName: initialData.insuredName,
+            insurer: initialData.insurer,
+            claimNumber: initialData.claimNumber,
+            jobNumber: initialData.jobNumber,
+          }}
+          onClose={() => setRoofPreviewOpen(false)}
+        />
+      )}
     </div>
   )
 }
