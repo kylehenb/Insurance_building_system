@@ -32,7 +32,7 @@ interface InitialData {
 
 interface ScopeItem { id: string; text: string }
 interface ScopeRoom { id: string; name: string; l: string; w: string; h: string; items: ScopeItem[] }
-interface PhotoEntry { id: string; file: File; previewUrl: string; label: string; processing: boolean }
+interface PhotoEntry { id: string; photoId: string | null; file: File | null; previewUrl: string; label: string; processing: boolean; uploading: boolean }
 
 interface RoofReportData {
   // Assessment Report Details
@@ -495,6 +495,27 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ─── Load persisted photos on mount ──────────────────────────────────────
+  useEffect(() => {
+    fetch(`${base}/photos`)
+      .then(r => r.json())
+      .then((data: { photos?: { id: string; url: string | null; label: string }[] }) => {
+        if (data.photos?.length) {
+          setRoofPhotos(data.photos.map(p => ({
+            id: uid(),
+            photoId: p.id,
+            file: null,
+            previewUrl: p.url ?? '',
+            label: p.label,
+            processing: false,
+            uploading: false,
+          })))
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ─── Room helpers ─────────────────────────────────────────────────────────
   const addRoom = () => {
     setScopeRooms(prev => [...prev, { id: uid(), name: '', l: '', w: '', h: '', items: [{ id: uid(), text: '' }] }])
@@ -532,15 +553,29 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     Array.from(files).forEach(file => {
       const id = uid()
       const rawPreview = URL.createObjectURL(file)
-      setRoofPhotos(prev => [...prev, { id, file, previewUrl: rawPreview, label: '', processing: true }])
-      processPhotoForUpload(file).then(processed => {
+      setRoofPhotos(prev => [...prev, { id, photoId: null, file, previewUrl: rawPreview, label: '', processing: true, uploading: false }])
+      processPhotoForUpload(file).then(async processed => {
         const processedPreview = URL.createObjectURL(processed)
         setRoofPhotos(prev => prev.map(p => {
           if (p.id !== id) return p
           URL.revokeObjectURL(p.previewUrl)
-          return { ...p, file: processed, previewUrl: processedPreview, processing: false }
+          return { ...p, file: processed, previewUrl: processedPreview, processing: false, uploading: true }
         }))
-        armDraft()
+        try {
+          const fd = new FormData()
+          fd.append('file', processed)
+          fd.append('isRoofPhoto', 'true')
+          const res = await fetch(`${base}/photos`, { method: 'POST', body: fd })
+          const data = await res.json()
+          if (data.id) {
+            setRoofPhotos(prev => prev.map(p => p.id !== id ? p : { ...p, photoId: data.id, previewUrl: data.url ?? p.previewUrl, file: null, uploading: false }))
+            armDraft()
+          } else {
+            setRoofPhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
+          }
+        } catch {
+          setRoofPhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
+        }
       })
     })
   }
@@ -548,7 +583,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const removeRoofPhoto = (id: string) => {
     setRoofPhotos(prev => {
       const p = prev.find(x => x.id === id)
-      if (p) URL.revokeObjectURL(p.previewUrl)
+      if (p) {
+        URL.revokeObjectURL(p.previewUrl)
+        if (p.photoId) {
+          fetch(`${base}/photos?photoId=${p.photoId}`, { method: 'DELETE' }).catch(() => {})
+        }
+      }
       return prev.filter(x => x.id !== id)
     })
     armDraft()
@@ -557,7 +597,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const runRoofAILabels = async () => {
     if (!roofPhotoContext.trim()) { alert('Add a photo description first.'); return }
     if (!roofPhotos.length) { alert('No photos to label.'); return }
-    if (roofPhotos.some(p => p.processing)) { alert('Photos are still processing — please wait a moment.'); return }
+    if (roofPhotos.some(p => p.processing || p.uploading)) { alert('Photos are still saving — please wait a moment.'); return }
     setRoofAiLabeling(true)
     try {
       const res = await fetch(`${base}/ai-label-roof`, {
@@ -567,8 +607,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       })
       const data = await res.json()
       if (data.ok && data.labels?.length) {
-        setRoofPhotos(prev => prev.map((p, i) => ({ ...p, label: data.labels[i] ?? p.label })))
+        const newLabels: string[] = data.labels
+        const labeled = roofPhotos.map((p, i) => ({ ...p, label: newLabels[i] ?? p.label }))
+        setRoofPhotos(labeled)
         setRoofAiLabelDone(true)
+        labeled.forEach(p => {
+          if (p.photoId) {
+            fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.photoId, label: p.label }) }).catch(() => {})
+          }
+        })
       }
     } catch { /* keep existing labels */ }
     setRoofAiLabeling(false)
@@ -1392,10 +1439,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <button
                         className={`fa-ai-label-btn${roofAiLabelDone ? ' done' : ''}`}
                         onClick={runRoofAILabels}
-                        disabled={roofAiLabeling || roofPhotos.some(p => p.processing)}
+                        disabled={roofAiLabeling || roofPhotos.some(p => p.processing || p.uploading)}
                       >
-                        {roofPhotos.some(p => p.processing)
-                          ? <><span className="fa-spinner" /> Converting photos…</>
+                        {roofPhotos.some(p => p.processing || p.uploading)
+                          ? <><span className="fa-spinner" /> {roofPhotos.some(p => p.processing) ? 'Converting photos…' : 'Saving photos…'}</>
                           : roofAiLabeling
                           ? <><span className="fa-spinner" /> Labelling…</>
                           : roofAiLabelDone
@@ -1410,22 +1457,26 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                     {roofPhotos.map(photo => (
                       <div key={photo.id} className="fa-photo-card">
                         <img className="fa-photo-thumb" src={photo.previewUrl} alt="roof inspection" />
-                        {photo.processing && (
+                        {(photo.processing || photo.uploading) && (
                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(44,26,14,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
-                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>Converting…</span>
+                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>{photo.processing ? 'Converting…' : 'Saving…'}</span>
                           </div>
                         )}
-                        {!photo.processing && <button className="fa-photo-del" onClick={() => removeRoofPhoto(photo.id)}>×</button>}
+                        {!photo.processing && !photo.uploading && <button className="fa-photo-del" onClick={() => removeRoofPhoto(photo.id)}>×</button>}
                         <div className="fa-photo-label-area">
                           <textarea
                             className="fa-photo-label-ta"
                             rows={1}
-                            placeholder={photo.processing ? 'Processing…' : 'Add label'}
+                            placeholder={photo.processing ? 'Processing…' : photo.uploading ? 'Saving…' : 'Add label'}
                             value={photo.label}
-                            disabled={photo.processing}
+                            disabled={photo.processing || photo.uploading}
                             onChange={e => {
-                              setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label: e.target.value } : p))
+                              const newLabel = e.target.value
+                              setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label: newLabel } : p))
+                              if (photo.photoId) {
+                                fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label: newLabel }) }).catch(() => {})
+                              }
                               armDraft()
                             }}
                           />

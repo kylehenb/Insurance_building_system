@@ -3,6 +3,42 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ inspectionId: string }> }
+) {
+  const { inspectionId } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const service = createServiceClient()
+  const { data: userRow } = await service
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .single()
+  if (!userRow) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const { data: photos } = await service
+    .from('photos')
+    .select('id, storage_path, label')
+    .eq('inspection_id', inspectionId)
+    .eq('tenant_id', userRow.tenant_id)
+
+  const result = await Promise.all(
+    (photos ?? []).map(async (p: { id: string; storage_path: string; label: string | null }) => {
+      const { data: signed } = await service.storage
+        .from('photos')
+        .createSignedUrl(p.storage_path, 60 * 60 * 24 * 7)
+      return { id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null }
+    })
+  )
+
+  return NextResponse.json({ photos: result })
+}
+
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
 const MAX_SIZE = 20 * 1024 * 1024 // 20MB
 
