@@ -163,7 +163,7 @@ export function RoofReportPreview({
             max-width: 100% !important;
             box-shadow: none !important;
             margin: 0 !important;
-            padding: 10mm 12mm !important;
+            padding: 16mm 18mm !important;
           }
         }
       `}</style>
