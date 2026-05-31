@@ -142,7 +142,7 @@ export function RoofReportPreview({
   return (
     <>
       <style>{`
-        @page { margin: 0; size: A4 portrait; }
+        @page { margin: 15mm 18mm; size: A4 portrait; }
         @media print {
           body { overflow: visible !important; }
           .fa-root { display: none !important; }
@@ -163,7 +163,7 @@ export function RoofReportPreview({
             max-width: 100% !important;
             box-shadow: none !important;
             margin: 0 !important;
-            padding: 16mm 18mm !important;
+            padding: 0 !important;
           }
         }
       `}</style>
