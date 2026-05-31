@@ -38,8 +38,8 @@ function uid() { return Math.random().toString(36).slice(2) }
 // Convert any image (including HEIC) to a compressed JPEG ≤ TARGET_BYTES.
 // Uses the canvas API — iOS Safari decodes HEIC natively, so no extra library needed.
 async function processPhotoForUpload(file: File): Promise<File> {
-  const TARGET_BYTES = 500 * 1024  // 500 KB ceiling
-  const MAX_DIM = 2048             // 2048px max on longest side
+  const TARGET_BYTES = 125 * 1024  // 125 KB ceiling
+  const MAX_DIM = 1600             // 1600px max on longest side
 
   return new Promise(resolve => {
     const img = new Image()

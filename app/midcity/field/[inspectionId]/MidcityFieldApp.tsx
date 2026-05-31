@@ -328,8 +328,8 @@ function InsuranceTemplateRenderer({
 function uid() { return Math.random().toString(36).slice(2) }
 
 async function processPhotoForUpload(file: File): Promise<File> {
-  const TARGET_BYTES = 500 * 1024
-  const MAX_DIM = 2048
+  const TARGET_BYTES = 125 * 1024
+  const MAX_DIM = 1600
 
   return new Promise(resolve => {
     const img = new Image()
