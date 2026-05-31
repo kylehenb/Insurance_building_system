@@ -35,6 +35,8 @@ interface ScopeRoom { id: string; name: string; l: string; w: string; h: string;
 interface PhotoEntry { id: string; photoId: string | null; file: File | null; previewUrl: string; label: string; processing: boolean; uploading: boolean }
 
 interface RoofReportData {
+  // Claim Details
+  claimDetails: string
   // Assessment Report Details
   attendanceDate: string; timeAttended: string; rooferName: string
   rooferQualification: string; rooferMetWith: string; timeOnSite: string; scopeOfAssessment: string
@@ -70,6 +72,7 @@ interface RoofReportData {
 
 function emptyRoofReport(): RoofReportData {
   return {
+    claimDetails: '',
     attendanceDate: '', timeAttended: '', rooferName: '', rooferQualification: '',
     rooferMetWith: '', timeOnSite: '30 mins', scopeOfAssessment: 'Carry out roof inspection and provide a roof report relating to the claim',
     propertyAge: '', wallConstruction: '', propertyType: '', propertyCondition: '', numberOfStoreys: '',
@@ -486,7 +489,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.msHours) setMsHours(d.msHours as string)
     if (d.roofRawNotes) setRoofRawNotes(d.roofRawNotes as string)
     if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
-    if (d.roofReportFields) setRoofReportFields(d.roofReportFields as RoofReportData)
+    if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
@@ -1087,6 +1090,13 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                     </div>
                     {roofFieldsOpen && (
                       <div className="mc-rrf-body">
+
+                        {/* ── Claim Details ── */}
+                        <div className="mc-rrf-sub">Claim Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Customer Name, Loss Address, Insurer, Claim Number</label>
+                          <input className="fa-input" type="text" placeholder="e.g. Mr & Mrs Smith · 123 Example St · IAG · Claim #123456" value={roofReportFields.claimDetails} onChange={e => setRoofField('claimDetails', e.target.value)} />
+                        </div>
 
                         {/* ── Assessment Report Details ── */}
                         <div className="mc-rrf-sub">Assessment Report Details</div>

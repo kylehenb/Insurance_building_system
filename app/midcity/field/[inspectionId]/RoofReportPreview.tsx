@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 
 type Fields = {
+  claimDetails: string
   attendanceDate: string; timeAttended: string; rooferName: string
   rooferQualification: string; rooferMetWith: string; timeOnSite: string; scopeOfAssessment: string
   propertyAge: string; wallConstruction: string; propertyType: string
@@ -127,7 +128,7 @@ export function RoofReportPreview({
     }, { once: true })
   }
 
-  const jobLine = [
+  const jobLine = fields.claimDetails || [
     jobInfo.insuredName,
     jobInfo.address,
     jobInfo.insurer,
