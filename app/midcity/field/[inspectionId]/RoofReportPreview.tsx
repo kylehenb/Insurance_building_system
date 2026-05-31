@@ -162,8 +162,11 @@ export function RoofReportPreview({
             max-width: 100% !important;
             box-shadow: none !important;
             margin: 0 !important;
+            padding-top: 10mm !important;
           }
-          @page { margin: 10mm 12mm; size: A4 portrait; }
+          /* margin-top: 0 collapses the browser header area (URL, date, timestamp).
+             margin-bottom: 14mm keeps the browser footer area where only page numbers appear. */
+          @page { margin: 0 12mm 14mm; size: A4 portrait; }
         }
       `}</style>
 
