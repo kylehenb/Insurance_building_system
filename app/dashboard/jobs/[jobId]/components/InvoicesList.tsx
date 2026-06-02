@@ -26,6 +26,7 @@ interface InvoiceListItem {
   amount_ex_gst: number | null
   gst: number | null
   amount_inc_gst: number | null
+  markup_pct: number | null
   issued_date: string | null
   paid_date: string | null
   created_at: string
@@ -504,6 +505,22 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                       )}
 
                       {/* Totals */}
+                      {invoice.invoice_type === 'make_safe' && invoice.markup_pct != null && invoice.markup_pct > 0 && (() => {
+                        const lineSub = invoice.line_items.reduce((s, i) => s + i.line_total, 0)
+                        const markup = Math.round(lineSub * invoice.markup_pct * 100) / 100
+                        return (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                              <span>Subtotal</span>
+                              <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(lineSub)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                              <span>Builder&apos;s Margin ({(invoice.markup_pct * 100).toFixed(1)}%)</span>
+                              <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(markup)}</span>
+                            </div>
+                          </>
+                        )
+                      })()}
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
                         <span>Subtotal (ex GST)</span>
                         <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.amount_ex_gst ?? 0)}</span>

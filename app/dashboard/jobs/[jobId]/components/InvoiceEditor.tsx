@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 interface JobInfo {
@@ -16,6 +16,7 @@ interface Invoice {
   amount_ex_gst: number
   gst: number
   amount_inc_gst: number
+  markup_pct: number | null
 }
 
 interface InvoiceLineItem {
@@ -44,29 +45,37 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
-  const [subtotal, setSubtotal] = useState(0)
-  const [gst, setGst] = useState(0)
-  const [total, setTotal] = useState(0)
 
-  // Load invoice line items
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), [])
+
+  // ── Computed totals ─────────────────────────────────────────────────────────
+
+  const isMakeSafe = invoice?.invoice_type === 'make_safe'
+  const markupPct = invoice?.markup_pct ?? 0
+  const lineSubtotal = lineItems.reduce((sum, item) => sum + item.line_total, 0)
+  const markupAmount = isMakeSafe ? Math.round(lineSubtotal * markupPct * 100) / 100 : 0
+  const exGst = Math.round((lineSubtotal + markupAmount) * 100) / 100
+  const gstAmount = invoice?.invoice_type === 'excess' ? (invoice.gst ?? 0) : Math.round(exGst * 0.10 * 100) / 100
+  const total = invoice?.invoice_type === 'excess' ? (invoice.amount_inc_gst ?? 0) : Math.round((exGst + gstAmount) * 100) / 100
+
+  // ── Load invoice + line items ───────────────────────────────────────────────
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
-        .select('id, invoice_type, amount_ex_gst, gst, amount_inc_gst')
+        .select('id, invoice_type, amount_ex_gst, gst, amount_inc_gst, markup_pct')
         .eq('id', invoiceId)
         .eq('tenant_id', tenantId)
         .single()
 
       if (invoiceError) throw invoiceError
-      setInvoice(invoiceData)
-      
+      setInvoice(invoiceData as Invoice)
+
       const { data: items, error } = await supabase
         .from('invoice_line_items')
         .select('*')
@@ -76,20 +85,6 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
       if (error) throw error
       setLineItems(items ?? [])
-      
-      // For excess invoices, use stored values (GST-inclusive excess amount)
-      // For other invoices, calculate from line items
-      if (invoiceData.invoice_type === 'excess') {
-        setSubtotal(invoiceData.amount_ex_gst)
-        setGst(invoiceData.gst)
-        setTotal(invoiceData.amount_inc_gst)
-      } else {
-        const exGst = (items ?? []).reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-        const gstAmount = exGst * 0.10
-        setSubtotal(exGst)
-        setGst(gstAmount)
-        setTotal(exGst + gstAmount)
-      }
     } catch (error) {
       console.error('Error loading invoice items:', error)
     } finally {
@@ -99,84 +94,88 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   useEffect(() => { load() }, [load])
 
-  // Update line item
+  // ── Persist recalculated totals to DB ───────────────────────────────────────
+
+  const persistTotals = useCallback(async (items: InvoiceLineItem[], currentMarkupPct: number, invType: string) => {
+    if (invType === 'excess') return
+
+    const sub = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
+    const markup = invType === 'make_safe' ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
+    const ex = Math.round((sub + markup) * 100) / 100
+    const g = Math.round(ex * 0.10 * 100) / 100
+    const inc = Math.round((ex + g) * 100) / 100
+
+    await supabase
+      .from('invoices')
+      .update({ amount_ex_gst: ex, gst: g, amount_inc_gst: inc })
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId)
+
+    setInvoice(prev => prev ? { ...prev, amount_ex_gst: ex, gst: g, amount_inc_gst: inc } : prev)
+  }, [invoiceId, tenantId])
+
+  // ── Update builder's margin (make_safe only) ────────────────────────────────
+
+  const updateMarkupPct = useCallback(async (pct: number) => {
+    if (!invoice || invoice.invoice_type !== 'make_safe') return
+    const decimal = pct / 100
+    setSaveStatus('saving')
+    try {
+      await supabase
+        .from('invoices')
+        .update({ markup_pct: decimal })
+        .eq('id', invoiceId)
+        .eq('tenant_id', tenantId)
+
+      setInvoice(prev => prev ? { ...prev, markup_pct: decimal } : prev)
+      await persistTotals(lineItems, decimal, 'make_safe')
+      setSaveStatus('saved')
+      onInvoiceUpdated?.()
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [invoice, lineItems, invoiceId, tenantId, persistTotals, onInvoiceUpdated])
+
+  // ── Update line item ────────────────────────────────────────────────────────
+
   const updateItem = useCallback(async (itemId: string, changes: Partial<InvoiceLineItem>) => {
-    setLineItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const updated = { ...item, ...changes }
-        // Recalculate line total if quantity or unit_price changed
-        if ('quantity' in changes || 'unit_price' in changes) {
-          updated.line_total = updated.quantity * updated.unit_price
-        }
-        return updated
-      }
-      return item
-    }))
+    const item = lineItems.find(i => i.id === itemId)
+    if (!item || !invoice) return
+
+    const updated = { ...item, ...changes }
+    if ('quantity' in changes || 'unit_price' in changes) {
+      updated.line_total = Math.round(updated.quantity * updated.unit_price * 100) / 100
+    }
+
+    const newItems = lineItems.map(i => i.id === itemId ? updated : i)
+    setLineItems(newItems)
     setSaveStatus('saving')
 
     try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      const updateData: any = { ...changes }
+      const updateData: Record<string, unknown> = { ...changes }
       if ('quantity' in changes || 'unit_price' in changes) {
-        const item = lineItems.find(i => i.id === itemId)
-        if (item) {
-          updateData.line_total = (changes.quantity ?? item.quantity) * (changes.unit_price ?? item.unit_price)
-        }
+        updateData.line_total = updated.line_total
       }
 
-      const { error } = await supabase
+      await supabase
         .from('invoice_line_items')
         .update(updateData)
         .eq('id', itemId)
         .eq('tenant_id', tenantId)
 
-      if (error) throw error
-      
-      // Recalculate totals - for excess invoices, don't recalculate from line items
-      if (invoice?.invoice_type === 'excess') {
-        // Excess invoices keep their stored GST values
-        // Line item changes don't affect the excess amount
-      } else {
-        const updatedItems = lineItems.map(item => 
-          item.id === itemId ? { ...item, ...changes, line_total: updateData.line_total } : item
-        )
-        const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-        const gstAmount = exGst * 0.10
-        setSubtotal(exGst)
-        setGst(gstAmount)
-        setTotal(exGst + gstAmount)
-        
-        // Update invoice totals
-        await supabase
-          .from('invoices')
-          .update({
-            amount_ex_gst: exGst,
-            gst: gstAmount,
-            amount_inc_gst: exGst + gstAmount,
-          })
-          .eq('id', invoiceId)
-          .eq('tenant_id', tenantId)
-      }
-
+      await persistTotals(newItems, markupPct, invoice.invoice_type)
       setSaveStatus('saved')
       onInvoiceUpdated?.()
     } catch (error) {
       console.error('Error updating item:', error)
       setSaveStatus('error')
     }
-  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated, invoice])
+  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
 
-  // Add new line item
+  // ── Add line item ───────────────────────────────────────────────────────────
+
   const addItem = useCallback(async () => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
+    if (!invoice) return
     const maxSort = lineItems.length > 0 ? Math.max(...lineItems.map(i => i.sort_order)) : 0
 
     const { data: newItem, error } = await supabase
@@ -193,75 +192,32 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       .select('*')
       .single()
 
-    if (error) {
-      console.error('Error adding item:', error)
-      return
-    }
-
+    if (error) { console.error('Error adding item:', error); return }
     setLineItems(prev => [...prev, newItem])
     onInvoiceUpdated?.()
-  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoiceId, invoice, onInvoiceUpdated])
 
-  // Delete line item
+  // ── Delete line item ────────────────────────────────────────────────────────
+
   const deleteItem = useCallback(async (itemId: string) => {
+    if (!invoice) return
     if (!window.confirm('Delete this line item?')) return
 
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    const { error } = await supabase
+    await supabase
       .from('invoice_line_items')
       .delete()
       .eq('id', itemId)
       .eq('tenant_id', tenantId)
 
-    if (error) {
-      console.error('Error deleting item:', error)
-      return
-    }
-
-    setLineItems(prev => prev.filter(item => item.id !== itemId))
-    
-    // Recalculate totals - for excess invoices, don't recalculate from line items
-    if (invoice?.invoice_type === 'excess') {
-      // Excess invoices keep their stored GST values
-      // Line item changes don't affect the excess amount
-    } else {
-      const updatedItems = lineItems.filter(item => item.id !== itemId)
-      const exGst = updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-      const gstAmount = exGst * 0.10
-      setSubtotal(exGst)
-      setGst(gstAmount)
-      setTotal(exGst + gstAmount)
-      
-      // Update invoice totals
-      await supabase
-        .from('invoices')
-        .update({
-          amount_ex_gst: exGst,
-          gst: gstAmount,
-          amount_inc_gst: exGst + gstAmount,
-        })
-        .eq('id', invoiceId)
-        .eq('tenant_id', tenantId)
-    }
-
+    const newItems = lineItems.filter(item => item.id !== itemId)
+    setLineItems(newItems)
+    await persistTotals(newItems, markupPct, invoice.invoice_type)
     onInvoiceUpdated?.()
-  }, [lineItems, tenantId, invoiceId, onInvoiceUpdated, invoice])
+  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
 
   if (loading) {
     return (
-      <div
-        style={{
-          padding: '40px',
-          textAlign: 'center',
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: 13,
-          color: '#9e998f',
-        }}
-      >
+      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
         Loading invoice…
       </div>
     )
@@ -271,60 +227,26 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       {/* Line items */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>
-          Line Items
-        </div>
-        
+        <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
+
         {lineItems.length === 0 ? (
-          <div
-            style={{
-              padding: '20px',
-              background: '#f5f2ee',
-              borderRadius: 6,
-              textAlign: 'center',
-              fontSize: 13,
-              color: '#9e998f',
-            }}
-          >
+          <div style={{ padding: '20px', background: '#f5f2ee', borderRadius: 6, textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
             No line items yet. Add items to build your invoice.
           </div>
         ) : (
           <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
-            {/* Header */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '3fr 1fr 1fr 1fr 40px',
-                gap: 12,
-                padding: '12px 16px',
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#9e998f',
-                borderBottom: '1px solid #e0dbd4',
-                background: '#fafaf8',
-              }}
-            >
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
               <div>Description</div>
               <div style={{ textAlign: 'right' }}>Qty</div>
               <div style={{ textAlign: 'right' }}>Unit Price</div>
               <div style={{ textAlign: 'right' }}>Total</div>
               <div />
             </div>
-            
-            {/* Items */}
+
             {lineItems.map((item, index) => (
               <div
                 key={item.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '3fr 1fr 1fr 1fr 40px',
-                  gap: 12,
-                  padding: '12px 16px',
-                  fontSize: 13,
-                  color: '#3a3530',
-                  borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none',
-                  alignItems: 'center',
-                }}
+                style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 13, color: '#3a3530', borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none', alignItems: 'center' }}
               >
                 <div>
                   <input
@@ -332,15 +254,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                     value={item.description}
                     onChange={(e) => updateItem(item.id, { description: e.target.value })}
                     placeholder="Item description"
-                    style={{
-                      width: '100%',
-                      fontSize: 13,
-                      color: '#3a3530',
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      fontFamily: 'DM Sans, sans-serif',
-                    }}
+                    style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
                   />
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -350,17 +264,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                     onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
                     min="0"
                     step="0.01"
-                    style={{
-                      width: '60px',
-                      fontSize: 13,
-                      color: '#3a3530',
-                      background: '#f5f2ee',
-                      border: '1px solid #e0dbd4',
-                      borderRadius: 4,
-                      padding: '4px 8px',
-                      textAlign: 'right',
-                      fontFamily: 'DM Sans, sans-serif',
-                    }}
+                    style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                   />
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -370,34 +274,14 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                     onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
                     min="0"
                     step="0.01"
-                    style={{
-                      width: '80px',
-                      fontSize: 13,
-                      color: '#3a3530',
-                      background: '#f5f2ee',
-                      border: '1px solid #e0dbd4',
-                      borderRadius: 4,
-                      padding: '4px 8px',
-                      textAlign: 'right',
-                      fontFamily: 'DM Sans, sans-serif',
-                    }}
+                    style={{ width: '80px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                   />
                 </div>
-                <div style={{ textAlign: 'right', fontWeight: 500 }}>
-                  {fmt(item.line_total)}
-                </div>
+                <div style={{ textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
                 <div style={{ textAlign: 'right' }}>
                   <button
                     onClick={() => deleteItem(item.id)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#c0bab3',
-                      fontSize: 14,
-                      padding: '2px',
-                      borderRadius: 3,
-                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
                     onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
                   >
@@ -413,52 +297,55 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       {/* Add item button */}
       <button
         onClick={addItem}
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: 13,
-          color: '#9e998f',
-          background: '#ffffff',
-          border: '1px solid #e0dbd4',
-          borderRadius: 6,
-          padding: '8px 16px',
-          cursor: 'pointer',
-          marginBottom: 20,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#c8b89a'
-          e.currentTarget.style.color = '#3a3530'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = '#e0dbd4'
-          e.currentTarget.style.color = '#9e998f'
-        }}
+        style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginBottom: 20 }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#c8b89a'; e.currentTarget.style.color = '#3a3530' }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e0dbd4'; e.currentTarget.style.color = '#9e998f' }}
       >
         + Add Line Item
       </button>
 
       {/* Totals */}
-      <div
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e0dbd4',
-          borderRadius: 6,
-          padding: '16px',
-        }}
-      >
+      <div style={{ background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '16px' }}>
+        {isMakeSafe && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#9e998f' }}>Subtotal</span>
+              <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(lineSubtotal)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#9e998f', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Builder&apos;s Margin
+                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input
+                    type="number"
+                    key={markupPct}
+                    defaultValue={(markupPct * 100).toFixed(1)}
+                    min="0"
+                    step="0.5"
+                    onBlur={(e) => updateMarkupPct(parseFloat(e.target.value) || 0)}
+                    style={{ width: 52, fontSize: 12, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '3px 6px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}
+                  />
+                  <span style={{ fontSize: 11, color: '#9e998f' }}>%</span>
+                </span>
+              </span>
+              <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(markupAmount)}</span>
+            </div>
+          </>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: '#9e998f' }}>Subtotal (ex GST)</span>
-          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(subtotal)}</span>
+          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(invoice?.invoice_type === 'excess' ? (invoice.amount_ex_gst ?? 0) : exGst)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: '#9e998f' }}>GST (10%)</span>
-          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(gst)}</span>
+          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(gstAmount)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(total)}</span>
         </div>
         <div style={{ marginTop: 12, fontSize: 11, color: saveStatus === 'saved' ? '#2e7d32' : saveStatus === 'error' ? '#c5221f' : '#9e998f' }}>
-          {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Error saving changes' : ''}
+          {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? 'Saving…' : 'Error saving changes'}
         </div>
       </div>
     </div>
