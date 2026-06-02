@@ -21,6 +21,7 @@ interface Invoice {
   amount_ex_gst: number | null
   gst: number | null
   amount_inc_gst: number | null
+  markup_pct: number | null
   issued_date: string | null
   paid_date: string | null
   notes: string | null
@@ -172,11 +173,19 @@ export default function InvoiceDetailPage() {
 
   // ── Recalculate totals from line items ────────────────────────────────────
 
-  const recalcTotals = useCallback(async (items: LineItem[]) => {
+  const recalcTotals = useCallback(async (items: LineItem[], overrideMarkupPct?: number) => {
     if (!invoice || !tenantId) return
     if (invoice.gst_treatment === 'inclusive') return
 
-    const exGst = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
+    const subtotal = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
+    let exGst = subtotal
+
+    if (invoice.invoice_type === 'make_safe') {
+      const markupPct = overrideMarkupPct ?? (invoice.markup_pct ?? 0)
+      const markup = Math.round(subtotal * markupPct * 100) / 100
+      exGst = Math.round((subtotal + markup) * 100) / 100
+    }
+
     const gst = Math.round(exGst * 0.1 * 100) / 100
     const incGst = Math.round((exGst + gst) * 100) / 100
 
@@ -188,6 +197,22 @@ export default function InvoiceDetailPage() {
 
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: exGst, gst, amount_inc_gst: incGst } : prev)
   }, [invoice, tenantId])
+
+  // ── Update builder's margin (make_safe only) ──────────────────────────────
+
+  const updateMarkupPct = useCallback(async (pct: number) => {
+    if (!tenantId || !invoice || invoice.invoice_type !== 'make_safe') return
+    const markupPct = pct / 100
+
+    await supabase
+      .from('invoices')
+      .update({ markup_pct: markupPct })
+      .eq('id', invoice.id)
+      .eq('tenant_id', tenantId)
+
+    setInvoice(prev => prev ? { ...prev, markup_pct: markupPct } : prev)
+    await recalcTotals(lineItems, markupPct)
+  }, [invoice, tenantId, lineItems, recalcTotals])
 
   // ── Line item updates ─────────────────────────────────────────────────────
 
@@ -357,6 +382,10 @@ export default function InvoiceDetailPage() {
   const canAddLines = !LOCKED_TYPES.has(invoice.invoice_type) && isEditable
 
   // Compute totals display
+  const isMakeSafe = invoice.invoice_type === 'make_safe'
+  const markupPct = invoice.markup_pct ?? 0
+  const subtotalFromLines = lineItems.reduce((s, i) => s + i.line_total, 0)
+  const markupAmount = isMakeSafe ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
   const exGst = invoice.amount_ex_gst ?? 0
   const gst = invoice.gst ?? 0
   const incGst = invoice.amount_inc_gst ?? 0
@@ -615,6 +644,37 @@ export default function InvoiceDetailPage() {
             <div className="invd-card">
               <div className="invd-card-title">Totals</div>
               <div className="invd-totals">
+                {isMakeSafe && (
+                  <>
+                    <div className="invd-total-row">
+                      <span className="invd-total-label">Subtotal</span>
+                      <span className="invd-total-val">{fmt(subtotalFromLines)}</span>
+                    </div>
+                    <div className="invd-total-row">
+                      <span className="invd-total-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Builder&apos;s Margin
+                        {isEditable ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <input
+                              className="invd-num-input"
+                              style={{ width: 52 }}
+                              key={markupPct}
+                              defaultValue={(markupPct * 100).toFixed(1)}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              onBlur={e => updateMarkupPct(parseFloat(e.target.value) || 0)}
+                            />
+                            <span style={{ fontSize: 12, color: '#9e998f' }}>%</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: '#3a3530' }}>({(markupPct * 100).toFixed(1)}%)</span>
+                        )}
+                      </span>
+                      <span className="invd-total-val">{fmt(markupAmount)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="invd-total-row">
                   <span className="invd-total-label">Ex GST</span>
                   <span className="invd-total-val">{fmt(exGst)}</span>

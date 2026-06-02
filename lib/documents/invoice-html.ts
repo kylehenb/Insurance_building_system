@@ -45,6 +45,11 @@ export function generateInvoiceHtml(params: {
     : (tenant.invoice_payment_terms ?? 14)
   const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + paymentDays * 24 * 60 * 60 * 1000).toISOString())
 
+  const isMakeSafe = invoice.invoice_type === 'make_safe'
+  const markupPct = (invoice as any).markup_pct as number | null ?? 0
+  const subtotalFromLines = lineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+  const markupAmount = isMakeSafe ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
+
   // Build line items table HTML
   const lineItemsHtml = lineItems.map((item, idx) => `
     <tr style="border-bottom:1px solid #f0ece6;">
@@ -166,6 +171,18 @@ export function generateInvoiceHtml(params: {
     <!-- Totals Section -->
     <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
       <div style="width:280px;">
+        ${isMakeSafe ? `
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;
+          border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Subtotal</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(subtotalFromLines)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;
+          border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Builder&apos;s Margin (${(markupPct * 100).toFixed(1)}%)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(markupAmount)}</span>
+        </div>
+        ` : ''}
         <div style="display:flex;justify-content:space-between;padding:8px 12px;
           border-bottom:1px solid #e0dbd4;">
           <span style="font-size:11px;color:#9e998f;">Subtotal (ex GST)</span>

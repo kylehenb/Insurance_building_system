@@ -130,6 +130,7 @@ export function generateMakeSafeInvoice(params: {
   claimNumber: string | null
   lineItems: Array<{ description: string; quantity: number; unitPrice: number; unit?: string; libraryItemId?: string }>
   gstPct: number
+  markupPct?: number
 }): GeneratedInvoice {
   const lineItemsWithTotals = params.lineItems.map((item, i) => ({
     tenant_id: params.tenantId,
@@ -142,7 +143,10 @@ export function generateMakeSafeInvoice(params: {
     sort_order: i,
   }))
 
-  const amountExGst = Math.round(lineItemsWithTotals.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+  const subtotal = Math.round(lineItemsWithTotals.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+  const markupPct = params.markupPct ?? 0
+  const markup = Math.round(subtotal * markupPct * 100) / 100
+  const amountExGst = Math.round((subtotal + markup) * 100) / 100
   const gst = Math.round(amountExGst * params.gstPct * 100) / 100
   const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
 
@@ -157,6 +161,7 @@ export function generateMakeSafeInvoice(params: {
       amount_ex_gst: amountExGst,
       gst,
       amount_inc_gst: amountIncGst,
+      markup_pct: markupPct,
       status: 'draft',
     },
     lineItems: lineItemsWithTotals,

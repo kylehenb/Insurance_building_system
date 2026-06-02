@@ -1511,6 +1511,7 @@ export type Database = {
           invoice_type: string
           issued_date: string | null
           job_id: string
+          markup_pct: number | null
           notes: string | null
           paid_date: string | null
           parse_status: string | null
@@ -1543,6 +1544,7 @@ export type Database = {
           invoice_type: string
           issued_date?: string | null
           job_id: string
+          markup_pct?: number | null
           notes?: string | null
           paid_date?: string | null
           parse_status?: string | null
@@ -1575,6 +1577,7 @@ export type Database = {
           invoice_type?: string
           issued_date?: string | null
           job_id?: string
+          markup_pct?: number | null
           notes?: string | null
           paid_date?: string | null
           parse_status?: string | null

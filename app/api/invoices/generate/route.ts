@@ -109,7 +109,14 @@ export async function POST(req: NextRequest) {
     description = description.replace(/{job_number}/g, job.job_number || 'N/A')
     description = description.replace(/{insured_name}/g, job.insured_name || 'N/A')
 
-    const amountExGst = price
+    // For make_safe, apply builder's margin from client settings
+    const makeSafeMarkupPct = type === 'make_safe'
+      ? ((client as any).builders_margin_pct ?? 0) / 100
+      : null
+
+    const lineItemTotal = price
+    const markup = makeSafeMarkupPct != null ? Math.round(lineItemTotal * makeSafeMarkupPct * 100) / 100 : 0
+    const amountExGst = Math.round((lineItemTotal + markup) * 100) / 100
     const gst = Math.round(amountExGst * DEFAULT_GST_PCT * 100) / 100
     const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
 
@@ -125,13 +132,14 @@ export async function POST(req: NextRequest) {
         gst,
         amount_inc_gst: amountIncGst,
         status: 'draft',
+        ...(makeSafeMarkupPct != null ? { markup_pct: makeSafeMarkupPct } : {}),
       },
       lineItems: [{
         tenant_id: tenantId,
         description,
         quantity: 1,
-        unit_price: amountExGst,
-        line_total: amountExGst,
+        unit_price: lineItemTotal,
+        line_total: lineItemTotal,
         sort_order: 0,
       }],
     }
