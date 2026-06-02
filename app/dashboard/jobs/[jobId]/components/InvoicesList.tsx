@@ -145,8 +145,14 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
         alert(err.error ?? 'Failed to create invoice')
         return
       }
+      const { invoice: newInvoice } = await res.json() as { invoice: { id: string } }
       await load()
       onInvoiceUpdated?.()
+      // Auto-expand and edit make_safe invoices so builder's margin is immediately visible
+      if (type === 'make_safe' && newInvoice?.id) {
+        setExpandedInvoiceId(newInvoice.id)
+        setEditingInvoiceId(newInvoice.id)
+      }
     } catch {
       alert('Failed to create invoice. Please try again.')
     } finally {
@@ -374,7 +380,14 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
                 cursor: 'pointer',
               }}
-              onClick={() => setExpandedInvoiceId(expandedInvoiceId === invoice.id ? null : invoice.id)}
+              onClick={() => {
+                const isExpanding = expandedInvoiceId !== invoice.id
+                setExpandedInvoiceId(isExpanding ? invoice.id : null)
+                // Make safe draft invoices open directly in edit mode
+                if (isExpanding && invoice.invoice_type === 'make_safe' && invoice.status === 'draft') {
+                  setEditingInvoiceId(invoice.id)
+                }
+              }}
             >
               {/* Invoice ref */}
               <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', flex: 1 }}>
@@ -505,9 +518,10 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                       )}
 
                       {/* Totals */}
-                      {invoice.invoice_type === 'make_safe' && invoice.markup_pct != null && invoice.markup_pct > 0 && (() => {
+                      {invoice.invoice_type === 'make_safe' && (() => {
                         const lineSub = invoice.line_items.reduce((s, i) => s + i.line_total, 0)
-                        const markup = Math.round(lineSub * invoice.markup_pct * 100) / 100
+                        const pct = invoice.markup_pct ?? 0
+                        const markup = Math.round(lineSub * pct * 100) / 100
                         return (
                           <>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
@@ -515,7 +529,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                               <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(lineSub)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
-                              <span>Builder&apos;s Margin ({(invoice.markup_pct * 100).toFixed(1)}%)</span>
+                              <span>Builder&apos;s Margin ({(pct * 100).toFixed(1)}%)</span>
                               <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(markup)}</span>
                             </div>
                           </>

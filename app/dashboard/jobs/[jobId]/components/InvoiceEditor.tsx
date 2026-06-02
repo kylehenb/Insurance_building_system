@@ -68,7 +68,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     try {
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
-        .select('id, invoice_type, amount_ex_gst, gst, amount_inc_gst, markup_pct')
+        .select('*')
         .eq('id', invoiceId)
         .eq('tenant_id', tenantId)
         .single()
