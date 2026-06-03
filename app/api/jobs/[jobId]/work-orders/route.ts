@@ -133,19 +133,18 @@ export async function POST(
     }
   })
 
-  // Fetch existing work orders for this quote to enable per-trade duplicate detection
+  // Fetch existing work orders by job_id so duplicate detection works across all
+  // trigger paths (auto-create on approval + manual Sync from quote).
   const { data: existingWOs } = await supabase
     .from('work_orders')
     .select('id, trade_id, trade_name, sequence_order, job_id')
-    .eq('quote_id', quote.id)
+    .eq('job_id', jobId)
     .eq('tenant_id', tenantId)
 
-  // Delete orphaned work orders:
-  // 1. Those with no trade_id and no trade_name (created by old sync code)
-  // 2. Those linked to a different or null job_id — these were created by the
-  //    auto-create trigger firing with a bad job_id and are invisible to the UI.
+  // Delete orphaned work orders: those with no trade_id and no trade_name
+  // (created by old sync code and invisible to the UI).
   const orphanedWOIds = (existingWOs ?? [])
-    .filter(wo => (wo.trade_id === null && !wo.trade_name) || wo.job_id !== jobId)
+    .filter(wo => wo.trade_id === null && !wo.trade_name)
     .map(wo => wo.id)
 
   if (orphanedWOIds.length > 0) {

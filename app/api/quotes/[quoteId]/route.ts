@@ -6,13 +6,13 @@ import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string, tenantId: string) {
   const supabase = createServiceClient()
 
-  // Fetch existing work orders per trade to allow per-trade duplicate detection.
-  // This means re-running (e.g. on a second status change) will fill in any
-  // trades that were missed on the first run rather than bailing out entirely.
+  // Check by job_id (not quote_id) so duplicate detection works across all
+  // trigger paths — prevents double-creation if the approval fires more than once
+  // or if Sync from quote is also used.
   const { data: existingWOs } = await supabase
     .from('work_orders')
     .select('id, trade_id, trade_name')
-    .eq('quote_id', quoteId)
+    .eq('job_id', jobId)
     .eq('tenant_id', tenantId)
 
   const existingTradeIds = new Set(
