@@ -18,8 +18,10 @@ import { BARReportForm } from './BARReportForm'
 import { RoofReportForm } from './RoofReportForm'
 import { MakeSafeReportForm } from './MakeSafeReportForm'
 import { LDRReportForm } from './LDRReportForm'
+import { AllianzSedgwickBARForm } from './insurer-forms/AllianzSedgwickBARForm'
 import { useReportAutosave } from './useReportAutosave'
 import { PropertyDetails, parsePropertyDetails } from '@/lib/types/property-details'
+import { getInsurerTemplateKey } from '@/lib/insurer-templates'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Report {
@@ -231,6 +233,10 @@ export function ReportAccordionItem({
     status: 'idle' | 'saving' | 'saved' | 'error'
   }>({ status: 'idle' })
 
+  // Insurer/adjuster state (for template selection)
+  const [jobInsurer, setJobInsurer] = useState<string | null>(null)
+  const [jobAdjuster, setJobAdjuster] = useState<string | null>(null)
+
   // Fetch job with property_details when accordion opens
   useEffect(() => {
     if (isOpen && !propertyDetailsLoading) return
@@ -240,13 +246,15 @@ export function ReportAccordionItem({
       setPropertyDetailsLoading(true)
       const { data: job } = await supabase
         .from('jobs')
-        .select('id, job_number, property_details')
+        .select('id, job_number, property_details, insurer, adjuster')
         .eq('id', report.job_id)
         .eq('tenant_id', report.tenant_id)
         .single()
 
       const parsed = parsePropertyDetails(job?.property_details)
       setPropertyDetails(parsed)
+      setJobInsurer(job?.insurer ?? null)
+      setJobAdjuster(job?.adjuster ?? null)
       setPropertyDetailsLoading(false)
     }
 
@@ -882,14 +890,25 @@ export function ReportAccordionItem({
             </div>
 
             {(report.report_type === 'BAR' || report.report_type === 'storm_wind') && (
-              <BARReportForm
-                data={report as unknown as Record<string, unknown>}
-                locked={isLocked}
-                onChange={handleFieldChange}
-                tenantId={report.tenant_id}
-                reportId={report.id}
-                jobId={report.job_id}
-              />
+              getInsurerTemplateKey(jobInsurer, jobAdjuster) === 'allianz-sedgwick' ? (
+                <AllianzSedgwickBARForm
+                  data={report as unknown as Record<string, unknown>}
+                  locked={isLocked}
+                  onChange={handleFieldChange}
+                  tenantId={report.tenant_id}
+                  reportId={report.id}
+                  jobId={report.job_id}
+                />
+              ) : (
+                <BARReportForm
+                  data={report as unknown as Record<string, unknown>}
+                  locked={isLocked}
+                  onChange={handleFieldChange}
+                  tenantId={report.tenant_id}
+                  reportId={report.id}
+                  jobId={report.job_id}
+                />
+              )
             )}
             {report.report_type === 'roof' && (
               <RoofReportForm

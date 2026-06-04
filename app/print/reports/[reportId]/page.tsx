@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { PrintButton } from './PrintButton'
 import { parsePropertyDetails } from '@/lib/types/property-details'
+import { getInsurerTemplateKey } from '@/lib/insurer-templates'
+import { AllianzSedgwickTemplate } from './templates/AllianzSedgwickTemplate'
 
 type Report = Database['public']['Tables']['reports']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
@@ -341,6 +343,25 @@ export default async function ReportPrintPage({
     .eq('report_id', reportId)
     .eq('tenant_id', tenantId)
     .order('sequence_number', { ascending: true })
+
+  // Route to insurer-specific template if applicable (BAR/storm_wind only)
+  const insurerTemplateKey = getInsurerTemplateKey(job.insurer, job.adjuster)
+  if (
+    insurerTemplateKey === 'allianz-sedgwick' &&
+    (report.report_type === 'BAR' || report.report_type === 'storm_wind')
+  ) {
+    return (
+      <>
+        <PrintButton reportRef={report.report_ref} jobNumber={job.job_number} />
+        <AllianzSedgwickTemplate
+          report={report}
+          job={job}
+          tenant={tenant}
+          photos={photos ?? []}
+        />
+      </>
+    )
+  }
 
   const pd = parsePropertyDetails(job.property_details)
 
