@@ -171,7 +171,7 @@ function TextRow({ text }: { text: string | null }) {
   )
 }
 
-// ——— Sedgwick logo (text-only representation) ————————————————————
+// ——— Sedgwick logo ————————————————————————————————————————————————
 function SedgwickHeader() {
   return (
     <div
@@ -183,25 +183,11 @@ function SedgwickHeader() {
         fontFamily: FONT,
       }}
     >
-      <span style={{ fontSize: '22px', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>
-        sedgwick
-      </span>
-      <sup
-        style={{
-          fontSize: '11px',
-          color: '#3ba08e',
-          fontWeight: '700',
-          verticalAlign: 'super',
-          marginLeft: '1px',
-          marginRight: '2px',
-        }}
-      >
-        ↑
-      </sup>
-      <span style={{ fontSize: '22px', color: '#6b7280', fontWeight: '400', marginLeft: '2px' }}>
-        |{' '}
-        <span style={{ color: '#3ba08e', fontWeight: '500' }}>repair solutions</span>
-      </span>
+      <img
+        src="/sedgwick-logo.png"
+        alt="Sedgwick Repair Solutions"
+        style={{ height: '36px', width: 'auto', display: 'inline-block' }}
+      />
     </div>
   )
 }

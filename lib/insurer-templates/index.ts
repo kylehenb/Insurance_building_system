@@ -17,7 +17,7 @@ export function getInsurerTemplateKey(
   const i = (insurer ?? '').toLowerCase()
   const a = (adjuster ?? '').toLowerCase()
 
-  if (i.includes('allianz') && a.includes('sedgwick')) return 'allianz-sedgwick'
+  if (i.includes('sedgwick') || (i.includes('allianz') && a.includes('sedgwick'))) return 'allianz-sedgwick'
 
   return 'default'
 }
