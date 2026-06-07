@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
+import TemplateSelectorField from '@/components/reports/TemplateSelectorField'
 
 interface InitialData {
   inspectionId: string
@@ -410,6 +411,17 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
+  // ─── Damage Templates ────────────────────────────────────────────────────
+  const [barDamageTemplate, setBarDamageTemplate] = useState<string | null>(null)
+  const [barDamageTemplateSaved, setBarDamageTemplateSaved] = useState(true)
+  const [isNewBarDamageTemplate, setIsNewBarDamageTemplate] = useState(false)
+  const [msDamageTemplate, setMsDamageTemplate] = useState<string | null>(null)
+  const [msDamageTemplateSaved, setMsDamageTemplateSaved] = useState(true)
+  const [isNewMsDamageTemplate, setIsNewMsDamageTemplate] = useState(false)
+  const [roofDamageTemplate, setRoofDamageTemplate] = useState<string | null>(null)
+  const [roofDamageTemplateSaved, setRoofDamageTemplateSaved] = useState(true)
+  const [isNewRoofDamageTemplate, setIsNewRoofDamageTemplate] = useState(false)
+
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
   const [barExporting, setBarExporting] = useState(false)
@@ -448,7 +460,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     msWorksCompleted, msTempFixes, msHours,
     roofRawNotes, roofPhotoContext,
     roofReportFields, roofFieldsOpen,
-  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, insuranceTemplate, insuranceFields, insuranceFieldsOpen, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen])
+    damage_template: barDamageTemplate, damage_template_saved: barDamageTemplateSaved,
+    ms_damage_template: msDamageTemplate, ms_damage_template_saved: msDamageTemplateSaved,
+    roof_damage_template: roofDamageTemplate, roof_damage_template_saved: roofDamageTemplateSaved,
+  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, insuranceTemplate, insuranceFields, insuranceFieldsOpen, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen, barDamageTemplate, barDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -491,6 +506,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
+    if (d.damage_template) setBarDamageTemplate(d.damage_template as string)
+    if (typeof d.damage_template_saved === 'boolean') setBarDamageTemplateSaved(d.damage_template_saved as boolean)
+    if (d.ms_damage_template) setMsDamageTemplate(d.ms_damage_template as string)
+    if (typeof d.ms_damage_template_saved === 'boolean') setMsDamageTemplateSaved(d.ms_damage_template_saved as boolean)
+    if (d.roof_damage_template) setRoofDamageTemplate(d.roof_damage_template as string)
+    if (typeof d.roof_damage_template_saved === 'boolean') setRoofDamageTemplateSaved(d.roof_damage_template_saved as boolean)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
@@ -907,6 +928,25 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
                   {/* Raw Report Notes */}
                   <div className="mc-section-head">Report Notes</div>
+                  <div style={{ padding: '12px 16px 0' }}>
+                    <TemplateSelectorField
+                      reportType="BAR"
+                      value={barDamageTemplate}
+                      onChange={name => { setBarDamageTemplate(name); setIsNewBarDamageTemplate(false); armDraft() }}
+                      onTemplateSaved={name => { setBarDamageTemplate(name); setIsNewBarDamageTemplate(true); armDraft() }}
+                    />
+                    {isNewBarDamageTemplate && barDamageTemplate && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={barDamageTemplateSaved}
+                          onChange={e => { setBarDamageTemplateSaved(e.target.checked); armDraft() }}
+                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
+                        />
+                        Save as template for future jobs
+                      </label>
+                    )}
+                  </div>
                   <div className="fa-ai-dark">
                     <div className="fa-ai-dark-head">
                       <span style={{ fontSize: 14 }}>✦</span>
@@ -1007,6 +1047,23 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                 <div className="mc-pill-body">
                   <div className="mc-section-head">Make Safe Fields</div>
                   <div style={{ padding: '14px 18px' }}>
+                    <TemplateSelectorField
+                      reportType="make_safe"
+                      value={msDamageTemplate}
+                      onChange={name => { setMsDamageTemplate(name); setIsNewMsDamageTemplate(false); armDraft() }}
+                      onTemplateSaved={name => { setMsDamageTemplate(name); setIsNewMsDamageTemplate(true); armDraft() }}
+                    />
+                    {isNewMsDamageTemplate && msDamageTemplate && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={msDamageTemplateSaved}
+                          onChange={e => { setMsDamageTemplateSaved(e.target.checked); armDraft() }}
+                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
+                        />
+                        Save as template for future jobs
+                      </label>
+                    )}
                     <div className="fa-fg" style={{ padding: 0, marginBottom: 14 }}>
                       <label className="fa-fl">Works Completed On Site</label>
                       <textarea className="fa-ta" placeholder="Describe emergency make safe works carried out…" value={msWorksCompleted} onChange={e => { setMsWorksCompleted(e.target.value); armDraft() }} />
@@ -1049,6 +1106,25 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
               {roofEnabled && (
                 <div className="mc-pill-body">
                   <div className="mc-section-head">Roof Report</div>
+                  <div style={{ padding: '12px 16px 0' }}>
+                    <TemplateSelectorField
+                      reportType="roof"
+                      value={roofDamageTemplate}
+                      onChange={name => { setRoofDamageTemplate(name); setIsNewRoofDamageTemplate(false); armDraft() }}
+                      onTemplateSaved={name => { setRoofDamageTemplate(name); setIsNewRoofDamageTemplate(true); armDraft() }}
+                    />
+                    {isNewRoofDamageTemplate && roofDamageTemplate && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={roofDamageTemplateSaved}
+                          onChange={e => { setRoofDamageTemplateSaved(e.target.checked); armDraft() }}
+                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
+                        />
+                        Save as template for future jobs
+                      </label>
+                    )}
+                  </div>
 
                   {/* Raw Notes */}
                   <div className="fa-ai-dark">
