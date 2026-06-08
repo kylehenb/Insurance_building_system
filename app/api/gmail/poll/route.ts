@@ -36,7 +36,7 @@ type LabelIds = {
 async function resolveLabelIds(gmail: gmail_v1.Gmail): Promise<LabelIds | null> {
   const listRes = await gmail.users.labels.list({ userId: 'me' })
   const existing = listRes.data.labels ?? []
-  const findId = (name: string) => existing.find(l => l.name === name)?.id ?? null
+  const findId = (name: string) => existing.find(l => l.name?.toLowerCase() === name.toLowerCase())?.id ?? null
 
   const lodgeJobId = findId(LABEL_LODGE_JOB)
   if (!lodgeJobId) return null
@@ -168,19 +168,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     for (const msgId of messageIds) {
       // Outer catch: message fetch / unexpected errors
       try {
-        // Claim message to prevent double-processing across concurrent poll invocations
-        const { count: claimedCount } = await rawDb
-          .from('processed_gmail_messages')
-          .upsert(
-            { message_id: msgId, processed_at: new Date().toISOString() },
-            { onConflict: 'message_id', ignoreDuplicates: true, count: 'exact' }
-          )
-
-        if (claimedCount === 0) {
-          // Another concurrent poll invocation already claimed this message — skip
-          continue
-        }
-
         const raw = await getFullMessage(msgId)
         const msg = extractMessageParts(raw)
         processedCount++
@@ -194,8 +181,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.complete)
         } catch (pipelineErr) {
           console.error(`[gmail-poll] pipeline error for message ${msgId}:`, pipelineErr)
-          // Clear claim so the user can retry by re-labelling to "Lodge Job"
-          await rawDb.from('processed_gmail_messages').delete().eq('message_id', msgId)
           await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.failed)
         }
 
