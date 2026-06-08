@@ -343,20 +343,11 @@ function ScopeItemsEditor({
   }
 
   async function handleCreate(data: ScopeItemData) {
-    if (!wo.quote_id) return
-    const newId = await onCreateScopeItem(wo.quote_id, wo.tradeTypeLabel, wo.id, data)
+    const newId = await onCreateScopeItem(wo.quote_id ?? '', wo.tradeTypeLabel, wo.id, data)
     if (newId) setNewItemIds(prev => new Set([...prev, newId]))
   }
 
   const items = wo.woDisplayItems
-
-  if (items.length === 0 && !wo.quote_id) {
-    return (
-      <div style={{ padding: '12px 20px', fontSize: 11, color: '#9a9590', background: '#faf8f5' }}>
-        This work order has no scope items (additional/make-safe work).
-      </div>
-    )
-  }
 
   // Group items by room
   const roomOrder: string[] = []
@@ -424,7 +415,7 @@ function ScopeItemsEditor({
               </React.Fragment>
             )
           })}
-          {!isLocked && wo.quote_id && (
+          {!isLocked && (
             <NewItemRow tradeLabel={wo.tradeTypeLabel} onAdd={handleCreate} />
           )}
         </tbody>
@@ -452,7 +443,7 @@ function WORow({
 }: {
   wo: WorkOrderWithDetails
   trades: TradeRow[]
-  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
+  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
@@ -461,6 +452,7 @@ function WORow({
 }) {
   const [expanded,       setExpanded]     = useState(false)
   const [localTradeId,   setLocalTradeId] = React.useState(wo.trade_id || '')
+  const [localTradeName, setLocalTradeName] = React.useState(wo.tradeTypeLabel || wo.trade_name || '')
   const [localAgreedAmt, setLocalAgreedAmt] = React.useState(
     (wo.agreed_amount ?? wo.lineItemsTotal).toString()
   )
@@ -473,15 +465,19 @@ function WORow({
       ? { bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Synced' }
       : { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' }
 
-  const isEditable = wo.status === 'pending'
-  const tradeType  = wo.work_type === 'make_safe' ? 'make_safe' : wo.tradeTypeLabel
+  const isEditable  = wo.status === 'pending'
+  const isAdditional = !wo.quote_id
+  const effectiveTrade = isAdditional && wo.work_type !== 'make_safe' ? localTradeName : wo.tradeTypeLabel
+  const tradeType  = wo.work_type === 'make_safe' ? 'make_safe' : effectiveTrade
   const eligibleTrades = trades.filter(t => t.primary_trade === tradeType || t.primary_trade === tradeType.toLowerCase())
+  const tradeOptions = Array.from(new Set(trades.map(t => t.primary_trade).filter((t): t is string => !!t)))
 
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')
+    setLocalTradeName(wo.tradeTypeLabel || wo.trade_name || '')
     setLocalAgreedAmt((wo.agreed_amount ?? wo.lineItemsTotal).toString())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wo.trade_id, wo.agreed_amount, wo.lineItemsTotal])
+  }, [wo.trade_id, wo.trade_name, wo.agreed_amount, wo.lineItemsTotal])
 
   const TD: React.CSSProperties = { padding: '6px 10px', borderBottom: expanded ? 'none' : '1px solid #e8e4de' }
   const MONO: React.CSSProperties = { ...TD, fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', whiteSpace: 'nowrap' }
@@ -504,9 +500,29 @@ function WORow({
         <td style={{ ...MONO }}>{wo.sequence_order ?? '—'}</td>
 
         {/* Trade */}
-        <td style={{ ...TD, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block', marginRight: 5, verticalAlign: 'middle' }} />
-          {wo.tradeTypeLabel || wo.work_type}
+        <td style={{ ...TD, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
+          {isAdditional && wo.work_type !== 'make_safe' && isEditable && !isLocked ? (
+            <select
+              value={localTradeName}
+              onChange={e => setLocalTradeName(e.target.value)}
+              onBlur={() => {
+                if (localTradeName !== (wo.tradeTypeLabel || wo.trade_name || '')) {
+                  onUpdate(wo.id, { trade_name: localTradeName || undefined })
+                }
+              }}
+              style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', maxWidth: '130px', width: '100%' }}
+            >
+              <option value="">Select trade…</option>
+              {tradeOptions.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block', marginRight: 5, verticalAlign: 'middle' }} />
+              {wo.tradeTypeLabel || wo.work_type}
+            </>
+          )}
         </td>
 
         {/* Contractor */}
@@ -688,7 +704,7 @@ function WOTable({
 }: {
   workOrders: WorkOrderWithDetails[]
   trades: TradeRow[]
-  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
+  onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
@@ -829,7 +845,7 @@ export interface BottomPanelProps {
   tenantId:    string
   onAddToQuote: (quoteId: string) => void
   onAddAdditional: () => void
-  onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null }>) => void
+  onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDeleteWorkOrder: (id: string) => Promise<void>
   onLockWorkOrder: (id: string) => Promise<void>
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
