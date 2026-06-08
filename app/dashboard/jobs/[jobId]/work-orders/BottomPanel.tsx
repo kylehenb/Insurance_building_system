@@ -65,7 +65,7 @@ function InvoiceChain({ extStatus }: { extStatus: string | null }) {
 
 // ─── Scope item editor ─────────────────────────────────────────────────────────
 
-type ScopeItemData = { item_description: string; qty: number; rate_labour: number; rate_materials: number; line_total: number }
+type ScopeItemData = { item_description: string; room: string | null; qty: number; rate_labour: number; rate_materials: number; line_total: number }
 
 
 function ScopeItemEditRow({
@@ -74,6 +74,8 @@ function ScopeItemEditRow({
   isNew,
   isLocked,
   modifiedFields,
+  roomOptions,
+  datalistId,
   onUpdate,
   onToggleDelete,
 }: {
@@ -82,15 +84,19 @@ function ScopeItemEditRow({
   isNew: boolean
   isLocked: boolean
   modifiedFields: Set<string>
+  roomOptions: string[]
+  datalistId: string
   onUpdate: (updates: Partial<ScopeItemRow>) => void
   onToggleDelete: () => void
 }) {
   const [localDesc,      setLocalDesc]      = React.useState(item.item_description ?? '')
+  const [localRoom,      setLocalRoom]      = React.useState(item.room ?? '')
   const [localQty,       setLocalQty]       = React.useState(String(item.qty ?? 0))
   const [localLabour,    setLocalLabour]     = React.useState(String(item.rate_labour ?? 0))
   const [localMaterials, setLocalMaterials]  = React.useState(String(item.rate_materials ?? 0))
 
   React.useEffect(() => { setLocalDesc(item.item_description ?? '') }, [item.item_description])
+  React.useEffect(() => { setLocalRoom(item.room ?? '') }, [item.room])
   React.useEffect(() => { setLocalQty(String(item.qty ?? 0)) }, [item.qty])
   React.useEffect(() => { setLocalLabour(String(item.rate_labour ?? 0)) }, [item.rate_labour])
   React.useEffect(() => { setLocalMaterials(String(item.rate_materials ?? 0)) }, [item.rate_materials])
@@ -110,8 +116,9 @@ function ScopeItemEditRow({
 
   function cellInputStyle(field: string): React.CSSProperties {
     const isMod  = modifiedFields.has(field)
+    const isSans = field === 'item_description' || field === 'room'
     return {
-      fontFamily: field === 'item_description' ? 'DM Sans, sans-serif' : 'DM Mono, monospace',
+      fontFamily: isSans ? 'DM Sans, sans-serif' : 'DM Mono, monospace',
       fontSize: 10,
       padding: '3px 6px',
       borderRadius: 4,
@@ -131,6 +138,8 @@ function ScopeItemEditRow({
     )
   }
 
+  const canEditRoom = item.isAddedInWO && !isLocked && !deleted
+
   return (
     <tr style={{ background: rowBg }}>
       {/* Index */}
@@ -148,6 +157,27 @@ function ScopeItemEditRow({
             onBlur={() => { if (localDesc !== (item.item_description ?? '')) onUpdate({ item_description: localDesc }) }}
             style={{ ...cellInputStyle('item_description'), width: '100%' }}
           />
+        )}
+      </td>
+
+      {/* Room */}
+      <td style={{ padding: '4px 6px', width: 110 }}>
+        {canEditRoom ? (
+          <>
+            <input
+              list={datalistId}
+              value={localRoom}
+              placeholder="Room…"
+              onChange={e => setLocalRoom(e.target.value)}
+              onBlur={() => {
+                const next = localRoom.trim() || null
+                if (next !== (item.room ?? null)) onUpdate({ room: next })
+              }}
+              style={{ ...cellInputStyle('room'), width: 98 }}
+            />
+          </>
+        ) : (
+          readSpan(item.room ?? '')
         )}
       </td>
 
@@ -218,20 +248,30 @@ function ScopeItemEditRow({
 
 function NewItemRow({
   tradeLabel,
+  roomOptions,
+  datalistId,
   onAdd,
 }: {
   tradeLabel: string
+  roomOptions: string[]
+  datalistId: string
   onAdd: (data: ScopeItemData) => void
 }) {
   type NewForm = Omit<ScopeItemData, 'line_total'>
-  const blank: NewForm = { item_description: '', qty: 1, rate_labour: 0, rate_materials: 0 }
+  const blank: NewForm = { item_description: '', room: null, qty: 1, rate_labour: 0, rate_materials: 0 }
   const [form, setForm] = useState<NewForm>(blank)
 
   function field<K extends keyof NewForm>(key: K, val: string) {
-    setForm(prev => ({ ...prev, [key]: key === 'item_description' ? val : parseFloat(val) || 0 }))
+    if (key === 'item_description') {
+      setForm(prev => ({ ...prev, item_description: val }))
+    } else if (key === 'room') {
+      setForm(prev => ({ ...prev, room: val || null }))
+    } else {
+      setForm(prev => ({ ...prev, [key]: parseFloat(val) || 0 }))
+    }
   }
 
-  const computedTotal = form.qty * (form.rate_labour + form.rate_materials)
+  const computedTotal = (form.qty as number) * ((form.rate_labour as number) + (form.rate_materials as number))
 
   function handleAdd() {
     if (!form.item_description.trim()) return
@@ -262,14 +302,23 @@ function NewItemRow({
           style={{ ...inputStyle, width: '100%' }}
         />
       </td>
+      <td style={{ padding: '4px 6px', width: 110 }}>
+        <input
+          list={datalistId}
+          placeholder="Room…"
+          value={form.room ?? ''}
+          onChange={e => field('room', e.target.value)}
+          style={{ ...inputStyle, width: 98 }}
+        />
+      </td>
       <td style={{ padding: '4px 6px', width: 70 }}>
-        <input type="number" value={form.qty} onChange={e => field('qty', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 60 }} />
+        <input type="number" value={form.qty as number} onChange={e => field('qty', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 60 }} />
       </td>
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <input type="number" value={form.rate_labour} onChange={e => field('rate_labour', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 88 }} />
+        <input type="number" value={form.rate_labour as number} onChange={e => field('rate_labour', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 88 }} />
       </td>
       <td style={{ padding: '4px 6px', width: 110 }}>
-        <input type="number" value={form.rate_materials} onChange={e => field('rate_materials', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 96 }} />
+        <input type="number" value={form.rate_materials as number} onChange={e => field('rate_materials', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 96 }} />
       </td>
       <td style={{ padding: '4px 6px', width: 100 }}>
         <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#5a5650', display: 'block', padding: '3px 4px' }}>
@@ -349,6 +398,12 @@ function ScopeItemsEditor({
 
   const items = wo.woDisplayItems
 
+  // Datalist of rooms already used in this WO (for the combo-box suggestions)
+  const datalistId = `room-opts-${wo.id}`
+  const roomOptions = Array.from(new Set(
+    items.filter(i => i.room && !i.isDeleted).map(i => i.room as string)
+  ))
+
   // Group items by room
   const roomOrder: string[] = []
   const byRoom = new Map<string, WODisplayItem[]>()
@@ -363,6 +418,11 @@ function ScopeItemsEditor({
 
   return (
     <div style={{ background: '#faf8f5', borderTop: '1px solid #e8e4de', overflowX: 'auto' }}>
+      {/* Shared datalist for room suggestions — one per WO to avoid cross-contamination */}
+      <datalist id={datalistId}>
+        {roomOptions.map(r => <option key={r} value={r} />)}
+      </datalist>
+
       {isLocked && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', background: '#eff4ff', borderBottom: '1px solid #bfdbfe' }}>
           <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', letterSpacing: '.04em' }}>
@@ -378,6 +438,7 @@ function ScopeItemsEditor({
           <tr>
             <th style={SCOPE_TH}>#</th>
             <th style={{ ...SCOPE_TH, minWidth: 160 }}>Description</th>
+            <th style={{ ...SCOPE_TH, width: 110 }}>Room</th>
             <th style={SCOPE_TH}>Qty</th>
             <th style={SCOPE_TH}>Labour Rate</th>
             <th style={SCOPE_TH}>Material Rate</th>
@@ -391,7 +452,7 @@ function ScopeItemsEditor({
             return (
               <React.Fragment key={room}>
                 <tr>
-                  <td colSpan={7} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
+                  <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650' }}>
                       {room}
                     </span>
@@ -407,6 +468,8 @@ function ScopeItemsEditor({
                       isNew={newItemIds.has(item.id)}
                       isLocked={isLocked}
                       modifiedFields={modifiedFields.get(item.id) ?? new Set()}
+                      roomOptions={roomOptions}
+                      datalistId={datalistId}
                       onUpdate={(updates) => handleUpdate(item.id, updates)}
                       onToggleDelete={() => onSoftDeleteScopeItem(wo.id, item.id)}
                     />
@@ -416,7 +479,12 @@ function ScopeItemsEditor({
             )
           })}
           {!isLocked && (
-            <NewItemRow tradeLabel={wo.tradeTypeLabel} onAdd={handleCreate} />
+            <NewItemRow
+              tradeLabel={wo.tradeTypeLabel}
+              roomOptions={roomOptions}
+              datalistId={datalistId}
+              onAdd={handleCreate}
+            />
           )}
         </tbody>
       </table>

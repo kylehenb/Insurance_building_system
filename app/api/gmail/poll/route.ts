@@ -1,132 +1,85 @@
 /**
  * Gmail API polling endpoint for email intake.
- * 
- * Replaces Gmail Watch + Pub/Sub with simpler polling mechanism.
- * Called by Vercel cron job every 2 minutes.
- * 
- * This endpoint:
- * 1. Fetches new messages since last poll timestamp
- * 2. Processes them using the same logic as the webhook
- * 3. Updates last_poll_timestamp
+ *
+ * Triggered by Vercel cron every 2 minutes.
+ * Processes emails labelled "Lodge Job" in Gmail.
+ *
+ * Label outcomes:
+ *   Order created (auto_parsed or needs_review) → "Auto lodge complete"
+ *   Hard failure (pipeline error / fetch error)  → "Auto Lodge failed"
+ *
+ * To retry a failed email: re-label it "Lodge Job" in Gmail.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
+import { gmail_v1 } from 'googleapis'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
-import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const WATCHED_EMAIL = 'office@insurancerepairco.com.au'
-const OUR_DOMAIN = 'insurancerepairco.com.au'
 
-type SenderPattern = {
-  type: 'domain' | 'email' | 'display_name'
-  value: string
-  active: boolean
+const LABEL_LODGE_JOB = 'Lodge Job'
+const LABEL_COMPLETE = 'Auto lodge complete'
+const LABEL_FAILED = 'Auto Lodge failed'
+
+type LabelIds = {
+  lodgeJob: string
+  complete: string
+  failed: string
 }
 
-type ClientEmailConfigRow = {
-  id: string
-  tenant_id: string
-  client_id: string
-  sender_patterns: SenderPattern[]
-  insurer_hint: string | null
-  custom_parsing_notes: string | null
-  default_work_order_type: string | null
-  active: boolean
-  created_at: string
-  updated_at: string
-}
+async function resolveLabelIds(gmail: gmail_v1.Gmail): Promise<LabelIds | null> {
+  const listRes = await gmail.users.labels.list({ userId: 'me' })
+  const existing = listRes.data.labels ?? []
+  const findId = (name: string) => existing.find(l => l.name === name)?.id ?? null
 
-type EmailKeywordRuleRow = {
-  id: string
-  tenant_id: string
-  keyword: string
-  active: boolean
-  created_at: string
-}
+  const lodgeJobId = findId(LABEL_LODGE_JOB)
+  if (!lodgeJobId) return null
 
-type RoutingConfig = {
-  clientConfigs: ClientEmailConfigRow[]
-  keywordRules: EmailKeywordRuleRow[]
-  loadedAt: number
-}
-
-const CACHE_TTL_MS = 60_000
-let routingConfigCache: RoutingConfig | null = null
-
-async function getRoutingConfig(tenantId: string): Promise<RoutingConfig> {
-  const now = Date.now()
-  if (routingConfigCache && now - routingConfigCache.loadedAt < CACHE_TTL_MS) {
-    return routingConfigCache
+  async function getOrCreate(name: string): Promise<string> {
+    const id = findId(name)
+    if (id) return id
+    const res = await gmail.users.labels.create({
+      userId: 'me',
+      requestBody: {
+        name,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show',
+      },
+    })
+    return res.data.id!
   }
 
-  const rawDb = createRawClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const [clientConfigsRes, keywordRulesRes] = await Promise.all([
-    rawDb
-      .from('client_email_config')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('active', true),
-    rawDb
-      .from('email_keyword_rules')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('active', true),
+  const [completeId, failedId] = await Promise.all([
+    getOrCreate(LABEL_COMPLETE),
+    getOrCreate(LABEL_FAILED),
   ])
 
-  const config: RoutingConfig = {
-    clientConfigs: (clientConfigsRes.data as ClientEmailConfigRow[]) ?? [],
-    keywordRules: (keywordRulesRes.data as EmailKeywordRuleRow[]) ?? [],
-    loadedAt: now,
-  }
-  routingConfigCache = config
-  return config
+  return { lodgeJob: lodgeJobId, complete: completeId, failed: failedId }
 }
 
-function matchClientConfig(
-  fromEmail: string,
-  fromName: string,
-  clientConfigs: ClientEmailConfigRow[]
-): ClientEmailConfigRow | null {
-  const emailLower = fromEmail.toLowerCase()
-  const nameLower = fromName.toLowerCase()
-  const domainPart = emailLower.split('@')[1] ?? ''
-
-  for (const config of clientConfigs) {
-    const patterns: SenderPattern[] = Array.isArray(config.sender_patterns)
-      ? config.sender_patterns
-      : []
-    for (const pattern of patterns) {
-      if (!pattern.active) continue
-      const val = pattern.value.toLowerCase()
-      if (pattern.type === 'domain' && domainPart.includes(val)) return config
-      if (pattern.type === 'email' && emailLower === val) return config
-      if (pattern.type === 'display_name' && nameLower.includes(val)) return config
-    }
-  }
-  return null
-}
-
-function isOrderEmailByKeywords(subject: string, keywordRules: EmailKeywordRuleRow[]): boolean {
-  const subjectLower = subject.toLowerCase()
-  return keywordRules.some(rule => rule.active && subjectLower.includes(rule.keyword.toLowerCase()))
-}
-
-function isOwnDomain(email: string): boolean {
-  return email.toLowerCase().endsWith(`@${OUR_DOMAIN}`)
+async function swapLabel(
+  gmail: gmail_v1.Gmail,
+  msgId: string,
+  removeLabelId: string,
+  addLabelId: string
+): Promise<void> {
+  await gmail.users.messages.modify({
+    userId: 'me',
+    id: msgId,
+    requestBody: {
+      removeLabelIds: [removeLabelId],
+      addLabelIds: [addLabelId],
+    },
+  })
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Verify cron secret for security
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
@@ -164,184 +117,104 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       tenantId = firstTenant.id
     }
 
-    // Get sync state
+    // Check polling is enabled
     const { data: syncState } = await rawDb
       .from('gmail_sync_state')
-      .select('*')
+      .select('polling_enabled')
       .eq('tenant_id', tenantId)
       .eq('email_address', WATCHED_EMAIL)
       .single()
 
-    // Check if polling is enabled
     if (!syncState || !syncState.polling_enabled) {
       console.log('[gmail-poll] polling not enabled for tenant', tenantId)
       return NextResponse.json({ status: 'polling_disabled' })
     }
 
-    const lastPollTimestamp = syncState.last_poll_timestamp
-      ? new Date(syncState.last_poll_timestamp).getTime()
-      : Date.now() - 120000 // Default: 2 minutes ago
+    // Resolve label IDs — auto-creates "Auto lodge complete" and "Auto Lodge failed" if missing
+    const labelIds = await resolveLabelIds(gmail)
+    if (!labelIds) {
+      console.error(`[gmail-poll] "${LABEL_LODGE_JOB}" label not found in Gmail`)
+      return NextResponse.json(
+        { error: `"${LABEL_LODGE_JOB}" label not found. Please create it in Gmail first.` },
+        { status: 400 }
+      )
+    }
 
-    // Ensure we don't go back more than 7 days to prevent picking up very old messages
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
-    const effectiveTimestamp = Math.max(lastPollTimestamp, sevenDaysAgo)
-
-    // Fetch messages since last poll, but not older than 7 days
-    const searchQuery = `after:${Math.floor(effectiveTimestamp / 1000)} in:inbox`
+    // Fetch all messages with "Lodge Job" label
     const messagesRes = await gmail.users.messages.list({
       userId: 'me',
-      q: searchQuery,
+      labelIds: [labelIds.lodgeJob],
       maxResults: 50,
     })
 
-    const messageIds = messagesRes.data.messages?.map(m => m.id).filter((id): id is string => Boolean(id)) ?? []
-    
+    const messageIds = messagesRes.data.messages
+      ?.map(m => m.id)
+      .filter((id): id is string => Boolean(id)) ?? []
+
     if (messageIds.length === 0) {
-      console.log('[gmail-poll] no new messages')
-      // Update poll timestamp even if no messages
-      await rawDb.from('gmail_sync_state').update({
-        last_poll_timestamp: new Date().toISOString(),
-      }).eq('tenant_id', tenantId).eq('email_address', WATCHED_EMAIL)
-      return NextResponse.json({ status: 'no_messages', messageIds: [] })
+      await rawDb
+        .from('gmail_sync_state')
+        .update({ last_poll_timestamp: new Date().toISOString() })
+        .eq('tenant_id', tenantId)
+        .eq('email_address', WATCHED_EMAIL)
+      return NextResponse.json({ status: 'no_messages' })
     }
 
-    console.log(`[gmail-poll] found ${messageIds.length} new messages`)
+    console.log(`[gmail-poll] found ${messageIds.length} messages with "${LABEL_LODGE_JOB}" label`)
 
-    // Load routing config
-    const routingConfig = await getRoutingConfig(tenantId)
-
-    // Process each message
     let processedCount = 0
     let orderCount = 0
-    let commCount = 0
 
     for (const msgId of messageIds) {
+      // Outer catch: message fetch / unexpected errors
       try {
-        // Deduplicate
+        // Claim message to prevent double-processing across concurrent poll invocations
         const { count: claimedCount } = await rawDb
           .from('processed_gmail_messages')
           .upsert(
             { message_id: msgId, processed_at: new Date().toISOString() },
             { onConflict: 'message_id', ignoreDuplicates: true, count: 'exact' }
           )
+
         if (claimedCount === 0) {
-          console.log(`[gmail-poll] skipping duplicate message ${msgId}`)
+          // Another concurrent poll invocation already claimed this message — skip
           continue
         }
 
         const raw = await getFullMessage(msgId)
         const msg = extractMessageParts(raw)
-
-        if (isOwnDomain(msg.fromEmail)) {
-          console.log(`[gmail-poll] skipping own domain message ${msgId}`)
-          continue
-        }
-
         processedCount++
 
-        // Check if thread already exists in communications
-        if (msg.threadId) {
-          const { data: existingThread } = await supabase
-            .from('communications')
-            .select('id, job_id')
-            .eq('tenant_id', tenantId)
-            .eq('thread_id', msg.threadId)
-            .limit(1)
-            .maybeSingle()
-
-          if (existingThread) {
-            await supabase.from('communications').insert({
-              tenant_id: tenantId,
-              job_id: existingThread.job_id,
-              type: 'email',
-              direction: 'inbound',
-              subject: msg.subject,
-              content: msg.bodyText,
-              created_at: msg.receivedAt,
-              thread_id: msg.threadId,
-              from_email: msg.fromEmail,
-              to_email: msg.to,
-              body_text: msg.bodyText,
-              source: 'inbound',
-            })
-            commCount++
-            continue
-          }
+        // Inner catch: order pipeline errors
+        try {
+          const parsed = await parseInsurerOrder(msg, null, tenantId)
+          const orderId = await writeInsurerOrder(parsed, msg, tenantId)
+          await sendOrderNotification(orderId, parsed, msg, tenantId)
+          orderCount++
+          await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.complete)
+        } catch (pipelineErr) {
+          console.error(`[gmail-poll] pipeline error for message ${msgId}:`, pipelineErr)
+          // Clear claim so the user can retry by re-labelling to "Lodge Job"
+          await rawDb.from('processed_gmail_messages').delete().eq('message_id', msgId)
+          await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.failed)
         }
 
-        // Match sender against client email configs
-        const matchedClientConfig = matchClientConfig(
-          msg.fromEmail,
-          msg.fromName,
-          routingConfig.clientConfigs
-        )
-
-        const isOrderByPattern = matchedClientConfig !== null
-        const isOrderByKeyword = isOrderEmailByKeywords(msg.subject, routingConfig.keywordRules)
-
-        if (isOrderByPattern || isOrderByKeyword) {
-          let orderId: string | null = null
-          const clientConfig: ClientEmailConfig | null = matchedClientConfig
-            ? (matchedClientConfig as unknown as ClientEmailConfig)
-            : null
-          try {
-            const parsed = await parseInsurerOrder(msg, clientConfig, tenantId)
-            orderId = await writeInsurerOrder(parsed, msg, tenantId)
-            await sendOrderNotification(orderId, parsed, msg, tenantId)
-            orderCount++
-          } catch (err) {
-            console.error(`[gmail-poll] order pipeline error for ${msgId}:`, err)
-            if (!orderId) {
-              const { error: fbErr } = await supabase.from('insurer_orders').insert({
-                tenant_id: tenantId,
-                parse_status: 'needs_review',
-                entry_method: 'email',
-                order_sender_email: msg.fromEmail || null,
-                order_sender_name: msg.fromName || null,
-                notes: msg.subject || null,
-                raw_email_link: `https://mail.google.com/mail/u/0/#inbox/${msgId}`,
-                status: 'pending',
-              })
-              if (fbErr) {
-                console.error(`[gmail-poll] fallback order insert failed for ${msgId}:`, fbErr)
-              }
-            }
-          }
-        } else {
-          await supabase.from('communications').insert({
-            tenant_id: tenantId,
-            job_id: null,
-            type: 'email',
-            direction: 'inbound',
-            subject: msg.subject,
-            content: msg.bodyText,
-            created_at: msg.receivedAt,
-            thread_id: msg.threadId || null,
-            from_email: msg.fromEmail,
-            to_email: msg.to,
-            body_text: msg.bodyText,
-            source: 'unlinked',
-          })
-          commCount++
-        }
-      } catch (err) {
-        console.error(`[gmail-poll] error processing message ${msgId}:`, err)
+      } catch (msgErr) {
+        console.error(`[gmail-poll] failed to process message ${msgId}:`, msgErr)
+        await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.failed)
       }
     }
 
-    // Update last poll timestamp
-    await rawDb.from('gmail_sync_state').update({
-      last_poll_timestamp: new Date().toISOString(),
-      last_synced_at: new Date().toISOString(),
-    }).eq('tenant_id', tenantId).eq('email_address', WATCHED_EMAIL)
+    await rawDb
+      .from('gmail_sync_state')
+      .update({
+        last_poll_timestamp: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('email_address', WATCHED_EMAIL)
 
-    return NextResponse.json({
-      status: 'success',
-      processedCount,
-      orderCount,
-      commCount,
-      messageIds,
-    })
+    return NextResponse.json({ status: 'success', processedCount, orderCount })
 
   } catch (err) {
     console.error('[gmail-poll] error:', err)

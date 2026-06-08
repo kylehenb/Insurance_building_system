@@ -45,7 +45,7 @@ export interface WorkOrderMutations {
   // Scope item mutations
   updateScopeItem:     (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   softDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
-  createScopeItem:     (quoteId: string, tradeLabel: string, workOrderId: string, data: { item_description: string; qty: number; rate_labour: number; rate_materials: number; line_total: number }) => Promise<string | null>
+  createScopeItem:     (quoteId: string, tradeLabel: string, workOrderId: string, data: { item_description: string; room: string | null; qty: number; rate_labour: number; rate_materials: number; line_total: number }) => Promise<string | null>
   deleteWorkOrder:     (id: string) => Promise<void>
   addWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
   lockWorkOrder:       (id: string) => Promise<void>
@@ -593,6 +593,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         // Update the item stored in notes.added_items
         const patch: Partial<WOAddedItem> = {}
         if ('item_description' in updates) patch.item_description = (updates.item_description ?? '') as string
+        if ('room'             in updates) patch.room             = updates.room ?? null
         if (updates.qty           !== undefined) patch.qty           = updates.qty as number
         if (updates.rate_labour   !== undefined) patch.rate_labour   = updates.rate_labour as number
         if (updates.rate_materials !== undefined) patch.rate_materials = updates.rate_materials as number
@@ -673,7 +674,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         rate_labour:      data.rate_labour,
         rate_materials:   data.rate_materials,
         line_total:       data.line_total,
-        room:             null,
+        room:             data.room,
         trade:            tradeLabel,
       }
       const newNotes = mergeAddedItem(wo.notes, newItem)
