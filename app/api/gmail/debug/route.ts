@@ -14,13 +14,13 @@ const LABEL_FAILED = 'Auto Lodge failed'
 
 async function getSessionAndClients() {
   const userSession = await getUser()
-  if (!userSession) return null
+  if (!userSession?.tenant_id) return null
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   const gmail = getGmailClient()
-  return { tenantId: userSession.tenant_id, rawDb, gmail }
+  return { tenantId: userSession.tenant_id as string, rawDb, gmail }
 }
 
 // GET /api/gmail/debug — shows current state, does not process anything
