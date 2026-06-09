@@ -79,6 +79,7 @@ async function swapLabel(
   })
 }
 
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
@@ -117,6 +118,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       tenantId = firstTenant.id
     }
 
+    console.log('[gmail-poll] tenant:', tenantId)
+
     // Check polling is enabled
     const { data: syncState } = await rawDb
       .from('gmail_sync_state')
@@ -125,13 +128,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .eq('email_address', WATCHED_EMAIL)
       .single()
 
+    console.log('[gmail-poll] syncState:', JSON.stringify(syncState))
+
     if (!syncState || !syncState.polling_enabled) {
-      console.log('[gmail-poll] polling not enabled for tenant', tenantId)
+      console.log('[gmail-poll] polling not enabled — returning polling_disabled')
       return NextResponse.json({ status: 'polling_disabled' })
     }
 
     // Resolve label IDs — auto-creates "Auto lodge complete" and "Auto Lodge failed" if missing
+    console.log('[gmail-poll] resolving labels...')
     const labelIds = await resolveLabelIds(gmail)
+    console.log('[gmail-poll] labelIds:', JSON.stringify(labelIds))
+
     if (!labelIds) {
       console.error(`[gmail-poll] "${LABEL_LODGE_JOB}" label not found in Gmail`)
       return NextResponse.json(
@@ -141,6 +149,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Fetch all messages with "Lodge Job" label
+    console.log('[gmail-poll] fetching messages with labelId:', labelIds.lodgeJob)
     const messagesRes = await gmail.users.messages.list({
       userId: 'me',
       labelIds: [labelIds.lodgeJob],
@@ -151,6 +160,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ?.map(m => m.id)
       .filter((id): id is string => Boolean(id)) ?? []
 
+    console.log(`[gmail-poll] messages found: ${messageIds.length}`, messageIds)
+
     if (messageIds.length === 0) {
       await rawDb
         .from('gmail_sync_state')
@@ -160,12 +171,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ status: 'no_messages' })
     }
 
-    console.log(`[gmail-poll] found ${messageIds.length} messages with "${LABEL_LODGE_JOB}" label`)
-
     let processedCount = 0
     let orderCount = 0
 
     for (const msgId of messageIds) {
+      console.log(`[gmail-poll] processing message ${msgId}`)
       // Outer catch: message fetch / unexpected errors
       try {
         const raw = await getFullMessage(msgId)
@@ -178,6 +188,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           const orderId = await writeInsurerOrder(parsed, msg, tenantId)
           await sendOrderNotification(orderId, parsed, msg, tenantId)
           orderCount++
+          console.log(`[gmail-poll] order created ${orderId} for message ${msgId}`)
           await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.complete)
         } catch (pipelineErr) {
           console.error(`[gmail-poll] pipeline error for message ${msgId}:`, pipelineErr)
