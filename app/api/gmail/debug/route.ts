@@ -131,7 +131,14 @@ export async function POST(): Promise<NextResponse> {
           id: msgId,
           requestBody: { removeLabelIds: [lodgeJobId], addLabelIds: [completeId] },
         })
-        results.push({ messageId: msgId, status: 'lodged', error: undefined })
+        results.push({
+          messageId: msgId,
+          status: parsed.confidence > 0 ? 'lodged' : 'lodged_zero_confidence',
+          confidence: parsed.confidence,
+          parseStatus: parsed.parseStatus,
+          claimNumber: parsed.data.claim_number ?? null,
+          bodyTextLength: msg.bodyText.length,
+        })
       } catch (pipelineErr) {
         await gmail.users.messages.modify({
           userId: 'me',

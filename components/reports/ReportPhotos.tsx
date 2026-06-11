@@ -253,16 +253,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
           .from('photos')
           .createSignedUrl(`${filePath}?width=400&height=300`, 3600)
 
-        // Update uploading photo to success state
-        setUploadingPhotos(prev => 
-          prev.map(p => 
-            p.id === uploadingPhoto.id 
-              ? { ...p, status: 'success', photoId: photoData.id, thumbnailUrl: signedUrlData?.signedUrl }
-              : p
-          )
-        )
-
-        // Add to photos array
+        // Remove the uploading placeholder and add the real photo
+        setUploadingPhotos(prev => prev.filter(p => p.id !== uploadingPhoto.id))
         setPhotos(prev => [...prev, { ...photoData as Photo, thumbnailUrl: signedUrlData?.signedUrl ?? null }])
       } catch (error) {
         console.error('Upload error:', error)

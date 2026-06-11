@@ -95,6 +95,21 @@ function extractParts(
   }
 }
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 export function extractMessageParts(message: GmailMessage): ExtractedMessage {
   const from = getHeader(message, 'From')
   const { email: fromEmail, name: fromName } = parseFromHeader(from)
@@ -119,13 +134,16 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
     }
   }
 
+  // Fall back to HTML-stripped text when there is no text/plain part
+  const bodyText = parts.bodyText || stripHtml(parts.bodyHtml)
+
   return {
     subject,
     from,
     fromEmail,
     fromName,
     to,
-    bodyText: parts.bodyText,
+    bodyText,
     bodyHtml: parts.bodyHtml,
     attachments: parts.attachments,
     threadId: message.threadId ?? '',

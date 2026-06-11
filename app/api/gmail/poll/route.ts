@@ -12,7 +12,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
 import { gmail_v1 } from 'googleapis'
@@ -87,7 +86,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -95,45 +93,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const gmail = getGmailClient()
 
   try {
-    // Get tenant
-    const { data: tenantRow } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('contact_email', WATCHED_EMAIL)
-      .single()
-
-    let tenantId: string
-    if (tenantRow) {
-      tenantId = tenantRow.id
-    } else {
-      const { data: firstTenant } = await supabase
-        .from('tenants')
-        .select('id')
-        .limit(1)
-        .single()
-      if (!firstTenant) {
-        console.error('[gmail-poll] no tenant found')
-        return NextResponse.json({ error: 'No tenant found' }, { status: 404 })
-      }
-      tenantId = firstTenant.id
-    }
-
-    console.log('[gmail-poll] tenant:', tenantId)
-
-    // Check polling is enabled
+    // Look up sync state directly by email — derives tenantId from it, no brittle tenant lookup
     const { data: syncState } = await rawDb
       .from('gmail_sync_state')
-      .select('polling_enabled')
-      .eq('tenant_id', tenantId)
+      .select('tenant_id, polling_enabled')
       .eq('email_address', WATCHED_EMAIL)
       .single()
 
     console.log('[gmail-poll] syncState:', JSON.stringify(syncState))
 
-    if (!syncState || !syncState.polling_enabled) {
+    if (!syncState?.polling_enabled) {
       console.log('[gmail-poll] polling not enabled — returning polling_disabled')
       return NextResponse.json({ status: 'polling_disabled' })
     }
+
+    const tenantId: string = syncState.tenant_id
+    console.log('[gmail-poll] tenant:', tenantId)
 
     // Resolve label IDs — auto-creates "Auto lodge complete" and "Auto Lodge failed" if missing
     console.log('[gmail-poll] resolving labels...')
