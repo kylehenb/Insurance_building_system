@@ -47,6 +47,7 @@ const DEFAULT_BAR_TEMPLATE = {
     'conclusion',
     'pre_existing_conditions',
     'maintenance_notes',
+    'additional_notes',
   ] as const,
 }
 
@@ -1292,11 +1293,9 @@ export default async function ReportPrintPage({
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                           </div>
-                          {photo.label && (
-                            <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center' }}>
-                              {globalSequence}. {photo.label}
-                            </div>
-                          )}
+                          <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center', marginTop: '4px' }}>
+                            {globalSequence}.{photo.label ? ` ${photo.label}` : ''}
+                          </div>
                         </div>
                       )
                     })}
