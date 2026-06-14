@@ -392,6 +392,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [insuranceTemplate, setInsuranceTemplate] = useState<InsuranceTemplate | ''>('')
   const [insuranceFields, setInsuranceFields] = useState<Record<string, string>>({})
   const [insuranceFieldsOpen, setInsuranceFieldsOpen] = useState(false)
+  const [autofillScript, setAutofillScript] = useState('')
+  const [autofillScriptOpen, setAutofillScriptOpen] = useState(false)
 
   // ─── Make Safe fields ─────────────────────────────────────────────────────
   const [msWorksCompleted, setMsWorksCompleted] = useState('')
@@ -456,14 +458,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     rawReportNotes,
-    insuranceTemplate, insuranceFields, insuranceFieldsOpen,
+    insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
     msWorksCompleted, msTempFixes, msHours,
     roofRawNotes, roofPhotoContext,
     roofReportFields, roofFieldsOpen,
     damage_template: barDamageTemplate, damage_template_saved: barDamageTemplateSaved,
     ms_damage_template: msDamageTemplate, ms_damage_template_saved: msDamageTemplateSaved,
     roof_damage_template: roofDamageTemplate, roof_damage_template_saved: roofDamageTemplateSaved,
-  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, insuranceTemplate, insuranceFields, insuranceFieldsOpen, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen, barDamageTemplate, barDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved])
+  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen, barDamageTemplate, barDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -499,6 +501,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.insuranceTemplate) setInsuranceTemplate(d.insuranceTemplate as InsuranceTemplate)
     if (d.insuranceFields) setInsuranceFields(d.insuranceFields as Record<string, string>)
     if (d.insuranceFieldsOpen) setInsuranceFieldsOpen(d.insuranceFieldsOpen as boolean)
+    if (d.autofillScript) setAutofillScript(d.autofillScript as string)
+    if (d.autofillScriptOpen) setAutofillScriptOpen(d.autofillScriptOpen as boolean)
     if (d.msWorksCompleted) setMsWorksCompleted(d.msWorksCompleted as string)
     if (d.msTempFixes) setMsTempFixes(d.msTempFixes as string)
     if (d.msHours) setMsHours(d.msHours as string)
@@ -755,6 +759,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       if (data.ok && data.fields) {
         setInsuranceFields(data.fields)
         setInsuranceFieldsOpen(true)
+        if (data.javascript) {
+          setAutofillScript(data.javascript)
+          setAutofillScriptOpen(true)
+        }
         armDraft()
       } else {
         alert('Failed to generate template. Please try again.')
@@ -1024,6 +1032,50 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                               Export to CSV
                             </button>
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* MySysWorks Autofill Script (AAI only) */}
+                  {autofillScript && (
+                    <div>
+                      <div
+                        className="mc-rrf-head"
+                        onClick={() => { setAutofillScriptOpen(p => !p); armDraft() }}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: 'var(--off)', borderTop: '1px solid var(--border)' }}
+                      >
+                        <span className="mc-rrf-head-label" style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text)', fontWeight: 500 }}>
+                          MySysWorks Autofill Script
+                        </span>
+                        <span className="mc-rrf-arrow">{autofillScriptOpen ? '▾' : '›'}</span>
+                      </div>
+                      {autofillScriptOpen && (
+                        <div style={{ background: 'white', padding: '12px 18px', paddingBottom: 16 }}>
+                          <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
+                            <button
+                              className="mc-export-btn"
+                              style={{ background: 'var(--blue)', fontSize: 12 }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(autofillScript)
+                                  .catch(() => {
+                                    const ta = document.createElement('textarea')
+                                    ta.value = autofillScript
+                                    document.body.appendChild(ta)
+                                    ta.select()
+                                    document.execCommand('copy')
+                                    document.body.removeChild(ta)
+                                  })
+                              }}
+                            >
+                              Copy to Clipboard
+                            </button>
+                          </div>
+                          <textarea
+                            readOnly
+                            value={autofillScript}
+                            style={{ width: '100%', height: 320, fontFamily: 'var(--font-dm-mono)', fontSize: 11, resize: 'vertical', border: '1px solid var(--border)', borderRadius: 4, padding: '8px 10px', background: '#f9f9f9', boxSizing: 'border-box' }}
+                          />
                         </div>
                       )}
                     </div>

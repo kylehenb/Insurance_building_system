@@ -159,6 +159,344 @@ const AUTO_GENERAL_SCHEMA = `{
   "performed_under_licence": "BC105884"
 }`
 
+// ── AAI JS Autofill ───────────────────────────────────────────────────────
+const AAI_JS_SYSTEM = `You are an expert building inspector at Insurance Repair Co Pty Ltd in Perth, Australia. Convert building inspection field notes and context into a filled JavaScript data object for an insurance form auto-fill script. Return the complete JavaScript script with ONLY the data object values filled from the notes and context. Do not change any field names, comments, or the auto-fill engine code below the data object. Only populate values in the data = { } object. Use "" for any field not mentioned or determinable.`
+
+const AAI_JS_TEMPLATE = `// ============================================================
+// SUNCORP REPAIR ASSESSMENT REPORT — AUTO-FILL SCRIPT
+// ============================================================
+// INSTRUCTIONS:
+//   1. Open the report form in MySysWorks
+//   2. Press F12 → Console tab
+//   3. Paste this entire script and press Enter
+//
+// EDIT ONLY THE VALUES IN THE 'data' OBJECT BELOW
+// Leave a field as "" to skip it (won't overwrite existing value)
+// ============================================================
+
+const data = {
+
+  // ── CLAIM INFORMATION ─────────────────────────────────────
+  reportDate:            "",        // Format: YYYY-MM-DD
+  reportType:            "",             // "Interim" or "Final"
+  lodgementDescription:  "",
+  claimedLossCause:      "",             // Short text e.g. "Storm", "Burst Pipe", "Fire"
+  suncorpAssessor:       "",            // Geoff | Katie | Lachie | David | Peta | Dane | Alex
+  assessmentType:        "",   // Dual Assessment | Desktop | Virtual Assessment
+  siteAttendanceDatetime:"",  // Format: YYYY-MM-DDTHH:MM (datetime-local)
+
+  // ── OVERALL PROPERTY OBSERVATIONS ─────────────────────────
+  maintenanceConcerns:   "",                // "Yes" or "No"
+  maintenanceConcernDetails: "",              // Fill if Yes above
+
+  // ── SAFETY CONCERNS ───────────────────────────────────────
+  safetyConcerns:        "",               // No | Mould | Asbestos | Electrical Hazards |
+                                              // Fall / Trip Hazards | Property Security Issues |
+                                              // Access Issues | Pets/ Animals | Other
+  safetyConcernDetails:  "",                 // Fill if not "No"
+
+  // ── CAUSE OF DAMAGE ───────────────────────────────────────
+  // Template dropdown for areas damaged (select by text):
+  areasDamagedTemplate:  "",
+  // Rich text - areas damaged detail (MCE editor):
+  areasDamagedDetail:    "",
+
+  // Template dropdown for proximate cause:
+  proximateCauseTemplate: "",
+  // Rich text - proximate cause detail (MCE editor):
+  proximateCauseDetail:   "",
+
+  // ── SPECIALIST REPORT ─────────────────────────────────────
+  specialistReportObtained: "",            // "Yes" or "No"
+  specialistReportSummary:  "",              // Fill if Yes
+
+  // ── DAMAGE TYPE ───────────────────────────────────────────
+  damageTermType:        "",     // "Single Event" or "Long Term"
+  wearAndTear:           "",                 // Plain text response for wear/tear question (leave "" if n/a)
+
+  // ── WEAR & TEAR ADDITIONAL (only if applicable) ───────────
+  wearTearObservations:  "",
+  preventativeMeasures:  "",
+  customerKnowledgeEvidence: "",
+
+  // ── ASSESSMENT SUMMARY ────────────────────────────────────
+  customerConversationTemplate: "",
+  // Rich text - general observations (MCE editor):
+  generalObservations:   "",
+
+  // ── MAKESAFE / RESTORATION ────────────────────────────────
+  makesafeActioned:      "",              // "Yes" or "No"
+  makesafeDetails:       "",               // Fill if Yes
+
+  // ── FLOOR PLAN ────────────────────────────────────────────
+  floorPlanSupplied:     "",            // "Yes" or "No"
+
+  // ── SPECIALIST REPORT REQUIRED ────────────────────────────
+  specialistRequired:    "",             // "Yes" or "No"
+  specialistDetails:     "",              // Fill if Yes
+
+  // ── REPAIR DETAILS ────────────────────────────────────────
+  nonWarrantableRepairs: "",            // "Yes" or "No"
+  nonWarrantableDetails: "",
+  ncrdRequired:          "",              // Non-claim issues REQUIRED before repairs
+  ncrdRecommended:       "",              // Non-claim issues RECOMMENDED
+  matchingIssues:        "",              // Matching of materials concerns
+
+  // ── CLAIM CONSIDERATIONS ──────────────────────────────────
+  authorityToProceed:    "",           // "Yes" or "No"
+  referToInsurer:        "",            // "Yes" or "No"
+  // Referral reason dropdown (only used if referToInsurer = "Yes"):
+  referralReason:        "",              // Repair costs are above the authorised limit |
+                                          // No resultant damage | Review required for policy coverage |
+                                          // Unable to warrant repairs | Liability Purposes |
+                                          // Obtain - Customer COD Proof | Under Applicable Excess |
+                                          // Refer to Assessor | Multiple COD identified on site |
+                                          // Maintenance / NCRD Outstanding - REQUIRED prior to commencing
+  // Rich text - referral reason detail (MCE editor):
+  referralReasonDetail:  "",
+  repairTimeframe:       "",     // Plain text
+  tempAccommodation:     "",            // "Yes" or "No"
+  tempAccommodationDetails: "",           // Fill if Yes
+  recoveryIdentified:    "",              // "" (leave blank) or "Yes"
+  recoveryDetails:       "",              // Fill if Yes
+
+};
+
+
+// ============================================================
+// AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
+// ============================================================
+(function() {
+
+  // ── FIND THE REPORT FORM CONTAINER ──────────────────────
+  // The container ID ends with a session number that changes each page load.
+  // We find it dynamically by prefix.
+  const container = document.querySelector('[id^="job_question_list_"]');
+  if (!container) {
+    console.error('❌ Report form container not found. Make sure the form is open.');
+    return;
+  }
+
+  // Get all form fields in DOM order (this is the reliable index-based map)
+  const fields = container.querySelectorAll('input:not([type=hidden]), select, textarea');
+
+  // ── HELPER: set a native input value and trigger React/KO events ──
+  function setVal(el, value) {
+    if (!el) return;
+    const nativeSetter = Object.getOwnPropertyDescriptor(el.constructor.prototype || window.HTMLInputElement.prototype, 'value')?.set
+                      || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    if (nativeSetter) nativeSetter.call(el, value);
+    else el.value = value;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // ── HELPER: click a radio button by ko_unique name + value ──
+  function setRadio(koName, value) {
+    const radio = container.querySelector(\`input[type="radio"][name="\${koName}"][value="\${value}"]\`);
+    if (radio) {
+      radio.click();
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      console.warn(\`⚠️ Radio not found: name="\${koName}" value="\${value}"\`);
+    }
+  }
+
+  // ── HELPER: set a <select> by option text (since many have empty values) ──
+  function setSelectByText(selectEl, text) {
+    if (!selectEl || !text) return;
+    for (const opt of selectEl.options) {
+      if (opt.text.trim() === text) {
+        selectEl.value = opt.value;
+        // Also set selectedIndex for KO compatibility
+        selectEl.selectedIndex = opt.index;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+    console.warn(\`⚠️ Option "\${text}" not found in select\`);
+  }
+
+  // ── HELPER: set TinyMCE rich text editor ──
+  function setMCE(editorId, html) {
+    if (!html) return;
+    if (typeof tinymce !== 'undefined') {
+      // Try dynamic ID (changes per session) — find by known static prefix
+      const allEditors = tinymce.editors;
+      const prefix = editorId.split('_').slice(0, 2).join('_'); // e.g. "mceEditor_422"
+      const editor = allEditors.find(e => e.id.startsWith(prefix));
+      if (editor) {
+        editor.setContent(html);
+        editor.save(); // sync back to textarea
+        return;
+      }
+    }
+    // Fallback: set textarea directly
+    const ta = container.querySelector(\`textarea[id^="\${editorId.split('_').slice(0,2).join('_')}"]\`);
+    if (ta) setVal(ta, html);
+    else console.warn(\`⚠️ MCE editor not found: \${editorId}\`);
+  }
+
+  // ── FIELD MAP (index within #job_question_list_*) ────────
+  // [0]  INPUT date        → Report Date
+  // [1]  RADIO ko_unique_1 → Type of Report: Interim
+  // [2]  RADIO ko_unique_2 → Type of Report: Final
+  // [3]  TEXTAREA          → Lodgement Description
+  // [4]  INPUT text        → Claimed Loss Cause
+  // [5]  SELECT [0]        → Suncorp Assessor
+  // [6]  SELECT [1]        → Assessment Type
+  // [7]  INPUT datetime-local → Site Attendance date/time
+  // [8]  RADIO ko_unique_3 → Maintenance concerns: Yes
+  // [9]  RADIO ko_unique_4 → Maintenance concerns: No
+  // [10] TEXTAREA          → If Yes, maintenance concern details
+  // [11] SELECT [2]        → Safety concerns dropdown
+  // [12] TEXTAREA          → Safety concern details
+  // [13] SELECT [3]        → Areas damaged template
+  // [14] TEXTAREA (MCE)    → Areas damaged detail  [mceEditor_422_*]
+  // [15] SELECT [4]        → Proximate cause template
+  // [16] TEXTAREA (MCE)    → Proximate cause detail [mceEditor_423_*]
+  // [17] RADIO ko_unique_5 → Specialist report: Yes
+  // [18] RADIO ko_unique_6 → Specialist report: No
+  // [19] TEXTAREA          → Specialist report summary
+  // [20] SELECT [5]        → Single Event / Long Term
+  // [21] TEXTAREA          → Wear/tear response
+  // [22] TEXTAREA          → Wear/tear observations
+  // [23] TEXTAREA          → Preventative measures
+  // [24] TEXTAREA          → Customer knowledge (inevitable?)
+  // [25] TEXTAREA          → Evidence customer should have known
+  // [26] SELECT [6]        → Customer conversation template
+  // [27] TEXTAREA (MCE)    → General observations [mceEditor_435_*]
+  // [28] TEXTAREA          → General observations (plain textarea mirror)
+  // [29] RADIO ko_unique_7 → Makesafe actioned: Yes
+  // [30] RADIO ko_unique_8 → Makesafe actioned: No
+  // [31] TEXTAREA          → Makesafe works carried out
+  // [32] RADIO ko_unique_9 → Floor plan supplied: Yes
+  // [33] RADIO ko_unique_10 → Floor plan supplied: No
+  // [34] RADIO ko_unique_11 → Specialist required: Yes
+  // [35] RADIO ko_unique_12 → Specialist required: No
+  // [36] TEXTAREA          → Specialist required details
+  // [37] RADIO ko_unique_13 → Non-warrantable repairs: Yes
+  // [38] RADIO ko_unique_14 → Non-warrantable repairs: No
+  // [39] TEXTAREA          → Non-warrantable repairs detail
+  // [40] TEXTAREA          → NCRD Required
+  // [41] TEXTAREA          → NCRD Recommended
+  // [42] TEXTAREA          → Matching materials issues
+  // [43] RADIO ko_unique_15 → Authority to proceed: Yes
+  // [44] RADIO ko_unique_16 → Authority to proceed: No
+  // [45] RADIO ko_unique_17 → Refer to insurer: Yes
+  // [46] RADIO ko_unique_18 → Refer to insurer: No
+  // [47] SELECT [7]        → Referral reason dropdown
+  // [48] TEXTAREA (MCE)    → Referral reason detail [mceEditor_453_*]
+  // [49] INPUT text        → Repair timeframe
+  // [50] RADIO ko_unique_19 → Temp accommodation: Yes
+  // [51] RADIO ko_unique_20 → Temp accommodation: No
+  // [52] TEXTAREA          → Temp accommodation details
+  // [53] SELECT [8]        → Recovery identified (Yes or blank)
+  // [54] TEXTAREA          → Recovery details
+
+  const f = fields; // shorthand
+
+  // ── FILL FIELDS ──────────────────────────────────────────
+
+  // Report Date
+  if (data.reportDate) setVal(f[0], data.reportDate);
+
+  // Report Type radio
+  if (data.reportType === 'Interim')  setRadio('ko_unique_1', 'Interim');
+  if (data.reportType === 'Final')    setRadio('ko_unique_2', 'Final');
+
+  // Lodgement Description
+  if (data.lodgementDescription) setVal(f[3], data.lodgementDescription);
+
+  // Claimed Loss Cause
+  if (data.claimedLossCause) setVal(f[4], data.claimedLossCause);
+
+  // Suncorp Assessor
+  setSelectByText(f[5], data.suncorpAssessor);
+
+  // Assessment Type
+  setSelectByText(f[6], data.assessmentType);
+
+  // Site Attendance datetime-local
+  if (data.siteAttendanceDatetime) setVal(f[7], data.siteAttendanceDatetime);
+
+  // Maintenance concerns
+  if (data.maintenanceConcerns === 'Yes') setRadio('ko_unique_3', 'Yes');
+  if (data.maintenanceConcerns === 'No')  setRadio('ko_unique_4', 'No');
+  if (data.maintenanceConcernDetails)     setVal(f[10], data.maintenanceConcernDetails);
+
+  // Safety concerns
+  setSelectByText(f[11], data.safetyConcerns);
+  if (data.safetyConcernDetails) setVal(f[12], data.safetyConcernDetails);
+
+  // Areas damaged
+  setSelectByText(f[13], data.areasDamagedTemplate);
+  setMCE('mceEditor_422', data.areasDamagedDetail);
+
+  // Proximate cause
+  setSelectByText(f[15], data.proximateCauseTemplate);
+  setMCE('mceEditor_423', data.proximateCauseDetail);
+
+  // Specialist report obtained
+  if (data.specialistReportObtained === 'Yes') setRadio('ko_unique_5', 'Yes');
+  if (data.specialistReportObtained === 'No')  setRadio('ko_unique_6', 'No');
+  if (data.specialistReportSummary)            setVal(f[19], data.specialistReportSummary);
+
+  // Single event / long term
+  setSelectByText(f[20], data.damageTermType);
+  if (data.wearAndTear)              setVal(f[21], data.wearAndTear);
+  if (data.wearTearObservations)     setVal(f[22], data.wearTearObservations);
+  if (data.preventativeMeasures)     setVal(f[23], data.preventativeMeasures);
+  if (data.customerKnowledgeEvidence) setVal(f[25], data.customerKnowledgeEvidence);
+
+  // Customer conversation + general observations
+  setSelectByText(f[26], data.customerConversationTemplate);
+  setMCE('mceEditor_435', data.generalObservations);
+
+  // Makesafe
+  if (data.makesafeActioned === 'Yes') setRadio('ko_unique_7', 'Yes');
+  if (data.makesafeActioned === 'No')  setRadio('ko_unique_8', 'No');
+  if (data.makesafeDetails)            setVal(f[31], data.makesafeDetails);
+
+  // Floor plan
+  if (data.floorPlanSupplied === 'Yes') setRadio('ko_unique_9',  'Yes');
+  if (data.floorPlanSupplied === 'No')  setRadio('ko_unique_10', 'No');
+
+  // Specialist required
+  if (data.specialistRequired === 'Yes') setRadio('ko_unique_11', 'Yes');
+  if (data.specialistRequired === 'No')  setRadio('ko_unique_12', 'No');
+  if (data.specialistDetails)            setVal(f[36], data.specialistDetails);
+
+  // Non-warrantable repairs
+  if (data.nonWarrantableRepairs === 'Yes') setRadio('ko_unique_13', 'Yes');
+  if (data.nonWarrantableRepairs === 'No')  setRadio('ko_unique_14', 'No');
+  if (data.nonWarrantableDetails)           setVal(f[39], data.nonWarrantableDetails);
+  if (data.ncrdRequired)                    setVal(f[40], data.ncrdRequired);
+  if (data.ncrdRecommended)                 setVal(f[41], data.ncrdRecommended);
+  if (data.matchingIssues)                  setVal(f[42], data.matchingIssues);
+
+  // Claim considerations
+  if (data.authorityToProceed === 'Yes') setRadio('ko_unique_15', 'Yes');
+  if (data.authorityToProceed === 'No')  setRadio('ko_unique_16', 'No');
+  if (data.referToInsurer === 'Yes')     setRadio('ko_unique_17', 'Yes');
+  if (data.referToInsurer === 'No')      setRadio('ko_unique_18', 'No');
+  setSelectByText(f[47], data.referralReason);
+  setMCE('mceEditor_453', data.referralReasonDetail);
+  if (data.repairTimeframe)              setVal(f[49], data.repairTimeframe);
+
+  // Temp accommodation
+  if (data.tempAccommodation === 'Yes') setRadio('ko_unique_19', 'Yes');
+  if (data.tempAccommodation === 'No')  setRadio('ko_unique_20', 'No');
+  if (data.tempAccommodationDetails)    setVal(f[52], data.tempAccommodationDetails);
+
+  // Recovery
+  setSelectByText(f[53], data.recoveryIdentified === 'Yes' ? 'Yes' : '--- Select ---');
+  if (data.recoveryDetails) setVal(f[54], data.recoveryDetails);
+
+  console.log('✅ Auto-fill complete! Review the form, then click Save or Complete.');
+
+})();`
+
 // ── IAG (unchanged) ───────────────────────────────────────────────────────
 const IAG_SYSTEM = `You are an expert Australian insurance building assessor completing a formal IAG insurance assessment report. Use professional language appropriate for insurance assessment reports. For Yes/No fields use exactly "Yes" or "No". For Good/Fair/Poor fields use those exact values. If information cannot be determined from the notes or context, use an empty string "". Pre-populate fields from the provided context where applicable.
 
@@ -299,7 +637,33 @@ ${schema}`,
       return NextResponse.json({ error: 'Failed to parse AI response', details: content.text }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, fields })
+    let javascript: string | undefined
+    if (template === 'aai') {
+      const jsMessage = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8192,
+        system: AAI_JS_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `Convert this building report dictation into the data = { } JavaScript object below. Use the exact field names shown. Only change the values — do not rename any keys. Leave fields as "" if not mentioned.
+
+MY DICTATION:
+[${rawNotes}]
+
+Context:
+[${contextLines}]
+
+TEMPLATE TO FILL:
+[${AAI_JS_TEMPLATE}]`,
+        }],
+      })
+      const jsContent = jsMessage.content[0]
+      if (jsContent.type === 'text') {
+        javascript = jsContent.text
+      }
+    }
+
+    return NextResponse.json({ ok: true, fields, ...(javascript !== undefined && { javascript }) })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
   }
