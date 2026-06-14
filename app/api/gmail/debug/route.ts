@@ -115,7 +115,7 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ status: 'no_messages' })
   }
 
-  const results: Array<{ messageId: string; status: string; error?: string }> = []
+  const results: Array<{ messageId: string; status: string; error?: string; confidence?: number; parseStatus?: string; claimNumber?: string | null; bodyTextLength?: number }> = []
 
   for (const msgId of messageIds) {
     try {
