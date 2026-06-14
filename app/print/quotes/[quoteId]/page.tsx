@@ -377,15 +377,16 @@ export default async function QuotePrintPage({
                       </div>
                     )}
                     {cashSettlementItems.length > 0 && (
-                      <div 
-                        className="flex justify-between mb-1 px-2"
-                        style={{ 
+                      <div
+                        className="flex justify-between pt-2 mt-2 px-2"
+                        style={{
+                          borderTop: '1px solid #e0dbd4',
                           borderLeft: '3px solid #94a3b8',
                           borderRight: '3px solid #94a3b8'
                         }}
                       >
-                        <span className="text-[10px] text-[#3a3530]">Cash Settlement Items incl GST</span>
-                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="text-sm font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Cash Settlement Items incl GST and Builder&apos;s margin</span>
+                        <span className="font-mono text-base font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * (1 + (quote.markup_pct || 0.2)) * (1 + (quote.gst_pct || 0.1)))}</span>
                       </div>
                     )}
                   </div>

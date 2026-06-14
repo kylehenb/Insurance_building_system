@@ -353,7 +353,15 @@ export default async function ReportPrintPage({
   ) {
     return (
       <>
-        <PrintButton reportRef={report.report_ref} jobNumber={job.job_number} />
+        <PrintButton
+          reportRef={report.report_ref}
+          jobNumber={job.job_number}
+          reportType={report.report_type}
+          insuredName={job.insured_name}
+          propertyAddress={job.property_address}
+          insurer={job.insurer}
+          claimNumber={job.claim_number}
+        />
         <AllianzSedgwickTemplate
           report={report}
           job={job}
@@ -479,7 +487,15 @@ export default async function ReportPrintPage({
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0" style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}>
-        <PrintButton reportRef={report.report_ref} jobNumber={job.job_number} />
+        <PrintButton
+          reportRef={report.report_ref}
+          jobNumber={job.job_number}
+          reportType={report.report_type}
+          insuredName={job.insured_name}
+          propertyAddress={job.property_address}
+          insurer={job.insurer}
+          claimNumber={job.claim_number}
+        />
 
         {/* Header - 3-column flex (matching invoice layout) */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>

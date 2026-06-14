@@ -650,40 +650,59 @@ export function QuoteFooter({
                   marginBottom: 6,
                 }}
               >
-                Informational breakdown
+                Included in Total
               </div>
               {(
                 ['provisional_sum', 'prime_cost', 'cash_settlement'] as NonNullable<ItemType>[]
               )
                 .filter(t => typeSubtotals[t] !== undefined)
-                .map(type => (
-                  <div
-                    key={type}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 4,
-                      paddingLeft: 8,
-                      paddingRight: 8,
-                      borderLeft: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
-                      borderRight: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
-                    }}
-                  >
-                    <span style={{ fontSize: 12, color: '#9e998f' }}>
-                      {ITEM_TYPE_LABELS[type].label} incl GST
-                    </span>
-                    <span
+                .map(type => {
+                  const isCash = type === 'cash_settlement'
+                  const amount = isCash
+                    ? typeSubtotals[type]! * (1 + quote.markup_pct) * (1 + quote.gst_pct)
+                    : typeSubtotals[type]! * 1.1
+                  const label = isCash
+                    ? 'Cash Settlement Items incl GST and Builder\'s margin'
+                    : `${ITEM_TYPE_LABELS[type].label} incl GST`
+                  return (
+                    <div
+                      key={type}
                       style={{
-                        fontSize: 12,
-                        color: '#3a3530',
-                        fontFamily: 'DM Mono, monospace',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: isCash ? 0 : 4,
+                        marginTop: isCash ? 6 : 0,
+                        paddingTop: isCash ? 8 : 0,
+                        paddingLeft: 8,
+                        paddingRight: 8,
+                        borderTop: isCash ? '1px solid #e0dbd4' : 'none',
+                        borderLeft: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
+                        borderRight: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
                       }}
                     >
-                      {fmt(typeSubtotals[type]! * 1.1)}
-                    </span>
-                  </div>
-                ))}
+                      <span
+                        style={{
+                          fontSize: isCash ? 14 : 12,
+                          fontWeight: isCash ? 600 : 400,
+                          color: isCash ? '#3a3530' : '#9e998f',
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: isCash ? 17 : 12,
+                          fontWeight: isCash ? 700 : 400,
+                          color: '#3a3530',
+                          fontFamily: 'DM Mono, monospace',
+                        }}
+                      >
+                        {fmt(amount)}
+                      </span>
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>
