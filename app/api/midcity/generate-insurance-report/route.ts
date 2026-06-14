@@ -3,70 +3,6 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const dynamic = 'force-dynamic'
 
-// ── AAI Limited ───────────────────────────────────────────────────────────
-const AAI_SYSTEM = `You are an expert building inspector at Insurance Repair Co Pty Ltd in Perth, Australia. Write formal, factual insurance building assessment reports for AAI Limited / Suncorp Group insurers (AAMI, GIO, Bingle, Apia, Shannons). Your style must be cold, clinical and professional - no first person language. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not use em dashes - use hyphens or alternative punctuation instead.
-
-Additional style rules:
-- All narrative fields use third person, clinical, professional language
-- All Yes/No fields must contain exactly "Yes" or "No" (capitalised, no punctuation)
-- Bullet lists use "- " prefix (hyphen-space), not em dashes, not dots
-- No speculation beyond observed evidence
-- Australian Standard references inline where applicable
-- If information is not available from the notes, use "" for that field - do not fabricate
-
-Respond only with a valid JSON object. No preamble, no markdown code fences, no explanation - just the raw JSON.`
-
-const AAI_SCHEMA = `{
-  "claim_number": "claim number",
-  "brand": "insurer brand e.g. AAMI Insurance, GIO, Suncorp",
-  "insured_address": "full property address",
-  "builder_reference_number": "builder reference number",
-  "report_date": "today's date DD/MM/YYYY",
-  "type_of_report": "e.g. Building Assessment Report",
-  "date_of_loss": "DD/MM/YYYY",
-  "lodgement_description": "one-line summary of what was lodged by the insured",
-  "claimed_loss_cause": "e.g. Storm, Escape of Liquid, Impact",
-  "client_name": "insured full name",
-  "assessment_completed_by": "Kyle Bindon",
-  "suncorp_assessor": "Suncorp assessor name if applicable, else empty string",
-  "assessment_type": "Desktop | Site Attendance | Drive-by",
-  "site_attendance": "date and time of site attendance",
-  "significant_defects": "No or narrative description of significant maintenance / structural defects / property condition concerns",
-  "defects_details": "details of observations if significant_defects is not No, else empty string",
-  "safety_concerns": "No or narrative description of safety concerns or hazards",
-  "safety_concerns_details": "details if safety_concerns is not No, else empty string",
-  "areas_damaged": "clinical paragraph describing all areas of the property that have been damaged",
-  "how_damage_occurred": "clinical paragraph explaining proximate cause and causal link between proximate cause and damage. No first person. Include relevant Australian Standard references where applicable.",
-  "specialist_report_obtained": "Yes or No",
-  "specialist_report_summary": "summary of specialist report findings if applicable, else empty string",
-  "damage_long_term_or_single": "Single event | Long term / gradual | narrative",
-  "wear_tear_gradual": "Yes or No",
-  "visible_evidence_wear_tear": "visible evidence of wear/tear/gradual deterioration/gradual leak if wear_tear_gradual is Yes, else empty string",
-  "repairs_could_have_prevented": "repairs or preventative measures that could have prevented the loss if wear_tear_gradual is Yes, else empty string",
-  "customer_knew_inevitable": "Yes or No - empty string if wear_tear_gradual is No",
-  "customer_knowledge_evidence": "evidence to substantiate if customer_knew_inevitable is Yes, else empty string",
-  "customer_conversation": "what the insured reported; third person only; facts only",
-  "general_observations": "other key facts observed during assessment; clinical format",
-  "makesafe_restoration_actioned": "Yes or No",
-  "makesafe_works_details": "details of makesafe or restoration works carried out if actioned, else empty string",
-  "floor_plan_supplied": "Yes or No",
-  "specialist_report_required": "Yes or No",
-  "which_specialist_required": "which specialist is required and why if applicable, else empty string",
-  "non_warrantable_repairs": "Yes or No",
-  "non_warrantable_details": "details with reference to Building Laws and Regulations if Yes, else empty string",
-  "pre_existing_required": "pre-existing issues REQUIRED to be addressed before repairs; None identified. if none",
-  "pre_existing_recommended": "pre-existing issues RECOMMENDED to be addressed; None identified. if none",
-  "material_matching_issues": "Yes or No with brief detail if Yes",
-  "within_authority_to_proceed": "Yes - progressing to repairs or explanation if not",
-  "claim_referred_to_insurer": "Yes or No",
-  "referral_reason": "reason for referral if Yes, else empty string",
-  "estimated_repair_timeframe": "overall estimated repair timeframe e.g. 4-6 weeks",
-  "temp_accommodation_required": "Yes or No",
-  "temp_accommodation_details": "details if Yes - what repairs require it, why, and duration; else empty string",
-  "potential_recovery_identified": "Yes or No",
-  "potential_recovery_details": "details of potential recovery if Yes, else empty string"
-}`
-
 // ── Auto & General ────────────────────────────────────────────────────────
 const AUTO_GENERAL_SYSTEM = `You are an expert building inspector at Insurance Repair Co Pty Ltd in Perth, Australia. Write formal, factual insurance building assessment reports for Auto & General Insurance Company Limited. Your style must be cold, clinical and professional - no first person language. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not use em dashes - use hyphens or alternative punctuation instead.
 
@@ -160,7 +96,9 @@ const AUTO_GENERAL_SCHEMA = `{
 }`
 
 // ── AAI JS Autofill ───────────────────────────────────────────────────────
-const AAI_JS_SYSTEM = `You are an expert building inspector at Insurance Repair Co Pty Ltd in Perth, Australia. Convert building inspection field notes and context into a filled JavaScript data object for an insurance form auto-fill script. Return the complete JavaScript script with ONLY the data object values filled from the notes and context. Do not change any field names, comments, or the auto-fill engine code below the data object. Only populate values in the data = { } object. Use "" for any field not mentioned or determinable.`
+const AAI_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
+
+Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
 const AAI_JS_TEMPLATE = `// ============================================================
 // SUNCORP REPAIR ASSESSMENT REPORT — AUTO-FILL SCRIPT
@@ -178,40 +116,30 @@ const data = {
 
   // ── CLAIM INFORMATION ─────────────────────────────────────
   reportDate:            "",        // Format: YYYY-MM-DD
-  reportType:            "",             // "Interim" or "Final"
-  lodgementDescription:  "",
+  reportType:            "Final",             // "Interim" or "Final"
   claimedLossCause:      "",             // Short text e.g. "Storm", "Burst Pipe", "Fire"
-  suncorpAssessor:       "",            // Geoff | Katie | Lachie | David | Peta | Dane | Alex
-  assessmentType:        "",   // Dual Assessment | Desktop | Virtual Assessment
-  siteAttendanceDatetime:"",  // Format: YYYY-MM-DDTHH:MM (datetime-local)
 
   // ── OVERALL PROPERTY OBSERVATIONS ─────────────────────────
-  maintenanceConcerns:   "",                // "Yes" or "No"
-  maintenanceConcernDetails: "",              // Fill if Yes above
+  maintenanceConcerns:   "No",                // always fill with "No"
+  maintenanceConcernDetails: "N/A",              // Always fill with "N/A"
 
   // ── SAFETY CONCERNS ───────────────────────────────────────
-  safetyConcerns:        "",               // No | Mould | Asbestos | Electrical Hazards |
-                                              // Fall / Trip Hazards | Property Security Issues |
-                                              // Access Issues | Pets/ Animals | Other
-  safetyConcernDetails:  "",                 // Fill if not "No"
+  safetyConcerns:        "No",               // always fill with "No"
+  safetyConcernDetails:  "N/A",                 // Always fill with "N/A"
 
   // ── CAUSE OF DAMAGE ───────────────────────────────────────
-  // Template dropdown for areas damaged (select by text):
-  areasDamagedTemplate:  "",
   // Rich text - areas damaged detail (MCE editor):
-  areasDamagedDetail:    "",
+  areasDamagedDetail:    "",       // Bullet list of observed damage. Each line: "• [Room] - [type of damage] [measurement if known]". Use a sub-bullet (-) only if scope needs clarifying. One line per item. If multiple items in a room or similar items across multiple rooms, group them: "• [Room] - [damage 1], [damage 2]" or "• [Room 1], [Room 3] - [damage]". No cause or opinion - observations only.
 
-  // Template dropdown for proximate cause:
-  proximateCauseTemplate: "",
   // Rich text - proximate cause detail (MCE editor):
-  proximateCauseDetail:   "",
+  proximateCauseDetail:   "",          // Bullet point analysis of the cause. First bullet: "• Primary cause - [type]". Sub-bullets are one-line evidence observations. Include Australian Standard references inline. No first person. Each secondary cause gets its own "• Primary cause" line.
 
   // ── SPECIALIST REPORT ─────────────────────────────────────
-  specialistReportObtained: "",            // "Yes" or "No"
+  specialistReportObtained: "No",            // "Yes" or "No"
   specialistReportSummary:  "",              // Fill if Yes
 
   // ── DAMAGE TYPE ───────────────────────────────────────────
-  damageTermType:        "",     // "Single Event" or "Long Term"
+  damageTermType:        "Single Event",     // "Single Event" or "Long Term"
   wearAndTear:           "",                 // Plain text response for wear/tear question (leave "" if n/a)
 
   // ── WEAR & TEAR ADDITIONAL (only if applicable) ───────────
@@ -220,31 +148,31 @@ const data = {
   customerKnowledgeEvidence: "",
 
   // ── ASSESSMENT SUMMARY ────────────────────────────────────
-  customerConversationTemplate: "",
+  customerConversationTemplate: "Storm - Client Discussion",
   // Rich text - general observations (MCE editor):
-  generalObservations:   "",
+  generalObservations:   "",   // Leave blank unless specific additional notes or notable observations impact the report or claim.
 
   // ── MAKESAFE / RESTORATION ────────────────────────────────
-  makesafeActioned:      "",              // "Yes" or "No"
+  makesafeActioned:      "No",              // "Yes" or "No"
   makesafeDetails:       "",               // Fill if Yes
 
   // ── FLOOR PLAN ────────────────────────────────────────────
-  floorPlanSupplied:     "",            // "Yes" or "No"
+  floorPlanSupplied:     "Yes",            // "Yes" or "No"
 
   // ── SPECIALIST REPORT REQUIRED ────────────────────────────
-  specialistRequired:    "",             // "Yes" or "No"
+  specialistRequired:    "No",             // "Yes" or "No"
   specialistDetails:     "",              // Fill if Yes
 
   // ── REPAIR DETAILS ────────────────────────────────────────
-  nonWarrantableRepairs: "",            // "Yes" or "No"
+  nonWarrantableRepairs: "No",            // "Yes" or "No"
   nonWarrantableDetails: "",
   ncrdRequired:          "",              // Non-claim issues REQUIRED before repairs
   ncrdRecommended:       "",              // Non-claim issues RECOMMENDED
   matchingIssues:        "",              // Matching of materials concerns
 
   // ── CLAIM CONSIDERATIONS ──────────────────────────────────
-  authorityToProceed:    "",           // "Yes" or "No"
-  referToInsurer:        "",            // "Yes" or "No"
+  authorityToProceed:    "Yes",           // "Yes" or "No"
+  referToInsurer:        "No",            // "Yes" or "No"
   // Referral reason dropdown (only used if referToInsurer = "Yes"):
   referralReason:        "",              // Repair costs are above the authorised limit |
                                           // No resultant damage | Review required for policy coverage |
@@ -254,8 +182,8 @@ const data = {
                                           // Maintenance / NCRD Outstanding - REQUIRED prior to commencing
   // Rich text - referral reason detail (MCE editor):
   referralReasonDetail:  "",
-  repairTimeframe:       "",     // Plain text
-  tempAccommodation:     "",            // "Yes" or "No"
+  repairTimeframe:       "4-6 weeks",     // Plain text
+  tempAccommodation:     "No",            // "Yes" or "No"
   tempAccommodationDetails: "",           // Fill if Yes
   recoveryIdentified:    "",              // "" (leave blank) or "Yes"
   recoveryDetails:       "",              // Fill if Yes
@@ -590,19 +518,36 @@ export async function POST(req: NextRequest) {
       scopeRoomsSummary ? `Rooms / scope:\n${scopeRoomsSummary}` : null,
     ].filter(Boolean).join('\n')
 
-    let systemPrompt: string
-    let schema: string
-
+    // ── AAI: JS autofill only ─────────────────────────────────────────────
     if (template === 'aai') {
-      systemPrompt = AAI_SYSTEM
-      schema = AAI_SCHEMA
-    } else if (template === 'auto_general') {
-      systemPrompt = AUTO_GENERAL_SYSTEM
-      schema = AUTO_GENERAL_SCHEMA
-    } else {
-      systemPrompt = IAG_SYSTEM
-      schema = IAG_SCHEMA
+      const jsMessage = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8192,
+        system: AAI_JS_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `Convert the dictation and context below into the data = { } JavaScript object. Use the exact field names shown. Only change the values - do not rename any keys. Leave fields as "" if unsure/low confidence, otherwise attempt to fill all fields.
+
+MY DICTATION:
+[${rawNotes}]
+
+Context:
+[${contextLines}]
+
+TEMPLATE TO FILL:
+[${AAI_JS_TEMPLATE}]`,
+        }],
+      })
+      const jsContent = jsMessage.content[0]
+      if (jsContent.type !== 'text') {
+        return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, javascript: jsContent.text })
     }
+
+    // ── Auto & General / IAG: JSON fields ────────────────────────────────
+    const systemPrompt = template === 'auto_general' ? AUTO_GENERAL_SYSTEM : IAG_SYSTEM
+    const schema = template === 'auto_general' ? AUTO_GENERAL_SCHEMA : IAG_SCHEMA
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
@@ -637,33 +582,7 @@ ${schema}`,
       return NextResponse.json({ error: 'Failed to parse AI response', details: content.text }, { status: 500 })
     }
 
-    let javascript: string | undefined
-    if (template === 'aai') {
-      const jsMessage = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8192,
-        system: AAI_JS_SYSTEM,
-        messages: [{
-          role: 'user',
-          content: `Convert this building report dictation into the data = { } JavaScript object below. Use the exact field names shown. Only change the values — do not rename any keys. Leave fields as "" if not mentioned.
-
-MY DICTATION:
-[${rawNotes}]
-
-Context:
-[${contextLines}]
-
-TEMPLATE TO FILL:
-[${AAI_JS_TEMPLATE}]`,
-        }],
-      })
-      const jsContent = jsMessage.content[0]
-      if (jsContent.type === 'text') {
-        javascript = jsContent.text
-      }
-    }
-
-    return NextResponse.json({ ok: true, fields, ...(javascript !== undefined && { javascript }) })
+    return NextResponse.json({ ok: true, fields })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
   }

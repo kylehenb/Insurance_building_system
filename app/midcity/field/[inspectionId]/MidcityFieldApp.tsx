@@ -756,9 +756,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         }),
       })
       const data = await res.json()
-      if (data.ok && data.fields) {
-        setInsuranceFields(data.fields)
-        setInsuranceFieldsOpen(true)
+      if (data.ok && (data.fields || data.javascript)) {
+        if (data.fields) {
+          setInsuranceFields(data.fields)
+          setInsuranceFieldsOpen(true)
+        }
         if (data.javascript) {
           setAutofillScript(data.javascript)
           setAutofillScriptOpen(true)
