@@ -376,36 +376,27 @@ function formatDate(d: string | null) {
 export default function MidcityFieldApp({ initialData }: { initialData: InitialData }) {
   const base = `/api/field/${initialData.inspectionId}`
 
-  // ─── Common fields ────────────────────────────────────────────────────────
-  const [personMet, setPersonMet] = useState(initialData.personMet ?? initialData.insuredName ?? '')
-  const [relation, setRelation] = useState('')
-  const [propDesc, setPropDesc] = useState('')
+  // ─── Section 1: Notes + scope ─────────────────────────────────────────────
+  const [dictationNotes, setDictationNotes] = useState('')
 
-  // ─── Report enable states (pill checkboxes) ───────────────────────────────
+  // ─── Report enable states ─────────────────────────────────────────────────
   const [barEnabled, setBarEnabled] = useState(false)
   const [makeSafeEnabled, setMakeSafeEnabled] = useState(false)
   const [roofEnabled, setRoofEnabled] = useState(false)
 
-  // ─── BAR fields ───────────────────────────────────────────────────────────
+  // ─── Scope notes ──────────────────────────────────────────────────────────
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
-  const [rawReportNotes, setRawReportNotes] = useState('')
+
+  // ─── BAR fields ───────────────────────────────────────────────────────────
   const [insuranceTemplate, setInsuranceTemplate] = useState<InsuranceTemplate | ''>('')
   const [insuranceFields, setInsuranceFields] = useState<Record<string, string>>({})
   const [insuranceFieldsOpen, setInsuranceFieldsOpen] = useState(false)
   const [autofillScript, setAutofillScript] = useState('')
   const [autofillScriptOpen, setAutofillScriptOpen] = useState(false)
-
-  // ─── Make Safe fields ─────────────────────────────────────────────────────
-  const [msWorksCompleted, setMsWorksCompleted] = useState('')
-  const [msTempFixes, setMsTempFixes] = useState('')
-  const [msHours, setMsHours] = useState('')
+  const [barDamageTemplate, setBarDamageTemplate] = useState<string | null>(null)
 
   // ─── Roof Report fields ───────────────────────────────────────────────────
-  const [roofRawNotes, setRoofRawNotes] = useState('')
   const [roofPhotos, setRoofPhotos] = useState<PhotoEntry[]>([])
-  const [roofPhotoContext, setRoofPhotoContext] = useState('')
-  const [roofAiLabeling, setRoofAiLabeling] = useState(false)
-  const [roofAiLabelDone, setRoofAiLabelDone] = useState(false)
   const roofPhotoInputRef = useRef<HTMLInputElement>(null)
 
   // ─── Roof Report structured fields ───────────────────────────────────────
@@ -413,21 +404,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
-  // ─── Damage Templates ────────────────────────────────────────────────────
-  const [barDamageTemplate, setBarDamageTemplate] = useState<string | null>(null)
-  const [barDamageTemplateSaved, setBarDamageTemplateSaved] = useState(true)
-  const [isNewBarDamageTemplate, setIsNewBarDamageTemplate] = useState(false)
-  const [msDamageTemplate, setMsDamageTemplate] = useState<string | null>(null)
-  const [msDamageTemplateSaved, setMsDamageTemplateSaved] = useState(true)
-  const [isNewMsDamageTemplate, setIsNewMsDamageTemplate] = useState(false)
-  const [roofDamageTemplate, setRoofDamageTemplate] = useState<string | null>(null)
-  const [roofDamageTemplateSaved, setRoofDamageTemplateSaved] = useState(true)
-  const [isNewRoofDamageTemplate, setIsNewRoofDamageTemplate] = useState(false)
-
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
   const [barExporting, setBarExporting] = useState(false)
-  const [makeSafeExporting, setMakeSafeExporting] = useState(false)
   const [roofExporting, setRoofExporting] = useState(false)
   const [roofPreviewOpen, setRoofPreviewOpen] = useState(false)
 
@@ -454,18 +433,13 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
-    personMet, relation, propDesc,
+    dictationNotes,
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
-    rawReportNotes,
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    msWorksCompleted, msTempFixes, msHours,
-    roofRawNotes, roofPhotoContext,
+    damage_template: barDamageTemplate,
     roofReportFields, roofFieldsOpen,
-    damage_template: barDamageTemplate, damage_template_saved: barDamageTemplateSaved,
-    ms_damage_template: msDamageTemplate, ms_damage_template_saved: msDamageTemplateSaved,
-    roof_damage_template: roofDamageTemplate, roof_damage_template_saved: roofDamageTemplateSaved,
-  }), [personMet, relation, propDesc, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, rawReportNotes, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, msWorksCompleted, msTempFixes, msHours, roofRawNotes, roofPhotoContext, roofReportFields, roofFieldsOpen, barDamageTemplate, barDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, barDamageTemplate, roofReportFields, roofFieldsOpen])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -491,31 +465,18 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   useEffect(() => {
     const d = initialData.fieldDraft as Record<string, unknown> | null
     if (!d) return
-    if (d.personMet) setPersonMet(d.personMet as string)
-    if (d.relation) setRelation(d.relation as string)
-    if (d.propDesc) setPropDesc(d.propDesc as string)
+    if (d.dictationNotes) setDictationNotes(d.dictationNotes as string)
     if (d.barEnabled) setBarEnabled(d.barEnabled as boolean)
     if (d.makeSafeEnabled) setMakeSafeEnabled(d.makeSafeEnabled as boolean)
     if (d.roofEnabled) setRoofEnabled(d.roofEnabled as boolean)
-    if (d.rawReportNotes) setRawReportNotes(d.rawReportNotes as string)
     if (d.insuranceTemplate) setInsuranceTemplate(d.insuranceTemplate as InsuranceTemplate)
     if (d.insuranceFields) setInsuranceFields(d.insuranceFields as Record<string, string>)
     if (d.insuranceFieldsOpen) setInsuranceFieldsOpen(d.insuranceFieldsOpen as boolean)
     if (d.autofillScript) setAutofillScript(d.autofillScript as string)
     if (d.autofillScriptOpen) setAutofillScriptOpen(d.autofillScriptOpen as boolean)
-    if (d.msWorksCompleted) setMsWorksCompleted(d.msWorksCompleted as string)
-    if (d.msTempFixes) setMsTempFixes(d.msTempFixes as string)
-    if (d.msHours) setMsHours(d.msHours as string)
-    if (d.roofRawNotes) setRoofRawNotes(d.roofRawNotes as string)
-    if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
+    if (d.damage_template) setBarDamageTemplate(d.damage_template as string)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
-    if (d.damage_template) setBarDamageTemplate(d.damage_template as string)
-    if (typeof d.damage_template_saved === 'boolean') setBarDamageTemplateSaved(d.damage_template_saved as boolean)
-    if (d.ms_damage_template) setMsDamageTemplate(d.ms_damage_template as string)
-    if (typeof d.ms_damage_template_saved === 'boolean') setMsDamageTemplateSaved(d.ms_damage_template_saved as boolean)
-    if (d.roof_damage_template) setRoofDamageTemplate(d.roof_damage_template as string)
-    if (typeof d.roof_damage_template_saved === 'boolean') setRoofDamageTemplateSaved(d.roof_damage_template_saved as boolean)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
@@ -577,7 +538,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Roof photo helpers ───────────────────────────────────────────────────
   const handleRoofPhotos = (files: FileList | null) => {
     if (!files) return
-    setRoofAiLabelDone(false)
     Array.from(files).forEach(file => {
       const id = uid()
       const rawPreview = URL.createObjectURL(file)
@@ -622,33 +582,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     armDraft()
   }
 
-  const runRoofAILabels = async () => {
-    if (!roofPhotoContext.trim()) { alert('Add a photo description first.'); return }
-    if (!roofPhotos.length) { alert('No photos to label.'); return }
-    if (roofPhotos.some(p => p.processing || p.uploading)) { alert('Photos are still saving — please wait a moment.'); return }
-    setRoofAiLabeling(true)
-    try {
-      const res = await fetch(`${base}/ai-label-roof`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: roofPhotoContext, photoCount: roofPhotos.length, jobContext: { lossType: initialData.lossType, insurer: 'Midcity', address: initialData.address } }),
-      })
-      const data = await res.json()
-      if (data.ok && data.labels?.length) {
-        const newLabels: string[] = data.labels
-        const labeled = roofPhotos.map((p, i) => ({ ...p, label: newLabels[i] ?? p.label }))
-        setRoofPhotos(labeled)
-        setRoofAiLabelDone(true)
-        labeled.forEach(p => {
-          if (p.photoId) {
-            fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.photoId, label: p.label }) }).catch(() => {})
-          }
-        })
-      }
-    } catch { /* keep existing labels */ }
-    setRoofAiLabeling(false)
-  }
-
   // ─── Roof report field helper ─────────────────────────────────────────────
   const setRoofField = (key: keyof RoofReportData, value: string) => {
     setRoofReportFields(prev => ({ ...prev, [key]: value }))
@@ -657,18 +590,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Generate Roof Report from raw notes ──────────────────────────────────
   const generateRoofReport = async () => {
-    if (!roofRawNotes.trim()) { alert('Add raw notes first.'); return }
+    if (!dictationNotes.trim()) { alert('Add job notes in Section 1 first.'); return }
     setRoofReportGenerating(true)
     try {
       const res = await fetch('/api/midcity/generate-roof-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rawNotes: roofRawNotes,
+          rawNotes: dictationNotes,
           inspectorName: initialData.inspector,
-          personMet,
-          relation,
-          propDesc,
           address: initialData.address,
           insuredName: initialData.insuredName,
           claimNumber: initialData.claimNumber,
@@ -726,7 +656,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Export handlers ──────────────────────────────────────────────────────
   const handleExportBAR = async () => {
     if (!insuranceTemplate) {
-      alert('Please select an insurance template before exporting.')
+      alert('Please select an insurer / template before generating.')
+      return
+    }
+    if (insuranceTemplate !== 'aai') {
+      alert('This insurer template has not been built yet. Only AAI Limited is currently available.')
       return
     }
     setBarExporting(true)
@@ -740,7 +674,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rawNotes: rawReportNotes,
+          rawNotes: dictationNotes,
           template: insuranceTemplate,
           claimNumber: initialData.claimNumber,
           insuredName: initialData.insuredName,
@@ -750,8 +684,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           inspector: initialData.inspector,
           scheduledDate: initialData.scheduledDate,
           lossType: initialData.lossType,
-          personMet,
-          propDesc,
           scopeRoomsSummary,
         }),
       })
@@ -773,12 +705,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       alert('Error generating template. Check your connection.')
     }
     setBarExporting(false)
-  }
-
-  const handleExportMakeSafe = async () => {
-    setMakeSafeExporting(true)
-    // TODO: wire up Make Safe export
-    setMakeSafeExporting(false)
   }
 
   const handleExportRoof = () => {
@@ -806,48 +732,99 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         {saveStatus && <div className="fa-save-indicator">{saveStatus}</div>}
       </div>
 
-      {/* ── 01 SITE DETAILS ───────────────────────────────────────────────── */}
+      {/* ── 01 NOTES & SCOPE ──────────────────────────────────────────────── */}
       <div className="fa-sc" id="sec-details">
         <div className="fa-sc-head">
           <div className="fa-sc-circle active">01</div>
           <div className="fa-sc-meta">
-            <h3>Site Details</h3>
-            <p>Person met · property description</p>
+            <h3>Notes &amp; Scope</h3>
+            <p>Job notes · scope of works</p>
           </div>
           <span className="fa-badge req">Required</span>
         </div>
         <div className="fa-sc-body">
           <div style={{ padding: '16px 0' }}>
-            <div className="fa-fg">
-              <label className="fa-fl">Person Met On Site <span className="req">*</span></label>
-              <input
-                className="fa-input"
-                type="text"
-                value={personMet}
-                onChange={e => { setPersonMet(e.target.value); armDraft() }}
-                placeholder="Full name"
-                enterKeyHint="next"
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
-              />
-            </div>
-            <div className="fa-fg">
-              <label className="fa-fl">Relation to Property</label>
-              <div className="fa-rg inline">
-                {['Owner', 'Tenant', 'Agent', 'Other'].map(r => (
-                  <button key={r} className={`fa-ro${relation === r ? ' sel' : ''}`} onClick={() => { setRelation(r); armDraft() }}>{r}</button>
+
+            {/* Job Notes dictation dump box */}
+            <div className="fa-ai-dark">
+              <div className="fa-ai-dark-head">
+                <span style={{ fontSize: 14 }}>✦</span>
+                <span className="fa-ai-dark-title">Job Notes</span>
+              </div>
+              <div className="fa-ai-hints">
+                {['Who you met', 'Property description', 'BAR findings', 'Cause of damage', 'Areas damaged', 'Roof inspection', 'Make safe works', 'Pre-existing conditions', 'Maintenance items'].map(hint => (
+                  <div key={hint} className="fa-ai-hint">{hint}</div>
                 ))}
               </div>
+              <div className="fa-ai-dark-body">
+                <textarea
+                  className="fa-ai-dark-ta"
+                  placeholder="Dictate all job notes here — who you met, property description, BAR findings, roof inspection details, make safe works, damage cause, pre-existing conditions, maintenance items, etc. Each report in Section 2 pulls from these notes…"
+                  style={{ minHeight: 160 }}
+                  value={dictationNotes}
+                  onChange={e => { setDictationNotes(e.target.value); armDraft() }}
+                />
+              </div>
             </div>
-            <div className="fa-fg">
-              <label className="fa-fl">Property Description</label>
-              <textarea
-                className="fa-ta"
-                placeholder="e.g. Single storey brick veneer, tiled roof, circa 1985…"
-                style={{ minHeight: 90 }}
-                value={propDesc}
-                onChange={e => { setPropDesc(e.target.value); armDraft() }}
-              />
+
+            {/* Scope Notes */}
+            <div className="mc-section-head" style={{ marginTop: 16 }}>Scope Notes</div>
+            <div style={{ paddingTop: 12 }}>
+              {scopeRooms.map(room => (
+                <div key={room.id} className="fa-room-block" data-room-id={room.id}>
+                  <div className="fa-room-head">
+                    <input
+                      className="fa-room-name"
+                      type="text"
+                      placeholder="Room name"
+                      value={room.name}
+                      onChange={e => updateRoom(room.id, 'name', e.target.value)}
+                      enterKeyHint="next"
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, marginLeft: 4 }}>
+                      <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>L</span>
+                      <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.l} onChange={e => updateRoom(room.id, 'l', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
+                      <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
+                      <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>W</span>
+                      <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.w} onChange={e => updateRoom(room.id, 'w', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
+                      <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
+                      <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>H</span>
+                      <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.h} onChange={e => updateRoom(room.id, 'h', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
+                    </div>
+                    <button style={{ background: 'none', border: 'none', color: 'var(--border)', fontSize: 16, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }} onClick={() => removeRoom(room.id)}>×</button>
+                  </div>
+                  <div className="fa-room-body">
+                    {room.items.map(item => (
+                      <div key={item.id} className="fa-scope-row">
+                        <input
+                          className="fa-scope-input"
+                          type="text"
+                          placeholder="Scope item"
+                          value={item.text}
+                          onChange={e => updateScopeItem(room.id, item.id, e.target.value)}
+                          enterKeyHint="done"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              pendingFocusRoomRef.current = room.id
+                              addScopeItem(room.id)
+                              armDraft()
+                            }
+                          }}
+                        />
+                        <button className="fa-scope-del" onClick={() => removeScopeItem(room.id, item.id)}>×</button>
+                      </div>
+                    ))}
+                    <button className="fa-add-btn" onClick={() => addScopeItem(room.id)}>+ Add Item</button>
+                  </div>
+                </div>
+              ))}
+              <div style={{ padding: '8px 12px 16px' }}>
+                <button onClick={addRoom} className="mc-add-room-btn">+ Add Room</button>
+              </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -878,130 +855,40 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
               {barEnabled && (
                 <div className="mc-pill-body">
 
-                  {/* Scope Notes */}
-                  <div className="mc-section-head">Scope Notes</div>
-                  <div style={{ paddingTop: 12 }}>
-                    {scopeRooms.map(room => (
-                      <div key={room.id} className="fa-room-block" data-room-id={room.id}>
-                        <div className="fa-room-head">
-                          <input
-                            className="fa-room-name"
-                            type="text"
-                            placeholder="Room name"
-                            value={room.name}
-                            onChange={e => updateRoom(room.id, 'name', e.target.value)}
-                            enterKeyHint="next"
-                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
-                          />
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, marginLeft: 4 }}>
-                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>L</span>
-                            <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.l} onChange={e => updateRoom(room.id, 'l', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
-                            <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
-                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>W</span>
-                            <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.w} onChange={e => updateRoom(room.id, 'w', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
-                            <span style={{ fontSize: 9, color: 'var(--border)' }}>×</span>
-                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 8, color: 'var(--muted)' }}>H</span>
-                            <input className="fa-dim-input" placeholder="-" maxLength={5} value={room.h} onChange={e => updateRoom(room.id, 'h', e.target.value)} enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
-                          </div>
-                          <button style={{ background: 'none', border: 'none', color: 'var(--border)', fontSize: 16, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }} onClick={() => removeRoom(room.id)}>×</button>
-                        </div>
-                        <div className="fa-room-body">
-                          {room.items.map(item => (
-                            <div key={item.id} className="fa-scope-row">
-                              <input
-                                className="fa-scope-input"
-                                type="text"
-                                placeholder="Scope item"
-                                value={item.text}
-                                onChange={e => updateScopeItem(room.id, item.id, e.target.value)}
-                                enterKeyHint="done"
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    pendingFocusRoomRef.current = room.id
-                                    addScopeItem(room.id)
-                                    armDraft()
-                                  }
-                                }}
-                              />
-                              <button className="fa-scope-del" onClick={() => removeScopeItem(room.id, item.id)}>×</button>
-                            </div>
-                          ))}
-                          <button className="fa-add-btn" onClick={() => addScopeItem(room.id)}>+ Add Item</button>
-                        </div>
-                      </div>
-                    ))}
-                    <div style={{ padding: '8px 12px 16px' }}>
-                      <button onClick={addRoom} className="mc-add-room-btn">+ Add Room</button>
-                    </div>
-                  </div>
-
-                  {/* Raw Report Notes */}
-                  <div className="mc-section-head">Report Notes</div>
-                  <div style={{ padding: '12px 16px 0' }}>
+                  {/* Damage Scenario Template */}
+                  <div style={{ padding: '16px 16px 0' }}>
                     <TemplateSelectorField
                       reportType="BAR"
                       value={barDamageTemplate}
-                      onChange={name => { setBarDamageTemplate(name); setIsNewBarDamageTemplate(false); armDraft() }}
-                      onTemplateSaved={name => { setBarDamageTemplate(name); setIsNewBarDamageTemplate(true); armDraft() }}
+                      onChange={name => { setBarDamageTemplate(name); armDraft() }}
+                      onTemplateSaved={name => { setBarDamageTemplate(name); armDraft() }}
                     />
-                    {isNewBarDamageTemplate && barDamageTemplate && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={barDamageTemplateSaved}
-                          onChange={e => { setBarDamageTemplateSaved(e.target.checked); armDraft() }}
-                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
-                        />
-                        Save as template for future jobs
-                      </label>
-                    )}
-                  </div>
-                  <div className="fa-ai-dark">
-                    <div className="fa-ai-dark-head">
-                      <span style={{ fontSize: 14 }}>✦</span>
-                      <span className="fa-ai-dark-title">AI Report Generation</span>
-                    </div>
-                    <div className="fa-ai-hints">
-                      {['What was damaged', 'Cause of damage', 'Pre-existing conditions', 'Any maintenance noted', 'Extent of damage', 'Structural concerns'].map(hint => (
-                        <div key={hint} className="fa-ai-hint">{hint}</div>
-                      ))}
-                    </div>
-                    <div className="fa-ai-dark-body">
-                      <textarea
-                        className="fa-ai-dark-ta"
-                        placeholder="Describe the damage, cause, and your findings in plain language. AI will structure this into a professional report…"
-                        style={{ minHeight: 130 }}
-                        value={rawReportNotes}
-                        onChange={e => { setRawReportNotes(e.target.value); armDraft() }}
-                      />
-                    </div>
                   </div>
 
-                  {/* Insurance Template Select */}
-                  <div className="fa-fg" style={{ paddingTop: 16 }}>
-                    <label className="fa-fl">Insurance Template</label>
+                  {/* Insurer / Template */}
+                  <div className="fa-fg" style={{ paddingTop: 8 }}>
+                    <label className="fa-fl">Insurer / Template</label>
                     <select
                       className="fa-input"
                       style={{ appearance: 'auto' as never }}
                       value={insuranceTemplate}
                       onChange={e => { setInsuranceTemplate(e.target.value as InsuranceTemplate | ''); armDraft() }}
                     >
-                      <option value="">Select template…</option>
+                      <option value="">Select insurer / template…</option>
                       <option value="aai">AAI Limited</option>
                       <option value="auto_general">Auto &amp; General</option>
                       <option value="iag">IAG</option>
                     </select>
                   </div>
 
-                  {/* Export */}
+                  {/* Generate */}
                   <div className="mc-export-wrap">
                     <button
                       className="mc-export-btn"
                       onClick={handleExportBAR}
                       disabled={barExporting}
                     >
-                      {barExporting ? <><span className="fa-spinner" /> Generating Template…</> : 'Export Report'}
+                      {barExporting ? <><span className="fa-spinner" /> Generating…</> : 'Generate Report'}
                     </button>
                   </div>
 
@@ -1099,48 +986,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
               {makeSafeEnabled && (
                 <div className="mc-pill-body">
-                  <div className="mc-section-head">Make Safe Fields</div>
-                  <div style={{ padding: '14px 18px' }}>
-                    <TemplateSelectorField
-                      reportType="make_safe"
-                      value={msDamageTemplate}
-                      onChange={name => { setMsDamageTemplate(name); setIsNewMsDamageTemplate(false); armDraft() }}
-                      onTemplateSaved={name => { setMsDamageTemplate(name); setIsNewMsDamageTemplate(true); armDraft() }}
-                    />
-                    {isNewMsDamageTemplate && msDamageTemplate && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={msDamageTemplateSaved}
-                          onChange={e => { setMsDamageTemplateSaved(e.target.checked); armDraft() }}
-                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
-                        />
-                        Save as template for future jobs
-                      </label>
-                    )}
-                    <div className="fa-fg" style={{ padding: 0, marginBottom: 14 }}>
-                      <label className="fa-fl">Works Completed On Site</label>
-                      <textarea className="fa-ta" placeholder="Describe emergency make safe works carried out…" value={msWorksCompleted} onChange={e => { setMsWorksCompleted(e.target.value); armDraft() }} />
-                    </div>
-                    <div className="fa-fg" style={{ padding: 0, marginBottom: 14 }}>
-                      <label className="fa-fl">Temporary Measures</label>
-                      <textarea className="fa-ta" placeholder="Tarps, boarding, temporary repairs…" style={{ minHeight: 70 }} value={msTempFixes} onChange={e => { setMsTempFixes(e.target.value); armDraft() }} />
-                    </div>
-                    <div className="fa-fg" style={{ padding: 0, marginBottom: 0 }}>
-                      <label className="fa-fl">Hours on Site</label>
-                      <input className="fa-input" type="text" placeholder="e.g. 2.5 hrs" value={msHours} onChange={e => { setMsHours(e.target.value); armDraft() }} />
-                    </div>
-                  </div>
-
-                  {/* Export */}
-                  <div className="mc-export-wrap">
-                    <button
-                      className="mc-export-btn"
-                      onClick={handleExportMakeSafe}
-                      disabled={makeSafeExporting}
-                    >
-                      {makeSafeExporting ? <><span className="fa-spinner" /> Exporting…</> : 'Export Report'}
-                    </button>
+                  <div style={{ padding: '32px 18px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, marginBottom: 10 }}>🔧</div>
+                    <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 12, color: 'var(--muted)', letterSpacing: 0.5 }}>Make Safe report not yet available</div>
+                    <div style={{ fontSize: 11, color: 'var(--border)', marginTop: 6 }}>Coming soon</div>
                   </div>
                 </div>
               )}
@@ -1160,56 +1009,17 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
               {roofEnabled && (
                 <div className="mc-pill-body">
                   <div className="mc-section-head">Roof Report</div>
-                  <div style={{ padding: '12px 16px 0' }}>
-                    <TemplateSelectorField
-                      reportType="roof"
-                      value={roofDamageTemplate}
-                      onChange={name => { setRoofDamageTemplate(name); setIsNewRoofDamageTemplate(false); armDraft() }}
-                      onTemplateSaved={name => { setRoofDamageTemplate(name); setIsNewRoofDamageTemplate(true); armDraft() }}
-                    />
-                    {isNewRoofDamageTemplate && roofDamageTemplate && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={roofDamageTemplateSaved}
-                          onChange={e => { setRoofDamageTemplateSaved(e.target.checked); armDraft() }}
-                          style={{ width: 14, height: 14, accentColor: 'var(--black)' }}
-                        />
-                        Save as template for future jobs
-                      </label>
-                    )}
-                  </div>
-
-                  {/* Raw Notes */}
-                  <div className="fa-ai-dark">
-                    <div className="fa-ai-dark-head">
-                      <span style={{ fontSize: 14 }}>✦</span>
-                      <span className="fa-ai-dark-title">Roof Report Raw Notes</span>
-                    </div>
-                    <div className="fa-ai-hints">
-                      {['Roof type', 'Roof condition', 'Roof pitch', 'Penetrations', 'Insulation', 'Solar PV', 'Solar HWS', 'Skylights', 'Gutters', 'Downpipes', 'Batten size', 'Claim type', 'Damage cause', 'Entry points', 'Client stated', 'Conditions contributed', 'Insured aware', 'Maintenance items', 'Prior repairs', 'Code violations', 'Make safe'].map(hint => (
-                        <div key={hint} className="fa-ai-hint">{hint}</div>
-                      ))}
-                    </div>
-                    <div className="fa-ai-dark-body">
-                      <textarea
-                        className="fa-ai-dark-ta"
-                        placeholder="Dictate roof inspection details covering all fields above. AI will generate the full roof report…"
-                        style={{ minHeight: 130 }}
-                        value={roofRawNotes}
-                        onChange={e => { setRoofRawNotes(e.target.value); armDraft() }}
-                      />
-                      <button
-                        className={`fa-ai-label-btn${roofReportGenerating ? '' : ''}`}
-                        onClick={generateRoofReport}
-                        disabled={roofReportGenerating}
-                        style={{ marginTop: 10 }}
-                      >
-                        {roofReportGenerating
-                          ? <><span className="fa-spinner" /> Generating Report…</>
-                          : '✦ Generate Roof Report'}
-                      </button>
-                    </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    <button
+                      className="fa-ai-label-btn"
+                      onClick={generateRoofReport}
+                      disabled={roofReportGenerating}
+                    >
+                      {roofReportGenerating
+                        ? <><span className="fa-spinner" /> Generating Report…</>
+                        : '✦ Generate Roof Report'}
+                    </button>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 0', fontFamily: 'var(--font-dm-mono)' }}>Uses notes from Section 1</p>
                   </div>
 
                   {/* ── ROOF REPORT FIELDS ACCORDION ── */}
@@ -1560,36 +1370,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
                       </div>
                     )}
-                  </div>
-
-                  {/* Photo Context */}
-                  <div className="fa-ai-dark" style={{ marginTop: 2 }}>
-                    <div className="fa-ai-dark-head">
-                      <span style={{ fontSize: 14 }}>📷</span>
-                      <span className="fa-ai-dark-title">Roof Photo Context</span>
-                    </div>
-                    <div className="fa-ai-dark-body">
-                      <textarea
-                        className="fa-ai-dark-ta"
-                        placeholder="Describe your roof photos in order…"
-                        style={{ minHeight: 80 }}
-                        value={roofPhotoContext}
-                        onChange={e => { setRoofPhotoContext(e.target.value); armDraft() }}
-                      />
-                      <button
-                        className={`fa-ai-label-btn${roofAiLabelDone ? ' done' : ''}`}
-                        onClick={runRoofAILabels}
-                        disabled={roofAiLabeling || roofPhotos.some(p => p.processing || p.uploading)}
-                      >
-                        {roofPhotos.some(p => p.processing || p.uploading)
-                          ? <><span className="fa-spinner" /> {roofPhotos.some(p => p.processing) ? 'Converting photos…' : 'Saving photos…'}</>
-                          : roofAiLabeling
-                          ? <><span className="fa-spinner" /> Labelling…</>
-                          : roofAiLabelDone
-                          ? '✓ Labels Applied'
-                          : '✦ AI Label All Photos'}
-                      </button>
-                    </div>
                   </div>
 
                   {/* Roof Photos */}
