@@ -116,6 +116,7 @@ const data = {
 
   // ── CLAIM INFORMATION ─────────────────────────────────────
   reportDate:            "",        // Format: YYYY-MM-DD
+  siteAttendanceDatetime: "",      // Format: YYYY-MM-DDTHH:MM (datetime-local)
   reportType:            "Final",             // "Interim" or "Final"
   claimedLossCause:      "",             // Short text e.g. "Storm", "Burst Pipe", "Fire"
 
@@ -491,9 +492,9 @@ export async function POST(req: NextRequest) {
       inspector,
       scheduledDate,
       lossType,
-      personMet,
-      propDesc,
       scopeRoomsSummary,
+      reportDateFormatted,
+      siteAttendanceDatetimeFormatted,
     } = await req.json()
 
     if (!rawNotes?.trim()) {
@@ -506,16 +507,16 @@ export async function POST(req: NextRequest) {
 
     const contextLines = [
       inspector ? `Assessor name: ${inspector}` : null,
-      personMet ? `Person met on site: ${personMet}` : null,
-      propDesc ? `Property description: ${propDesc}` : null,
       address ? `Property address: ${address}` : null,
       insuredName ? `Insured name: ${insuredName}` : null,
       claimNumber ? `Claim number: ${claimNumber}` : null,
       insurer ? `Insurer: ${insurer}` : null,
-      scheduledDate ? `Date of inspection: ${scheduledDate}` : null,
+      scheduledDate ? `Scheduled inspection date: ${scheduledDate}` : null,
       dateOfLoss ? `Date of loss: ${dateOfLoss}` : null,
       lossType ? `Loss / claim type: ${lossType}` : null,
       scopeRoomsSummary ? `Rooms / scope:\n${scopeRoomsSummary}` : null,
+      reportDateFormatted ? `Report date (use exactly for reportDate, format YYYY-MM-DD): ${reportDateFormatted}` : null,
+      siteAttendanceDatetimeFormatted ? `Site attendance datetime (use exactly for siteAttendanceDatetime, format YYYY-MM-DDTHH:MM): ${siteAttendanceDatetimeFormatted}` : null,
     ].filter(Boolean).join('\n')
 
     // ── AAI: JS autofill only ─────────────────────────────────────────────
@@ -533,6 +534,14 @@ MY DICTATION:
 
 Context:
 [${contextLines}]
+
+FOCUS GUIDANCE — COMBINED DICTATION:
+These notes cover a full site inspection and may include roof report details, make safe works, and general site observations. For this Building Assessment Report:
+- INCLUDE: Customer/client discussion and what the insured stated, cause of loss and causal chain, damaged areas and extent, property conditions and pre-existing defects, wear and tear evidence, claim considerations (authority to proceed, referrals, specialist needs, temp accommodation, recovery potential).
+- The Roof Report is a supporting document for this BAR — you may reference roof findings where they are causally relevant to the claimed damage. For example, if the roof is underpitched and that contributed to water ingress, include that in the cause analysis. If a damaged roof allowed water entry causing internal damage, reference it.
+- Do NOT include roof technical specifications as standalone observations — pitch degrees, batten/truss compliance ratings, gutter overflow details, downpipe dimensions, skylight flashing condition — these belong in the Roof Report only. Only reference these if they directly explain the cause or extent of the claimed building damage.
+- Use the "Report date" value from Context for reportDate, and "Site attendance datetime" for siteAttendanceDatetime — both must be used exactly as provided.
+- Verbal cues like "BAR section", "building report", "starting BAR" indicate content especially relevant to this report.
 
 TEMPLATE TO FILL:
 [${AAI_JS_TEMPLATE}]`,

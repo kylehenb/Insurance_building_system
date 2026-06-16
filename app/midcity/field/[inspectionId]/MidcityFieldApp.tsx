@@ -592,6 +592,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const generateRoofReport = async () => {
     if (!dictationNotes.trim()) { alert('Add job notes in Section 1 first.'); return }
     setRoofReportGenerating(true)
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const tzAbbr = Intl.DateTimeFormat('en-AU', { timeZoneName: 'short' }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value ?? ''
+    const attendanceDateFormatted = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`
+    const timeAttendedFormatted = `${pad(now.getHours())}:${pad(now.getMinutes())}${tzAbbr ? ' ' + tzAbbr : ''}`
     try {
       const res = await fetch('/api/midcity/generate-roof-report', {
         method: 'POST',
@@ -605,6 +610,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           insurer: initialData.insurer,
           scheduledDate: initialData.scheduledDate,
           lossType: initialData.lossType,
+          attendanceDateFormatted,
+          timeAttendedFormatted,
         }),
       })
       const data = await res.json()
@@ -613,6 +620,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         setRoofReportFields(prev => ({
           ...prev,
           ...rd,
+          attendanceDate: attendanceDateFormatted,
+          timeAttended: timeAttendedFormatted,
           rooferName: '',
           rooferQualification: '',
           timeOnSite: rd.timeOnSite || prev.timeOnSite,
@@ -665,6 +674,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     }
     setBarExporting(true)
     try {
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const reportDateFormatted = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+      const siteAttendanceDatetimeFormatted = `${reportDateFormatted}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+
       const scopeRoomsSummary = scopeRooms
         .filter(r => r.name || r.items.some(i => i.text))
         .map(r => `${r.name}: ${r.items.map(i => i.text).filter(Boolean).join(', ')}`)
@@ -685,6 +699,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           scheduledDate: initialData.scheduledDate,
           lossType: initialData.lossType,
           scopeRoomsSummary,
+          reportDateFormatted,
+          siteAttendanceDatetimeFormatted,
         }),
       })
       const data = await res.json()

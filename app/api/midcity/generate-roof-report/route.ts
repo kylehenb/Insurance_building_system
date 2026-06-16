@@ -10,15 +10,14 @@ export async function POST(req: NextRequest) {
     const {
       rawNotes,
       inspectorName,
-      personMet,
-      relation,
-      propDesc,
       address,
       insuredName,
       claimNumber,
       insurer,
       scheduledDate,
       lossType,
+      attendanceDateFormatted,
+      timeAttendedFormatted,
     } = await req.json()
 
     if (!rawNotes?.trim()) {
@@ -27,15 +26,14 @@ export async function POST(req: NextRequest) {
 
     const contextLines = [
       inspectorName ? `Inspector name: ${inspectorName}` : null,
-      personMet ? `Person met on site: ${personMet}` : null,
-      relation ? `Relation to property: ${relation}` : null,
-      propDesc ? `Property description: ${propDesc}` : null,
       address ? `Property address: ${address}` : null,
       insuredName ? `Insured name: ${insuredName}` : null,
       claimNumber ? `Claim number: ${claimNumber}` : null,
       insurer ? `Insurer: ${insurer}` : null,
-      scheduledDate ? `Date of inspection: ${scheduledDate}` : null,
+      scheduledDate ? `Scheduled inspection date: ${scheduledDate}` : null,
       lossType ? `Loss / claim type: ${lossType}` : null,
+      attendanceDateFormatted ? `Date of attendance (use exactly for attendanceDate): ${attendanceDateFormatted}` : null,
+      timeAttendedFormatted ? `Time attended (use exactly for timeAttended): ${timeAttendedFormatted}` : null,
     ].filter(Boolean).join('\n')
 
     const message = await anthropic.messages.create({
@@ -60,6 +58,17 @@ FIXED DEFAULTS — use these exact values unless the raw notes explicitly state 
 
 Raw Notes:
 ${rawNotes}${contextLines ? `\n\nAdditional Context:\n${contextLines}` : ''}
+
+FOCUS GUIDANCE — COMBINED DICTATION:
+These notes cover a full site inspection and may include building assessment (BAR) details, make safe works, and general site observations. For this Roof Report, extract and prioritise:
+- Roof-specific technical details: type, pitch, penetrations, insulation type, solar PV/HWS, skylights (watertight, flashing notes), gutters (compliance, overflow), downpipes (compliance, size, corrosion), batten/truss compliance
+- Cause of damage as it relates to the roof: storm entry points, impact locations, displaced tiles, flashing failures, ponding due to pitch, etc.
+- Roof conditions: pre-existing roof deterioration, maintenance items, prior roof repairs, building code violations relating to the roof
+- Who was met on site and what they stated (may appear anywhere in the notes)
+- Property details: approximate age, wall construction, number of storeys, property type and condition (often in a general site description at the start of notes)
+- Attendance date and time: use the values from Additional Context ("Date of attendance" and "Time attended") if provided — these are the authoritative values and must be used exactly as given
+General building damage details (wet carpet, damaged walls, ceilings) should appear only as evidence of roof failure, not as standalone observations.
+Verbal cues like "roof section", "roof report", "starting roof" indicate content especially relevant to this report.
 
 JSON structure to fill:
 {
