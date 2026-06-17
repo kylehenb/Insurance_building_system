@@ -332,8 +332,8 @@ function InsuranceTemplateRenderer({
 function uid() { return Math.random().toString(36).slice(2) }
 
 async function processPhotoForUpload(file: File): Promise<File> {
-  const TARGET_BYTES = 125 * 1024
-  const MAX_DIM = 1600
+  const TARGET_BYTES = 62 * 1024
+  const MAX_DIM = 1200
 
   return new Promise(resolve => {
     const img = new Image()
@@ -355,7 +355,7 @@ async function processPhotoForUpload(file: File): Promise<File> {
       const compress = (quality: number) => {
         canvas.toBlob(blob => {
           if (!blob) { resolve(file); return }
-          if (blob.size > TARGET_BYTES && quality > 0.55) { compress(Math.round((quality - 0.08) * 100) / 100); return }
+          if (blob.size > TARGET_BYTES && quality > 0.40) { compress(Math.round((quality - 0.08) * 100) / 100); return }
           const baseName = file.name.replace(/\.(heic|heif)$/i, '')
           const jpegName = baseName.match(/\.(jpe?g)$/i) ? file.name : `${baseName}.jpg`
           resolve(new File([blob], jpegName, { type: 'image/jpeg', lastModified: Date.now() }))
