@@ -212,8 +212,9 @@ const data = {
   // ── HELPER: set a native input value and trigger React/KO events ──
   function setVal(el, value) {
     if (!el) return;
-    const nativeSetter = Object.getOwnPropertyDescriptor(el.constructor.prototype || window.HTMLInputElement.prototype, 'value')?.set
-                      || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    var desc1 = Object.getOwnPropertyDescriptor(el.constructor.prototype || window.HTMLInputElement.prototype, 'value');
+    var desc2 = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+    var nativeSetter = (desc1 && desc1.set) || (desc2 && desc2.set);
     if (nativeSetter) nativeSetter.call(el, value);
     else el.value = value;
     el.dispatchEvent(new Event('input',  { bubbles: true }));
@@ -222,48 +223,47 @@ const data = {
 
   // ── HELPER: click a radio button by ko_unique name + value ──
   function setRadio(koName, value) {
-    const radio = container.querySelector(\`input[type="radio"][name="\${koName}"][value="\${value}"]\`);
+    var radio = container.querySelector('input[type="radio"][name="' + koName + '"][value="' + value + '"]');
     if (radio) {
       radio.click();
       radio.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
-      console.warn(\`⚠️ Radio not found: name="\${koName}" value="\${value}"\`);
+      console.warn('Radio not found: name="' + koName + '" value="' + value + '"');
     }
   }
 
   // ── HELPER: set a <select> by option text (since many have empty values) ──
   function setSelectByText(selectEl, text) {
     if (!selectEl || !text) return;
-    for (const opt of selectEl.options) {
+    for (var i = 0; i < selectEl.options.length; i++) {
+      var opt = selectEl.options[i];
       if (opt.text.trim() === text) {
         selectEl.value = opt.value;
-        // Also set selectedIndex for KO compatibility
         selectEl.selectedIndex = opt.index;
         selectEl.dispatchEvent(new Event('change', { bubbles: true }));
         return;
       }
     }
-    console.warn(\`⚠️ Option "\${text}" not found in select\`);
+    console.warn('Option "' + text + '" not found in select');
   }
 
   // ── HELPER: set TinyMCE rich text editor ──
   function setMCE(editorId, html) {
     if (!html) return;
+    var prefix = editorId.split('_').slice(0, 2).join('_');
     if (typeof tinymce !== 'undefined') {
-      // Try dynamic ID (changes per session) — find by known static prefix
-      const allEditors = tinymce.editors;
-      const prefix = editorId.split('_').slice(0, 2).join('_'); // e.g. "mceEditor_422"
-      const editor = allEditors.find(e => e.id.startsWith(prefix));
-      if (editor) {
-        editor.setContent(html);
-        editor.save(); // sync back to textarea
-        return;
+      var allEditors = tinymce.editors;
+      for (var i = 0; i < allEditors.length; i++) {
+        if (allEditors[i].id.indexOf(prefix) === 0) {
+          allEditors[i].setContent(html);
+          allEditors[i].save();
+          return;
+        }
       }
     }
-    // Fallback: set textarea directly
-    const ta = container.querySelector(\`textarea[id^="\${editorId.split('_').slice(0,2).join('_')}"]\`);
+    var ta = container.querySelector('textarea[id^="' + prefix + '"]');
     if (ta) setVal(ta, html);
-    else console.warn(\`⚠️ MCE editor not found: \${editorId}\`);
+    else console.warn('MCE editor not found: ' + editorId);
   }
 
   // ── FIELD MAP (index within #job_question_list_*) ────────
