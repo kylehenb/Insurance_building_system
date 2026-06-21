@@ -115,8 +115,7 @@ var data = {
 
   // ── CLAIM INFORMATION ─────────────────────────────────────
   reportDate:            "",        // Format: YYYY-MM-DD
-  siteAttendanceDatetime: "",      // Format: YYYY-MM-DDTHH:MM (datetime-local)
-  reportType:            "Final",             // "Interim" or "Final"
+  reportType:            "Final",             // always use "Final"
   claimedLossCause:      "",             // Short text e.g. "Storm", "Burst Pipe", "Fire"
 
   // ── OVERALL PROPERTY OBSERVATIONS ─────────────────────────
@@ -129,46 +128,47 @@ var data = {
 
   // ── CAUSE OF DAMAGE ───────────────────────────────────────
   // Rich text - areas damaged detail (MCE editor):
-  areasDamagedDetail:    "",       // Bullet list of observed damage. Each line: "• [Room] - [type of damage] [measurement if known]". Use a sub-bullet (-) only if scope needs clarifying. One line per item. If multiple items in a room or similar items across multiple rooms, group them: "• [Room] - [damage 1], [damage 2]" or "• [Room 1], [Room 3] - [damage]". No cause or opinion - observations only.
+  areasDamagedDetail:    "",       // Always start with "I observed the following resulting damage during my inspection:" and then enter a bullet list of observed damage. Each line: "• [Room] - [type of damage] [measurement if known]". Use a sub-bullet (-) only if scope needs clarifying. One line per item. If multiple items in a room or similar items across multiple rooms, group them: "• [Room] - [damage 1], [damage 2]" or "• [Room 1], [Room 3] - [damage]". No cause or opinion - observations only.
 
   // Rich text - proximate cause detail (MCE editor):
-  proximateCauseDetail:   "",          // Bullet point analysis of the cause. First bullet: "• Primary cause - [type]". Sub-bullets are one-line evidence observations. Include Australian Standard references inline. No first person. Each secondary cause gets its own "• Primary cause" line.
+  proximateCauseDetail:   "",          // Bullet point analysis of the cause. First bullet: "• Primary cause - [type]". Sub-bullets are one-line evidence observations. Include Australian Standard references inline. No first person. Each secondary cause gets its own "• Primary cause" line. Keep sub bullets to a minimum (1 or 2 sub bullets per primary cause) and have them help explain the primary bullet point, not just repeat it in different wording.
 
   // ── SPECIALIST REPORT ─────────────────────────────────────
-  specialistReportObtained: "No",            // "Yes" or "No"
+  specialistReportObtained: "No",            // "Yes" or "No", If there are details of a roof report in the dictation then answer should be "Yes"
   specialistReportSummary:  "",              // Fill if Yes
 
   // ── DAMAGE TYPE ───────────────────────────────────────────
   damageTermType:        "Single Event",     // "Single Event" or "Long Term"
-  wearAndTear:           "",                 // Plain text response for wear/tear question (leave "" if n/a)
+  wearAndTear:           "",                 // "No" if (damageTermType = "Single Event") or "Yes" if (damageTermType = "Long Term")
 
   // ── WEAR & TEAR ADDITIONAL (only if applicable) ───────────
-  wearTearObservations:  "",
-  preventativeMeasures:  "",
-  customerKnowledgeEvidence: "",
+  wearTearObservations:  "",   // "N/A" if (damageTermType = "Single Event"), or plain text answering (What did you observe and what visible evidence is there that the damage was caused by wear, tear, gradual deterioration or a gradual leak?) if (damageTermType = "Long Term")
+  preventativeMeasures:  "",    // "N/A" if (damageTermType = "Single Event"), or plain text answering (What repairs and/or preventative measures, if completed before the event could have prevented the loss/damage) if (damageTermType = "Long Term")
+  customerKnowledgeEvidence: "",    // "N/A" if (damageTermType = "Single Event"), or plain text answering (In respect to damage identified in previous question, did the customer know or should the customer have reasonably known that the damage was inevitable and/or that the proximate cause of damage was occurring?) if (damageTermType = "Long Term")
 
   // ── ASSESSMENT SUMMARY ────────────────────────────────────
   customerConversationTemplate: "Storm - Client Discussion",
+  customerConversationDetail: "",   // Plain text outlining what the customer or homeowner or insured is claiming or what they have said
   // Rich text - general observations (MCE editor):
   generalObservations:   "",   // Leave blank unless specific additional notes or notable observations impact the report or claim.
 
   // ── MAKESAFE / RESTORATION ────────────────────────────────
-  makesafeActioned:      "No",              // "Yes" or "No"
-  makesafeDetails:       "",               // Fill if Yes
+  makesafeActioned:      "No",              // "Yes" or "No", use "No" as default or if unsure
+  makesafeDetails:       "N/A",               // Plain text if (makesafeActioned = "Yes"), if (makesafeActioned = "No") then fill with "N/A"
 
   // ── FLOOR PLAN ────────────────────────────────────────────
-  floorPlanSupplied:     "Yes",            // "Yes" or "No"
+  floorPlanSupplied:     "No",            // "Yes" or "No", use "No" as default or if unsure
 
   // ── SPECIALIST REPORT REQUIRED ────────────────────────────
-  specialistRequired:    "No",             // "Yes" or "No"
-  specialistDetails:     "",              // Fill if Yes
+  specialistRequired:    "No",             // "Yes" or "No", use "No" as default or if unsure
+  specialistDetails:     "N/A",              // plain text if (specialistRequired = "Yes"), if (specialistRequired = "No") then fill with "N/A"
 
   // ── REPAIR DETAILS ────────────────────────────────────────
-  nonWarrantableRepairs: "No",            // "Yes" or "No"
-  nonWarrantableDetails: "",
-  ncrdRequired:          "",              // Non-claim issues REQUIRED before repairs
-  ncrdRecommended:       "",              // Non-claim issues RECOMMENDED
-  matchingIssues:        "",              // Matching of materials concerns
+  nonWarrantableRepairs: "No",            // "Yes" or "No", use "No" as default or if unsure
+  nonWarrantableDetails: "N/A",    // plain text answering "If Yes, explain in detail and include reference to Building Laws and Regulations where applicable" if (nonWarrantableRepairs = "Yes") or "N/A" if (nonWarrantableRepairs = "No")
+  ncrdRequired:          "None",              // Non-claim issues REQUIRED before repairs in "•" point form. Use "None" if none are required, not applicable or if unsure.
+  ncrdRecommended:       "None",              // Non-claim issues RECOMMENDED in "•" point form. Use "None" if none are required, not applicable or if unsure.
+  matchingIssues:        "None",              // Matching of materials concerns, Use "None" if none are required, not applicable or if unsure.
 
   // ── CLAIM CONSIDERATIONS ──────────────────────────────────
   authorityToProceed:    "Yes",           // "Yes" or "No"
@@ -183,10 +183,10 @@ var data = {
   // Rich text - referral reason detail (MCE editor):
   referralReasonDetail:  "",
   repairTimeframe:       "4-6 weeks",     // Plain text
-  tempAccommodation:     "No",            // "Yes" or "No"
-  tempAccommodationDetails: "",           // Fill if Yes
+  tempAccommodation:     "No",            // "Yes" or "No", use "No" as default or if unsure
+  tempAccommodationDetails: "N/A",           // Plain text if Yes, use "N/A" as default or if unsure
   recoveryIdentified:    "",              // "" (leave blank) or "Yes"
-  recoveryDetails:       "",              // Fill if Yes
+  recoveryDetails:       "N/A",              // use "N/A" as default or if unsure
 
 };
 
@@ -247,17 +247,11 @@ var data = {
   if (data.reportType === 'Final')   setRadio('ko_unique_2', 'Final');
   if (data.lodgementDescription)     setVal(f[3],  data.lodgementDescription);
   if (data.claimedLossCause)         setVal(f[4],  data.claimedLossCause);
-  setSelectByText(f[5],  data.suncorpAssessor);
-  setSelectByText(f[6],  data.assessmentType);
-  if (data.siteAttendanceDatetime)   setVal(f[7],  data.siteAttendanceDatetime);
-  if (data.maintenanceConcerns === 'Yes') setRadio('ko_unique_3', 'Yes');
-  if (data.maintenanceConcerns === 'No')  setRadio('ko_unique_4', 'No');
-  if (data.maintenanceConcernDetails)     setVal(f[10], data.maintenanceConcernDetails);
-  setSelectByText(f[11], data.safetyConcerns);
-  if (data.safetyConcernDetails)     setVal(f[12], data.safetyConcernDetails);
-  setSelectByText(f[13], data.areasDamagedTemplate);
+  setRadio('ko_unique_4', 'No');
+  setVal(f[10], 'N/A');
+  setSelectByText(f[11], 'No');
+  setVal(f[12], 'N/A');
   setMCE('mceEditor_422', data.areasDamagedDetail);
-  setSelectByText(f[15], data.proximateCauseTemplate);
   setMCE('mceEditor_423', data.proximateCauseDetail);
   if (data.specialistReportObtained === 'Yes') setRadio('ko_unique_5', 'Yes');
   if (data.specialistReportObtained === 'No')  setRadio('ko_unique_6', 'No');
@@ -294,7 +288,7 @@ var data = {
   if (data.tempAccommodation === 'No')  setRadio('ko_unique_20', 'No');
   if (data.tempAccommodationDetails)    setVal(f[52], data.tempAccommodationDetails);
   if (data.recoveryIdentified === 'Yes') setSelectByText(f[53], 'Yes');
-  if (data.recoveryDetails)             setVal(f[54], data.recoveryDetails);
+  setVal(f[54], 'N/A');
 
   console.log('Auto-fill complete! Review the form, then click Save or Complete.');
 
@@ -401,7 +395,7 @@ export async function POST(req: NextRequest) {
         system: AAI_JS_SYSTEM,
         messages: [{
           role: 'user',
-          content: `Convert the dictation and context below into the data = { } JavaScript object. Use the exact field names shown. Only change the values - do not rename any keys. Leave fields as "" if unsure/low confidence, otherwise attempt to fill all fields.
+          content: `Convert the dictation and context below into the data = { } JavaScript object. Use the exact field names shown. Only change the values - do not rename any keys. Attempt to fill all fields. If there is not enough information to fill a particular field then or it is not applicable, the answer should be "N/A", "No" or "None"
 
 MY DICTATION:
 [${rawNotes}]
