@@ -294,56 +294,334 @@ var data = {
 
 })();`
 
-// ── IAG (unchanged) ───────────────────────────────────────────────────────
-const IAG_SYSTEM = `You are an expert Australian insurance building assessor completing a formal IAG insurance assessment report. Use professional language appropriate for insurance assessment reports. For Yes/No fields use exactly "Yes" or "No". For Good/Fair/Poor fields use those exact values. If information cannot be determined from the notes or context, use an empty string "". Pre-populate fields from the provided context where applicable.
+// ── IAG JS Autofill ───────────────────────────────────────────────────────
+const IAG_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
-Respond only with a valid JSON object. No preamble, no markdown code fences, no explanation - just the raw JSON.`
+Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
-const IAG_SCHEMA = `{
-  "claim_number": "claim number",
-  "insurer": "insurer name",
-  "date_of_loss": "DD/MM/YYYY",
-  "customer_name": "customer full name",
-  "loss_address": "full property address",
-  "loss_type": "e.g. Water Damage, Storm, Impact",
-  "attendance_date": "DD/MM/YYYY",
-  "time_attended": "e.g. 10:00 AM",
-  "assessor_name": "assessor full name",
-  "assessor_met_with": "name of person met on site",
-  "time_on_site": "e.g. 1 hour",
-  "property_age": "approximate age e.g. Circa 1985",
-  "wall_construction": "e.g. Brick Veneer, Double Brick",
-  "roof_type": "e.g. Tiled, Colorbond",
-  "number_of_storeys": "e.g. 1",
-  "property_condition": "Good or Fair or Poor",
-  "heritage_listed": "Yes or No",
-  "client_stated": "what the client stated about the loss",
-  "areas_affected": "all areas of the property affected",
-  "cause_of_loss": "detailed cause of loss",
-  "damage_description": "detailed description of all damage observed",
-  "pre_existing_damage": "pre-existing damage or conditions unrelated to the claim",
-  "damage_long_term_or_single": "Long Term or Single Event",
-  "property_conditions_contributed": "Yes or No",
-  "conditions_details": "details of property conditions that contributed to damage",
-  "customer_aware_conditions": "Yes or No",
-  "maintenance_required": "maintenance items required or recommended",
-  "specialist_required": "Yes or No",
-  "specialist_details": "specialist type required and reason",
-  "make_safe_required": "Yes or No",
-  "make_safe_details": "make safe works details",
-  "claim_assessment": "overall assessment of the claim",
-  "authority_to_proceed": "Yes or No",
-  "referral_required": "Yes or No",
-  "referral_reason": "reason for referral if applicable",
-  "estimated_timeframe": "estimated repair timeframe e.g. 4-6 weeks",
-  "temp_accommodation_required": "Yes or No",
-  "temp_accommodation_details": "temporary accommodation details",
-  "recovery_potential": "Yes or No",
-  "recovery_details": "recovery details if applicable",
-  "assessor_comments": "overall comments and recommendations",
-  "assessor_name_signoff": "assessor full name",
-  "licence_number": "licence number e.g. BC12132"
-}`
+const IAG_JS_TEMPLATE = `// ============================================================
+// IAG ASSESSMENT REPORT — AUTO-FILL SCRIPT
+// ============================================================
+// INSTRUCTIONS:
+//   1. Open the IAG Assessment Report form in MySysWorks
+//   2. Press F12 → Console tab
+//   3. Paste this entire script and press Enter
+// ============================================================
+
+(function() {
+
+var data = {
+
+  // ── BASIC INFORMATION ─────────────────────────────────────
+  incidentType:          "",        // Select from: Accidental Loss or Damage | Age, Wear and Tear |
+                                    // Animal | Burglary | Cracking | Earthquake | Electric Motor Fusion |
+                                    // Escape of Liquids | Explosion | Fire or Smoke | Flood |
+                                    // Glass Breakage | Home Warranty Defects | Home Warranty Uncompleted Works |
+                                    // Impact by Animals | Impact by Falling Trees | Impact or Collision by Vehicle |
+                                    // Impact or Collision by Watercraft | Lightning or Thunderbolt | Maintenance |
+                                    // Malicious Act or Vandalism | Mould | Other | Pets or Vermin | Rectification |
+                                    // Riot, Civil Commotion or Public Disturbance | Storm or Rainwater |
+                                    // Theft and / or Damage by Thieves | Tsunami | WA Bushfires 01-02-2021 |
+                                    // WA Cyclone Seroja
+
+  makeSafeRequired:      "No",      // "Yes" or "No"
+  makeSafeConducted:     "No",      // "Yes" or "No"
+  makeSafeType:          "",        // Plain text description of make safe type if makeSafeRequired = "Yes", else ""
+  makeSafeDate:          "",        // Date format YYYY-MM-DD if makeSafeRequired = "Yes", else ""
+
+  specialistReportObtained: "No",   // "Yes" or "No". If there are details of a roof report in the dictation answer should be "Yes"
+  specialistType:        "",        // Plain text e.g. "Roofer" if specialistReportObtained = "Yes", else ""
+  droneUtilised:         "N/A",     // "Yes", "No", or "N/A"
+
+  // ── PROPERTY DETAILS ──────────────────────────────────────
+  buildingAge:           "",        // Select nearest: 5 | 10 | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 50 |
+                                    // 55 | 60 | 65 | 70 | 75 | 80 | 85 | 90 | 95 | 100 +
+  condition:             "",        // Select from: Average | Dilapidated | Excellent | Fair | Good |
+                                    // Poor | Poorly Maintained | Ruin | Un-inhabitable | Unsound | Well Maintained
+  roofType:              "",        // Select from: Aluminium Sheet | Asbestos | Cement Tiled |
+                                    // Corrugated Compressed Fibre | Corrugated Fibro | Decromastic Tiled |
+                                    // Metal Corrugated | Metal Deck | Other | Shingle | Slate Tiled |
+                                    // Terracotta Tiled | Tile / Metal | Zincalume
+  wallType:              "",        // Select from: Brick | Brick Veneer | Compressed Fibre | Concrete Panel |
+                                    // Double Brick | Metal Sheet | Other | Rammed Earth | Rendered |
+                                    // Solid Board | Steel Framed and Cladded | Stone |
+                                    // Timber Framed and Cladded | Weatherboard
+  storeys:               "",        // Select: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 +
+  foundation:            "",        // Select from: Brick | Cement | Concrete Floating Slab |
+                                    // Concrete Monolithic Slab | Concrete Supported Slab | Other | Sand |
+                                    // Steel Poles | Timber on Brick Stumps | Timber on Concrete Stumps |
+                                    // Timber on Steel Stumps | Timber on Timber Stumps | Timber Poles
+  fenceType:             "None",    // Select from: Hardie Fence | Asbestos Super 6 (pre-1990) | Super 6 |
+                                    // Pickett | Colorbond | Brushwood | Farm Fence | Wire Fence |
+                                    // Wrought Iron Fencing | Brick | Other - specify in conclusion
+                                    // Use "None" if not applicable or unknown
+  fenceAge:              "",        // Select nearest age or "" if fenceType = "None"
+  tempFenceRequired:     "No",      // "Yes" or "No"
+  detachedGarage:        "No",      // "Yes" or "No"
+  sheds:                 "No",      // "Yes" or "No"
+  swimmingPool:          "No",      // "Yes" or "No"
+  detachedGrannyFlat:    "No",      // "Yes" or "No"
+
+  // ── CLIENT DISCUSSIONS ────────────────────────────────────
+  clientDiscussionTemplate: "Storm - Client Discussion",
+                                    // Select from: Storm - Client Discussion |
+                                    // Fence Template - Client Discussion |
+                                    // EOL (Burst Pipe) - Client Discussion |
+                                    // Vehicle IMPACT - Client Discussion |
+                                    // EOL (WaterProof Failure) - Client Discussion |
+                                    // FIRE - Client Discussion |
+                                    // Tree IMPACT - Client Discussion |
+                                    // Adhesive Failure - Client Discussion |
+                                    // RetainingWall - Client Discussion |
+                                    // Balcony Ingress - Client Discussion |
+                                    // EnviromentalMOULD - Client Discussion |
+                                    // Impact - Garage Door
+
+  // Rich text - client discussion (MCE editor):
+  clientDiscussionDetail: "",       // Plain text outlining what the customer/homeowner/insured is claiming or has said
+
+  // ── RESULTANT DAMAGE ──────────────────────────────────────
+  tarpInstalled:         "No",      // "Yes" or "No" - was a tarp installed to protect roof damage?
+  mainDamageType:        "",        // Select from: Ceiling | Door | External Areas | Fencing | Fire |
+                                    // Flooring | Internal Areas | Roof | Water
+  resultantDamageTemplate: "",      // Select from: Storm - Resultant Damage | Storm - Ceiling Replacement |
+                                    // Storm - Painting Only - Ceiling | Storm - Painting only - Walls |
+                                    // EOL (Burst Pipe ) - Resultant Damage | Fence Hardie Template - Resultant Damage |
+                                    // Fence Asbestos Template -Resultant Damage |
+                                    // Vehicle IMPACT - Resultant Damage |
+                                    // EOL (WaterProof Failure) - Resultant damage | FIRE - Resultant Damge |
+                                    // Tree IMPACT - Resultant Damage | Adhesive Failure - Resultant Damage |
+                                    // RetainingWall - Resultant Damage | Balcony Ingress - Resultant Damage |
+                                    // EnviromentalMOULD - Resultant Damage | Impact - Garage Door |
+                                    // TC Alfred - Resultant Damage
+
+  // Rich text - resultant damage detail (MCE editor):
+  resultantDamageDetail:  "",       // Always start with "The following resultant damage was identified during inspection:" and then enter a bullet list of observed damage. Each line: "• [Room] - [type of damage] [measurement if known]". Use a sub-bullet (-) only if scope needs clarifying. One line per item. If multiple items in a room or similar items across multiple rooms, group them. No cause or opinion - observations only.
+
+  listedEvent:           "Yes",     // "Yes" or "No" - was the damage caused by a listed event?
+  mainRoofDamage:        "No",      // "Yes" or "No" - is the main damage to the roof?
+
+  causeOfDamageTemplate: "",        // Select from: Storm - Roof Report Arranged COD |
+                                    // Storm - Groundwater runoff | Storm - Roof Tile - COD |
+                                    // Storm - Valley/Gutter Overflow-Blocked COD |
+                                    // EOL (Burst Pipe) Sudden - COD | Fence Hardie Template - - COD |
+                                    // Fence Asbestos Template - COD | Vehicle IMPACT - COD |
+                                    // EOL (WaterProof Failure) - COD | FIRE - COD |
+                                    // Tree IMPACT - COD | Adhesive Failure - COD |
+                                    // RetainingWall - COD | Balcony Ingress - COD |
+                                    // EnviromentalMOULD - COD | Impact - Garage Door |
+                                    // TC Alfred - COD - Fencing | TC Alfred - COD - Wind Driven Rain
+
+  // Rich text - cause of damage detail (MCE editor):
+  causeOfDamageDetail:    "",       // Bullet point analysis of the cause. First bullet: "• Primary cause - [type]". Sub-bullets are one-line evidence observations. Include Australian Standard references inline. No first person. Each secondary cause gets its own "• Primary cause" line. Keep sub-bullets to a minimum (1 or 2 per primary cause) and have them help explain the primary bullet point, not just repeat it in different wording.
+
+  // ── DEFECT ISSUES AND MAINTENANCE ────────────────────────
+  defectIssues:          "None",    // Plain text describing defect-related issues directly responsible or contributing to damage. Use "None" if none.
+  maintenanceDamageDesc: "None",    // Plain text describing maintenance directly relating to the damage (e.g. cracked roof tile). Use "None" if none.
+  maintenanceTemplate:   "NO maintenance identified",
+                                    // Select from: NO maintenance identified | Maintenance General |
+                                    // Storm - Additional Downpipe | Storm - Capping/Rebedding |
+                                    // Storm - Gutters / Valley | EOL (Burst Pipe ) - Maintenance |
+                                    // EOL (WaterProof Failure) - Maintenance | Balcony Ingress - Maintenance
+
+  // Rich text - maintenance details (MCE editor):
+  maintenanceDetail:     "N/A",     // Plain text describing what maintenance the insured/owner must complete prior to repairs, or "N/A" if none
+
+  maintenanceEstimate:   "",        // Dollar amount if maintenance works have a cost, else ""
+  otherMaintenanceComments: "None", // Any other comments regarding maintenance NOT directly related to the event, or "None"
+  insuredAwareOfRepairs: "No",      // "Yes" or "No" - is the insured aware of repairs they are responsible for?
+
+  // ── RECOMMENDATION ────────────────────────────────────────
+  recommendation:        "Accept",  // Select from: Accept |
+                                    // Accept - Review: Client seeks alternate settlement method |
+                                    // Accept - Review: Cannot warrant the work |
+                                    // Accept - Review: Component of claim requires cash settling |
+                                    // Accept - Review: Maintenance required by customer |
+                                    // Accept - Review: Replacement Required |
+                                    // Accept - Cash Settlement Required |
+                                    // Do Not Accept - Not Covered |
+                                    // Unsure - Policy Coverage |
+                                    // Cancel - Under Excess |
+                                    // Cancel - Client Wishes to Withdraw Claim |
+                                    // Cancel - No Resultant Damage
+
+  conclusionTemplate:    "",        // Select from: Storm - Singular Event | Storm - Hail |
+                                    // Conclusion - Age,wear,tear / Deterioation |
+                                    // EOL (Burst Pipe ) - Conclusion |
+                                    // Fence Template - Shared Fence - Conclusion |
+                                    // Fence Template - Wholly Owned |
+                                    // Vehicle IMPACT - Conclusion |
+                                    // EOL (WaterProof Failure) - Conclusion | FIRE - Conclusion |
+                                    // Tree IMPACT - Conclusion | Adhesive Failure - Conclusion |
+                                    // RetainingWall - Conclusion | Balcony Ingress - Conclusion |
+                                    // EnviromentalMOULD - Conclusion | Impact - Garage Door |
+                                    // TC Alfred - Conclusion- Fencing | TC Alfred - Conclusion- Wind Driven Rain
+
+  // Rich text - conclusion/summary of findings (MCE editor):
+  conclusionDetail:       "",       // Plain text summary of findings. State cause, damage, and recommendation outcome clearly and concisely. Cold, clinical, professional tone. No first person.
+
+  tempAccommImmediate:   "No",      // "Yes" or "No" - is immediate temp accommodation required?
+  tempAccommImmediateTimeframe: "", // Timeframe if tempAccommImmediate = "Yes", else ""
+  tempRepairsRequired:   "",        // Plain text describing temporary repairs to make home liveable, or "" if N/A
+  tempAccommDuringRepairs: "No",    // "Yes" or "No" - is temp accommodation required during repairs?
+  tempAccommRepairsTimeframe: "",   // Timeframe if tempAccommDuringRepairs = "Yes", else ""
+  worksDuringAccomm:     "",        // Plain text describing works to complete while insured in temp accommodation, or "" if N/A
+
+  // ── SPECIAL NOTES ─────────────────────────────────────────
+  specialNotesTemplate:  "",        // Select from: Shared Fence Note | Unable to Match - Flooring | or "" if none
+  specialNotesDetail:    "",        // Plain text special notes, or "" if none
+
+  // ── INTERNAL USE ONLY ─────────────────────────────────────
+  sumInsuredAdequate:    "Yes",     // "Yes" or "No"
+  overallConditionAcceptable: "Yes", // "Yes" or "No"
+  propertySize:          "",        // Estimate in square metres, numeric only
+  isHabitable:           "Yes",     // "Yes" or "No"
+  mould:                 "No",      // "Yes" or "No"
+  otherHazards:          "",        // Plain text if any hazards on site, else ""
+  asbestosOnSite:        "No",      // "Yes" or "No"
+  incidentConfirmed:     "Yes",     // "Yes" or "No"
+  claimRecommendation:   "Accept",  // "Accept" or "Reject"
+  unableToWarrantReason: "",        // Plain text if claimRecommendation = "Reject" or recommendation includes "Cannot warrant", else ""
+  iagRepRequired:        "No",      // "Yes" or "No" - is risk assessment by IAG representative required?
+  clientWilling:         "Yes",     // "Yes" or "No" - is the client willing to proceed?
+  insuredAdvised:        "Yes",     // "Yes" or "No" - has the insured been advised of next steps?
+  furtherInformation:    "",        // Any further information the insurance company needs to know (property for sale, previous claim, police report, etc.), or "" if none
+
+};
+
+// ============================================================
+// AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
+// ============================================================
+
+  var container = document.querySelector('[id^="job_question_list_"]');
+  if (!container) { console.error('Report form container not found.'); return; }
+
+  var f = container.querySelectorAll('input:not([type=hidden]), select, textarea');
+
+  function setVal(el, value) {
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setRadio(el) {
+    if (!el) return;
+    el.click();
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setSelectByText(selectEl, text) {
+    if (!selectEl || !text) return;
+    for (var i = 0; i < selectEl.options.length; i++) {
+      if (selectEl.options[i].text.trim() === text) {
+        selectEl.value = selectEl.options[i].value;
+        selectEl.selectedIndex = i;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+  }
+
+  function setMCE(index, html) {
+    if (!html) return;
+    if (typeof tinymce !== 'undefined') {
+      var eds = tinymce.editors;
+      var edArr = Array.isArray(eds) ? eds : Object.values(eds);
+      if (edArr[index]) {
+        edArr[index].setContent(html);
+        edArr[index].save();
+        return;
+      }
+    }
+    var tas = container.querySelectorAll('textarea');
+    if (tas[index]) setVal(tas[index], html);
+  }
+
+  // ── BASIC INFORMATION ─────────────────────────────────────
+  setSelectByText(f[0], data.incidentType);
+  if (data.makeSafeRequired === 'Yes') setRadio(f[1]); else setRadio(f[2]);
+  if (data.makeSafeConducted === 'Yes') setRadio(f[3]); else setRadio(f[4]);
+  if (data.makeSafeType)  setVal(f[5], data.makeSafeType);
+  if (data.makeSafeDate)  setVal(f[6], data.makeSafeDate);
+  if (data.specialistReportObtained === 'Yes') setRadio(f[7]); else setRadio(f[8]);
+  if (data.specialistType) setVal(f[9], data.specialistType);
+  if (data.droneUtilised === 'Yes')  setRadio(f[10]);
+  if (data.droneUtilised === 'No')   setRadio(f[11]);
+  if (data.droneUtilised === 'N/A')  setRadio(f[12]);
+
+  // ── PROPERTY DETAILS ──────────────────────────────────────
+  setSelectByText(f[13], data.buildingAge);
+  setSelectByText(f[14], data.condition);
+  setSelectByText(f[15], data.roofType);
+  setSelectByText(f[16], data.wallType);
+  setSelectByText(f[17], data.storeys);
+  setSelectByText(f[18], data.foundation);
+  if (data.fenceType && data.fenceType !== 'None') setSelectByText(f[19], data.fenceType);
+  if (data.fenceAge)   setSelectByText(f[20], data.fenceAge);
+  if (data.tempFenceRequired === 'Yes') setRadio(f[21]); else setRadio(f[22]);
+  if (data.detachedGarage === 'Yes')    setRadio(f[23]); else setRadio(f[24]);
+  if (data.sheds === 'Yes')             setRadio(f[25]); else setRadio(f[26]);
+  if (data.swimmingPool === 'Yes')      setRadio(f[27]); else setRadio(f[28]);
+  if (data.detachedGrannyFlat === 'Yes') setRadio(f[29]); else setRadio(f[30]);
+
+  // ── CLIENT DISCUSSIONS ────────────────────────────────────
+  setSelectByText(f[31], data.clientDiscussionTemplate);
+  setMCE(0, data.clientDiscussionDetail);
+
+  // ── RESULTANT DAMAGE ──────────────────────────────────────
+  if (data.tarpInstalled === 'Yes') setRadio(f[33]); else setRadio(f[34]);
+  setSelectByText(f[35], data.mainDamageType);
+  setSelectByText(f[36], data.resultantDamageTemplate);
+  setMCE(1, data.resultantDamageDetail);
+  if (data.listedEvent === 'Yes') setRadio(f[38]); else setRadio(f[39]);
+  if (data.mainRoofDamage === 'Yes') setRadio(f[40]); else setRadio(f[41]);
+  setSelectByText(f[42], data.causeOfDamageTemplate);
+  setMCE(2, data.causeOfDamageDetail);
+
+  // ── DEFECT ISSUES AND MAINTENANCE ────────────────────────
+  if (data.defectIssues)          setVal(f[44], data.defectIssues);
+  if (data.maintenanceDamageDesc) setVal(f[45], data.maintenanceDamageDesc);
+  setSelectByText(f[46], data.maintenanceTemplate);
+  setMCE(3, data.maintenanceDetail);
+  if (data.maintenanceEstimate)   setVal(f[48], data.maintenanceEstimate);
+  if (data.otherMaintenanceComments) setVal(f[49], data.otherMaintenanceComments);
+  if (data.insuredAwareOfRepairs === 'Yes') setRadio(f[50]); else setRadio(f[51]);
+
+  // ── RECOMMENDATION ────────────────────────────────────────
+  setSelectByText(f[52], data.recommendation);
+  setSelectByText(f[53], data.conclusionTemplate);
+  setMCE(4, data.conclusionDetail);
+  if (data.tempAccommImmediate === 'Yes') setRadio(f[55]); else setRadio(f[56]);
+  if (data.tempAccommImmediateTimeframe) setVal(f[57], data.tempAccommImmediateTimeframe);
+  if (data.tempRepairsRequired)           setVal(f[58], data.tempRepairsRequired);
+  if (data.tempAccommDuringRepairs === 'Yes') setRadio(f[59]); else setRadio(f[60]);
+  if (data.tempAccommRepairsTimeframe)    setVal(f[61], data.tempAccommRepairsTimeframe);
+  if (data.worksDuringAccomm)             setVal(f[62], data.worksDuringAccomm);
+
+  // ── SPECIAL NOTES ─────────────────────────────────────────
+  if (data.specialNotesTemplate) setSelectByText(f[63], data.specialNotesTemplate);
+  setMCE(5, data.specialNotesDetail);
+
+  // ── INTERNAL USE ONLY ─────────────────────────────────────
+  if (data.sumInsuredAdequate === 'Yes')       setRadio(f[65]); else setRadio(f[66]);
+  if (data.overallConditionAcceptable === 'Yes') setRadio(f[67]); else setRadio(f[68]);
+  if (data.propertySize)                       setVal(f[69], data.propertySize);
+  if (data.isHabitable === 'Yes')              setRadio(f[70]); else setRadio(f[71]);
+  if (data.mould === 'Yes')                    setRadio(f[72]); else setRadio(f[73]);
+  if (data.otherHazards)                       setVal(f[74], data.otherHazards);
+  if (data.asbestosOnSite === 'Yes')           setRadio(f[75]); else setRadio(f[76]);
+  if (data.incidentConfirmed === 'Yes')        setRadio(f[77]); else setRadio(f[78]);
+  if (data.claimRecommendation === 'Accept')   setRadio(f[79]); else setRadio(f[80]);
+  if (data.unableToWarrantReason)              setVal(f[81], data.unableToWarrantReason);
+  if (data.iagRepRequired === 'Yes')           setRadio(f[82]); else setRadio(f[83]);
+  if (data.clientWilling === 'Yes')            setRadio(f[84]); else setRadio(f[85]);
+  if (data.insuredAdvised === 'Yes')           setRadio(f[86]); else setRadio(f[87]);
+  if (data.furtherInformation)                 setVal(f[88], data.furtherInformation);
+
+  console.log('IAG Auto-fill complete! Review the form, then click Save or Complete.');
+
+})();`
 
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -387,7 +665,7 @@ export async function POST(req: NextRequest) {
       siteAttendanceDatetimeFormatted ? `Site attendance datetime (use exactly for siteAttendanceDatetime, format YYYY-MM-DDTHH:MM): ${siteAttendanceDatetimeFormatted}` : null,
     ].filter(Boolean).join('\n')
 
-    // ── AAI: JS autofill only ─────────────────────────────────────────────
+    // ── AAI: JS autofill ─────────────────────────────────────────────────
     if (template === 'aai') {
       const jsMessage = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
@@ -422,14 +700,44 @@ TEMPLATE TO FILL:
       return NextResponse.json({ ok: true, javascript: jsContent.text })
     }
 
-    // ── Auto & General / IAG: JSON fields ────────────────────────────────
-    const systemPrompt = template === 'auto_general' ? AUTO_GENERAL_SYSTEM : IAG_SYSTEM
-    const schema = template === 'auto_general' ? AUTO_GENERAL_SCHEMA : IAG_SCHEMA
+    // ── IAG: JS autofill ─────────────────────────────────────────────────
+    if (template === 'iag') {
+      const jsMessage = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8192,
+        system: IAG_JS_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `Convert the dictation and context below into the data = { } JavaScript object. Use the exact field names shown. Only change the values - do not rename any keys. Attempt to fill all fields. If there is not enough information to fill a particular field, or it is not applicable, the answer should be "N/A", "No" or "None" as appropriate.
 
+MY DICTATION:
+[${rawNotes}]
+
+Context:
+[${contextLines}]
+
+FOCUS GUIDANCE — COMBINED DICTATION:
+These notes cover a full site inspection and may include roof report details, make safe works, and general site observations. For this IAG Building Assessment Report:
+- INCLUDE: Customer/client discussion and what the insured stated, cause of loss and causal chain, damaged areas and extent, property conditions and pre-existing defects, wear and tear evidence, claim considerations (referrals, specialist needs, temp accommodation, recovery potential).
+- The Roof Report is a supporting document for this report - you may reference roof findings where they are causally relevant to the claimed damage. If the roof allowed water entry causing internal damage, reference it. Only reference roof technical specifications if they directly explain the cause or extent of the claimed building damage.
+- Verbal cues like "IAG section", "building report", "starting IAG" indicate content especially relevant to this report.
+
+TEMPLATE TO FILL:
+[${IAG_JS_TEMPLATE}]`,
+        }],
+      })
+      const jsContent = jsMessage.content[0]
+      if (jsContent.type !== 'text') {
+        return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, javascript: jsContent.text })
+    }
+
+    // ── Auto & General: JSON fields ───────────────────────────────────────
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
-      system: systemPrompt,
+      system: AUTO_GENERAL_SYSTEM,
       messages: [{
         role: 'user',
         content: `Complete the following insurance report template using the raw field notes and context provided. Return ONLY valid JSON.
@@ -441,7 +749,7 @@ Context:
 ${contextLines}
 
 JSON structure to complete:
-${schema}`,
+${AUTO_GENERAL_SCHEMA}`,
       }],
     })
 
