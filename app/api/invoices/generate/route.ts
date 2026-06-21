@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
     })
 
   } else if (type === 'balance') {
-    // Fetch approved quote amount
+    // Fetch approved quote
     const { data: quote } = await supabase
       .from('quotes')
       .select('id, approved_amount, gst_pct, markup_pct')
@@ -174,43 +174,99 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    let approvedQuoteAmountIncGst = quote?.approved_amount ?? 0
     const gstPct = quote?.gst_pct ?? DEFAULT_GST_PCT
+    const markupPct = quote?.markup_pct ?? 0
 
-    // For quotes approved before approved_amount was auto-set, compute from scope items
-    if (!approvedQuoteAmountIncGst && quote?.id) {
-      const { data: scopeItems } = await supabase
+    // Fetch scope items from the approved quote
+    let scopeItems: Array<{
+      item_description: string | null
+      qty: number | null
+      rate_total: number | null
+      line_total: number | null
+      unit: string | null
+      sort_order: number | null
+    }> = []
+
+    if (quote?.id) {
+      const { data: items } = await supabase
         .from('scope_items')
-        .select('line_total')
+        .select('item_description, qty, rate_total, line_total, unit, sort_order')
         .eq('quote_id', quote.id)
         .eq('tenant_id', tenantId)
-      const subtotal = (scopeItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
-      const markupPct = quote.markup_pct ?? 0
-      approvedQuoteAmountIncGst = Math.round(subtotal * (1 + markupPct) * (1 + gstPct) * 100) / 100
+        .order('sort_order', { ascending: true })
+      scopeItems = items ?? []
     }
 
-    // Sum of all non-voided outbound invoices for this job
-    const { data: priorInvoices } = await supabase
-      .from('invoices')
-      .select('amount_inc_gst')
-      .eq('job_id', jobId)
-      .eq('tenant_id', tenantId)
-      .eq('direction', 'outbound')
-      .neq('status', 'voided')
+    if (scopeItems.length > 0) {
+      // Build line items from scope items — each item is listed explicitly
+      const lineItems = scopeItems.map((item, index) => ({
+        tenant_id: tenantId,
+        description: item.item_description ?? 'Scope Item',
+        quantity: item.qty ?? 1,
+        unit_price: item.rate_total ?? 0,
+        line_total: item.line_total ?? 0,
+        unit: item.unit ?? null,
+        sort_order: item.sort_order ?? index,
+      }))
 
-    const previouslyInvoicedAmountIncGst = (priorInvoices ?? []).reduce(
-      (sum, inv) => sum + (inv.amount_inc_gst ?? 0),
-      0
-    )
+      const subtotal = Math.round(
+        lineItems.reduce((sum, li) => sum + (li.line_total ?? 0), 0) * 100
+      ) / 100
+      const amountExGst = Math.round(subtotal * (1 + markupPct) * 100) / 100
+      const gst = Math.round(amountExGst * gstPct * 100) / 100
+      const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
 
-    generated = generateBalanceInvoice({
-      tenantId,
-      jobId,
-      claimNumber: job.claim_number,
-      approvedQuoteAmountIncGst,
-      previouslyInvoicedAmountIncGst,
-      gstPct,
-    })
+      generated = {
+        invoiceData: {
+          tenant_id: tenantId,
+          job_id: jobId,
+          invoice_type: 'repair',
+          direction: 'outbound',
+          gst_treatment: 'exclusive',
+          amount_ex_gst: amountExGst,
+          gst,
+          amount_inc_gst: amountIncGst,
+          ...(markupPct > 0 ? { markup_pct: markupPct } : {}),
+          status: 'draft',
+        },
+        lineItems,
+      }
+    } else {
+      // Fallback when no scope items: compute balance from approved amount minus prior invoices
+      let approvedQuoteAmountIncGst = quote?.approved_amount ?? 0
+
+      if (!approvedQuoteAmountIncGst && quote?.id) {
+        const { data: fallbackItems } = await supabase
+          .from('scope_items')
+          .select('line_total')
+          .eq('quote_id', quote.id)
+          .eq('tenant_id', tenantId)
+        const subtotal = (fallbackItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+        approvedQuoteAmountIncGst = Math.round(subtotal * (1 + markupPct) * (1 + gstPct) * 100) / 100
+      }
+
+      const { data: priorInvoices } = await supabase
+        .from('invoices')
+        .select('amount_inc_gst')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('direction', 'outbound')
+        .neq('status', 'voided')
+
+      const previouslyInvoicedAmountIncGst = (priorInvoices ?? []).reduce(
+        (sum, inv) => sum + (inv.amount_inc_gst ?? 0),
+        0
+      )
+
+      generated = generateBalanceInvoice({
+        tenantId,
+        jobId,
+        claimNumber: job.claim_number,
+        approvedQuoteAmountIncGst,
+        previouslyInvoicedAmountIncGst,
+        gstPct,
+      })
+    }
 
   } else {
     return NextResponse.json({ error: `Unknown invoice type: ${type}` }, { status: 400 })
