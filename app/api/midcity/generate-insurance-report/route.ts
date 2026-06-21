@@ -458,7 +458,7 @@ var data = {
                                     // TC Alfred - Conclusion- Fencing | TC Alfred - Conclusion- Wind Driven Rain
 
   // Rich text - conclusion/summary of findings (MCE editor):
-  conclusionDetail:       "",       // Plain text summary of findings. State cause, damage, and recommendation outcome clearly and concisely. Cold, clinical, professional tone. No first person.
+  conclusionDetail:       "",       // Plain text summary of findings. 1 or 2 sentences maximum. Eg. "I am of the opinion that the damage being claimed to the property is consistent with water entry in a storm event." Or "I am of the opinion that the damage being claimed to the property is consistent with age and gradual deterioration over a period of time and the damage has not been caused by a singular event."
 
   tempAccommImmediate:   "No",      // "Yes" or "No" - is immediate temp accommodation required?
   tempAccommImmediateTimeframe: "", // Timeframe if tempAccommImmediate = "Yes", else ""
