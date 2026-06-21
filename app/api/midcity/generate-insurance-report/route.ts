@@ -3,98 +3,6 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const dynamic = 'force-dynamic'
 
-// ── Auto & General ────────────────────────────────────────────────────────
-const AUTO_GENERAL_SYSTEM = `You are an expert building inspector at Insurance Repair Co Pty Ltd in Perth, Australia. Write formal, factual insurance building assessment reports for Auto & General Insurance Company Limited. Your style must be cold, clinical and professional - no first person language. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not use em dashes - use hyphens or alternative punctuation instead.
-
-Additional style rules:
-- All narrative fields use third person, clinical, professional language
-- All Yes/No fields must contain exactly "Yes" or "No" or "N/A" where applicable (capitalised, no punctuation)
-- Bullet lists use "- " prefix (hyphen-space), not em dashes, not dots
-- No speculation beyond observed evidence
-- Australian Standard references inline where applicable
-- If information is not available from the notes, use "" for that field - do not fabricate
-
-Respond only with a valid JSON object. No preamble, no markdown code fences, no explanation - just the raw JSON.`
-
-const AUTO_GENERAL_SCHEMA = `{
-  "insurer_brand": "Auto & General",
-  "claim_number": "claim number",
-  "date_of_loss": "DD/MM/YYYY",
-  "customer_name": "customer full name",
-  "loss_address": "full property address",
-  "attendance_date": "DD/MM/YYYY",
-  "time_attended": "e.g. 10:00 AM",
-  "assessor_name": "Kyle Bindon",
-  "assessor_contact_number": "IRC mobile number if known, else empty string",
-  "assessor_met_with": "name of person met on site",
-  "amount_of_time_on_site": "e.g. 45 minutes",
-  "year_property_built": "year or approximate era e.g. Circa 1985",
-  "wall_construction_type": "e.g. Brick veneer, Double brick, Weatherboard",
-  "roof_type": "e.g. Colorbond metal, Concrete tile, Terracotta tile",
-  "number_of_storeys": "e.g. Single storey",
-  "under_construction": "Yes or No",
-  "construction_removal_detail": "Yes or No",
-  "construction_details": "details if applicable, else empty string",
-  "heritage_listed": "Yes or No",
-  "unoccupied_180_days": "Yes or No",
-  "customer_discussion": "clinical paragraph summary of what the insured reported and what was found on inspection. Third person. Facts only.",
-  "claim_type": "e.g. Escape of Liquid, Storm, Impact, Fire",
-  "source_room": "e.g. Kitchen, Bathroom, Roof",
-  "specific_cause": "e.g. Burst flexi hose under kitchen sink",
-  "cause_details": "clinical paragraph. Proximate cause and causal link explained. No first person. Australian Standard references inline where applicable.",
-  "resulting_damage_description": "bullet list of observed damage. Format: - [Room] - [type of damage] [measurement if known]. No cause or opinion - observations only.",
-  "damage_duration": "how long damage appears to have been occurring e.g. Recent, 1-2 weeks",
-  "asbestos_present": "Yes or No",
-  "electrical_damaged": "Yes or No",
-  "mould_present": "Yes or No",
-  "restoration_required": "Yes or No",
-  "restoration_works_overview": "overview of restoration works if Yes, else empty string",
-  "restoration_time_estimate": "estimated time e.g. 3-5 days",
-  "contents_claimed": "Yes or No",
-  "property_conditions_contributed": "Yes or No",
-  "conditions_duration": "how long conditions have been occurring if Yes, else empty string",
-  "conditions_details": "details of contributing property conditions if Yes, else empty string",
-  "damage_without_conditions": "Yes or No",
-  "damage_without_conditions_details": "explanation if Yes, else empty string",
-  "customer_aware_conditions": "Yes or No",
-  "customer_aware_details": "details if Yes, else empty string",
-  "other_property_issues": "Yes or No",
-  "other_property_issues_details": "details of other property condition issues if Yes, else empty string",
-  "maintenance_repairs_required": "Yes or No",
-  "urgent_maintenance": "urgent maintenance items if Yes, else empty string",
-  "other_maintenance": "recommended maintenance items if applicable, else empty string",
-  "conditions_prevent_repairs": "Yes or No",
-  "conditions_prevent_details": "details if Yes, else empty string",
-  "emergency_temp_accommodation": "Yes or No",
-  "emergency_temp_timeframe": "approximate timeframe if Yes, else empty string",
-  "temp_accommodation_during_repairs": "Yes or No",
-  "temp_accommodation_timeframe": "approximate timeframe if Yes, else empty string",
-  "temp_accommodation_notes": "any special requirements",
-  "property_not_good_condition": "Yes or No",
-  "property_not_structurally_sound": "Yes or No",
-  "property_not_well_maintained": "Yes or No",
-  "property_not_water_tight": "Yes or No",
-  "business_use_airbnb": "Yes or No",
-  "underwriting_further_detail": "any additional underwriting notes",
-  "damage_failed_appliance": "Yes or No",
-  "appliance_less_than_10_years": "Yes or No or N/A",
-  "appliance_salvageable": "Yes or No or N/A",
-  "technician_attended": "Yes or No",
-  "property_under_10_years": "Yes or No",
-  "builders_trade_details": "builder or trade details if applicable, else empty string",
-  "third_party_impact": "Yes or No",
-  "third_party_details": "third party details if Yes, else empty string",
-  "any_further_details": "any further details or other relevant information",
-  "next_steps_home_assessor": "Kyle Bindon action item",
-  "next_steps_claims": "what claims needs to do",
-  "next_steps_builder": "what IRC/builder needs to do",
-  "next_steps_specialist": "blank if none required",
-  "next_steps_customer": "any customer action items",
-  "report_completed_by": "Kyle Bindon",
-  "individual_experience_qualification": "e.g. Licensed Builder BC105884, Insurance Repair Co Pty Ltd",
-  "performed_under_licence": "BC105884"
-}`
-
 // ── AAI JS Autofill ───────────────────────────────────────────────────────
 const AAI_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
@@ -623,6 +531,324 @@ var data = {
 
 })();`
 
+// ── A&G JS Autofill ───────────────────────────────────────────────────────
+const AUTO_GENERAL_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
+
+Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
+
+const AUTO_GENERAL_JS_TEMPLATE = `// ============================================================
+// A&G BUILDER SITE REPORT — AUTO-FILL SCRIPT
+// ============================================================
+// INSTRUCTIONS:
+//   1. Open the A&G Builder Site Report form in MySysWorks
+//   2. Press F12 → Console tab
+//   3. Paste this entire script and press Enter
+// ============================================================
+
+(function() {
+
+var data = {
+
+  // ── ASSESSMENT REPORT DETAILS ─────────────────────────────
+  attendanceDate:        "",        // Format: YYYY-MM-DD (from siteAttendanceDatetime)
+  timeAttended:          "",        // Format: HH:MMam/pm e.g. "9:30am" (from siteAttendanceDatetime)
+  assessorContactNumber: "",        // Assessor phone number from context
+  assessorMetWith:       "",        // First name of insured e.g. "Gary"
+  timeOnSite:            "",        // Approximate time on site e.g. "45 mins", "1 hour"
+
+  // ── PROPERTY DETAILS ──────────────────────────────────────
+  yearBuilt:             "",        // Year as a number e.g. "1995"
+  wallConstruction:      "",        // Select from: Asbestos | Besser Block/Cement | Brick Veneer |
+                                    // Double Brick | Fibro | Hebel | Non-Asbestos Fibro | Other |
+                                    // Other Cladding | Stone | Timber/Weatherboard
+  roofType:              "",        // Select from: Asbestos | Cement Tiles | Clay/Terracotta Tiles |
+                                    // Colorbond | Metal Other | Other | Slate
+  storeys:               "",        // Select: 1 | 2 | 3
+  underConstruction:     "No",      // Select: Yes | No | N/A
+  constructionRoofWalls: "No",      // Select: Yes | No | N/A - is work involving removal of roof/external walls?
+  constructionDetails:   "",        // Plain text if underConstruction = "Yes", else ""
+  heritageListed:        "No",      // Select: Yes | No | N/A
+  unoccupied180Days:     "No",      // Select: Yes | No | N/A
+
+  // ── CUSTOMER DISCUSSION AND INSPECTION FINDINGS ───────────
+  customerDiscussionTemplate: "Storm - Client Discussion",
+                                    // Select from: Storm - Client Discussion |
+                                    // EOL (Burst Pipe) - Client Discussion |
+                                    // Fence Template - Client Discussion |
+                                    // Vehicle IMPACT - Client Discussion |
+                                    // EOL (WaterProof Failure) - Client Discussion |
+                                    // FIRE - Client Discussion |
+                                    // Tree IMPACT - Client Discussion |
+                                    // Adhesive Failure - Client Discussion |
+                                    // RetainingWall - Client Discussion |
+                                    // Balcony Ingress - Client Discussion |
+                                    // EnviromentalMOULD - Client Discussion |
+                                    // Impact - Garage Door
+
+  // Rich text - customer discussion and inspection findings (MCE editor 0):
+  customerDiscussionDetail: "",     // FIRST PERSON narrative. Begin: "I met with the Insured - [name] as arranged. The Insured stated that [what insured said about the event and damage]. Upon inspection, [what was found on site]." Include what the insured said AND key site observations. This is the combined Statement of Objectivity.
+
+  // ── CAUSE OF DAMAGE ───────────────────────────────────────
+  claimType:             "",        // Select from: Accidental Damage | Escape of Liquid | Storm(wind) |
+                                    // Hail | Rainwater Runoff | Flood | Lighting | Earth Movement |
+                                    // Impact | Fire Damage | Bushfire | Explosion | Earthquake |
+                                    // Glass | Theft Damage | Malicious Damage/Vadalism |
+                                    // Tenant Malicious Damage | Motor Burnout | Third Party Property |
+                                    // Liability (Third Party) | Personal Effects | Riot/Civil Commotion |
+                                    // Theft | Tenant Theft | Other
+  sourceRoom:            "",        // Plain text location/source e.g. "Western boundary fence", "Lounge room ceiling"
+  specificCause:         "",        // Select from: Storm - Roof Report Arranged COD |
+                                    // Storm - Groundwater runoff | Storm - Roof Tile - COD |
+                                    // Storm - Valley/Gutter Overflow-Blocked COD |
+                                    // EOL (Burst Pipe) Sudden - COD |
+                                    // Fence Hardie Template - - COD |
+                                    // Vehicle IMPACT - COD |
+                                    // EOL (WaterProof Failure) - COD |
+                                    // FIRE - COD | Tree IMPACT - COD |
+                                    // Adhesive Failure - COD | RetainingWall - COD |
+                                    // Balcony Ingress - COD | EnviromentalMOULD - COD |
+                                    // Impact - Garage Door | Fence Asbestos Template - COD
+
+  // Rich text - cause of damage detail (MCE editor 1):
+  causeOfDamageDetail:   "",        // Bullet point analysis of the cause. First bullet: "• Primary cause - [type]". Sub-bullets are one-line evidence observations. Include Australian Standard references inline. No first person. Each secondary cause gets its own "• Primary cause" line. Keep sub-bullets to a minimum (1 or 2 per primary cause) - they should help explain the primary bullet, not just repeat it in different wording.
+
+  // ── RESULTING DAMAGE ──────────────────────────────────────
+  resultantDamageTemplate: "",      // Select from: Storm - Resultant Damage | Storm - Ceiling Replacement |
+                                    // Storm - Painting Only - Ceiling | Storm - Painting only - Walls |
+                                    // EOL (Burst Pipe ) - Resultant Damage |
+                                    // Fence Hardie Template - Resultant Damage |
+                                    // Vehicle IMPACT - Resultant Damage |
+                                    // EOL (WaterProof Failure) - Resultant damage |
+                                    // FIRE - Resultant Damge | Tree IMPACT - Resultant Damage |
+                                    // Adhesive Failure - Resultant Damage |
+                                    // RetainingWall - Resultant Damage |
+                                    // Balcony Ingress - Resultant Damage |
+                                    // EnviromentalMOULD - Resultant Damage |
+                                    // Impact - Garage Door |
+                                    // Fence Asbestos Template -Resultant Damage
+
+  // Rich text - resulting damage description (MCE editor 2):
+  resultantDamageDetail:  "",       // Always start with "The following resultant damage was identified during inspection:" and then a bullet list. Each line: "• [Room] - [type of damage] [measurement if known]". Use a sub-bullet (-) only if scope needs clarifying. One line per item. Group similar items across rooms where applicable. No cause or opinion - observations only.
+
+  damageDuration:        "",        // Plain text e.g. "Single event", "Multiple Years". How long the claim-related damage appears to have been occurring.
+  asbestosPresent:       "No",      // Select: Yes | No | N/A
+  electricalDamaged:     "No",      // Select: Yes | No | N/A
+  mouldPresent:          "No",      // Select: Yes | No | N/A
+  restorationRequired:   "No",      // Select: Yes | No | N/A
+  restorationOverview:   "",        // Plain text overview if restorationRequired = "Yes", else ""
+  restorationTimeframe:  "N/A",     // Plain text timeframe if restorationRequired = "Yes", else "N/A"
+  contentsItemsClaimed:  "No",      // Select: Yes | No | N/A
+
+  // ── PROPERTY CONDITIONS ───────────────────────────────────
+  propertyConditionsContributed: "No", // Select: Yes | No | N/A
+  conditionsDuration:    "",        // Plain text how long conditions have been occurring, or ""
+  conditionsDetails:     "",        // Plain text details if propertyConditionsContributed = "Yes", else ""
+  damageWouldStillOccur: "No",      // Select: Yes | No | N/A - would damage still have occurred if property was in good condition?
+  damageWouldOccurDetails: "",      // Plain text if damageWouldStillOccur = "Yes", else ""
+  customerAwareConditions: "No",    // Select: Yes | No | N/A
+  customerAwareDetails:  "",        // Plain text if customerAwareConditions = "Yes", else ""
+  otherPropertyIssues:   "No",      // Select: Yes | No | N/A
+  otherIssuesDetails:    "",        // Plain text if otherPropertyIssues = "Yes", else ""
+  maintenanceRequired:   "No",      // Select: Yes | No | N/A
+  urgentMaintenance:     "",        // Plain text urgent maintenance items, or ""
+  otherMaintenance:      "",        // Plain text other maintenance items, or ""
+  warrantableRepairsPrevented: "No", // Select: Yes - Maintenance to be completed prior | No | N/A | Yes - Unable to warrant
+  maintenanceTemplate:   "A&G - Maintenance", // Select from: A&G - Maintenance |
+                                    // Following the completion of the required maintenance works, Midcity group can proceed with the resultant repairs provided in the scope of works.
+
+  // ── TEMPORARY ACCOMMODATION ───────────────────────────────
+  emergencyAccomm:       "No",      // Select: Yes, required until repairs are completed |
+                                    // Yes, required until Make Safe is completed | No
+  emergencyTimeframe:    "",        // Plain text timeframe if emergencyAccomm = "Yes", else ""
+  accommDuringRepairs:   "No",      // Select: Yes | No | N/A
+  repairsTimeframe:      "",        // Plain text timeframe if accommDuringRepairs = "Yes", else ""
+  accommNotes:           "",        // Plain text notes / special requirements, or ""
+
+  // ── UNDERWRITING RISK ASSESSMENT ─────────────────────────
+  propertyNotGoodCondition:  "No",  // Select: Yes | No | N/A
+  propertyNotStructurallySound: "No", // Select: Yes | No | N/A
+  propertyNotWellMaintained: "No",  // Select: Yes | No | N/A
+  propertyNotWaterTight:     "No",  // Select: Yes | No | N/A
+  businessUse:               "No",  // Select: Yes | No | N/A
+  underwritingFurtherDetail: "",    // Plain text further detail, or ""
+
+  // ── RECOVERIES ASSESSMENT ────────────────────────────────
+  failedAppliance:       "No",      // Select: Yes | No | N/A
+  applianceUnder10Years: "No",      // Select: Yes | No | N/A
+  applianceSalvageable:  "No",      // Select from: Yes, the assessor has retrieved the item |
+                                    // Yes, the item is onsite and can be collected |
+                                    // Yes, the item is offsite and can be collected |
+                                    // No, the item has been disposed of
+                                    // Use "No, the item has been disposed of" as default if failedAppliance = "No"
+  technicianAttended:    "No",      // Select: Yes | No | N/A
+  propertyUnder10Years:  "No",      // Select: Yes | No | N/A
+  builderTradeDetails:   "",        // Plain text if propertyUnder10Years = "Yes", else ""
+  thirdPartyImpact:      "No",      // Select: Yes | No | N/A
+  recoveriesFurtherDetails: "",     // Plain text any further details, or ""
+
+  // ── ADDITIONAL INFORMATION / NEXT STEPS ──────────────────
+  nextSteps:             "Await Further Instructions",
+                                    // Select from: Await Further Instructions
+  homeAssessor:          "HA to be appointed for claim review",
+                                    // Select from: HA to be appointed for claim review
+  claims:                "Review Report and determine policy coverage",
+                                    // Select from: Review Report and determine policy coverage
+  builder:               "Await Further Instructions",
+                                    // Select from: Await Further Instructions
+  specialist:            "N/A",     // Select from: N/A |
+                                    // Engineer - Attend site to provide causation report & SOW for repair methodology
+  customer:              "Await A&G Review",
+                                    // Select from: Complete Maintenance Repairs | Await A&G Review
+
+  // ── STATEMENT OF OBJECTIVITY ─────────────────────────────
+  qualification:         "Building Supervisor",
+                                    // Select from: Building Supervisor | Other | Plumber | Electrician
+  licence:               "WA Lic. BC12132",
+                                    // Select from: WA Lic. BC12132 | VIC Lic. CDB-U 65461 / CCB-U 57405 |
+                                    // NSW Lic. 197071C | QLD Lic. 1202589
+
+};
+
+// ============================================================
+// AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
+// ============================================================
+
+  var container = document.querySelector('[id^="job_question_list_"]');
+  if (!container) { console.error('Report form container not found.'); return; }
+
+  var f = container.querySelectorAll('input:not([type=hidden]), select, textarea');
+
+  function setVal(el, value) {
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setSelectByText(selectEl, text) {
+    if (!selectEl || !text) return;
+    for (var i = 0; i < selectEl.options.length; i++) {
+      if (selectEl.options[i].text.trim() === text) {
+        selectEl.value = selectEl.options[i].value;
+        selectEl.selectedIndex = i;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+  }
+
+  function setMCE(index, html) {
+    if (!html) return;
+    if (typeof tinymce !== 'undefined') {
+      var eds = tinymce.editors;
+      var edArr = Array.isArray(eds) ? eds : Object.values(eds);
+      if (edArr[index]) {
+        edArr[index].setContent(html);
+        edArr[index].save();
+        return;
+      }
+    }
+    var tas = container.querySelectorAll('textarea');
+    if (tas[index]) setVal(tas[index], html);
+  }
+
+  // ── ASSESSMENT REPORT DETAILS ─────────────────────────────
+  if (data.attendanceDate)        setVal(f[0],  data.attendanceDate);
+  if (data.timeAttended)          setVal(f[1],  data.timeAttended);
+  if (data.assessorContactNumber) setVal(f[2],  data.assessorContactNumber);
+  if (data.assessorMetWith)       setVal(f[3],  data.assessorMetWith);
+  if (data.timeOnSite)            setVal(f[4],  data.timeOnSite);
+
+  // ── PROPERTY DETAILS ──────────────────────────────────────
+  if (data.yearBuilt)             setVal(f[5],  data.yearBuilt);
+  setSelectByText(f[6],  data.wallConstruction);
+  setSelectByText(f[7],  data.roofType);
+  setSelectByText(f[8],  data.storeys);
+  setSelectByText(f[9],  data.underConstruction);
+  setSelectByText(f[10], data.constructionRoofWalls);
+  if (data.constructionDetails)   setVal(f[11], data.constructionDetails);
+  setSelectByText(f[12], data.heritageListed);
+  setSelectByText(f[13], data.unoccupied180Days);
+
+  // ── CUSTOMER DISCUSSION ───────────────────────────────────
+  setSelectByText(f[14], data.customerDiscussionTemplate);
+  setMCE(0, data.customerDiscussionDetail);
+
+  // ── CAUSE OF DAMAGE ───────────────────────────────────────
+  setSelectByText(f[16], data.claimType);
+  if (data.sourceRoom)            setVal(f[17], data.sourceRoom);
+  setSelectByText(f[18], data.specificCause);
+  setMCE(1, data.causeOfDamageDetail);
+
+  // ── RESULTING DAMAGE ──────────────────────────────────────
+  setSelectByText(f[20], data.resultantDamageTemplate);
+  setMCE(2, data.resultantDamageDetail);
+  if (data.damageDuration)        setVal(f[22], data.damageDuration);
+  setSelectByText(f[23], data.asbestosPresent);
+  setSelectByText(f[24], data.electricalDamaged);
+  setSelectByText(f[25], data.mouldPresent);
+  setSelectByText(f[26], data.restorationRequired);
+  if (data.restorationOverview)   setVal(f[27], data.restorationOverview);
+  if (data.restorationTimeframe)  setVal(f[28], data.restorationTimeframe);
+  setSelectByText(f[29], data.contentsItemsClaimed);
+
+  // ── PROPERTY CONDITIONS ───────────────────────────────────
+  setSelectByText(f[30], data.propertyConditionsContributed);
+  if (data.conditionsDuration)    setVal(f[31], data.conditionsDuration);
+  if (data.conditionsDetails)     setVal(f[32], data.conditionsDetails);
+  setSelectByText(f[33], data.damageWouldStillOccur);
+  if (data.damageWouldOccurDetails)  setVal(f[34], data.damageWouldOccurDetails);
+  setSelectByText(f[35], data.customerAwareConditions);
+  if (data.customerAwareDetails)  setVal(f[36], data.customerAwareDetails);
+  setSelectByText(f[37], data.otherPropertyIssues);
+  if (data.otherIssuesDetails)    setVal(f[38], data.otherIssuesDetails);
+  setSelectByText(f[39], data.maintenanceRequired);
+  if (data.urgentMaintenance)     setVal(f[40], data.urgentMaintenance);
+  if (data.otherMaintenance)      setVal(f[41], data.otherMaintenance);
+  setSelectByText(f[42], data.warrantableRepairsPrevented);
+  setSelectByText(f[43], data.maintenanceTemplate);
+
+  // ── TEMPORARY ACCOMMODATION ───────────────────────────────
+  setSelectByText(f[44], data.emergencyAccomm);
+  if (data.emergencyTimeframe)    setVal(f[45], data.emergencyTimeframe);
+  setSelectByText(f[46], data.accommDuringRepairs);
+  if (data.repairsTimeframe)      setVal(f[47], data.repairsTimeframe);
+  if (data.accommNotes)           setVal(f[48], data.accommNotes);
+
+  // ── UNDERWRITING RISK ASSESSMENT ─────────────────────────
+  setSelectByText(f[49], data.propertyNotGoodCondition);
+  setSelectByText(f[50], data.propertyNotStructurallySound);
+  setSelectByText(f[51], data.propertyNotWellMaintained);
+  setSelectByText(f[52], data.propertyNotWaterTight);
+  setSelectByText(f[53], data.businessUse);
+  if (data.underwritingFurtherDetail) setVal(f[54], data.underwritingFurtherDetail);
+
+  // ── RECOVERIES ASSESSMENT ─────────────────────────────────
+  setSelectByText(f[55], data.failedAppliance);
+  setSelectByText(f[56], data.applianceUnder10Years);
+  setSelectByText(f[57], data.applianceSalvageable);
+  setSelectByText(f[58], data.technicianAttended);
+  setSelectByText(f[59], data.propertyUnder10Years);
+  if (data.builderTradeDetails)   setVal(f[60], data.builderTradeDetails);
+  setSelectByText(f[61], data.thirdPartyImpact);
+  if (data.recoveriesFurtherDetails) setVal(f[62], data.recoveriesFurtherDetails);
+
+  // ── ADDITIONAL INFORMATION / NEXT STEPS ──────────────────
+  setSelectByText(f[63], data.nextSteps);
+  setSelectByText(f[64], data.homeAssessor);
+  setSelectByText(f[65], data.claims);
+  setSelectByText(f[66], data.builder);
+  setSelectByText(f[67], data.specialist);
+  setSelectByText(f[68], data.customer);
+
+  // ── STATEMENT OF OBJECTIVITY ─────────────────────────────
+  setSelectByText(f[69], data.qualification);
+  setSelectByText(f[70], data.licence);
+
+  console.log('A&G Auto-fill complete! Review the form, then click Save or Complete.');
+
+})();`
+
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -733,41 +959,39 @@ TEMPLATE TO FILL:
       return NextResponse.json({ ok: true, javascript: jsContent.text })
     }
 
-    // ── Auto & General: JSON fields ───────────────────────────────────────
-    const message = await anthropic.messages.create({
+    // ── A&G: JS autofill ─────────────────────────────────────────────────
+    const jsMessage = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
-      system: AUTO_GENERAL_SYSTEM,
+      system: AUTO_GENERAL_JS_SYSTEM,
       messages: [{
         role: 'user',
-        content: `Complete the following insurance report template using the raw field notes and context provided. Return ONLY valid JSON.
+        content: `Convert the dictation and context below into the data = { } JavaScript object. Use the exact field names shown. Only change the values - do not rename any keys. Attempt to fill all fields. If there is not enough information to fill a particular field, or it is not applicable, the answer should be "N/A", "No" or "None" as appropriate.
 
-Raw Field Notes:
-${rawNotes}
+MY DICTATION:
+[${rawNotes}]
 
 Context:
-${contextLines}
+[${contextLines}]
 
-JSON structure to complete:
-${AUTO_GENERAL_SCHEMA}`,
+FOCUS GUIDANCE — COMBINED DICTATION:
+These notes cover a full site inspection and may include roof report details, make safe works, and general site observations. For this A&G Builder Site Report:
+- INCLUDE: Customer/client discussion and what the insured stated, cause of loss and causal chain, damaged areas and extent, property conditions and pre-existing defects, wear and tear evidence, claim considerations (temp accommodation, recovery potential, maintenance).
+- The Roof Report is a supporting document for this report - you may reference roof findings where they are causally relevant to the claimed damage. Only reference roof technical specifications if they directly explain the cause or extent of the claimed building damage.
+- Verbal cues like "A&G section", "builder site report", "starting A&G" indicate content especially relevant to this report.
+- The "siteAttendanceDatetime" value should be used for the attendanceDate (YYYY-MM-DD) and timeAttended fields.
+- The "Statement of Objectivity" field (customerDiscussionDetail) should be written in the FIRST PERSON. This is the one exception to the no-first-person rule. Begin with "I met with the Insured - [insuredName] as arranged. The Insured stated that..." and then describe what the insured said and what was observed on site. This is a combined narrative of client discussion AND inspection findings.
+
+TEMPLATE TO FILL:
+[${AUTO_GENERAL_JS_TEMPLATE}]`,
       }],
     })
-
-    const content = message.content[0]
-    if (content.type !== 'text') {
+    const jsContent = jsMessage.content[0]
+    if (jsContent.type !== 'text') {
       return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
     }
+    return NextResponse.json({ ok: true, javascript: jsContent.text })
 
-    let fields: Record<string, string>
-    try {
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response')
-      fields = JSON.parse(jsonMatch[0])
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse AI response', details: content.text }, { status: 500 })
-    }
-
-    return NextResponse.json({ ok: true, fields })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
   }

@@ -44,11 +44,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 500 })
     }
 
-    // Compute next job number
+    // Compute next job number — only consider jobs that carry the IRC prefix
+    // (Midcity jobs are stored with raw external numbers and must not skew the sequence)
     const { data: existingJobs } = await supabase
       .from('jobs')
       .select('job_number')
       .eq('tenant_id', tenantId)
+      .like('job_number', `${tenant.job_prefix}%`)
 
     let maxNum = 1000
     for (const j of existingJobs ?? []) {

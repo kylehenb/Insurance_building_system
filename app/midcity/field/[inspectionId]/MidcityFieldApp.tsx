@@ -668,10 +668,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       alert('Please select an insurer / template before generating.')
       return
     }
-    if (insuranceTemplate === 'auto_general') {
-      alert('This insurer template has not been built yet.')
-      return
-    }
     setBarExporting(true)
     try {
       const now = new Date()
