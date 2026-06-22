@@ -508,7 +508,6 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                             >
                               <div style={{ flex: 1 }}>{item.description}</div>
                               <div style={{ minWidth: 60, textAlign: 'right' }}>{item.quantity}</div>
-                              <div style={{ minWidth: 80, textAlign: 'right' }}>{fmt(item.unit_price)}</div>
                               <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
                             </div>
                           ))}

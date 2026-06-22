@@ -55,7 +55,6 @@ export function generateInvoiceHtml(params: {
     <tr style="border-bottom:1px solid #f0ece6;">
       <td style="padding:8px 12px;font-size:11px;color:#3a3530;line-height:1.5;">${item.description || '-'}</td>
       <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.quantity || '-'}</td>
-      <td style="padding:8px 12px;text-align:right;font-size:11px;color:#3a3530;">${fmt(item.unit_price)}</td>
       <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:#1a1a1a;">${fmt(item.line_total)}</td>
     </tr>
   `).join('')
@@ -154,9 +153,6 @@ export function generateInvoiceHtml(params: {
             <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
               Qty</th>
-            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Unit Price</th>
             <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
               Total</th>
