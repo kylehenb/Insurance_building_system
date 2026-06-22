@@ -110,15 +110,15 @@ var data = {
   function setVal(el, value) {
     if (!el) return;
     el.value = value;
-    el.dispatchEvent(new Event('input',  { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('input',  { bubbles: false }));
+    el.dispatchEvent(new Event('change', { bubbles: false }));
   }
 
   function setRadio(koName, value) {
     var radio = container.querySelector('input[type="radio"][name="' + koName + '"][value="' + value + '"]');
     if (!radio) return;
     radio.checked = true;
-    radio.dispatchEvent(new Event('change', { bubbles: true }));
+    radio.dispatchEvent(new Event('change', { bubbles: false }));
   }
 
   function setSelectByText(selectEl, text) {
@@ -127,7 +127,7 @@ var data = {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value;
         selectEl.selectedIndex = i;
-        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('change', { bubbles: false }));
         return;
       }
     }
@@ -411,14 +411,14 @@ var data = {
   function setVal(el, value) {
     if (!el) return;
     el.value = value;
-    el.dispatchEvent(new Event('input',  { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('input',  { bubbles: false }));
+    el.dispatchEvent(new Event('change', { bubbles: false }));
   }
 
   function setRadio(el) {
     if (!el) return;
     el.click();
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: false }));
   }
 
   function setSelectByText(selectEl, text) {
@@ -427,7 +427,7 @@ var data = {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value;
         selectEl.selectedIndex = i;
-        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('change', { bubbles: false }));
         return;
       }
     }
@@ -723,8 +723,8 @@ var data = {
   function setVal(el, value) {
     if (!el) return;
     el.value = value;
-    el.dispatchEvent(new Event('input',  { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('input',  { bubbles: false }));
+    el.dispatchEvent(new Event('change', { bubbles: false }));
   }
 
   function setSelectByText(selectEl, text) {
@@ -733,7 +733,7 @@ var data = {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value;
         selectEl.selectedIndex = i;
-        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('change', { bubbles: false }));
         return;
       }
     }
