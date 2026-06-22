@@ -224,12 +224,12 @@ export default function InvoiceDetailPage() {
     if (!item) return
 
     let value: string | number = rawValue
-    if (field === 'quantity' || field === 'unit_price') {
+    if (field === 'quantity' || field === 'unit_price' || field === 'line_total') {
       value = parseFloat(rawValue) || 0
     }
 
     const updated = { ...item, [field]: value }
-    if (field === 'quantity' || field === 'unit_price') {
+    if (field === 'quantity') {
       updated.line_total = Math.round(updated.quantity * updated.unit_price * 100) / 100
     }
 
@@ -238,7 +238,7 @@ export default function InvoiceDetailPage() {
 
     try {
       const patch: Record<string, unknown> = { [field]: value }
-      if (field === 'quantity' || field === 'unit_price') {
+      if (field === 'quantity') {
         patch.line_total = updated.line_total
       }
 
@@ -511,7 +511,6 @@ export default function InvoiceDetailPage() {
                     <th>Description</th>
                     <th style={{ width: 60, textAlign: 'right' }}>Qty</th>
                     {!isInclusive && <th style={{ width: 60, textAlign: 'right' }}>Unit</th>}
-                    <th style={{ width: 90, textAlign: 'right' }}>Unit Price</th>
                     <th style={{ width: 100, textAlign: 'right' }}>Line Total</th>
                     {!isLocked && <th style={{ width: 32 }} />}
                   </tr>
@@ -519,7 +518,7 @@ export default function InvoiceDetailPage() {
                 <tbody>
                   {lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={isLocked ? 4 : 5} style={{ textAlign: 'center', color: '#9e998f', padding: '24px' }}>
+                      <td colSpan={isLocked ? 3 : 4} style={{ textAlign: 'center', color: '#9e998f', padding: '24px' }}>
                         No line items
                       </td>
                     </tr>
@@ -567,21 +566,20 @@ export default function InvoiceDetailPage() {
                           )}
                         </td>
                       )}
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>
                         {isLocked ? (
-                          <span>{fmt(item.unit_price)}</span>
+                          <span>{fmt(item.line_total)}</span>
                         ) : (
                           <input
                             className="invd-num-input"
-                            defaultValue={item.unit_price}
+                            defaultValue={item.line_total}
                             type="number"
                             min="0"
                             step="0.01"
-                            onBlur={e => updateItem(item.id, 'unit_price', e.target.value)}
+                            onBlur={e => updateItem(item.id, 'line_total', e.target.value)}
                           />
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</td>
                       {!isLocked && (
                         <td>
                           <button

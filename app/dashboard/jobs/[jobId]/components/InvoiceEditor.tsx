@@ -143,7 +143,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     if (!item || !invoice) return
 
     const updated = { ...item, ...changes }
-    if ('quantity' in changes || 'unit_price' in changes) {
+    if ('quantity' in changes) {
       updated.line_total = Math.round(updated.quantity * updated.unit_price * 100) / 100
     }
 
@@ -153,7 +153,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
     try {
       const updateData: Record<string, unknown> = { ...changes }
-      if ('quantity' in changes || 'unit_price' in changes) {
+      if ('quantity' in changes) {
         updateData.line_total = updated.line_total
       }
 
@@ -235,10 +235,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
           </div>
         ) : (
           <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
               <div>Description</div>
               <div style={{ textAlign: 'right' }}>Qty</div>
-              <div style={{ textAlign: 'right' }}>Unit Price</div>
               <div style={{ textAlign: 'right' }}>Total</div>
               <div />
             </div>
@@ -246,7 +245,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
             {lineItems.map((item, index) => (
               <div
                 key={item.id}
-                style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 13, color: '#3a3530', borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none', alignItems: 'center' }}
+                style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 13, color: '#3a3530', borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none', alignItems: 'center' }}
               >
                 <div>
                   <input
@@ -270,14 +269,13 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                 <div style={{ textAlign: 'right' }}>
                   <input
                     type="number"
-                    value={item.unit_price}
-                    onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
+                    value={item.line_total}
+                    onChange={(e) => updateItem(item.id, { line_total: parseFloat(e.target.value) || 0 })}
                     min="0"
                     step="0.01"
-                    style={{ width: '80px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                    style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                   />
                 </div>
-                <div style={{ textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
                 <div style={{ textAlign: 'right' }}>
                   <button
                     onClick={() => deleteItem(item.id)}

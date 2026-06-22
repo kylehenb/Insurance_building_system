@@ -116,7 +116,9 @@ var data = {
 
   function setRadio(koName, value) {
     var radio = container.querySelector('input[type="radio"][name="' + koName + '"][value="' + value + '"]');
-    if (radio) { radio.click(); radio.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (!radio) return;
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function setSelectByText(selectEl, text) {
