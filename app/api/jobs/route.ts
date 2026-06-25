@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
       excess,
     } = body
 
-    // Fetch tenant prefix
+    // Fetch tenant prefix + explicit sequence counter
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('job_prefix')
+      .select('job_prefix, job_sequence')
       .eq('id', tenantId)
       .single()
 
@@ -44,23 +44,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 500 })
     }
 
-    // Compute next job number — only consider jobs that carry the IRC prefix
-    // (Midcity jobs are stored with raw external numbers and must not skew the sequence)
-    const { data: existingJobs } = await supabase
-      .from('jobs')
-      .select('job_number')
-      .eq('tenant_id', tenantId)
-      .like('job_number', `${tenant.job_prefix}%`)
+    // job_sequence (when set > 1) is the authoritative last-used number.
+    // Fall back to scanning existing jobs only when the counter hasn't been
+    // explicitly set, so that bad/external job numbers can never skew the sequence.
+    let currentSequence: number
+    const explicitSequence = (tenant as unknown as { job_sequence: number | null }).job_sequence
+    if (explicitSequence != null && explicitSequence > 1) {
+      currentSequence = explicitSequence
+    } else {
+      const { data: existingJobs } = await supabase
+        .from('jobs')
+        .select('job_number')
+        .eq('tenant_id', tenantId)
+        .like('job_number', `${tenant.job_prefix}%`)
 
-    let maxNum = 1000
-    for (const j of existingJobs ?? []) {
-      const match = j.job_number.match(/(\d+)$/)
-      if (match) {
-        const n = parseInt(match[1], 10)
-        if (n > maxNum) maxNum = n
+      currentSequence = 1000
+      for (const j of existingJobs ?? []) {
+        const match = j.job_number.match(/(\d+)$/)
+        if (match) {
+          const n = parseInt(match[1], 10)
+          if (n > currentSequence) currentSequence = n
+        }
       }
     }
-    const jobNumber = `${tenant.job_prefix}${maxNum + 1}`
+
+    const nextNum = currentSequence + 1
+    const jobNumber = `${tenant.job_prefix}${nextNum}`
 
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
@@ -93,6 +102,12 @@ export async function POST(req: NextRequest) {
       console.error('[jobs] create error:', jobError)
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 })
     }
+
+    // Persist the sequence so the next creation doesn't need to scan
+    await supabase
+      .from('tenants')
+      .update({ job_sequence: nextNum } as unknown as Database['public']['Tables']['tenants']['Update'])
+      .eq('id', tenantId)
 
     return NextResponse.json({ id: newJob.id, job_number: newJob.job_number })
   } catch (err) {

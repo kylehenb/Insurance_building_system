@@ -743,10 +743,10 @@ export default function TenantSettingsPage() {
                     </p>
                   </div>
 
-                  {/* Starting job number */}
+                  {/* Job sequence */}
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
-                      Starting job number
+                      Last job sequence number
                     </label>
                     <input
                       type="number"
@@ -758,18 +758,11 @@ export default function TenantSettingsPage() {
                           job_sequence: parseInt(e.target.value) || 1,
                         }))
                       }
-                      disabled={jobCount > 0}
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] disabled:bg-[#f5f2ee] disabled:text-[#9e998f] disabled:cursor-not-allowed"
+                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
                     />
-                    {jobCount > 0 ? (
-                      <p className="text-xs text-[#9e998f] mt-1">
-                        Locked — {jobCount} job{jobCount !== 1 ? 's' : ''} already created.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-amber-600 mt-1">
-                        Only increase — decreasing may cause duplicate job numbers.
-                      </p>
-                    )}
+                    <p className="text-xs text-amber-600 mt-1">
+                      The next job will be {profileForm.job_prefix || 'PREFIX'}{profileForm.job_sequence + 1}. Only set this if you need to correct the sequence — setting it lower than existing jobs may cause duplicates.
+                    </p>
                   </div>
 
                   {/* Primary email */}
