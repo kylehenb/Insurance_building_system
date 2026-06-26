@@ -119,21 +119,24 @@ export function RoofReportPreview({
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  const handlePrint = () => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = ''
-    window.print()
-    window.addEventListener('afterprint', () => {
-      document.body.style.overflow = prev || 'hidden'
-    }, { once: true })
-  }
-
   const jobLine = fields.claimDetails || [
     jobInfo.insuredName,
     jobInfo.address,
     jobInfo.insurer,
     jobInfo.claimNumber ? `Claim #${jobInfo.claimNumber}` : null,
   ].filter(Boolean).join(' · ')
+
+  const handlePrint = () => {
+    const prevOverflow = document.body.style.overflow
+    const prevTitle = document.title
+    document.body.style.overflow = ''
+    document.title = `Roof report - ${jobLine}`
+    window.print()
+    window.addEventListener('afterprint', () => {
+      document.body.style.overflow = prevOverflow || 'hidden'
+      document.title = prevTitle
+    }, { once: true })
+  }
 
   const maintenanceDetails = [
     fields.requiredMaintenanceDetails ? `REQUIRED\n${fields.requiredMaintenanceDetails}` : '',
