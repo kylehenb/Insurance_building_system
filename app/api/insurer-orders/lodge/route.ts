@@ -45,11 +45,11 @@ export async function POST(req: NextRequest) {
 
     const tenantId = order.tenant_id
 
-    // Step 4: Get tenant job_prefix
+    // Step 4: Get tenant job_prefix + job_sequence
     console.log('[lodge] fetching tenant', tenantId)
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('job_prefix')
+      .select('job_prefix, job_sequence')
       .eq('id', tenantId)
       .single()
 
@@ -158,22 +158,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 4 cont: Compute next job number
-    console.log('[lodge] finding max job number for tenant', tenantId)
-    const { data: existingJobs } = await supabase
-      .from('jobs')
-      .select('job_number')
-      .eq('tenant_id', tenantId)
+    // Step 4 cont: Compute next job number (mirrors /api/jobs sequence logic)
+    const explicitSequence = (tenant as unknown as { job_sequence: number | null }).job_sequence
+    let currentSequence: number
+    if (explicitSequence != null && explicitSequence > 1) {
+      currentSequence = explicitSequence
+    } else {
+      console.log('[lodge] finding max job number for tenant', tenantId)
+      const { data: existingJobs } = await supabase
+        .from('jobs')
+        .select('job_number')
+        .eq('tenant_id', tenantId)
+        .like('job_number', `${prefix}%`)
 
-    let maxNum = 1000
-    for (const j of existingJobs ?? []) {
-      const match = j.job_number.match(/(\d+)$/)
-      if (match) {
-        const n = parseInt(match[1], 10)
-        if (n > maxNum) maxNum = n
+      currentSequence = 1000
+      for (const j of existingJobs ?? []) {
+        const match = j.job_number.match(/(\d+)$/)
+        if (match) {
+          const n = parseInt(match[1], 10)
+          if (n > currentSequence) currentSequence = n
+        }
       }
     }
-    const nextNum = maxNum + 1
+    const nextNum = currentSequence + 1
     const jobNumber = `${prefix}${nextNum}`
     console.log('[lodge] new job number:', jobNumber)
 
@@ -217,6 +224,12 @@ export async function POST(req: NextRequest) {
 
     const jobId = newJob.id
     console.log('[lodge] job created:', jobId)
+
+    // Persist sequence so future creations don't need to scan
+    await supabase
+      .from('tenants')
+      .update({ job_sequence: nextNum } as unknown as Database['public']['Tables']['tenants']['Update'])
+      .eq('id', tenantId)
 
     // Step 6: Conditionally create inspection based on wo_type
     let inspectionId: string | null = null
