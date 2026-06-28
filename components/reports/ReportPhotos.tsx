@@ -68,9 +68,7 @@ function PhotoCard({
 }) {
   const [label, setLabel] = useState(photo.label || '')
 
-  useEffect(() => {
-    setLabel(photo.label || '')
-  }, [photo.label])
+  // No useEffect sync — parent label changes must not reset the input mid-type
 
   const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLabel = e.target.value
@@ -79,12 +77,8 @@ function PhotoCard({
   }
 
   return (
+    // Outer wrapper: drop target only — NOT draggable, so the label input works normally
     <div
-      draggable={!locked}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move'
-        onDragStart()
-      }}
       onDragEnter={(e) => {
         e.preventDefault()
         onDragEnter()
@@ -97,17 +91,23 @@ function PhotoCard({
         if (isInternalDragging) {
           onDrop()
         }
-        // else: let event bubble to container for file handling
       }}
-      onDragEnd={onDragEnd}
       className="relative group"
       style={{ opacity: isDragged ? 0.3 : 1, transition: 'opacity 0.15s' }}
     >
+      {/* Image container — this is the only draggable surface */}
       <div
+        draggable={!locked}
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move'
+          onDragStart()
+        }}
+        onDragEnd={onDragEnd}
         className="relative aspect-square rounded-lg overflow-hidden"
         style={{
           border: isDragOver && !isDragged ? '2px dashed #c8b89a' : '1px solid #e0dbd4',
           boxSizing: 'border-box',
+          cursor: locked ? 'default' : 'grab',
         }}
       >
         {thumbnailUrl ? (
@@ -129,7 +129,7 @@ function PhotoCard({
         {!locked && (
           <>
             <div
-              className="absolute top-2 left-2 p-1 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-2 left-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
               style={{ background: 'rgba(0,0,0,0.45)' }}
             >
               <GripVertical className="h-3 w-3 text-white" />
@@ -252,6 +252,7 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const labelDebounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const isFileDrag = (e: React.DragEvent) =>
     Array.from(e.dataTransfer.types).includes('Files')
@@ -358,19 +359,25 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
     uploadFiles(files)
   }
 
-  const handleLabelChange = async (id: string, label: string) => {
-    const { error } = await supabase
-      .from('photos')
-      .update({ label })
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-
-    if (error) {
-      console.error('Update error:', error)
-      return
-    }
-
+  const handleLabelChange = (id: string, label: string) => {
+    // Update parent state immediately so nothing resets the input
     setPhotos(prev => prev.map(p => p.id === id ? { ...p, label } : p))
+
+    // Debounce the DB write per photo so fast typing doesn't hammer the server
+    const existing = labelDebounceRefs.current.get(id)
+    if (existing) clearTimeout(existing)
+
+    const timer = setTimeout(async () => {
+      labelDebounceRefs.current.delete(id)
+      const { error } = await supabase
+        .from('photos')
+        .update({ label })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+      if (error) console.error('Label save error:', error)
+    }, 600)
+
+    labelDebounceRefs.current.set(id, timer)
   }
 
   const handleRotate = async (id: string, direction: 'cw' | 'ccw') => {
