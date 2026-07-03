@@ -1296,15 +1296,23 @@ export default async function ReportPrintPage({
                       return (
                         <div key={photo.id} style={{ breakInside: 'avoid' }}>
                           <div style={{
+                            position: 'relative',
+                            height: 260,
                             borderRadius: '6px',
                             overflow: 'hidden',
                             border: '1px solid #e0dbd4',
+                            background: '#f5f2ee',
                             marginBottom: '8px'
                           }}>
                             <img
                               src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
                               alt={photo.label || photo.file_name || 'Photo'}
-                              style={{ width: '100%', maxHeight: 260, objectFit: 'contain', background: '#f5f2ee', display: 'block' }}
+                              style={{
+                                position: 'absolute', width: '100%', height: '100%',
+                                objectFit: 'contain',
+                                transformOrigin: 'center center',
+                                transform: `translate(${photo.crop_x ?? 0}%, ${photo.crop_y ?? 0}%) scale(${photo.crop_scale ?? 1})`,
+                              }}
                             />
                           </div>
                           <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center', marginTop: '4px' }}>

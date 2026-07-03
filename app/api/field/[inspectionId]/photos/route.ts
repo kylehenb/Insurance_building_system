@@ -23,16 +23,16 @@ export async function GET(
 
   const { data: photos } = await service
     .from('photos')
-    .select('id, storage_path, label')
+    .select('id, storage_path, label, crop_x, crop_y, crop_scale')
     .eq('inspection_id', inspectionId)
     .eq('tenant_id', userRow.tenant_id)
 
   const result = await Promise.all(
-    (photos ?? []).map(async (p: { id: string; storage_path: string; label: string | null }) => {
+    (photos ?? []).map(async (p: { id: string; storage_path: string; label: string | null; crop_x: number; crop_y: number; crop_scale: number }) => {
       const { data: signed } = await service.storage
         .from('photos')
         .createSignedUrl(p.storage_path, 60 * 60 * 24 * 7)
-      return { id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null }
+      return { id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null, crop_x: p.crop_x ?? 0, crop_y: p.crop_y ?? 0, crop_scale: p.crop_scale ?? 1 }
     })
   )
 
@@ -150,7 +150,7 @@ export async function PATCH(
   { params }: { params: Promise<{ inspectionId: string }> }
 ) {
   const { inspectionId } = await params
-  const { photoId, label } = await req.json()
+  const { photoId, label, crop_x, crop_y, crop_scale } = await req.json()
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -164,9 +164,15 @@ export async function PATCH(
     .single()
   if (!userRow) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
+  const updates: Record<string, unknown> = {}
+  if (label !== undefined) updates.label = label
+  if (crop_x !== undefined) updates.crop_x = crop_x
+  if (crop_y !== undefined) updates.crop_y = crop_y
+  if (crop_scale !== undefined) updates.crop_scale = crop_scale
+
   const { error } = await service
     .from('photos')
-    .update({ label })
+    .update(updates)
     .eq('id', photoId)
     .eq('inspection_id', inspectionId)
     .eq('tenant_id', userRow.tenant_id)

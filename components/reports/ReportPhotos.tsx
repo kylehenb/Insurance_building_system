@@ -16,6 +16,9 @@ interface Photo {
   uploaded_at: string
   sequence_number: number
   rotation: number
+  crop_x: number
+  crop_y: number
+  crop_scale: number
 }
 
 interface UploadingPhoto {
@@ -43,6 +46,7 @@ function PhotoCard({
   onLabelChange,
   onDelete,
   onRotate,
+  onCropChange,
   locked,
   isDragged,
   isDragOver,
@@ -57,6 +61,7 @@ function PhotoCard({
   onLabelChange: (id: string, label: string) => void
   onDelete: (id: string) => void
   onRotate: (id: string, direction: 'cw' | 'ccw') => void
+  onCropChange: (id: string, x: number, y: number, scale: number) => void
   locked: boolean
   isDragged: boolean
   isDragOver: boolean
@@ -67,8 +72,14 @@ function PhotoCard({
   onDrop: () => void
 }) {
   const [label, setLabel] = useState(photo.label || '')
-
-  // No useEffect sync — parent label changes must not reset the input mid-type
+  const [cropX, setCropX] = useState(photo.crop_x ?? 0)
+  const [cropY, setCropY] = useState(photo.crop_y ?? 0)
+  const [cropScale, setCropScale] = useState(photo.crop_scale ?? 1)
+  const cropRef = useRef({ x: photo.crop_x ?? 0, y: photo.crop_y ?? 0, scale: photo.crop_scale ?? 1 })
+  const frameRef = useRef<HTMLDivElement>(null)
+  const isPanning = useRef(false)
+  const lastPointer = useRef({ x: 0, y: 0 })
+  const dragEnabled = useRef(false)
 
   const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLabel = e.target.value
@@ -76,95 +87,193 @@ function PhotoCard({
     onLabelChange(photo.id, newLabel)
   }
 
+  const updateCrop = useCallback((x: number, y: number, scale: number) => {
+    cropRef.current = { x, y, scale }
+    setCropX(x)
+    setCropY(y)
+    setCropScale(scale)
+    onCropChange(photo.id, x, y, scale)
+  }, [photo.id, onCropChange])
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (locked) return
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -0.1 : 0.1
+    const newScale = Math.max(0.5, Math.min(8, cropRef.current.scale + delta))
+    updateCrop(cropRef.current.x, cropRef.current.y, newScale)
+  }, [locked, updateCrop])
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (locked) return
+    dragEnabled.current = false
+    e.preventDefault()
+    isPanning.current = true
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+    frameRef.current?.setPointerCapture(e.pointerId)
+  }, [locked])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isPanning.current || !frameRef.current) return
+    const rect = frameRef.current.getBoundingClientRect()
+    const dx = (e.clientX - lastPointer.current.x) / rect.width * 100
+    const dy = (e.clientY - lastPointer.current.y) / rect.height * 100
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+    updateCrop(cropRef.current.x + dx, cropRef.current.y + dy, cropRef.current.scale)
+  }, [updateCrop])
+
+  const handlePointerUp = useCallback(() => {
+    isPanning.current = false
+  }, [])
+
+  const isCropped = cropX !== 0 || cropY !== 0 || cropScale !== 1
+
   return (
-    // Outer wrapper: drop target only — NOT draggable, so the label input works normally
+    // Outer wrapper: drop target only
     <div
       onDragEnter={(e) => {
         e.preventDefault()
         onDragEnter()
       }}
-      onDragOver={(e) => {
-        e.preventDefault()
-      }}
+      onDragOver={(e) => { e.preventDefault() }}
       onDrop={(e) => {
         e.preventDefault()
-        if (isInternalDragging) {
-          onDrop()
-        }
+        if (isInternalDragging) onDrop()
       }}
       className="relative group"
       style={{ opacity: isDragged ? 0.3 : 1, transition: 'opacity 0.15s' }}
     >
-      {/* Image container — this is the only draggable surface */}
+      {/* Drag shell — draggable only when grip is held */}
       <div
         draggable={!locked}
         onDragStart={(e) => {
+          if (!dragEnabled.current) { e.preventDefault(); return }
           e.dataTransfer.effectAllowed = 'move'
           onDragStart()
         }}
-        onDragEnd={onDragEnd}
-        className="relative aspect-square rounded-lg overflow-hidden"
-        style={{
-          border: isDragOver && !isDragged ? '2px dashed #c8b89a' : '1px solid #e0dbd4',
-          boxSizing: 'border-box',
-          cursor: locked ? 'default' : 'grab',
-        }}
+        onDragEnd={() => { dragEnabled.current = false; onDragEnd() }}
       >
-        {thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumbnailUrl}
-            alt={photo.label || photo.file_name || 'Photo'}
-            className="w-full h-full object-cover"
-            style={{
-              transform: `rotate(${photo.rotation ?? 0}deg)`,
-              transition: 'transform 0.25s ease',
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px] bg-[#f5f2ee]">
-            Loading
-          </div>
-        )}
-        {!locked && (
-          <>
-            <div
-              className="absolute top-2 left-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-              style={{ background: 'rgba(0,0,0,0.45)' }}
-            >
-              <GripVertical className="h-3 w-3 text-white" />
+        {/* Crop frame — pointer events for pan/zoom */}
+        <div
+          ref={frameRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onWheel={handleWheel}
+          style={{
+            position: 'relative',
+            height: 190,
+            overflow: 'hidden',
+            borderRadius: 8,
+            background: '#f5f2ee',
+            border: isDragOver && !isDragged ? '2px dashed #c8b89a' : '1px solid #e0dbd4',
+            cursor: locked ? 'default' : 'grab',
+            touchAction: 'none',
+          }}
+        >
+          {thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnailUrl}
+              alt={photo.label || photo.file_name || 'Photo'}
+              draggable={false}
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                transformOrigin: 'center center',
+                transform: `rotate(${photo.rotation ?? 0}deg) translate(${cropX}%, ${cropY}%) scale(${cropScale})`,
+                userSelect: 'none',
+                pointerEvents: 'none',
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px] bg-[#f5f2ee]">
+              Loading
             </div>
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onRotate(photo.id, 'ccw') }}
-                className="p-1.5 text-white rounded-md transition-colors hover:bg-black/70"
-                style={{ background: 'rgba(0,0,0,0.45)' }}
-                title="Rotate left"
+          )}
+
+          {!locked && (
+            <>
+              {/* Grip — only drag handle; stops propagation so frame's pointerdown doesn't fire */}
+              <div
+                className="absolute top-2 left-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: 'rgba(0,0,0,0.45)', cursor: 'grab', zIndex: 2 }}
+                onPointerDown={(e) => { e.stopPropagation(); dragEnabled.current = true }}
+                onPointerUp={() => { dragEnabled.current = false }}
               >
-                <RotateCcw className="h-3 w-3" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onRotate(photo.id, 'cw') }}
-                className="p-1.5 text-white rounded-md transition-colors hover:bg-black/70"
-                style={{ background: 'rgba(0,0,0,0.45)' }}
-                title="Rotate right"
-              >
-                <RotateCw className="h-3 w-3" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onDelete(photo.id) }}
-                className="p-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                title="Delete"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            </div>
-          </>
-        )}
+                <GripVertical className="h-3 w-3 text-white" style={{ pointerEvents: 'none' }} />
+              </div>
+
+              {/* Action buttons */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ zIndex: 2 }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onRotate(photo.id, 'ccw') }}
+                  className="p-1.5 text-white rounded-md transition-colors hover:bg-black/70"
+                  style={{ background: 'rgba(0,0,0,0.45)' }}
+                  title="Rotate left"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onRotate(photo.id, 'cw') }}
+                  className="p-1.5 text-white rounded-md transition-colors hover:bg-black/70"
+                  style={{ background: 'rgba(0,0,0,0.45)' }}
+                  title="Rotate right"
+                >
+                  <RotateCw className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDelete(photo.id) }}
+                  className="p-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+
+              {/* Reset crop */}
+              {isCropped && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); updateCrop(0, 0, 1) }}
+                  className="absolute opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{
+                    bottom: 6, right: 6, zIndex: 2,
+                    background: 'rgba(0,0,0,0.55)', color: 'white',
+                    border: 'none', borderRadius: 4, padding: '2px 8px',
+                    fontSize: 9, cursor: 'pointer',
+                    fontFamily: 'DM Sans, sans-serif', letterSpacing: '0.5px',
+                  }}
+                >
+                  Reset crop
+                </button>
+              )}
+
+              {/* Zoom/pan hint */}
+              {!isCropped && (
+                <div
+                  className="absolute opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                  style={{
+                    bottom: 6, left: '50%', transform: 'translateX(-50%)',
+                    background: 'rgba(0,0,0,0.45)', color: 'white',
+                    borderRadius: 4, padding: '2px 8px',
+                    fontSize: 9, whiteSpace: 'nowrap',
+                    fontFamily: 'DM Sans, sans-serif',
+                  }}
+                >
+                  Scroll to zoom · Drag to pan
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
       <input
         type="text"
         value={label}
@@ -198,7 +307,7 @@ function UploadingPhotoCard({
 
   return (
     <div className="relative group">
-      <div className="relative aspect-square rounded-lg overflow-hidden border border-[#e0dbd4] bg-[#f5f2ee]">
+      <div style={{ position: 'relative', height: 190, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0dbd4', background: '#f5f2ee' }}>
         {uploadingPhoto.status === 'uploading' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <Loader2 className="h-8 w-8 text-[#c8b89a] animate-spin mb-2" />
@@ -210,7 +319,7 @@ function UploadingPhotoCard({
           <img
             src={uploadingPhoto.thumbnailUrl}
             alt={uploadingPhoto.label || uploadingPhoto.fileName}
-            className="w-full h-full object-cover"
+            style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'contain' }}
           />
         )}
         {uploadingPhoto.status === 'error' && (
@@ -253,6 +362,7 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const labelDebounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const cropDebounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const isFileDrag = (e: React.DragEvent) =>
     Array.from(e.dataTransfer.types).includes('Files')
@@ -360,10 +470,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
   }
 
   const handleLabelChange = (id: string, label: string) => {
-    // Update parent state immediately so nothing resets the input
     setPhotos(prev => prev.map(p => p.id === id ? { ...p, label } : p))
 
-    // Debounce the DB write per photo so fast typing doesn't hammer the server
     const existing = labelDebounceRefs.current.get(id)
     if (existing) clearTimeout(existing)
 
@@ -378,6 +486,26 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
     }, 600)
 
     labelDebounceRefs.current.set(id, timer)
+  }
+
+  const handleCropChange = (id: string, x: number, y: number, scale: number) => {
+    setPhotos(prev => prev.map(p => p.id === id ? { ...p, crop_x: x, crop_y: y, crop_scale: scale } : p))
+
+    const existing = cropDebounceRefs.current.get(id)
+    if (existing) clearTimeout(existing)
+
+    const timer = setTimeout(async () => {
+      cropDebounceRefs.current.delete(id)
+      const { error } = await supabase
+        .from('photos')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ crop_x: x, crop_y: y, crop_scale: scale } as any)
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+      if (error) console.error('Crop save error:', error)
+    }, 400)
+
+    cropDebounceRefs.current.set(id, timer)
   }
 
   const handleRotate = async (id: string, direction: 'cw' | 'ccw') => {
@@ -413,10 +541,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
     const photo = photos.find(p => p.id === id)
     if (!photo) return
 
-    // Remove immediately so the user can keep working
     setPhotos(prev => prev.filter(p => p.id !== id))
 
-    // Clean up storage and DB in the background
     const { error: storageError } = await supabase.storage
       .from('photos')
       .remove([photo.storage_path])
@@ -436,20 +562,9 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
     }
   }
 
-  const handleDragStart = (id: string) => {
-    setDraggedId(id)
-  }
-
-  const handleDragEnter = (id: string) => {
-    if (draggedId && draggedId !== id) {
-      setDragOverId(id)
-    }
-  }
-
-  const handleDragEnd = () => {
-    setDraggedId(null)
-    setDragOverId(null)
-  }
+  const handleDragStart = (id: string) => { setDraggedId(id) }
+  const handleDragEnter = (id: string) => { if (draggedId && draggedId !== id) setDragOverId(id) }
+  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null) }
 
   const handleDrop = async (targetId: string) => {
     if (!draggedId || draggedId === targetId) return
@@ -505,7 +620,6 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
         }
       }}
     >
-      {/* Upload button */}
       {!locked && (
         <div className="flex justify-between items-center mb-4">
           <div className="text-[12px] text-[#b0a898]">
@@ -560,6 +674,7 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
                 onLabelChange={handleLabelChange}
                 onDelete={handleDelete}
                 onRotate={handleRotate}
+                onCropChange={handleCropChange}
                 locked={locked}
                 isDragged={draggedId === photo.id}
                 isDragOver={dragOverId === photo.id}

@@ -29,7 +29,7 @@ type Fields = {
   makeSafeCompleted: string; makeSafeCompletedDetails: string; makeSafeRequired: string
 }
 
-type Photo = { id: string; previewUrl: string; label: string }
+type Photo = { id: string; previewUrl: string; label: string; cropX?: number; cropY?: number; cropScale?: number }
 
 type JobInfo = {
   address: string | null
@@ -384,15 +384,18 @@ export function RoofReportPreview({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                   {photos.map((photo, idx) => (
                     <div key={photo.id} style={{ breakInside: 'avoid' as const }}>
-                      <img
-                        src={photo.previewUrl}
-                        alt={photo.label || `Photo ${idx + 1}`}
-                        style={{
-                          width: '100%', maxHeight: 260, objectFit: 'contain' as const,
-                          background: '#f0f0f0',
-                          borderRadius: 4, border: '1px solid #ddd', display: 'block',
-                        }}
-                      />
+                      <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f0f0f0', borderRadius: 4, border: '1px solid #ddd' }}>
+                        <img
+                          src={photo.previewUrl}
+                          alt={photo.label || `Photo ${idx + 1}`}
+                          style={{
+                            position: 'absolute', width: '100%', height: '100%',
+                            objectFit: 'contain' as const,
+                            transformOrigin: 'center center',
+                            transform: `translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`,
+                          }}
+                        />
+                      </div>
                       <div style={{ fontSize: 10, color: '#555', marginTop: 5, textAlign: 'center' as const }}>
                         Photo {idx + 1}{photo.label ? ` — ${photo.label}` : ''}
                       </div>

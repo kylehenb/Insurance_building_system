@@ -2135,6 +2135,9 @@ export type Database = {
       }
       photos: {
         Row: {
+          crop_x: number
+          crop_y: number
+          crop_scale: number
           file_name: string | null
           id: string
           inspection_id: string | null
@@ -2150,6 +2153,9 @@ export type Database = {
           uploaded_at: string | null
         }
         Insert: {
+          crop_x?: number
+          crop_y?: number
+          crop_scale?: number
           file_name?: string | null
           id?: string
           inspection_id?: string | null
@@ -2165,6 +2171,9 @@ export type Database = {
           uploaded_at?: string | null
         }
         Update: {
+          crop_x?: number
+          crop_y?: number
+          crop_scale?: number
           file_name?: string | null
           id?: string
           inspection_id?: string | null
