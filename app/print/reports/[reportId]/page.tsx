@@ -1295,18 +1295,16 @@ export default async function ReportPrintPage({
                       const globalSequence = pageIndex * 6 + photoIndex + 1
                       return (
                         <div key={photo.id} style={{ breakInside: 'avoid' }}>
-                          <div style={{ 
-                            aspectRatio: '4/3', 
-                            background: '#f5f2ee', 
-                            borderRadius: '6px', 
+                          <div style={{
+                            borderRadius: '6px',
                             overflow: 'hidden',
                             border: '1px solid #e0dbd4',
                             marginBottom: '8px'
                           }}>
-                            <img 
+                            <img
                               src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
                               alt={photo.label || photo.file_name || 'Photo'}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              style={{ width: '100%', maxHeight: 260, objectFit: 'contain', background: '#f5f2ee', display: 'block' }}
                             />
                           </div>
                           <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center', marginTop: '4px' }}>

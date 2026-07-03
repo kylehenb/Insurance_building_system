@@ -647,11 +647,11 @@ function PhotosSection({ photos }: { photos: Photo[] }) {
               const seq = pageIdx * 6 + idx + 1
               return (
                 <div key={photo.id} style={{ breakInside: 'avoid' }}>
-                  <div style={{ aspectRatio: '4/3', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden', border: BORDER, marginBottom: '6px' }}>
+                  <div style={{ borderRadius: '4px', border: BORDER, marginBottom: '6px', overflow: 'hidden' }}>
                     <img
                       src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
                       alt={photo.label || photo.file_name || 'Photo'}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain', background: '#f3f4f6', display: 'block' }}
                     />
                   </div>
                   {photo.label && (
