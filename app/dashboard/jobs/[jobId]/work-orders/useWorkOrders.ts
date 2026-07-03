@@ -173,9 +173,10 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         const invoice = woInvoiceMap.get(wo.id) ?? null
         const visits  = visitsMap.get(wo.id) ?? []
 
-        // Trade type label: prefer the linked trade record's primary_trade,
-        // then the stored trade_name, then work_type special cases.
-        let tradeTypeLabel = trade?.primary_trade ?? wo.trade_name ?? ''
+        // Trade type label: use the stored trade_name (set from scope item trade when WO was
+        // created) as the source of truth — it identifies what work this order covers.
+        // Fall back to the contractor's primary_trade only if trade_name is absent.
+        let tradeTypeLabel = wo.trade_name ?? trade?.primary_trade ?? ''
         if (!tradeTypeLabel) {
           if (wo.work_type === 'make_safe') tradeTypeLabel = 'Make Safe'
         }
