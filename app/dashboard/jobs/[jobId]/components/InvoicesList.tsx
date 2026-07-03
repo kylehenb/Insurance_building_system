@@ -51,6 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
   balance: 'Balance',
   progress: 'Progress',
   standard: 'Standard',
+  custom: 'Custom',
 }
 
 function fmt(v: number) {
@@ -148,8 +149,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
       const { invoice: newInvoice } = await res.json() as { invoice: { id: string } }
       await load()
       onInvoiceUpdated?.()
-      // Auto-expand and edit make_safe invoices so builder's margin is immediately visible
-      if (type === 'make_safe' && newInvoice?.id) {
+      // Auto-expand and edit make_safe and custom invoices so they open ready to edit
+      if ((type === 'make_safe' || type === 'custom') && newInvoice?.id) {
         setExpandedInvoiceId(newInvoice.id)
         setEditingInvoiceId(newInvoice.id)
       }
@@ -322,6 +323,21 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     : 'No approved quote — balance will be $0.00'}
                 </div>
               </button>
+
+              {/* Custom */}
+              <button
+                onClick={() => createInvoice('custom')}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: '#fff',
+                  cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Custom</div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  Blank invoice with custom line items and builder&apos;s margin
+                </div>
+              </button>
             </div>
 
             <button
@@ -383,8 +399,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               onClick={() => {
                 const isExpanding = expandedInvoiceId !== invoice.id
                 setExpandedInvoiceId(isExpanding ? invoice.id : null)
-                // Make safe draft invoices open directly in edit mode
-                if (isExpanding && invoice.invoice_type === 'make_safe' && invoice.status === 'draft') {
+                // Make safe and custom draft invoices open directly in edit mode
+                if (isExpanding && (invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom') && invoice.status === 'draft') {
                   setEditingInvoiceId(invoice.id)
                 }
               }}
@@ -517,7 +533,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                       )}
 
                       {/* Totals */}
-                      {invoice.invoice_type === 'make_safe' && (() => {
+                      {(invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom') && (() => {
                         const lineSub = invoice.line_items.reduce((s, i) => s + i.line_total, 0)
                         const pct = invoice.markup_pct ?? 0
                         const markup = Math.round(lineSub * pct * 100) / 100

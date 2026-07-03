@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
+import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import TemplateSelectorField from '@/components/reports/TemplateSelectorField'
 
 interface InitialData {
@@ -29,6 +30,16 @@ interface InitialData {
   fieldDraft: Record<string, unknown> | null
   safetyConfirmedAt: string | null
   formSubmittedAt: string | null
+}
+
+interface MakeSafeData {
+  claimDetails: string
+  conductedOn: string
+  description: string
+}
+
+function emptyMakeSafe(): MakeSafeData {
+  return { claimDetails: '', conductedOn: '', description: '• ' }
 }
 
 interface ScopeItem { id: string; text: string }
@@ -395,6 +406,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [autofillScriptOpen, setAutofillScriptOpen] = useState(false)
   const [barDamageTemplate, setBarDamageTemplate] = useState<string | null>(null)
 
+  // ─── Make Safe fields ─────────────────────────────────────────────────────
+  const [makeSafeFields, setMakeSafeFields] = useState<MakeSafeData>(emptyMakeSafe)
+  const [makeSafeFieldsOpen, setMakeSafeFieldsOpen] = useState(true)
+  const [makeSafePhotos, setMakeSafePhotos] = useState<PhotoEntry[]>([])
+  const [makeSafePreviewOpen, setMakeSafePreviewOpen] = useState(false)
+  const makeSafePhotoInputRef = useRef<HTMLInputElement>(null)
+  const makeSafePhotoIdsRef = useRef<Set<string>>(new Set())
+
   // ─── Roof Report fields ───────────────────────────────────────────────────
   const [roofPhotos, setRoofPhotos] = useState<PhotoEntry[]>([])
   const roofPhotoInputRef = useRef<HTMLInputElement>(null)
@@ -439,7 +458,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
     damage_template: barDamageTemplate,
     roofReportFields, roofFieldsOpen,
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, barDamageTemplate, roofReportFields, roofFieldsOpen])
+    makeSafeFields, makeSafeFieldsOpen,
+    makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, barDamageTemplate, roofReportFields, roofFieldsOpen, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -477,6 +498,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.damage_template) setBarDamageTemplate(d.damage_template as string)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
+    if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
+    if (d.makeSafeFieldsOpen !== undefined) setMakeSafeFieldsOpen(d.makeSafeFieldsOpen as boolean)
+    if (d.makeSafePhotoIds) makeSafePhotoIdsRef.current = new Set(d.makeSafePhotoIds as string[])
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
       setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
@@ -490,15 +514,18 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       .then(r => r.json())
       .then((data: { photos?: { id: string; url: string | null; label: string }[] }) => {
         if (data.photos?.length) {
-          setRoofPhotos(data.photos.map(p => ({
-            id: uid(),
-            photoId: p.id,
-            file: null,
-            previewUrl: p.url ?? '',
-            label: p.label,
-            processing: false,
-            uploading: false,
-          })))
+          const roofP: PhotoEntry[] = []
+          const makeSafeP: PhotoEntry[] = []
+          for (const p of data.photos) {
+            const entry: PhotoEntry = { id: uid(), photoId: p.id, file: null, previewUrl: p.url ?? '', label: p.label, processing: false, uploading: false }
+            if (makeSafePhotoIdsRef.current.has(p.id)) {
+              makeSafeP.push(entry)
+            } else {
+              roofP.push(entry)
+            }
+          }
+          if (roofP.length) setRoofPhotos(roofP)
+          if (makeSafeP.length) setMakeSafePhotos(makeSafeP)
         }
       })
       .catch(() => {})
@@ -585,6 +612,77 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Roof report field helper ─────────────────────────────────────────────
   const setRoofField = (key: keyof RoofReportData, value: string) => {
     setRoofReportFields(prev => ({ ...prev, [key]: value }))
+    if (key === 'claimDetails') setMakeSafeFields(prev => ({ ...prev, claimDetails: value }))
+    armDraft()
+  }
+
+  // ─── Make Safe field helper ───────────────────────────────────────────────
+  const setMakeSafeField = (key: keyof MakeSafeData, value: string) => {
+    setMakeSafeFields(prev => ({ ...prev, [key]: value }))
+    if (key === 'claimDetails') setRoofReportFields(prev => ({ ...prev, claimDetails: value }))
+    armDraft()
+  }
+
+  // ─── Make Safe photo helpers ──────────────────────────────────────────────
+  const handleMakeSafePhotos = (files: FileList | null) => {
+    if (!files) return
+    Array.from(files).forEach(file => {
+      const id = uid()
+      const rawPreview = URL.createObjectURL(file)
+      setMakeSafePhotos(prev => [...prev, { id, photoId: null, file, previewUrl: rawPreview, label: '', processing: true, uploading: false }])
+      processPhotoForUpload(file).then(async processed => {
+        const processedPreview = URL.createObjectURL(processed)
+        setMakeSafePhotos(prev => prev.map(p => {
+          if (p.id !== id) return p
+          URL.revokeObjectURL(p.previewUrl)
+          return { ...p, file: processed, previewUrl: processedPreview, processing: false, uploading: true }
+        }))
+        try {
+          const fd = new FormData()
+          fd.append('file', processed)
+          const res = await fetch(`${base}/photos`, { method: 'POST', body: fd })
+          const data = await res.json()
+          if (data.id) {
+            makeSafePhotoIdsRef.current.add(data.id)
+            setMakeSafePhotos(prev => prev.map(p => p.id !== id ? p : { ...p, photoId: data.id, previewUrl: data.url ?? p.previewUrl, file: null, uploading: false }))
+            armDraft()
+          } else {
+            setMakeSafePhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
+          }
+        } catch {
+          setMakeSafePhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
+        }
+      })
+    })
+  }
+
+  const removeMakeSafePhoto = (id: string) => {
+    setMakeSafePhotos(prev => {
+      const p = prev.find(x => x.id === id)
+      if (p) {
+        URL.revokeObjectURL(p.previewUrl)
+        if (p.photoId) {
+          makeSafePhotoIdsRef.current.delete(p.photoId)
+          fetch(`${base}/photos?photoId=${p.photoId}`, { method: 'DELETE' }).catch(() => {})
+        }
+      }
+      return prev.filter(x => x.id !== id)
+    })
+    armDraft()
+  }
+
+  // ─── Make Safe toggle (records conducted-on timestamp on first enable) ────
+  const handleMakeSafeToggle = () => {
+    const isEnabling = !makeSafeEnabled
+    setMakeSafeEnabled(isEnabling)
+    if (isEnabling && !makeSafeFields.conductedOn) {
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const tzAbbr = Intl.DateTimeFormat('en-AU', { timeZoneName: 'short' }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value ?? ''
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`
+      const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}${tzAbbr ? ' ' + tzAbbr : ''}`
+      setMakeSafeFields(prev => ({ ...prev, conductedOn: `${dateStr} ${timeStr}` }))
+    }
     armDraft()
   }
 
@@ -987,7 +1085,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
             {/* ── MAKE SAFE ────────────────────────────────────────────────── */}
             <div className={`mc-pill${makeSafeEnabled ? ' enabled' : ''}`}>
-              <div className="mc-pill-header" onClick={() => { setMakeSafeEnabled(p => !p); armDraft() }}>
+              <div className="mc-pill-header" onClick={handleMakeSafeToggle}>
                 <div className="mc-pill-check">{makeSafeEnabled ? '✓' : ''}</div>
                 <div className="mc-pill-info">
                   <div className="mc-pill-name">Make Safe</div>
@@ -998,10 +1096,129 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
               {makeSafeEnabled && (
                 <div className="mc-pill-body">
-                  <div style={{ padding: '32px 18px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 28, marginBottom: 10 }}>🔧</div>
-                    <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 12, color: 'var(--muted)', letterSpacing: 0.5 }}>Make Safe report not yet available</div>
-                    <div style={{ fontSize: 11, color: 'var(--border)', marginTop: 6 }}>Coming soon</div>
+                  <div className="mc-section-head">Make Safe Report</div>
+
+                  {/* Make Safe Fields Accordion */}
+                  <div className="mc-rrf-accordion">
+                    <div className="mc-rrf-head" onClick={() => setMakeSafeFieldsOpen(p => !p)}>
+                      <span className="mc-rrf-head-label">📋 Make Safe Report Fields</span>
+                      <span className="mc-rrf-arrow">{makeSafeFieldsOpen ? '▾' : '›'}</span>
+                    </div>
+                    {makeSafeFieldsOpen && (
+                      <div className="mc-rrf-body">
+
+                        {/* Claim Details */}
+                        <div className="mc-rrf-sub">Claim Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Customer Name, Loss Address, Insurer, Claim Number</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            placeholder="e.g. Mr & Mrs Smith · 123 Example St · IAG · Claim #123456"
+                            value={makeSafeFields.claimDetails}
+                            onChange={e => setMakeSafeField('claimDetails', e.target.value)}
+                          />
+                        </div>
+
+                        {/* Make Safe Details */}
+                        <div className="mc-rrf-sub">Make Safe Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Contractor</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            value="Bindi Co"
+                            readOnly
+                            style={{ background: '#f5f5f5', color: '#666' }}
+                          />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Conducted On</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            placeholder="Date and time"
+                            value={makeSafeFields.conductedOn}
+                            onChange={e => setMakeSafeField('conductedOn', e.target.value)}
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div className="mc-rrf-sub">Make Safe Description</div>
+                        <div className="fa-fg" style={{ paddingBottom: 16 }}>
+                          <label className="fa-fl">Description of Works</label>
+                          <textarea
+                            className="fa-ta"
+                            style={{ minHeight: 180 }}
+                            value={makeSafeFields.description}
+                            onChange={e => setMakeSafeField('description', e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const ta = e.currentTarget
+                                const pos = ta.selectionStart ?? makeSafeFields.description.length
+                                const newVal = makeSafeFields.description.slice(0, pos) + '\n• ' + makeSafeFields.description.slice(pos)
+                                setMakeSafeField('description', newVal)
+                                setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + 3 }, 0)
+                              }
+                            }}
+                          />
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Make Safe Photos */}
+                  <div className="fa-photo-grid">
+                    {makeSafePhotos.map(photo => (
+                      <div key={photo.id} className="fa-photo-card">
+                        <img className="fa-photo-thumb" src={photo.previewUrl} alt="make safe" />
+                        {(photo.processing || photo.uploading) && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(44,26,14,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
+                            <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>{photo.processing ? 'Converting…' : 'Saving…'}</span>
+                          </div>
+                        )}
+                        {!photo.processing && !photo.uploading && <button className="fa-photo-del" onClick={() => removeMakeSafePhoto(photo.id)}>×</button>}
+                        <div className="fa-photo-label-area">
+                          <textarea
+                            className="fa-photo-label-ta"
+                            rows={1}
+                            placeholder={photo.processing ? 'Processing…' : photo.uploading ? 'Saving…' : 'Add label'}
+                            value={photo.label}
+                            disabled={photo.processing || photo.uploading}
+                            onChange={e => {
+                              const newLabel = e.target.value
+                              setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label: newLabel } : p))
+                              if (photo.photoId) {
+                                fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label: newLabel }) }).catch(() => {})
+                              }
+                              armDraft()
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => makeSafePhotoInputRef.current?.click()} className="fa-upload-slot">
+                      <span style={{ fontSize: 24 }}>📷</span>
+                      <span>Add Photo</span>
+                    </button>
+                    <input
+                      ref={makeSafePhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={e => handleMakeSafePhotos(e.target.files)}
+                    />
+                  </div>
+
+                  {/* Export */}
+                  <div className="mc-export-wrap">
+                    <button className="mc-export-btn" onClick={() => setMakeSafePreviewOpen(true)}>
+                      Export Report
+                    </button>
                   </div>
                 </div>
               )}
@@ -1462,6 +1679,20 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           jobNumber: initialData.jobNumber,
         }}
         onClose={() => setRoofPreviewOpen(false)}
+      />
+    )}
+
+    {makeSafePreviewOpen && (
+      <MakeSafeReportPreview
+        fields={makeSafeFields}
+        photos={makeSafePhotos}
+        jobInfo={{
+          address: initialData.address,
+          insuredName: initialData.insuredName,
+          insurer: initialData.insurer,
+          claimNumber: initialData.claimNumber,
+        }}
+        onClose={() => setMakeSafePreviewOpen(false)}
       />
     )}
     </>

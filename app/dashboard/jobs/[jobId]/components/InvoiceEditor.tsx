@@ -53,10 +53,10 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   // ── Computed totals ─────────────────────────────────────────────────────────
 
-  const isMakeSafe = invoice?.invoice_type === 'make_safe'
+  const hasBuilderMargin = invoice?.invoice_type === 'make_safe' || invoice?.invoice_type === 'custom'
   const markupPct = invoice?.markup_pct ?? 0
   const lineSubtotal = lineItems.reduce((sum, item) => sum + item.line_total, 0)
-  const markupAmount = isMakeSafe ? Math.round(lineSubtotal * markupPct * 100) / 100 : 0
+  const markupAmount = hasBuilderMargin ? Math.round(lineSubtotal * markupPct * 100) / 100 : 0
   const exGst = Math.round((lineSubtotal + markupAmount) * 100) / 100
   const gstAmount = invoice?.invoice_type === 'excess' ? (invoice.gst ?? 0) : Math.round(exGst * 0.10 * 100) / 100
   const total = invoice?.invoice_type === 'excess' ? (invoice.amount_inc_gst ?? 0) : Math.round((exGst + gstAmount) * 100) / 100
@@ -100,7 +100,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     if (invType === 'excess') return
 
     const sub = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
-    const markup = invType === 'make_safe' ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
+    const markup = (invType === 'make_safe' || invType === 'custom') ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
     const ex = Math.round((sub + markup) * 100) / 100
     const g = Math.round(ex * 0.10 * 100) / 100
     const inc = Math.round((ex + g) * 100) / 100
@@ -117,7 +117,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
   // ── Update builder's margin (make_safe only) ────────────────────────────────
 
   const updateMarkupPct = useCallback(async (pct: number) => {
-    if (!invoice || invoice.invoice_type !== 'make_safe') return
+    if (!invoice || (invoice.invoice_type !== 'make_safe' && invoice.invoice_type !== 'custom')) return
     const decimal = pct / 100
     setSaveStatus('saving')
     try {
@@ -128,7 +128,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         .eq('tenant_id', tenantId)
 
       setInvoice(prev => prev ? { ...prev, markup_pct: decimal } : prev)
-      await persistTotals(lineItems, decimal, 'make_safe')
+      await persistTotals(lineItems, decimal, invoice.invoice_type)
       setSaveStatus('saved')
       onInvoiceUpdated?.()
     } catch {
@@ -304,7 +304,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
       {/* Totals */}
       <div style={{ background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '16px' }}>
-        {isMakeSafe && (
+        {hasBuilderMargin && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: '#9e998f' }}>Subtotal</span>

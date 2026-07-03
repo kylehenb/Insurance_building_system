@@ -268,6 +268,34 @@ export async function POST(req: NextRequest) {
       })
     }
 
+  } else if (type === 'custom') {
+    let customMarkupPct = 0
+    if (job.client_id) {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('builders_margin_pct')
+        .eq('id', job.client_id)
+        .eq('tenant_id', tenantId)
+        .single()
+      customMarkupPct = ((client as any)?.builders_margin_pct ?? 0) / 100
+    }
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId,
+        job_id: jobId,
+        invoice_type: 'custom',
+        direction: 'outbound',
+        gst_treatment: 'exclusive',
+        amount_ex_gst: 0,
+        gst: 0,
+        amount_inc_gst: 0,
+        markup_pct: customMarkupPct,
+        status: 'draft',
+      },
+      lineItems: [],
+    }
+
   } else {
     return NextResponse.json({ error: `Unknown invoice type: ${type}` }, { status: 400 })
   }
