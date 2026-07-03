@@ -537,8 +537,15 @@ function WORow({
   const isAdditional = !wo.quote_id
   const effectiveTrade = isAdditional && wo.work_type !== 'make_safe' ? localTradeName : wo.tradeTypeLabel
   const tradeType  = wo.work_type === 'make_safe' ? 'make_safe' : effectiveTrade
-  const eligibleTrades = trades.filter(t => t.primary_trade === tradeType || t.primary_trade === tradeType.toLowerCase())
-  const tradeOptions = Array.from(new Set(trades.map(t => t.primary_trade).filter((t): t is string => !!t)))
+  const tradeTypeLower = tradeType.toLowerCase()
+  const eligibleTrades = trades.filter(t =>
+    t.primary_trade?.toLowerCase() === tradeTypeLower ||
+    t.trade_specialties?.some(s => s.toLowerCase() === tradeTypeLower)
+  )
+  const tradeOptions = Array.from(new Set([
+    ...trades.map(t => t.primary_trade).filter((t): t is string => !!t),
+    ...trades.flatMap(t => t.trade_specialties ?? []).filter(Boolean),
+  ])).sort()
 
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')

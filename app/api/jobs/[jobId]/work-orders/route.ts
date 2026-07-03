@@ -101,20 +101,20 @@ export async function POST(
 
   const tradeMap = new Map<string, { id: string; primary_trade: string | null; business_name: string | null }>()
   allTrades?.forEach(trade => {
+    const entry = { id: trade.id, primary_trade: trade.primary_trade, business_name: trade.business_name }
     if (trade.primary_trade) {
-      tradeMap.set(trade.primary_trade.toLowerCase(), {
-        id: trade.id,
-        primary_trade: trade.primary_trade,
-        business_name: trade.business_name,
-      })
+      tradeMap.set(trade.primary_trade.toLowerCase(), entry)
     }
     if (trade.business_name) {
-      tradeMap.set(trade.business_name.toLowerCase(), {
-        id: trade.id,
-        primary_trade: trade.primary_trade,
-        business_name: trade.business_name,
-      })
+      tradeMap.set(trade.business_name.toLowerCase(), entry)
     }
+    // Register each specialty without overwriting a primary_trade match
+    const specialties = (trade as any).trade_specialties as string[] | null
+    specialties?.forEach(specialty => {
+      if (specialty && !tradeMap.has(specialty.toLowerCase())) {
+        tradeMap.set(specialty.toLowerCase(), entry)
+      }
+    })
   })
 
   // Get trade type sequence for visit counts

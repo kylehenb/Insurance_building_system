@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('trades')
-    .select('id, primary_trade, trade_code')
+    .select('id, primary_trade, trade_code, trade_specialties')
     .eq('tenant_id', tenantId)
     .order('primary_trade')
 

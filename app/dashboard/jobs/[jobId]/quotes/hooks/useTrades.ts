@@ -6,6 +6,7 @@ export interface Trade {
   id: string
   primary_trade: string
   trade_code: string | null
+  trade_specialties: string[] | null
 }
 
 export function useTrades(tenantId: string) {

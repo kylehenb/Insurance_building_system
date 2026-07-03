@@ -3598,6 +3598,7 @@ export type Database = {
           status_note: string | null
           tenant_id: string
           trade_code: string | null
+          trade_specialties: string[] | null
         }
         Insert: {
           abn?: string | null
@@ -3628,6 +3629,7 @@ export type Database = {
           status_note?: string | null
           tenant_id: string
           trade_code?: string | null
+          trade_specialties?: string[] | null
         }
         Update: {
           abn?: string | null
@@ -3658,6 +3660,7 @@ export type Database = {
           status_note?: string | null
           tenant_id?: string
           trade_code?: string | null
+          trade_specialties?: string[] | null
         }
         Relationships: [
           {

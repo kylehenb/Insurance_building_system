@@ -41,7 +41,7 @@ export default function TradesPage() {
 
   // Form state
   const [formData, setFormData] = useState<Partial<TradesInsert>>({
-    primary_trade: '',
+    trade_specialties: [],
     trade_code: null,
     business_name: '',
     entity_name: null,
@@ -235,6 +235,7 @@ export default function TradesPage() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item =>
         (item.primary_trade && item.primary_trade.toLowerCase().includes(query)) ||
+        ((item as any).trade_specialties as string[] | null)?.some((s: string) => s.toLowerCase().includes(query)) ||
         (item.business_name && item.business_name.toLowerCase().includes(query)) ||
         (item.primary_contact && item.primary_contact.toLowerCase().includes(query)) ||
         (item.trade_code && item.trade_code.toLowerCase().includes(query))
@@ -285,7 +286,7 @@ export default function TradesPage() {
   const handleAdd = () => {
     setEditingItem(null);
     setFormData({
-      primary_trade: '',
+      trade_specialties: [],
       trade_code: null,
       business_name: '',
       entity_name: null,
@@ -316,7 +317,7 @@ export default function TradesPage() {
   const handleEdit = (item: TradesRow) => {
     setEditingItem(item);
     setFormData({
-      primary_trade: item.primary_trade,
+      trade_specialties: (item as any).trade_specialties ?? (item.primary_trade ? [item.primary_trade] : []),
       trade_code: item.trade_code,
       business_name: item.business_name,
       entity_name: item.entity_name,
@@ -368,16 +369,23 @@ export default function TradesPage() {
   const handleSave = async () => {
     if (!tenantId) return;
 
+    const specialties = (formData.trade_specialties as string[] | undefined) ?? [];
+    const saveData = {
+      ...formData,
+      trade_specialties: specialties.length > 0 ? specialties : null,
+      primary_trade: specialties[0] ?? null,
+    };
+
     if (editingItem) {
       // Update existing item
       await supabase
         .from('trades')
-        .update(formData as TradesInsert)
+        .update(saveData as TradesInsert)
         .eq('id', editingItem.id);
     } else {
       // Insert new item
       await supabase.from('trades').insert({
-        ...formData,
+        ...saveData,
         tenant_id: tenantId,
       } as TradesInsert);
     }
@@ -396,10 +404,14 @@ export default function TradesPage() {
   const handleCsvImport = async (importedItems: TradesImportRow[]) => {
     if (!tenantId) return;
 
-    const records = importedItems.map(item => ({
-      ...item,
-      tenant_id: tenantId,
-    } as TradesInsert));
+    const records = importedItems.map(item => {
+      const specialties = item.primary_trade ? [item.primary_trade] : [];
+      return {
+        ...item,
+        trade_specialties: specialties.length > 0 ? specialties : null,
+        tenant_id: tenantId,
+      } as TradesInsert;
+    });
 
     await supabase.from('trades').insert(records);
 
@@ -537,7 +549,7 @@ export default function TradesPage() {
                       style={{ position: 'relative', width: columnWidths.primary_trade, borderRightWidth: '0.2px' }}
                       onClick={() => handleSort('primary_trade')}
                     >
-                      Primary Trade {sortColumn === 'primary_trade' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Specialties {sortColumn === 'primary_trade' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
                         style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
                         onMouseDown={(e) => handleResizeStart('primary_trade', e)}
@@ -644,17 +656,26 @@ export default function TradesPage() {
                 <tbody className="divide-y divide-[#f0ece6] bg-white">
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
-                      <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.primary_trade }}>
-                        <select
-                          defaultValue={item.primary_trade || ''}
-                          onChange={(e) => handleInlineEdit(item.id, 'primary_trade', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                        >
-                          <option value="">Select...</option>
-                          {primaryTradeOptions.map(trade => (
-                            <option key={trade} value={trade}>{trade}</option>
-                          ))}
-                        </select>
+                      <td className="px-1.5 py-3" style={{ width: columnWidths.primary_trade }}>
+                        <div className="flex flex-wrap gap-1">
+                          {((item as any).trade_specialties as string[] | null)?.length
+                            ? ((item as any).trade_specialties as string[]).map((s: string) => (
+                                <span
+                                  key={s}
+                                  className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-[#f5f0e8] text-[#3a3530] border border-[#e0dbd4]"
+                                >
+                                  {s}
+                                </span>
+                              ))
+                            : item.primary_trade
+                              ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-[#f5f0e8] text-[#3a3530] border border-[#e0dbd4]">
+                                    {item.primary_trade}
+                                  </span>
+                                )
+                              : <span className="text-[10px] text-[#b0a898]">—</span>
+                          }
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.business_name }}>
                         <input
@@ -760,18 +781,37 @@ export default function TradesPage() {
                 {editingItem ? 'Edit Trade' : 'Add Trade'}
               </h2>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Primary Trade *</label>
-                  <select
-                    value={formData.primary_trade || ''}
-                    onChange={(e) => setFormData({ ...formData, primary_trade: e.target.value })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
-                  >
-                    <option value="">Select...</option>
-                    {primaryTradeOptions.map(trade => (
-                      <option key={trade} value={trade}>{trade}</option>
-                    ))}
-                  </select>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-2">Trade Specialties *</label>
+                  <div className="rounded-md border border-[#e0dbd4] bg-white p-3 grid grid-cols-3 gap-x-4 gap-y-1.5 max-h-48 overflow-y-auto">
+                    {primaryTradeOptions.map(trade => {
+                      const selected = ((formData.trade_specialties as string[] | undefined) ?? []).includes(trade);
+                      return (
+                        <label key={trade} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(e) => {
+                              const current = (formData.trade_specialties as string[] | undefined) ?? [];
+                              setFormData({
+                                ...formData,
+                                trade_specialties: e.target.checked
+                                  ? [...current, trade]
+                                  : current.filter(t => t !== trade),
+                              });
+                            }}
+                            className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                          />
+                          <span className="text-xs text-[#1a1a1a]">{trade}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {((formData.trade_specialties as string[] | undefined) ?? []).length > 0 && (
+                    <p className="mt-1 text-[10px] text-[#1a1a1a]/50">
+                      Primary: {((formData.trade_specialties as string[]) ?? [])[0]}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Trade Code</label>

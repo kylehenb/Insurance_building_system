@@ -7,19 +7,30 @@ export async function GET(req: NextRequest) {
   if (!tenantId) return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('trades')
-    .select('primary_trade')
-    .eq('tenant_id', tenantId)
-    .not('primary_trade', 'is', null)
-    .order('primary_trade')
+
+  const [{ data: tradesData, error }, { data: sequenceData }] = await Promise.all([
+    supabase
+      .from('trades')
+      .select('primary_trade, trade_specialties')
+      .eq('tenant_id', tenantId),
+    supabase
+      .from('trade_type_sequence')
+      .select('trade_type')
+      .eq('tenant_id', tenantId),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Get distinct values
-  const distinctTrades = [...new Set(data?.map(t => t.primary_trade) || [])]
-  
+  const collected = new Set<string>()
+  tradesData?.forEach(t => {
+    if (t.primary_trade) collected.add(t.primary_trade)
+    t.trade_specialties?.forEach(s => { if (s) collected.add(s) })
+  })
+  sequenceData?.forEach(s => { if (s.trade_type) collected.add(s.trade_type) })
+
+  const distinctTrades = [...collected].sort((a, b) => a.localeCompare(b))
+
   return NextResponse.json(distinctTrades, {
-    headers: { 'Cache-Control': 'private, max-age=300' },
+    headers: { 'Cache-Control': 'private, max-age=60' },
   })
 }
