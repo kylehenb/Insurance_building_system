@@ -210,7 +210,8 @@ export function MakeSafeReportPreview({
                         src={photo.previewUrl}
                         alt={photo.label || `Photo ${idx + 1}`}
                         style={{
-                          width: '100%', aspectRatio: '4/3', objectFit: 'cover' as const,
+                          width: '100%', maxHeight: 260, objectFit: 'contain' as const,
+                          background: '#f0f0f0',
                           borderRadius: 4, border: '1px solid #ddd', display: 'block',
                         }}
                       />
