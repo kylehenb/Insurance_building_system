@@ -363,7 +363,7 @@ function MidcityPhotoCard({
   const frameRef = React.useRef<HTMLDivElement>(null)
   const isPanning = React.useRef(false)
   const lastPointer = React.useRef({ x: 0, y: 0 })
-  const saveTimer = React.useRef<ReturnType<typeof setTimeout>>()
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const updateCrop = React.useCallback((x: number, y: number, scale: number) => {
     cropRef.current = { x, y, scale }
