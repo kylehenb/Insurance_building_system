@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import TemplateSelectorField from '@/components/reports/TemplateSelectorField'
