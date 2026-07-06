@@ -164,7 +164,8 @@ export async function PATCH(
     .single()
   if (!userRow) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const updates: Record<string, unknown> = {}
+  type PhotoUpdate = import('@/lib/supabase/database.types').Database['public']['Tables']['photos']['Update']
+  const updates: PhotoUpdate = {}
   if (label !== undefined) updates.label = label
   if (crop_x !== undefined) updates.crop_x = crop_x
   if (crop_y !== undefined) updates.crop_y = crop_y
