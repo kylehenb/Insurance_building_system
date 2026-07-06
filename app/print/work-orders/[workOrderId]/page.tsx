@@ -169,20 +169,25 @@ export default async function WorkOrderPrintPage({
     ...addedItems,
   ]
 
-  // Separate scope items: trade's items vs other trades' items
+  // Separate scope items: this work order's items vs other trades' items.
+  // Use trade_name (the trade type this WO was created for) as the filter key so
+  // a multi-specialty contractor assigned to two WOs on the same job gets the
+  // correct scope on each PDF — not their primary_trade.
+  const tradeLabel = workOrder.trade_name ?? trade?.primary_trade ?? null
+
   const tradeScopeItems: ScopeItem[] = []
   const otherScopeItems: ScopeItem[] = []
 
-  if (trade) {
+  if (tradeLabel) {
     allScopeItems.forEach(item => {
-      if (item.trade === trade.primary_trade) {
+      if (item.trade === tradeLabel) {
         tradeScopeItems.push(item)
       } else {
         otherScopeItems.push(item)
       }
     })
   } else {
-    // If no trade assigned, all items are "other"
+    // If no trade label at all, all items are "other"
     otherScopeItems.push(...allScopeItems)
   }
 

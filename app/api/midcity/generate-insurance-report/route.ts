@@ -715,139 +715,168 @@ var data = {
 // AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
 // ============================================================
 
-  var container = document.querySelector('[id^="job_question_list_"]');
-  if (!container) { console.error('Report form container not found.'); return; }
+function runFormFill(specs, opts) {
+  opts = opts || {};
+  var container = document.querySelector(opts.containerSelector || '[id^="job_question_list_"]');
+  if (!container) { console.error('Report form container not found.'); return { issues: ['container not found'] }; }
 
-  var f = container.querySelectorAll('input:not([type=hidden]), select, textarea');
+  var groups = Array.prototype.slice.call(container.querySelectorAll('.control-group'));
+  var cursor = 0;
+  var issues = [];
 
-  function setVal(el, value) {
-    if (!el) return;
-    el.value = value;
-    el.dispatchEvent(new Event('input',  { bubbles: false }));
-    el.dispatchEvent(new Event('change', { bubbles: false }));
+  function normLabel(cg) {
+    var labelEl = cg.querySelector(':scope > .control-label');
+    return labelEl ? labelEl.innerText.replace(/\s+/g, ' ').trim() : null;
   }
-
+  function findGroup(matchText) {
+    for (var i = cursor; i < groups.length; i++) {
+      var lbl = normLabel(groups[i]);
+      if (lbl && lbl.indexOf(matchText) === 0) { cursor = i + 1; return { group: groups[i], index: i }; }
+    }
+    issues.push('Label not found: "' + matchText + '"');
+    return null;
+  }
+  function detailAfter() {
+    var refIndex = cursor - 1;
+    var next = groups[refIndex + 1];
+    if (next && !normLabel(next)) { cursor = refIndex + 2; return next; }
+    issues.push('Detail field not found after group ' + refIndex);
+    return null;
+  }
+  function setVal(el, value) {
+    if (!el || value === '' || value == null) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
   function setSelectByText(selectEl, text) {
     if (!selectEl || !text) return;
     for (var i = 0; i < selectEl.options.length; i++) {
       if (selectEl.options[i].text.trim() === text) {
-        selectEl.value = selectEl.options[i].value;
-        selectEl.selectedIndex = i;
-        selectEl.dispatchEvent(new Event('change', { bubbles: false }));
+        selectEl.value = selectEl.options[i].value; selectEl.selectedIndex = i;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
         return;
       }
     }
+    issues.push('Option not found: "' + text + '"');
   }
-
-  function setMCE(index, html) {
-    if (!html) return;
+  function setMce(cg, html) {
+    if (!cg || !html) return;
+    var ta = cg.querySelector('textarea[id^="mceEditor_"]');
+    if (!ta) { issues.push('MCE textarea missing in companion group'); return; }
     if (typeof tinymce !== 'undefined') {
-      var eds = tinymce.editors;
-      var edArr = Array.isArray(eds) ? eds : Object.values(eds);
-      if (edArr[index]) {
-        edArr[index].setContent(html);
-        edArr[index].save();
-        return;
-      }
+      var ed = tinymce.get(ta.id);
+      if (ed) { ed.setContent(html); ed.save(); return; }
     }
-    var tas = container.querySelectorAll('textarea');
-    if (tas[index]) setVal(tas[index], html);
+    setVal(ta, html);
   }
 
-  // ── ASSESSMENT REPORT DETAILS ─────────────────────────────
-  if (data.attendanceDate)        setVal(f[0],  data.attendanceDate);
-  if (data.timeAttended)          setVal(f[1],  data.timeAttended);
-  if (data.assessorContactNumber) setVal(f[2],  data.assessorContactNumber);
-  if (data.assessorMetWith)       setVal(f[3],  data.assessorMetWith);
-  if (data.timeOnSite)            setVal(f[4],  data.timeOnSite);
+  specs.forEach(function(spec) {
+    try {
+      if (spec.type === 'detail') {
+        if (!spec.value) return;
+        var d = detailAfter();
+        if (d) setVal(d.querySelector('textarea'), spec.value);
+        return;
+      }
+      var f = findGroup(spec.label);
+      if (!f) return;
+      if (spec.type === 'text') {
+        if (spec.value) setVal(f.group.querySelector('input:not([type=hidden]), textarea'), spec.value);
+      } else if (spec.type === 'select') {
+        if (spec.value) setSelectByText(f.group.querySelector('select'), spec.value);
+      } else if (spec.type === 'richText') {
+        var companion = groups[f.index + 1];
+        if (!companion || companion.className.indexOf('pb-4') === -1) {
+          issues.push('Rich-text companion missing for "' + spec.label + '"');
+          return;
+        }
+        cursor = f.index + 2;
+        if (spec.value) setSelectByText(companion.querySelector('select'), spec.value);
+        if (spec.richText) setMce(companion, spec.richText);
+      }
+    } catch (e) {
+      issues.push('Error on "' + (spec.label || 'detail') + '": ' + e.message);
+    }
+  });
 
-  // ── PROPERTY DETAILS ──────────────────────────────────────
-  if (data.yearBuilt)             setVal(f[5],  data.yearBuilt);
-  setSelectByText(f[6],  data.wallConstruction);
-  setSelectByText(f[7],  data.roofType);
-  setSelectByText(f[8],  data.storeys);
-  setSelectByText(f[9],  data.underConstruction);
-  setSelectByText(f[10], data.constructionRoofWalls);
-  if (data.constructionDetails)   setVal(f[11], data.constructionDetails);
-  setSelectByText(f[12], data.heritageListed);
-  setSelectByText(f[13], data.unoccupied180Days);
+  return { issues: issues, fieldsProcessed: cursor, totalFields: groups.length };
+}
 
-  // ── CUSTOMER DISCUSSION ───────────────────────────────────
-  setSelectByText(f[14], data.customerDiscussionTemplate);
-  setMCE(0, data.customerDiscussionDetail);
+var specs = [
+  {label:'Attendance Date:', type:'text', value: data.attendanceDate},
+  {label:'Time Attended:', type:'text', value: data.timeAttended},
+  {label:'Assessor contact number:', type:'text', value: data.assessorContactNumber},
+  {label:'Assessor met with:', type:'text', value: data.assessorMetWith},
+  {label:'Amount of time on site:', type:'text', value: data.timeOnSite},
+  {label:'What year was the property built:', type:'text', value: data.yearBuilt},
+  {label:'Wall construction type:', type:'select', value: data.wallConstruction},
+  {label:'Roof type:', type:'select', value: data.roofType},
+  {label:'No. of storeys:', type:'select', value: data.storeys},
+  {label:'Is the home under construction, alteration, or renovation work?', type:'select', value: data.underConstruction},
+  {label:'Is this work relating to the removal of roof, external walls, building-in under the home, or removal or replacement of stumps?', type:'select', value: data.constructionRoofWalls},
+  {type:'detail', value: data.constructionDetails},
+  {label:'Is the property heritage listed or have a heritage overlay?', type:'select', value: data.heritageListed},
+  {label:'Has the property been unoccupied for more than 180 consecutive days?', type:'select', value: data.unoccupied180Days},
+  {label:'Customer Discussion and Inspection Findings', type:'richText', value: data.customerDiscussionTemplate, richText: data.customerDiscussionDetail},
+  {label:'Claim type:', type:'select', value: data.claimType},
+  {label:'Source / Room:', type:'text', value: data.sourceRoom},
+  {label:'Specific cause:', type:'richText', value: data.specificCause, richText: data.causeOfDamageDetail},
+  {label:'Provide a description of the resulting damage', type:'richText', value: data.resultantDamageTemplate, richText: data.resultantDamageDetail},
+  {label:'How long does the claim-related damage appear to have been occurring for?', type:'text', value: data.damageDuration},
+  {label:'Is exposed and/or damaged asbestos present?', type:'select', value: data.asbestosPresent},
+  {label:'Is the electrical supply or electrical circuit at the property damaged?', type:'select', value: data.electricalDamaged},
+  {label:'Is there any mould present?', type:'select', value: data.mouldPresent},
+  {label:'Is any restoration required as a result of the claimed event?', type:'select', value: data.restorationRequired},
+  {type:'detail', value: data.restorationOverview},
+  {label:'Estimated time to complete restoration works:', type:'text', value: data.restorationTimeframe},
+  {label:'Are contents items (excluding carpet) being claimed by the customer?', type:'select', value: data.contentsItemsClaimed},
+  {label:'Are there any property conditions that contributed to the claim damage?', type:'select', value: data.propertyConditionsContributed},
+  {label:'How long have they been occurring?', type:'text', value: data.conditionsDuration},
+  {type:'detail', value: data.conditionsDetails},
+  {label:'If the property was in a good condition prior to the incident, would the resultant damage still have occurred?', type:'select', value: data.damageWouldStillOccur},
+  {type:'detail', value: data.damageWouldOccurDetails},
+  {label:'Would the customer have been reasonably aware of the property conditions?', type:'select', value: data.customerAwareConditions},
+  {type:'detail', value: data.customerAwareDetails},
+  {label:"Are there any other issues relating to the property's conditions?", type:'select', value: data.otherPropertyIssues},
+  {type:'detail', value: data.otherIssuesDetails},
+  {label:'Are there any maintenance repairs required to reduce the risk of additional damage in the future?', type:'select', value: data.maintenanceRequired},
+  {type:'detail', value: data.urgentMaintenance},
+  {type:'detail', value: data.otherMaintenance},
+  {label:'Do any of the property conditions or maintenance items prevent warrantable claim repairs?', type:'select', value: data.warrantableRepairsPrevented},
+  {label:'If yes, provide details:', type:'richText', value: data.maintenanceTemplate},
+  {label:'Does the Customer require Emergency Temporary Accommodation?', type:'select', value: data.emergencyAccomm},
+  {label:'Approx Time frame: XX days, weeks, months', type:'text', value: data.emergencyTimeframe},
+  {label:'Does the customer require Temporary Accommodation during repairs?', type:'select', value: data.accommDuringRepairs},
+  {label:'Approx Time frame: XX days, weeks, months', type:'text', value: data.repairsTimeframe},
+  {type:'detail', value: data.accommNotes},
+  {label:'Is the property not in good condition?', type:'select', value: data.propertyNotGoodCondition},
+  {label:'Is the property not structurally sound?', type:'select', value: data.propertyNotStructurallySound},
+  {label:'Is the property not well maintained?', type:'select', value: data.propertyNotWellMaintained},
+  {label:'Is the property not water tight?', type:'select', value: data.propertyNotWaterTight},
+  {label:'Is any part of the home being used for a business, trade or profession, including AirBNB/Short stay use?', type:'select', value: data.businessUse},
+  {type:'detail', value: data.underwritingFurtherDetail},
+  {label:'Is the damage due to a failed appliance/filter/hose?', type:'select', value: data.failedAppliance},
+  {label:'Is the failed appliance/filter/hose less than 10 years old?', type:'select', value: data.applianceUnder10Years},
+  {label:'Can the appliance/filter/hose be salvaged for recovery purposes?', type:'select', value: data.applianceSalvageable},
+  {label:'Has the customer had a technician/plumber/trade attend?', type:'select', value: data.technicianAttended},
+  {label:'Is the property/renovation under 10 years old?', type:'select', value: data.propertyUnder10Years},
+  {label:"Builders / Trade's details:", type:'text', value: data.builderTradeDetails},
+  {label:'Was the damage caused by a third party impact?', type:'select', value: data.thirdPartyImpact},
+  {type:'detail', value: data.recoveriesFurtherDetails},
+  {label:'Next Steps:', type:'select', value: data.nextSteps},
+  {label:'Home Assessor:', type:'select', value: data.homeAssessor},
+  {label:'Claims:', type:'select', value: data.claims},
+  {label:'Builder:', type:'select', value: data.builder},
+  {label:'Specialist:', type:'select', value: data.specialist},
+  {label:'Customer:', type:'select', value: data.customer},
+  {label:'Individual Experience / Qualification:', type:'select', value: data.qualification},
+  {label:'Performed under licence:', type:'select', value: data.licence}
+];
 
-  // ── CAUSE OF DAMAGE ───────────────────────────────────────
-  setSelectByText(f[16], data.claimType);
-  if (data.sourceRoom)            setVal(f[17], data.sourceRoom);
-  setSelectByText(f[18], data.specificCause);
-  setMCE(1, data.causeOfDamageDetail);
-
-  // ── RESULTING DAMAGE ──────────────────────────────────────
-  setSelectByText(f[20], data.resultantDamageTemplate);
-  setMCE(2, data.resultantDamageDetail);
-  if (data.damageDuration)        setVal(f[22], data.damageDuration);
-  setSelectByText(f[23], data.asbestosPresent);
-  setSelectByText(f[24], data.electricalDamaged);
-  setSelectByText(f[25], data.mouldPresent);
-  setSelectByText(f[26], data.restorationRequired);
-  if (data.restorationOverview)   setVal(f[27], data.restorationOverview);
-  if (data.restorationTimeframe)  setVal(f[28], data.restorationTimeframe);
-  setSelectByText(f[29], data.contentsItemsClaimed);
-
-  // ── PROPERTY CONDITIONS ───────────────────────────────────
-  setSelectByText(f[30], data.propertyConditionsContributed);
-  if (data.conditionsDuration)    setVal(f[31], data.conditionsDuration);
-  if (data.conditionsDetails)     setVal(f[32], data.conditionsDetails);
-  setSelectByText(f[33], data.damageWouldStillOccur);
-  if (data.damageWouldOccurDetails)  setVal(f[34], data.damageWouldOccurDetails);
-  setSelectByText(f[35], data.customerAwareConditions);
-  if (data.customerAwareDetails)  setVal(f[36], data.customerAwareDetails);
-  setSelectByText(f[37], data.otherPropertyIssues);
-  if (data.otherIssuesDetails)    setVal(f[38], data.otherIssuesDetails);
-  setSelectByText(f[39], data.maintenanceRequired);
-  if (data.urgentMaintenance)     setVal(f[40], data.urgentMaintenance);
-  if (data.otherMaintenance)      setVal(f[41], data.otherMaintenance);
-  setSelectByText(f[42], data.warrantableRepairsPrevented);
-  setSelectByText(f[43], data.maintenanceTemplate);
-
-  // ── TEMPORARY ACCOMMODATION ───────────────────────────────
-  setSelectByText(f[44], data.emergencyAccomm);
-  if (data.emergencyTimeframe)    setVal(f[45], data.emergencyTimeframe);
-  setSelectByText(f[46], data.accommDuringRepairs);
-  if (data.repairsTimeframe)      setVal(f[47], data.repairsTimeframe);
-  if (data.accommNotes)           setVal(f[48], data.accommNotes);
-
-  // ── UNDERWRITING RISK ASSESSMENT ─────────────────────────
-  setSelectByText(f[49], data.propertyNotGoodCondition);
-  setSelectByText(f[50], data.propertyNotStructurallySound);
-  setSelectByText(f[51], data.propertyNotWellMaintained);
-  setSelectByText(f[52], data.propertyNotWaterTight);
-  setSelectByText(f[53], data.businessUse);
-  if (data.underwritingFurtherDetail) setVal(f[54], data.underwritingFurtherDetail);
-
-  // ── RECOVERIES ASSESSMENT ─────────────────────────────────
-  setSelectByText(f[55], data.failedAppliance);
-  setSelectByText(f[56], data.applianceUnder10Years);
-  setSelectByText(f[57], data.applianceSalvageable);
-  setSelectByText(f[58], data.technicianAttended);
-  setSelectByText(f[59], data.propertyUnder10Years);
-  if (data.builderTradeDetails)   setVal(f[60], data.builderTradeDetails);
-  setSelectByText(f[61], data.thirdPartyImpact);
-  if (data.recoveriesFurtherDetails) setVal(f[62], data.recoveriesFurtherDetails);
-
-  // ── ADDITIONAL INFORMATION / NEXT STEPS ──────────────────
-  setSelectByText(f[63], data.nextSteps);
-  setSelectByText(f[64], data.homeAssessor);
-  setSelectByText(f[65], data.claims);
-  setSelectByText(f[66], data.builder);
-  setSelectByText(f[67], data.specialist);
-  setSelectByText(f[68], data.customer);
-
-  // ── STATEMENT OF OBJECTIVITY ─────────────────────────────
-  setSelectByText(f[69], data.qualification);
-  setSelectByText(f[70], data.licence);
-
-  console.log('A&G Auto-fill complete! Review the form, then click Save or Complete.');
+var result = runFormFill(specs);
+if (result.issues.length) console.warn('Auto-fill finished with issues:', result.issues);
+else console.log('Auto-fill complete — no issues detected (' + result.fieldsProcessed + '/' + result.totalFields + ' groups matched).');
 
 })();`
 
