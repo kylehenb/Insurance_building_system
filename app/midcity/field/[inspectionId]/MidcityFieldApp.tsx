@@ -342,94 +342,27 @@ function InsuranceTemplateRenderer({
 
 function uid() { return Math.random().toString(36).slice(2) }
 
-// — Pan/zoom photo card used in both roof and make safe photo grids ——————————
+// — Photo card used in both roof and make safe photo grids ——————————————————
 function MidcityPhotoCard({
   photo,
-  base,
   onDelete,
   onLabelChange,
-  onCropChange,
 }: {
   photo: PhotoEntry
-  base: string
   onDelete: () => void
   onLabelChange: (label: string) => void
-  onCropChange: (x: number, y: number, scale: number) => void
 }) {
-  const [cropX, setCropX] = React.useState(photo.cropX)
-  const [cropY, setCropY] = React.useState(photo.cropY)
-  const [cropScale, setCropScale] = React.useState(photo.cropScale)
-  const cropRef = React.useRef({ x: photo.cropX, y: photo.cropY, scale: photo.cropScale })
-  const frameRef = React.useRef<HTMLDivElement>(null)
-  const isPanning = React.useRef(false)
-  const lastPointer = React.useRef({ x: 0, y: 0 })
-  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  const updateCrop = React.useCallback((x: number, y: number, scale: number) => {
-    cropRef.current = { x, y, scale }
-    setCropX(x); setCropY(y); setCropScale(scale)
-    onCropChange(x, y, scale)
-    if (photo.photoId) {
-      clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => {
-        fetch(`${base}/photos`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photoId: photo.photoId, crop_x: x, crop_y: y, crop_scale: scale }),
-        }).catch(() => {})
-      }, 400)
-    }
-  }, [photo.photoId, base, onCropChange])
-
-  const handleWheel = React.useCallback((e: React.WheelEvent) => {
-    if (photo.processing || photo.uploading) return
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? -0.1 : 0.1
-    const newScale = Math.max(0.5, Math.min(8, cropRef.current.scale + delta))
-    updateCrop(cropRef.current.x, cropRef.current.y, newScale)
-  }, [photo.processing, photo.uploading, updateCrop])
-
-  const handlePointerDown = React.useCallback((e: React.PointerEvent) => {
-    if (photo.processing || photo.uploading) return
-    e.preventDefault()
-    isPanning.current = true
-    lastPointer.current = { x: e.clientX, y: e.clientY }
-    frameRef.current?.setPointerCapture(e.pointerId)
-  }, [photo.processing, photo.uploading])
-
-  const handlePointerMove = React.useCallback((e: React.PointerEvent) => {
-    if (!isPanning.current || !frameRef.current) return
-    const rect = frameRef.current.getBoundingClientRect()
-    const dx = (e.clientX - lastPointer.current.x) / rect.width * 100
-    const dy = (e.clientY - lastPointer.current.y) / rect.height * 100
-    lastPointer.current = { x: e.clientX, y: e.clientY }
-    updateCrop(cropRef.current.x + dx, cropRef.current.y + dy, cropRef.current.scale)
-  }, [updateCrop])
-
-  const handlePointerUp = React.useCallback(() => { isPanning.current = false }, [])
-
-  const isCropped = cropX !== 0 || cropY !== 0 || cropScale !== 1
   const busy = photo.processing || photo.uploading
 
   return (
     <div className="fa-photo-card">
-      <div
-        ref={frameRef}
-        className="fa-photo-frame"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onWheel={handleWheel}
-        style={{ cursor: busy ? 'default' : 'grab', touchAction: 'none' }}
-      >
+      <div className="fa-photo-frame">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="fa-photo-thumb"
           src={photo.previewUrl}
           alt="photo"
           draggable={false}
-          style={{ transform: `translate(${cropX}%, ${cropY}%) scale(${cropScale})` }}
         />
         {busy && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(44,26,14,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -438,15 +371,7 @@ function MidcityPhotoCard({
           </div>
         )}
         {!busy && (
-          <button className="fa-photo-del" onClick={(e) => { e.stopPropagation(); onDelete() }}>×</button>
-        )}
-        {!busy && isCropped && (
-          <button
-            onClick={(e) => { e.stopPropagation(); updateCrop(0, 0, 1) }}
-            style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 9, cursor: 'pointer', fontFamily: 'var(--font-dm-mono)', letterSpacing: 1 }}
-          >
-            Reset
-          </button>
+          <button className="fa-photo-del" onClick={onDelete}>×</button>
         )}
       </div>
       <div className="fa-photo-label-area">
@@ -1296,7 +1221,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <MidcityPhotoCard
                         key={photo.id}
                         photo={photo}
-                        base={base}
                         onDelete={() => removeMakeSafePhoto(photo.id)}
                         onLabelChange={(label) => {
                           setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
@@ -1304,9 +1228,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label }) }).catch(() => {})
                           }
                           armDraft()
-                        }}
-                        onCropChange={(x, y, scale) => {
-                          setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, cropX: x, cropY: y, cropScale: scale } : p))
                         }}
                       />
                     ))}
@@ -1717,7 +1638,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <MidcityPhotoCard
                         key={photo.id}
                         photo={photo}
-                        base={base}
                         onDelete={() => removeRoofPhoto(photo.id)}
                         onLabelChange={(label) => {
                           setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
@@ -1725,9 +1645,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label }) }).catch(() => {})
                           }
                           armDraft()
-                        }}
-                        onCropChange={(x, y, scale) => {
-                          setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, cropX: x, cropY: y, cropScale: scale } : p))
                         }}
                       />
                     ))}
