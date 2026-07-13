@@ -375,6 +375,8 @@ function ScopeItemsEditor({
 }) {
   const [newItemIds,     setNewItemIds]     = useState<Set<string>>(new Set())
   const [modifiedFields, setModifiedFields] = useState<Map<string, Set<string>>>(new Map())
+  const [editingRoom,    setEditingRoom]    = useState<string | null>(null)
+  const [editRoomValue,  setEditRoomValue]  = useState('')
 
   function markModified(itemId: string, field: string) {
     setModifiedFields(prev => {
@@ -396,6 +398,16 @@ function ScopeItemsEditor({
     if (newId) setNewItemIds(prev => new Set([...prev, newId]))
   }
 
+  async function handleRenameRoom(displayRoom: string, groupItems: WODisplayItem[]) {
+    const newDisplay = editRoomValue.trim() || 'General'
+    setEditingRoom(null)
+    if (newDisplay === displayRoom) return
+    const newRoomVal = newDisplay === 'General' ? null : newDisplay
+    for (const item of groupItems.filter(i => !i.isDeleted)) {
+      await onUpdateScopeItem(item.id, { room: newRoomVal })
+    }
+  }
+
   const items = wo.woDisplayItems
 
   // Datalist of rooms already used in this WO (for the combo-box suggestions)
@@ -408,7 +420,7 @@ function ScopeItemsEditor({
   const roomOrder: string[] = []
   const byRoom = new Map<string, WODisplayItem[]>()
   for (const item of items) {
-    const room = item.room ?? 'Unassigned'
+    const room = item.room ?? 'General'
     if (!byRoom.has(room)) { byRoom.set(room, []); roomOrder.push(room) }
     byRoom.get(room)!.push(item)
   }
@@ -453,9 +465,27 @@ function ScopeItemsEditor({
               <React.Fragment key={room}>
                 <tr>
                   <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650' }}>
-                      {room}
-                    </span>
+                    {!isLocked && editingRoom === room ? (
+                      <input
+                        autoFocus
+                        value={editRoomValue}
+                        onChange={e => setEditRoomValue(e.target.value)}
+                        onBlur={() => handleRenameRoom(room, roomItems)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleRenameRoom(room, roomItems)
+                          if (e.key === 'Escape') setEditingRoom(null)
+                        }}
+                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650', background: '#fff', border: '1px solid #c5bfb8', borderRadius: 3, padding: '1px 5px', outline: 'none', width: 140 }}
+                      />
+                    ) : (
+                      <span
+                        title={!isLocked ? 'Click to rename room' : undefined}
+                        onClick={!isLocked ? () => { setEditingRoom(room); setEditRoomValue(room) } : undefined}
+                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650', cursor: !isLocked ? 'text' : 'default' }}
+                      >
+                        {room}
+                      </span>
+                    )}
                   </td>
                 </tr>
                 {roomItems.map(item => {
