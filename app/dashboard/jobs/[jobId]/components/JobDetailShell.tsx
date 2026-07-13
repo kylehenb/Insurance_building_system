@@ -168,7 +168,16 @@ function TabPanel({
     case 'work-orders':
       return null // rendered outside the padded wrapper below
     case 'photos':
-      return <PhotosTab jobId={jobId} tenantId={tenantId} />
+      return (
+        <PhotosTab
+          jobId={jobId}
+          tenantId={tenantId}
+          jobNumber={job.job_number}
+          insuredName={job.insured_name}
+          propertyAddress={job.property_address}
+          claimNumber={job.claim_number}
+        />
+      )
     case 'files':
       return <FilesTab jobId={jobId} />
     case 'insurer-orders':

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { X, Upload } from 'lucide-react'
+import { X, Upload, FileDown, Check } from 'lucide-react'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Photo {
@@ -25,6 +25,10 @@ interface PhotoGroup {
 interface PhotosTabProps {
   jobId: string
   tenantId: string
+  jobNumber: string
+  insuredName: string | null
+  propertyAddress: string | null
+  claimNumber: string | null
 }
 
 // — Lightbox ————————————————————————————————————————————————————
@@ -89,40 +93,79 @@ function Lightbox({
 // — Thumbnail ——————————————————————————————————————————————————
 function Thumbnail({
   photo,
-  onClick,
+  selected,
+  onToggleSelect,
+  onOpenLightbox,
 }: {
   photo: Photo & { thumbnailUrl: string | null }
-  onClick: () => void
+  selected: boolean
+  onToggleSelect: () => void
+  onOpenLightbox: () => void
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="relative aspect-square rounded-lg overflow-hidden group"
+    <div
+      className="relative aspect-square rounded-lg overflow-hidden"
       style={{ background: '#f0ece6' }}
     >
-      {photo.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photo.thumbnailUrl}
-          alt={photo.label ?? photo.file_name ?? 'Photo'}
-          className="w-full h-full object-cover"
+      {/* Photo — clicks open lightbox */}
+      <button
+        type="button"
+        onClick={onOpenLightbox}
+        className="absolute inset-0 w-full h-full"
+      >
+        {photo.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo.thumbnailUrl}
+            alt={photo.label ?? photo.file_name ?? 'Photo'}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px]">
+            Loading
+          </div>
+        )}
+        {photo.label && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
+            <p className="text-white text-[10px] truncate">{photo.label}</p>
+          </div>
+        )}
+      </button>
+
+      {/* Deselected overlay */}
+      {!selected && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.55)' }}
         />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px]">
-          Loading
-        </div>
       )}
-      {photo.label && (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
-          <p className="text-white text-[10px] truncate">{photo.label}</p>
-        </div>
-      )}
-    </button>
+
+      {/* Selection toggle — top-right corner */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggleSelect() }}
+        className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full flex items-center justify-center transition-all"
+        style={{
+          background: selected ? '#1a1a1a' : 'rgba(255,255,255,0.85)',
+          border: `1.5px solid ${selected ? '#1a1a1a' : 'rgba(0,0,0,0.2)'}`,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+        }}
+      >
+        {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+      </button>
+    </div>
   )
 }
 
 // — PhotosTab ——————————————————————————————————————————————————
-export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
+export function PhotosTab({
+  jobId,
+  tenantId,
+  jobNumber,
+  insuredName,
+  propertyAddress,
+  claimNumber,
+}: PhotosTabProps) {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -131,11 +174,11 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
   const [groups, setGroups] = useState<PhotoGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [lightbox, setLightbox] = useState<{ path: string; label: string | null } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const buildGroups = useCallback(
     async (photos: Photo[]) => {
-      // Generate thumbnail signed URLs (60-min)
       const withUrls = await Promise.all(
         photos.map(async p => {
           const { data } = await supabase.storage
@@ -145,7 +188,6 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
         })
       )
 
-      // Group by inspection_id
       const groupMap = new Map<string, { label: string; photos: typeof withUrls }>()
 
       for (const photo of withUrls) {
@@ -159,7 +201,6 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
         groupMap.get(key)!.photos.push(photo)
       }
 
-      // Put job photos first, then inspections
       const result: PhotoGroup[] = []
       const jobGroup = groupMap.get('__job__')
       if (jobGroup) result.push({ key: '__job__', ...jobGroup })
@@ -169,6 +210,7 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
       }
 
       setGroups(result)
+      setSelectedIds(new Set(photos.map(p => p.id)))
     },
     [supabase]
   )
@@ -189,6 +231,25 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
     load()
   }, [jobId, tenantId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const allPhotos = groups.flatMap(g => g.photos)
+  const totalCount = allPhotos.length
+  const selectedCount = selectedIds.size
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleExportPDF() {
+    if (selectedIds.size === 0) return
+    const ids = [...selectedIds].join(',')
+    window.open(`/print/jobs/${jobId}/photos?ids=${encodeURIComponent(ids)}`, '_blank')
+  }
+
   if (loading) {
     return (
       <div className="py-12 text-center text-[13px] text-[#9e998f]">Loading photos…</div>
@@ -197,23 +258,59 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
 
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      {/* Upload button (stub) */}
-      <div className="flex justify-end mb-5">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors"
-        >
-          <Upload className="h-4 w-4" />
-          Upload photos
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          className="sr-only"
-        />
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 mb-5">
+        {totalCount > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedIds(
+                selectedCount === totalCount
+                  ? new Set()
+                  : new Set(allPhotos.map(p => p.id))
+              )
+            }
+            className="text-[12px] text-[#9e998f] hover:text-[#3a3530] transition-colors"
+          >
+            {selectedCount === totalCount ? 'Deselect all' : 'Select all'}
+          </button>
+        )}
+
+        <div className="flex items-center gap-2 ml-auto">
+          {totalCount > 0 && (
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={selectedCount === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: selectedCount > 0 ? '#1a1a1a' : '#e0dbd4',
+                color: selectedCount > 0 ? '#f5f2ee' : '#9e998f',
+              }}
+            >
+              <FileDown className="h-4 w-4" />
+              Export PDF
+              <span className="text-[11px] opacity-60">
+                {selectedCount}/{totalCount}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            Upload photos
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            className="sr-only"
+          />
+        </div>
       </div>
 
       {groups.length === 0 ? (
@@ -222,9 +319,7 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
         <div className="space-y-8">
           {groups.map(group => (
             <div key={group.key}>
-              <h3
-                className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-3"
-              >
+              <h3 className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-3">
                 {group.label}
               </h3>
               <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
@@ -232,7 +327,9 @@ export function PhotosTab({ jobId, tenantId }: PhotosTabProps) {
                   <Thumbnail
                     key={photo.id}
                     photo={photo}
-                    onClick={() => setLightbox({ path: photo.storage_path, label: photo.label })}
+                    selected={selectedIds.has(photo.id)}
+                    onToggleSelect={() => toggleSelect(photo.id)}
+                    onOpenLightbox={() => setLightbox({ path: photo.storage_path, label: photo.label })}
                   />
                 ))}
               </div>
