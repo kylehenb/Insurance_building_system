@@ -6,9 +6,9 @@ export const dynamic = 'force-dynamic'
 // ── AAI JS Autofill ───────────────────────────────────────────────────────
 const AAI_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
-Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
+Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
-const AAI_JS_TEMPLATE = `// ============================================================
+const AAI_JS_DATA_TEMPLATE = `// ============================================================
 // SUNCORP REPAIR ASSESSMENT REPORT — AUTO-FILL SCRIPT
 // ============================================================
 // INSTRUCTIONS:
@@ -96,9 +96,9 @@ var data = {
   recoveryIdentified:    "",              // "" (leave blank) or "Yes"
   recoveryDetails:       "N/A",              // use "N/A" as default or if unsure
 
-};
+};`
 
-// ============================================================
+const AAI_JS_ENGINE = `// ============================================================
 // AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
 // ============================================================
 
@@ -207,9 +207,9 @@ var data = {
 // ── IAG JS Autofill ───────────────────────────────────────────────────────
 const IAG_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
-Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
+Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
-const IAG_JS_TEMPLATE = `// ============================================================
+const IAG_JS_DATA_TEMPLATE = `// ============================================================
 // IAG ASSESSMENT REPORT — AUTO-FILL SCRIPT
 // ============================================================
 // INSTRUCTIONS:
@@ -397,9 +397,9 @@ var data = {
   insuredAdvised:        "Yes",     // "Yes" or "No" - has the insured been advised of next steps?
   furtherInformation:    "",        // Any further information the insurance company needs to know (property for sale, previous claim, police report, etc.), or "" if none
 
-};
+};`
 
-// ============================================================
+const IAG_JS_ENGINE = `// ============================================================
 // AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
 // ============================================================
 
@@ -536,9 +536,9 @@ var data = {
 // ── A&G JS Autofill ───────────────────────────────────────────────────────
 const AUTO_GENERAL_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
-Return only the complete filled JavaScript script. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
+Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
-const AUTO_GENERAL_JS_TEMPLATE = `// ============================================================
+const AUTO_GENERAL_JS_DATA_TEMPLATE = `// ============================================================
 // A&G BUILDER SITE REPORT — AUTO-FILL SCRIPT
 // ============================================================
 // INSTRUCTIONS:
@@ -709,9 +709,9 @@ var data = {
                                     // Select from: WA Lic. BC12132 | VIC Lic. CDB-U 65461 / CCB-U 57405 |
                                     // NSW Lic. 197071C | QLD Lic. 1202589
 
-};
+};`
 
-// ============================================================
+const AUTO_GENERAL_JS_ENGINE = `// ============================================================
 // AUTO-FILL ENGINE — DO NOT EDIT BELOW THIS LINE
 // ============================================================
 
@@ -947,14 +947,14 @@ These notes cover a full site inspection and may include roof report details, ma
 - Verbal cues like "BAR section", "building report", "starting BAR" indicate content especially relevant to this report.
 
 TEMPLATE TO FILL:
-[${AAI_JS_TEMPLATE}]`,
+[${AAI_JS_DATA_TEMPLATE}]`,
         }],
       })
       const jsContent = jsMessage.content[0]
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, javascript: jsContent.text })
+      return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + AAI_JS_ENGINE })
     }
 
     // ── IAG: JS autofill ─────────────────────────────────────────────────
@@ -980,14 +980,14 @@ These notes cover a full site inspection and may include roof report details, ma
 - Verbal cues like "IAG section", "building report", "starting IAG" indicate content especially relevant to this report.
 
 TEMPLATE TO FILL:
-[${IAG_JS_TEMPLATE}]`,
+[${IAG_JS_DATA_TEMPLATE}]`,
         }],
       })
       const jsContent = jsMessage.content[0]
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, javascript: jsContent.text })
+      return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + IAG_JS_ENGINE })
     }
 
     // ── A&G: JS autofill ─────────────────────────────────────────────────
@@ -1014,14 +1014,14 @@ These notes cover a full site inspection and may include roof report details, ma
 - The "Statement of Objectivity" field (customerDiscussionDetail) should be written in the FIRST PERSON. This is the one exception to the no-first-person rule. Begin with "I met with the Insured - [insuredName] as arranged. The Insured stated that..." and then describe what the insured said and what was observed on site. This is a combined narrative of client discussion AND inspection findings.
 
 TEMPLATE TO FILL:
-[${AUTO_GENERAL_JS_TEMPLATE}]`,
+[${AUTO_GENERAL_JS_DATA_TEMPLATE}]`,
       }],
     })
     const jsContent = jsMessage.content[0]
     if (jsContent.type !== 'text') {
       return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
     }
-    return NextResponse.json({ ok: true, javascript: jsContent.text })
+    return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + AUTO_GENERAL_JS_ENGINE })
 
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
