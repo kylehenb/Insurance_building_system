@@ -132,11 +132,11 @@ export default async function PhotosPrintPage({
               </div>
             </div>
 
-            {/* 3 × 2 photo grid */}
+            {/* 2 × 3 photo grid */}
             <div style={{
               padding: '14px 16px',
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(2, 1fr)',
               gap: '12px 12px',
             }}>
               {pagePhotos.map((photo) => (
