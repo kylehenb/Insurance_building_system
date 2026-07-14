@@ -42,16 +42,26 @@ export async function PATCH(
           ? (rawUpdates.rate_materials as number | null)
           : (current?.rate_materials ?? null)
 
+      // Compute line_total only when we have meaningful rate information.
+      // A single rate of exactly 0 with the other rate still null means the
+      // user has set one side to zero but hasn't entered the other side yet —
+      // we should leave line_total null rather than storing 0 prematurely.
+      // Both rates being non-null (even if one is 0) or at least one non-zero
+      // rate is enough to compute a correct total.
+      const ratesReady =
+        (rateLabour !== null && rateLabour !== 0) ||
+        (rateMaterials !== null && rateMaterials !== 0) ||
+        (rateLabour !== null && rateMaterials !== null)
+
       const lineTotal =
-        qty != null && (rateLabour != null || rateMaterials != null)
+        qty != null && ratesReady
           ? qty * ((rateLabour ?? 0) + (rateMaterials ?? 0))
           : null
 
       updates.line_total = lineTotal
-      updates.rate_total =
-        rateLabour != null || rateMaterials != null
-          ? (rateLabour ?? 0) + (rateMaterials ?? 0)
-          : null
+      updates.rate_total = ratesReady
+        ? (rateLabour ?? 0) + (rateMaterials ?? 0)
+        : null
     }
 
     console.error('Supabase update payload:', JSON.stringify(updates, null, 2))

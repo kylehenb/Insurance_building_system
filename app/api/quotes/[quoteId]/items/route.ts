@@ -56,8 +56,12 @@ export async function POST(
 
   const rateLabour = rate_labour ?? null
   const rateMaterials = rate_materials ?? null
+  const ratesReady =
+    (rateLabour !== null && rateLabour !== 0) ||
+    (rateMaterials !== null && rateMaterials !== 0) ||
+    (rateLabour !== null && rateMaterials !== null)
   const lineTotal =
-    qty != null && (rateLabour != null || rateMaterials != null)
+    qty != null && ratesReady
       ? qty * ((rateLabour ?? 0) + (rateMaterials ?? 0))
       : null
 
@@ -71,10 +75,9 @@ export async function POST(
       qty,
       rate_labour: rateLabour,
       rate_materials: rateMaterials,
-      rate_total:
-        rateLabour != null || rateMaterials != null
-          ? (rateLabour ?? 0) + (rateMaterials ?? 0)
-          : null,
+      rate_total: ratesReady
+        ? (rateLabour ?? 0) + (rateMaterials ?? 0)
+        : null,
       line_total: lineTotal,
       is_custom: (rest.is_custom as boolean | undefined) ?? true,
       ...(rest as object),

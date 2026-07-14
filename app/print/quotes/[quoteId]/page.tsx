@@ -127,8 +127,20 @@ export default async function QuotePrintPage({
     return roomNames.sort((a, b) => a.localeCompare(b))
   })()
 
+  // Compute effective line total from rates — the stored line_total can be stale
+  // if one rate was saved as 0 before the other rate was entered. Recomputing
+  // here ensures the PDF always reflects the correct values.
+  const effectiveLineTotal = (item: ScopeItem): number => {
+    const qty = item.qty
+    const rL = item.rate_labour
+    const rM = item.rate_materials
+    if (qty == null) return item.line_total ?? 0
+    if (rL == null && rM == null) return item.line_total ?? 0
+    return qty * ((rL ?? 0) + (rM ?? 0))
+  }
+
   // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.line_total || 0), 0)
+  const subtotal = items.reduce((sum, item) => sum + effectiveLineTotal(item), 0)
   const markup = subtotal * (quote.markup_pct || 0.2)
   const subtotalAfterMarkup = subtotal + markup
   const gst = subtotalAfterMarkup * (quote.gst_pct || 0.1)
@@ -136,7 +148,7 @@ export default async function QuotePrintPage({
 
   // Calculate room subtotals
   const roomSubtotals = Object.entries(groupedByRoom).reduce((acc, [room, roomItems]) => {
-    acc[room] = roomItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
+    acc[room] = roomItems.reduce((sum, item) => sum + effectiveLineTotal(item), 0)
     return acc
   }, {} as Record<string, number>)
 
@@ -306,7 +318,7 @@ export default async function QuotePrintPage({
                           <td className="py-1.5 px-2 text-center text-[#3a3530]" style={{ width: '5%', fontFamily: 'var(--font-dm-sans)' }}>{item.unit || '-'}</td>
                           <td className="py-1.5 px-2 text-left text-[#3a3530]" style={{ width: '15%', fontFamily: 'var(--font-dm-sans)' }}>{item.trade || '-'}</td>
                           <td className="py-1.5 px-2 text-right text-[#3a3530] font-mono whitespace-nowrap" style={{ width: '15%', fontFamily: 'var(--font-dm-mono)' }}>
-                            {fmt(item.line_total)}
+                            {fmt(effectiveLineTotal(item))}
                           </td>
                         </tr>
                       )
@@ -361,7 +373,7 @@ export default async function QuotePrintPage({
                         }}
                       >
                         <span className="text-[10px] text-[#3a3530]">Provisional Sum Items incl GST</span>
-                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(provisionalSumItems.reduce((sum, i) => sum + effectiveLineTotal(i), 0) * 1.1)}</span>
                       </div>
                     )}
                     {primeCostItems.length > 0 && (
@@ -373,7 +385,7 @@ export default async function QuotePrintPage({
                         }}
                       >
                         <span className="text-[10px] text-[#3a3530]">Prime Cost Items incl GST</span>
-                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * 1.1)}</span>
+                        <span className="font-mono text-[10px] text-[#3a3530]">{fmt(primeCostItems.reduce((sum, i) => sum + effectiveLineTotal(i), 0) * 1.1)}</span>
                       </div>
                     )}
                     {cashSettlementItems.length > 0 && (
@@ -386,7 +398,7 @@ export default async function QuotePrintPage({
                         }}
                       >
                         <span className="text-sm font-semibold text-[#3a3530] uppercase" style={{ fontFamily: 'var(--font-dm-sans)' }}>Cash Settlement Items incl GST and Builder&apos;s margin</span>
-                        <span className="font-mono text-base font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(cashSettlementItems.reduce((sum, i) => sum + (i.line_total || 0), 0) * (1 + (quote.markup_pct || 0.2)) * (1 + (quote.gst_pct || 0.1)))}</span>
+                        <span className="font-mono text-base font-bold text-[#3a3530]" style={{ fontFamily: 'var(--font-dm-mono)' }}>{fmt(cashSettlementItems.reduce((sum, i) => sum + effectiveLineTotal(i), 0) * (1 + (quote.markup_pct || 0.2)) * (1 + (quote.gst_pct || 0.1)))}</span>
                       </div>
                     )}
                   </div>
