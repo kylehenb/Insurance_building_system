@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { X, Upload, FileDown, Check } from 'lucide-react'
+import { X, Upload, FileDown, Check, Loader2 } from 'lucide-react'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Photo {
@@ -14,6 +14,13 @@ interface Photo {
   label: string | null
   file_name: string | null
   uploaded_at: string
+}
+
+interface UploadingPhoto {
+  id: string
+  fileName: string
+  status: 'uploading' | 'error'
+  error?: string
 }
 
 interface PhotoGroup {
@@ -107,7 +114,6 @@ function Thumbnail({
       className="relative aspect-square rounded-lg overflow-hidden"
       style={{ background: '#f0ece6' }}
     >
-      {/* Photo — clicks open lightbox */}
       <button
         type="button"
         onClick={onOpenLightbox}
@@ -132,7 +138,6 @@ function Thumbnail({
         )}
       </button>
 
-      {/* Deselected overlay */}
       {!selected && (
         <div
           className="absolute inset-0 pointer-events-none rounded-lg"
@@ -140,7 +145,6 @@ function Thumbnail({
         />
       )}
 
-      {/* Selection toggle — top-right corner */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleSelect() }}
@@ -153,6 +157,28 @@ function Thumbnail({
       >
         {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
       </button>
+    </div>
+  )
+}
+
+// — UploadingThumbnail ————————————————————————————————————————
+function UploadingThumbnail({ photo }: { photo: UploadingPhoto }) {
+  return (
+    <div
+      className="relative aspect-square rounded-lg overflow-hidden flex flex-col items-center justify-center gap-1"
+      style={{ background: '#f0ece6' }}
+    >
+      {photo.status === 'uploading' ? (
+        <>
+          <Loader2 className="h-5 w-5 text-[#9e998f] animate-spin" />
+          <p className="text-[10px] text-[#9e998f] px-2 text-center truncate w-full">{photo.fileName}</p>
+        </>
+      ) : (
+        <>
+          <X className="h-5 w-5 text-red-400" />
+          <p className="text-[10px] text-red-400 px-2 text-center">Failed</p>
+        </>
+      )}
     </div>
   )
 }
@@ -175,6 +201,8 @@ export function PhotosTab({
   const [loading, setLoading] = useState(true)
   const [lightbox, setLightbox] = useState<{ path: string; label: string | null } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [uploadingPhotos, setUploadingPhotos] = useState<UploadingPhoto[]>([])
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const buildGroups = useCallback(
@@ -231,6 +259,75 @@ export function PhotosTab({
     load()
   }, [jobId, tenantId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const uploadFiles = useCallback(async (files: File[]) => {
+    const imageFiles = files.filter(f => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
+
+    const placeholders: UploadingPhoto[] = imageFiles.map(file => ({
+      id: `uploading-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      fileName: file.name,
+      status: 'uploading' as const,
+    }))
+
+    setUploadingPhotos(prev => [...prev, ...placeholders])
+
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i]
+      const placeholder = placeholders[i]
+
+      try {
+        const ext = file.name.split('.').pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+        const filePath = `${tenantId}/${jobId}/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('photos')
+          .upload(filePath, file, { upsert: false })
+
+        if (uploadError) throw uploadError
+
+        const { data: photoData, error: dbError } = await supabase
+          .from('photos')
+          .insert({
+            tenant_id: tenantId,
+            job_id: jobId,
+            storage_path: filePath,
+            file_name: file.name,
+          })
+          .select('id,tenant_id,job_id,inspection_id,storage_path,label,file_name,uploaded_at')
+          .single()
+
+        if (dbError) throw dbError
+
+        const { data: signedUrlData } = await supabase.storage
+          .from('photos')
+          .createSignedUrl(filePath, 3600)
+
+        setUploadingPhotos(prev => prev.filter(p => p.id !== placeholder.id))
+
+        const newPhoto = { ...(photoData as Photo), thumbnailUrl: signedUrlData?.signedUrl ?? null }
+        setGroups(prev => {
+          const jobGroupIndex = prev.findIndex(g => g.key === '__job__')
+          if (jobGroupIndex >= 0) {
+            const updated = [...prev]
+            updated[jobGroupIndex] = {
+              ...updated[jobGroupIndex],
+              photos: [...updated[jobGroupIndex].photos, newPhoto],
+            }
+            return updated
+          }
+          return [...prev, { key: '__job__', label: 'Job Photos', photos: [newPhoto] }]
+        })
+        setSelectedIds(prev => new Set([...prev, (photoData as Photo).id]))
+      } catch (error) {
+        console.error('Upload error:', error)
+        setUploadingPhotos(prev =>
+          prev.map(p => p.id === placeholder.id ? { ...p, status: 'error' as const } : p)
+        )
+      }
+    }
+  }, [supabase, tenantId, jobId])
+
   const allPhotos = groups.flatMap(g => g.photos)
   const totalCount = allPhotos.length
   const selectedCount = selectedIds.size
@@ -250,14 +347,61 @@ export function PhotosTab({
     window.open(`/print/jobs/${jobId}/photos?ids=${encodeURIComponent(ids)}`, '_blank')
   }
 
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    uploadFiles(Array.from(files))
+    e.target.value = ''
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    if (Array.from(e.dataTransfer.types).includes('Files')) {
+      setIsDraggingFile(true)
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingFile(false)
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDraggingFile(false)
+    const files = Array.from(e.dataTransfer.files)
+    uploadFiles(files)
+  }
+
   if (loading) {
     return (
       <div className="py-12 text-center text-[13px] text-[#9e998f]">Loading photos…</div>
     )
   }
 
+  const hasContent = groups.length > 0 || uploadingPhotos.length > 0
+
   return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
+    <div
+      style={{ fontFamily: 'DM Sans, sans-serif' }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDraggingFile && (
+        <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center"
+          style={{ background: 'rgba(245,242,238,0.85)' }}
+        >
+          <div className="flex flex-col items-center gap-3 text-[#3a3530]">
+            <Upload className="h-10 w-10" />
+            <p className="text-[15px] font-medium">Drop photos to upload</p>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-5">
         {totalCount > 0 && (
@@ -309,12 +453,19 @@ export function PhotosTab({
             multiple
             accept="image/*"
             className="sr-only"
+            onChange={handleFileInputChange}
           />
         </div>
       </div>
 
-      {groups.length === 0 ? (
-        <div className="py-16 text-center text-[13px] text-[#9e998f]">No photos yet</div>
+      {!hasContent ? (
+        <div
+          className="py-16 flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors"
+          style={{ borderColor: '#e0dbd4', color: '#9e998f' }}
+        >
+          <Upload className="h-8 w-8 opacity-40" />
+          <p className="text-[13px]">No photos yet — drag &amp; drop or click Upload photos</p>
+        </div>
       ) : (
         <div className="space-y-8">
           {groups.map(group => (
@@ -335,6 +486,19 @@ export function PhotosTab({
               </div>
             </div>
           ))}
+
+          {uploadingPhotos.length > 0 && (
+            <div>
+              <h3 className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-3">
+                Uploading
+              </h3>
+              <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                {uploadingPhotos.map(p => (
+                  <UploadingThumbnail key={p.id} photo={p} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
