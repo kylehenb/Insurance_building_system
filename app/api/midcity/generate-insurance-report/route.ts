@@ -62,7 +62,7 @@ var data = {
   customerConversationTemplate: "Storm - Client Discussion",
   customerConversationDetail: "",   // Plain text outlining what the customer or homeowner or insured is claiming or what they have said
   // Rich text - general observations (MCE editor):
-  generalObservations:   "",   // Leave blank unless specific additional notes or notable observations impact the report or claim.
+  generalObservations:   "",   // Leave blank ("") in the vast majority of cases. Only populate if there is a specific, relevant observation that has NOT been mentioned anywhere else in the report and is genuinely important for the insurer to know. Do NOT include anything about the roof, anything the customer said, damage descriptions, cause of damage, or anything already covered in any other field. If in doubt, leave blank.
 
   // ── MAKESAFE / RESTORATION ────────────────────────────────
   makesafeActioned:      "No",              // "Yes" or "No", use "No" as default or if unsure
@@ -139,7 +139,7 @@ const AAI_JS_ENGINE = `// ======================================================
 
   function setMCE(editorId, text) {
     if (!text) return;
-    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split(String.fromCharCode(10)).join('<br>') + '</p>';
     var prefix = editorId.split('_').slice(0, 2).join('_');
     if (typeof tinymce !== 'undefined') {
       var eds = tinymce.editors;
@@ -177,7 +177,7 @@ const AAI_JS_ENGINE = `// ======================================================
   if (data.preventativeMeasures)           setVal(f[23], data.preventativeMeasures);
   if (data.customerKnowledgeEvidence)      setVal(f[25], data.customerKnowledgeEvidence);
   setSelectByText(f[26], data.customerConversationTemplate);
-  setMCE('mceEditor_435', data.generalObservations);
+  setMCE('mceEditor_435', data.customerConversationDetail);
   if (data.makesafeActioned === 'Yes') setRadio('ko_unique_7', 'Yes');
   if (data.makesafeActioned === 'No')  setRadio('ko_unique_8', 'No');
   if (data.makesafeDetails)            setVal(f[31], data.makesafeDetails);
@@ -444,7 +444,7 @@ const IAG_JS_ENGINE = `// ======================================================
 
   function setMCE(index, text) {
     if (!text) return;
-    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split(String.fromCharCode(10)).join('<br>') + '</p>';
     if (typeof tinymce !== 'undefined') {
       var eds = tinymce.editors;
       var edArr = Array.isArray(eds) ? eds : Object.values(eds);
@@ -778,7 +778,7 @@ function runFormFill(specs, opts) {
     if (!cg || !text) return;
     var ta = cg.querySelector('textarea[id^="mceEditor_"]');
     if (!ta) { issues.push('MCE textarea missing in companion group'); return; }
-    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split(String.fromCharCode(10)).join('<br>') + '</p>';
     if (typeof tinymce !== 'undefined') {
       var ed = tinymce.get(ta.id);
       if (ed) { ed.setContent(html); ed.save(); return; }
