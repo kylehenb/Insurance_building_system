@@ -6,6 +6,10 @@ export const dynamic = 'force-dynamic'
 // ── AAI JS Autofill ───────────────────────────────────────────────────────
 const AAI_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
 
+FORMATTING RULES — apply to all generated field values without exception:
+- Always use numerals, never number words: write "2" not "two", "7" not "seven", "15" not "fifteen", "1" not "one", etc.
+- Measurements must use standard abbreviations: "LM" for linear metres / lineal metres, "M2" for square metres, "M3" for cubic metres, "mm" for millimetres, "m" for metres, "cm" for centimetres
+
 Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
 const AAI_JS_DATA_TEMPLATE = `// ============================================================
@@ -133,8 +137,9 @@ const AAI_JS_ENGINE = `// ======================================================
     }
   }
 
-  function setMCE(editorId, html) {
-    if (!html) return;
+  function setMCE(editorId, text) {
+    if (!text) return;
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
     var prefix = editorId.split('_').slice(0, 2).join('_');
     if (typeof tinymce !== 'undefined') {
       var eds = tinymce.editors;
@@ -149,7 +154,7 @@ const AAI_JS_ENGINE = `// ======================================================
       }
     }
     var ta = container.querySelector('textarea[id^="' + prefix + '"]');
-    if (ta) setVal(ta, html);
+    if (ta) setVal(ta, text);
   }
 
   if (data.reportDate)               setVal(f[0],  data.reportDate);
@@ -206,6 +211,10 @@ const AAI_JS_ENGINE = `// ======================================================
 
 // ── IAG JS Autofill ───────────────────────────────────────────────────────
 const IAG_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
+
+FORMATTING RULES — apply to all generated field values without exception:
+- Always use numerals, never number words: write "2" not "two", "7" not "seven", "15" not "fifteen", "1" not "one", etc.
+- Measurements must use standard abbreviations: "LM" for linear metres / lineal metres, "M2" for square metres, "M3" for cubic metres, "mm" for millimetres, "m" for metres, "cm" for centimetres
 
 Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
@@ -433,8 +442,9 @@ const IAG_JS_ENGINE = `// ======================================================
     }
   }
 
-  function setMCE(index, html) {
-    if (!html) return;
+  function setMCE(index, text) {
+    if (!text) return;
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
     if (typeof tinymce !== 'undefined') {
       var eds = tinymce.editors;
       var edArr = Array.isArray(eds) ? eds : Object.values(eds);
@@ -445,7 +455,7 @@ const IAG_JS_ENGINE = `// ======================================================
       }
     }
     var tas = container.querySelectorAll('textarea');
-    if (tas[index]) setVal(tas[index], html);
+    if (tas[index]) setVal(tas[index], text);
   }
 
   // ── BASIC INFORMATION ─────────────────────────────────────
@@ -535,6 +545,10 @@ const IAG_JS_ENGINE = `// ======================================================
 
 // ── A&G JS Autofill ───────────────────────────────────────────────────────
 const AUTO_GENERAL_JS_SYSTEM = `You are an expert building inspector in Perth, Australia. Write formal, factual insurance building assessment reports. Your style must be cold, clinical and professional - no first person language except where the format explicitly requires it. Never use phrases like "I observed", "it appears", "I believe", or "I noted". Never speculate beyond what the evidence supports. Do not include any em dashes - use hyphens or alternative punctuation instead.
+
+FORMATTING RULES — apply to all generated field values without exception:
+- Always use numerals, never number words: write "2" not "two", "7" not "seven", "15" not "fifteen", "1" not "one", etc.
+- Measurements must use standard abbreviations: "LM" for linear metres / lineal metres, "M2" for square metres, "M3" for cubic metres, "mm" for millimetres, "m" for metres, "cm" for centimetres
 
 Return only the filled data section — from the opening comment block through the closing }; line. Stop before and do not output anything after the AUTO-FILL ENGINE marker. No preamble, no markdown code fences, no explanation - just the raw JavaScript.`
 
@@ -760,15 +774,16 @@ function runFormFill(specs, opts) {
     }
     issues.push('Option not found: "' + text + '"');
   }
-  function setMce(cg, html) {
-    if (!cg || !html) return;
+  function setMce(cg, text) {
+    if (!cg || !text) return;
     var ta = cg.querySelector('textarea[id^="mceEditor_"]');
     if (!ta) { issues.push('MCE textarea missing in companion group'); return; }
+    var html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>';
     if (typeof tinymce !== 'undefined') {
       var ed = tinymce.get(ta.id);
       if (ed) { ed.setContent(html); ed.save(); return; }
     }
-    setVal(ta, html);
+    setVal(ta, text);
   }
 
   specs.forEach(function(spec) {
