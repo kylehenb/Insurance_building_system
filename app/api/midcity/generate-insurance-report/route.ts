@@ -122,7 +122,7 @@ const AAI_JS_ENGINE = `// ======================================================
   }
 
   function setSelectByText(selectEl, text) {
-    if (!selectEl || !text) return;
+    if (!selectEl || !text || !selectEl.options) return;
     for (var i = 0; i < selectEl.options.length; i++) {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value;
@@ -422,7 +422,7 @@ const IAG_JS_ENGINE = `// ======================================================
   }
 
   function setSelectByText(selectEl, text) {
-    if (!selectEl || !text) return;
+    if (!selectEl || !text || !selectEl.options) return;
     for (var i = 0; i < selectEl.options.length; i++) {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value;
@@ -750,7 +750,7 @@ function runFormFill(specs, opts) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
   function setSelectByText(selectEl, text) {
-    if (!selectEl || !text) return;
+    if (!selectEl || !text || !selectEl.options) return;
     for (var i = 0; i < selectEl.options.length; i++) {
       if (selectEl.options[i].text.trim() === text) {
         selectEl.value = selectEl.options[i].value; selectEl.selectedIndex = i;
