@@ -880,6 +880,10 @@ else console.log('Auto-fill complete — no issues detected (' + result.fieldsPr
 
 })();`
 
+function stripMarkdownFences(text: string): string {
+  return text.replace(/^```(?:javascript)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
+}
+
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -954,7 +958,7 @@ TEMPLATE TO FILL:
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + AAI_JS_ENGINE })
+      return NextResponse.json({ ok: true, javascript: stripMarkdownFences(jsContent.text) + '\n\n' + AAI_JS_ENGINE })
     }
 
     // ── IAG: JS autofill ─────────────────────────────────────────────────
@@ -987,7 +991,7 @@ TEMPLATE TO FILL:
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + IAG_JS_ENGINE })
+      return NextResponse.json({ ok: true, javascript: stripMarkdownFences(jsContent.text) + '\n\n' + IAG_JS_ENGINE })
     }
 
     // ── A&G: JS autofill ─────────────────────────────────────────────────
@@ -1021,7 +1025,7 @@ TEMPLATE TO FILL:
     if (jsContent.type !== 'text') {
       return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
     }
-    return NextResponse.json({ ok: true, javascript: jsContent.text.trimEnd() + '\n\n' + AUTO_GENERAL_JS_ENGINE })
+    return NextResponse.json({ ok: true, javascript: stripMarkdownFences(jsContent.text) + '\n\n' + AUTO_GENERAL_JS_ENGINE })
 
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
