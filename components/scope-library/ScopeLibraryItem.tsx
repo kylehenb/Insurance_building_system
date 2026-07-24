@@ -67,7 +67,6 @@ export function ScopeLibraryItemRow({
   const [unit, setUnit] = useState(item.unit ?? '')
   const [labour, setLabour] = useState(item.labour_per_unit !== null ? String(item.labour_per_unit) : '')
   const [materials, setMaterials] = useState(item.materials_per_unit !== null ? String(item.materials_per_unit) : '')
-  const [total, setTotal] = useState(item.total_per_unit !== null ? String(item.total_per_unit) : '')
   const [estHrs, setEstHrs] = useState(item.estimated_hours !== null ? String(item.estimated_hours) : '')
   const [keyword, setKeyword] = useState(item.keyword ?? '')
   const [siteNotes, setSiteNotes] = useState(item.site_notes ?? '')
@@ -94,12 +93,15 @@ export function ScopeLibraryItemRow({
     }
   }
 
-  function handlePriceBlur(field: 'labour' | 'materials' | 'total', value: string) {
+  function handlePriceBlur(field: 'labour' | 'materials', value: string) {
     const numVal = value === '' ? null : parseFloat(value) || null
     const payload: Record<string, unknown> = {}
     if (field === 'labour') payload.labour_per_unit = numVal
     else if (field === 'materials') payload.materials_per_unit = numVal
-    else if (field === 'total') payload.total_per_unit = numVal
+
+    const labourNum = field === 'labour' ? numVal : (labour === '' ? null : parseFloat(labour) || null)
+    const materialsNum = field === 'materials' ? numVal : (materials === '' ? null : parseFloat(materials) || null)
+    payload.total_per_unit = labourNum !== null || materialsNum !== null ? (labourNum ?? 0) + (materialsNum ?? 0) : null
 
     if (!priceManuallyEdited) {
       payload.price_updated_at = today
@@ -276,17 +278,13 @@ export function ScopeLibraryItemRow({
           />
         </div>
 
-        {/* Total */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <input
-            type="number"
-            step="0.01"
-            value={total}
-            onChange={(e) => setTotal(e.target.value)}
-            onBlur={() => handlePriceBlur('total', total)}
-            className={`${inputClass} font-semibold`}
-            placeholder="—"
-          />
+        {/* Total (computed) */}
+        <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+          {(() => {
+            const l = labour === '' ? null : parseFloat(labour) || null
+            const m = materials === '' ? null : parseFloat(materials) || null
+            return l !== null || m !== null ? ((l ?? 0) + (m ?? 0)).toFixed(2) : '—'
+          })()}
         </div>
 
         {/* Est hrs */}

@@ -32,9 +32,6 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
   const [materials, setMaterials] = useState(
     override.materials_per_unit !== null ? String(override.materials_per_unit) : ''
   )
-  const [total, setTotal] = useState(
-    override.total_per_unit !== null ? String(override.total_per_unit) : ''
-  )
   const [wordingSingle, setWordingSingle] = useState(override.wording_single ?? '')
   const [wordingLabour, setWordingLabour] = useState(override.wording_labour ?? '')
   const [wordingMaterials, setWordingMaterials] = useState(override.wording_materials ?? '')
@@ -49,10 +46,17 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
     setSaving(true)
     const payload: Partial<ScopeLibraryOverride> = {}
 
-    if (field === 'labour') payload.labour_per_unit = value === '' ? null : parseFloat(value as string) || null
-    else if (field === 'materials') payload.materials_per_unit = value === '' ? null : parseFloat(value as string) || null
-    else if (field === 'total') payload.total_per_unit = value === '' ? null : parseFloat(value as string) || null
-    else if (field === 'wording_single') payload.wording_single = (value as string) || null
+    if (field === 'labour') {
+      payload.labour_per_unit = value === '' ? null : parseFloat(value as string) || null
+      const materialsNum = materials === '' ? null : parseFloat(materials) || null
+      const labourNum = payload.labour_per_unit as number | null
+      payload.total_per_unit = labourNum !== null || materialsNum !== null ? (labourNum ?? 0) + (materialsNum ?? 0) : null
+    } else if (field === 'materials') {
+      payload.materials_per_unit = value === '' ? null : parseFloat(value as string) || null
+      const labourNum = labour === '' ? null : parseFloat(labour) || null
+      const materialsNum = payload.materials_per_unit as number | null
+      payload.total_per_unit = labourNum !== null || materialsNum !== null ? (labourNum ?? 0) + (materialsNum ?? 0) : null
+    } else if (field === 'wording_single') payload.wording_single = (value as string) || null
     else if (field === 'wording_labour') payload.wording_labour = (value as string) || null
     else if (field === 'wording_materials') payload.wording_materials = (value as string) || null
 
@@ -136,16 +140,14 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
         placeholder="—"
       />
 
-      {/* Total */}
-      <input
-        type="number"
-        step="0.01"
-        value={total}
-        onChange={(e) => setTotal(e.target.value)}
-        onBlur={() => handleBlur('total', total)}
-        className={`${inputClass} font-semibold`}
-        placeholder="—"
-      />
+      {/* Total (computed) */}
+      <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+        {(() => {
+          const l = labour === '' ? null : parseFloat(labour) || null
+          const m = materials === '' ? null : parseFloat(materials) || null
+          return l !== null || m !== null ? ((l ?? 0) + (m ?? 0)).toFixed(2) : '—'
+        })()}
+      </div>
 
       {/* Split toggle */}
       <div className="flex justify-center">
@@ -230,16 +232,14 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
         placeholder="—"
       />
 
-      {/* Total */}
-      <input
-        type="number"
-        step="0.01"
-        value={total}
-        onChange={(e) => setTotal(e.target.value)}
-        onBlur={() => handleBlur('total', total)}
-        className={`${inputClass} font-semibold`}
-        placeholder="—"
-      />
+      {/* Total (computed) */}
+      <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+        {(() => {
+          const l = labour === '' ? null : parseFloat(labour) || null
+          const m = materials === '' ? null : parseFloat(materials) || null
+          return l !== null || m !== null ? ((l ?? 0) + (m ?? 0)).toFixed(2) : '—'
+        })()}
+      </div>
 
       <div />
       <div />

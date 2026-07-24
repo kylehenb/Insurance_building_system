@@ -21,6 +21,59 @@ interface ScopeItem {
   unit: string
 }
 
+interface LibraryItem {
+  id: string
+  trade: string | null
+  keyword: string | null
+  item_description: string | null
+  unit: string | null
+  labour_per_unit: number | null
+  materials_per_unit: number | null
+  total_per_unit: number | null
+  trade_rate_total: number | null
+  estimated_hours: number | null
+}
+
+const LIBRARY_MATCH_THRESHOLD = 0.55
+
+function normalizeStr(s: string | null | undefined): string {
+  return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
+}
+
+function wordOverlapScore(a: string, b: string): number {
+  const ta = new Set(a.split(/\s+/).filter(Boolean))
+  const tb = new Set(b.split(/\s+/).filter(Boolean))
+  if (ta.size === 0 || tb.size === 0) return 0
+  const intersection = [...ta].filter(t => tb.has(t)).length
+  return intersection / Math.max(ta.size, tb.size)
+}
+
+function computeLibraryMatchScore(parsed: ScopeItem, lib: LibraryItem): number {
+  let score = 0
+  const pk = normalizeStr(parsed.keyword)
+  const lk = normalizeStr(lib.keyword)
+  if (pk && lk) {
+    if (pk === lk) score += 0.55
+    else if (pk.includes(lk) || lk.includes(pk)) score += 0.35
+    else score += 0.2 * wordOverlapScore(pk, lk)
+  }
+  score += 0.3 * wordOverlapScore(normalizeStr(parsed.item_description), normalizeStr(lib.item_description))
+  const pt = normalizeStr(parsed.trade)
+  const lt = normalizeStr(lib.trade)
+  if (pt && lt && pt === lt) score += 0.15
+  return score
+}
+
+function findBestLibraryMatch(parsed: ScopeItem, library: LibraryItem[]): LibraryItem | null {
+  let best: LibraryItem | null = null
+  let bestScore = 0
+  for (const lib of library) {
+    const s = computeLibraryMatchScore(parsed, lib)
+    if (s > bestScore) { bestScore = s; best = lib }
+  }
+  return bestScore >= LIBRARY_MATCH_THRESHOLD ? best : null
+}
+
 async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: string; lossType: string }, tenantId: string, service: any): Promise<ScopeItem[]> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -488,19 +541,38 @@ Return ONLY a JSON object with these exact keys (empty string or null if unknown
 
           let sortOrder = (maxSort?.sort_order ?? 0) + 1
 
-          const inserts = itemsToInsert.map(item => ({
-            tenant_id: tenantId,
-            quote_id: resolvedQuoteId as string,
-            room: item.room || null,
-            trade: item.trade || null,
-            keyword: item.keyword || null,
-            item_description: item.item_description || null,
-            qty: item.qty ?? null,
-            unit: item.unit || null,
-            is_custom: true,
-            approval_status: 'pending',
-            sort_order: sortOrder++,
-          }))
+          // Fetch scope library for auto-matching
+          const { data: libData } = await service
+            .from('scope_library')
+            .select('id, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, total_per_unit, trade_rate_total, estimated_hours')
+            .eq('tenant_id', tenantId)
+            .neq('approval_status', 'archived')
+          const library: LibraryItem[] = libData ?? []
+
+          const inserts = itemsToInsert.map(item => {
+            const match = library.length > 0 ? findBestLibraryMatch(item, library) : null
+            return {
+              tenant_id: tenantId,
+              quote_id: resolvedQuoteId as string,
+              room: item.room || null,
+              trade: item.trade || null,
+              keyword: item.keyword || null,
+              item_description: item.item_description || null,
+              qty: item.qty ?? null,
+              unit: match?.unit || item.unit || null,
+              is_custom: !match,
+              approval_status: 'pending',
+              sort_order: sortOrder++,
+              ...(match ? {
+                scope_library_id: match.id,
+                rate_labour: match.labour_per_unit,
+                rate_materials: match.materials_per_unit,
+                rate_total: match.total_per_unit,
+                trade_rate_total: match.trade_rate_total,
+                estimated_hours: match.estimated_hours,
+              } : {}),
+            }
+          })
 
           const { error: insertErr } = await service.from('scope_items').insert(inserts)
           if (insertErr) {
