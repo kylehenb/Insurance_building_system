@@ -388,7 +388,7 @@ export function generateBuildingContractHtml(params: {
      PRINT BUTTON (hidden on print)
 ═══════════════════════════════════════════════════════════════ -->
 <div class="no-print" style="position:fixed;top:12px;right:12px;z-index:999;">
-  <button onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 20px;font-size:13px;cursor:pointer;border-radius:4px;font-family:Arial;">
+  <button onclick="(function(){ var t = document.title; document.title = '${job.job_number ? `DOC-${job.job_number}` : 'Building Contract'}'; window.print(); document.title = t; })()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 20px;font-size:13px;cursor:pointer;border-radius:4px;font-family:Arial;">
     🖨 Print / Save PDF
   </button>
 </div>

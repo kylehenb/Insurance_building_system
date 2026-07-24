@@ -1,9 +1,9 @@
 'use client'
 
-export function SowPreviewPrintButton({ jobNumber }: { jobNumber?: string | null }) {
+export function SowPreviewPrintButton({ quoteRef }: { quoteRef?: string | null }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    document.title = `${jobNumber || 'Job'}-SOW`
+    document.title = quoteRef ? `${quoteRef}-Auth` : 'SOW-Auth'
     window.print()
     document.title = originalTitle
   }

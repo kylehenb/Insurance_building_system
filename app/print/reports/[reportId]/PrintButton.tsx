@@ -1,13 +1,5 @@
 'use client'
 
-const REPORT_TYPE_LABELS: Record<string, string> = {
-  roof: 'Roof Report',
-  BAR: 'Building Assessment Report',
-  storm_wind: 'Building Assessment Report',
-  LDR: 'Leak Detection Report',
-  make_safe: 'Make Safe Report',
-}
-
 export function PrintButton({
   reportRef,
   jobNumber,
@@ -27,12 +19,7 @@ export function PrintButton({
 }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    const typeLabel = (reportType && REPORT_TYPE_LABELS[reportType]) || 'Report'
-    const parts = [insuredName, propertyAddress, insurer, claimNumber].filter(Boolean)
-    const filename = parts.length > 0
-      ? `${typeLabel} - ${parts.join(', ')}`
-      : `${typeLabel} - ${reportRef || jobNumber || 'Report'}`
-    document.title = filename
+    document.title = reportRef || 'Report'
     window.print()
     document.title = originalTitle
   }

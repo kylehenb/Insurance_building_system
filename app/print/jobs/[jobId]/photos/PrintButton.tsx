@@ -9,8 +9,7 @@ export function PrintButton({
 }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    const parts = ['Photos', jobNumber, insuredName].filter(Boolean)
-    document.title = parts.join(' - ')
+    document.title = jobNumber ? `Photos-${jobNumber}` : 'Photos'
     window.print()
     document.title = originalTitle
   }

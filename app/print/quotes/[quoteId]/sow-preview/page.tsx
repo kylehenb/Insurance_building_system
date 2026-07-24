@@ -122,7 +122,7 @@ export default async function SowPreviewPage({
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 print:p-0">
-        <SowPreviewPrintButton jobNumber={job.job_number} />
+        <SowPreviewPrintButton quoteRef={quote.quote_ref} />
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>

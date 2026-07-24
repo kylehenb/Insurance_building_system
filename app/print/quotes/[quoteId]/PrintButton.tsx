@@ -3,8 +3,7 @@
 export function PrintButton({ quoteRef, jobNumber }: { quoteRef?: string | null; jobNumber?: string | null }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    const filename = quoteRef || jobNumber || 'Quote'
-    document.title = `Quote - ${filename}`
+    document.title = quoteRef || 'Quote'
     window.print()
     document.title = originalTitle
   }

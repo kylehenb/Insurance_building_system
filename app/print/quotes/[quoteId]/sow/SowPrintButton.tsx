@@ -1,9 +1,9 @@
 'use client'
 
-export function SowPrintButton({ jobNumber }: { jobNumber?: string | null }) {
+export function SowPrintButton({ quoteRef }: { quoteRef?: string | null }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    document.title = `${jobNumber || 'Job'}-SOW`
+    document.title = quoteRef ? `${quoteRef}-SOW` : 'SOW'
     window.print()
     document.title = originalTitle
   }

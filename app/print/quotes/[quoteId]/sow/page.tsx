@@ -131,7 +131,7 @@ export default async function SowPrintPage({
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0">
-        <SowPrintButton jobNumber={job.job_number} />
+        <SowPrintButton quoteRef={quote.quote_ref} />
         <SendForSignatureButton quoteId={quoteId} insuredEmail={job.insured_email ?? null} />
 
         {/* Header - 3-column grid */}

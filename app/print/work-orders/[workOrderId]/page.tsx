@@ -220,7 +220,7 @@ export default async function WorkOrderPrintPage({
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0 relative">
         {/* Print button - hidden when printing */}
         <div className="no-print absolute top-4 right-4 z-10 print:hidden">
-          <WorkOrderPrintButton />
+          <WorkOrderPrintButton workOrderRef={workOrder.work_order_ref} />
         </div>
 
         {/* Render HTML */}

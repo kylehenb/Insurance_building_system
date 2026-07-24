@@ -4,7 +4,7 @@ export function InvoicePrintButton({ invoiceRef }: { invoiceRef?: string | null 
   const handlePrint = () => {
     const originalTitle = document.title
     if (invoiceRef) {
-      document.title = `Invoice-${invoiceRef}`
+      document.title = invoiceRef
     }
     window.print()
     document.title = originalTitle
