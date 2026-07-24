@@ -2,19 +2,74 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 
+const DEFAULT_TRADE_TYPES = [
+  'Brick Layer',
+  'Brick Paver',
+  'Builder',
+  'Cabinet Maker',
+  'Carpenter',
+  'Carpet Layer',
+  'Ceiling Fixer',
+  'Cleaner',
+  'Demolition',
+  'Electrician',
+  'Fencer',
+  'Floorer',
+  'Glazier',
+  'Painter',
+  'Plasterer',
+  'Plumber',
+  'Removalist',
+  'Restorer',
+  'Roof Plumber',
+  'Roof Tiler',
+  'Tiler',
+]
+
 export async function GET() {
   const userSession = await getUser()
   if (!userSession?.tenant_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
+  const tenantId = userSession.tenant_id
+
+  const { data: existing, error } = await supabase
     .from('trade_type_sequence')
     .select('id, trade_type')
-    .eq('tenant_id', userSession.tenant_id)
-    .order('trade_type', { ascending: true })
+    .eq('tenant_id', tenantId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  const existingNames = new Set((existing ?? []).map(r => r.trade_type.toLowerCase()))
+  const missing = DEFAULT_TRADE_TYPES.filter(t => !existingNames.has(t.toLowerCase()))
+
+  if (missing.length > 0) {
+    await supabase
+      .from('trade_type_sequence')
+      .insert(missing.map(trade_type => ({
+        tenant_id: tenantId,
+        trade_type,
+        typical_sequence_order: null,
+        typical_visit_count: 1,
+        notes: null,
+        typical_depends_on: [],
+        typical_comes_before: [],
+        typically_paired_with: [],
+        can_run_concurrent_with: [],
+        cant_run_concurrent_with: [],
+        typical_lag_days: 0,
+        lag_description: null,
+      })) as any)
+  }
+
+  const { data: all, error: fetchError } = await supabase
+    .from('trade_type_sequence')
+    .select('id, trade_type')
+    .eq('tenant_id', tenantId)
+    .order('trade_type', { ascending: true })
+
+  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 })
+  return NextResponse.json(all ?? [])
 }
 
 export async function POST(req: NextRequest) {
