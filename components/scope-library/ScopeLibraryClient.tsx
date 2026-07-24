@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { ScopeLibraryItem, InsurersOption, PricingTiers } from '@/lib/types/scope-library'
 import { ScopeLibraryItemRow } from './ScopeLibraryItem'
 import { ScopeLibraryDraftItem } from './ScopeLibraryDraftItem'
 import { ScopeLibraryImportModal } from './ScopeLibraryImportModal'
+
+interface TradeTypeRecord {
+  id: string
+  trade_type: string
+}
 
 interface Props {
   tenantId: string
@@ -25,6 +30,7 @@ interface NewItemForm {
 
 export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) {
   const [items, setItems] = useState<ScopeLibraryItem[]>(initialItems)
+  const [tradeTypes, setTradeTypes] = useState<string[]>([])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState({ trade: '', search: '' })
   const [showImport, setShowImport] = useState(false)
@@ -40,6 +46,12 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
     total_per_unit: '',
     estimated_hours: '',
   })
+
+  useEffect(() => {
+    fetch('/api/settings/trade-types')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: TradeTypeRecord[]) => setTradeTypes(data.map((t) => t.trade_type)))
+  }, [])
 
   const refresh = useCallback(async () => {
     const params = new URLSearchParams()
@@ -113,8 +125,10 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
     })
   }
 
-  // Unique trades from items
-  const allTrades = Array.from(new Set(items.map((i) => i.trade ?? ''))).filter(Boolean).sort()
+  // Trades for filter: all current trade types + any orphaned item trades not in that list
+  const itemTrades = Array.from(new Set(items.map((i) => i.trade ?? ''))).filter(Boolean)
+  const orphanedTrades = itemTrades.filter((t) => !tradeTypes.includes(t))
+  const allTrades = [...tradeTypes, ...orphanedTrades].sort()
 
   // Apply client-side filter
   const filteredItems = items.filter((item) => {
@@ -197,13 +211,16 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
             </div>
             <div>
               <label className="block text-xs font-medium text-[#3a3530] mb-1">Trade</label>
-              <input
-                type="text"
+              <select
                 value={newItem.trade}
                 onChange={(e) => setNewItem((f) => ({ ...f, trade: e.target.value }))}
-                placeholder="e.g. Roofing"
                 className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#c9a96e]"
-              />
+              >
+                <option value="">— No trade —</option>
+                {tradeTypes.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-[#3a3530] mb-1">Keyword</label>
@@ -330,6 +347,7 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
                 key={item.id}
                 item={item}
                 tenantId={tenantId}
+                tradeTypes={tradeTypes}
                 onApprove={() => {
                   refresh()
                 }}

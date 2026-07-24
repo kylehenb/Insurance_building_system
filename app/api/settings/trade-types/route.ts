@@ -127,6 +127,12 @@ export async function PATCH(req: NextRequest) {
   if (seqError) return NextResponse.json({ error: seqError.message }, { status: 500 })
 
   await supabase
+    .from('scope_library')
+    .update({ trade: newName })
+    .eq('tenant_id', tenantId)
+    .eq('trade', oldName)
+
+  await supabase
     .from('trades')
     .update({ primary_trade: newName })
     .eq('tenant_id', tenantId)
@@ -176,6 +182,12 @@ export async function DELETE(req: NextRequest) {
     .eq('trade_type', tradeType)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await supabase
+    .from('scope_library')
+    .update({ trade: null })
+    .eq('tenant_id', tenantId)
+    .eq('trade', tradeType)
 
   return NextResponse.json({ ok: true, in_use_count: count ?? 0 })
 }

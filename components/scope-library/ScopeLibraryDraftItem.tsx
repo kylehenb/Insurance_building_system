@@ -6,11 +6,12 @@ import type { ScopeLibraryItem } from '@/lib/types/scope-library'
 interface Props {
   item: ScopeLibraryItem
   tenantId: string
+  tradeTypes: string[]
   onApprove: () => void
   onDiscard: () => void
 }
 
-export function ScopeLibraryDraftItem({ item, tenantId, onApprove, onDiscard }: Props) {
+export function ScopeLibraryDraftItem({ item, tenantId, tradeTypes, onApprove, onDiscard }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [approving, setApproving] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -92,13 +93,19 @@ export function ScopeLibraryDraftItem({ item, tenantId, onApprove, onDiscard }: 
             </div>
             <div>
               <label className="block text-xs font-medium text-[#3a3530] mb-1">Trade</label>
-              <input
-                type="text"
+              <select
                 value={trade}
                 onChange={(e) => setTrade(e.target.value)}
-                placeholder="e.g. Roofing"
                 className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm bg-white text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e]"
-              />
+              >
+                <option value="">— No trade —</option>
+                {trade && !tradeTypes.includes(trade) && (
+                  <option value={trade}>{trade} (unrecognised)</option>
+                )}
+                {tradeTypes.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           </div>
 
