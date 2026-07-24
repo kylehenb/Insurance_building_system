@@ -71,6 +71,37 @@ export async function POST(req: NextRequest) {
     const nextNum = currentSequence + 1
     const jobNumber = `${tenant.job_prefix}${nextNum}`
 
+    // Resolve client_id by matching insurer/adjuster name and invoice_to trading name
+    let resolvedClientId: string | null = null
+    if (insurer || adjuster) {
+      let clientQuery = supabase
+        .from('clients')
+        .select('id, name, trading_name')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+
+      if (insurer && adjuster) {
+        clientQuery = clientQuery.or(`name.eq.${insurer},name.eq.${adjuster}`)
+      } else if (insurer) {
+        clientQuery = clientQuery.eq('name', insurer)
+      } else {
+        clientQuery = clientQuery.eq('name', adjuster)
+      }
+
+      const { data: matchingClients } = await clientQuery
+
+      if (matchingClients && matchingClients.length > 0) {
+        if (invoice_to) {
+          const byTradingName = matchingClients.find(
+            c => (c.trading_name || c.name) === invoice_to
+          )
+          resolvedClientId = byTradingName?.id ?? matchingClients[0].id
+        } else {
+          resolvedClientId = matchingClients[0].id
+        }
+      }
+    }
+
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
       .insert({
@@ -83,6 +114,7 @@ export async function POST(req: NextRequest) {
         property_address: property_address || null,
         insurer: insurer || null,
         invoice_to: invoice_to || null,
+        client_id: resolvedClientId,
         claim_number: claim_number || null,
         adjuster: adjuster || null,
         adjuster_reference: adjuster_reference || null,

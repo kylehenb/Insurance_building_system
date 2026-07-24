@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/lib/supabase/database.types';
 import { TradesCsvImportDialog, type TradesImportRow } from './TradesCsvImportDialog';
+import { TradeTypesModal } from './TradeTypesModal';
 
 type TradesRow = Database['public']['Tables']['trades']['Row'];
 type TradesInsert = Database['public']['Tables']['trades']['Insert'];
@@ -38,6 +39,7 @@ export default function TradesPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<TradesRow | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [showTradeTypes, setShowTradeTypes] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<Partial<TradesInsert>>({
@@ -453,6 +455,12 @@ export default function TradesPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTradeTypes(true)}
+              className="inline-flex items-center justify-center rounded-lg border border-[#e0dbd4] bg-white px-4 py-2 text-sm font-medium text-[#3a3530] hover:bg-[#f5f0e8] transition-colors"
+            >
+              Trade Types
+            </button>
             <button
               onClick={() => setShowCsvImport(true)}
               className="inline-flex items-center justify-center rounded-lg border border-[#e0dbd4] bg-white px-4 py-2 text-sm font-medium text-[#3a3530] hover:bg-[#f5f0e8] transition-colors"
@@ -1036,6 +1044,17 @@ export default function TradesPage() {
           isOpen={showCsvImport}
           onClose={() => setShowCsvImport(false)}
           onImport={handleCsvImport}
+        />
+
+        {/* Trade Types Modal */}
+        <TradeTypesModal
+          isOpen={showTradeTypes}
+          onClose={() => setShowTradeTypes(false)}
+          onChanged={async () => {
+            if (!tenantId) return;
+            const response = await fetch(`/api/trades/primary-trades?tenantId=${tenantId}`);
+            if (response.ok) setPrimaryTradeOptions(await response.json());
+          }}
         />
       </div>
     </div>
