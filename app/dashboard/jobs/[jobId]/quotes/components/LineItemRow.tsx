@@ -23,6 +23,7 @@ interface LineItemRowProps {
   search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
+  tradeTypes: string[]
   onNavigateNext?: () => void
   descRef?: React.RefObject<HTMLTextAreaElement | null>
   isDragging?: boolean
@@ -517,6 +518,7 @@ export function LineItemRow({
   search,
   isLocked,
   trades,
+  tradeTypes,
   onNavigateNext,
   descRef,
   isDragging,
@@ -761,13 +763,11 @@ export function LineItemRow({
             style={selectStyle}
           >
             <option value="">—</option>
-            {Array.from(new Set(trades.map(t => t.primary_trade)))
-              .sort()
-              .map(trade => (
-                <option key={trade} value={trade}>
-                  {trade}
-                </option>
-              ))}
+            {tradeTypes.map(trade => (
+              <option key={trade} value={trade}>
+                {trade}
+              </option>
+            ))}
           </select>
         </div>
 

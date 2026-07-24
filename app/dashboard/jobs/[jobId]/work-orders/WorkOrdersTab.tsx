@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { type WorkOrderRow, woIsSent } from './types'
 import { useWorkOrders } from './useWorkOrders'
 import { BlueprintView } from './BlueprintView'
@@ -25,6 +25,15 @@ export interface WorkOrdersTabProps {
 
 export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
   const { workOrders, scopeItems, quotes, trades, isLoading, error, mutations, refetch } = useWorkOrders(jobId, tenantId)
+  const [tradeTypes, setTradeTypes] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!tenantId) return
+    fetch(`/api/trades/primary-trades?tenantId=${encodeURIComponent(tenantId)}`)
+      .then(r => r.json())
+      .then((data: string[]) => { if (Array.isArray(data)) setTradeTypes(data) })
+      .catch(() => {})
+  }, [tenantId])
 
   const [view,         setView]         = useState<View>('blueprint')
   const [expandedIds,  setExpandedIds]  = useState<Set<string>>(new Set())
@@ -310,6 +319,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           scopeItems={scopeItems}
           quotes={quotes}
           trades={trades}
+          tradeTypes={tradeTypes}
           jobId={jobId}
           tenantId={tenantId}
           onAddToQuote={openAddQuote}

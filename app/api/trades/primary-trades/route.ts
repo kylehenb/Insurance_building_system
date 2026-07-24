@@ -8,29 +8,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const [{ data: tradesData, error }, { data: sequenceData }] = await Promise.all([
-    supabase
-      .from('trades')
-      .select('primary_trade, trade_specialties')
-      .eq('tenant_id', tenantId),
-    supabase
-      .from('trade_type_sequence')
-      .select('trade_type')
-      .eq('tenant_id', tenantId),
-  ])
+  const { data, error } = await supabase
+    .from('trade_type_sequence')
+    .select('trade_type')
+    .eq('tenant_id', tenantId)
+    .order('trade_type', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const collected = new Set<string>()
-  tradesData?.forEach(t => {
-    if (t.primary_trade) collected.add(t.primary_trade)
-    t.trade_specialties?.forEach(s => { if (s) collected.add(s) })
-  })
-  sequenceData?.forEach(s => { if (s.trade_type) collected.add(s.trade_type) })
+  const tradeTypes = (data ?? []).map(r => r.trade_type).filter(Boolean)
 
-  const distinctTrades = [...collected].sort((a, b) => a.localeCompare(b))
-
-  return NextResponse.json(distinctTrades, {
+  return NextResponse.json(tradeTypes, {
     headers: { 'Cache-Control': 'private, max-age=60' },
   })
 }

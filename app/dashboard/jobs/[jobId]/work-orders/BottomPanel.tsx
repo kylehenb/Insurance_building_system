@@ -532,6 +532,7 @@ function ScopeItemsEditor({
 function WORow({
   wo,
   trades,
+  tradeTypes,
   onUpdate,
   onDelete,
   onLock,
@@ -541,6 +542,7 @@ function WORow({
 }: {
   wo: WorkOrderWithDetails
   trades: TradeRow[]
+  tradeTypes: string[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
@@ -572,10 +574,7 @@ function WORow({
     t.primary_trade?.toLowerCase() === tradeTypeLower ||
     t.trade_specialties?.some(s => s.toLowerCase() === tradeTypeLower)
   )
-  const tradeOptions = Array.from(new Set([
-    ...trades.map(t => t.primary_trade).filter((t): t is string => !!t),
-    ...trades.flatMap(t => t.trade_specialties ?? []).filter(Boolean),
-  ])).sort()
+  const tradeOptions = tradeTypes
 
   React.useEffect(() => {
     setLocalTradeId(wo.trade_id || '')
@@ -800,6 +799,7 @@ const TH: React.CSSProperties = {
 function WOTable({
   workOrders,
   trades,
+  tradeTypes,
   onUpdate,
   onDelete,
   onLock,
@@ -809,6 +809,7 @@ function WOTable({
 }: {
   workOrders: WorkOrderWithDetails[]
   trades: TradeRow[]
+  tradeTypes: string[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
@@ -843,6 +844,7 @@ function WOTable({
             key={wo.id}
             wo={wo}
             trades={trades}
+            tradeTypes={tradeTypes}
             onUpdate={onUpdate}
             onDelete={onDelete}
             onLock={onLock}
@@ -946,6 +948,7 @@ export interface BottomPanelProps {
   scopeItems:  ScopeItemRow[]
   quotes:      QuoteRow[]
   trades:      TradeRow[]
+  tradeTypes:  string[]
   jobId:       string
   tenantId:    string
   onAddToQuote: (quoteId: string) => void
@@ -965,6 +968,7 @@ export function BottomPanel({
   scopeItems,
   quotes,
   trades,
+  tradeTypes,
   jobId,
   tenantId,
   onAddToQuote,
@@ -1063,6 +1067,7 @@ export function BottomPanel({
                   <WOTable
                     workOrders={qWOs}
                     trades={trades}
+                    tradeTypes={tradeTypes}
                     onUpdate={onUpdateWorkOrder}
                     onDelete={onDeleteWorkOrder}
                     onLock={onLockWorkOrder}
@@ -1107,6 +1112,7 @@ export function BottomPanel({
               <WOTable
                 workOrders={additionalWOs}
                 trades={trades}
+                tradeTypes={tradeTypes}
                 onUpdate={onUpdateWorkOrder}
                 onDelete={onDeleteWorkOrder}
                 onLock={onLockWorkOrder}

@@ -230,6 +230,7 @@ interface SortableRoomSectionProps {
   onReorderItems: (room: string, orderedIds: string[]) => void
   search: (q: string) => ScopeSearchResult[]
   trades: Trade[]
+  tradeTypes: string[]
   startingIndex: number
   tenantId: string
   isAdmin?: boolean
@@ -247,6 +248,7 @@ function SortableRoomSection({
   onReorderItems,
   search,
   trades,
+  tradeTypes,
   startingIndex,
   tenantId,
   isAdmin,
@@ -281,6 +283,7 @@ function SortableRoomSection({
         search={search}
         isLocked={isLocked}
         trades={trades}
+        tradeTypes={tradeTypes}
         startingIndex={startingIndex}
         tenantId={tenantId}
         isAdmin={isAdmin}
@@ -337,6 +340,15 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
 
   const { search } = useScopeLibrary({ tenantId })
   const trades = useTrades(tenantId)
+  const [tradeTypes, setTradeTypes] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!tenantId) return
+    fetch(`/api/trades/primary-trades?tenantId=${encodeURIComponent(tenantId)}`)
+      .then(r => r.json())
+      .then((data: string[]) => { if (Array.isArray(data)) setTradeTypes(data) })
+      .catch(() => {})
+  }, [tenantId])
 
   // Local-only rooms (added locally, no items yet)
   const [pendingRooms, setPendingRooms] = useState<Array<{ id: string; name: string }>>([])
@@ -622,6 +634,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
                     onReorderItems={reorderItems}
                     search={search}
                     trades={trades}
+                    tradeTypes={tradeTypes}
                     startingIndex={startIndex}
                     tenantId={tenantId}
                     isAdmin={isAdmin}
@@ -652,6 +665,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               search={search}
               isLocked={isLocked}
               trades={trades}
+              tradeTypes={tradeTypes}
               autoFocusName={true}
               startingIndex={totalItemsInRooms + 1}
               tenantId={tenantId}

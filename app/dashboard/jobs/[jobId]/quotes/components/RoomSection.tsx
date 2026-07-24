@@ -43,6 +43,7 @@ interface RoomSectionProps {
   search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
+  tradeTypes: string[]
   autoFocusName?: boolean
   tenantId: string
   isAdmin?: boolean
@@ -243,6 +244,7 @@ function SortableLineItemRow({
   search,
   isLocked,
   trades,
+  tradeTypes,
   onNavigateNext,
   descRef,
   activeId,
@@ -256,6 +258,7 @@ function SortableLineItemRow({
   search: (q: string) => ScopeSearchResult[]
   isLocked: boolean
   trades: Trade[]
+  tradeTypes: string[]
   onNavigateNext: () => void
   descRef: React.RefObject<HTMLTextAreaElement | null>
   activeId: string | null
@@ -312,6 +315,7 @@ function SortableLineItemRow({
         search={search}
         isLocked={isLocked}
         trades={trades}
+        tradeTypes={tradeTypes}
         onNavigateNext={onNavigateNext}
         descRef={descRef}
         tenantId={tenantId}
@@ -351,6 +355,7 @@ export function RoomSection({
   search,
   isLocked,
   trades,
+  tradeTypes,
   autoFocusName,
   tenantId,
   isAdmin,
@@ -736,6 +741,7 @@ export function RoomSection({
                     search={search}
                     isLocked={isLocked}
                     trades={trades}
+                    tradeTypes={tradeTypes}
                     onNavigateNext={() => handleNavigateNext(idx)}
                     descRef={dRef}
                     activeId={activeId}
@@ -767,6 +773,7 @@ export function RoomSection({
                     search={search}
                     isLocked
                     trades={trades}
+                    tradeTypes={tradeTypes}
                     tenantId={tenantId}
                     isAdmin={isAdmin}
                   />
