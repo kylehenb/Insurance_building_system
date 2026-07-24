@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { generateInvoiceRef } from '@/lib/invoices/ref'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -136,14 +137,7 @@ export async function POST(req: NextRequest) {
     }]
   }
 
-  const { count } = await supabase
-    .from('invoices')
-    .select('*', { count: 'exact', head: true })
-    .eq('job_id', jobId)
-    .eq('tenant_id', tenantId)
-
-  const seq = String((count ?? 0) + 1)
-  const invoiceRef = `INV-${job.job_number}-${seq}`
+  const invoiceRef = await generateInvoiceRef(supabase, tenantId, jobId, job.job_number ?? jobId)
 
   // Calculate totals from line items
   let amountExGst = 0
