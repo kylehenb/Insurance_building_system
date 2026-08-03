@@ -462,7 +462,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
       if (!trimmed || trimmed === oldName) return
       setItems(prev => {
         const updated = prev.map(item => (item.room === oldName ? { ...item, room: trimmed } : item))
-        const roomItems = updated.filter(i => i.room === oldName && !i.id.startsWith('temp-'))
+        const roomItems = prev.filter(i => i.room === oldName && !i.id.startsWith('temp-'))
         Promise.all(
           roomItems.map(item =>
             fetch(`/api/quotes/${quoteId}/items/${item.id}`, {
