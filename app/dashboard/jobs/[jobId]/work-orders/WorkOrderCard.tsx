@@ -803,6 +803,9 @@ export function WorkOrderCard({
   const filteredTrades = trades.filter(
     t => !wo.tradeTypeLabel || t.primary_trade === wo.tradeTypeLabel
   )
+  if (filteredTrades.length === 0) {
+    trades.forEach(t => { if (!filteredTrades.includes(t)) filteredTrades.push(t) })
+  }
 
   return (
     <div

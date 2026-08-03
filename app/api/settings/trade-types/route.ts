@@ -133,6 +133,12 @@ export async function PATCH(req: NextRequest) {
     .eq('trade', oldName)
 
   await supabase
+    .from('work_orders')
+    .update({ trade_name: newName })
+    .eq('tenant_id', tenantId)
+    .eq('trade_name', oldName)
+
+  await supabase
     .from('trades')
     .update({ primary_trade: newName })
     .eq('tenant_id', tenantId)
@@ -188,6 +194,12 @@ export async function DELETE(req: NextRequest) {
     .update({ trade: null })
     .eq('tenant_id', tenantId)
     .eq('trade', tradeType)
+
+  await supabase
+    .from('work_orders')
+    .update({ trade_name: null })
+    .eq('tenant_id', tenantId)
+    .eq('trade_name', tradeType)
 
   return NextResponse.json({ ok: true, in_use_count: count ?? 0 })
 }
