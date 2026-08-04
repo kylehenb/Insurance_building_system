@@ -45,19 +45,24 @@ export function generateInvoiceHtml(params: {
     : (tenant.invoice_payment_terms ?? 14)
   const dueDateDisplay = formatDate(new Date(new Date(baseDate).getTime() + paymentDays * 24 * 60 * 60 * 1000).toISOString())
 
-  const hasBuilderMargin = invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom'
   const markupPct = (invoice as any).markup_pct as number | null ?? 0
-  const subtotalFromLines = lineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+  const hasBuilderMargin = markupPct > 0
+  const completedLineItems = lineItems.filter(item => (item as any).completed !== false)
+  const subtotalFromLines = completedLineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
   const markupAmount = hasBuilderMargin ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
 
   // Build line items table HTML
-  const lineItemsHtml = lineItems.map((item, idx) => `
-    <tr style="border-bottom:1px solid #f0ece6;">
-      <td style="padding:8px 12px;font-size:11px;color:#3a3530;line-height:1.5;">${item.description || '-'}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:11px;color:#3a3530;">${item.quantity || '-'}</td>
-      <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:#1a1a1a;">${fmt(item.line_total)}</td>
+  const lineItemsHtml = lineItems.map((item) => {
+    const isIncomplete = (item as any).completed === false
+    const cellColor = isIncomplete ? '#9e998f' : '#3a3530'
+    const struck = isIncomplete ? 'text-decoration:line-through;' : ''
+    return `
+    <tr style="border-bottom:1px solid #f0ece6;${isIncomplete ? 'background:#fafaf8;' : ''}">
+      <td style="padding:8px 12px;font-size:11px;color:${cellColor};line-height:1.5;${struck}">${item.description || '-'}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:11px;color:${cellColor};${struck}">${item.quantity || '-'}</td>
+      <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:${isIncomplete ? '#9e998f' : '#1a1a1a'};${struck}">${fmt(item.line_total)}</td>
     </tr>
-  `).join('')
+  `}).join('')
 
   return `<!DOCTYPE html>
 <html>

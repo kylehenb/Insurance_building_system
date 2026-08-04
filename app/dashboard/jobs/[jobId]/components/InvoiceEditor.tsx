@@ -26,6 +26,7 @@ interface InvoiceLineItem {
   unit_price: number
   line_total: number
   sort_order: number
+  completed?: boolean | null
 }
 
 interface InvoiceEditorProps {
@@ -53,9 +54,10 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   // ── Computed totals ─────────────────────────────────────────────────────────
 
-  const hasBuilderMargin = invoice?.invoice_type === 'make_safe' || invoice?.invoice_type === 'custom'
+  const hasBuilderMargin = (invoice?.markup_pct ?? 0) > 0
   const markupPct = invoice?.markup_pct ?? 0
-  const lineSubtotal = lineItems.reduce((sum, item) => sum + item.line_total, 0)
+  const activeItems = lineItems.filter(i => i.completed !== false)
+  const lineSubtotal = activeItems.reduce((sum, item) => sum + item.line_total, 0)
   const markupAmount = hasBuilderMargin ? Math.round(lineSubtotal * markupPct * 100) / 100 : 0
   const exGst = Math.round((lineSubtotal + markupAmount) * 100) / 100
   const gstAmount = invoice?.invoice_type === 'excess' ? (invoice.gst ?? 0) : Math.round(exGst * 0.10 * 100) / 100
@@ -99,8 +101,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
   const persistTotals = useCallback(async (items: InvoiceLineItem[], currentMarkupPct: number, invType: string) => {
     if (invType === 'excess') return
 
-    const sub = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
-    const markup = (invType === 'make_safe' || invType === 'custom') ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
+    const sub = Math.round(items.filter(i => i.completed !== false).reduce((s, i) => s + i.line_total, 0) * 100) / 100
+    const markup = currentMarkupPct > 0 ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
     const ex = Math.round((sub + markup) * 100) / 100
     const g = Math.round(ex * 0.10 * 100) / 100
     const inc = Math.round((ex + g) * 100) / 100
@@ -114,10 +116,10 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: ex, gst: g, amount_inc_gst: inc } : prev)
   }, [invoiceId, tenantId])
 
-  // ── Update builder's margin (make_safe only) ────────────────────────────────
+  // ── Update builder's margin ─────────────────────────────────────────────────
 
   const updateMarkupPct = useCallback(async (pct: number) => {
-    if (!invoice || (invoice.invoice_type !== 'make_safe' && invoice.invoice_type !== 'custom')) return
+    if (!invoice) return
     const decimal = pct / 100
     setSaveStatus('saving')
     try {
@@ -135,6 +137,28 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       setSaveStatus('error')
     }
   }, [invoice, lineItems, invoiceId, tenantId, persistTotals, onInvoiceUpdated])
+
+  // ── Toggle line item completed ──────────────────────────────────────────────
+
+  const toggleCompleted = useCallback(async (itemId: string, completed: boolean) => {
+    if (!invoice) return
+    const newItems = lineItems.map(i => i.id === itemId ? { ...i, completed } : i)
+    setLineItems(newItems)
+    setSaveStatus('saving')
+    try {
+      await supabase
+        .from('invoice_line_items')
+        .update({ completed })
+        .eq('id', itemId)
+        .eq('tenant_id', tenantId)
+
+      await persistTotals(newItems, markupPct, invoice.invoice_type)
+      setSaveStatus('saved')
+      onInvoiceUpdated?.()
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
 
   // ── Update line item ────────────────────────────────────────────────────────
 
@@ -235,59 +259,105 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
           </div>
         ) : (
           <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+            {/* Header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+              <div />
               <div>Description</div>
               <div style={{ textAlign: 'right' }}>Qty</div>
               <div style={{ textAlign: 'right' }}>Total</div>
               <div />
             </div>
 
-            {lineItems.map((item, index) => (
-              <div
-                key={item.id}
-                style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 40px', gap: 12, padding: '12px 16px', fontSize: 13, color: '#3a3530', borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none', alignItems: 'center' }}
-              >
-                <div>
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(e) => updateItem(item.id, { description: e.target.value })}
-                    placeholder="Item description"
-                    style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
-                  />
+            {lineItems.map((item, index) => {
+              const isIncomplete = item.completed === false
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '20px 3fr 1fr 1fr 40px',
+                    gap: 12,
+                    padding: '12px 16px',
+                    fontSize: 13,
+                    borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none',
+                    alignItems: 'center',
+                    background: isIncomplete ? '#fafaf8' : 'transparent',
+                  }}
+                >
+                  {/* Completed checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={!isIncomplete}
+                      onChange={e => toggleCompleted(item.id, e.target.checked)}
+                      title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
+                      style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    {isIncomplete ? (
+                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>
+                        {item.description || 'Item description'}
+                      </span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                        placeholder="Item description"
+                        style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Qty */}
+                  <div style={{ textAlign: 'right' }}>
+                    {isIncomplete ? (
+                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{item.quantity}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Line total */}
+                  <div style={{ textAlign: 'right' }}>
+                    {isIncomplete ? (
+                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.line_total)}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        value={item.line_total}
+                        onChange={(e) => updateItem(item.id, { line_total: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Delete */}
+                  <div style={{ textAlign: 'right' }}>
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    step="0.01"
-                    style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
-                  />
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <input
-                    type="number"
-                    value={item.line_total}
-                    onChange={(e) => updateItem(item.id, { line_total: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    step="0.01"
-                    style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
-                  />
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

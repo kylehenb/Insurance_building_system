@@ -1388,6 +1388,7 @@ export type Database = {
       }
       invoice_line_items: {
         Row: {
+          completed: boolean
           created_at: string | null
           description: string
           id: string
@@ -1401,6 +1402,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          completed?: boolean
           created_at?: string | null
           description: string
           id?: string
@@ -1414,6 +1416,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          completed?: boolean
           created_at?: string | null
           description?: string
           id?: string

@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
           amount_ex_gst: amountExGst,
           gst,
           amount_inc_gst: amountIncGst,
-          ...(markupPct > 0 ? { markup_pct: markupPct } : {}),
+          markup_pct: markupPct,
           status: 'draft',
         },
         lineItems,

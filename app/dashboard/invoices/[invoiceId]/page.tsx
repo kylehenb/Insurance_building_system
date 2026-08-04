@@ -41,6 +41,7 @@ interface LineItem {
   line_total: number
   sort_order: number | null
   library_item_id: string | null
+  completed?: boolean | null
 }
 
 interface LibraryItem {
@@ -177,12 +178,13 @@ export default function InvoiceDetailPage() {
     if (!invoice || !tenantId) return
     if (invoice.gst_treatment === 'inclusive') return
 
-    const subtotal = Math.round(items.reduce((s, i) => s + i.line_total, 0) * 100) / 100
+    const activeItems = items.filter(i => i.completed !== false)
+    const subtotal = Math.round(activeItems.reduce((s, i) => s + i.line_total, 0) * 100) / 100
     let exGst = subtotal
 
-    if (invoice.invoice_type === 'make_safe') {
-      const markupPct = overrideMarkupPct ?? (invoice.markup_pct ?? 0)
-      const markup = Math.round(subtotal * markupPct * 100) / 100
+    const currentMarkupPct = overrideMarkupPct ?? (invoice.markup_pct ?? 0)
+    if (currentMarkupPct > 0) {
+      const markup = Math.round(subtotal * currentMarkupPct * 100) / 100
       exGst = Math.round((subtotal + markup) * 100) / 100
     }
 
@@ -198,10 +200,10 @@ export default function InvoiceDetailPage() {
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: exGst, gst, amount_inc_gst: incGst } : prev)
   }, [invoice, tenantId])
 
-  // ── Update builder's margin (make_safe only) ──────────────────────────────
+  // ── Update builder's margin ───────────────────────────────────────────────
 
   const updateMarkupPct = useCallback(async (pct: number) => {
-    if (!tenantId || !invoice || invoice.invoice_type !== 'make_safe') return
+    if (!tenantId || !invoice) return
     const markupPct = pct / 100
 
     await supabase
@@ -213,6 +215,27 @@ export default function InvoiceDetailPage() {
     setInvoice(prev => prev ? { ...prev, markup_pct: markupPct } : prev)
     await recalcTotals(lineItems, markupPct)
   }, [invoice, tenantId, lineItems, recalcTotals])
+
+  // ── Toggle line item completed ────────────────────────────────────────────
+
+  const toggleCompleted = useCallback(async (itemId: string, completed: boolean) => {
+    if (!tenantId) return
+    setSaveStatus('saving')
+    const newItems = lineItems.map(i => i.id === itemId ? { ...i, completed } : i)
+    setLineItems(newItems)
+    try {
+      const { error } = await supabase
+        .from('invoice_line_items')
+        .update({ completed })
+        .eq('id', itemId)
+        .eq('tenant_id', tenantId)
+      if (error) throw error
+      await recalcTotals(newItems)
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [lineItems, tenantId, recalcTotals])
 
   // ── Line item updates ─────────────────────────────────────────────────────
 
@@ -382,10 +405,11 @@ export default function InvoiceDetailPage() {
   const canAddLines = !LOCKED_TYPES.has(invoice.invoice_type) && isEditable
 
   // Compute totals display
-  const isMakeSafe = invoice.invoice_type === 'make_safe'
+  const hasMarkup = (invoice.markup_pct ?? 0) > 0
   const markupPct = invoice.markup_pct ?? 0
-  const subtotalFromLines = lineItems.reduce((s, i) => s + i.line_total, 0)
-  const markupAmount = isMakeSafe ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
+  const activeLineItems = lineItems.filter(i => i.completed !== false)
+  const subtotalFromLines = activeLineItems.reduce((s, i) => s + i.line_total, 0)
+  const markupAmount = hasMarkup ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
   const exGst = invoice.amount_ex_gst ?? 0
   const gst = invoice.gst ?? 0
   const incGst = invoice.amount_inc_gst ?? 0
@@ -445,6 +469,10 @@ export default function InvoiceDetailPage() {
         .lib-item-name { color: #3a3530; font-weight: 500; }
         .lib-item-meta { font-size: 11px; color: #9e998f; margin-top: 2px; }
         .voided-banner { background: #fce8e6; border: 1px solid #f5a0a0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #c5221f; margin-bottom: 16px; font-weight: 500; }
+        .invd-row-incomplete { background: #fafaf8; }
+        .invd-struck { text-decoration: line-through; color: #9e998f !important; }
+        .invd-muted { color: #9e998f; }
+        .invd-cb-cell { padding-left: 12px !important; }
       `}</style>
 
       <div className="invd">
@@ -508,6 +536,7 @@ export default function InvoiceDetailPage() {
               <table className="invd-table">
                 <thead>
                   <tr>
+                    {!isLocked && <th style={{ width: 32 }} />}
                     <th>Description</th>
                     <th style={{ width: 60, textAlign: 'right' }}>Qty</th>
                     {!isInclusive && <th style={{ width: 60, textAlign: 'right' }}>Unit</th>}
@@ -518,81 +547,96 @@ export default function InvoiceDetailPage() {
                 <tbody>
                   {lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={isLocked ? 3 : 4} style={{ textAlign: 'center', color: '#9e998f', padding: '24px' }}>
+                      <td colSpan={(isLocked ? 0 : 2) + (isInclusive ? 3 : 4)} style={{ textAlign: 'center', color: '#9e998f', padding: '24px' }}>
                         No line items
                       </td>
                     </tr>
                   )}
-                  {lineItems.map(item => (
-                    <tr key={item.id}>
-                      <td>
-                        {isLocked ? (
-                          <span>{item.description}</span>
-                        ) : (
-                          <input
-                            className="invd-input"
-                            defaultValue={item.description}
-                            placeholder="Description"
-                            onBlur={e => updateItem(item.id, 'description', e.target.value)}
-                          />
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {isLocked ? (
-                          <span>{item.quantity}</span>
-                        ) : (
-                          <input
-                            className="invd-num-input"
-                            defaultValue={item.quantity}
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            onBlur={e => updateItem(item.id, 'quantity', e.target.value)}
-                          />
-                        )}
-                      </td>
-                      {!isInclusive && (
-                        <td style={{ textAlign: 'right' }}>
-                          {isLocked ? (
-                            <span style={{ fontSize: 12, color: '#9e998f' }}>{item.unit ?? '—'}</span>
-                          ) : (
+                  {lineItems.map(item => {
+                    const isIncomplete = item.completed === false
+                    const isRowEditable = !isLocked && !isIncomplete
+                    return (
+                      <tr key={item.id} className={isIncomplete ? 'invd-row-incomplete' : ''}>
+                        {!isLocked && (
+                          <td className="invd-cb-cell">
                             <input
-                              className="invd-num-input"
-                              style={{ width: 50, textAlign: 'center' }}
-                              defaultValue={item.unit ?? ''}
-                              placeholder="ea"
-                              onBlur={e => updateItem(item.id, 'unit', e.target.value)}
+                              type="checkbox"
+                              checked={!isIncomplete}
+                              onChange={e => toggleCompleted(item.id, e.target.checked)}
+                              title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
+                              style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
                             />
+                          </td>
+                        )}
+                        <td>
+                          {isRowEditable ? (
+                            <input
+                              className="invd-input"
+                              defaultValue={item.description}
+                              placeholder="Description"
+                              onBlur={e => updateItem(item.id, 'description', e.target.value)}
+                            />
+                          ) : (
+                            <span className={isIncomplete ? 'invd-struck' : ''}>{item.description}</span>
                           )}
                         </td>
-                      )}
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>
-                        {isLocked ? (
-                          <span>{fmt(item.line_total)}</span>
-                        ) : (
-                          <input
-                            className="invd-num-input"
-                            defaultValue={item.line_total}
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            onBlur={e => updateItem(item.id, 'line_total', e.target.value)}
-                          />
-                        )}
-                      </td>
-                      {!isLocked && (
-                        <td>
-                          <button
-                            className="invd-del-btn"
-                            onClick={() => deleteItem(item.id)}
-                            title="Remove line"
-                          >
-                            ×
-                          </button>
+                        <td style={{ textAlign: 'right' }}>
+                          {isRowEditable ? (
+                            <input
+                              className="invd-num-input"
+                              defaultValue={item.quantity}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              onBlur={e => updateItem(item.id, 'quantity', e.target.value)}
+                            />
+                          ) : (
+                            <span className={isIncomplete ? 'invd-struck' : ''}>{item.quantity}</span>
+                          )}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        {!isInclusive && (
+                          <td style={{ textAlign: 'right' }}>
+                            {isRowEditable ? (
+                              <input
+                                className="invd-num-input"
+                                style={{ width: 50, textAlign: 'center' }}
+                                defaultValue={item.unit ?? ''}
+                                placeholder="ea"
+                                onBlur={e => updateItem(item.id, 'unit', e.target.value)}
+                              />
+                            ) : (
+                              <span style={{ fontSize: 12 }} className={isIncomplete ? 'invd-struck' : 'invd-muted'}>{item.unit ?? '—'}</span>
+                            )}
+                          </td>
+                        )}
+                        <td style={{ textAlign: 'right', fontWeight: 500 }}>
+                          {isRowEditable ? (
+                            <input
+                              className="invd-num-input"
+                              defaultValue={item.line_total}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              onBlur={e => updateItem(item.id, 'line_total', e.target.value)}
+                            />
+                          ) : (
+                            <span className={isIncomplete ? 'invd-struck' : ''}>{fmt(item.line_total)}</span>
+                          )}
+                        </td>
+                        {!isLocked && (
+                          <td>
+                            <button
+                              className="invd-del-btn"
+                              onClick={() => deleteItem(item.id)}
+                              title="Remove line"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
 
@@ -642,7 +686,7 @@ export default function InvoiceDetailPage() {
             <div className="invd-card">
               <div className="invd-card-title">Totals</div>
               <div className="invd-totals">
-                {isMakeSafe && (
+                {hasMarkup && (
                   <>
                     <div className="invd-total-row">
                       <span className="invd-total-label">Subtotal</span>
