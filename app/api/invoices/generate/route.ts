@@ -320,34 +320,25 @@ export async function POST(req: NextRequest) {
       sortOffset += 1000
     }
 
-    // Add excess deduction if an excess invoice exists (applies once — on this first invoice)
+    // Fetch excess invoices — the deduction is applied post-GST, not as a line item
     const { data: excessInvoices } = await supabase
       .from('invoices')
-      .select('amount_ex_gst')
+      .select('amount_inc_gst')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .eq('invoice_type', 'excess')
       .neq('status', 'voided')
 
-    if (excessInvoices && excessInvoices.length > 0) {
-      const totalExcessExGst = Math.round(
-        excessInvoices.reduce((sum, inv) => sum + (inv.amount_ex_gst ?? 0), 0) * 100
-      ) / 100
-      allLineItems.push({
-        tenant_id: tenantId,
-        description: `Less: Excess payment received${job.claim_number ? ` — Claim ${job.claim_number}` : ''}`,
-        quantity: 1,
-        unit_price: -totalExcessExGst,
-        line_total: -totalExcessExGst,
-        unit: null,
-        sort_order: sortOffset + 1000,
-      })
-    }
+    const excessDeductionIncGst = excessInvoices && excessInvoices.length > 0
+      ? Math.round(excessInvoices.reduce((sum, inv) => sum + (inv.amount_inc_gst ?? 0), 0) * 100) / 100
+      : 0
 
     const subtotal = Math.round(allLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
     const amountExGst = Math.round(subtotal * (1 + markupPct) * 100) / 100
     const gst = Math.round(amountExGst * gstPct * 100) / 100
-    const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
+    const grossIncGst = Math.round((amountExGst + gst) * 100) / 100
+    // Excess is subtracted after GST — amount_inc_gst is the net amount the insurer pays
+    const amountIncGst = Math.round((grossIncGst - excessDeductionIncGst) * 100) / 100
 
     generated = {
       invoiceData: {
@@ -360,6 +351,10 @@ export async function POST(req: NextRequest) {
         gst,
         amount_inc_gst: amountIncGst,
         markup_pct: markupPct,
+        // Store deduction in notes so the UI can render the breakdown correctly
+        notes: excessDeductionIncGst > 0
+          ? JSON.stringify({ excess_deduction_inc_gst: excessDeductionIncGst })
+          : null,
         status: 'draft',
       },
       lineItems: allLineItems,

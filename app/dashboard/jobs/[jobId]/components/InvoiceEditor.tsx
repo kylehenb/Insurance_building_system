@@ -17,6 +17,7 @@ interface Invoice {
   gst: number
   amount_inc_gst: number
   markup_pct: number | null
+  notes: string | null
 }
 
 interface InvoiceLineItem {
@@ -63,6 +64,15 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
   const gstAmount = invoice?.invoice_type === 'excess' ? (invoice.gst ?? 0) : Math.round(exGst * 0.10 * 100) / 100
   const total = invoice?.invoice_type === 'excess' ? (invoice.amount_inc_gst ?? 0) : Math.round((exGst + gstAmount) * 100) / 100
 
+  // For quoted_amounts invoices: excess is deducted post-GST, stored in notes
+  const excessDeductionIncGst = useMemo(() => {
+    if (invoice?.invoice_type !== 'quoted_amounts' || !invoice.notes) return 0
+    try {
+      const parsed = JSON.parse(invoice.notes) as Record<string, unknown>
+      return typeof parsed.excess_deduction_inc_gst === 'number' ? parsed.excess_deduction_inc_gst : 0
+    } catch { return 0 }
+  }, [invoice?.invoice_type, invoice?.notes])
+
   // ── Load invoice + line items ───────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -105,7 +115,11 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     const markup = currentMarkupPct > 0 ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
     const ex = Math.round((sub + markup) * 100) / 100
     const g = Math.round(ex * 0.10 * 100) / 100
-    const inc = Math.round((ex + g) * 100) / 100
+    const grossInc = Math.round((ex + g) * 100) / 100
+    // For quoted_amounts, the excess is deducted post-GST to give the net insurer amount
+    const inc = invType === 'quoted_amounts'
+      ? Math.round((grossInc - excessDeductionIncGst) * 100) / 100
+      : grossInc
 
     await supabase
       .from('invoices')
@@ -114,7 +128,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       .eq('tenant_id', tenantId)
 
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: ex, gst: g, amount_inc_gst: inc } : prev)
-  }, [invoiceId, tenantId])
+  }, [invoiceId, tenantId, excessDeductionIncGst])
 
   // ── Update builder's margin ─────────────────────────────────────────────────
 
@@ -412,10 +426,27 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
           <span style={{ fontSize: 12, color: '#9e998f' }}>GST (10%)</span>
           <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(gstAmount)}</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(total)}</span>
-        </div>
+        {excessDeductionIncGst > 0 ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Total (inc GST)</span>
+              <span style={{ fontSize: 14, fontWeight: 500, color: '#3a3530' }}>{fmt(total)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#9e998f' }}>Less: Excess payment received</span>
+              <span style={{ fontSize: 13, color: '#c5221f' }}>{fmt(-excessDeductionIncGst)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #3a3530' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Final Invoice Total (inc GST)</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(Math.round((total - excessDeductionIncGst) * 100) / 100)}</span>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(total)}</span>
+          </div>
+        )}
         <div style={{ marginTop: 12, fontSize: 11, color: saveStatus === 'saved' ? '#2e7d32' : saveStatus === 'error' ? '#c5221f' : '#9e998f' }}>
           {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? 'Saving…' : 'Error saving changes'}
         </div>

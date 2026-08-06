@@ -27,6 +27,7 @@ interface InvoiceListItem {
   gst: number | null
   amount_inc_gst: number | null
   markup_pct: number | null
+  notes: string | null
   issued_date: string | null
   paid_date: string | null
   created_at: string
@@ -589,10 +590,42 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                         <span>GST (10%)</span>
                         <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.gst ?? 0)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
-                      </div>
+                      {(() => {
+                        let excessDeduction = 0
+                        if (invoice.invoice_type === 'quoted_amounts' && invoice.notes) {
+                          try {
+                            const parsed = JSON.parse(invoice.notes) as Record<string, unknown>
+                            if (typeof parsed.excess_deduction_inc_gst === 'number') {
+                              excessDeduction = parsed.excess_deduction_inc_gst
+                            }
+                          } catch { /* ignore */ }
+                        }
+                        if (excessDeduction > 0) {
+                          const grossIncGst = (invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0)
+                          return (
+                            <>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Total (inc GST)</span>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: '#3a3530' }}>{fmt(grossIncGst)}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 12, color: '#9e998f' }}>Less: Excess payment received</span>
+                                <span style={{ fontSize: 13, color: '#c5221f' }}>{fmt(-excessDeduction)}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #3a3530' }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Final Invoice Total (inc GST)</span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
+                              </div>
+                            </>
+                          )
+                        }
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
+                            <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
+                          </div>
+                        )
+                      })()}
 
                       {/* Edit button */}
                       {invoice.status === 'draft' && (
