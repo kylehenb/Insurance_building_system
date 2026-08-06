@@ -383,18 +383,22 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: '#9e998f', display: 'flex', alignItems: 'center', gap: 6 }}>
                 Builder&apos;s Margin
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <input
-                    type="number"
-                    key={markupPct}
-                    defaultValue={(markupPct * 100).toFixed(1)}
-                    min="0"
-                    step="0.5"
-                    onBlur={(e) => updateMarkupPct(parseFloat(e.target.value) || 0)}
-                    style={{ width: 52, fontSize: 12, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '3px 6px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}
-                  />
-                  <span style={{ fontSize: 11, color: '#9e998f' }}>%</span>
-                </span>
+                {invoice?.invoice_type === 'quoted_amounts' ? (
+                  <span style={{ fontSize: 12, color: '#9e998f' }}>{(markupPct * 100).toFixed(1)}%</span>
+                ) : (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <input
+                      type="number"
+                      key={markupPct}
+                      defaultValue={(markupPct * 100).toFixed(1)}
+                      min="0"
+                      step="0.5"
+                      onBlur={(e) => updateMarkupPct(parseFloat(e.target.value) || 0)}
+                      style={{ width: 52, fontSize: 12, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '3px 6px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#9e998f' }}>%</span>
+                  </span>
+                )}
               </span>
               <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(markupAmount)}</span>
             </div>
