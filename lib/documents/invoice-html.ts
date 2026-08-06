@@ -51,6 +51,19 @@ export function generateInvoiceHtml(params: {
   const subtotalFromLines = completedLineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
   const markupAmount = hasBuilderMargin ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
 
+  // Parse excess deduction stored in notes (quoted_amounts invoices only)
+  let excessDeductionIncGst = 0
+  let notesDisplay = invoice.notes || ''
+  if (notesDisplay) {
+    try {
+      const parsed = JSON.parse(notesDisplay) as Record<string, unknown>
+      if (typeof parsed.excess_deduction_inc_gst === 'number') {
+        excessDeductionIncGst = parsed.excess_deduction_inc_gst
+        notesDisplay = '' // strip system metadata — not user-visible notes
+      }
+    } catch { /* plain text notes — show as-is */ }
+  }
+
   // Build line items table HTML
   const lineItemsHtml = lineItems.map((item) => {
     const isIncomplete = (item as any).completed === false
@@ -194,11 +207,29 @@ export function generateInvoiceHtml(params: {
           <span style="font-size:11px;color:#9e998f;">GST (10%)</span>
           <span style="font-size:12px;color:#3a3530;">${fmt(invoice.gst)}</span>
         </div>
+        ${excessDeductionIncGst > 0 ? `
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;
+          border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Total (inc GST)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt((invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0))}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;
+          border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Less: Excess payment received</span>
+          <span style="font-size:12px;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px;
+          background:#1a1a1a;border-radius:4px;margin-top:4px;">
+          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Final Invoice Total (inc GST)</span>
+          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
+        </div>
+        ` : `
         <div style="display:flex;justify-content:space-between;padding:12px;
           background:#1a1a1a;border-radius:4px;margin-top:4px;">
           <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Total (inc GST)</span>
           <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
         </div>
+        `}
       </div>
     </div>
 
@@ -271,7 +302,7 @@ export function generateInvoiceHtml(params: {
         color:#b0a89e;font-weight:700;margin-bottom:6px;">NOTES</div>
       <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
         <div style="font-size:10px;color:#3a3530;line-height:1.65;">
-          ${invoice.notes || 'No additional notes for this invoice.'}
+          ${notesDisplay || 'No additional notes for this invoice.'}
         </div>
       </div>
     </div>
