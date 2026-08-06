@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
+import { TccModal } from './TccModal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null)
   const [previewData, setPreviewData] = useState<any>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+
+  // TCC modal state
+  const [tccModalQuoteId, setTccModalQuoteId] = useState<string | null>(null)
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -2783,7 +2787,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         onClick={e => {
                           e.stopPropagation()
                           setMenuDropdownId(null)
-                          window.open(`/print/quotes/${q.id}/tcc`, '_blank')
+                          setTccModalQuoteId(q.id)
                         }}
                         style={{
                           display: 'flex',
@@ -2868,6 +2872,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           )
         })}
       </div>
+
+      {tccModalQuoteId && (
+        <TccModal
+          quoteId={tccModalQuoteId}
+          onClose={() => setTccModalQuoteId(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { QuoteData } from '../hooks/useQuote'
+import { TccModal } from './TccModal'
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   draft:              { bg: '#fff8e1', text: '#b45309' },
@@ -64,6 +65,9 @@ export function QuoteHeader({
   // 3-dot menu state
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // TCC modal state
+  const [showTccModal, setShowTccModal] = useState(false)
 
   // Fetch versions when dropdown opens
   useEffect(() => {
@@ -552,7 +556,7 @@ export function QuoteHeader({
             <button
               onClick={() => {
                 setShowMenu(false)
-                window.open(`/print/quotes/${quoteId}/tcc`, '_blank')
+                setShowTccModal(true)
               }}
               style={{
                 display: 'flex',
@@ -579,6 +583,13 @@ export function QuoteHeader({
           </div>
         )}
       </div>
+
+      {showTccModal && (
+        <TccModal
+          quoteId={quoteId}
+          onClose={() => setShowTccModal(false)}
+        />
+      )}
     </div>
   )
 }

@@ -4,10 +4,17 @@ import { PrintButton } from './PrintButton'
 
 export default async function TccPrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ quoteId: string }>
+  searchParams: Promise<{ date?: string; time?: string; completedBy?: string; method?: string }>
 }) {
   const { quoteId } = await params
+  const sp = await searchParams
+  const dateContacted = sp.date || ''
+  const timeContacted = sp.time || ''
+  const completedBy = sp.completedBy || ''
+  const contactMethod = sp.method || ''
 
   const supabase = await createClient()
 
@@ -123,8 +130,10 @@ export default async function TccPrintPage({
                 { label: 'Insurer', value: job.insurer, mono: false },
                 { label: 'Property Address', value: job.property_address, mono: false },
                 { label: 'Policy Holder', value: job.insured_name, mono: false },
-                { label: 'Date & Time Contacted', value: '', mono: false },
-                { label: 'Completed By', value: '', mono: false },
+                { label: 'Date Contacted', value: dateContacted, mono: false },
+                { label: 'Time Contacted', value: timeContacted, mono: false },
+                { label: 'Contact Method', value: contactMethod, mono: false },
+                { label: 'Completed By', value: completedBy, mono: false },
               ].map((row, i, arr) => (
                 <tr key={row.label}>
                   <td style={{ width: '160px', padding: '6px 16px 6px 0', borderBottom: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none', fontSize: '9px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6b6560', verticalAlign: 'top' }}>
