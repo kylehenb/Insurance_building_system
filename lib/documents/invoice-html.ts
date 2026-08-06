@@ -19,8 +19,9 @@ export function generateInvoiceHtml(params: {
     excess_payment_terms?: number | null
   }
   lineItems: InvoiceLineItem[]
+  approvedQuoteRefs?: string[]
 }): string {
-  const { invoice, job, tenant, lineItems } = params
+  const { invoice, job, tenant, lineItems, approvedQuoteRefs } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -64,6 +65,11 @@ export function generateInvoiceHtml(params: {
     } catch { /* plain text notes — show as-is */ }
   }
 
+  const grossIncGst = Math.round(((invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0)) * 100) / 100
+  const quoteRefDisplay = approvedQuoteRefs && approvedQuoteRefs.length > 0
+    ? approvedQuoteRefs.join(' & ')
+    : null
+
   // Build line items table HTML
   const lineItemsHtml = lineItems.map((item) => {
     const isIncomplete = (item as any).completed === false
@@ -76,6 +82,172 @@ export function generateInvoiceHtml(params: {
       <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:${isIncomplete ? '#9e998f' : '#1a1a1a'};${struck}">${fmt(item.line_total)}</td>
     </tr>
   `}).join('')
+
+  // ── Build the line-items + totals section (different layout for quoted_amounts) ──────
+
+  const sectionDivider = (label: string) =>
+    `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#3a3530;white-space:nowrap;">${label}</span>
+      <div style="flex:1;height:1px;background:#e0dbd4;"></div>
+    </div>`
+
+  const mainBodySectionHtml = invoice.invoice_type === 'quoted_amounts' ? `
+
+    <!-- Clause statement -->
+    <div style="background:#f5f2ee;border-left:3px solid #c8b89a;padding:10px 14px;margin-bottom:18px;border-radius:0 4px 4px 0;">
+      <span style="font-size:11px;color:#3a3530;line-height:1.6;">
+        Work carried out and completed as per our quote
+        <strong>${quoteRefDisplay ?? 'approved quote'}</strong>,
+        to rectify damage as authorised.
+      </span>
+    </div>
+
+    <!-- Scope of works section -->
+    ${sectionDivider(`${quoteRefDisplay ?? 'Quote'} — Scope of Works`)}
+    <div style="margin-bottom:8px;">
+      <table>
+        <thead>
+          <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
+            <th style="text-align:left;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Description</th>
+            <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</th>
+            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${lineItemsHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- Quote Invoice Amount sub-totals -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:18px;margin-top:6px;">
+      <div style="width:290px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#3a3530;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #3a3530;">
+          ${quoteRefDisplay ?? 'Quote'} Invoice Amount
+        </div>
+        ${hasBuilderMargin ? `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Line Items Subtotal</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(subtotalFromLines)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Builder&apos;s Margin (${(markupPct * 100).toFixed(1)}%)</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(markupAmount)}</span>
+        </div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Subtotal (ex GST)</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(invoice.amount_ex_gst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">GST Applied</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(invoice.gst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#f5f2ee;border-radius:4px;margin-top:2px;">
+          <span style="font-size:11px;font-weight:700;color:#3a3530;">Total (inc GST)</span>
+          <span style="font-size:12px;font-weight:700;color:#3a3530;">${fmt(grossIncGst)}</span>
+        </div>
+      </div>
+    </div>
+
+    ${excessDeductionIncGst > 0 ? `
+    <!-- Deductions section -->
+    ${sectionDivider('Deductions')}
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fce8e6;border-radius:4px;border-left:3px solid #c5221f;">
+        <span style="font-size:11px;color:#3a3530;">Policy Excess</span>
+        <span style="font-size:12px;font-weight:600;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Total Invoice Payable -->
+    ${sectionDivider('Total Invoice Payable')}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
+      <div style="width:290px;">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Subtotal (ex GST)</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(invoice.amount_ex_gst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">GST Applied</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(invoice.gst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Total (inc GST)</span>
+          <span style="font-size:11px;color:#3a3530;">${fmt(grossIncGst)}</span>
+        </div>
+        ${excessDeductionIncGst > 0 ? `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0ece6;">
+          <span style="font-size:10px;color:#9e998f;">Less Deductions</span>
+          <span style="font-size:11px;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
+        </div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;padding:12px;background:#1a1a1a;border-radius:4px;margin-top:4px;">
+          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Total Invoice Payable</span>
+          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
+        </div>
+      </div>
+    </div>
+
+  ` : `
+
+    <!-- Standard: Line Items Table -->
+    <div style="margin-bottom:14px;">
+      <table>
+        <thead>
+          <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
+            <th style="text-align:left;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Description</th>
+            <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</th>
+            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${lineItemsHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- Standard: Totals Section -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
+      <div style="width:280px;">
+        ${hasBuilderMargin ? `
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Subtotal</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(subtotalFromLines)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Builder&apos;s Margin (${(markupPct * 100).toFixed(1)}%)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(markupAmount)}</span>
+        </div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Subtotal (ex GST)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(invoice.amount_ex_gst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">GST (10%)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(invoice.gst)}</span>
+        </div>
+        ${excessDeductionIncGst > 0 ? `
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Total (inc GST)</span>
+          <span style="font-size:12px;color:#3a3530;">${fmt(grossIncGst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #e0dbd4;">
+          <span style="font-size:11px;color:#9e998f;">Less: Excess payment received</span>
+          <span style="font-size:12px;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px;background:#1a1a1a;border-radius:4px;margin-top:4px;">
+          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Final Invoice Total (inc GST)</span>
+          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
+        </div>
+        ` : `
+        <div style="display:flex;justify-content:space-between;padding:12px;background:#1a1a1a;border-radius:4px;margin-top:4px;">
+          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Total (inc GST)</span>
+          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
+        </div>
+        `}
+      </div>
+    </div>
+
+  `
 
   return `<!DOCTYPE html>
 <html>
@@ -160,78 +332,7 @@ export function generateInvoiceHtml(params: {
   <!-- BODY -->
   <div style="padding:14px 20px 0;">
 
-    <!-- Line Items Table -->
-    <div style="margin-bottom:14px;">
-      <table>
-        <thead>
-          <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
-            <th style="text-align:left;padding:8px 12px;font-size:8px;font-weight:600;
-              text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Description</th>
-            <th style="width:60px;text-align:center;padding:8px 12px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Qty</th>
-            <th style="width:100px;text-align:right;padding:8px 12px;font-size:8px;
-              font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">
-              Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lineItemsHtml}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Totals Section -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
-      <div style="width:280px;">
-        ${hasBuilderMargin ? `
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">Subtotal</span>
-          <span style="font-size:12px;color:#3a3530;">${fmt(subtotalFromLines)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">Builder&apos;s Margin (${(markupPct * 100).toFixed(1)}%)</span>
-          <span style="font-size:12px;color:#3a3530;">${fmt(markupAmount)}</span>
-        </div>
-        ` : ''}
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">Subtotal (ex GST)</span>
-          <span style="font-size:12px;color:#3a3530;">${fmt(invoice.amount_ex_gst)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">GST (10%)</span>
-          <span style="font-size:12px;color:#3a3530;">${fmt(invoice.gst)}</span>
-        </div>
-        ${excessDeductionIncGst > 0 ? `
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">Total (inc GST)</span>
-          <span style="font-size:12px;color:#3a3530;">${fmt((invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0))}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;
-          border-bottom:1px solid #e0dbd4;">
-          <span style="font-size:11px;color:#9e998f;">Less: Excess payment received</span>
-          <span style="font-size:12px;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:12px;
-          background:#1a1a1a;border-radius:4px;margin-top:4px;">
-          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Final Invoice Total (inc GST)</span>
-          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
-        </div>
-        ` : `
-        <div style="display:flex;justify-content:space-between;padding:12px;
-          background:#1a1a1a;border-radius:4px;margin-top:4px;">
-          <span style="font-size:12px;font-weight:600;color:#f5f2ee;">Total (inc GST)</span>
-          <span style="font-size:14px;font-weight:700;color:#ffffff;">${fmt(invoice.amount_inc_gst)}</span>
-        </div>
-        `}
-      </div>
-    </div>
+    ${mainBodySectionHtml}
 
     <!-- Payment Details -->
     <div style="margin-bottom:14px;">

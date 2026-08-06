@@ -84,6 +84,21 @@ export default async function InvoicePrintPage({
     return <div>Tenant not found</div>
   }
 
+  // For quoted_amounts invoices, fetch the approved quote refs for the clause statement
+  let approvedQuoteRefs: string[] = []
+  if (invoice.invoice_type === 'quoted_amounts') {
+    const { data: quotes } = await supabase
+      .from('quotes')
+      .select('quote_ref')
+      .eq('job_id', invoice.job_id)
+      .eq('tenant_id', tenantId)
+      .in('status', ['approved', 'partially_approved'])
+      .order('created_at', { ascending: true })
+    approvedQuoteRefs = (quotes ?? [])
+      .map(q => q.quote_ref)
+      .filter((r): r is string => !!r)
+  }
+
   const html = generateInvoiceHtml({
     invoice,
     job,
@@ -96,6 +111,7 @@ export default async function InvoicePrintPage({
       accounts_email?: string | null
     },
     lineItems: lineItems || [],
+    approvedQuoteRefs,
   })
 
   return (
