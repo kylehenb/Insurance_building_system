@@ -28,6 +28,8 @@ export interface JobContext {
   roofReport: ReportRow | null
   leakDetectionReport: ReportRow | null
   approvedQuote: QuoteRow | null
+  approvedQuotes: QuoteRow[]
+  hasAdditionalItems: boolean
   invoicedReportTypes: string[]
 }
 
@@ -86,11 +88,24 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .neq('status', 'voided'),
-    ]).then(([jobRes, barRes, makeSafeRes, roofRes, leakRes, quotesData, invoicesRes]) => {
+      supabase
+        .from('work_orders')
+        .select('notes')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId),
+    ]).then(([jobRes, barRes, makeSafeRes, roofRes, leakRes, quotesData, invoicesRes, workOrdersRes]) => {
       if (!jobRes.data) return
       const quotes: any[] = Array.isArray(quotesData) ? quotesData : []
-      const approvedQuote = quotes.find((q: any) => q.status === 'approved' || q.status === 'partially_approved') ?? null
+      const approvedQuotes = quotes.filter((q: any) => q.status === 'approved' || q.status === 'partially_approved')
+      const approvedQuote = approvedQuotes[0] ?? null
       const invoicedTypes = (invoicesRes.data ?? []).map((i: any) => i.invoice_type)
+      const hasAdditionalItems = (workOrdersRes.data ?? []).some((wo: any) => {
+        if (!wo.notes) return false
+        try {
+          const parsed = JSON.parse(wo.notes) as Record<string, unknown>
+          return Array.isArray(parsed.added_items) && (parsed.added_items as unknown[]).length > 0
+        } catch { return false }
+      })
       setCtx({
         job: jobRes.data as JobMeta,
         barReport: barRes.data as ReportRow | null,
@@ -98,6 +113,8 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
         roofReport: roofRes.data as ReportRow | null,
         leakDetectionReport: leakRes.data as ReportRow | null,
         approvedQuote: approvedQuote as QuoteRow | null,
+        approvedQuotes: approvedQuotes as QuoteRow[],
+        hasAdditionalItems,
         invoicedReportTypes: invoicedTypes,
       })
     })

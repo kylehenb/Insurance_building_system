@@ -268,6 +268,177 @@ export async function POST(req: NextRequest) {
       })
     }
 
+  } else if (type === 'quoted_amounts') {
+    // Fetch all approved/partially-approved quotes, ordered oldest first
+    const { data: approvedQuotes } = await supabase
+      .from('quotes')
+      .select('id, approved_amount, gst_pct, markup_pct')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .in('status', ['approved', 'partially_approved'])
+      .order('created_at', { ascending: true })
+
+    if (!approvedQuotes || approvedQuotes.length === 0) {
+      return NextResponse.json({ error: 'No approved quotes for this job' }, { status: 400 })
+    }
+
+    const primaryQuote = approvedQuotes[0]
+    const gstPct = primaryQuote.gst_pct ?? DEFAULT_GST_PCT
+    const markupPct = primaryQuote.markup_pct ?? 0
+
+    // Collect scope items from all approved quotes
+    const allLineItems: Array<{
+      tenant_id: string
+      description: string
+      quantity: number
+      unit_price: number
+      line_total: number
+      unit: string | null
+      sort_order: number
+    }> = []
+
+    let sortOffset = 0
+    for (const quote of approvedQuotes) {
+      const { data: items } = await supabase
+        .from('scope_items')
+        .select('item_description, qty, rate_total, line_total, unit, sort_order')
+        .eq('quote_id', quote.id)
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+
+      for (const item of items ?? []) {
+        allLineItems.push({
+          tenant_id: tenantId,
+          description: item.item_description ?? 'Scope Item',
+          quantity: item.qty ?? 1,
+          unit_price: item.rate_total ?? 0,
+          line_total: item.line_total ?? 0,
+          unit: item.unit ?? null,
+          sort_order: (item.sort_order ?? 0) + sortOffset,
+        })
+      }
+      sortOffset += 1000
+    }
+
+    // Add excess deduction if an excess invoice exists (applies once — on this first invoice)
+    const { data: excessInvoices } = await supabase
+      .from('invoices')
+      .select('amount_ex_gst')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .eq('invoice_type', 'excess')
+      .neq('status', 'voided')
+
+    if (excessInvoices && excessInvoices.length > 0) {
+      const totalExcessExGst = Math.round(
+        excessInvoices.reduce((sum, inv) => sum + (inv.amount_ex_gst ?? 0), 0) * 100
+      ) / 100
+      allLineItems.push({
+        tenant_id: tenantId,
+        description: `Less: Excess payment received${job.claim_number ? ` — Claim ${job.claim_number}` : ''}`,
+        quantity: 1,
+        unit_price: -totalExcessExGst,
+        line_total: -totalExcessExGst,
+        unit: null,
+        sort_order: sortOffset + 1000,
+      })
+    }
+
+    const subtotal = Math.round(allLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+    const amountExGst = Math.round(subtotal * (1 + markupPct) * 100) / 100
+    const gst = Math.round(amountExGst * gstPct * 100) / 100
+    const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId,
+        job_id: jobId,
+        invoice_type: 'quoted_amounts',
+        direction: 'outbound',
+        gst_treatment: 'exclusive',
+        amount_ex_gst: amountExGst,
+        gst,
+        amount_inc_gst: amountIncGst,
+        markup_pct: markupPct,
+        status: 'draft',
+      },
+      lineItems: allLineItems,
+    }
+
+  } else if (type === 'variations') {
+    // Collect added_items from all work orders
+    const { data: workOrders } = await supabase
+      .from('work_orders')
+      .select('id, notes')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+
+    interface WOAddedItem {
+      id: string
+      item_description: string
+      qty: number
+      rate_labour: number
+      rate_materials: number
+      line_total: number
+    }
+
+    const allAddedItems: WOAddedItem[] = []
+    for (const wo of workOrders ?? []) {
+      if (!wo.notes) continue
+      try {
+        const parsed = JSON.parse(wo.notes) as Record<string, unknown>
+        if (Array.isArray(parsed.added_items)) {
+          allAddedItems.push(...(parsed.added_items as WOAddedItem[]))
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (allAddedItems.length === 0) {
+      return NextResponse.json({ error: 'No additional items or variations in work orders' }, { status: 400 })
+    }
+
+    let variationsMarkupPct = 0
+    if (job.client_id) {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('builders_margin_pct')
+        .eq('id', job.client_id)
+        .eq('tenant_id', tenantId)
+        .single()
+      variationsMarkupPct = ((client as any)?.builders_margin_pct ?? 0) / 100
+    }
+
+    const variationsLineItems = allAddedItems.map((item, index) => ({
+      tenant_id: tenantId,
+      description: item.item_description,
+      quantity: item.qty,
+      unit_price: item.rate_labour + item.rate_materials,
+      line_total: item.line_total,
+      unit: null as string | null,
+      sort_order: index,
+    }))
+
+    const varSubtotal = Math.round(variationsLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+    const varAmountExGst = Math.round(varSubtotal * (1 + variationsMarkupPct) * 100) / 100
+    const varGst = Math.round(varAmountExGst * DEFAULT_GST_PCT * 100) / 100
+    const varAmountIncGst = Math.round((varAmountExGst + varGst) * 100) / 100
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId,
+        job_id: jobId,
+        invoice_type: 'variations',
+        direction: 'outbound',
+        gst_treatment: 'exclusive',
+        amount_ex_gst: varAmountExGst,
+        gst: varGst,
+        amount_inc_gst: varAmountIncGst,
+        markup_pct: variationsMarkupPct,
+        status: 'draft',
+      },
+      lineItems: variationsLineItems,
+    }
+
   } else if (type === 'custom') {
     let customMarkupPct = 0
     if (job.client_id) {

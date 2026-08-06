@@ -52,6 +52,8 @@ const TYPE_LABELS: Record<string, string> = {
   progress: 'Progress',
   standard: 'Standard',
   custom: 'Custom',
+  quoted_amounts: 'Quoted Amounts',
+  variations: 'Variations',
 }
 
 function fmt(v: number) {
@@ -70,7 +72,7 @@ interface InvoicesListProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: InvoicesListProps) {
-  const { job, barReport, makeSafeReport, roofReport, leakDetectionReport, approvedQuote, invoicedReportTypes } = ctx
+  const { job, barReport, makeSafeReport, roofReport, leakDetectionReport, approvedQuote, approvedQuotes, hasAdditionalItems, invoicedReportTypes } = ctx
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
 
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
@@ -129,6 +131,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
   const hasRoof = invoicedReportTypes.includes('roof')
   const hasLeakDetection = invoicedReportTypes.includes('leak_detection')
   const hasExcess = invoicedReportTypes.includes('excess')
+  const hasQuotedAmounts = invoicedReportTypes.includes('quoted_amounts')
+  const hasVariations = invoicedReportTypes.includes('variations')
 
   // ── Create handlers ───────────────────────────────────────────────────────
 
@@ -149,8 +153,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
       const { invoice: newInvoice } = await res.json() as { invoice: { id: string } }
       await load()
       onInvoiceUpdated?.()
-      // Auto-expand and edit make_safe and custom invoices so they open ready to edit
-      if ((type === 'make_safe' || type === 'custom') && newInvoice?.id) {
+      // Auto-expand and edit these types so they open ready to edit line items
+      if ((type === 'make_safe' || type === 'custom' || type === 'quoted_amounts' || type === 'variations') && newInvoice?.id) {
         setExpandedInvoiceId(newInvoice.id)
         setEditingInvoiceId(newInvoice.id)
       }
@@ -307,20 +311,47 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 </div>
               </button>
 
-              {/* Balance */}
+              {/* Quoted Amounts */}
               <button
-                onClick={() => createInvoice('balance')}
+                disabled={!approvedQuotes.length || hasQuotedAmounts}
+                onClick={() => createInvoice('quoted_amounts')}
                 style={{
                   textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: '#fff',
-                  cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                  borderRadius: 8, background: (!approvedQuotes.length || hasQuotedAmounts) ? '#f5f2ee' : '#fff',
+                  cursor: (!approvedQuotes.length || hasQuotedAmounts) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Balance / Final</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!approvedQuotes.length || hasQuotedAmounts) ? '#9e998f' : '#3a3530' }}>
+                  Quoted Amounts
+                </div>
                 <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
-                  {approvedAmount > 0
-                    ? `${fmt(Math.max(0, balance))} remaining of ${fmt(approvedAmount)}`
-                    : 'No approved quote — balance will be $0.00'}
+                  {!approvedQuotes.length
+                    ? 'No approved quotes for this job'
+                    : hasQuotedAmounts
+                      ? 'Quoted amounts invoice already exists'
+                      : `${approvedQuotes.length} approved quote${approvedQuotes.length > 1 ? 's' : ''} — scope items pre-filled`}
+                </div>
+              </button>
+
+              {/* Additional Items / Variations */}
+              <button
+                disabled={!hasAdditionalItems || hasVariations}
+                onClick={() => createInvoice('variations')}
+                style={{
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
+                  borderRadius: 8, background: (!hasAdditionalItems || hasVariations) ? '#f5f2ee' : '#fff',
+                  cursor: (!hasAdditionalItems || hasVariations) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!hasAdditionalItems || hasVariations) ? '#9e998f' : '#3a3530' }}>
+                  Additional Items / Variations
+                </div>
+                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                  {!hasAdditionalItems
+                    ? 'No additional works or variations in work orders'
+                    : hasVariations
+                      ? 'Variations invoice already exists'
+                      : 'Pre-filled from work order additional items'}
                 </div>
               </button>
 
@@ -399,8 +430,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               onClick={() => {
                 const isExpanding = expandedInvoiceId !== invoice.id
                 setExpandedInvoiceId(isExpanding ? invoice.id : null)
-                // Make safe and custom draft invoices open directly in edit mode
-                if (isExpanding && (invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom') && invoice.status === 'draft') {
+                // These types open directly in edit mode so users can tick/delete line items
+                if (isExpanding && (invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom' || invoice.invoice_type === 'quoted_amounts' || invoice.invoice_type === 'variations') && invoice.status === 'draft') {
                   setEditingInvoiceId(invoice.id)
                 }
               }}
@@ -533,7 +564,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                       )}
 
                       {/* Totals */}
-                      {(invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom') && (() => {
+                      {(invoice.invoice_type === 'make_safe' || invoice.invoice_type === 'custom' || invoice.invoice_type === 'quoted_amounts' || invoice.invoice_type === 'variations') && (() => {
                         const lineSub = invoice.line_items.reduce((s, i) => s + i.line_total, 0)
                         const pct = invoice.markup_pct ?? 0
                         const markup = Math.round(lineSub * pct * 100) / 100
