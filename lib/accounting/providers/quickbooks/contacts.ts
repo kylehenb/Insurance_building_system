@@ -84,14 +84,14 @@ export async function upsertQboContact(
   // 3. Create new contact
   if (contact.isVendor) {
     const payload = {
-      Vendor: {
-        DisplayName: contact.displayName,
-        ...(contact.email ? { PrimaryEmailAddr: { Address: contact.email } } : {}),
-        ...(contact.phone ? { PrimaryPhone: { FreeFormNumber: contact.phone } } : {}),
-        ...(contact.companyName ? { CompanyName: contact.companyName } : {}),
-        ...(contact.abn ? { TaxIdentifier: contact.abn } : {}),
-      },
+      DisplayName: contact.displayName,
+      ...(contact.email ? { PrimaryEmailAddr: { Address: contact.email } } : {}),
+      ...(contact.phone ? { PrimaryPhone: { FreeFormNumber: contact.phone } } : {}),
+      ...(contact.companyName ? { CompanyName: contact.companyName } : {}),
+      ...(contact.abn ? { TaxIdentifier: contact.abn } : {}),
     }
+
+    console.log('[qbo-contact] Creating Vendor payload:', JSON.stringify(payload))
 
     const createRes = await qboFetch(supabase, tenantId, '/vendor', {
       method: 'POST',
@@ -107,13 +107,13 @@ export async function upsertQboContact(
     return createData.Vendor.Id
   } else {
     const payload = {
-      Customer: {
-        DisplayName: contact.displayName,
-        ...(contact.email ? { PrimaryEmailAddr: { Address: contact.email } } : {}),
-        ...(contact.phone ? { PrimaryPhone: { FreeFormNumber: contact.phone } } : {}),
-        ...(contact.companyName ? { CompanyName: contact.companyName } : {}),
-      },
+      DisplayName: contact.displayName,
+      ...(contact.email ? { PrimaryEmailAddr: { Address: contact.email } } : {}),
+      ...(contact.phone ? { PrimaryPhone: { FreeFormNumber: contact.phone } } : {}),
+      ...(contact.companyName ? { CompanyName: contact.companyName } : {}),
     }
+
+    console.log('[qbo-contact] Creating Customer payload:', JSON.stringify(payload))
 
     const createRes = await qboFetch(supabase, tenantId, '/customer', {
       method: 'POST',
