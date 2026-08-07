@@ -184,6 +184,24 @@ export async function POST(req: NextRequest) {
     const jobNumber = `${prefix}${nextNum}`
     console.log('[lodge] new job number:', jobNumber)
 
+    // Step 4c: Resolve client_id from insurer/adjuster name
+    let resolvedClientId: string | null = null
+    const namesToMatch = [order.insurer, order.adjuster].filter((n): n is string => Boolean(n))
+    if (namesToMatch.length > 0) {
+      const { data: matchingClients } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+        .in('name', namesToMatch)
+
+      if (matchingClients && matchingClients.length > 0) {
+        const insurerMatch = order.insurer ? matchingClients.find(c => c.name === order.insurer) : null
+        resolvedClientId = insurerMatch?.id ?? matchingClients[0].id
+      }
+    }
+    console.log('[lodge] resolved client_id:', resolvedClientId)
+
     // Step 5: Create job
     console.log('[lodge] creating job')
     const { data: newJob, error: jobError } = await supabase
@@ -208,6 +226,7 @@ export async function POST(req: NextRequest) {
         special_instructions: order.special_instructions,
         sum_insured: order.sum_insured_building,
         excess: order.excess_building,
+        client_id: resolvedClientId,
         kpi_contact_due: kpi_contact_due.toISOString(),
         kpi_booking_due: kpi_booking_due.toISOString(),
         kpi_visit_due: kpi_visit_due.toISOString(),

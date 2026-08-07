@@ -27,15 +27,32 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
 
   // Fetch job details needed by all types
-  const { data: job, error: jobError } = await supabase
+  const { data: jobData, error: jobError } = await supabase
     .from('jobs')
-    .select('job_number, claim_number, insured_name, excess, tenant_id, client_id, property_address')
+    .select('job_number, claim_number, insured_name, excess, tenant_id, client_id, property_address, insurer')
     .eq('id', jobId)
     .eq('tenant_id', tenantId)
     .single()
 
-  if (jobError || !job) {
+  if (jobError || !jobData) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  }
+
+  // Resolve client_id from insurer name if not set (handles jobs lodged before this was wired up)
+  const job = { ...jobData }
+  if (!job.client_id && job.insurer) {
+    const { data: resolvedClient } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .eq('name', job.insurer)
+      .maybeSingle()
+
+    if (resolvedClient) {
+      job.client_id = resolvedClient.id
+      await supabase.from('jobs').update({ client_id: resolvedClient.id }).eq('id', jobId)
+    }
   }
 
   let generated: {

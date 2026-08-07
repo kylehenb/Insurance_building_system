@@ -73,22 +73,14 @@ export async function POST(req: NextRequest) {
 
     // Resolve client_id by matching insurer/adjuster name and invoice_to trading name
     let resolvedClientId: string | null = null
-    if (insurer || adjuster) {
-      let clientQuery = supabase
+    const namesToMatch = [insurer, adjuster].filter((n): n is string => Boolean(n))
+    if (namesToMatch.length > 0) {
+      const { data: matchingClients } = await supabase
         .from('clients')
         .select('id, name, trading_name')
         .eq('tenant_id', tenantId)
         .eq('status', 'active')
-
-      if (insurer && adjuster) {
-        clientQuery = clientQuery.or(`name.eq.${insurer},name.eq.${adjuster}`)
-      } else if (insurer) {
-        clientQuery = clientQuery.eq('name', insurer)
-      } else {
-        clientQuery = clientQuery.eq('name', adjuster)
-      }
-
-      const { data: matchingClients } = await clientQuery
+        .in('name', namesToMatch)
 
       if (matchingClients && matchingClients.length > 0) {
         if (invoice_to) {
@@ -97,7 +89,8 @@ export async function POST(req: NextRequest) {
           )
           resolvedClientId = byTradingName?.id ?? matchingClients[0].id
         } else {
-          resolvedClientId = matchingClients[0].id
+          const insurerMatch = insurer ? matchingClients.find(c => c.name === insurer) : null
+          resolvedClientId = insurerMatch?.id ?? matchingClients[0].id
         }
       }
     }
