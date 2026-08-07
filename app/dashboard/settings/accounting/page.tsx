@@ -161,6 +161,9 @@ export default function AccountingSettingsPage() {
         if (accountsRes.ok) {
           const accountsData = (await accountsRes.json()) as { accounts: ChartOfAccountsItem[] }
           setAccounts(accountsData.accounts)
+        } else {
+          const accountsErr = (await accountsRes.json().catch(() => ({}))) as { error?: string }
+          setError(`Failed to load accounts: ${accountsErr.error ?? `HTTP ${accountsRes.status}`}`)
         }
 
         // Fetch existing mappings
