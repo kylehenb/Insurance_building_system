@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 
+interface OAuthStateRow {
+  tenant_id: string
+  created_at: string
+}
+
 interface QboTokenResponse {
   access_token: string
   refresh_token: string
@@ -10,17 +15,58 @@ interface QboTokenResponse {
   token_type: string
 }
 
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000 // 10 minutes
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const realmId = searchParams.get('realmId')
-  const tenantId = searchParams.get('state')
+  const nonce = searchParams.get('state')
 
-  if (!code || !realmId || !tenantId) {
+  if (!code || !realmId || !nonce) {
     return NextResponse.redirect(
       new URL('/dashboard/settings/accounting?error=missing_params', req.url)
     )
   }
+
+  // oauth_state and accounting_credentials are not in the generated Database types
+  const rawDb = createRawClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // CSRF check: validate the nonce against the server-side store.
+  // tenantId is retrieved from the DB — it is never read from the inbound URL.
+  const { data: stateRow, error: stateError } = await rawDb
+    .from('oauth_state')
+    .select('tenant_id, created_at')
+    .eq('nonce', nonce)
+    .single()
+
+  if (stateError || !stateRow) {
+    console.error('[accounting/callback] unknown or already-used OAuth state nonce')
+    return NextResponse.redirect(
+      new URL('/dashboard/settings/accounting?error=invalid_state', req.url)
+    )
+  }
+
+  const row = stateRow as OAuthStateRow
+
+  // Enforce TTL — nonce must have been issued within the last 10 minutes
+  const age = Date.now() - new Date(row.created_at).getTime()
+  if (age > OAUTH_STATE_TTL_MS) {
+    await rawDb.from('oauth_state').delete().eq('nonce', nonce)
+    console.error('[accounting/callback] OAuth state nonce expired (age ms:', age, ')')
+    return NextResponse.redirect(
+      new URL('/dashboard/settings/accounting?error=state_expired', req.url)
+    )
+  }
+
+  // Consume the nonce — one-time use, prevents replay
+  await rawDb.from('oauth_state').delete().eq('nonce', nonce)
+
+  // tenantId comes from the server-side DB row, not from the inbound URL
+  const tenantId = row.tenant_id
 
   const clientId = process.env.QBO_CLIENT_ID!
   const clientSecret = process.env.QBO_CLIENT_SECRET!
@@ -59,12 +105,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     now + tokens.x_refresh_token_expires_in * 1000
   ).toISOString()
 
-  // Use raw client for new tables not yet in Database types
-  const rawDb = createRawClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
   const { error: credError } = await rawDb
     .from('accounting_credentials')
     .upsert(
@@ -88,8 +128,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     )
   }
 
-  const supabase = createServiceClient()
-  await supabase
+  const serviceSupabase = createServiceClient()
+  await serviceSupabase
     .from('automation_config')
     .upsert(
       {
