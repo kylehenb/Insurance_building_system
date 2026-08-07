@@ -96,9 +96,9 @@ export function generateInvoiceHtml(params: {
     <!-- Clause statement -->
     <div style="background:#f5f2ee;border-left:3px solid #c8b89a;padding:10px 14px;margin-bottom:18px;border-radius:0 4px 4px 0;">
       <span style="font-size:11px;color:#3a3530;line-height:1.6;">
-        Work carried out and completed as per our quote
+        Work completed as per our quote
         <strong>${quoteRefDisplay ?? 'approved quote'}</strong>,
-        to rectify damage as authorised.
+        as authorised
       </span>
     </div>
 

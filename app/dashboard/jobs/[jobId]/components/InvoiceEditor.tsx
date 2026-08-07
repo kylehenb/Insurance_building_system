@@ -55,7 +55,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   // ── Computed totals ─────────────────────────────────────────────────────────
 
-  const hasBuilderMargin = (invoice?.markup_pct ?? 0) > 0
+  const hasBuilderMargin = (invoice?.markup_pct ?? 0) > 0 || invoice?.invoice_type === 'variations'
   const markupPct = invoice?.markup_pct ?? 0
   const activeItems = lineItems.filter(i => i.completed !== false)
   const lineSubtotal = activeItems.reduce((sum, item) => sum + item.line_total, 0)
