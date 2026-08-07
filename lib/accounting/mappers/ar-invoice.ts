@@ -13,6 +13,7 @@ interface InvoiceRow {
   amount_ex_gst: number
   gst: number
   amount_inc_gst: number
+  markup_pct: number | null
   issued_date: string
   paid_date: string | null
   trade_invoice_number: string | null
@@ -205,12 +206,40 @@ export async function mapIrcInvoiceToAccounting(
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unit_price,
-      lineTotal: item.line_total,  // GST-exclusive; confirmed by invoice.amount_ex_gst = sum(line_total)
+      lineTotal: item.line_total,
       accountId: defaultAccountId,
       accountName: defaultAccountName,
       taxCode: 'GST',
     }
   })
+
+  const lineSubtotal = lineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+  const markupPct = invoice.markup_pct ?? 0
+  const margin = Math.round(lineSubtotal * markupPct * 100) / 100
+
+  console.log(
+    `[ar-invoice] markup_pct=${markupPct} lineSubtotal=${lineSubtotal} margin=${margin} amount_ex_gst=${invoice.amount_ex_gst}`
+  )
+
+  if (margin > 0) {
+    mappedLineItems.push({
+      description: 'IRC Builders Margin',
+      quantity: 1,
+      unitPrice: margin,
+      lineTotal: margin,
+      accountId: defaultAccountId,
+      accountName: defaultAccountName,
+      taxCode: 'GST',
+    })
+  }
+
+  const totalLineAmounts = mappedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
+  const roundedTotal = Math.round(totalLineAmounts * 100) / 100
+  if (Math.abs(roundedTotal - invoice.amount_ex_gst) > 0.01) {
+    throw new Error(
+      `[ar-invoice] Line total mismatch: sum of lines=${roundedTotal} but invoice.amount_ex_gst=${invoice.amount_ex_gst} (diff=${Math.abs(roundedTotal - invoice.amount_ex_gst).toFixed(4)}). Aborting QBO sync to prevent mismatched totals.`
+    )
+  }
 
   const accountingInvoice: AccountingInvoice = {
     ircInvoiceRef: invoice.invoice_ref,
