@@ -5,6 +5,7 @@ import {
   generateBalanceInvoice,
 } from '@/lib/invoices/generators'
 import { generateInvoiceRef } from '@/lib/invoices/ref'
+import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
 
 const DEFAULT_GST_PCT = 0.1
 
@@ -520,6 +521,13 @@ export async function POST(req: NextRequest) {
     .eq('invoice_id', invoice.id)
     .eq('tenant_id', tenantId)
     .order('sort_order', { ascending: true })
+
+  if (invoice.status === 'sent') {
+    console.log(`[invoice-sync] Auto-triggering sync for invoice ${invoice.id} on generation with status 'sent'`)
+    void syncInvoiceToAccounting(supabase, tenantId, invoice.id).catch((err: unknown) => {
+      console.error(`[invoice-sync] Unexpected sync error for invoice ${invoice.id}:`, err)
+    })
+  }
 
   return NextResponse.json({ invoice, lineItems: lineItems ?? [] }, { status: 201 })
 }
