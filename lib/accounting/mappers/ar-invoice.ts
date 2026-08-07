@@ -197,14 +197,19 @@ export async function mapIrcInvoiceToAccounting(
   const defaultAccountId = accountMap?.accounting_account_id ?? '1'
   const defaultAccountName = accountMap?.accounting_account_name ?? 'Income'
 
-  const mappedLineItems: AccountingLineItem[] = lineItems.map((item) => ({
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    lineTotal: item.line_total,
-    accountId: defaultAccountId,
-    accountName: defaultAccountName,
-  }))
+  const mappedLineItems: AccountingLineItem[] = lineItems.map((item) => {
+    console.log(
+      `[ar-invoice] raw line item — unit_price=${item.unit_price} quantity=${item.quantity} line_total=${item.line_total} desc="${item.description}"`
+    )
+    return {
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      lineTotal: item.line_total,
+      accountId: defaultAccountId,
+      accountName: defaultAccountName,
+    }
+  })
 
   const accountingInvoice: AccountingInvoice = {
     ircInvoiceRef: invoice.invoice_ref,

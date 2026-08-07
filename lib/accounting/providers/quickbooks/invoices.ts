@@ -43,12 +43,15 @@ export async function createQboInvoice(
   contactId: string
 ): Promise<string> {
   const lines: QboInvoiceLine[] = invoice.lineItems.map((item) => {
-    // QBO requires Amount === UnitPrice * Qty exactly. Derive Amount from the
-    // same fields QBO will use for validation rather than using lineTotal
-    // (which may be GST-inclusive or rounded differently).
-    const amount = Math.round(item.unitPrice * item.quantity * 100) / 100
+    // unit_price/quantity may be null/0 in invoice_line_items — only line_total is
+    // guaranteed to be populated. When unit_price is absent, model the line as
+    // qty=1 at line_total price so QBO's Amount === UnitPrice * Qty check passes.
+    const hasUnitPrice = item.unitPrice != null && item.unitPrice !== 0
+    const qty = hasUnitPrice ? item.quantity : 1
+    const unitPrice = hasUnitPrice ? item.unitPrice : item.lineTotal
+    const amount = Math.round(unitPrice * qty * 100) / 100
     console.log(
-      `[qbo-invoice] line — UnitPrice=${item.unitPrice} Qty=${item.quantity} Amount=${amount} (lineTotal in DB=${item.lineTotal})`
+      `[qbo-invoice] line — raw unitPrice=${item.unitPrice} qty=${item.quantity} lineTotal=${item.lineTotal} → sending UnitPrice=${unitPrice} Qty=${qty} Amount=${amount}`
     )
     return {
       DetailType: 'SalesItemLineDetail',
@@ -59,8 +62,8 @@ export async function createQboInvoice(
           value: item.accountId,
           name: item.accountName,
         },
-        Qty: item.quantity,
-        UnitPrice: item.unitPrice,
+        Qty: qty,
+        UnitPrice: unitPrice,
       },
     }
   })
