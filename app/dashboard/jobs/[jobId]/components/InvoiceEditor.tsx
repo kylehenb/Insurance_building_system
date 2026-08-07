@@ -181,10 +181,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     if (!item || !invoice) return
 
     const updated = { ...item, ...changes }
-    if ('quantity' in changes) {
+    if ('quantity' in changes || 'unit_price' in changes) {
       updated.line_total = Math.round(updated.quantity * updated.unit_price * 100) / 100
-    } else if ('line_total' in changes) {
-      updated.unit_price = updated.quantity > 0 ? Math.round((updated.line_total / updated.quantity) * 100) / 100 : 0
     }
 
     const newItems = lineItems.map(i => i.id === itemId ? updated : i)
@@ -193,10 +191,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
     try {
       const updateData: Record<string, unknown> = { ...changes }
-      if ('quantity' in changes) {
+      if ('quantity' in changes || 'unit_price' in changes) {
         updateData.line_total = updated.line_total
-      } else if ('line_total' in changes) {
-        updateData.unit_price = updated.unit_price
       }
 
       await supabase
@@ -278,10 +274,11 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         ) : (
           <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
               <div />
               <div>Description</div>
               <div style={{ textAlign: 'right' }}>Qty</div>
+              <div style={{ textAlign: 'right' }}>Amount</div>
               <div style={{ textAlign: 'right' }}>Total</div>
               <div />
             </div>
@@ -293,7 +290,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                   key={item.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '20px 3fr 1fr 1fr 40px',
+                    gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px',
                     gap: 12,
                     padding: '12px 16px',
                     fontSize: 13,
@@ -346,20 +343,27 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                     )}
                   </div>
 
-                  {/* Line total */}
+                  {/* Amount (unit price) */}
                   <div style={{ textAlign: 'right' }}>
                     {isIncomplete ? (
-                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.line_total)}</span>
+                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.unit_price)}</span>
                     ) : (
                       <input
                         type="number"
-                        value={item.line_total}
-                        onChange={(e) => updateItem(item.id, { line_total: parseFloat(e.target.value) || 0 })}
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
                         min="0"
                         step="0.01"
                         style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                       />
                     )}
+                  </div>
+
+                  {/* Line total (read-only) */}
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, color: isIncomplete ? '#9e998f' : '#3a3530', textDecoration: isIncomplete ? 'line-through' : 'none' }}>
+                      {fmt(item.line_total)}
+                    </span>
                   </div>
 
                   {/* Delete */}
