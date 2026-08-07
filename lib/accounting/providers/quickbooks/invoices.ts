@@ -42,19 +42,28 @@ export async function createQboInvoice(
   invoice: AccountingInvoice,
   contactId: string
 ): Promise<string> {
-  const lines: QboInvoiceLine[] = invoice.lineItems.map((item) => ({
-    DetailType: 'SalesItemLineDetail',
-    Amount: item.lineTotal,
-    Description: item.description,
-    SalesItemLineDetail: {
-      ItemRef: {
-        value: item.accountId,
-        name: item.accountName,
+  const lines: QboInvoiceLine[] = invoice.lineItems.map((item) => {
+    // QBO requires Amount === UnitPrice * Qty exactly. Derive Amount from the
+    // same fields QBO will use for validation rather than using lineTotal
+    // (which may be GST-inclusive or rounded differently).
+    const amount = Math.round(item.unitPrice * item.quantity * 100) / 100
+    console.log(
+      `[qbo-invoice] line — UnitPrice=${item.unitPrice} Qty=${item.quantity} Amount=${amount} (lineTotal in DB=${item.lineTotal})`
+    )
+    return {
+      DetailType: 'SalesItemLineDetail',
+      Amount: amount,
+      Description: item.description,
+      SalesItemLineDetail: {
+        ItemRef: {
+          value: item.accountId,
+          name: item.accountName,
+        },
+        Qty: item.quantity,
+        UnitPrice: item.unitPrice,
       },
-      Qty: item.quantity,
-      UnitPrice: item.unitPrice,
-    },
-  }))
+    }
+  })
 
   const payload: QboInvoicePayload = {
     CustomerRef: {
