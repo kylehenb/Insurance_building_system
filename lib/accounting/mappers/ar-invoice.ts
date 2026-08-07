@@ -159,11 +159,18 @@ export async function mapIrcInvoiceToAccounting(
   }
 
   // 5. Fetch tenant for payment terms
-  const { data: tenantData } = await supabase
+  const { data: tenantData, error: tenantError } = await supabase
     .from('tenants')
     .select('id, invoice_payment_terms')
-    .eq('tenant_id', tenantId)
+    .eq('id', tenantId)
     .single()
+
+  if (tenantError) {
+    console.warn(
+      `[ar-invoice] Failed to fetch tenant payment terms for tenant ${tenantId}:`,
+      tenantError.message
+    )
+  }
 
   const tenant = tenantData as TenantRow | null
   const paymentTermsDays = tenant?.invoice_payment_terms ?? 14

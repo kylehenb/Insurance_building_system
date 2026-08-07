@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
+import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
 
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 
@@ -61,6 +62,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if ('issued_date' in updates) allowedFields.issued_date = updates.issued_date
   if ('notes' in updates) allowedFields.notes = updates.notes
 
+  // Capture previous status before update so we can detect a transition to 'sent'
+  let previousStatus: string | null = null
+  if (updates.status === 'sent') {
+    const { data: current } = await supabase
+      .from('invoices')
+      .select('status')
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId)
+      .single()
+    previousStatus = (current as { status: string } | null)?.status ?? null
+  }
+
   const { data: invoice, error } = await supabase
     .from('invoices')
     .update(allowedFields)
@@ -71,6 +84,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (error || !invoice) {
     return NextResponse.json({ error: error?.message ?? 'Update failed' }, { status: 500 })
+  }
+
+  // Auto-trigger accounting sync when an invoice is first marked sent
+  if (updates.status === 'sent' && previousStatus !== 'sent') {
+    console.log(
+      `[invoice-sync] Auto-triggering sync for invoice ${invoiceId} on status change to 'sent'`
+    )
+    // Non-blocking: sync writes its own failure state via accounting_sync_status
+    void syncInvoiceToAccounting(supabase, tenantId, invoiceId).catch((err: unknown) => {
+      console.error(`[invoice-sync] Unexpected sync error for invoice ${invoiceId}:`, err)
+    })
   }
 
   return NextResponse.json({ invoice })
