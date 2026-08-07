@@ -49,6 +49,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     notes?: string
   }
 
+  console.log(`[invoice-patch] PATCH hit — invoiceId=${invoiceId} body=${JSON.stringify(body)}`)
+
   const { tenantId, ...updates } = body
 
   if (!tenantId) {
@@ -86,8 +88,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: error?.message ?? 'Update failed' }, { status: 500 })
   }
 
+  const syncConditionMet = updates.status === 'sent' && previousStatus !== 'sent'
+  console.log(
+    `[invoice-patch] sync-condition check — newStatus=${updates.status ?? 'not set'} previousStatus=${previousStatus ?? 'null'} conditionMet=${syncConditionMet}`
+  )
+
   // Auto-trigger accounting sync when an invoice is first marked sent
-  if (updates.status === 'sent' && previousStatus !== 'sent') {
+  if (syncConditionMet) {
     console.log(
       `[invoice-sync] Auto-triggering sync for invoice ${invoiceId} on status change to 'sent'`
     )
