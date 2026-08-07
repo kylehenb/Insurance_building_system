@@ -135,5 +135,12 @@ export async function qboFetch(
     },
   })
 
+  // Log Intuit's trace ID on every response so it's always available in Vercel logs,
+  // even when the caller swallows or reformats the error.
+  const tid = response.headers.get('intuit_tid')
+  console.log(
+    `[qbo] ${options?.method ?? 'GET'} ${path} → ${response.status}${tid ? ` intuit_tid=${tid}` : ''}`
+  )
+
   return response
 }

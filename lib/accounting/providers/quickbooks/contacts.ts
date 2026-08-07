@@ -99,8 +99,9 @@ export async function upsertQboContact(
     })
 
     if (!createRes.ok) {
+      const tid = createRes.headers.get('intuit_tid') ?? 'unavailable'
       const errBody = await createRes.text()
-      throw new Error(`Failed to create QBO vendor: ${createRes.status} ${errBody}`)
+      throw new Error(`Failed to create QBO vendor: ${createRes.status} ${errBody} [intuit_tid=${tid}]`)
     }
 
     const createData = (await createRes.json()) as QboVendorResponse
@@ -121,8 +122,9 @@ export async function upsertQboContact(
     })
 
     if (!createRes.ok) {
+      const tid = createRes.headers.get('intuit_tid') ?? 'unavailable'
       const errBody = await createRes.text()
-      throw new Error(`Failed to create QBO customer: ${createRes.status} ${errBody}`)
+      throw new Error(`Failed to create QBO customer: ${createRes.status} ${errBody} [intuit_tid=${tid}]`)
     }
 
     const createData = (await createRes.json()) as QboCustomerResponse

@@ -495,6 +495,17 @@ export default function AccountingSettingsPage() {
         </div>
       )}
 
+      {/* Support contact */}
+      <p className="mt-6 text-xs text-[#9e998f]">
+        Need help?{' '}
+        <a
+          href="mailto:office@insurancerepairco.com.au"
+          className="underline hover:text-[#3a3530]"
+        >
+          Contact office@insurancerepairco.com.au
+        </a>
+      </p>
+
       {/* Tenant ID for debugging — hidden from UI, available as data attr if needed */}
       {tenantId && <div className="hidden" data-tenant-id={tenantId} />}
     </div>

@@ -98,8 +98,9 @@ export async function createQboInvoice(
   })
 
   if (!res.ok) {
+    const tid = res.headers.get('intuit_tid') ?? 'unavailable'
     const errBody = await res.text()
-    throw new Error(`Failed to create QBO invoice: ${res.status} ${errBody}`)
+    throw new Error(`Failed to create QBO invoice: ${res.status} ${errBody} [intuit_tid=${tid}]`)
   }
 
   const data = (await res.json()) as QboInvoiceCreateResponse
