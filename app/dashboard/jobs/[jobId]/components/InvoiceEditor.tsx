@@ -183,6 +183,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     const updated = { ...item, ...changes }
     if ('quantity' in changes) {
       updated.line_total = Math.round(updated.quantity * updated.unit_price * 100) / 100
+    } else if ('line_total' in changes) {
+      updated.unit_price = updated.quantity > 0 ? Math.round((updated.line_total / updated.quantity) * 100) / 100 : 0
     }
 
     const newItems = lineItems.map(i => i.id === itemId ? updated : i)
@@ -193,6 +195,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       const updateData: Record<string, unknown> = { ...changes }
       if ('quantity' in changes) {
         updateData.line_total = updated.line_total
+      } else if ('line_total' in changes) {
+        updateData.unit_price = updated.unit_price
       }
 
       await supabase
