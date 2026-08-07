@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AccountingInvoice } from '../../types'
 import { qboFetch } from './client'
+import { getQboGstTaxCodeId } from './taxcodes'
 
 interface QboInvoiceLine {
   DetailType: 'SalesItemLineDetail'
@@ -13,6 +14,9 @@ interface QboInvoiceLine {
     }
     Qty: number
     UnitPrice: number
+    TaxCodeRef: {
+      value: string
+    }
   }
 }
 
@@ -26,6 +30,7 @@ interface QboInvoicePayload {
   CurrencyRef: {
     value: string
   }
+  GlobalTaxCalculation: 'TaxExcluded'
   Line: QboInvoiceLine[]
 }
 
@@ -42,6 +47,8 @@ export async function createQboInvoice(
   invoice: AccountingInvoice,
   contactId: string
 ): Promise<string> {
+  const gstCodeId = await getQboGstTaxCodeId(supabase, tenantId)
+
   const lines: QboInvoiceLine[] = invoice.lineItems.map((item) => {
     // unit_price/quantity may be null/0 in invoice_line_items — only line_total is
     // guaranteed to be populated. When unit_price is absent, model the line as
@@ -64,6 +71,9 @@ export async function createQboInvoice(
         },
         Qty: qty,
         UnitPrice: unitPrice,
+        TaxCodeRef: {
+          value: gstCodeId,
+        },
       },
     }
   })
@@ -78,6 +88,7 @@ export async function createQboInvoice(
     CurrencyRef: {
       value: invoice.currency,
     },
+    GlobalTaxCalculation: 'TaxExcluded',
     Line: lines,
   }
 

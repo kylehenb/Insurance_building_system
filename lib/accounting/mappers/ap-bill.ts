@@ -116,6 +116,7 @@ export async function mapIrcBillToAccounting(
     lineTotal: item.line_total,
     accountId: defaultAccountId,
     accountName: defaultAccountName,
+    taxCode: 'GST',
   }))
 
   // 6. Calculate due date (today + 30 days)

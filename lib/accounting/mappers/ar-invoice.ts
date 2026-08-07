@@ -205,9 +205,10 @@ export async function mapIrcInvoiceToAccounting(
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unit_price,
-      lineTotal: item.line_total,
+      lineTotal: item.line_total,  // GST-exclusive; confirmed by invoice.amount_ex_gst = sum(line_total)
       accountId: defaultAccountId,
       accountName: defaultAccountName,
+      taxCode: 'GST',
     }
   })
 

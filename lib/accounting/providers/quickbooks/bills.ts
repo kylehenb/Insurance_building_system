@@ -42,19 +42,25 @@ export async function createQboBill(
   bill: AccountingBill,
   vendorId: string
 ): Promise<string> {
-  const lines: QboBillLine[] = bill.lineItems.map((item) => ({
-    DetailType: 'ItemBasedExpenseLineDetail',
-    Amount: item.lineTotal,
-    Description: item.description,
-    ItemBasedExpenseLineDetail: {
-      ItemRef: {
-        value: item.accountId,
-        name: item.accountName,
+  const lines: QboBillLine[] = bill.lineItems.map((item) => {
+    const hasUnitPrice = item.unitPrice != null && item.unitPrice !== 0
+    const qty = hasUnitPrice ? item.quantity : 1
+    const unitPrice = hasUnitPrice ? item.unitPrice : item.lineTotal
+    const amount = Math.round(unitPrice * qty * 100) / 100
+    return {
+      DetailType: 'ItemBasedExpenseLineDetail',
+      Amount: amount,
+      Description: item.description,
+      ItemBasedExpenseLineDetail: {
+        ItemRef: {
+          value: item.accountId,
+          name: item.accountName,
+        },
+        Qty: qty,
+        UnitPrice: unitPrice,
       },
-      Qty: item.quantity,
-      UnitPrice: item.unitPrice,
-    },
-  }))
+    }
+  })
 
   const payload: QboBillPayload = {
     VendorRef: {

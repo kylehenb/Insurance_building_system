@@ -32,6 +32,7 @@ export interface AccountingLineItem {
   lineTotal: number
   accountId: string
   accountName: string
+  taxCode: string
 }
 
 export interface AccountingInvoice {
