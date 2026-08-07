@@ -93,15 +93,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     `[invoice-patch] sync-condition check — newStatus=${updates.status ?? 'not set'} previousStatus=${previousStatus ?? 'null'} conditionMet=${syncConditionMet}`
   )
 
-  // Auto-trigger accounting sync when an invoice is first marked sent
+  // Auto-trigger accounting sync when an invoice is first marked sent.
+  // Must be awaited — Vercel terminates the execution context when the response is sent,
+  // so a fire-and-forget void call is killed before it can write 'failed' to the DB.
   if (syncConditionMet) {
     console.log(
       `[invoice-sync] Auto-triggering sync for invoice ${invoiceId} on status change to 'sent'`
     )
-    // Non-blocking: sync writes its own failure state via accounting_sync_status
-    void syncInvoiceToAccounting(supabase, tenantId, invoiceId).catch((err: unknown) => {
+    try {
+      await syncInvoiceToAccounting(supabase, tenantId, invoiceId)
+    } catch (err: unknown) {
+      // syncInvoiceToAccounting catches its own errors and writes 'failed' to the DB.
+      // This outer catch is a last-resort guard and should never be reached.
       console.error(`[invoice-sync] Unexpected sync error for invoice ${invoiceId}:`, err)
-    })
+    }
   }
 
   return NextResponse.json({ invoice })
