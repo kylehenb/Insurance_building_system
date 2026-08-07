@@ -171,15 +171,11 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
   const handleStatusChange = useCallback(async (invoiceId: string, newStatus: string) => {
     setStatusChangingId(invoiceId)
     try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      await supabase
-        .from('invoices')
-        .update({ status: newStatus })
-        .eq('id', invoiceId)
-        .eq('tenant_id', tenantId)
+      await fetch(`/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, status: newStatus }),
+      })
       load()
     } finally {
       setStatusChangingId(null)

@@ -121,12 +121,12 @@ export default function InvoicesPage() {
 
   const markSent = useCallback(async (e: React.MouseEvent, invoice: InvoiceRow) => {
     e.stopPropagation()
-    const { error } = await supabase
-      .from('invoices')
-      .update({ status: 'sent' })
-      .eq('id', invoice.id)
-      .eq('tenant_id', tenantId!)
-    if (!error) loadInvoices()
+    const res = await fetch(`/api/invoices/${invoice.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId: tenantId!, status: 'sent' }),
+    })
+    if (res.ok) loadInvoices()
   }, [tenantId, loadInvoices])
 
   const uniqueTypes = Array.from(new Set(invoices.map(i => i.invoice_type)))
