@@ -2,36 +2,30 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ChartOfAccountsItem } from '../../types'
 import { qboFetch } from './client'
 
-interface QboAccountRow {
+interface QboItemRow {
   Id: string
   Name: string
-  AccountType: string
-  AccountSubType: string | null
-  AcctNum: string | null
+  FullyQualifiedName: string
+  Type: string
   Active: boolean
+  Sku: string | null
 }
 
-interface QboAccountQueryResponse {
+interface QboItemQueryResponse {
   QueryResponse: {
-    Account?: QboAccountRow[]
+    Item?: QboItemRow[]
     totalCount?: number
   }
 }
 
-const ALLOWED_ACCOUNT_TYPES = new Set([
-  'Income',
-  'OtherIncome',
-  'CostOfGoodsSold',
-  'Expense',
-  'OtherExpense',
-])
+const ALLOWED_ITEM_TYPES = new Set(['Service', 'NonInventory'])
 
 export async function getQboAccounts(
   supabase: SupabaseClient,
   tenantId: string
 ): Promise<ChartOfAccountsItem[]> {
   const query = encodeURIComponent(
-    'SELECT * FROM Account WHERE Active = true MAXRESULTS 200'
+    'SELECT * FROM Item WHERE Active = true MAXRESULTS 200'
   )
 
   const res = await qboFetch(supabase, tenantId, `/query?query=${query}`)
@@ -39,19 +33,19 @@ export async function getQboAccounts(
   if (!res.ok) {
     const tid = res.headers.get('intuit_tid') ?? 'unavailable'
     const errBody = await res.text()
-    throw new Error(`Failed to fetch QBO accounts: ${res.status} ${errBody} [intuit_tid=${tid}]`)
+    throw new Error(`Failed to fetch QBO items: ${res.status} ${errBody} [intuit_tid=${tid}]`)
   }
 
-  const data = (await res.json()) as QboAccountQueryResponse
-  const accounts = data.QueryResponse.Account ?? []
+  const data = (await res.json()) as QboItemQueryResponse
+  const items = data.QueryResponse.Item ?? []
 
-  return accounts
-    .filter((account) => ALLOWED_ACCOUNT_TYPES.has(account.AccountType))
-    .map((account) => ({
-      id: account.Id,
-      name: account.Name,
-      accountType: account.AccountType,
-      accountSubType: account.AccountSubType ?? null,
-      code: account.AcctNum ?? null,
+  return items
+    .filter((item) => ALLOWED_ITEM_TYPES.has(item.Type))
+    .map((item) => ({
+      id: item.Id,
+      name: item.FullyQualifiedName || item.Name,
+      accountType: item.Type,
+      accountSubType: null,
+      code: item.Sku ?? null,
     }))
 }

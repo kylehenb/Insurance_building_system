@@ -330,7 +330,7 @@ export default function AccountingSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-[#1a1a1a]">Accounting & QuickBooks</h1>
         <p className="text-sm text-[#9e998f] mt-1">
-          Connect QuickBooks Online, map your chart of accounts, and sync invoices and bills.
+          Connect QuickBooks Online, map your products and services, and sync invoices and bills.
         </p>
       </div>
 
@@ -401,9 +401,9 @@ export default function AccountingSettingsPage() {
         <div className="bg-white rounded-lg border border-[#e8e4e0] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-[#1a1a1a]">Chart of Accounts Mapping</h2>
+              <h2 className="text-sm font-semibold text-[#1a1a1a]">Product & Service Mapping</h2>
               <p className="text-xs text-[#9e998f] mt-0.5">
-                Map each IRC invoice category to a QuickBooks account.
+                Map each IRC invoice category to a QuickBooks product or service.
               </p>
             </div>
             <button
@@ -421,8 +421,8 @@ export default function AccountingSettingsPage() {
 
           {accounts.length === 0 ? (
             <p className="text-sm text-[#9e998f]">
-              No accounts loaded. Ensure QuickBooks is connected and your chart of accounts has
-              Income, Expense, or COGS accounts.
+              No products or services loaded. Ensure QuickBooks is connected and you have active
+              Service or Non-Inventory items in your Products & Services list.
             </p>
           ) : (
             <div className="divide-y divide-[#e8e4e0]">
@@ -441,7 +441,7 @@ export default function AccountingSettingsPage() {
                       onChange={(e) => handleMappingChange(category, e.target.value)}
                       className="w-full border border-[#e8e4e0] rounded text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#c9a96e] text-[#1a1a1a]"
                     >
-                      <option value="">— select account —</option>
+                      <option value="">— select product/service —</option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.id}>
                           {account.name}
