@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { qboFetch } from './client'
 
+// Cached per lambda invocation — tax codes don't change mid-batch
+const gstCodeCache = new Map<string, string>()
+
 interface QboTaxCodeRow {
   Id: string
   Name: string
@@ -17,6 +20,9 @@ export async function getQboGstTaxCodeId(
   supabase: SupabaseClient,
   tenantId: string
 ): Promise<string> {
+  const cached = gstCodeCache.get(tenantId)
+  if (cached) return cached
+
   const query = encodeURIComponent('SELECT * FROM TaxCode WHERE Active = true MAXRESULTS 100')
   const res = await qboFetch(supabase, tenantId, `/query?query=${query}`)
 
@@ -36,5 +42,6 @@ export async function getQboGstTaxCodeId(
     )
   }
 
+  gstCodeCache.set(tenantId, gst.Id)
   return gst.Id
 }
