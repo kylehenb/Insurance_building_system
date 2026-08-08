@@ -5,7 +5,7 @@ import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
 
 export const maxDuration = 300
 
-const DELAY_MS = 750
+const DELAY_MS = 250
 
 interface TenantRow {
   id: string
