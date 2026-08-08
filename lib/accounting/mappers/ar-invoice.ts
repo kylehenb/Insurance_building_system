@@ -133,6 +133,10 @@ export async function mapIrcInvoiceToAccounting(
     }
   } else {
     // Use client as contact
+    if (!job.client_id || job.client_id === 'null') {
+      throw new Error(`Job ${job.id} has no client assigned — cannot determine billing contact for invoice ${invoiceId}`)
+    }
+
     contactSourceType = 'client'
     contactSourceId = job.client_id
 
