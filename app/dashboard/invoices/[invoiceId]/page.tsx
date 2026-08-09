@@ -408,11 +408,16 @@ export default function InvoiceDetailPage() {
   const hasMarkup = (invoice.markup_pct ?? 0) > 0
   const markupPct = invoice.markup_pct ?? 0
   const activeLineItems = lineItems.filter(i => i.completed !== false)
-  const subtotalFromLines = activeLineItems.reduce((s, i) => s + i.line_total, 0)
-  const markupAmount = hasMarkup ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
   const exGst = invoice.amount_ex_gst ?? 0
   const gst = invoice.gst ?? 0
   const incGst = invoice.amount_inc_gst ?? 0
+  // Derive the display subtotal from the stored exGst so the totals panel is always
+  // internally consistent (subtotal + margin = exGst), regardless of whether line items
+  // have been added/changed since the last recalc.
+  const displaySubtotal = hasMarkup ? Math.round(exGst / (1 + markupPct) * 100) / 100 : exGst
+  const markupAmount = hasMarkup ? Math.round((exGst - displaySubtotal) * 100) / 100 : 0
+  // subtotalFromLines is still used as the live input to recalcTotals when items change
+  const subtotalFromLines = activeLineItems.reduce((s, i) => s + i.line_total, 0)
 
   return (
     <>
@@ -690,7 +695,7 @@ export default function InvoiceDetailPage() {
                   <>
                     <div className="invd-total-row">
                       <span className="invd-total-label">Subtotal</span>
-                      <span className="invd-total-val">{fmt(subtotalFromLines)}</span>
+                      <span className="invd-total-val">{fmt(displaySubtotal)}</span>
                     </div>
                     <div className="invd-total-row">
                       <span className="invd-total-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
