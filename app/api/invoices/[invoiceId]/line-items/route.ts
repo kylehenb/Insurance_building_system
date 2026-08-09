@@ -17,11 +17,15 @@ async function recalcInvoiceTotals(supabase: ReturnType<typeof import('@/lib/sup
 
   const { data: items } = await supabase
     .from('invoice_line_items')
-    .select('line_total')
+    .select('line_total, completed')
     .eq('invoice_id', invoiceId)
     .eq('tenant_id', tenantId)
 
-  const amountExGst = Math.round((items ?? []).reduce((sum, i) => sum + (i.line_total ?? 0), 0) * 100) / 100
+  const amountExGst = Math.round(
+    (items ?? [])
+      .filter((i) => (i as { completed: boolean | null }).completed !== false)
+      .reduce((sum, i) => sum + (i.line_total ?? 0), 0) * 100
+  ) / 100
   const gst = Math.round(amountExGst * 0.1 * 100) / 100
   const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
 

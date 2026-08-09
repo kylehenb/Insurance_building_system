@@ -27,6 +27,7 @@ interface LineItemRow {
   quantity: number
   unit_price: number
   line_total: number
+  completed: boolean | null
 }
 
 interface JobRow {
@@ -94,7 +95,9 @@ export async function mapIrcInvoiceToAccounting(
     throw new Error(`Failed to fetch line items: ${lineItemsError.message}`)
   }
 
-  const lineItems = (lineItemsData ?? []) as LineItemRow[]
+  const lineItems = (lineItemsData ?? [] as LineItemRow[]).filter(
+    (item) => item.completed !== false
+  ) as LineItemRow[]
 
   // 3. Fetch job
   const { data: jobData, error: jobError } = await supabase
