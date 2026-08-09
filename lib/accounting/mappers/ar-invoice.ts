@@ -118,12 +118,14 @@ export async function mapIrcInvoiceToAccounting(
   let contactSourceId: string
   let contactSourceType: 'client' | 'job_homeowner'
 
-  if (isExcessType) {
-    // Use homeowner (insured) as contact
+  const hasClient = job.client_id && job.client_id !== 'null'
+
+  if (isExcessType || !hasClient) {
+    // Use homeowner (insured) as contact — either excess invoice or private/no-client job
     contactSourceType = 'job_homeowner'
     contactSourceId = job.id
     contact = {
-      displayName: job.insured_name ?? 'Homeowner',
+      displayName: job.insured_name ?? 'Private Client',
       email: job.insured_email ?? null,
       phone: job.insured_phone ?? null,
       companyName: null,
@@ -132,11 +134,7 @@ export async function mapIrcInvoiceToAccounting(
       existingAccountingId: job.homeowner_accounting_contact_id ?? null,
     }
   } else {
-    // Use client as contact
-    if (!job.client_id || job.client_id === 'null') {
-      throw new Error(`Job ${job.id} has no client assigned — cannot determine billing contact for invoice ${invoiceId}`)
-    }
-
+    // Use insurer client as contact
     contactSourceType = 'client'
     contactSourceId = job.client_id
 
