@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import JobSchedule from '@/components/schedule/JobSchedule'
+import { CommsFeed } from '@/components/comms/CommsFeed'
 import ContactsEditor from '@/components/contacts/ContactsEditor'
 import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
 import { InsurerSelect } from '@/components/clients/InsurerSelect'
@@ -1974,6 +1975,9 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
           <CommunicationsCard jobId={jobId} tenantId={tenantId} />
           <JobSchedule jobId={jobId} tenantId={tenantId} />
         </div>
+
+        {/* 4. Full-width communications feed */}
+        <CommsFeed jobId={jobId} />
       </div>
     </div>
   )
