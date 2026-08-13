@@ -271,7 +271,6 @@ export async function POST(
       // Save basic attendance fields to the report
       await service.from('reports').update({
         ...(rawReportDump ? { raw_report_notes: rawReportDump } : {}),
-        person_met: personMet ?? null,
         attendance_date: now.split('T')[0],
       }).eq('id', resolvedReportId).eq('tenant_id', tenantId)
 
@@ -296,18 +295,14 @@ export async function POST(
           system: barSystemPrompt,
           messages: [{
             role: 'user',
-            content: `Generate a structured BAR report from the following inspection notes.
+            content: `Generate a structured BAR report from the following inspection notes. The inspector has dictated everything into a single note — extract all relevant details including who they met and the property description.
 
 Raw Report Notes:
 ${rawReportDump}
 
-Property Description (inspector's notes):
-${propDesc || ''}
-
-Person Met on Site: ${personMet || ''}
-
 Return ONLY a JSON object with these exact keys (empty string if unknown):
 {
+  "person_met": "",
   "property_description": "",
   "incident_description": "",
   "cause_of_damage": "",
@@ -325,6 +320,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
         if (barMatch) {
           const ai = JSON.parse(barMatch[0]) as Record<string, string>
           const updateData: Record<string, unknown> = {
+            ...(ai.person_met ? { person_met: ai.person_met } : {}),
             incident_description: ai.incident_description || null,
             cause_of_damage: ai.cause_of_damage || null,
             how_damage_occurred: ai.how_damage_occurred || null,
@@ -334,6 +330,10 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
             conclusion: ai.conclusion || null,
           }
           await service.from('reports').update(updateData as any).eq('id', resolvedReportId).eq('tenant_id', tenantId)
+          // Also update inspection person_met if extracted
+          if (ai.person_met) {
+            await service.from('inspections').update({ person_met: ai.person_met }).eq('id', inspectionId).eq('tenant_id', tenantId)
+          }
           reportGenerated = true
         }
       }
@@ -342,8 +342,8 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
     }
   }
 
-  // 2.6. Extract structured property details from propDesc via AI → jobs.property_details
-  if (propDesc?.trim() && insp.job_id) {
+  // 2.6. Extract structured property details from rawReportDump via AI → jobs.property_details
+  if (rawReportDump?.trim() && insp.job_id) {
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const pdMsg = await anthropic.messages.create({
@@ -351,10 +351,10 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
         max_tokens: 512,
         messages: [{
           role: 'user',
-          content: `Extract structured property details from the following description. Return ONLY a JSON object — only include keys where the value can be clearly identified. Omit keys you are uncertain about.
+          content: `Extract structured property details from the following inspection notes. Return ONLY a JSON object — only include keys where the value can be clearly identified. Omit keys you are uncertain about.
 
-Property Description:
-${propDesc.trim()}
+Inspection Notes:
+${rawReportDump.trim()}
 
 JSON keys and types:
 {

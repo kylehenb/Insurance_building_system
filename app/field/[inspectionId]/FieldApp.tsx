@@ -112,11 +112,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
 
-  // ─── Details ─────────────────────────────────────────────────────────────
-  const [personMet, setPersonMet] = useState(initialData.personMet ?? initialData.insuredName ?? '')
-  const [relation, setRelation] = useState('')
-  const [propDesc, setPropDesc] = useState('')
-
   // ─── Scope ────────────────────────────────────────────────────────────────
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
 
@@ -260,7 +255,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
-    personMet, relation, propDesc, raw_report_notes, photoContext,
+    raw_report_notes, photoContext,
     hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     roofRawNotes, roofPhotoContext,
@@ -271,7 +266,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     damage_template: damageTemplate, damage_template_saved: damageTemplateSaved,
     roof_damage_template: roofDamageTemplate, roof_damage_template_saved: roofDamageTemplateSaved,
     ms_damage_template: msDamageTemplate, ms_damage_template_saved: msDamageTemplateSaved,
-  }), [personMet, relation, propDesc, raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes, damageTemplate, damageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved])
+  }), [raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes, damageTemplate, damageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -303,9 +298,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   useEffect(() => {
     const d = initialData.fieldDraft as Record<string, unknown> | null
     if (!d) return
-    if (d.personMet) setPersonMet(d.personMet as string)
-    if (d.relation) setRelation(d.relation as string)
-    if (d.propDesc) setPropDesc(d.propDesc as string)
     if (d.raw_report_notes) setRawReportNotes(d.raw_report_notes as string)
     if (d.photoContext) setPhotoContext(d.photoContext as string)
     if (d.hospitalName) setHospitalName(d.hospitalName as string)
@@ -358,7 +350,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     setSafetyDone(true)
     setStep(2)
     armDraft()
-    setTimeout(() => document.getElementById('sec-details')?.scrollIntoView({ behavior: 'smooth' }), 150)
+    setTimeout(() => document.getElementById('sec-scope')?.scrollIntoView({ behavior: 'smooth' }), 150)
   }
 
   const addRoom = () => {
@@ -493,7 +485,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          personMet,
+          personMet: '',
           safetyData: {
             general: chips.general,
             ppe: chips.ppe,
@@ -503,11 +495,11 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             weather: chips.weather,
             customNotes: customSafetyNotes,
             hospitalName,
-            signedBy: personMet,
+            signedBy: initialData.inspector ?? '',
           },
           scopeRooms: scopeRoomsPayload,
           rawReportDump: raw_report_notes,
-          propDesc,
+          propDesc: '',
           photoContext,
           insurer: initialData.insurer ?? '',
           lossType: initialData.lossType ?? '',
@@ -544,7 +536,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
-  const stepLabels = ['', 'Safety', 'Details', 'Scope', 'Notes', 'Photos', 'Reports']
+  const stepLabels = ['', 'Safety', 'Scope', 'Notes', 'Photos', 'Reports', '']
 
   return (
     <div className="fa-root">
@@ -567,7 +559,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
       {/* PROGRESS */}
       <div className="fa-prog-bar">
-        {[1, 2, 3, 4, 5, 6].map(i => (
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className={`fa-prog${step > i ? ' done' : step === i ? ' active' : ''}`} />
         ))}
         <div className="fa-prog-lbl">{stepLabels[step]}</div>
@@ -696,46 +688,10 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
       </div>
 
-      {/* ── 02 DETAILS ───────────────────────────────────────────────────── */}
-      <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-details">
-        <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>02</div>
-          <div className="fa-sc-meta"><h3>Details</h3><p>Person on site · property description</p></div>
-          <span className="fa-badge req">Required</span>
-        </div>
-        <div className="fa-sc-body">
-          {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
-          <div style={{ padding: '16px 0' }}>
-            <div className="fa-fg">
-              <label className="fa-fl">Person Met On Site <span className="req">*</span></label>
-              <input className="fa-input" type="text" value={personMet} onChange={e => { setPersonMet(e.target.value); armDraft() }} placeholder="Full name" enterKeyHint="next" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }} />
-            </div>
-            <div className="fa-fg">
-              <label className="fa-fl">Relation to Property</label>
-              <div className="fa-rg inline">
-                {['Owner', 'Tenant', 'Agent', 'Other'].map(r => (
-                  <button key={r} className={`fa-ro${relation === r ? ' sel' : ''}`} onClick={() => { setRelation(r); armDraft() }}>{r}</button>
-                ))}
-              </div>
-            </div>
-            <div className="fa-fg">
-              <label className="fa-fl">Property Description</label>
-              <textarea
-                className="fa-ta"
-                placeholder="e.g. Single storey brick veneer, tiled roof, circa 1985…"
-                style={{ minHeight: 90 }}
-                value={propDesc}
-                onChange={e => { setPropDesc(e.target.value); armDraft() }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 03 SCOPE NOTES ───────────────────────────────────────────────── */}
+      {/* ── 02 SCOPE NOTES ───────────────────────────────────────────────── */}
       <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-scope">
         <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>03</div>
+          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>02</div>
           <div className="fa-sc-meta"><h3>Scope Notes</h3><p>Rooms · dimensions · items</p></div>
           <span className="fa-badge req">Required</span>
         </div>
@@ -804,10 +760,10 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
       </div>
 
-      {/* ── 04 REPORT NOTES ──────────────────────────────────────────────── */}
+      {/* ── 03 REPORT NOTES ──────────────────────────────────────────────── */}
       <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-notes">
         <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>04</div>
+          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>03</div>
           <div className="fa-sc-meta"><h3>Raw Report Notes</h3><p>Damage description · cause · findings</p></div>
           <span className="fa-badge req">Required</span>
         </div>
@@ -840,14 +796,14 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
               <span className="fa-ai-dark-title">AI Report Generation</span>
             </div>
             <div className="fa-ai-hints">
-              {['What was damaged', 'Cause of damage', 'Pre-existing conditions', 'Any maintenance noted', 'Extent of damage', 'Structural concerns'].map(hint => (
+              {['Who you met', 'Property description', 'What was damaged', 'Cause of damage', 'Pre-existing conditions', 'Any maintenance noted', 'Extent of damage', 'Structural concerns'].map(hint => (
                 <div key={hint} className="fa-ai-hint">{hint}</div>
               ))}
             </div>
             <div className="fa-ai-dark-body">
               <textarea
                 className="fa-ai-dark-ta"
-                placeholder="Describe the damage, cause, and your findings in plain language. AI will structure this into a professional report…"
+                placeholder="Dictate your raw notes here — who you met on site, property description, damage description, cause, and your findings. AI will structure this into a professional report…"
                 style={{ minHeight: 130 }}
                 value={raw_report_notes}
                 onChange={e => { setRawReportNotes(e.target.value); armDraft() }}
@@ -857,10 +813,10 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
       </div>
 
-      {/* ── 05 PHOTOS ────────────────────────────────────────────────────── */}
+      {/* ── 04 PHOTOS ────────────────────────────────────────────────────── */}
       <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-photos">
         <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>05</div>
+          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>04</div>
           <div className="fa-sc-meta"><h3>Photos</h3><p>Upload · label with AI</p></div>
           <span className="fa-badge req">Required</span>
         </div>
@@ -935,10 +891,10 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
       </div>
 
-      {/* ── 06 ADDITIONAL REPORTS ─────────────────────────────────────────── */}
+      {/* ── 05 ADDITIONAL REPORTS ─────────────────────────────────────────── */}
       <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-reports">
         <div className="fa-sc-head">
-          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>06</div>
+          <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>05</div>
           <div className="fa-sc-meta"><h3>Additional Reports</h3><p>Make Safe · Roof Report · Leak Detection · Restoration</p></div>
           <span className="fa-badge opt">Optional</span>
         </div>
