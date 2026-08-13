@@ -16,6 +16,7 @@ type Client = Database['public']['Tables']['clients']['Row']
 interface InsurerSelectProps {
   tenantId: string
   value: string | null
+  clientId?: string | null
   onSave: (value: string | null, clientId: string | null) => void
   label?: string
 }
@@ -34,7 +35,7 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 }
 
-export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: InsurerSelectProps) {
+export function InsurerSelect({ tenantId, value, clientId, onSave, label = 'Insurer' }: InsurerSelectProps) {
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -62,6 +63,20 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
     }
   }, [tenantId, supabase])
 
+  // Resolve displayed value: prefer matching by clientId, then by exact name
+  const resolvedValue = (() => {
+    if (loading) return '_none_'
+    if (clientId) {
+      const byId = insurers.find(i => i.id === clientId)
+      if (byId) return byId.name
+    }
+    if (value) {
+      const byName = insurers.find(i => i.name === value)
+      if (byName) return byName.name
+    }
+    return '_none_'
+  })()
+
   const handleChange = (newValue: string) => {
     // Find the selected insurer to get its name and id
     const selected = insurers.find(i => i.name === newValue)
@@ -85,7 +100,7 @@ export function InsurerSelect({ tenantId, value, onSave, label = 'Insurer' }: In
         {label}
       </div>
       <Select
-        value={value || '_none_'}
+        value={resolvedValue}
         onValueChange={handleChange}
         disabled={loading}
       >

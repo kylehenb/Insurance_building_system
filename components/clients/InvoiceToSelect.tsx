@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import {
@@ -51,6 +51,7 @@ export function InvoiceToSelect({
 
   const [options, setOptions] = useState<Array<{ trading_name: string; name: string; type: string }>>([])
   const [loading, setLoading] = useState(false)
+  const hasAutoSelected = useRef(false)
 
   useEffect(() => {
     async function fetchMatchingClients() {
@@ -107,6 +108,16 @@ export function InvoiceToSelect({
       fetchMatchingClients()
     }
   }, [tenantId, insurer, adjuster, supabase])
+
+  // Auto-select when options first load and value is empty
+  useEffect(() => {
+    if (loading) { hasAutoSelected.current = false; return }
+    if (!hasAutoSelected.current && !value && options.length === 1) {
+      hasAutoSelected.current = true
+      onSave(options[0].trading_name)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, options])
 
   const handleChange = (newValue: string) => {
     if (newValue === '_none_') {

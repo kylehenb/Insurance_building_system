@@ -270,6 +270,7 @@ export default function InsurerOrdersPage() {
     claim_description: '',
     special_instructions: '',
   })
+  const [newOrderClientId, setNewOrderClientId] = useState<string | null>(null)
   const [creatingOrder, setCreatingOrder] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -622,6 +623,7 @@ export default function InsurerOrdersPage() {
           loss_type: newOrderForm.loss_type.trim() || null,
           claim_description: newOrderForm.claim_description.trim() || null,
           special_instructions: newOrderForm.special_instructions.trim() || null,
+          client_id: newOrderClientId,
           entry_method: 'manual',
           parse_status: 'manual_entry',
           status: 'pending',
@@ -633,6 +635,7 @@ export default function InsurerOrdersPage() {
 
       setOrders(prev => [newOrder, ...prev])
       setNewOrderOpen(false)
+      setNewOrderClientId(null)
       setNewOrderForm({
         claim_number: '',
         insurer: '',
@@ -1041,7 +1044,16 @@ export default function InsurerOrdersPage() {
                                     <InsurerSelect
                                       tenantId={tenantId!}
                                       value={order.insurer}
-                                      onSave={v => saveField(order.id, 'insurer', v || '')}
+                                      clientId={order.client_id}
+                                      onSave={(v, newClientId) => {
+                                        saveField(order.id, 'insurer', v || '')
+                                        supabase.from('insurer_orders')
+                                          .update({ client_id: newClientId } as never)
+                                          .eq('id', order.id)
+                                          .then(() => setOrders(prev =>
+                                            prev.map(o => o.id === order.id ? { ...o, client_id: newClientId } : o)
+                                          ))
+                                      }}
                                     />
                                     <WoTypeSelect
                                       label="WO Type" value={order.wo_type}
@@ -1446,7 +1458,10 @@ export default function InsurerOrdersPage() {
               <InsurerSelect
                 tenantId={tenantId!}
                 value={newOrderForm.insurer}
-                onSave={v => setNewOrderForm(f => ({ ...f, insurer: v || '' }))}
+                onSave={(v, clientId) => {
+                  setNewOrderForm(f => ({ ...f, insurer: v || '' }))
+                  setNewOrderClientId(clientId)
+                }}
               />
 
               <div>
@@ -1595,6 +1610,7 @@ export default function InsurerOrdersPage() {
                 <button
                   onClick={() => {
                     setNewOrderOpen(false)
+                    setNewOrderClientId(null)
                     setNewOrderForm({
                       claim_number: '',
                       insurer: '',
