@@ -79,13 +79,12 @@ async function swapLabel(
 }
 
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get('authorization')
+function checkCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
+}
 
+async function runPoll(): Promise<NextResponse> {
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -191,4 +190,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[gmail-poll] error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+// Vercel Cron triggers via GET
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runPoll()
+}
+
+// Keep POST for manual/test invocation
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runPoll()
 }
