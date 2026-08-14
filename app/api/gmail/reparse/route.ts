@@ -60,7 +60,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const apiKey = process.env.GEMINI_API_KEY
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
       const parts: Part[] = [
         { text: 'Extract claim data as JSON. Return only valid JSON.' },
