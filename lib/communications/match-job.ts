@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 
 // Candidate match surfaced to the manual-link UI
@@ -65,20 +65,22 @@ async function extractIdentifiers(
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY not set')
 
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const ai = new GoogleGenAI({ apiKey })
 
-  const result = await model.generateContent([
-    { text: EXTRACTION_SYSTEM },
-    { text: '\n<email_content>\n' },
-    { text: `Subject: ${subject}\n\n${body}` },
-    { text: '\n</email_content>' },
-  ])
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: [
+      { text: '\n<email_content>\n' },
+      { text: `Subject: ${subject}\n\n${body}` },
+      { text: '\n</email_content>' },
+    ],
+    config: { systemInstruction: EXTRACTION_SYSTEM },
+  })
 
-  const text = result.response.text().trim()
-  const jsonText = text.startsWith('```')
-    ? text.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '')
-    : text
+  const text = (result.text ?? '').trim()
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  const jsonObjectMatch = text.match(/\{[\s\S]*\}/)
+  const jsonText = codeBlockMatch ? codeBlockMatch[1] : (jsonObjectMatch ? jsonObjectMatch[0] : text)
 
   let raw: GeminiExtraction = {}
   try {

@@ -10,7 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI, Part } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
+import type { Part } from '@google/genai'
 import { getUser } from '@/lib/supabase/get-user'
 import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
@@ -59,11 +60,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY
     if (apiKey) {
-      const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+      const ai = new GoogleGenAI({ apiKey })
 
       const parts: Part[] = [
-        { text: 'Extract claim data as JSON. Return only valid JSON.' },
         { text: `Subject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.bodyText}` },
       ]
 
@@ -72,8 +71,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         parts.push({ inlineData: { mimeType: 'application/pdf', data: pdf.data } })
       }
 
-      const result = await model.generateContent(parts)
-      geminiRawText = result.response.text()
+      const result = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: parts,
+        config: { systemInstruction: 'Extract claim data as JSON. Return only valid JSON.' },
+      })
+      geminiRawText = result.text ?? null
     }
   } catch (err) {
     geminiError = String(err)

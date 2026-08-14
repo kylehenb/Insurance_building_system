@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, Part } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
+import type { Part } from '@google/genai'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -126,8 +127,7 @@ export async function parseInsurerOrder(
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY not set')
 
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const ai = new GoogleGenAI({ apiKey })
 
   const pdf = findLargestPdf(message)
 
@@ -185,7 +185,6 @@ export async function parseInsurerOrder(
   }
 
   const parts: Part[] = [
-    { text: systemInstruction },
     { text: '\n<email_content>\n' },
     { text: `Subject: ${message.subject}\nFrom: ${message.from}\nTo: ${message.to}\n\n${message.bodyText}` },
     { text: '\n</email_content>' },
@@ -202,8 +201,12 @@ export async function parseInsurerOrder(
 
   let raw: GeminiRawResult = {}
   try {
-    const result = await model.generateContent(parts)
-    const text = result.response.text().trim()
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: parts,
+      config: { systemInstruction },
+    })
+    const text = (result.text ?? '').trim()
     // Extract JSON robustly: handle code fences anywhere in the response,
     // or fall back to the first {...} block, or the raw text.
     let jsonText: string
