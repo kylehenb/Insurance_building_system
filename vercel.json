@@ -5,6 +5,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/gmail/renew",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/accounting/poll-payments",
       "schedule": "0 22 * * *"
     }

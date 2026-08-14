@@ -38,6 +38,9 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
     const { error: upsertError } = await rawDb
       .from('gmail_sync_state')
       .upsert(
@@ -45,7 +48,10 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
           tenant_id: tenantId,
           email_address: WATCHED_EMAIL,
           last_history_id: watch.historyId,
-          last_synced_at: new Date().toISOString(),
+          last_synced_at: now.toISOString(),
+          expires_at: expiresAt,
+          last_renewal_status: 'ok',
+          last_renewal_error: null,
         },
         { onConflict: 'tenant_id,email_address' }
       )
@@ -59,6 +65,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
       success: true,
       expiration: watch.expiration,
       historyId: watch.historyId,
+      expiresAt,
     })
   } catch (err) {
     console.error('[gmail-setup] error:', err)
