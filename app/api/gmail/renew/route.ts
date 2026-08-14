@@ -4,12 +4,12 @@ import { startGmailWatch } from '@/lib/gmail/watch'
 
 const WATCHED_EMAIL = 'office@insurancerepairco.com.au'
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get('authorization')
+function checkCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
+}
+
+async function renewWatch(): Promise<NextResponse> {
 
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,4 +73,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 502 }
     )
   }
+}
+
+// Vercel Cron triggers via GET — guard is the same CRON_SECRET Bearer check
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return renewWatch()
+}
+
+// Keep POST for manual/test invocation
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return renewWatch()
 }
