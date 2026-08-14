@@ -56,15 +56,6 @@ interface ActionCard {
   type: string
 }
 
-interface CommEntry {
-  id: string
-  type: string
-  direction: string | null
-  contact_name: string | null
-  content: string | null
-  created_at: string
-}
-
 interface CalendarEvent {
   date: string
   label: string
@@ -89,15 +80,6 @@ function formatDate(s: string | null) {
   return new Date(s).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function formatRelativeTime(s: string) {
-  const diff = Date.now() - new Date(s).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return formatDate(s)
-}
-
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
   const h = Math.floor(diff / 3600000)
@@ -113,16 +95,6 @@ function inferCardType(ruleKey: string): string {
   if (ruleKey.includes('status')) return 'status'
   if (ruleKey.includes('alert')) return 'notification'
   return 'task'
-}
-
-const COMM_COLORS: Record<string, string> = {
-  email: '#1a73e8',
-  sms: '#2e7d32',
-  note: '#b45309',
-}
-
-function commInitial(type: string) {
-  return type.charAt(0).toUpperCase()
 }
 
 // ── Shared CSS ─────────────────────────────────────────────────────────────
@@ -1554,150 +1526,6 @@ function ActionCardsSection({ jobId, tenantId, job }: { jobId: string; tenantId:
   )
 }
 
-// ── Communications Card ────────────────────────────────────────────────────
-
-function CommunicationsCard({ jobId, tenantId }: { jobId: string; tenantId: string }) {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
-  const [comms, setComms] = useState<CommEntry[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('communications')
-        .select('id,type,direction,contact_name,content,created_at')
-        .eq('job_id', jobId)
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false })
-        .limit(6)
-      setComms((data ?? []) as CommEntry[])
-      setLoading(false)
-    }
-    load()
-  }, [jobId, tenantId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div
-      style={{
-        background: '#fff',
-        border: '0.5px solid #e4dfd8',
-        borderRadius: 8,
-        overflow: 'hidden',
-        fontFamily: 'DM Sans, sans-serif',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 16px',
-          borderBottom: '0.5px solid #e4dfd8',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-            color: '#9e998f',
-            fontWeight: 500,
-          }}
-        >
-          Communications
-        </span>
-        <button
-          style={{
-            fontSize: 11,
-            color: '#c8b89a',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          Full feed →
-        </button>
-      </div>
-
-      <div>
-        {loading ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
-            Loading…
-          </div>
-        ) : comms.length === 0 ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
-            No communications yet
-          </div>
-        ) : (
-          comms.map(c => {
-            const color = COMM_COLORS[c.type] ?? '#9e998f'
-            const initial = commInitial(c.type)
-            const dirLabel =
-              c.direction === 'inbound' ? 'Inbound' : c.direction === 'outbound' ? 'Outbound' : 'Note'
-            return (
-              <div
-                key={c.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 12,
-                  padding: '11px 16px',
-                  borderBottom: '0.5px solid #f0ece6',
-                }}
-              >
-                <div
-                  style={{
-                    flexShrink: 0,
-                    width: 30,
-                    height: 30,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: color,
-                    color: '#fff',
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  {initial}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>
-                      {c.contact_name || 'Unknown'}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#9e998f' }}>{formatRelativeTime(c.created_at)}</span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        padding: '1px 6px',
-                        borderRadius: 4,
-                        background: '#f5f2ee',
-                        color: '#9e998f',
-                      }}
-                    >
-                      {dirLabel}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 12, color: '#9e998f', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {c.content || '(no content)'}
-                  </p>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Calendar Card ──────────────────────────────────────────────────────────
 
 const MONTH_NAMES = [
@@ -1970,14 +1798,11 @@ export function OverviewTab({ jobId, tenantId, job }: OverviewTabProps) {
           <ActionCardsSection jobId={jobId} tenantId={tenantId} job={job} />
         </div>
 
-        {/* 3. Two equal columns: Communications + Calendar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          <CommunicationsCard jobId={jobId} tenantId={tenantId} />
-          <JobSchedule jobId={jobId} tenantId={tenantId} />
-        </div>
-
         {/* 4. Full-width communications feed */}
         <CommsFeed jobId={jobId} />
+
+        {/* 5. Calendar */}
+        <JobSchedule jobId={jobId} tenantId={tenantId} />
       </div>
     </div>
   )
