@@ -47,7 +47,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/ai/") ||
     pathname.startsWith("/api/webhooks/") ||
-    pathname.startsWith("/api/gmail/setup");
+    pathname.startsWith("/api/gmail/");
 
   // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
