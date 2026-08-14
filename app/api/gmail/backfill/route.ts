@@ -50,8 +50,6 @@ type EmailKeywordRuleRow = {
   active: boolean
 }
 
-type RawDb = ReturnType<typeof createRawClient>
-
 function isOwnDomain(email: string): boolean {
   return email.toLowerCase().endsWith(`@${OUR_DOMAIN}`)
 }
@@ -104,7 +102,11 @@ async function listInboxSince(since: string): Promise<string[]> {
   return ids
 }
 
-async function getProcessedSet(ids: string[], rawDb: RawDb): Promise<Set<string>> {
+async function getProcessedSet(ids: string[]): Promise<Set<string>> {
+  const rawDb = createRawClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const processed = new Set<string>()
   const CHUNK = 400
   for (let i = 0; i < ids.length; i += CHUNK) {
@@ -130,11 +132,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const since = req.nextUrl.searchParams.get('since') ?? DEFAULT_SINCE
 
-  const rawDb = createRawClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
   let allIds: string[]
   try {
     allIds = await listInboxSince(since)
@@ -142,7 +139,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Gmail list failed', detail: String(err) }, { status: 502 })
   }
 
-  const alreadyProcessed = await getProcessedSet(allIds, rawDb)
+  const alreadyProcessed = await getProcessedSet(allIds)
 
   return NextResponse.json({
     since,
@@ -194,7 +191,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Gmail list failed', detail: String(err) }, { status: 502 })
   }
 
-  const alreadyProcessed = await getProcessedSet(allIds, rawDb)
+  const alreadyProcessed = await getProcessedSet(allIds)
   const toProcess = allIds.filter(id => !alreadyProcessed.has(id)).slice(0, max)
 
   type ResultEntry = {
