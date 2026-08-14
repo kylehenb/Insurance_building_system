@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { CommsItem } from './CommsItem'
@@ -27,6 +27,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CommsFilters>(DEFAULT_FILTERS)
+  const [fetchRevision, setFetchRevision] = useState(0)
 
   // ── Auth bootstrap ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -44,6 +45,8 @@ export function CommsFeed({ jobId }: { jobId: string }) {
     }
     init()
   }, [])
+
+  const refetch = useCallback(() => setFetchRevision(r => r + 1), [])
 
   // ── Fetch comms (after auth) ───────────────────────────────────────────────
   useEffect(() => {
@@ -69,7 +72,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
     }
 
     fetchComms()
-  }, [userId, tenantId, jobId])
+  }, [userId, tenantId, jobId, fetchRevision])
 
   // ── Derived: unique contact types for filter bar ───────────────────────────
   const contactTypeOptions = useMemo(() => {
@@ -188,7 +191,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
       ) : (
         <div>
           {filtered.map(c => (
-            <CommsItem key={c.id} comm={c} />
+            <CommsItem key={c.id} comm={c} onReplySent={refetch} />
           ))}
         </div>
       )}

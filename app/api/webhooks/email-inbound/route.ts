@@ -286,6 +286,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
             from_email: msg.fromEmail,
             to_email: msg.to,
             body_text: msg.bodyText,
+            gmail_message_id: msg.gmailMessageId || null,
             source: 'inbound',
           } as never)
           continue
@@ -342,6 +343,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           from_email: msg.fromEmail,
           to_email: msg.to,
           body_text: msg.bodyText,
+          gmail_message_id: msg.gmailMessageId || null,
           source: 'unlinked',
         } as never)
       }

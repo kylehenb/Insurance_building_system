@@ -21,6 +21,8 @@ export type ExtractedMessage = {
   attachments: MessageAttachment[]
   threadId: string
   messageId: string
+  /** RFC 822 Message-ID header value, e.g. <CABcd1234@mail.gmail.com> */
+  gmailMessageId: string
   receivedAt: string
 }
 
@@ -115,6 +117,7 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
   const { email: fromEmail, name: fromName } = parseFromHeader(from)
   const to = getHeader(message, 'To')
   const subject = getHeader(message, 'Subject')
+  const gmailMessageId = getHeader(message, 'Message-ID')
 
   const internalDate = message.internalDate
     ? new Date(parseInt(message.internalDate, 10)).toISOString()
@@ -148,6 +151,7 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
     attachments: parts.attachments,
     threadId: message.threadId ?? '',
     messageId: message.id ?? '',
+    gmailMessageId,
     receivedAt: internalDate,
   }
 }

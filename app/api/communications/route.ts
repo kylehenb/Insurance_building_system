@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('communications')
     .select(
-      'id,type,direction,contact_type,contact_name,contact_detail,subject,content,attachments,requires_action,created_at,from_email,to_email,persona,source'
+      'id,type,direction,contact_type,contact_name,contact_detail,subject,content,attachments,requires_action,created_at,from_email,to_email,gmail_message_id,persona,source'
     )
     .eq('job_id', jobId)
     .order('requires_action', { ascending: false, nullsFirst: false })

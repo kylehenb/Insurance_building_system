@@ -632,6 +632,7 @@ export type Database = {
           created_by: string | null
           direction: string | null
           from_email: string | null
+          gmail_message_id: string | null
           id: string
           inspection_id: string | null
           insurer_order_id: string | null
@@ -661,6 +662,7 @@ export type Database = {
           created_by?: string | null
           direction?: string | null
           from_email?: string | null
+          gmail_message_id?: string | null
           id?: string
           inspection_id?: string | null
           insurer_order_id?: string | null
@@ -690,6 +692,7 @@ export type Database = {
           created_by?: string | null
           direction?: string | null
           from_email?: string | null
+          gmail_message_id?: string | null
           id?: string
           inspection_id?: string | null
           insurer_order_id?: string | null

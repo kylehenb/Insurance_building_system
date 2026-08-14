@@ -1,5 +1,6 @@
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
+import { buildEmailRaw } from './build-raw'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 
@@ -24,19 +25,6 @@ function isWithinBusinessHours(): boolean {
   const hour = perthNow.getHours()
   // Mon–Fri (1–5), 7am–6pm
   return day >= 1 && day <= 5 && hour >= 7 && hour < 18
-}
-
-function buildEmailRaw(from: string, to: string, subject: string, body: string): string {
-  const lines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'Content-Type: text/plain; charset=utf-8',
-    'MIME-Version: 1.0',
-    '',
-    body,
-  ]
-  return Buffer.from(lines.join('\r\n')).toString('base64url')
 }
 
 function replaceTokens(template: string, tokens: Record<string, string>): string {
@@ -131,7 +119,7 @@ export async function sendOrderNotification(
       await gmail.users.messages.send({
         userId: 'me',
         requestBody: {
-          raw: buildEmailRaw(email, email, subject, body),
+          raw: buildEmailRaw({ from: email, to: email, subject, body }),
         },
       })
     } catch (err) {
@@ -169,7 +157,7 @@ export async function sendOrderNotification(
     await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
-        raw: buildEmailRaw(OFFICE_EMAIL, OFFICE_EMAIL, subject, body),
+        raw: buildEmailRaw({ from: OFFICE_EMAIL, to: OFFICE_EMAIL, subject, body }),
       },
     })
   } catch (err) {
