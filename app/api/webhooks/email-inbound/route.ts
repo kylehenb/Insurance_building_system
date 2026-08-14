@@ -167,6 +167,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 async function processWebhook(body: PubSubBody): Promise<void> {
+  // TEMP VERBOSE LOGGING — remove after diagnosis
+  console.log('[email-inbound] DIAG raw pub/sub message:', JSON.stringify(body.message).slice(0, 500))
+
   const supabase = createServiceClient()
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -177,10 +180,12 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   // Decode Pub/Sub message
   let notification: { emailAddress: string; historyId: string }
   try {
-    const decoded = Buffer.from(body.message.data, 'base64').toString('utf-8')
-    notification = JSON.parse(decoded) as { emailAddress: string; historyId: string }
+    const rawDecoded = Buffer.from(body.message.data, 'base64').toString('utf-8')
+    console.log('[email-inbound] DIAG decoded notification:', rawDecoded)
+    notification = JSON.parse(rawDecoded) as { emailAddress: string; historyId: string }
+    console.log('[email-inbound] DIAG parsed — emailAddress:', notification.emailAddress, '| newHistoryId:', notification.historyId)
   } catch (err) {
-    console.error('[email-inbound] failed to decode pub/sub message:', err)
+    console.error('[email-inbound] DIAG failed to decode pub/sub message:', err)
     return
   }
 
@@ -196,35 +201,52 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   let tenantId: string
   if (tenantRow) {
     tenantId = tenantRow.id
+    console.log('[email-inbound] DIAG tenant matched by contact_email:', tenantId)
   } else {
+    console.log('[email-inbound] DIAG no tenant matched contact_email, falling back to first tenant')
     const { data: firstTenant } = await supabase
       .from('tenants')
       .select('id')
       .limit(1)
       .single()
     if (!firstTenant) {
-      console.error('[email-inbound] no tenant found')
+      console.error('[email-inbound] DIAG no tenant found at all — aborting')
       return
     }
     tenantId = firstTenant.id
+    console.log('[email-inbound] DIAG using fallback tenantId:', tenantId)
   }
 
   // Load routing config from DB (cached 60s)
   const routingConfig = await getRoutingConfig(tenantId)
 
   // Get last known historyId
-  const { data: syncState } = await rawDb
+  const { data: syncState, error: syncStateError } = await rawDb
     .from('gmail_sync_state')
     .select('last_history_id')
     .eq('tenant_id', tenantId)
     .eq('email_address', emailAddress)
     .single()
 
-  const startHistoryId = (syncState as { last_history_id: string } | null)?.last_history_id ?? newHistoryId
+  const storedHistoryId = (syncState as { last_history_id: string } | null)?.last_history_id ?? null
+  const startHistoryId = storedHistoryId ?? newHistoryId
+
+  console.log('[email-inbound] DIAG gmail_sync_state lookup — error:', syncStateError?.message ?? 'none')
+  console.log('[email-inbound] DIAG storedHistoryId (from DB):', storedHistoryId)
+  console.log('[email-inbound] DIAG newHistoryId  (from push):', newHistoryId)
+  console.log('[email-inbound] DIAG startHistoryId (used for history.list):', startHistoryId)
+  if (storedHistoryId === null) {
+    console.log('[email-inbound] DIAG no stored historyId — using newHistoryId as start, history.list will likely return nothing')
+  } else if (BigInt(startHistoryId) >= BigInt(newHistoryId)) {
+    console.log('[email-inbound] DIAG WARNING: startHistoryId >= newHistoryId — history.list will return nothing (already caught up or ahead)')
+  } else {
+    console.log('[email-inbound] DIAG gap:', BigInt(newHistoryId) - BigInt(startHistoryId), 'history steps to walk')
+  }
 
   // Fetch history since last known id
   let messageIds: string[] = []
   try {
+    console.log('[email-inbound] DIAG calling gmail.users.history.list with startHistoryId:', startHistoryId)
     const histRes = await gmail.users.history.list({
       userId: 'me',
       startHistoryId,
@@ -232,15 +254,19 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       labelId: 'INBOX',
     })
 
-    for (const record of histRes.data.history ?? []) {
+    const historyRecords = histRes.data.history ?? []
+    console.log('[email-inbound] DIAG history.list returned', historyRecords.length, 'records, nextPageToken:', histRes.data.nextPageToken ?? 'none')
+
+    for (const record of historyRecords) {
       for (const added of record.messagesAdded ?? []) {
         if (added.message?.id) {
           messageIds.push(added.message.id)
         }
       }
     }
+    console.log('[email-inbound] DIAG messageIds to process:', messageIds)
   } catch (err) {
-    console.error('[email-inbound] history.list error:', err)
+    console.error('[email-inbound] DIAG history.list error:', err)
     return
   }
 
