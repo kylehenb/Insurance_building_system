@@ -29,6 +29,11 @@ const TYPE_STYLES: Record<string, { bg: string; color: string }> = {
   system: { bg: '#f3e8ff', color: '#7c3aed' },
 }
 
+type ParsedAttachment = {
+  filename: string
+  storage_path: string | null
+}
+
 function formatDate(s: string | null): string {
   if (!s) return '—'
   const diff = Date.now() - new Date(s).getTime()
@@ -47,15 +52,17 @@ function DirectionIcon({ direction, type }: { direction: string | null; type: st
   return null
 }
 
-function parseAttachments(raw: Json): string[] {
+function parseAttachments(raw: Json): ParsedAttachment[] {
   if (!Array.isArray(raw)) return []
   return (raw as Array<Record<string, unknown>>)
-    .map(a =>
-      typeof a.filename === 'string' ? a.filename
-      : typeof a.name === 'string' ? a.name
-      : null
-    )
-    .filter((n): n is string => n !== null)
+    .map(a => ({
+      filename:
+        typeof a.filename === 'string' ? a.filename
+        : typeof a.name === 'string' ? a.name
+        : null,
+      storage_path: typeof a.storage_path === 'string' ? a.storage_path : null,
+    }))
+    .filter((a): a is ParsedAttachment => a.filename !== null)
 }
 
 // ── Reply modal ────────────────────────────────────────────────────────────
@@ -329,8 +336,48 @@ export function CommsItem({
   onReplySent?: () => void
 }) {
   const [replyOpen, setReplyOpen] = useState(false)
+  const [chipStates, setChipStates] = useState<Record<number, 'loading' | 'error'>>({})
   const typeStyle = TYPE_STYLES[comm.type] ?? { bg: '#f5f2ee', color: '#9e998f' }
-  const filenames = parseAttachments(comm.attachments)
+  const attachments = parseAttachments(comm.attachments)
+
+  async function handleAttachmentClick(att: ParsedAttachment, idx: number) {
+    if (!att.storage_path || chipStates[idx] === 'loading') return
+
+    setChipStates(prev => ({ ...prev, [idx]: 'loading' }))
+
+    try {
+      const res = await fetch('/api/communications/attachments/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communicationId: comm.id, storagePath: att.storage_path }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json() as { error?: string }
+        console.error('[CommsItem] sign failed:', data.error)
+        setChipStates(prev => ({ ...prev, [idx]: 'error' }))
+        return
+      }
+
+      const data = await res.json() as { url?: string }
+      if (!data.url) {
+        console.error('[CommsItem] sign returned no URL')
+        setChipStates(prev => ({ ...prev, [idx]: 'error' }))
+        return
+      }
+
+      // Clear state and open
+      setChipStates(prev => {
+        const next = { ...prev }
+        delete next[idx]
+        return next
+      })
+      window.open(data.url, '_blank')
+    } catch (err) {
+      console.error('[CommsItem] sign request threw:', err)
+      setChipStates(prev => ({ ...prev, [idx]: 'error' }))
+    }
+  }
 
   return (
     <>
@@ -434,25 +481,47 @@ export function CommsItem({
           </div>
         )}
 
-        {/* Attachment filenames */}
-        {filenames.length > 0 && (
+        {/* Attachment chips */}
+        {attachments.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-            {filenames.map((name, i) => (
-              <span
-                key={i}
-                style={{
-                  fontSize: 10,
-                  color: '#7a6a58',
-                  background: '#f5f2ee',
-                  border: '0.5px solid #e4dfd8',
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  fontFamily: 'DM Mono, monospace',
-                }}
-              >
-                📎 {name}
-              </span>
-            ))}
+            {attachments.map((att, i) => {
+              const state = chipStates[i]
+              const isLoading = state === 'loading'
+              const isError = state === 'error'
+              const clickable = att.storage_path !== null && !isLoading
+
+              return (
+                <button
+                  key={i}
+                  onClick={clickable ? () => handleAttachmentClick(att, i) : undefined}
+                  disabled={!clickable}
+                  title={
+                    isError ? 'Failed to open — click to retry'
+                    : att.storage_path ? 'Click to open'
+                    : undefined
+                  }
+                  style={{
+                    fontSize: 10,
+                    color: isError ? '#b91c1c' : '#7a6a58',
+                    background: isError ? '#fdecea' : '#f5f2ee',
+                    border: `0.5px solid ${isError ? '#fca5a5' : '#e4dfd8'}`,
+                    borderRadius: 4,
+                    padding: '2px 8px',
+                    fontFamily: 'DM Mono, monospace',
+                    cursor: clickable ? 'pointer' : 'default',
+                    opacity: isLoading ? 0.55 : 1,
+                    transition: 'opacity 0.1s',
+                    // Reset button defaults
+                    display: 'inline-block',
+                    lineHeight: 'inherit',
+                    textAlign: 'left',
+                  }}
+                >
+                  {isLoading ? '⏳' : isError ? '⚠ ' : '📎'} {att.filename}
+                  {isError && <span style={{ marginLeft: 4, fontSize: 9 }}>retry</span>}
+                </button>
+              )
+            })}
           </div>
         )}
 

@@ -22,17 +22,32 @@
  */
 
 import { NextRequest, NextResponse, after } from 'next/server'
+import { randomUUID } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
-import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
+import { getFullMessage, extractMessageParts, type MessageAttachment } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 import { matchJob } from '@/lib/communications/match-job'
 
+export const maxDuration = 300
+
 const OUR_DOMAIN = 'insurancerepairco.com.au'
+
+// Extensions that are never stored regardless of MIME type
+const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.scr', '.js', '.jar', '.msi', '.cmd'])
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024 // 50 MB — matches job-files convention
+
+type StoredAttachment = {
+  filename: string
+  storage_path: string
+  mime_type: string
+  size_bytes: number
+}
 
 type SenderPattern = {
   type: 'domain' | 'email' | 'display_name'
@@ -134,6 +149,82 @@ function isOrderEmailByKeywords(subject: string, keywordRules: EmailKeywordRuleR
 
 function isOwnDomain(email: string): boolean {
   return email.toLowerCase().endsWith(`@${OUR_DOMAIN}`)
+}
+
+function sanitizeAttachmentName(filename: string): string {
+  return filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._\-]/g, '_')
+}
+
+function getExtension(filename: string): string {
+  const dot = filename.lastIndexOf('.')
+  return dot >= 0 ? filename.slice(dot).toLowerCase() : ''
+}
+
+async function uploadAttachments(
+  attachments: MessageAttachment[],
+  tenantId: string,
+  communicationId: string,
+  db: SupabaseClient,
+  msgId: string
+): Promise<StoredAttachment[]> {
+  const stored: StoredAttachment[] = []
+
+  for (const att of attachments) {
+    const ext = getExtension(att.filename)
+
+    if (BLOCKED_EXTENSIONS.has(ext)) {
+      console.warn(
+        `[email-inbound] BLOCKED executable attachment "${att.filename}" ext="${ext}" (msgId=${msgId}) — skipping`
+      )
+      continue
+    }
+
+    if (att.size > MAX_ATTACHMENT_BYTES) {
+      console.warn(
+        `[email-inbound] OVERSIZED attachment "${att.filename}" (${att.size}B > 50MB limit, msgId=${msgId}) — skipping`
+      )
+      continue
+    }
+
+    if (!att.data) {
+      console.warn(
+        `[email-inbound] attachment "${att.filename}" has no data (msgId=${msgId}) — skipping`
+      )
+      continue
+    }
+
+    const sanitized = sanitizeAttachmentName(att.filename)
+    const storagePath = `tenants/${tenantId}/comms/${communicationId}/${Date.now()}-${sanitized}`
+
+    try {
+      const bytes = Buffer.from(att.data, 'base64')
+      const { error: uploadErr } = await db.storage
+        .from('job-files')
+        .upload(storagePath, bytes, { contentType: att.mimeType })
+
+      if (uploadErr) {
+        console.error(
+          `[email-inbound] Storage upload FAILED for "${att.filename}" (msgId=${msgId}):`,
+          uploadErr
+        )
+        continue
+      }
+
+      stored.push({
+        filename: att.filename,
+        storage_path: storagePath,
+        mime_type: att.mimeType,
+        size_bytes: att.size,
+      })
+    } catch (err) {
+      console.error(
+        `[email-inbound] unexpected upload error for "${att.filename}" (msgId=${msgId}):`,
+        err
+      )
+    }
+  }
+
+  return stored
 }
 
 type PubSubMessage = {
@@ -299,6 +390,17 @@ async function processWebhook(body: PubSubBody): Promise<void> {
 
       if (isOwnDomain(msg.fromEmail)) continue
 
+      // Pre-generate the communications row ID so storage paths can be built
+      // before we know which branch will handle this message.
+      const communicationId = randomUUID()
+
+      // Upload all attachment blobs now, once, before branching.
+      // Each file is independently failable — failures are logged loudly and skipped
+      // so a bad attachment never blocks the rest of the message.
+      const storedAttachments: StoredAttachment[] = msg.attachments.length > 0
+        ? await uploadAttachments(msg.attachments, tenantId, communicationId, rawDb, msgId)
+        : []
+
       // Check if thread already exists in communications
       if (msg.threadId) {
         const { data: existingThread } = await supabase
@@ -311,6 +413,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
 
         if (existingThread) {
           await supabase.from('communications').insert({
+            id: communicationId,
             tenant_id: tenantId,
             job_id: existingThread.job_id,
             type: 'email',
@@ -324,6 +427,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
             body_text: msg.bodyText,
             gmail_message_id: msg.gmailMessageId || null,
             source: 'inbound',
+            attachments: storedAttachments,
           } as never)
           continue
         }
@@ -340,6 +444,16 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       const isOrderByKeyword = isOrderEmailByKeywords(msg.subject, routingConfig.keywordRules)
 
       if (isOrderByPattern || isOrderByKeyword) {
+        // Order pipeline routes to insurer_orders (via writeInsurerOrder), not communications.
+        // Attachments have been uploaded; log storage paths so they can be retrieved manually
+        // if needed. A future pass can link them to the insurer_order row.
+        if (storedAttachments.length > 0) {
+          console.log(
+            `[email-inbound] order pipeline message ${msgId} has ${storedAttachments.length} uploaded attachment(s):`,
+            storedAttachments.map(a => a.storage_path)
+          )
+        }
+
         let orderId: string | null = null
         const clientConfig: ClientEmailConfig | null = matchedClientConfig
           ? (matchedClientConfig as unknown as ClientEmailConfig)
@@ -387,6 +501,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
         }
 
         await supabase.from('communications').insert({
+          id: communicationId,
           tenant_id: tenantId,
           job_id: resolvedJobId,
           type: 'email',
@@ -401,6 +516,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           gmail_message_id: msg.gmailMessageId || null,
           source: resolvedJobId ? 'auto_linked' : 'unlinked',
           match_candidates: matchCandidates,
+          attachments: storedAttachments,
         } as never)
       }
     } catch (err) {
