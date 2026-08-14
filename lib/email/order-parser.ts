@@ -204,7 +204,16 @@ export async function parseInsurerOrder(
   try {
     const result = await model.generateContent(parts)
     const text = result.response.text().trim()
-    const jsonText = text.startsWith('```') ? text.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '') : text
+    // Extract JSON robustly: handle code fences anywhere in the response,
+    // or fall back to the first {...} block, or the raw text.
+    let jsonText: string
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1]
+    } else {
+      const jsonObjectMatch = text.match(/\{[\s\S]*\}/)
+      jsonText = jsonObjectMatch ? jsonObjectMatch[0] : text
+    }
     raw = JSON.parse(jsonText) as GeminiRawResult
   } catch (err) {
     console.error('[order-parser] Gemini parse error:', err)
