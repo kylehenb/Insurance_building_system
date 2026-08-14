@@ -21,7 +21,7 @@
  * 4. Call POST /api/gmail/setup once to register the Gmail watch and seed historyId.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
@@ -153,15 +153,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Always return 200 — Pub/Sub retries on anything else
+  // Always return 200 — Pub/Sub retries on anything else.
+  // after() keeps the serverless function alive until processWebhook completes,
+  // even though the HTTP response is sent immediately.
+  let body: PubSubBody
   try {
-    const body = await req.json() as PubSubBody
-    processWebhook(body).catch(err => {
-      console.error('[email-inbound] unhandled processing error:', err)
-    })
+    body = await req.json() as PubSubBody
   } catch (err) {
     console.error('[email-inbound] failed to parse pub/sub body:', err)
+    return NextResponse.json({ ok: true })
   }
+
+  after(async () => {
+    try {
+      await processWebhook(body)
+    } catch (err) {
+      console.error('[email-inbound] unhandled processing error:', err)
+    }
+  })
 
   return NextResponse.json({ ok: true })
 }
