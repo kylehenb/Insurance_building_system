@@ -638,6 +638,7 @@ export type Database = {
           insurer_order_id: string | null
           job_id: string | null
           linked_to: string | null
+          match_candidates: Json | null
           parse_confidence: string | null
           persona: string | null
           requires_action: boolean | null
@@ -668,6 +669,7 @@ export type Database = {
           insurer_order_id?: string | null
           job_id?: string | null
           linked_to?: string | null
+          match_candidates?: Json | null
           parse_confidence?: string | null
           persona?: string | null
           requires_action?: boolean | null
@@ -698,6 +700,7 @@ export type Database = {
           insurer_order_id?: string | null
           job_id?: string | null
           linked_to?: string | null
+          match_candidates?: Json | null
           parse_confidence?: string | null
           persona?: string | null
           requires_action?: boolean | null

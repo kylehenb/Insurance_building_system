@@ -33,6 +33,7 @@ export type ParsedOrderResult = {
   insurerDetected: string | null
   rawEmailBody: string | null
   emailAttachments: Array<{ filename: string; mimeType: string; size: number }>
+  rawGeminiOutput: GeminiRawResult | null
 }
 
 const FALLBACK_PROMPT = [
@@ -60,7 +61,7 @@ function findLargestPdf(message: ExtractedMessage): { data: string; size: number
   return { data: largest.data, size: largest.size }
 }
 
-type GeminiRawResult = {
+export type GeminiRawResult = {
   claim_number?: string | null
   insured_name?: string | null
   insured_phone?: string | null
@@ -225,6 +226,7 @@ export async function parseInsurerOrder(
         mimeType: a.mimeType,
         size: a.size,
       })),
+      rawGeminiOutput: null,
     }
   }
 
@@ -274,5 +276,6 @@ export async function parseInsurerOrder(
       mimeType: a.mimeType,
       size: a.size,
     })),
+    rawGeminiOutput: raw,
   }
 }

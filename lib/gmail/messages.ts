@@ -6,7 +6,7 @@ export type GmailMessage = gmail_v1.Schema$Message
 export type MessageAttachment = {
   filename: string
   mimeType: string
-  data: string
+  data: string  // standard base64 (not base64url); empty string if fetch failed
   size: number
 }
 
@@ -41,6 +41,11 @@ function decodeBase64(encoded: string): string {
   return Buffer.from(normalized, 'base64').toString('utf-8')
 }
 
+// Gmail uses base64url; Gemini inlineData expects standard base64
+function toStandardBase64(base64url: string): string {
+  return base64url.replace(/-/g, '+').replace(/_/g, '/')
+}
+
 function getHeader(message: GmailMessage, name: string): string {
   const header = message.payload?.headers?.find(
     h => h.name?.toLowerCase() === name.toLowerCase()
@@ -60,10 +65,11 @@ function parseFromHeader(from: string): { email: string; name: string } {
   return { name: '', email: emailOnly }
 }
 
-function extractParts(
+async function extractParts(
   part: gmail_v1.Schema$MessagePart,
-  result: { bodyText: string; bodyHtml: string; attachments: MessageAttachment[] }
-): void {
+  result: { bodyText: string; bodyHtml: string; attachments: MessageAttachment[] },
+  messageId: string
+): Promise<void> {
   const mimeType = part.mimeType ?? ''
 
   if (mimeType === 'text/plain' && part.body?.data) {
@@ -76,23 +82,37 @@ function extractParts(
     return
   }
 
-  if (
-    part.filename &&
-    part.filename.length > 0 &&
-    part.body?.attachmentId
-  ) {
+  if (part.filename && part.filename.length > 0) {
+    let data = ''
+    if (part.body?.data) {
+      // Inline data present (small attachments embedded directly in the message)
+      data = toStandardBase64(part.body.data)
+    } else if (part.body?.attachmentId) {
+      // Attachment bytes live in a separate resource — fetch them
+      try {
+        const gmail = getGmailClient()
+        const res = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId,
+          id: part.body.attachmentId,
+        })
+        data = res.data.data ? toStandardBase64(res.data.data) : ''
+      } catch (err) {
+        console.error(`[messages] failed to fetch attachment "${part.filename}" (messageId=${messageId}):`, err)
+      }
+    }
     result.attachments.push({
       filename: part.filename,
-      mimeType: mimeType,
-      data: part.body.data ?? '',
-      size: part.body.size ?? 0,
+      mimeType,
+      data,
+      size: part.body?.size ?? 0,
     })
     return
   }
 
   if (part.parts) {
     for (const child of part.parts) {
-      extractParts(child, result)
+      await extractParts(child, result, messageId)
     }
   }
 }
@@ -112,7 +132,7 @@ function stripHtml(html: string): string {
     .trim()
 }
 
-export function extractMessageParts(message: GmailMessage): ExtractedMessage {
+export async function extractMessageParts(message: GmailMessage): Promise<ExtractedMessage> {
   const from = getHeader(message, 'From')
   const { email: fromEmail, name: fromName } = parseFromHeader(from)
   const to = getHeader(message, 'To')
@@ -124,6 +144,7 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
     : new Date().toISOString()
 
   const parts = { bodyText: '', bodyHtml: '', attachments: [] as MessageAttachment[] }
+  const msgId = message.id ?? ''
 
   if (message.payload) {
     if (message.payload.mimeType === 'text/plain' && message.payload.body?.data) {
@@ -132,7 +153,7 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
       parts.bodyHtml = decodeBase64(message.payload.body.data)
     } else if (message.payload.parts) {
       for (const part of message.payload.parts) {
-        extractParts(part, parts)
+        await extractParts(part, parts, msgId)
       }
     }
   }
@@ -150,7 +171,7 @@ export function extractMessageParts(message: GmailMessage): ExtractedMessage {
     bodyHtml: parts.bodyHtml,
     attachments: parts.attachments,
     threadId: message.threadId ?? '',
-    messageId: message.id ?? '',
+    messageId: msgId,
     gmailMessageId,
     receivedAt: internalDate,
   }

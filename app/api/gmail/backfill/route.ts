@@ -216,7 +216,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
 
       const raw = await getFullMessage(msgId)
-      const msg = extractMessageParts(raw)
+      const msg = await extractMessageParts(raw)
 
       if (isOwnDomain(msg.fromEmail)) {
         results.push({ messageId: msgId, status: 'skipped_own_domain' })

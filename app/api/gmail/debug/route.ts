@@ -120,7 +120,7 @@ export async function POST(): Promise<NextResponse> {
   for (const msgId of messageIds) {
     try {
       const raw = await getFullMessage(msgId)
-      const msg = extractMessageParts(raw)
+      const msg = await extractMessageParts(raw)
 
       try {
         const parsed = await parseInsurerOrder(msg, null, tenantId)

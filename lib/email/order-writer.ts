@@ -70,7 +70,7 @@ export async function writeInsurerOrder(
       raw_email_link: rawEmailLink,
       raw_email_body: parsed.rawEmailBody,
       email_attachments: parsed.emailAttachments,
-      gemini_output: parsed.data as never,
+      gemini_output: (parsed.rawGeminiOutput ?? parsed.data) as never,
       status: 'pending',
     })
     .select('id')

@@ -153,7 +153,14 @@ async function runPoll(): Promise<NextResponse> {
       // Outer catch: message fetch / unexpected errors
       try {
         const raw = await getFullMessage(msgId)
-        const msg = extractMessageParts(raw)
+        const msg = await extractMessageParts(raw)
+
+        if (msg.fromEmail.toLowerCase().endsWith('@insurancerepairco.com.au')) {
+          console.log(`[gmail-poll] skipping own-domain message ${msgId} from ${msg.fromEmail}`)
+          await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.complete)
+          continue
+        }
+
         processedCount++
 
         // Inner catch: order pipeline errors

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import type { JobCandidate } from '@/lib/communications/match-job'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 
 const supabase = createBrowserClient<Database>(
@@ -53,6 +54,24 @@ interface ChatMessage {
   content: string
   actionProposal?: { steps: { n: number; description: string }[] } | null
   confirmed?: boolean
+}
+
+interface UnlinkedComm {
+  id: string
+  subject: string | null
+  content: string | null
+  from_email: string | null
+  contact_name: string | null
+  created_at: string | null
+  match_candidates: JobCandidate[] | null
+}
+
+interface JobSearchHit {
+  id: string
+  job_number: string
+  insured_name: string | null
+  property_address: string | null
+  claim_number: string | null
 }
 
 // ── WMO weather codes ────────────────────────────────────────────────────────
@@ -147,6 +166,14 @@ export default function DashboardPage() {
   const [stepEdits, setStepEdits] = useState<Record<string, string>>({})
   const [savedSteps, setSavedSteps] = useState<Record<string, boolean>>({})
 
+  // Unlinked inbox
+  const [unlinkedComms, setUnlinkedComms] = useState<UnlinkedComm[]>([])
+  const [linkingId, setLinkingId] = useState<string | null>(null)
+  const [linkSearch, setLinkSearch] = useState('')
+  const [linkResults, setLinkResults] = useState<JobSearchHit[]>([])
+  const [linkSaving, setLinkSaving] = useState<string | null>(null)
+  const linkSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Auth
   const [userId, setUserId] = useState<string | null>(null)
   const [tenantId, setTenantId] = useState<string | null>(null)
@@ -203,6 +230,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     fetchFlaggedJobs()
     fetchActionCards()
+    fetchUnlinkedComms()
   }, [userId, tenantId])
 
   // Auto-refresh when AI actions complete
@@ -210,6 +238,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     fetchFlaggedJobs()
     fetchActionCards()
+    fetchUnlinkedComms()
   }, [userId, tenantId])
 
   async function fetchFlaggedJobs() {
@@ -274,6 +303,66 @@ export default function DashboardPage() {
       type: inferCardType(row.rule_key),
     }))
     setActionCards(cards)
+  }
+
+  async function fetchUnlinkedComms() {
+    if (!tenantId) return
+    const { data } = await supabase
+      .from('communications')
+      .select('id, subject, content, from_email, contact_name, created_at, match_candidates')
+      .is('job_id', null)
+      .eq('type', 'email')
+      .eq('direction', 'inbound')
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (!data) return
+    setUnlinkedComms(
+      data.map((row) => ({
+        id: row.id,
+        subject: row.subject,
+        content: row.content,
+        from_email: row.from_email,
+        contact_name: row.contact_name,
+        created_at: row.created_at,
+        match_candidates: row.match_candidates as JobCandidate[] | null,
+      }))
+    )
+  }
+
+  // ── Unlinked inbox ───────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!linkSearch.trim() || !tenantId) { setLinkResults([]); return }
+    if (linkSearchTimer.current) clearTimeout(linkSearchTimer.current)
+    const term = linkSearch.trim()
+    linkSearchTimer.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('jobs')
+        .select('id, job_number, insured_name, property_address, claim_number')
+        .eq('tenant_id', tenantId)
+        .or(`job_number.ilike.%${term}%,claim_number.ilike.%${term}%,insured_name.ilike.%${term}%,property_address.ilike.%${term}%`)
+        .limit(5)
+      setLinkResults((data as JobSearchHit[]) ?? [])
+    }, 300)
+    return () => { if (linkSearchTimer.current) clearTimeout(linkSearchTimer.current) }
+  }, [linkSearch, tenantId])
+
+  async function linkCommToJob(commId: string, jobId: string) {
+    setLinkSaving(commId)
+    try {
+      await fetch(`/api/communications/${commId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId }),
+      })
+      setUnlinkedComms(prev => prev.filter(c => c.id !== commId))
+      setLinkingId(null)
+      setLinkSearch('')
+      setLinkResults([])
+    } finally {
+      setLinkSaving(null)
+    }
   }
 
   // ── AI Chat ──────────────────────────────────────────────────────────────────
@@ -567,6 +656,41 @@ export default function DashboardPage() {
         .snooze-bar { font-size: 11px; color: #9a9088; background: #faf9f7; padding: 8px 16px; border-top: 0.5px solid #f0ece6; font-weight: 300; }
         .snooze-undo { cursor: pointer; color: #c8b89a; border-bottom: 0.5px solid #c8b89a; background: none; border-left: none; border-right: none; border-top: none; font-family: inherit; font-size: 11px; padding: 0; }
 
+        /* Unlinked inbox */
+        .ui-wrap { border: 0.5px solid #e4dfd8; border-radius: 8px; overflow: hidden; background: #fff; margin-bottom: 28px; }
+        .ui-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 0.5px solid #f0ece6; background: #fdfdfc; }
+        .ui-hdr-left { display: flex; align-items: center; gap: 8px; }
+        .ui-badge { font-size: 10px; font-weight: 700; background: #fdf5e8; color: #8a6020; border: 0.5px solid #e8c884; padding: 1px 7px; border-radius: 20px; }
+        .ui-empty { padding: 28px; text-align: center; font-size: 13px; color: #b0a898; font-weight: 300; }
+        .ui-row { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; padding: 11px 14px; border-bottom: 0.5px solid #f5f2ee; }
+        .ui-row:last-child { border-bottom: none; }
+        .ui-row:hover { background: #faf9f7; }
+        .ui-from { font-size: 11px; color: #c8b89a; font-weight: 500; margin-bottom: 2px; font-family: 'DM Mono', monospace; }
+        .ui-subject { font-size: 13px; color: #1a1a1a; font-weight: 500; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
+        .ui-preview { font-size: 12px; color: #7a7167; font-weight: 300; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
+        .ui-age { font-size: 10px; color: #c8c0b8; font-weight: 300; margin-top: 3px; }
+        .ui-link-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid #d4cfc8; background: transparent; color: #7a6a58; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; transition: border-color 0.15s; flex-shrink: 0; }
+        .ui-link-btn:hover { border-color: #c8b89a; color: #5a4a38; }
+        .ui-link-panel { padding: 10px 14px 14px; background: #fdfcfb; border-top: 0.5px solid #f0ece6; }
+        .ui-suggestion-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #c8b89a; font-weight: 700; margin-bottom: 6px; }
+        .ui-suggestion-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: #fff; border: 0.5px solid #e8ddd0; border-radius: 5px; margin-bottom: 5px; cursor: pointer; text-align: left; font-family: inherit; transition: border-color 0.15s; }
+        .ui-suggestion-btn:hover { border-color: #c8b89a; background: #fdf9f4; }
+        .ui-sug-num { font-family: 'DM Mono', monospace; font-size: 11px; color: #c8b89a; font-weight: 600; flex-shrink: 0; }
+        .ui-sug-name { font-size: 12px; color: #3a3530; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ui-sug-why { font-size: 10px; color: #b0a898; flex-shrink: 0; }
+        .ui-search-wrap { position: relative; margin-top: 8px; }
+        .ui-search { width: 100%; border: 0.5px solid #e4dfd8; border-radius: 5px; padding: '7px 10px'; font-size: 13px; font-family: inherit; color: #1a1a1a; background: #fff; outline: none; box-sizing: border-box; }
+        .ui-search:focus { border-color: #c8b89a; }
+        .ui-results { border: 0.5px solid #e4dfd8; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+        .ui-result-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: none; border-bottom: 0.5px solid #f0ece6; cursor: pointer; text-align: left; font-family: inherit; }
+        .ui-result-row:last-child { border-bottom: none; }
+        .ui-result-row:hover { background: #faf9f7; }
+        .ui-result-num { font-family: 'DM Mono', monospace; font-size: 11px; color: #c8b89a; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+        .ui-result-name { font-size: 13px; color: #3a3530; }
+        .ui-result-addr { font-size: 11px; color: #b0a898; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+        .ui-cancel-btn { background: none; border: none; cursor: pointer; color: #b0a898; font-size: 20px; line-height: 1; padding: 0; margin-left: 6px; }
+        .ui-cancel-btn:hover { color: #5a534a; }
+
         /* Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(15,12,10,0.55); z-index: 200; display: flex; align-items: center; justify-content: center; }
         .email-modal { background: #fff; border-radius: 10px; width: 620px; max-width: 92vw; border: 0.5px solid #e4dfd8; overflow: hidden; display: flex; flex-direction: column; max-height: 80vh; }
@@ -807,6 +931,128 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* ── UNLINKED INBOX ── */}
+        {unlinkedComms.length > 0 && (
+          <div className="ui-wrap">
+            <div className="ui-hdr">
+              <div className="ui-hdr-left">
+                <span className="sec-label" style={{ margin: 0 }}>Unlinked inbox</span>
+                <span className="ui-badge">{unlinkedComms.length} unlinked</span>
+              </div>
+              <span style={{ fontSize: 12, color: '#b0a898', fontWeight: 300 }}>
+                Emails with no matching job — link manually or auto-suggestions shown below
+              </span>
+            </div>
+
+            {unlinkedComms.map(comm => {
+              const isOpen = linkingId === comm.id
+              const isSaving = linkSaving === comm.id
+              const candidates = Array.isArray(comm.match_candidates) ? comm.match_candidates : []
+
+              return (
+                <div key={comm.id}>
+                  <div className="ui-row">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="ui-from">{comm.from_email ?? comm.contact_name ?? 'Unknown sender'}</div>
+                      <div className="ui-subject">{comm.subject ?? '(no subject)'}</div>
+                      <div className="ui-preview">{comm.content ?? ''}</div>
+                      <div className="ui-age">{timeAgo(comm.created_at ?? '')}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        className="ui-link-btn"
+                        onClick={() => {
+                          if (isOpen) {
+                            setLinkingId(null)
+                            setLinkSearch('')
+                            setLinkResults([])
+                          } else {
+                            setLinkingId(comm.id)
+                            setLinkSearch('')
+                            setLinkResults([])
+                          }
+                        }}
+                      >
+                        {isOpen ? 'Cancel' : 'Link to job'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isOpen && (
+                    <div className="ui-link-panel">
+                      {candidates.length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div className="ui-suggestion-lbl">AI suggestions</div>
+                          {candidates.map(c => (
+                            <button
+                              key={c.job_id}
+                              className="ui-suggestion-btn"
+                              disabled={isSaving}
+                              onClick={() => linkCommToJob(comm.id, c.job_id)}
+                            >
+                              <span className="ui-sug-num">{c.job_number}</span>
+                              <span className="ui-sug-name">
+                                {c.insured_name ?? c.property_address ?? c.job_number}
+                              </span>
+                              <span className="ui-sug-why">
+                                matched on {c.matched_on.join(', ')}
+                              </span>
+                              {c.confidence === 'high' && (
+                                <span style={{ fontSize: 10, color: '#2a6b50', fontWeight: 700, marginLeft: 4 }}>
+                                  High
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                          <div style={{ fontSize: 10, color: '#b0a898', marginBottom: 8 }}>
+                            Or search manually:
+                          </div>
+                        </div>
+                      )}
+
+                      {candidates.length === 0 && (
+                        <div className="ui-suggestion-lbl" style={{ marginBottom: 8 }}>
+                          Search by job number, claim number, address or insured name
+                        </div>
+                      )}
+
+                      <input
+                        className="ui-search"
+                        style={{ width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 5, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', color: '#1a1a1a', background: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                        placeholder="e.g. IRC1008, CLM-12345, Smith St…"
+                        value={linkSearch}
+                        onChange={e => setLinkSearch(e.target.value)}
+                        autoFocus
+                      />
+
+                      {linkResults.length > 0 && (
+                        <div className="ui-results" style={{ marginTop: 4 }}>
+                          {linkResults.map(job => (
+                            <button
+                              key={job.id}
+                              className="ui-result-row"
+                              disabled={isSaving}
+                              onClick={() => linkCommToJob(comm.id, job.id)}
+                            >
+                              <span className="ui-result-num">{job.job_number}</span>
+                              <span className="ui-result-name">{job.insured_name ?? '—'}</span>
+                              <span className="ui-result-addr">{job.property_address ?? ''}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {isSaving && (
+                        <div style={{ fontSize: 12, color: '#c8b89a', marginTop: 8 }}>Linking…</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* ── TO DO ── */}
         <div>

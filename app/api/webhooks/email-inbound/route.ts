@@ -30,6 +30,7 @@ import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
+import { matchJob } from '@/lib/communications/match-job'
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
 
@@ -259,7 +260,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       }
 
       const raw = await getFullMessage(msgId)
-      const msg = extractMessageParts(raw)
+      const msg = await extractMessageParts(raw)
 
       if (isOwnDomain(msg.fromEmail)) continue
 
@@ -331,9 +332,28 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           }
         }
       } else {
+        let resolvedJobId: string | null = null
+        let matchCandidates: unknown = null
+
+        try {
+          const match = await matchJob({
+            subject: msg.subject,
+            body: msg.bodyText,
+            from_email: msg.fromEmail,
+            tenant_id: tenantId,
+          })
+          if (match.job_id && match.confidence === 'high') {
+            resolvedJobId = match.job_id
+          } else if (match.candidates.length > 0) {
+            matchCandidates = match.candidates
+          }
+        } catch (err) {
+          console.error('[email-inbound] matchJob error:', err)
+        }
+
         await supabase.from('communications').insert({
           tenant_id: tenantId,
-          job_id: null,
+          job_id: resolvedJobId,
           type: 'email',
           direction: 'inbound',
           subject: msg.subject,
@@ -344,7 +364,8 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           to_email: msg.to,
           body_text: msg.bodyText,
           gmail_message_id: msg.gmailMessageId || null,
-          source: 'unlinked',
+          source: resolvedJobId ? 'auto_linked' : 'unlinked',
+          match_candidates: matchCandidates,
         } as never)
       }
     } catch (err) {
