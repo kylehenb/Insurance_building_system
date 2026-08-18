@@ -246,26 +246,14 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
     }
   }, [jobId, tenantId, supabase])
 
-  // ── Realtime ───────────────────────────────────────────────────────────────
+  // ── Initial load ───────────────────────────────────────────────────────────
+  // No Realtime subscription here: work_orders / work_order_visits are not enabled
+  // in the supabase_realtime publication (confirmed via dashboard), so a postgres_changes
+  // channel on them never fires. Data is refreshed via explicit fetchData() calls only —
+  // on mount, after every mutation, and via the manual refresh action in WorkOrdersTab.
   useEffect(() => {
     fetchData()
-
-    const channel = supabase
-      .channel(`work-orders-${jobId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'work_orders', filter: `job_id=eq.${jobId}` },
-        () => fetchData()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'work_order_visits', filter: `job_id=eq.${jobId}` },
-        () => fetchData()
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [jobId, fetchData, supabase])
+  }, [fetchData])
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const mutations: WorkOrderMutations = {

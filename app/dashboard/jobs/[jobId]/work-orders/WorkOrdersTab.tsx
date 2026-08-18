@@ -238,6 +238,52 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               </button>
             ))}
           </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Manual refresh — work orders no longer auto-update via Realtime */}
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            title="Refresh work orders"
+            aria-label="Refresh work orders"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              padding: 0,
+              fontSize: 14,
+              background: 'transparent',
+              color: '#9a9590',
+              border: '1px solid #ddd8d0',
+              borderRadius: 6,
+              cursor: isLoading ? 'default' : 'pointer',
+              opacity: isLoading ? 0.5 : 1,
+              transition: 'all .15s',
+            }}
+            onMouseEnter={e => {
+              if (isLoading) return
+              e.currentTarget.style.background = '#f5f2ee'
+              e.currentTarget.style.color = '#1a1a1a'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = '#9a9590'
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                lineHeight: 1,
+                animation: isLoading ? 'wo-refresh-spin .8s linear infinite' : 'none',
+              }}
+            >
+              ↻
+            </span>
+          </button>
+          <style>{'@keyframes wo-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style>
         </div>
 
         {/* ── Main panel ──────────────────────────────────────────────────── */}
