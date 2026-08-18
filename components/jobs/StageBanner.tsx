@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import type { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
 import type { OpenLoop } from '@/lib/jobs/openLoops'
@@ -72,14 +73,36 @@ export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
     fetchJobData()
   }, [fetchJobData])
 
-  // Poll for job stage changes every 3 seconds
+  // Live stage updates via Realtime — replaces the previous 3-second poll.
+  // `jobs` is enabled in the supabase_realtime publication (see
+  // supabase/migrations/20260818_enable_realtime_jobs.sql). The UPDATE payload's
+  // `new` row always carries the full post-update row (regardless of REPLICA
+  // IDENTITY, which only affects `old`), so we apply it directly rather than
+  // triggering a re-fetch.
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchJobData()
-    }, 3000)
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
-    return () => clearInterval(interval)
-  }, [fetchJobData])
+    const channel = supabase
+      .channel(`job-stage-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `id=eq.${jobId}`,
+        },
+        (payload: RealtimePostgresUpdatePayload<JobStageRow>) => {
+          setRow(payload.new)
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [jobId])
 
   // Loading state: job not yet computed
   if (row === null || row.current_stage === null) {
