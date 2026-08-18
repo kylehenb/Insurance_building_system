@@ -636,11 +636,13 @@ export type Database = {
           id: string
           inspection_id: string | null
           insurer_order_id: string | null
+          is_starred: boolean
           job_id: string | null
           linked_to: string | null
           match_candidates: Json | null
           parse_confidence: string | null
           persona: string | null
+          read_at: string | null
           requires_action: boolean | null
           source: string | null
           subject: string | null
@@ -667,11 +669,13 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           insurer_order_id?: string | null
+          is_starred?: boolean
           job_id?: string | null
           linked_to?: string | null
           match_candidates?: Json | null
           parse_confidence?: string | null
           persona?: string | null
+          read_at?: string | null
           requires_action?: boolean | null
           source?: string | null
           subject?: string | null
@@ -698,11 +702,13 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           insurer_order_id?: string | null
+          is_starred?: boolean
           job_id?: string | null
           linked_to?: string | null
           match_candidates?: Json | null
           parse_confidence?: string | null
           persona?: string | null
+          read_at?: string | null
           requires_action?: boolean | null
           source?: string | null
           subject?: string | null

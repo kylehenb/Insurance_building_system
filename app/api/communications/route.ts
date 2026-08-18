@@ -18,11 +18,12 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('communications')
     .select(
-      'id,type,direction,contact_type,contact_name,contact_detail,subject,content,attachments,requires_action,created_at,from_email,to_email,gmail_message_id,persona,source'
+      'id,type,direction,contact_type,contact_name,contact_detail,subject,content,body_text,' +
+      'attachments,requires_action,action_queue_id,created_at,from_email,to_email,' +
+      'gmail_message_id,thread_id,work_order_id,persona,source,read_at,is_starred'
     )
     .eq('job_id', jobId)
-    .order('requires_action', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
