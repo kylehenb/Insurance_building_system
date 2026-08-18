@@ -42,6 +42,11 @@ const OUR_DOMAIN = 'insurancerepairco.com.au'
 const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.scr', '.js', '.jar', '.msi', '.cmd'])
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024 // 50 MB — matches job-files convention
 
+// Castle-specific claim number format (CHCCLM + digits).
+// Used as a corroborating signal in audit logging — not a gate. Won't generalise to
+// other insurer claim formats without extension.
+const CASTLE_CLAIM_RE = /\bCHCCLM\d+\b/i
+
 type StoredAttachment = {
   filename: string
   storage_path: string
@@ -142,9 +147,38 @@ function matchClientConfig(
   return null
 }
 
+/**
+ * Strips leading reply/forward prefixes from an email subject before keyword matching.
+ * Handles Re:, RE:, Fwd:, FW:, Re[2]:, nested variants (e.g. "Re: Fwd: Re: Subject"),
+ * and extra whitespace between prefix and colon.
+ *
+ * Subjects are NOT rejected when they carry a reply/forward prefix — the stripped
+ * subject still goes through keyword matching. Classification (is_new_order from
+ * Gemini) is the real gate for whether a matched email is a new order.
+ */
+function stripReplyPrefixes(subject: string): string {
+  const prefixRe = /^(re(\[\d+\])?|fw|fwd)\s*:\s*/i
+  let stripped = subject.trim()
+  let prev: string
+  do {
+    prev = stripped
+    stripped = stripped.replace(prefixRe, '').trim()
+  } while (stripped !== prev)
+  return stripped
+}
+
+/**
+ * Returns true when the email subject (after stripping reply/forward prefixes) contains
+ * any active keyword rule as a case-insensitive substring.
+ *
+ * Prefix stripping prevents "new work order" from spuriously matching on
+ * "Re: New Work Order - Plumbing …" at the routing stage while still allowing
+ * emails whose stripped subject genuinely contains an order keyword to reach
+ * the Gemini classification step (which is the authoritative gate).
+ */
 function isOrderEmailByKeywords(subject: string, keywordRules: EmailKeywordRuleRow[]): boolean {
-  const subjectLower = subject.toLowerCase()
-  return keywordRules.some(rule => rule.active && subjectLower.includes(rule.keyword.toLowerCase()))
+  const strippedLower = stripReplyPrefixes(subject).toLowerCase()
+  return keywordRules.some(rule => rule.active && strippedLower.includes(rule.keyword.toLowerCase()))
 }
 
 function isOwnDomain(email: string): boolean {
@@ -267,9 +301,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 async function processWebhook(body: PubSubBody): Promise<void> {
-  // TEMP VERBOSE LOGGING — remove after diagnosis
-  console.log('[email-inbound] DIAG raw pub/sub message:', JSON.stringify(body.message).slice(0, 500))
-
   const supabase = createServiceClient()
   const rawDb = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -281,11 +312,9 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   let notification: { emailAddress: string; historyId: string }
   try {
     const rawDecoded = Buffer.from(body.message.data, 'base64').toString('utf-8')
-    console.log('[email-inbound] DIAG decoded notification:', rawDecoded)
     notification = JSON.parse(rawDecoded) as { emailAddress: string; historyId: string }
-    console.log('[email-inbound] DIAG parsed — emailAddress:', notification.emailAddress, '| newHistoryId:', notification.historyId)
   } catch (err) {
-    console.error('[email-inbound] DIAG failed to decode pub/sub message:', err)
+    console.error('[email-inbound] failed to decode pub/sub message:', err)
     return
   }
 
@@ -301,27 +330,24 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   let tenantId: string
   if (tenantRow) {
     tenantId = tenantRow.id
-    console.log('[email-inbound] DIAG tenant matched by contact_email:', tenantId)
   } else {
-    console.log('[email-inbound] DIAG no tenant matched contact_email, falling back to first tenant')
     const { data: firstTenant } = await supabase
       .from('tenants')
       .select('id')
       .limit(1)
       .single()
     if (!firstTenant) {
-      console.error('[email-inbound] DIAG no tenant found at all — aborting')
+      console.error('[email-inbound] no tenant found — aborting')
       return
     }
     tenantId = firstTenant.id
-    console.log('[email-inbound] DIAG using fallback tenantId:', tenantId)
   }
 
   // Load routing config from DB (cached 60s)
   const routingConfig = await getRoutingConfig(tenantId)
 
   // Get last known historyId
-  const { data: syncState, error: syncStateError } = await rawDb
+  const { data: syncState } = await rawDb
     .from('gmail_sync_state')
     .select('last_history_id')
     .eq('tenant_id', tenantId)
@@ -331,22 +357,9 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   const storedHistoryId = (syncState as { last_history_id: string } | null)?.last_history_id ?? null
   const startHistoryId = storedHistoryId ?? newHistoryId
 
-  console.log('[email-inbound] DIAG gmail_sync_state lookup — error:', syncStateError?.message ?? 'none')
-  console.log('[email-inbound] DIAG storedHistoryId (from DB):', storedHistoryId)
-  console.log('[email-inbound] DIAG newHistoryId  (from push):', newHistoryId)
-  console.log('[email-inbound] DIAG startHistoryId (used for history.list):', startHistoryId)
-  if (storedHistoryId === null) {
-    console.log('[email-inbound] DIAG no stored historyId — using newHistoryId as start, history.list will likely return nothing')
-  } else if (BigInt(startHistoryId) >= BigInt(newHistoryId)) {
-    console.log('[email-inbound] DIAG WARNING: startHistoryId >= newHistoryId — history.list will return nothing (already caught up or ahead)')
-  } else {
-    console.log('[email-inbound] DIAG gap:', BigInt(newHistoryId) - BigInt(startHistoryId), 'history steps to walk')
-  }
-
   // Fetch history since last known id
   let messageIds: string[] = []
   try {
-    console.log('[email-inbound] DIAG calling gmail.users.history.list with startHistoryId:', startHistoryId)
     const histRes = await gmail.users.history.list({
       userId: 'me',
       startHistoryId,
@@ -354,26 +367,31 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       labelId: 'INBOX',
     })
 
-    const historyRecords = histRes.data.history ?? []
-    console.log('[email-inbound] DIAG history.list returned', historyRecords.length, 'records, nextPageToken:', histRes.data.nextPageToken ?? 'none')
-
-    for (const record of historyRecords) {
+    for (const record of histRes.data.history ?? []) {
       for (const added of record.messagesAdded ?? []) {
         if (added.message?.id) {
           messageIds.push(added.message.id)
         }
       }
     }
-    console.log('[email-inbound] DIAG messageIds to process:', messageIds)
   } catch (err) {
-    console.error('[email-inbound] DIAG history.list error:', err)
+    console.error('[email-inbound] history.list error:', err)
     return
   }
 
-  // Process each new message
+  // Track thread IDs for which an insurer_order was written in this batch.
+  // Closes the sequential-processing race where multiple messages from the same
+  // Gmail thread arrive in one history window: message N+1's thread-dedup DB
+  // query is guaranteed to see message N's communications row (sequential await
+  // means the write is committed), but the in-memory set acts as a belt-and-
+  // suspenders guard for any DB write lag or edge cases.
+  const processedOrderThreadIds = new Set<string>()
+
+  // Process each new message sequentially — order matters for thread dedup
   for (const msgId of messageIds) {
     try {
-      // Deduplicate
+      // Gmail message-level dedup: claim the message_id atomically; skip if
+      // already processed (upsert returns count=0 when ignoreDuplicates fires).
       const { count: claimedCount } = await rawDb
         .from('processed_gmail_messages')
         .upsert(
@@ -401,8 +419,33 @@ async function processWebhook(body: PubSubBody): Promise<void> {
         ? await uploadAttachments(msg.attachments, tenantId, communicationId, rawDb, msgId)
         : []
 
-      // Check if thread already exists in communications
+      // Thread dedup: check in-memory batch set first (fast), then DB.
+      // An existing thread in communications means this is a follow-up to a
+      // known order or conversation — append it and move on.
       if (msg.threadId) {
+        if (processedOrderThreadIds.has(msg.threadId)) {
+          // An earlier message in this same batch already wrote an order for
+          // this thread; append as a follow-up communication.
+          await supabase.from('communications').insert({
+            id: communicationId,
+            tenant_id: tenantId,
+            job_id: null,
+            type: 'email',
+            direction: 'inbound',
+            subject: msg.subject,
+            content: msg.bodyText,
+            created_at: msg.receivedAt,
+            thread_id: msg.threadId,
+            from_email: msg.fromEmail,
+            to_email: msg.to,
+            body_text: msg.bodyText,
+            gmail_message_id: msg.gmailMessageId || null,
+            source: 'inbound',
+            attachments: storedAttachments,
+          } as never)
+          continue
+        }
+
         const { data: existingThread } = await supabase
           .from('communications')
           .select('id, job_id')
@@ -440,6 +483,9 @@ async function processWebhook(body: PubSubBody): Promise<void> {
         routingConfig.clientConfigs
       )
 
+      // Keyword matching uses the stripped subject (Re:/Fwd: prefixes removed).
+      // Subjects are NOT rejected for having a reply prefix — classification
+      // (is_new_order from Gemini) is the authoritative gate.
       const isOrderByPattern = matchedClientConfig !== null
       const isOrderByKeyword = isOrderEmailByKeywords(msg.subject, routingConfig.keywordRules)
 
@@ -460,10 +506,36 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           : null
         try {
           const parsed = await parseInsurerOrder(msg, clientConfig, tenantId)
+
+          // Log the classification decision alongside the Castle-specific claim
+          // token check (corroborating signal — informational only, not a gate).
+          const subjectHasClaimToken = CASTLE_CLAIM_RE.test(msg.subject)
+          console.log(
+            `[email-inbound] order classification | msgId=${msgId}` +
+            ` is_new_order=${parsed.isNewOrder}` +
+            ` castle_claim_in_subject=${subjectHasClaimToken}` +
+            ` confidence=${parsed.confidence}` +
+            ` parse_status=${parsed.parseStatus}` +
+            ` reason="${parsed.isNewOrderReasoning}"`
+          )
+
+          // writeInsurerOrder returns null when Gemini classified the email as
+          // not a new order (is_new_order: false). Null is intentional — do NOT
+          // write a fallback row in that case (the catch block below only runs
+          // on thrown exceptions, not on a null return).
           orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          await sendOrderNotification(orderId, parsed, msg, tenantId)
+          if (orderId) {
+            await sendOrderNotification(orderId, parsed, msg, tenantId)
+            // Register this thread so subsequent messages in the same batch
+            // are routed to communications rather than re-entering the order pipeline.
+            if (msg.threadId) processedOrderThreadIds.add(msg.threadId)
+          }
         } catch (err) {
           console.error(`[email-inbound] order pipeline error for ${msgId}:`, err)
+          // Only write a fallback row for genuine exceptions (Gemini call failure,
+          // DB error, etc.) — not when writeInsurerOrder intentionally returns null.
+          // orderId will still be null here because writeInsurerOrder threw before
+          // it could return a value, so the null guard is correct.
           if (!orderId) {
             const { error: fbErr } = await supabase.from('insurer_orders').insert({
               tenant_id: tenantId,

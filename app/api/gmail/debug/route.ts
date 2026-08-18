@@ -125,7 +125,9 @@ export async function POST(): Promise<NextResponse> {
       try {
         const parsed = await parseInsurerOrder(msg, null, tenantId)
         const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-        await sendOrderNotification(orderId, parsed, msg, tenantId)
+        if (orderId) {
+          await sendOrderNotification(orderId, parsed, msg, tenantId)
+        }
         await gmail.users.messages.modify({
           userId: 'me',
           id: msgId,

@@ -167,9 +167,13 @@ async function runPoll(): Promise<NextResponse> {
         try {
           const parsed = await parseInsurerOrder(msg, null, tenantId)
           const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          await sendOrderNotification(orderId, parsed, msg, tenantId)
-          orderCount++
-          console.log(`[gmail-poll] order created ${orderId} for message ${msgId}`)
+          if (orderId) {
+            await sendOrderNotification(orderId, parsed, msg, tenantId)
+            orderCount++
+            console.log(`[gmail-poll] order created ${orderId} for message ${msgId}`)
+          } else {
+            console.log(`[gmail-poll] order rejected (is_new_order=false) for message ${msgId}`)
+          }
           await swapLabel(gmail, msgId, labelIds.lodgeJob, labelIds.complete)
         } catch (pipelineErr) {
           console.error(`[gmail-poll] pipeline error for message ${msgId}:`, pipelineErr)

@@ -270,8 +270,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             tenantId
           )
           const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          await sendOrderNotification(orderId, parsed, msg, tenantId)
-          results.push({ messageId: msgId, status: 'order', detail: orderId })
+          if (orderId) {
+            await sendOrderNotification(orderId, parsed, msg, tenantId)
+          }
+          results.push({ messageId: msgId, status: 'order', detail: orderId ?? undefined })
         } catch (err) {
           console.error(`[gmail-backfill] order pipeline error for ${msgId}:`, err)
           results.push({ messageId: msgId, status: 'error', detail: String(err) })
