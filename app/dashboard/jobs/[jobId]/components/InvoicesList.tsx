@@ -61,6 +61,11 @@ function fmt(v: number) {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
 }
 
+function fmtDate(s: string | null) {
+  if (!s) return '—'
+  return new Date(s).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface InvoicesListProps {
@@ -180,6 +185,19 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
     } finally {
       setStatusChangingId(null)
     }
+  }, [tenantId, load])
+
+  // ── Invoice date handler — editable while draft, locked once sent ─────────
+
+  const handleIssuedDateChange = useCallback(async (invoiceId: string, value: string) => {
+    if (!value) return
+    setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, issued_date: value } : i))
+    await fetch(`/api/invoices/${invoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, issued_date: value }),
+    })
+    load()
   }, [tenantId, load])
 
   // ── Delete handler (hard delete for draft invoices) ───────────────────────
@@ -534,6 +552,21 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     />
                   ) : (
                     <div>
+                      {/* Invoice date — editable while draft, locked once sent */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <span style={{ fontSize: 12, color: '#9e998f' }}>Invoice Date</span>
+                        {invoice.status === 'draft' ? (
+                          <input
+                            type="date"
+                            defaultValue={invoice.issued_date ? invoice.issued_date.slice(0, 10) : ''}
+                            onChange={e => handleIssuedDateChange(invoice.id, e.target.value)}
+                            style={{ fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 13, color: '#3a3530', fontWeight: 500 }}>{fmtDate(invoice.issued_date)}</span>
+                        )}
+                      </div>
+
                       {/* Line items preview */}
                       {invoice.line_items.length > 0 ? (
                         <div style={{ marginBottom: 16 }}>

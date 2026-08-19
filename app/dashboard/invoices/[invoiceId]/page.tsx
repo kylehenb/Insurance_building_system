@@ -362,10 +362,28 @@ export default function InvoiceDetailPage() {
     await fetch(`/api/invoices/${invoice.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId, status: 'sent', issued_date: new Date().toISOString().split('T')[0] }),
+      body: JSON.stringify({ tenantId, status: 'sent' }),
     })
     load()
   }, [tenantId, invoice, load])
+
+  // Invoice date — editable while draft, locked once sent (enforced server-side too).
+  const updateIssuedDate = useCallback(async (value: string) => {
+    if (!tenantId || !invoice || !value) return
+    setSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId, issued_date: value }),
+      })
+      if (!res.ok) throw new Error('Failed to update invoice date')
+      setInvoice(prev => prev ? { ...prev, issued_date: value } : prev)
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [tenantId, invoice])
 
   const markPaid = useCallback(async () => {
     if (!tenantId || !invoice) return
@@ -767,8 +785,18 @@ export default function InvoiceDetailPage() {
                 </>
               )}
               <div className="invd-meta-row">
-                <span className="invd-meta-label">Issued Date</span>
-                <span className="invd-meta-val">{fmtDate(invoice.issued_date)}</span>
+                <span className="invd-meta-label">Invoice Date</span>
+                {isEditable ? (
+                  <input
+                    type="date"
+                    className="invd-num-input"
+                    style={{ width: 132, textAlign: 'right' }}
+                    defaultValue={invoice.issued_date ? invoice.issued_date.slice(0, 10) : ''}
+                    onChange={e => updateIssuedDate(e.target.value)}
+                  />
+                ) : (
+                  <span className="invd-meta-val">{fmtDate(invoice.issued_date)}</span>
+                )}
               </div>
               <div className="invd-meta-row">
                 <span className="invd-meta-label">Created</span>

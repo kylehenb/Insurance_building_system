@@ -59,22 +59,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const supabase = createServiceClient()
 
+  // Capture previous status up front — needed both to detect a transition to 'sent'
+  // and to guard the invoice date, which is only editable while the invoice is a draft.
+  const { data: current } = await supabase
+    .from('invoices')
+    .select('status')
+    .eq('id', invoiceId)
+    .eq('tenant_id', tenantId)
+    .single()
+  const previousStatus = (current as { status: string } | null)?.status ?? null
+
   const allowedFields: InvoiceUpdate = {}
   if ('status' in updates) allowedFields.status = updates.status
-  if ('issued_date' in updates) allowedFields.issued_date = updates.issued_date
-  if ('notes' in updates) allowedFields.notes = updates.notes
-
-  // Capture previous status before update so we can detect a transition to 'sent'
-  let previousStatus: string | null = null
-  if (updates.status === 'sent') {
-    const { data: current } = await supabase
-      .from('invoices')
-      .select('status')
-      .eq('id', invoiceId)
-      .eq('tenant_id', tenantId)
-      .single()
-    previousStatus = (current as { status: string } | null)?.status ?? null
+  if ('issued_date' in updates) {
+    if (previousStatus && previousStatus !== 'draft') {
+      return NextResponse.json({ error: 'Invoice date is locked once the invoice has been sent' }, { status: 400 })
+    }
+    allowedFields.issued_date = updates.issued_date
   }
+  if ('notes' in updates) allowedFields.notes = updates.notes
 
   const { data: invoice, error } = await supabase
     .from('invoices')

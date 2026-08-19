@@ -193,7 +193,7 @@ export default function InvoicesPage() {
             className="inv-date-input"
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            title="Issued from"
+            title="Invoice date from"
           />
           <span style={{ fontSize: 12, color: '#9e998f' }}>to</span>
           <input
@@ -201,7 +201,7 @@ export default function InvoicesPage() {
             className="inv-date-input"
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            title="Issued to"
+            title="Invoice date to"
           />
         </div>
 
@@ -219,7 +219,7 @@ export default function InvoicesPage() {
                   <th>Job</th>
                   <th>Insurer</th>
                   <th>Type</th>
-                  <th>Issued Date</th>
+                  <th>Invoice Date</th>
                   <th style={{ textAlign: 'right' }}>Amount inc GST</th>
                   <th>Status</th>
                   <th>Actions</th>

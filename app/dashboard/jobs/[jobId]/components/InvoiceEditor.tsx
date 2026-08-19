@@ -18,6 +18,7 @@ interface Invoice {
   amount_inc_gst: number
   markup_pct: number | null
   notes: string | null
+  issued_date: string | null
 }
 
 interface InvoiceLineItem {
@@ -152,6 +153,26 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     }
   }, [invoice, lineItems, invoiceId, tenantId, persistTotals, onInvoiceUpdated])
 
+  // ── Update invoice date — editable while draft, locked once sent ───────────
+
+  const updateIssuedDate = useCallback(async (value: string) => {
+    if (!invoice || !value) return
+    setSaveStatus('saving')
+    try {
+      await supabase
+        .from('invoices')
+        .update({ issued_date: value })
+        .eq('id', invoiceId)
+        .eq('tenant_id', tenantId)
+
+      setInvoice(prev => prev ? { ...prev, issued_date: value } : prev)
+      setSaveStatus('saved')
+      onInvoiceUpdated?.()
+    } catch {
+      setSaveStatus('error')
+    }
+  }, [invoice, invoiceId, tenantId, onInvoiceUpdated])
+
   // ── Toggle line item completed ──────────────────────────────────────────────
 
   const toggleCompleted = useCallback(async (itemId: string, completed: boolean) => {
@@ -263,6 +284,17 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
+      {/* Invoice date — editable while draft, locked once sent */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 12, color: '#9e998f' }}>Invoice Date</span>
+        <input
+          type="date"
+          defaultValue={invoice?.issued_date ? invoice.issued_date.slice(0, 10) : ''}
+          onChange={e => updateIssuedDate(e.target.value)}
+          style={{ fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
+        />
+      </div>
+
       {/* Line items */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
