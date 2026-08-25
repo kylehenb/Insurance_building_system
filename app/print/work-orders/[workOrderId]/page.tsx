@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { generateWorkOrderHtml } from '@/lib/documents/work-order-html'
+import { resolveOwnedScopeItems } from '@/lib/work-orders/scope-item-ownership'
 import { WorkOrderPrintButton } from './WorkOrderPrintButton'
 
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
@@ -93,6 +94,19 @@ export default async function WorkOrderPrintPage({
     }
   }
 
+  // Fetch every work order sharing this quote — needed to resolve which items
+  // *other* trades currently own (their own custom items, edits, reassignments),
+  // not just what the quote originally said.
+  let quoteWorkOrders: WorkOrder[] = []
+  if (quote) {
+    const { data } = await supabase
+      .from('work_orders')
+      .select('*')
+      .eq('quote_id', quote.id)
+      .eq('tenant_id', tenantId)
+    quoteWorkOrders = data ?? []
+  }
+
   // Fetch all scope items for the quote
   let rawScopeItems: ScopeItem[] = []
   if (quote) {
@@ -108,12 +122,30 @@ export default async function WorkOrderPrintPage({
     }
   }
 
-  // Apply WO-specific overrides from work_order.notes so the PDF reflects
-  // what was actually agreed for this work order, not the original quote prices.
-  function parseWONotes(notes: string | null) {
-    if (!notes) return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[] }
+  // Contractor lookup, for labelling other trades' items with who's doing them
+  const { data: allTrades } = await supabase
+    .from('trades')
+    .select('*')
+    .eq('tenant_id', tenantId)
+  const tradesById = new Map((allTrades ?? []).map(t => [t.id, t]))
+
+  function tradeLabelFor(wo: WorkOrder): string | null {
+    const t = wo.trade_id ? tradesById.get(wo.trade_id) ?? null : null
+    return wo.trade_name ?? t?.primary_trade ?? null
+  }
+
+  function contractorNameFor(wo: WorkOrder): string | null {
+    const t = wo.trade_id ? tradesById.get(wo.trade_id) ?? null : null
+    return t?.business_name || t?.primary_trade || null
+  }
+
+  // Apply a work order's own notes overlay (custom items, edited descriptions/
+  // qty, soft-deletions) so the PDF reflects what's actually in the work
+  // orders table for it, not the original quote prices.
+  function parseWONotes(wo: WorkOrder) {
+    if (!wo.notes) return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[], deletedIds: new Set<string>() }
     try {
-      const p = JSON.parse(notes) as Record<string, unknown>
+      const p = JSON.parse(wo.notes) as Record<string, unknown>
       const overrides = (typeof p.item_overrides === 'object' && p.item_overrides && !Array.isArray(p.item_overrides))
         ? p.item_overrides as Record<string, Partial<ScopeItem>>
         : {} as Record<string, Partial<ScopeItem>>
@@ -124,7 +156,7 @@ export default async function WorkOrderPrintPage({
       }> : []
       const addedItems: ScopeItem[] = addedRaw.map(item => ({
         id:                       item.id,
-        quote_id:                 workOrder!.quote_id ?? '',
+        quote_id:                 wo.quote_id ?? '',
         tenant_id:                tenantId,
         item_description:         item.item_description,
         qty:                      item.qty,
@@ -134,6 +166,7 @@ export default async function WorkOrderPrintPage({
         line_total:               item.line_total,
         room:                     item.room,
         trade:                    item.trade,
+        assigned_work_order_id:   wo.id,
         unit:                     null,
         room_length:              null,
         room_width:               null,
@@ -152,44 +185,37 @@ export default async function WorkOrderPrintPage({
         trade_rate_total:         null,
         created_at:               null,
       }))
-      return { overrides, addedItems }
+      const deletedIds = new Set(Array.isArray(p.deleted_scope_item_ids) ? p.deleted_scope_item_ids as string[] : [])
+      return { overrides, addedItems, deletedIds }
     } catch {
-      return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[] }
+      return { overrides: {} as Record<string, Partial<ScopeItem>>, addedItems: [] as ScopeItem[], deletedIds: new Set<string>() }
     }
   }
 
-  const { overrides, addedItems } = parseWONotes(workOrder.notes)
-
-  // Merge: apply overrides to original items, then append WO-added items
-  const allScopeItems: ScopeItem[] = [
-    ...rawScopeItems.map(item => {
-      const override = overrides[item.id]
-      return override ? { ...item, ...override } : item
-    }),
-    ...addedItems,
-  ]
-
-  // Separate scope items: this work order's items vs other trades' items.
-  // Use trade_name (the trade type this WO was created for) as the filter key so
-  // a multi-specialty contractor assigned to two WOs on the same job gets the
-  // correct scope on each PDF — not their primary_trade.
-  const tradeLabel = workOrder.trade_name ?? trade?.primary_trade ?? null
-
-  const tradeScopeItems: ScopeItem[] = []
-  const otherScopeItems: ScopeItem[] = []
-
-  if (tradeLabel) {
-    allScopeItems.forEach(item => {
-      if (item.trade === tradeLabel) {
-        tradeScopeItems.push(item)
-      } else {
-        otherScopeItems.push(item)
-      }
-    })
-  } else {
-    // If no trade label at all, all items are "other"
-    otherScopeItems.push(...allScopeItems)
+  // Resolve the final item list a given work order owns: explicit assignment
+  // or trade match (never both a trade's original WO and a WO it was
+  // reassigned to — see resolveOwnedScopeItems), then that WO's own edits.
+  function resolveItemsForWO(wo: WorkOrder): ScopeItem[] {
+    const owned = resolveOwnedScopeItems({ id: wo.id, tradeLabel: tradeLabelFor(wo) }, rawScopeItems)
+    const { overrides, addedItems, deletedIds } = parseWONotes(wo)
+    const withOverrides = owned
+      .filter(item => !deletedIds.has(item.id))
+      .map(item => { const o = overrides[item.id]; return o ? { ...item, ...o } : item })
+    return [...withOverrides, ...addedItems]
   }
+
+  const tradeScopeItems = resolveItemsForWO(workOrder)
+
+  // Other trades' items, as each of their own work orders currently resolves
+  // them — an item with no owning work order (unallocated) appears nowhere,
+  // by design: unallocated usually means the repair isn't going ahead.
+  const otherScopeItems = quoteWorkOrders
+    .filter(wo => wo.id !== workOrder.id)
+    .flatMap(wo => resolveItemsForWO(wo).map(item => ({
+      ...item,
+      trade: tradeLabelFor(wo) ?? item.trade,
+      contractorName: contractorNameFor(wo),
+    })))
 
   // Fetch tenant details
   const { data: tenant, error: tenantError } = await supabase

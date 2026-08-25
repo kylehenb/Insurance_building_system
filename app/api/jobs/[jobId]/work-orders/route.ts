@@ -82,9 +82,13 @@ export async function POST(
     return NextResponse.json({ error: 'No scope items found for this quote' }, { status: 404 })
   }
 
-  // Group scope items by trade (string field)
+  // Group scope items by trade (string field) — items already explicitly
+  // claimed into a work order (assigned_work_order_id) are excluded so that
+  // a trade whose only items were reassigned elsewhere doesn't spawn an
+  // empty duplicate work order.
   const itemsByTrade = new Map<string, typeof scopeItems>()
   scopeItems.forEach(item => {
+    if (item.assigned_work_order_id) return
     if (item.trade) {
       if (!itemsByTrade.has(item.trade)) {
         itemsByTrade.set(item.trade, [])

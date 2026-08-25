@@ -13,6 +13,7 @@ import {
   aud,
   INVOICE_CHAIN_STEPS,
   woIsSent,
+  getUnallocatedScopeItems,
 } from './types'
 
 // ─── Status / Gary / InvoiceChain pills ────────────────────────────────────────
@@ -347,6 +348,64 @@ function NewItemRow({
   )
 }
 
+// Picker for claiming an unallocated item (quoted under a different trade)
+// into this work order. Only ever offers items still sitting in Unallocated —
+// moving an item that already belongs to another work order isn't supported
+// from here.
+function ClaimItemRow({
+  eligibleItems,
+  onClaim,
+}: {
+  eligibleItems: ScopeItemRow[]
+  onClaim: (scopeItemId: string) => void
+}) {
+  const [selected, setSelected] = useState('')
+
+  function handleClaim() {
+    if (!selected) return
+    onClaim(selected)
+    setSelected('')
+  }
+
+  return (
+    <tr style={{ background: '#fef3e2', borderTop: '1px dashed #fcd38d' }}>
+      <td style={{ padding: '4px 6px', width: 28, color: '#92400e', fontSize: 10, textAlign: 'center' }}>+</td>
+      <td colSpan={5} style={{ padding: '4px 6px' }}>
+        <select
+          value={selected}
+          onChange={e => setSelected(e.target.value)}
+          style={{
+            fontFamily: 'DM Sans, sans-serif', fontSize: 10, padding: '3px 6px', borderRadius: 4,
+            border: '1px solid #fcd38d', background: '#fff', color: '#1a1a1a', width: '100%', maxWidth: 420,
+          }}
+        >
+          <option value="">Add an unallocated item from another trade…</option>
+          {eligibleItems.map(item => (
+            <option key={item.id} value={item.id}>
+              {item.item_description ?? '(no description)'} — {item.trade} — {aud.format(item.line_total ?? 0)}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td style={{ padding: '4px 6px', width: 36 }}>
+        <button
+          onClick={handleClaim}
+          disabled={!selected}
+          style={{
+            fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+            border: '1px solid #fcd38d',
+            background: selected ? '#92400e' : '#fde8c8',
+            color: selected ? '#fff' : '#9a9590',
+            cursor: selected ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Add
+        </button>
+      </td>
+    </tr>
+  )
+}
+
 const SCOPE_TH: React.CSSProperties = {
   padding: '4px 6px',
   textAlign: 'left',
@@ -363,15 +422,19 @@ const SCOPE_TH: React.CSSProperties = {
 function ScopeItemsEditor({
   wo,
   isLocked,
+  unallocatedItems,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
+  onClaimScopeItem,
 }: {
   wo: WorkOrderWithDetails
   isLocked: boolean
+  unallocatedItems: ScopeItemRow[]
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
+  onClaimScopeItem: (scopeItemId: string, workOrderId: string) => Promise<void>
 }) {
   const [newItemIds,     setNewItemIds]     = useState<Set<string>>(new Set())
   const [modifiedFields, setModifiedFields] = useState<Map<string, Set<string>>>(new Map())
@@ -409,6 +472,9 @@ function ScopeItemsEditor({
   }
 
   const items = wo.woDisplayItems
+
+  // Unallocated items from the same quote, eligible to be claimed into this WO
+  const eligibleUnallocated = unallocatedItems.filter(item => item.quote_id === wo.quote_id)
 
   // Datalist of rooms already used in this WO (for the combo-box suggestions)
   const datalistId = `room-opts-${wo.id}`
@@ -508,6 +574,12 @@ function ScopeItemsEditor({
               </React.Fragment>
             )
           })}
+          {!isLocked && eligibleUnallocated.length > 0 && (
+            <ClaimItemRow
+              eligibleItems={eligibleUnallocated}
+              onClaim={itemId => onClaimScopeItem(itemId, wo.id)}
+            />
+          )}
           {!isLocked && (
             <NewItemRow
               tradeLabel={wo.tradeTypeLabel}
@@ -533,22 +605,26 @@ function WORow({
   wo,
   trades,
   tradeTypes,
+  unallocatedItems,
   onUpdate,
   onDelete,
   onLock,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
+  onClaimScopeItem,
 }: {
   wo: WorkOrderWithDetails
   trades: TradeRow[]
   tradeTypes: string[]
+  unallocatedItems: ScopeItemRow[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
+  onClaimScopeItem: (scopeItemId: string, workOrderId: string) => Promise<void>
 }) {
   const [expanded,       setExpanded]     = useState(false)
   const [localTradeId,   setLocalTradeId] = React.useState(wo.trade_id || '')
@@ -770,9 +846,11 @@ function WORow({
             <ScopeItemsEditor
               wo={wo}
               isLocked={isLocked}
+              unallocatedItems={unallocatedItems}
               onUpdateScopeItem={onUpdateScopeItem}
               onSoftDeleteScopeItem={onSoftDeleteScopeItem}
               onCreateScopeItem={onCreateScopeItem}
+              onClaimScopeItem={onClaimScopeItem}
             />
           </td>
         </tr>
@@ -800,22 +878,26 @@ function WOTable({
   workOrders,
   trades,
   tradeTypes,
+  unallocatedItems,
   onUpdate,
   onDelete,
   onLock,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
+  onClaimScopeItem,
 }: {
   workOrders: WorkOrderWithDetails[]
   trades: TradeRow[]
   tradeTypes: string[]
+  unallocatedItems: ScopeItemRow[]
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
+  onClaimScopeItem: (scopeItemId: string, workOrderId: string) => Promise<void>
 }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
@@ -845,12 +927,14 @@ function WOTable({
             wo={wo}
             trades={trades}
             tradeTypes={tradeTypes}
+            unallocatedItems={unallocatedItems}
             onUpdate={onUpdate}
             onDelete={onDelete}
             onLock={onLock}
             onUpdateScopeItem={onUpdateScopeItem}
             onSoftDeleteScopeItem={onSoftDeleteScopeItem}
             onCreateScopeItem={onCreateScopeItem}
+            onClaimScopeItem={onClaimScopeItem}
           />
         ))}
       </tbody>
@@ -871,21 +955,21 @@ function UnallocatedSection({
   quotes: QuoteRow[]
   onAddWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
 }) {
-  // Find (quoteId, trade) groups with no active work order
+  // Items with no owning work order — excludes anything explicitly claimed
+  // into a work order elsewhere, even if that item's own trade has no WO.
+  const unallocated = getUnallocatedScopeItems(scopeItems, workOrders)
+
+  // Group by (quoteId, trade) for display
   const groups: { quoteId: string; trade: string; items: ScopeItemRow[] }[] = []
 
   const seen = new Set<string>()
-  for (const si of scopeItems) {
-    if (!si.trade) continue
+  for (const si of unallocated) {
     const key = `${si.quote_id}:${si.trade}`
     if (seen.has(key)) continue
     seen.add(key)
 
-    const hasWO = workOrders.some(wo => wo.quote_id === si.quote_id && wo.tradeTypeLabel === si.trade)
-    if (!hasWO) {
-      const items = scopeItems.filter(s => s.quote_id === si.quote_id && s.trade === si.trade)
-      groups.push({ quoteId: si.quote_id, trade: si.trade, items })
-    }
+    const items = unallocated.filter(s => s.quote_id === si.quote_id && s.trade === si.trade)
+    groups.push({ quoteId: si.quote_id, trade: si.trade!, items })
   }
 
   if (groups.length === 0) return null
@@ -959,6 +1043,7 @@ export interface BottomPanelProps {
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
+  onClaimScopeItem: (scopeItemId: string, workOrderId: string) => Promise<void>
   onAddWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
   onRefresh: () => void
 }
@@ -979,6 +1064,7 @@ export function BottomPanel({
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
+  onClaimScopeItem,
   onAddWorkOrderForTrade,
   onRefresh,
 }: BottomPanelProps) {
@@ -1008,6 +1094,7 @@ export function BottomPanel({
 
   const quotedWOs     = workOrders.filter(wo => wo.quote_id !== null && wo.work_type !== 'make_safe')
   const additionalWOs = workOrders.filter(wo => wo.quote_id === null  || wo.work_type === 'make_safe')
+  const unallocatedItems = getUnallocatedScopeItems(scopeItems, workOrders)
 
   function quoteTotal(quoteId: string) {
     return quotedWOs.filter(wo => wo.quote_id === quoteId).reduce((s, wo) => s + wo.quotedAllowance, 0)
@@ -1068,12 +1155,14 @@ export function BottomPanel({
                     workOrders={qWOs}
                     trades={trades}
                     tradeTypes={tradeTypes}
+                    unallocatedItems={unallocatedItems}
                     onUpdate={onUpdateWorkOrder}
                     onDelete={onDeleteWorkOrder}
                     onLock={onLockWorkOrder}
                     onUpdateScopeItem={onUpdateScopeItem}
                     onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                     onCreateScopeItem={onCreateScopeItem}
+                    onClaimScopeItem={onClaimScopeItem}
                   />
                 ) : (
                   <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>
@@ -1113,12 +1202,14 @@ export function BottomPanel({
                 workOrders={additionalWOs}
                 trades={trades}
                 tradeTypes={tradeTypes}
+                unallocatedItems={unallocatedItems}
                 onUpdate={onUpdateWorkOrder}
                 onDelete={onDeleteWorkOrder}
                 onLock={onLockWorkOrder}
                 onUpdateScopeItem={onUpdateScopeItem}
                 onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                 onCreateScopeItem={onCreateScopeItem}
+                onClaimScopeItem={onClaimScopeItem}
               />
             ) : (
               <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>

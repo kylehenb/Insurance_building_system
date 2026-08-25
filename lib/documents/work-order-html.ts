@@ -5,16 +5,11 @@ type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
-
-function getDeletedIds(notes: string | null): Set<string> {
-  if (!notes) return new Set()
-  try {
-    const parsed = JSON.parse(notes) as Record<string, unknown>
-    return new Set(Array.isArray(parsed.deleted_scope_item_ids) ? (parsed.deleted_scope_item_ids as string[]) : [])
-  } catch {
-    return new Set()
-  }
-}
+// Other-trades items carry who's actually executing them, since the item's
+// own `trade` field is overridden to the owning work order's trade label —
+// see resolveItemsForWO in the print page, which builds both arrays already
+// fully resolved (overrides/additions/deletions/reassignment applied).
+type OtherScopeItem = ScopeItem & { contractorName?: string | null }
 
 // notes is a structured JSON blob — only surface a dedicated text_notes field if present,
 // otherwise suppress it to avoid leaking raw JSON into the PDF.
@@ -37,15 +32,10 @@ export function generateWorkOrderHtml(params: {
   }
   trade: Trade | null
   tradeScopeItems: ScopeItem[]
-  otherScopeItems: ScopeItem[]
+  otherScopeItems: OtherScopeItem[]
   generatedDate?: Date
 }): string {
-  const { workOrder, job, tenant, trade, generatedDate = new Date() } = params
-
-  // Filter out soft-deleted scope items
-  const deletedIds = getDeletedIds(workOrder.notes)
-  const tradeScopeItems = params.tradeScopeItems.filter(i => !deletedIds.has(i.id))
-  const otherScopeItems = params.otherScopeItems.filter(i => !deletedIds.has(i.id))
+  const { workOrder, job, tenant, trade, tradeScopeItems, otherScopeItems, generatedDate = new Date() } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -127,7 +117,7 @@ export function generateWorkOrderHtml(params: {
     if (!acc[room]) acc[room] = []
     acc[room].push(item)
     return acc
-  }, {} as Record<string, ScopeItem[]>)
+  }, {} as Record<string, OtherScopeItem[]>)
 
   const otherSortedRooms = Object.keys(otherGroupedByRoom).sort((a, b) => a.localeCompare(b))
 
@@ -147,7 +137,7 @@ export function generateWorkOrderHtml(params: {
 
     const roomHeaderHtml = `
     <tr>
-      <td colspan="4" style="padding:4px 12px;background:#faf8f5;
+      <td colspan="5" style="padding:4px 12px;background:#faf8f5;
         border-bottom:1px solid #e8e4e0;border-top:6px solid white;">
         <span style="font-weight:700;color:#6a6560;font-size:11px;
           text-transform:uppercase;">${room}</span>
@@ -169,6 +159,10 @@ export function generateWorkOrderHtml(params: {
         <td style="width:70px;padding:6px 4px;text-align:center;
           font-size:9px;color:#6a6560;font-weight:600;text-transform:uppercase;">
           ${item.trade || '—'}
+        </td>
+        <td style="width:100px;padding:6px 4px;text-align:center;
+          font-size:9px;color:#6a6560;">
+          ${item.contractorName || '—'}
         </td>
       </tr>`
     }).join('')
@@ -348,6 +342,9 @@ export function generateWorkOrderHtml(params: {
               <th style="width:70px;text-align:center;padding:6px 4px;font-size:8px;
                 font-weight:600;text-transform:uppercase;letter-spacing:1px;
                 color:#9e998f;">Trade</th>
+              <th style="width:100px;text-align:center;padding:6px 4px;font-size:8px;
+                font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                color:#9e998f;">Contractor</th>
             </tr>
           </thead>
           <tbody>

@@ -376,6 +376,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           onUpdateScopeItem={mutations.updateScopeItem}
           onSoftDeleteScopeItem={mutations.softDeleteScopeItem}
           onCreateScopeItem={mutations.createScopeItem}
+          onClaimScopeItem={mutations.claimScopeItem}
           onAddWorkOrderForTrade={mutations.addWorkOrderForTrade}
           onRefresh={refetch}
         />

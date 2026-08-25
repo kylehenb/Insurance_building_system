@@ -228,6 +228,11 @@ export function removeAddedItem(notes: string | null, itemId: string): string {
   return JSON.stringify({ ...parsed, added_items: existing.filter(item => item.id !== itemId) })
 }
 
+// ─── Scope item ownership ──────────────────────────────────────────────────────
+// Shared with the work-order print page (server-side) — see lib/work-orders/
+// scope-item-ownership.ts for the resolution rule.
+export { resolveOwnedScopeItems, getUnallocatedScopeItems } from '@/lib/work-orders/scope-item-ownership'
+
 // ─── Build merged WO display items ────────────────────────────────────────────
 
 export function buildWODisplayItems(

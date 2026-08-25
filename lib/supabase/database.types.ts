@@ -3116,6 +3116,7 @@ export type Database = {
       scope_items: {
         Row: {
           approval_status: string | null
+          assigned_work_order_id: string | null
           created_at: string | null
           estimated_hours: number | null
           id: string
@@ -3146,6 +3147,7 @@ export type Database = {
         }
         Insert: {
           approval_status?: string | null
+          assigned_work_order_id?: string | null
           created_at?: string | null
           estimated_hours?: number | null
           id?: string
@@ -3176,6 +3178,7 @@ export type Database = {
         }
         Update: {
           approval_status?: string | null
+          assigned_work_order_id?: string | null
           created_at?: string | null
           estimated_hours?: number | null
           id?: string
@@ -3205,6 +3208,13 @@ export type Database = {
           unit?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "scope_items_assigned_work_order_id_fkey"
+            columns: ["assigned_work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scope_items_quote_id_fkey"
             columns: ["quote_id"]

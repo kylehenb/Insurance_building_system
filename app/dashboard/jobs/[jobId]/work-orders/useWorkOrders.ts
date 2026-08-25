@@ -25,6 +25,7 @@ import {
   patchAddedItem,
   removeAddedItem,
   buildWODisplayItems,
+  resolveOwnedScopeItems,
   woIsSent,
 } from './types'
 
@@ -46,6 +47,7 @@ export interface WorkOrderMutations {
   updateScopeItem:     (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   softDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   createScopeItem:     (quoteId: string, tradeLabel: string, workOrderId: string, data: { item_description: string; room: string | null; qty: number; rate_labour: number; rate_materials: number; line_total: number }) => Promise<string | null>
+  claimScopeItem:      (scopeItemId: string, workOrderId: string) => Promise<void>
   deleteWorkOrder:     (id: string) => Promise<void>
   addWorkOrderForTrade: (quoteId: string, tradeName: string) => Promise<void>
   lockWorkOrder:       (id: string) => Promise<void>
@@ -181,13 +183,12 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           if (wo.work_type === 'make_safe') tradeTypeLabel = 'Make Safe'
         }
 
-        // Scope items for this work order: same quote + same trade label
+        // Scope items owned by this work order: explicitly assigned to it, or —
+        // for anything not explicitly assigned — matching its trade label.
         let woScopeItems: ScopeItemRow[] = []
         if (wo.quote_id) {
           const allForQuote = scopeByQuote.get(wo.quote_id) ?? []
-          woScopeItems = tradeTypeLabel
-            ? allForQuote.filter(si => si.trade === tradeTypeLabel)
-            : allForQuote
+          woScopeItems = resolveOwnedScopeItems({ id: wo.id, tradeLabel: tradeTypeLabel || null }, allForQuote)
         }
 
         // quotedAllowance = original quote prices, never modified by WO edits
@@ -681,6 +682,23 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
         .eq('tenant_id', tenantId)
       if (error) fetchData()
       return newId
+    },
+
+    // Claim an unallocated scope item (originally quoted under a different
+    // trade) into this work order. This never touches the item's `trade` —
+    // that stays the original estimating category for margin/insurer
+    // reporting — it only records which work order executes it. Affects the
+    // composed fields of two work orders at once (this one gains the item;
+    // whichever WO its trade would otherwise have matched loses it), so we
+    // refetch rather than try to patch both optimistically.
+    claimScopeItem: async (scopeItemId, workOrderId) => {
+      const { error } = await supabase
+        .from('scope_items')
+        .update({ assigned_work_order_id: workOrderId })
+        .eq('id', scopeItemId)
+        .eq('tenant_id', tenantId)
+      if (error) { console.error('Failed to claim scope item:', error); return }
+      fetchData()
     },
 
     deleteWorkOrder: async (id) => {
