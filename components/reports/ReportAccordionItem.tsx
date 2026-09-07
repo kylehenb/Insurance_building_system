@@ -482,12 +482,12 @@ export function ReportAccordionItem({
       )}
 
       <div
-        className="rounded-lg overflow-hidden mb-2 transition-all duration-200"
+        className="rounded-lg mb-2 transition-all duration-200"
         style={{ border: `0.5px solid ${cardBorderColor}`, background: cardBgColor }}
       >
         {/* — Header row (always visible) — */}
         <div
-          className="flex items-center gap-3 px-5 py-3 select-none"
+          className={`flex items-center gap-3 px-5 py-3 select-none ${isOpen ? 'rounded-t-lg' : 'rounded-lg'}`}
           style={{ background: headerBgColor, borderBottom: isOpen ? `0.5px solid ${cardBorderColor}` : 'none' }}
         >
           <button
