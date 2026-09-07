@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { QuoteData } from '../hooks/useQuote'
 import { TccModal } from './TccModal'
 
@@ -38,6 +38,7 @@ interface QuoteHeaderProps {
   onUnlockEdit?: () => void
   onSend?: () => void
   onShowLocked?: () => void
+  onFlushPending?: () => Promise<void>
 }
 
 export function QuoteHeader({
@@ -52,7 +53,28 @@ export function QuoteHeader({
   onUnlockEdit,
   onSend,
   onShowLocked,
+  onFlushPending,
 }: QuoteHeaderProps) {
+  // Blur whatever's focused (a description field only commits its edit on
+  // blur) and wait for any pending debounced item saves to land on the
+  // server before opening a preview tab — otherwise the preview can render
+  // before the last edit was persisted and show stale text.
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const openPreview = useCallback(
+    async (url: string) => {
+      setShowMenu(false)
+      setPreviewLoading(true)
+      try {
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        await new Promise(resolve => setTimeout(resolve, 200))
+        await onFlushPending?.()
+      } finally {
+        setPreviewLoading(false)
+      }
+      window.open(url, '_blank')
+    },
+    [onFlushPending]
+  )
   const s = STATUS_STYLES[quote.status.toLowerCase()] ?? STATUS_STYLES.draft
 
   // Version history state
@@ -527,9 +549,9 @@ export function QuoteHeader({
             }}
           >
             <button
+              disabled={previewLoading}
               onClick={() => {
-                setShowMenu(false)
-                window.open(`/print/quotes/${quoteId}`, '_blank')
+                void openPreview(`/print/quotes/${quoteId}`)
               }}
               style={{
                 display: 'flex',
@@ -542,7 +564,8 @@ export function QuoteHeader({
                 color: '#3a3530',
                 background: 'transparent',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: previewLoading ? 'default' : 'pointer',
+                opacity: previewLoading ? 0.6 : 1,
                 fontWeight: 400,
                 fontFamily: 'DM Sans, sans-serif',
                 transition: 'background 0.1s',
@@ -551,7 +574,7 @@ export function QuoteHeader({
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
             >
               <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
-              <span>Preview Quote</span>
+              <span>{previewLoading ? 'Saving changes…' : 'Preview Quote'}</span>
             </button>
             <button
               onClick={() => {

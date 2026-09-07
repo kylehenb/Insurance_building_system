@@ -121,7 +121,11 @@ export default async function SowPrintPage({
         return aIdx - bIdx
       })
     }
-    return roomNames.sort((a, b) => a.localeCompare(b))
+    // No room_order saved — preserve the order rooms first appear in the
+    // items (already sorted by sort_order), matching the quote editor's
+    // own fallback. Do NOT alphabetize; that silently overrides the
+    // editor's room order for any quote that hasn't been manually reordered.
+    return roomNames
   })()
 
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'

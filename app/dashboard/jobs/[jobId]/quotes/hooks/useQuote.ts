@@ -218,6 +218,16 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     [quoteId, tenantId, setSaveStatusTimed]
   )
 
+  // Flush every pending debounced item save immediately, in parallel, and wait
+  // for them to land. Call this before navigating somewhere that reads the
+  // quote straight from the server (e.g. opening the PDF/print preview) — the
+  // 600ms debounce otherwise races that read and the preview can show stale
+  // (pre-edit) descriptions.
+  const flushAllPending = useCallback(async () => {
+    const itemIds = Array.from(pendingChanges.current.keys())
+    await Promise.all(itemIds.map(id => flushItem(id)))
+  }, [flushItem])
+
   const scheduleItemSave = useCallback(
     (itemId: string, changes: Record<string, unknown>) => {
       // `labour_total` and `materials_total` are client-only display values
@@ -622,6 +632,7 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     reorderItems,
     reorderRooms,
     setAllItemTypes,
+    flushAllPending,
     reload: load,
   }
 }

@@ -336,6 +336,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
     reorderItems,
     reorderRooms,
     setAllItemTypes,
+    flushAllPending,
   } = useQuote({ quoteId, tenantId })
 
   const { search } = useScopeLibrary({ tenantId })
@@ -595,6 +596,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
             onUnlockEdit={() => handleUpdateQuoteMeta({ status: 'draft', is_locked: false })}
             onSend={() => setShowSendDialog(true)}
             onShowLocked={() => setShowLockedDialog(true)}
+            onFlushPending={flushAllPending}
           />
         </>
       )}
