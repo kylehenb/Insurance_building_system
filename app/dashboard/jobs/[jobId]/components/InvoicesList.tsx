@@ -434,7 +434,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
             key={invoice.id}
             style={{
               background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 8,
-              marginBottom: 10, overflow: 'hidden',
+              marginBottom: 10, overflow: 'visible',
             }}
           >
             <div
