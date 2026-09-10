@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
   let generated: {
     invoiceData: any
     lineItems: any[]
+    deductions?: Array<{ description: string; amount_inc_gst: number }>
   }
 
   // Report-based invoices use template system with client config pricing
@@ -184,7 +185,7 @@ export async function POST(req: NextRequest) {
     // Fetch approved quote
     const { data: quote } = await supabase
       .from('quotes')
-      .select('id, approved_amount, gst_pct, markup_pct')
+      .select('id, approved_amount, gst_pct, markup_pct, quote_ref')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .eq('status', 'approved')
@@ -224,6 +225,8 @@ export async function POST(req: NextRequest) {
         unit_price: item.rate_total ?? 0,
         line_total: item.line_total ?? 0,
         unit: item.unit ?? null,
+        quote_id: quote?.id ?? null,
+        quote_ref: quote?.quote_ref ?? null,
         sort_order: item.sort_order ?? index,
       }))
 
@@ -290,7 +293,7 @@ export async function POST(req: NextRequest) {
     // Fetch all approved/partially-approved quotes, ordered oldest first
     const { data: approvedQuotes } = await supabase
       .from('quotes')
-      .select('id, approved_amount, gst_pct, markup_pct')
+      .select('id, approved_amount, gst_pct, markup_pct, quote_ref')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
       .in('status', ['approved', 'partially_approved'])
@@ -312,6 +315,8 @@ export async function POST(req: NextRequest) {
       unit_price: number
       line_total: number
       unit: string | null
+      quote_id: string | null
+      quote_ref: string | null
       sort_order: number
     }> = []
 
@@ -332,6 +337,8 @@ export async function POST(req: NextRequest) {
           unit_price: item.rate_total ?? 0,
           line_total: item.line_total ?? 0,
           unit: item.unit ?? null,
+          quote_id: quote.id,
+          quote_ref: quote.quote_ref ?? null,
           sort_order: (item.sort_order ?? 0) + sortOffset,
         })
       }
@@ -369,13 +376,12 @@ export async function POST(req: NextRequest) {
         gst,
         amount_inc_gst: amountIncGst,
         markup_pct: markupPct,
-        // Store deduction in notes so the UI can render the breakdown correctly
-        notes: excessDeductionIncGst > 0
-          ? JSON.stringify({ excess_deduction_inc_gst: excessDeductionIncGst })
-          : null,
         status: 'draft',
       },
       lineItems: allLineItems,
+      deductions: excessDeductionIncGst > 0
+        ? [{ description: 'Policy Excess Payment Received', amount_inc_gst: excessDeductionIncGst }]
+        : [],
     }
 
   } else if (type === 'variations') {
@@ -515,8 +521,35 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Write deductions (e.g. policy excess already paid, deducted post-GST)
+  if (generated.deductions && generated.deductions.length > 0) {
+    const deductionsToInsert = generated.deductions.map((d, index) => ({
+      tenant_id: tenantId,
+      invoice_id: invoice.id,
+      description: d.description,
+      amount_inc_gst: d.amount_inc_gst,
+      sort_order: index,
+    }))
+
+    const { error: deductionsError } = await supabase
+      .from('invoice_deductions')
+      .insert(deductionsToInsert)
+
+    if (deductionsError) {
+      await supabase.from('invoices').delete().eq('id', invoice.id)
+      return NextResponse.json({ error: deductionsError.message }, { status: 500 })
+    }
+  }
+
   const { data: lineItems } = await supabase
     .from('invoice_line_items')
+    .select('*')
+    .eq('invoice_id', invoice.id)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
+  const { data: deductions } = await supabase
+    .from('invoice_deductions')
     .select('*')
     .eq('invoice_id', invoice.id)
     .eq('tenant_id', tenantId)
@@ -529,5 +562,5 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ invoice, lineItems: lineItems ?? [] }, { status: 201 })
+  return NextResponse.json({ invoice, lineItems: lineItems ?? [], deductions: deductions ?? [] }, { status: 201 })
 }

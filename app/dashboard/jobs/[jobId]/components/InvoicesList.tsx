@@ -15,6 +15,14 @@ interface InvoiceLineItem {
   unit_price: number
   line_total: number
   sort_order: number | null
+  quote_ref?: string | null
+}
+
+interface InvoiceDeduction {
+  id: string
+  description: string
+  amount_inc_gst: number
+  sort_order: number | null
 }
 
 interface InvoiceListItem {
@@ -33,6 +41,32 @@ interface InvoiceListItem {
   created_at: string
   line_items: InvoiceLineItem[]
   item_count: number
+  deductions: InvoiceDeduction[]
+}
+
+const OTHER_ITEMS_LABEL = 'Additional Items'
+
+function groupLineItemsByQuote(items: InvoiceLineItem[]) {
+  const groups: { label: string; items: InvoiceLineItem[] }[] = []
+  const indexByKey = new Map<string, number>()
+
+  for (const item of items) {
+    const key = item.quote_ref || '__other__'
+    let idx = indexByKey.get(key)
+    if (idx === undefined) {
+      idx = groups.length
+      indexByKey.set(key, idx)
+      groups.push({ label: item.quote_ref ? `Quote ${item.quote_ref}` : OTHER_ITEMS_LABEL, items: [] })
+    }
+    groups[idx].items.push(item)
+  }
+
+  const otherIdx = groups.findIndex(g => g.label === OTHER_ITEMS_LABEL)
+  if (groups.length > 1 && otherIdx !== -1 && otherIdx !== groups.length - 1) {
+    groups.push(groups.splice(otherIdx, 1)[0])
+  }
+
+  return groups
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────
@@ -567,13 +601,52 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                         )}
                       </div>
 
-                      {/* Line items preview */}
+                      {/* Line items preview — grouped by quote when an invoice spans more than one */}
                       {invoice.line_items.length > 0 ? (
                         <div style={{ marginBottom: 16 }}>
                           <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
-                          {invoice.line_items.map((item) => (
+                          {(() => {
+                            const groups = groupLineItemsByQuote(invoice.line_items)
+                            const showGroupHeadings = groups.length > 1
+                            return groups.map((group, groupIndex) => (
+                              <div key={group.label + groupIndex}>
+                                {showGroupHeadings && (
+                                  <div style={{ padding: '6px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#9e998f' }}>
+                                    {group.label}
+                                  </div>
+                                )}
+                                {group.items.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 0',
+                                      fontSize: 13,
+                                      color: '#3a3530',
+                                      borderBottom: '1px solid #e8e0d0',
+                                    }}
+                                  >
+                                    <div style={{ flex: 1 }}>{item.description}</div>
+                                    <div style={{ minWidth: 60, textAlign: 'right' }}>{item.quantity}</div>
+                                    <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))
+                          })()}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: '#9e998f', marginBottom: 16 }}>No line items</div>
+                      )}
+
+                      {/* Deductions preview — read-only; edited from the invoice editor */}
+                      {invoice.deductions.length > 0 && (
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Deductions</div>
+                          {invoice.deductions.map((deduction) => (
                             <div
-                              key={item.id}
+                              key={deduction.id}
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -583,14 +656,11 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                                 borderBottom: '1px solid #e8e0d0',
                               }}
                             >
-                              <div style={{ flex: 1 }}>{item.description}</div>
-                              <div style={{ minWidth: 60, textAlign: 'right' }}>{item.quantity}</div>
-                              <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500 }}>{fmt(item.line_total)}</div>
+                              <div style={{ flex: 1 }}>{deduction.description || 'Deduction'}</div>
+                              <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500, color: '#c5221f' }}>{fmt(-deduction.amount_inc_gst)}</div>
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <div style={{ fontSize: 13, color: '#9e998f', marginBottom: 16 }}>No line items</div>
                       )}
 
                       {/* Totals */}
@@ -620,15 +690,9 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                         <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.gst ?? 0)}</span>
                       </div>
                       {(() => {
-                        let excessDeduction = 0
-                        if (invoice.invoice_type === 'quoted_amounts' && invoice.notes) {
-                          try {
-                            const parsed = JSON.parse(invoice.notes) as Record<string, unknown>
-                            if (typeof parsed.excess_deduction_inc_gst === 'number') {
-                              excessDeduction = parsed.excess_deduction_inc_gst
-                            }
-                          } catch { /* ignore */ }
-                        }
+                        const excessDeduction = invoice.invoice_type === 'quoted_amounts'
+                          ? Math.round(invoice.deductions.reduce((sum, d) => sum + (d.amount_inc_gst ?? 0), 0) * 100) / 100
+                          : 0
                         if (excessDeduction > 0) {
                           const grossIncGst = (invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0)
                           return (

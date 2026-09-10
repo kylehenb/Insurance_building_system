@@ -74,13 +74,27 @@ export async function POST(req: NextRequest) {
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('job_number')
+    .select('job_number, client_id')
     .eq('id', jobId)
     .eq('tenant_id', tenantId)
     .single()
 
   if (jobError || !job) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  }
+
+  let markupPct = 0.19
+  if (job.client_id) {
+    const { data: client } = await supabase
+      .from('clients')
+      .select('builders_margin_pct')
+      .eq('id', job.client_id)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (client?.builders_margin_pct != null) {
+      markupPct = client.builders_margin_pct / 100
+    }
   }
 
   const { count } = await supabase
@@ -102,7 +116,7 @@ export async function POST(req: NextRequest) {
       status: 'draft',
       is_active_version: true,
       is_locked: false,
-      markup_pct: 0.19,
+      markup_pct: markupPct,
       gst_pct: 0.10,
     })
     .select('*')

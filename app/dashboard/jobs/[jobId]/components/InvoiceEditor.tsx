@@ -29,6 +29,14 @@ interface InvoiceLineItem {
   line_total: number
   sort_order: number
   completed?: boolean | null
+  quote_ref?: string | null
+}
+
+interface InvoiceDeduction {
+  id: string
+  description: string
+  amount_inc_gst: number
+  sort_order: number | null
 }
 
 interface InvoiceEditorProps {
@@ -39,12 +47,15 @@ interface InvoiceEditorProps {
   onInvoiceUpdated?: () => void
 }
 
+const OTHER_ITEMS_LABEL = 'Additional Items'
+
 function fmt(v: number) {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
 }
 
 export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdated }: InvoiceEditorProps) {
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([])
+  const [deductions, setDeductions] = useState<InvoiceDeduction[]>([])
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
@@ -65,16 +76,43 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
   const gstAmount = invoice?.invoice_type === 'excess' ? (invoice.gst ?? 0) : Math.round(exGst * 0.10 * 100) / 100
   const total = invoice?.invoice_type === 'excess' ? (invoice.amount_inc_gst ?? 0) : Math.round((exGst + gstAmount) * 100) / 100
 
-  // For quoted_amounts invoices: excess is deducted post-GST, stored in notes
+  // For quoted_amounts invoices: deductions (e.g. policy excess already paid) are
+  // subtracted post-GST, and are user-editable line items in their own right.
   const excessDeductionIncGst = useMemo(() => {
-    if (invoice?.invoice_type !== 'quoted_amounts' || !invoice.notes) return 0
-    try {
-      const parsed = JSON.parse(invoice.notes) as Record<string, unknown>
-      return typeof parsed.excess_deduction_inc_gst === 'number' ? parsed.excess_deduction_inc_gst : 0
-    } catch { return 0 }
-  }, [invoice?.invoice_type, invoice?.notes])
+    if (invoice?.invoice_type !== 'quoted_amounts') return 0
+    return Math.round(deductions.reduce((sum, d) => sum + (d.amount_inc_gst ?? 0), 0) * 100) / 100
+  }, [invoice?.invoice_type, deductions])
 
-  // ── Load invoice + line items ───────────────────────────────────────────────
+  // Group line items by the quote they were pulled from, so a quoted_amounts
+  // invoice spanning multiple approved quotes can show which items belong to
+  // which quote. Items with no linked quote fall under a trailing catch-all
+  // group. Headings only render when there's more than one group — invoice
+  // types that never span quotes look exactly as they always have.
+  const lineItemGroups = useMemo(() => {
+    const groups: { label: string; items: InvoiceLineItem[] }[] = []
+    const indexByKey = new Map<string, number>()
+
+    for (const item of lineItems) {
+      const key = item.quote_ref || '__other__'
+      let idx = indexByKey.get(key)
+      if (idx === undefined) {
+        idx = groups.length
+        indexByKey.set(key, idx)
+        groups.push({ label: item.quote_ref ? `Quote ${item.quote_ref}` : OTHER_ITEMS_LABEL, items: [] })
+      }
+      groups[idx].items.push(item)
+    }
+
+    const otherIdx = groups.findIndex(g => g.label === OTHER_ITEMS_LABEL)
+    if (groups.length > 1 && otherIdx !== -1 && otherIdx !== groups.length - 1) {
+      groups.push(groups.splice(otherIdx, 1)[0])
+    }
+
+    return groups
+  }, [lineItems])
+  const showGroupHeadings = lineItemGroups.length > 1
+
+  // ── Load invoice + line items + deductions ──────────────────────────────────
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,6 +136,16 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
       if (error) throw error
       setLineItems(items ?? [])
+
+      const { data: deductionRows, error: deductionsError } = await supabase
+        .from('invoice_deductions')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+
+      if (deductionsError) throw deductionsError
+      setDeductions(deductionRows ?? [])
     } catch (error) {
       console.error('Error loading invoice items:', error)
     } finally {
@@ -109,7 +157,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   // ── Persist recalculated totals to DB ───────────────────────────────────────
 
-  const persistTotals = useCallback(async (items: InvoiceLineItem[], currentMarkupPct: number, invType: string) => {
+  const persistTotals = useCallback(async (items: InvoiceLineItem[], currentMarkupPct: number, invType: string, deductionsTotal: number) => {
     if (invType === 'excess') return
 
     const sub = Math.round(items.filter(i => i.completed !== false).reduce((s, i) => s + i.line_total, 0) * 100) / 100
@@ -117,9 +165,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     const ex = Math.round((sub + markup) * 100) / 100
     const g = Math.round(ex * 0.10 * 100) / 100
     const grossInc = Math.round((ex + g) * 100) / 100
-    // For quoted_amounts, the excess is deducted post-GST to give the net insurer amount
+    // For quoted_amounts, deductions are subtracted post-GST to give the net insurer amount
     const inc = invType === 'quoted_amounts'
-      ? Math.round((grossInc - excessDeductionIncGst) * 100) / 100
+      ? Math.round((grossInc - deductionsTotal) * 100) / 100
       : grossInc
 
     await supabase
@@ -129,7 +177,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       .eq('tenant_id', tenantId)
 
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: ex, gst: g, amount_inc_gst: inc } : prev)
-  }, [invoiceId, tenantId, excessDeductionIncGst])
+  }, [invoiceId, tenantId])
 
   // ── Update builder's margin ─────────────────────────────────────────────────
 
@@ -145,13 +193,13 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         .eq('tenant_id', tenantId)
 
       setInvoice(prev => prev ? { ...prev, markup_pct: decimal } : prev)
-      await persistTotals(lineItems, decimal, invoice.invoice_type)
+      await persistTotals(lineItems, decimal, invoice.invoice_type, excessDeductionIncGst)
       setSaveStatus('saved')
       onInvoiceUpdated?.()
     } catch {
       setSaveStatus('error')
     }
-  }, [invoice, lineItems, invoiceId, tenantId, persistTotals, onInvoiceUpdated])
+  }, [invoice, lineItems, excessDeductionIncGst, invoiceId, tenantId, persistTotals, onInvoiceUpdated])
 
   // ── Update invoice date — editable while draft, locked once sent ───────────
 
@@ -187,13 +235,13 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         .eq('id', itemId)
         .eq('tenant_id', tenantId)
 
-      await persistTotals(newItems, markupPct, invoice.invoice_type)
+      await persistTotals(newItems, markupPct, invoice.invoice_type, excessDeductionIncGst)
       setSaveStatus('saved')
       onInvoiceUpdated?.()
     } catch {
       setSaveStatus('error')
     }
-  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoice, markupPct, excessDeductionIncGst, persistTotals, onInvoiceUpdated])
 
   // ── Update line item ────────────────────────────────────────────────────────
 
@@ -222,14 +270,14 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
         .eq('id', itemId)
         .eq('tenant_id', tenantId)
 
-      await persistTotals(newItems, markupPct, invoice.invoice_type)
+      await persistTotals(newItems, markupPct, invoice.invoice_type, excessDeductionIncGst)
       setSaveStatus('saved')
       onInvoiceUpdated?.()
     } catch (error) {
       console.error('Error updating item:', error)
       setSaveStatus('error')
     }
-  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoice, markupPct, excessDeductionIncGst, persistTotals, onInvoiceUpdated])
 
   // ── Add line item ───────────────────────────────────────────────────────────
 
@@ -270,9 +318,79 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
     const newItems = lineItems.filter(item => item.id !== itemId)
     setLineItems(newItems)
-    await persistTotals(newItems, markupPct, invoice.invoice_type)
+    await persistTotals(newItems, markupPct, invoice.invoice_type, excessDeductionIncGst)
     onInvoiceUpdated?.()
-  }, [lineItems, tenantId, invoice, markupPct, persistTotals, onInvoiceUpdated])
+  }, [lineItems, tenantId, invoice, markupPct, excessDeductionIncGst, persistTotals, onInvoiceUpdated])
+
+  // ── Add deduction ────────────────────────────────────────────────────────────
+
+  const addDeduction = useCallback(async () => {
+    if (!invoice) return
+    const maxSort = deductions.length > 0 ? Math.max(...deductions.map(d => d.sort_order ?? 0)) : 0
+
+    const { data: newDeduction, error } = await supabase
+      .from('invoice_deductions')
+      .insert({
+        tenant_id: tenantId,
+        invoice_id: invoiceId,
+        description: '',
+        amount_inc_gst: 0,
+        sort_order: maxSort + 1,
+      })
+      .select('*')
+      .single()
+
+    if (error) { console.error('Error adding deduction:', error); return }
+    setDeductions(prev => [...prev, newDeduction])
+    onInvoiceUpdated?.()
+  }, [deductions, tenantId, invoiceId, invoice, onInvoiceUpdated])
+
+  // ── Update deduction ─────────────────────────────────────────────────────────
+
+  const updateDeduction = useCallback(async (deductionId: string, changes: Partial<InvoiceDeduction>) => {
+    const deduction = deductions.find(d => d.id === deductionId)
+    if (!deduction || !invoice) return
+
+    const updated = { ...deduction, ...changes }
+    const newDeductions = deductions.map(d => d.id === deductionId ? updated : d)
+    setDeductions(newDeductions)
+    setSaveStatus('saving')
+
+    try {
+      await supabase
+        .from('invoice_deductions')
+        .update(changes)
+        .eq('id', deductionId)
+        .eq('tenant_id', tenantId)
+
+      const newTotal = Math.round(newDeductions.reduce((sum, d) => sum + (d.amount_inc_gst ?? 0), 0) * 100) / 100
+      await persistTotals(lineItems, markupPct, invoice.invoice_type, newTotal)
+      setSaveStatus('saved')
+      onInvoiceUpdated?.()
+    } catch (error) {
+      console.error('Error updating deduction:', error)
+      setSaveStatus('error')
+    }
+  }, [deductions, tenantId, invoice, lineItems, markupPct, persistTotals, onInvoiceUpdated])
+
+  // ── Delete deduction ─────────────────────────────────────────────────────────
+
+  const deleteDeduction = useCallback(async (deductionId: string) => {
+    if (!invoice) return
+    if (!window.confirm('Delete this deduction?')) return
+
+    await supabase
+      .from('invoice_deductions')
+      .delete()
+      .eq('id', deductionId)
+      .eq('tenant_id', tenantId)
+
+    const newDeductions = deductions.filter(d => d.id !== deductionId)
+    setDeductions(newDeductions)
+    const newTotal = Math.round(newDeductions.reduce((sum, d) => sum + (d.amount_inc_gst ?? 0), 0) * 100) / 100
+    await persistTotals(lineItems, markupPct, invoice.invoice_type, newTotal)
+    onInvoiceUpdated?.()
+  }, [deductions, tenantId, invoice, lineItems, markupPct, persistTotals, onInvoiceUpdated])
 
   if (loading) {
     return (
@@ -315,103 +433,116 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
               <div />
             </div>
 
-            {lineItems.map((item, index) => {
-              const isIncomplete = item.completed === false
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px',
-                    gap: 12,
-                    padding: '12px 16px',
-                    fontSize: 13,
-                    borderBottom: index < lineItems.length - 1 ? '1px solid #e8e0d0' : 'none',
-                    alignItems: 'center',
-                    background: isIncomplete ? '#fafaf8' : 'transparent',
-                  }}
-                >
-                  {/* Completed checkbox */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={!isIncomplete}
-                      onChange={e => toggleCompleted(item.id, e.target.checked)}
-                      title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
-                      style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
-                    />
+            {lineItemGroups.map((group, groupIndex) => (
+              <div key={group.label + groupIndex}>
+                {showGroupHeadings && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '7px 16px', background: '#fafaf8', borderBottom: '1px solid #e8e0d0' }}>
+                    <div style={{ gridColumn: '2 / -1', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#9e998f' }}>
+                      {group.label}
+                    </div>
                   </div>
+                )}
 
-                  {/* Description */}
-                  <div>
-                    {isIncomplete ? (
-                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>
-                        {item.description || 'Item description'}
-                      </span>
-                    ) : (
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) => updateItem(item.id, { description: e.target.value })}
-                        placeholder="Item description"
-                        style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Qty */}
-                  <div style={{ textAlign: 'right' }}>
-                    {isIncomplete ? (
-                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{item.quantity}</span>
-                    ) : (
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Amount (unit price) */}
-                  <div style={{ textAlign: 'right' }}>
-                    {isIncomplete ? (
-                      <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.unit_price)}</span>
-                    ) : (
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Line total (read-only) */}
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 13, color: isIncomplete ? '#9e998f' : '#3a3530', textDecoration: isIncomplete ? 'line-through' : 'none' }}>
-                      {fmt(item.line_total)}
-                    </span>
-                  </div>
-
-                  {/* Delete */}
-                  <div style={{ textAlign: 'right' }}>
-                    <button
-                      onClick={() => deleteItem(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                {group.items.map((item) => {
+                  const isLastOverall = groupIndex === lineItemGroups.length - 1 && item === group.items[group.items.length - 1]
+                  const isIncomplete = item.completed === false
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px',
+                        gap: 12,
+                        padding: '12px 16px',
+                        fontSize: 13,
+                        borderBottom: isLastOverall ? 'none' : '1px solid #e8e0d0',
+                        alignItems: 'center',
+                        background: isIncomplete ? '#fafaf8' : 'transparent',
+                      }}
                     >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+                      {/* Completed checkbox */}
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={!isIncomplete}
+                          onChange={e => toggleCompleted(item.id, e.target.checked)}
+                          title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
+                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        {isIncomplete ? (
+                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>
+                            {item.description || 'Item description'}
+                          </span>
+                        ) : (
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                            placeholder="Item description"
+                            style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Qty */}
+                      <div style={{ textAlign: 'right' }}>
+                        {isIncomplete ? (
+                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{item.quantity}</span>
+                        ) : (
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                            min="0"
+                            step="0.01"
+                            style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Amount (unit price) */}
+                      <div style={{ textAlign: 'right' }}>
+                        {isIncomplete ? (
+                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.unit_price)}</span>
+                        ) : (
+                          <input
+                            type="number"
+                            value={item.unit_price}
+                            onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
+                            min="0"
+                            step="0.01"
+                            style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Line total (read-only) */}
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: 13, color: isIncomplete ? '#9e998f' : '#3a3530', textDecoration: isIncomplete ? 'line-through' : 'none' }}>
+                          {fmt(item.line_total)}
+                        </span>
+                      </div>
+
+                      {/* Delete */}
+                      <div style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -425,6 +556,81 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       >
         + Add Line Item
       </button>
+
+      {/* Deductions — quoted_amounts invoices only (e.g. policy excess already paid) */}
+      {invoice?.invoice_type === 'quoted_amounts' && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Deductions</div>
+
+          {deductions.length === 0 ? (
+            <div style={{ padding: '20px', background: '#f5f2ee', borderRadius: 6, textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
+              No deductions yet.
+            </div>
+          ) : (
+            <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+                <div>Description</div>
+                <div style={{ textAlign: 'right' }}>Amount</div>
+                <div />
+              </div>
+
+              {deductions.map((deduction, index) => (
+                <div
+                  key={deduction.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '3fr 1fr 40px',
+                    gap: 12,
+                    padding: '12px 16px',
+                    fontSize: 13,
+                    borderBottom: index < deductions.length - 1 ? '1px solid #e8e0d0' : 'none',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <input
+                      type="text"
+                      value={deduction.description}
+                      onChange={(e) => updateDeduction(deduction.id, { description: e.target.value })}
+                      placeholder="Deduction description"
+                      style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
+                    />
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <input
+                      type="number"
+                      value={deduction.amount_inc_gst}
+                      onChange={(e) => updateDeduction(deduction.id, { amount_inc_gst: parseFloat(e.target.value) || 0 })}
+                      min="0"
+                      step="0.01"
+                      style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                    />
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <button
+                      onClick={() => deleteDeduction(deduction.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={addDeduction}
+            style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginTop: 10 }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#c8b89a'; e.currentTarget.style.color = '#3a3530' }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e0dbd4'; e.currentTarget.style.color = '#9e998f' }}
+          >
+            + Add Deduction
+          </button>
+        </div>
+      )}
 
       {/* Totals */}
       <div style={{ background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '16px' }}>

@@ -1351,6 +1351,51 @@ export type Database = {
           },
         ]
       }
+      invoice_deductions: {
+        Row: {
+          amount_inc_gst: number
+          created_at: string | null
+          description: string
+          id: string
+          invoice_id: string
+          sort_order: number | null
+          tenant_id: string
+        }
+        Insert: {
+          amount_inc_gst?: number
+          created_at?: string | null
+          description: string
+          id?: string
+          invoice_id: string
+          sort_order?: number | null
+          tenant_id: string
+        }
+        Update: {
+          amount_inc_gst?: number
+          created_at?: string | null
+          description?: string
+          id?: string
+          invoice_id?: string
+          sort_order?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_deductions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_deductions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_line_item_library: {
         Row: {
           created_at: string | null
@@ -1408,6 +1453,8 @@ export type Database = {
           library_item_id: string | null
           line_total: number
           quantity: number
+          quote_id: string | null
+          quote_ref: string | null
           sort_order: number | null
           tenant_id: string
           unit: string | null
@@ -1422,6 +1469,8 @@ export type Database = {
           library_item_id?: string | null
           line_total: number
           quantity?: number
+          quote_id?: string | null
+          quote_ref?: string | null
           sort_order?: number | null
           tenant_id: string
           unit?: string | null
@@ -1436,6 +1485,8 @@ export type Database = {
           library_item_id?: string | null
           line_total?: number
           quantity?: number
+          quote_id?: string | null
+          quote_ref?: string | null
           sort_order?: number | null
           tenant_id?: string
           unit?: string | null
@@ -1454,6 +1505,13 @@ export type Database = {
             columns: ["library_item_id"]
             isOneToOne: false
             referencedRelation: "invoice_line_item_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
           {

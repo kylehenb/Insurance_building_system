@@ -2,6 +2,7 @@ import type { Database } from '@/lib/supabase/database.types'
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
 type InvoiceLineItem = Database['public']['Tables']['invoice_line_items']['Row']
+type InvoiceDeduction = Database['public']['Tables']['invoice_deductions']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
@@ -19,9 +20,10 @@ export function generateInvoiceHtml(params: {
     excess_payment_terms?: number | null
   }
   lineItems: InvoiceLineItem[]
+  deductions?: InvoiceDeduction[]
   approvedQuoteRefs?: string[]
 }): string {
-  const { invoice, job, tenant, lineItems, approvedQuoteRefs } = params
+  const { invoice, job, tenant, lineItems, deductions = [], approvedQuoteRefs } = params
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -52,26 +54,21 @@ export function generateInvoiceHtml(params: {
   const subtotalFromLines = completedLineItems.reduce((sum, item) => sum + (item.line_total ?? 0), 0)
   const markupAmount = hasBuilderMargin ? Math.round(subtotalFromLines * markupPct * 100) / 100 : 0
 
-  // Parse excess deduction stored in notes (quoted_amounts invoices only)
-  let excessDeductionIncGst = 0
-  let notesDisplay = invoice.notes || ''
-  if (notesDisplay) {
-    try {
-      const parsed = JSON.parse(notesDisplay) as Record<string, unknown>
-      if (typeof parsed.excess_deduction_inc_gst === 'number') {
-        excessDeductionIncGst = parsed.excess_deduction_inc_gst
-        notesDisplay = '' // strip system metadata — not user-visible notes
-      }
-    } catch { /* plain text notes — show as-is */ }
-  }
+  // Deductions (e.g. policy excess already paid) are deducted from the total post-GST
+  const notesDisplay = invoice.notes || ''
+  const excessDeductionIncGst = Math.round(deductions.reduce((sum, d) => sum + (d.amount_inc_gst ?? 0), 0) * 100) / 100
 
   const grossIncGst = Math.round(((invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0)) * 100) / 100
   const quoteRefDisplay = approvedQuoteRefs && approvedQuoteRefs.length > 0
     ? approvedQuoteRefs.join(' & ')
     : null
 
-  // Build line items table HTML
-  const lineItemsHtml = lineItems.map((item) => {
+  // Build line items table HTML — grouped under a "Quote {ref}" subheading whenever
+  // an invoice's items span more than one quote (quoted_amounts invoices); items
+  // with no linked quote fall under a trailing "Additional Items" group. When
+  // everything belongs to a single group, render the plain flat row list exactly
+  // as before — no heading is introduced for invoice types that never span quotes.
+  const lineItemRow = (item: InvoiceLineItem) => {
     const isIncomplete = (item as any).completed === false
     const cellColor = isIncomplete ? '#9e998f' : '#3a3530'
     const struck = isIncomplete ? 'text-decoration:line-through;' : ''
@@ -81,7 +78,44 @@ export function generateInvoiceHtml(params: {
       <td style="padding:8px 12px;text-align:center;font-size:11px;color:${cellColor};${struck}">${item.quantity || '-'}</td>
       <td style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:${isIncomplete ? '#9e998f' : '#1a1a1a'};${struck}">${fmt(item.line_total)}</td>
     </tr>
-  `}).join('')
+  `}
+
+  const buildLineItemsHtml = (items: InvoiceLineItem[]) => {
+    const OTHER_LABEL = 'Additional Items'
+    const groups: { label: string; items: InvoiceLineItem[] }[] = []
+    const groupIndexByKey = new Map<string, number>()
+
+    for (const item of items) {
+      const quoteRef = item.quote_ref
+      const key = quoteRef || '__other__'
+      let idx = groupIndexByKey.get(key)
+      if (idx === undefined) {
+        idx = groups.length
+        groupIndexByKey.set(key, idx)
+        groups.push({ label: quoteRef ? `Quote ${quoteRef}` : OTHER_LABEL, items: [] })
+      }
+      groups[idx].items.push(item)
+    }
+
+    if (groups.length <= 1) {
+      return items.map(lineItemRow).join('')
+    }
+
+    // Keep quote groups in first-seen order, but the no-quote group always trails
+    const otherIdx = groups.findIndex(g => g.label === OTHER_LABEL)
+    if (otherIdx !== -1 && otherIdx !== groups.length - 1) {
+      groups.push(groups.splice(otherIdx, 1)[0])
+    }
+
+    return groups.map(group => `
+      <tr>
+        <td colspan="3" style="padding:9px 12px 5px;font-size:9px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#9e998f;background:#fafaf8;border-bottom:1px solid #e8e4e0;">${group.label}</td>
+      </tr>
+      ${group.items.map(lineItemRow).join('')}
+    `).join('')
+  }
+
+  const lineItemsHtml = buildLineItemsHtml(lineItems)
 
   // ── Build the line-items + totals section (different layout for quoted_amounts) ──────
 
@@ -148,14 +182,16 @@ export function generateInvoiceHtml(params: {
       </div>
     </div>
 
-    ${excessDeductionIncGst > 0 ? `
+    ${deductions.length > 0 ? `
     <!-- Deductions section -->
     ${sectionDivider('Deductions')}
-    <div style="margin-bottom:18px;">
+    <div style="margin-bottom:18px;display:flex;flex-direction:column;gap:6px;">
+      ${deductions.map(d => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fce8e6;border-radius:4px;border-left:3px solid #c5221f;">
-        <span style="font-size:11px;color:#3a3530;">Policy Excess</span>
-        <span style="font-size:12px;font-weight:600;color:#c5221f;">${fmt(-excessDeductionIncGst)}</span>
+        <span style="font-size:11px;color:#3a3530;">${d.description || 'Deduction'}</span>
+        <span style="font-size:12px;font-weight:600;color:#c5221f;">${fmt(-(d.amount_inc_gst ?? 0))}</span>
       </div>
+      `).join('')}
     </div>
     ` : ''}
 

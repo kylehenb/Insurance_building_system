@@ -31,10 +31,18 @@ export async function GET(req: NextRequest) {
         .eq('tenant_id', tenantId)
         .order('sort_order', { ascending: true })
 
+      const { data: deductions } = await supabase
+        .from('invoice_deductions')
+        .select('*')
+        .eq('invoice_id', invoice.id)
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+
       return {
         ...invoice,
         line_items: items ?? [],
         item_count: items?.length ?? 0,
+        deductions: deductions ?? [],
       }
     })
   )

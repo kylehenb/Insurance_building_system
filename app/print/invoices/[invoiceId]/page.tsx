@@ -61,6 +61,14 @@ export default async function InvoicePrintPage({
     return <div>Error fetching line items</div>
   }
 
+  // Fetch deductions (e.g. policy excess already paid, deducted post-GST)
+  const { data: deductions } = await supabase
+    .from('invoice_deductions')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
   // Fetch job details
   const { data: job, error: jobError } = await supabase
     .from('jobs')
@@ -111,6 +119,7 @@ export default async function InvoicePrintPage({
       accounts_email?: string | null
     },
     lineItems: lineItems || [],
+    deductions: deductions || [],
     approvedQuoteRefs,
   })
 
