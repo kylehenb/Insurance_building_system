@@ -40,6 +40,8 @@ export default function TradesPage() {
   const [itemToDelete, setItemToDelete] = useState<TradesRow | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [showTradeTypes, setShowTradeTypes] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<Partial<TradesInsert>>({
@@ -287,6 +289,7 @@ export default function TradesPage() {
 
   const handleAdd = () => {
     setEditingItem(null);
+    setSaveError(null);
     setFormData({
       trade_specialties: [],
       trade_code: null,
@@ -318,6 +321,7 @@ export default function TradesPage() {
 
   const handleEdit = (item: TradesRow) => {
     setEditingItem(item);
+    setSaveError(null);
     setFormData({
       trade_specialties: (item as any).trade_specialties ?? (item.primary_trade ? [item.primary_trade] : []),
       trade_code: item.trade_code,
@@ -371,6 +375,15 @@ export default function TradesPage() {
   const handleSave = async () => {
     if (!tenantId) return;
 
+    setSaveError(null);
+
+    if (!formData.business_name || !formData.business_name.trim()) {
+      setSaveError('Business Name is required.');
+      return;
+    }
+
+    setSaving(true);
+
     const specialties = (formData.trade_specialties as string[] | undefined) ?? [];
     const saveData = {
       ...formData,
@@ -378,18 +391,21 @@ export default function TradesPage() {
       primary_trade: specialties[0] ?? null,
     };
 
-    if (editingItem) {
-      // Update existing item
-      await supabase
-        .from('trades')
-        .update(saveData as TradesInsert)
-        .eq('id', editingItem.id);
-    } else {
-      // Insert new item
-      await supabase.from('trades').insert({
-        ...saveData,
-        tenant_id: tenantId,
-      } as TradesInsert);
+    const { error } = editingItem
+      ? await supabase
+          .from('trades')
+          .update(saveData as TradesInsert)
+          .eq('id', editingItem.id)
+      : await supabase.from('trades').insert({
+          ...saveData,
+          tenant_id: tenantId,
+        } as TradesInsert);
+
+    if (error) {
+      console.error('Failed to save trade:', error);
+      setSaveError(error.message);
+      setSaving(false);
+      return;
     }
 
     // Refresh
@@ -399,6 +415,7 @@ export default function TradesPage() {
       .eq('tenant_id', tenantId);
     setItems((data as TradesRow[]) ?? []);
 
+    setSaving(false);
     setShowModal(false);
   };
 
@@ -995,6 +1012,11 @@ export default function TradesPage() {
                   />
                 </div>
               </div>
+              {saveError && (
+                <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  {saveError}
+                </p>
+              )}
               <div className="mt-6 flex justify-end gap-2">
                 <button
                   onClick={() => setShowModal(false)}
@@ -1004,9 +1026,10 @@ export default function TradesPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded-lg hover:bg-[#1a1a1a]/90 transition-colors"
+                  disabled={saving}
+                  className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded-lg hover:bg-[#1a1a1a]/90 transition-colors disabled:opacity-50"
                 >
-                  Save
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
