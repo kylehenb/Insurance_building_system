@@ -23,23 +23,27 @@ export async function POST(req: NextRequest) {
 
     const tenantId = userData.tenant_id
 
-    const { quoteId } = await req.json() as { quoteId: string }
+    const { quoteIds } = await req.json() as { quoteIds: string[] }
 
-    const { data: quote, error: quoteError } = await supabase
+    const { data: quotes, error: quoteError } = await supabase
       .from('quotes')
       .select('*')
-      .eq('id', quoteId)
+      .in('id', quoteIds)
       .eq('tenant_id', tenantId)
-      .single()
+      .order('created_at', { ascending: true })
 
-    if (quoteError || !quote) {
+    if (quoteError || !quotes || quotes.length !== quoteIds.length) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 400 })
+    }
+
+    if (new Set(quotes.map(q => q.job_id)).size > 1) {
+      return NextResponse.json({ error: 'Quotes must belong to the same job' }, { status: 400 })
     }
 
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .select('*')
-      .eq('id', quote.job_id)
+      .eq('id', quotes[0].job_id)
       .eq('tenant_id', tenantId)
       .single()
 
@@ -50,7 +54,7 @@ export async function POST(req: NextRequest) {
     const { data: scopeItems } = await supabase
       .from('scope_items')
       .select('*')
-      .eq('quote_id', quoteId)
+      .in('quote_id', quoteIds)
       .eq('tenant_id', tenantId)
       .order('sort_order', { ascending: true })
 
@@ -71,7 +75,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const html = generateSowHtml({ quote, job, scopeItems: scopeItems || [], tenant })
+    const html = generateSowHtml({ quotes, job, scopeItems: scopeItems || [], tenant })
 
     const puppeteerRes = await fetch(`${process.env.PDF_SERVICE_URL}/generate`, {
       method: 'POST',

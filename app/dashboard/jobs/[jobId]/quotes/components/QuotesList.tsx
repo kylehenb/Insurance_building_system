@@ -136,6 +136,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [partialApproveDialogQuoteId, setPartialApproveDialogQuoteId] = useState<string | null>(null)
   const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
   const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
+  const [quotePicker, setQuotePicker] = useState<{ docType: 'sow' | 'building-contract'; selectedIds: string[] } | null>(null)
   const [sendForSignatureQuoteId, setSendForSignatureQuoteId] = useState<string | null>(null)
   const [receiveSignOffVisible, setReceiveSignOffVisible] = useState(false)
   const [currentJobStage, setCurrentJobStage] = useState<string | null>(null)
@@ -2037,6 +2038,178 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         </div>
       )}
 
+      {quotePicker && (() => {
+        const approvedQuotes = quotes.filter(
+          aq => aq.status === 'approved' || aq.status === 'partially_approved'
+        )
+        const docLabel = quotePicker.docType === 'sow' ? 'Scope of Works Authorisation' : 'Building Contract'
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.42)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9000,
+            }}
+            onClick={() => setQuotePicker(null)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: 12,
+                padding: '32px 36px',
+                maxWidth: 520,
+                width: '90%',
+                maxHeight: '80vh',
+                fontFamily: 'DM Sans, sans-serif',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+                Select quotes for {docLabel}
+              </div>
+              <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 20 }}>
+                This job has more than one approved quote. Choose which ones this document should cover.
+              </p>
+
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                <button
+                  onClick={() => setQuotePicker(qp => qp && { ...qp, selectedIds: approvedQuotes.map(aq => aq.id) })}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#ffffff',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 4,
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Tick all
+                </button>
+                <button
+                  onClick={() => setQuotePicker(qp => qp && { ...qp, selectedIds: [] })}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#ffffff',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 4,
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear all
+                </button>
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  border: '1px solid #e0dbd4',
+                  borderRadius: 6,
+                  padding: '12px',
+                  marginBottom: 20,
+                  maxHeight: '300px',
+                }}
+              >
+                {approvedQuotes.map(aq => (
+                  <div
+                    key={aq.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '8px',
+                      borderBottom: '1px solid #e8e4e0',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      setQuotePicker(qp => qp && {
+                        ...qp,
+                        selectedIds: qp.selectedIds.includes(aq.id)
+                          ? qp.selectedIds.filter(id => id !== aq.id)
+                          : [...qp.selectedIds, aq.id],
+                      })
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={quotePicker.selectedIds.includes(aq.id)}
+                      onChange={() => {}}
+                      onClick={e => e.stopPropagation()}
+                      style={{ marginRight: 12, cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', marginBottom: 2 }}>
+                        {aq.quote_ref || 'Untitled quote'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#9e998f' }}>
+                        {STATUS_LABELS[normalizeStatus(aq.status)] ?? aq.status} • {fmt(aq.total_amount || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setQuotePicker(null)}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#3a3530',
+                    background: '#f5f2ee',
+                    border: '1px solid #d8d0c8',
+                    borderRadius: 6,
+                    padding: '8px 20px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (quotePicker.selectedIds.length === 0) return
+                    const primaryId = quotePicker.selectedIds[0]
+                    setSowLoading(primaryId)
+                    window.open(`/print/quotes/${primaryId}/${quotePicker.docType}?quoteIds=${quotePicker.selectedIds.join(',')}`, '_blank')
+                    setTimeout(() => setSowLoading(null), 500)
+                    setQuotePicker(null)
+                  }}
+                  disabled={quotePicker.selectedIds.length === 0}
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#ffffff',
+                    background: quotePicker.selectedIds.length > 0 ? '#1a1a1a' : '#9e998f',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '8px 20px',
+                    cursor: quotePicker.selectedIds.length > 0 ? 'pointer' : 'not-allowed',
+                    opacity: quotePicker.selectedIds.length > 0 ? 1 : 0.6,
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Quote rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {quotes.map(q => {
@@ -2697,8 +2870,15 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       <button
                         onClick={e => {
                           e.stopPropagation()
-                          setSowLoading(q.id)
                           setMenuDropdownId(null)
+                          const approvedQuotes = quotes.filter(
+                            aq => aq.status === 'approved' || aq.status === 'partially_approved'
+                          )
+                          if (approvedQuotes.length > 1) {
+                            setQuotePicker({ docType: 'sow', selectedIds: approvedQuotes.map(aq => aq.id) })
+                            return
+                          }
+                          setSowLoading(q.id)
                           // Open print version in new tab (without sidebar)
                           window.open(`/print/quotes/${q.id}/sow`, '_blank')
                           // Clear loading state after a short delay
@@ -2742,8 +2922,15 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         <button
                           onClick={e => {
                             e.stopPropagation()
-                            setSowLoading(q.id)
                             setMenuDropdownId(null)
+                            const approvedQuotes = quotes.filter(
+                              aq => aq.status === 'approved' || aq.status === 'partially_approved'
+                            )
+                            if (approvedQuotes.length > 1) {
+                              setQuotePicker({ docType: 'building-contract', selectedIds: approvedQuotes.map(aq => aq.id) })
+                              return
+                            }
+                            setSowLoading(q.id)
                             // Open print version in new tab (without sidebar)
                             window.open(`/print/quotes/${q.id}/building-contract`, '_blank')
                             // Clear loading state after a short delay

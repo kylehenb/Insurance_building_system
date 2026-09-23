@@ -3,18 +3,20 @@ import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { SowPrintButton } from './SowPrintButton'
 import { SendForSignatureButton } from './SendForSignatureButton'
+import { groupScopeItemsAcrossQuotes, combinedQuoteRefLabel } from '@/lib/documents/scope-grouping'
 
-type Quote = Database['public']['Tables']['quotes']['Row']
-type ScopeItem = Database['public']['Tables']['scope_items']['Row']
-type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
 export default async function SowPrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ quoteId: string }>
+  searchParams: Promise<{ quoteIds?: string }>
 }) {
   const { quoteId } = await params
+  const { quoteIds: quoteIdsParam } = await searchParams
+  const quoteIds = quoteIdsParam ? quoteIdsParam.split(',') : [quoteId]
 
   const supabase = await createClient()
 
@@ -37,23 +39,26 @@ export default async function SowPrintPage({
 
   const tenantId = userData.tenant_id
 
-  // Fetch quote
-  const { data: quote, error: quoteError } = await supabase
+  // Fetch quotes
+  const { data: quotes, error: quoteError } = await supabase
     .from('quotes')
     .select('*')
-    .eq('id', quoteId)
+    .in('id', quoteIds)
     .eq('tenant_id', tenantId)
-    .single()
+    .order('created_at', { ascending: true })
 
-  if (quoteError || !quote) {
+  if (quoteError || !quotes || quotes.length === 0) {
     return <div>Quote not found</div>
   }
+
+  const isMultiQuote = quotes.length > 1
+  const quoteRefLabel = combinedQuoteRefLabel(quotes)
 
   // Fetch scope items
   const { data: scopeItems, error: itemsError } = await supabase
     .from('scope_items')
     .select('*')
-    .eq('quote_id', quoteId)
+    .in('quote_id', quoteIds)
     .eq('tenant_id', tenantId)
     .order('sort_order', { ascending: true })
 
@@ -65,7 +70,7 @@ export default async function SowPrintPage({
   const { data: job, error: jobError } = await supabase
     .from('jobs')
     .select('*')
-    .eq('id', quote.job_id)
+    .eq('id', quotes[0].job_id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -98,36 +103,9 @@ export default async function SowPrintPage({
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
   }
 
-  const items = (scopeItems || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const { groupedByRoom, sortedRooms, quoteRefById } = groupScopeItemsAcrossQuotes(quotes, scopeItems || [])
 
-  // Group items by room
-  const groupedByRoom = items.reduce((acc, item) => {
-    const room = item.room || 'Unassigned'
-    if (!acc[room]) {
-      acc[room] = []
-    }
-    acc[room].push(item)
-    return acc
-  }, {} as Record<string, ScopeItem[]>)
-
-  // Sort rooms based on room_order from quote if available
-  const sortedRooms = (() => {
-    const roomNames = Object.keys(groupedByRoom)
-    if (quote.room_order && quote.room_order.length > 0) {
-      const orderMap = new Map(quote.room_order.map((r, i) => [r, i]))
-      return roomNames.sort((a, b) => {
-        const aIdx = orderMap.get(a) ?? 999
-        const bIdx = orderMap.get(b) ?? 999
-        return aIdx - bIdx
-      })
-    }
-    // No room_order saved — preserve the order rooms first appear in the
-    // items (already sorted by sort_order), matching the quote editor's
-    // own fallback. Do NOT alphabetize; that silently overrides the
-    // editor's room order for any quote that hasn't been manually reordered.
-    return roomNames
-  })()
-
+  const sowReference = isMultiQuote ? `${job.job_number}-SOW` : `${quotes[0].quote_ref}-SOW`
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'
   const docDateDisplay = formatDate(new Date().toISOString())
 
@@ -135,8 +113,8 @@ export default async function SowPrintPage({
     <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0">
-        <SowPrintButton quoteRef={quote.quote_ref} />
-        <SendForSignatureButton quoteId={quoteId} insuredEmail={job.insured_email ?? null} />
+        <SowPrintButton quoteRef={isMultiQuote ? job.job_number : quotes[0].quote_ref} />
+        <SendForSignatureButton quoteIds={quoteIds} insuredEmail={job.insured_email ?? null} />
 
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
@@ -152,7 +130,7 @@ export default async function SowPrintPage({
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', color: '#9e998f' }}>SOW Reference: </span>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{quote.quote_ref}-SOW</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{sowReference}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#9e998f' }}>Authorised for: </span>
@@ -162,7 +140,7 @@ export default async function SowPrintPage({
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
               {[
                 { label: 'Doc Date', value: docDateDisplay },
-                { label: 'Quote Ref', value: quote.quote_ref },
+                { label: isMultiQuote ? 'Quote Refs' : 'Quote Ref', value: quoteRefLabel },
               ].filter(f => f.value).map((field, i, arr) => (
                 <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
                   <span style={{ color: '#b0a89e' }}>{field.label}: </span>
@@ -249,6 +227,9 @@ export default async function SowPrintPage({
                   <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Qty</th>
                   <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Unit</th>
                   <th style={{ width: '80px', textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Trade</th>
+                  {isMultiQuote && (
+                    <th style={{ width: '70px', textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Quote</th>
+                  )}
                 </tr>
               </thead>
             </table>
@@ -292,6 +273,9 @@ export default async function SowPrintPage({
                               <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: '#3a3530' }}>{item.qty || '-'}</td>
                               <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: '#3a3530' }}>{item.unit || '-'}</td>
                               <td style={{ width: '80px', padding: '6px 8px', fontSize: '10px', color: '#3a3530' }}>{item.trade || '-'}</td>
+                              {isMultiQuote && (
+                                <td style={{ width: '70px', padding: '6px 8px', fontSize: '10px', color: '#9e998f', fontFamily: 'var(--font-dm-mono)' }}>{quoteRefById.get(item.quote_id) || '-'}</td>
+                              )}
                             </tr>
                           )
                         })}

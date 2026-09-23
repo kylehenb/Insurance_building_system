@@ -1,15 +1,18 @@
 import type { Database } from '@/lib/supabase/database.types'
+import { groupScopeItemsAcrossQuotes, combinedQuoteRefLabel } from './scope-grouping'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 
 export function generateBuildingContractHtml(params: {
-  quote: Quote
+  quotes: Quote[]
   job: Job
   scopeItems: ScopeItem[]
 }): string {
-  const { quote, job, scopeItems } = params
+  const { quotes, job, scopeItems } = params
+  const isMultiQuote = quotes.length > 1
+  const quoteRefLabel = combinedQuoteRefLabel(quotes)
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -27,41 +30,22 @@ export function generateBuildingContractHtml(params: {
 
   const contractDate = formatDate(new Date().toISOString())
   const excessValue = job.excess != null && job.excess !== 0 ? fmt(job.excess) : 'N/A'
-  
-  // Calculate total incl GST if approved_amount is not set
-  const subtotal = scopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
-  const markup = subtotal * (quote.markup_pct || 0.2)
-  const subtotalAfterMarkup = subtotal + markup
-  const gst = subtotalAfterMarkup * (quote.gst_pct || 0.1)
-  const totalInclGst = subtotalAfterMarkup + gst
-  const approvedAmount = quote.approved_amount != null ? fmt(quote.approved_amount) : fmt(totalInclGst)
+
+  // Total incl GST — computed per quote (its own markup/GST rate against its
+  // own scope items) then summed, so one quote's rate never applies to
+  // another quote's items.
+  const totalInclGst = quotes.reduce((sum, quote) => {
+    if (quote.approved_amount != null) return sum + quote.approved_amount
+    const quoteSubtotal = scopeItems
+      .filter(item => item.quote_id === quote.id)
+      .reduce((s, item) => s + (item.line_total || 0), 0)
+    const quoteSubtotalAfterMarkup = quoteSubtotal * (1 + (quote.markup_pct || 0.2))
+    return sum + quoteSubtotalAfterMarkup * (1 + (quote.gst_pct || 0.1))
+  }, 0)
+  const approvedAmount = fmt(totalInclGst)
 
   // Group and sort items — identical logic to sow-html.ts
-  const items = [...scopeItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-
-  const groupedByRoom = items.reduce((acc, item) => {
-    const room = item.room || 'Unassigned'
-    if (!acc[room]) acc[room] = []
-    acc[room].push(item)
-    return acc
-  }, {} as Record<string, ScopeItem[]>)
-
-  const sortedRooms = (() => {
-    const roomNames = Object.keys(groupedByRoom)
-    if (quote.room_order && quote.room_order.length > 0) {
-      const orderMap = new Map(quote.room_order.map((r, i) => [r, i]))
-      return roomNames.sort((a, b) => {
-        const aIdx = orderMap.get(a) ?? 999
-        const bIdx = orderMap.get(b) ?? 999
-        return aIdx - bIdx
-      })
-    }
-    // No room_order saved — preserve the order rooms first appear in the
-    // items (already sorted by sort_order), matching the quote editor's
-    // own fallback. Do NOT alphabetize; that silently overrides the
-    // editor's room order for any quote that hasn't been manually reordered.
-    return roomNames
-  })()
+  const { groupedByRoom, sortedRooms, quoteRefById } = groupScopeItemsAcrossQuotes(quotes, scopeItems)
 
   // Build scope rows HTML for Item 9
   let globalCounter = 0
@@ -95,6 +79,7 @@ export function generateBuildingContractHtml(params: {
               <td style="width:44px;padding:6px 4px;text-align:center;font-size:10px;color:#3a3530;">${item.qty ?? '-'}</td>
               <td style="width:44px;padding:6px 4px;text-align:center;font-size:10px;color:#3a3530;">${item.unit ?? '-'}</td>
               <td style="width:80px;padding:6px 8px;font-size:10px;color:#3a3530;">${item.trade ?? '-'}</td>
+              ${isMultiQuote ? `<td style="width:70px;padding:6px 8px;font-size:10px;color:#9e998f;font-family:monospace;">${quoteRefById.get(item.quote_id) || '-'}</td>` : ''}
             </tr>`
           }).join('')}
         </tbody>
@@ -424,7 +409,7 @@ export function generateBuildingContractHtml(params: {
       <table>
         <tr><td><strong>RE:</strong></td><td>Building Contract: ${job.insured_name || ''} - ${job.property_address || ''}</td></tr>
         <tr><td><strong>CLAIM NO:</strong></td><td>${job.claim_number || ''}</td></tr>
-        <tr><td><strong>REF NO:</strong></td><td>${quote.quote_ref || ''}</td></tr>
+        <tr><td><strong>REF NO:</strong></td><td>${quoteRefLabel}</td></tr>
         <tr><td><strong>JOB NO:</strong></td><td>${job.job_number || ''}</td></tr>
       </table>
     </div>
@@ -643,6 +628,7 @@ export function generateBuildingContractHtml(params: {
             <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Qty</th>
             <th style="width:44px;text-align:center;padding:6px 4px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Unit</th>
             <th style="width:80px;text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Trade</th>
+            ${isMultiQuote ? `<th style="width:70px;text-align:left;padding:6px 8px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#b0a89e;">Quote</th>` : ''}
           </tr>
         </thead>
       </table>

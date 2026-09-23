@@ -3,10 +3,10 @@
 import { useState } from 'react'
 
 export function SendForSignatureButton({
-  quoteId,
+  quoteIds,
   insuredEmail,
 }: {
-  quoteId: string
+  quoteIds: string[]
   insuredEmail: string | null
 }) {
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export function SendForSignatureButton({
       const res = await fetch('/api/docuseal/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteId }),
+        body: JSON.stringify({ quoteIds }),
       })
       if (res.ok) {
         setResult({ success: true, message: `Sent to ${insuredEmail}` })

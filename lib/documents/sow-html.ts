@@ -1,4 +1,5 @@
 import type { Database } from '@/lib/supabase/database.types'
+import { groupScopeItemsAcrossQuotes, combinedQuoteRefLabel } from './scope-grouping'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
@@ -6,14 +7,17 @@ type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
 export function generateSowHtml(params: {
-  quote: Quote
+  quotes: Quote[]
   job: Job
   scopeItems: ScopeItem[]
   tenant: Tenant & {
     building_licence_number?: string | null
   }
 }): string {
-  const { quote, job, scopeItems, tenant } = params
+  const { quotes, job, scopeItems, tenant } = params
+  const isMultiQuote = quotes.length > 1
+  const sowReference = isMultiQuote ? `${job.job_number}-SOW` : `${quotes[0].quote_ref}-SOW`
+  const quoteRefLabel = combinedQuoteRefLabel(quotes)
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -33,31 +37,7 @@ export function generateSowHtml(params: {
   const docDateDisplay = formatDate(new Date().toISOString())
 
   // Group and sort items — identical logic to page.tsx
-  const items = [...scopeItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-
-  const groupedByRoom = items.reduce((acc, item) => {
-    const room = item.room || 'Unassigned'
-    if (!acc[room]) acc[room] = []
-    acc[room].push(item)
-    return acc
-  }, {} as Record<string, ScopeItem[]>)
-
-  const sortedRooms = (() => {
-    const roomNames = Object.keys(groupedByRoom)
-    if (quote.room_order && quote.room_order.length > 0) {
-      const orderMap = new Map(quote.room_order.map((r, i) => [r, i]))
-      return roomNames.sort((a, b) => {
-        const aIdx = orderMap.get(a) ?? 999
-        const bIdx = orderMap.get(b) ?? 999
-        return aIdx - bIdx
-      })
-    }
-    // No room_order saved — preserve the order rooms first appear in the
-    // items (already sorted by sort_order), matching the quote editor's
-    // own fallback. Do NOT alphabetize; that silently overrides the
-    // editor's room order for any quote that hasn't been manually reordered.
-    return roomNames
-  })()
+  const { groupedByRoom, sortedRooms, quoteRefById } = groupScopeItemsAcrossQuotes(quotes, scopeItems)
 
   // Build scope rows HTML
   let globalCounter = 0
@@ -76,7 +56,7 @@ export function generateSowHtml(params: {
 
     const roomHeaderHtml = `
     <tr>
-      <td colspan="5" style="padding:4px 12px;background:#f5f2ee;
+      <td colspan="${isMultiQuote ? 6 : 5}" style="padding:4px 12px;background:#f5f2ee;
         border-bottom:1px solid #e0dbd4;border-top:6px solid white;">
         <span style="font-weight:700;color:#3a3530;font-size:12px;
           text-transform:uppercase;">${room}</span>
@@ -99,6 +79,8 @@ export function generateSowHtml(params: {
           font-size:10px;color:#3a3530;">${item.unit || '-'}</td>
         <td style="width:80px;padding:6px 8px;font-size:10px;
           color:#3a3530;">${item.trade || '-'}</td>
+        ${isMultiQuote ? `<td style="width:70px;padding:6px 8px;font-size:10px;
+          color:#9e998f;font-family:monospace;">${quoteRefById.get(item.quote_id) || '-'}</td>` : ''}
       </tr>`
     }).join('')
 
@@ -148,7 +130,7 @@ export function generateSowHtml(params: {
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:11px;color:#9e998f;">SOW Reference: </span>
           <span style="font-size:14px;font-weight:600;color:#1a1a1a;">
-            ${quote.quote_ref}-SOW</span>
+            ${sowReference}</span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
           <span style="font-size:11px;color:#9e998f;">Authorised for: </span>
@@ -159,7 +141,7 @@ export function generateSowHtml(params: {
       <div style="display:flex;flex-wrap:wrap;font-size:12px;margin-top:6px;">
         ${[
           { label: 'Doc Date', value: docDateDisplay },
-          { label: 'Quote Ref', value: quote.quote_ref },
+          { label: isMultiQuote ? 'Quote Refs' : 'Quote Ref', value: quoteRefLabel },
         ].filter(f => f.value).map((field, i, arr) => `
           <span style="padding-right:8px;margin-right:8px;
             border-right:${i < arr.length - 1 ? '1px solid #e0dbd4' : 'none'};">
@@ -256,6 +238,9 @@ export function generateSowHtml(params: {
             <th style="width:80px;text-align:left;padding:6px 8px;font-size:8px;
               font-weight:600;text-transform:uppercase;letter-spacing:1px;
               color:#b0a89e;">Trade</th>
+            ${isMultiQuote ? `<th style="width:70px;text-align:left;padding:6px 8px;font-size:8px;
+              font-weight:600;text-transform:uppercase;letter-spacing:1px;
+              color:#b0a89e;">Quote</th>` : ''}
           </tr>
         </thead>
         <tbody>

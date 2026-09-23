@@ -1,18 +1,17 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Database } from '@/lib/supabase/database.types'
 import { generateBuildingContractHtml } from '@/lib/documents/building-contract-html'
-
-type Quote = Database['public']['Tables']['quotes']['Row']
-type ScopeItem = Database['public']['Tables']['scope_items']['Row']
-type Job = Database['public']['Tables']['jobs']['Row']
 
 export default async function BuildingContractPrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ quoteId: string }>
+  searchParams: Promise<{ quoteIds?: string }>
 }) {
   const { quoteId } = await params
+  const { quoteIds: quoteIdsParam } = await searchParams
+  const quoteIds = quoteIdsParam ? quoteIdsParam.split(',') : [quoteId]
 
   const supabase = await createClient()
 
@@ -35,15 +34,15 @@ export default async function BuildingContractPrintPage({
 
   const tenantId = userData.tenant_id
 
-  // Fetch quote
-  const { data: quote, error: quoteError } = await supabase
+  // Fetch quotes
+  const { data: quotes, error: quoteError } = await supabase
     .from('quotes')
     .select('*')
-    .eq('id', quoteId)
+    .in('id', quoteIds)
     .eq('tenant_id', tenantId)
-    .single()
+    .order('created_at', { ascending: true })
 
-  if (quoteError || !quote) {
+  if (quoteError || !quotes || quotes.length === 0) {
     return <div>Quote not found</div>
   }
 
@@ -51,7 +50,7 @@ export default async function BuildingContractPrintPage({
   const { data: scopeItems, error: itemsError } = await supabase
     .from('scope_items')
     .select('*')
-    .eq('quote_id', quoteId)
+    .in('quote_id', quoteIds)
     .eq('tenant_id', tenantId)
     .order('sort_order', { ascending: true })
 
@@ -63,7 +62,7 @@ export default async function BuildingContractPrintPage({
   const { data: job, error: jobError } = await supabase
     .from('jobs')
     .select('*')
-    .eq('id', quote.job_id)
+    .eq('id', quotes[0].job_id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -73,7 +72,7 @@ export default async function BuildingContractPrintPage({
 
   // Generate HTML
   const html = generateBuildingContractHtml({
-    quote,
+    quotes,
     job,
     scopeItems: scopeItems || [],
   })
