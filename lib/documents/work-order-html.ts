@@ -1,4 +1,6 @@
 import type { Database } from '@/lib/supabase/database.types'
+import type { JobContact } from '@/lib/types/contacts'
+import { getContactsByRole } from '@/lib/contacts/defaults'
 
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
@@ -10,6 +12,58 @@ type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 // see resolveItemsForWO in the print page, which builds both arrays already
 // fully resolved (overrides/additions/deletions/reassignment applied).
 type OtherScopeItem = ScopeItem & { contractorName?: string | null }
+
+const ADDITIONAL_CONTACT_TYPE_LABELS: Record<string, string> = {
+  tenant: 'Tenant',
+  real_estate: 'Real Estate Agent',
+  property_manager: 'Property Manager',
+  owner: 'Owner',
+  broker: 'Broker',
+  other: 'Other Contact',
+}
+
+// A site contact for the trade to call — resolved from the job's contacts
+// list rather than assumed to be the insured/homeowner, since the person
+// present on site (e.g. a tenant) is often someone else.
+interface SiteContact {
+  label: string // e.g. "Tenant" — what the trade should know before calling
+  isInsured: boolean
+  name: string
+  phone: string
+  email: string
+}
+
+function resolveSiteContact(job: Job, role: 'primary_site' | 'secondary_site'): SiteContact | null {
+  const contacts = (job.contacts as unknown as JobContact[] | null) || []
+  const match = getContactsByRole(contacts, role)[0]
+
+  if (match) {
+    const isInsured = match.slot === 'insured'
+    return {
+      label: isInsured
+        ? 'Homeowner'
+        : (match.type && ADDITIONAL_CONTACT_TYPE_LABELS[match.type]) || 'Site Contact',
+      isInsured,
+      name: match.name || '',
+      phone: match.phone || '',
+      email: match.email || '',
+    }
+  }
+
+  // No structured contacts on this job yet — fall back to the legacy
+  // insured fields, but only for the primary slot.
+  if (role === 'primary_site' && (job.insured_name || job.insured_phone || job.insured_email)) {
+    return {
+      label: 'Homeowner',
+      isInsured: true,
+      name: job.insured_name || '',
+      phone: job.insured_phone || '',
+      email: job.insured_email || '',
+    }
+  }
+
+  return null
+}
 
 // notes is a structured JSON blob — only surface a dedicated text_notes field if present,
 // otherwise suppress it to avoid leaking raw JSON into the PDF.
@@ -52,6 +106,35 @@ export function generateWorkOrderHtml(params: {
   }
 
   const displayNotes = getDisplayNotes(workOrder.notes)
+
+  const primarySiteContact = resolveSiteContact(job, 'primary_site')
+  const secondarySiteContact = resolveSiteContact(job, 'secondary_site')
+
+  const siteContactCardHtml = (contact: SiteContact) => `
+    <div style="flex:1;">
+      ${!contact.isInsured ? `
+      <div style="display:inline-block;background:#c8302f;color:#fff;font-size:9px;
+        font-weight:700;text-transform:uppercase;letter-spacing:0.6px;
+        border-radius:3px;padding:2px 6px;margin-bottom:5px;">
+        Not the homeowner — ${contact.label}
+      </div>
+      <br/>` : `
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;
+        letter-spacing:0.6px;color:#9e998f;margin-bottom:4px;">${contact.label}</div>
+      `}
+      <div style="font-size:14px;color:#1a1a1a;font-weight:700;margin-bottom:4px;">
+        ${contact.name || '—'}
+      </div>
+      <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
+        ${job.property_address ? `Site: ${job.property_address}` : ''}
+      </div>
+      <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
+        ${contact.phone ? `Phone: ${contact.phone}` : ''}
+      </div>
+      <div style="font-size:12px;color:#3a3530;">
+        ${contact.email ? `Email: ${contact.email}` : ''}
+      </div>
+    </div>`
 
   // Use manual override if set, else sum scope items
   const scopeSum = tradeScopeItems.reduce((sum, item) => sum + (item.line_total || 0), 0)
@@ -256,26 +339,16 @@ export function generateWorkOrderHtml(params: {
       </div>
     </div>
 
-    <!-- Homeowner Details -->
+    <!-- Site Contact(s) -->
     <div style="margin-bottom:14px;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
-        color:#b0a89e;font-weight:700;margin-bottom:8px;">HOMEOWNER / SITE CONTACT</div>
+        color:#b0a89e;font-weight:700;margin-bottom:8px;">SITE CONTACT</div>
       <div style="background:#f5f2ee;border-radius:8px;padding:16px;">
         <div style="display:flex;gap:20px;">
-          <div style="flex:1;">
-            <div style="font-size:14px;color:#1a1a1a;font-weight:700;margin-bottom:4px;">
-              ${job.insured_name || '—'}
-            </div>
-            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
-              ${job.property_address ? `Site: ${job.property_address}` : ''}
-            </div>
-            <div style="font-size:12px;color:#3a3530;margin-bottom:2px;">
-              ${job.insured_phone ? `Phone: ${job.insured_phone}` : ''}
-            </div>
-            <div style="font-size:12px;color:#3a3530;">
-              ${job.insured_email ? `Email: ${job.insured_email}` : ''}
-            </div>
-          </div>
+          ${primarySiteContact ? siteContactCardHtml(primarySiteContact) : `
+          <div style="flex:1;font-size:12px;color:#9e998f;">No site contact on file — check with the office before attending.</div>
+          `}
+          ${secondarySiteContact ? siteContactCardHtml(secondarySiteContact) : ''}
         </div>
       </div>
     </div>

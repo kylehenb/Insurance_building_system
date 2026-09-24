@@ -36,6 +36,23 @@ interface PhotoEntry { id: string; file: File; previewUrl: string; label: string
 
 function uid() { return Math.random().toString(36).slice(2) }
 
+// Upload photos concurrently (a few at a time) instead of one-by-one — this is what made
+// submission take minutes: N photos each waiting on a full round trip in series.
+async function uploadPhotoEntries(entries: { file: File; label: string; isRoofPhoto?: boolean }[], base: string, concurrency = 4) {
+  let next = 0
+  const worker = async () => {
+    while (next < entries.length) {
+      const entry = entries[next++]
+      const fd = new FormData()
+      fd.append('file', entry.file)
+      fd.append('label', entry.label)
+      if (entry.isRoofPhoto) fd.append('isRoofPhoto', 'true')
+      await fetch(`${base}/photos`, { method: 'POST', body: fd })
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker))
+}
+
 // Convert any image (including HEIC) to a compressed JPEG ≤ TARGET_BYTES.
 // Uses the canvas API — iOS Safari decodes HEIC natively, so no extra library needed.
 async function processPhotoForUpload(file: File): Promise<File> {
@@ -457,29 +474,17 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         body: JSON.stringify({ draft: collectDraft() }),
       })
 
-      // Upload photos first
-      for (const photo of photos) {
-        const fd = new FormData()
-        fd.append('file', photo.file)
-        fd.append('label', photo.label)
-        await fetch(`${base}/photos`, { method: 'POST', body: fd })
-      }
-
-      // Submit the inspection
+      // Upload all photos (field + roof) concurrently instead of one at a time
       const scopeRoomsPayload = scopeRooms.map(r => ({
         room: r.name,
         l: r.l, w: r.w, h: r.h,
         items: r.items.map(i => i.text).filter(Boolean),
       }))
 
-      // Upload roof photos first if any
-      for (const photo of roofPhotos) {
-        const fd = new FormData()
-        fd.append('file', photo.file)
-        fd.append('label', photo.label)
-        fd.append('isRoofPhoto', 'true')
-        await fetch(`${base}/photos`, { method: 'POST', body: fd })
-      }
+      await uploadPhotoEntries([
+        ...photos.map(p => ({ file: p.file, label: p.label })),
+        ...roofPhotos.map(p => ({ file: p.file, label: p.label, isRoofPhoto: true })),
+      ], base)
 
       const res = await fetch(`${base}/submit`, {
         method: 'POST',

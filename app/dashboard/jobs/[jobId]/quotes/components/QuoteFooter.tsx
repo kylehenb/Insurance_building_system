@@ -936,7 +936,7 @@ export function QuoteFooter({
                 onMouseEnter={e => !isCloning && (e.currentTarget.style.background = '#1b5e20')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
               >
-                {isCloning ? 'Creating...' : 'Create variation or make changes (new quote version)'}
+                {isCloning ? 'Creating...' : 'Duplicate to make changes'}
               </button>
             </div>
           </div>

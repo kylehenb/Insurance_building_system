@@ -7,7 +7,7 @@ export async function POST(
 ) {
   const { quoteId } = await params
   const body = await req.json()
-  const { tenantId, cloneType = 'version' } = body as { tenantId: string; cloneType?: 'version' | 'new_quote' }
+  const { tenantId } = body as { tenantId: string }
 
   if (!tenantId) {
     return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
@@ -39,34 +39,28 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to fetch scope items' }, { status: 500 })
   }
 
-  // Calculate the new version number (only for version clones)
-  const newVersion = (originalQuote.version ?? 1) + 1
-
-  // Generate quote_ref for new_quote clones
+  // Generate a fresh quote_ref for the duplicate
   let quoteRef = originalQuote.quote_ref
-  if (cloneType === 'new_quote') {
-    // Get job number to generate new quote_ref
-    const { data: job } = await supabase
-      .from('jobs')
-      .select('job_number')
-      .eq('id', originalQuote.job_id)
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('job_number')
+    .eq('id', originalQuote.job_id)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (job) {
+    // Count existing quotes for this job to generate sequence number
+    const { count } = await supabase
+      .from('quotes')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', originalQuote.job_id)
       .eq('tenant_id', tenantId)
-      .single()
 
-    if (job) {
-      // Count existing quotes for this job to generate sequence number
-      const { count } = await supabase
-        .from('quotes')
-        .select('*', { count: 'exact', head: true })
-        .eq('job_id', originalQuote.job_id)
-        .eq('tenant_id', tenantId)
-
-      const seq = String((count ?? 0) + 1)
-      quoteRef = `Q-${job.job_number}-${seq}`
-    }
+    const seq = String((count ?? 0) + 1)
+    quoteRef = `Q-${job.job_number}-${seq}`
   }
 
-  // Create the new quote (clone)
+  // Create the duplicate quote — a brand new, independent quote record
   const { data: newQuote, error: createError } = await supabase
     .from('quotes')
     .insert({
@@ -74,10 +68,9 @@ export async function POST(
       job_id: originalQuote.job_id,
       inspection_id: originalQuote.inspection_id,
       report_id: originalQuote.report_id,
-      parent_quote_id: cloneType === 'version' ? originalQuote.id : null,
       quote_ref: quoteRef,
       quote_type: originalQuote.quote_type,
-      version: cloneType === 'version' ? newVersion : 1,
+      version: 1,
       is_active_version: true,
       is_locked: false,
       status: 'draft',
@@ -128,22 +121,6 @@ export async function POST(
 
     if (insertItemsError) {
       return NextResponse.json({ error: 'Failed to clone scope items' }, { status: 500 })
-    }
-  }
-
-  // Update the original quote to rejected and inactive (only for version clones)
-  if (cloneType === 'version') {
-    const { error: updateError } = await supabase
-      .from('quotes')
-      .update({
-        status: 'rejected',
-        is_active_version: false,
-      })
-      .eq('id', quoteId)
-      .eq('tenant_id', tenantId)
-
-    if (updateError) {
-      return NextResponse.json({ error: 'Failed to update original quote' }, { status: 500 })
     }
   }
 

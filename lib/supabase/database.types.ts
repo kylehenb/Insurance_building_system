@@ -1095,6 +1095,8 @@ export type Database = {
           send_checklist: Json | null
           start_time: string | null
           status: string | null
+          submission_error: string | null
+          submission_status: string | null
           tenant_id: string
         }
         Insert: {
@@ -1128,6 +1130,8 @@ export type Database = {
           send_checklist?: Json | null
           start_time?: string | null
           status?: string | null
+          submission_error?: string | null
+          submission_status?: string | null
           tenant_id: string
         }
         Update: {
@@ -1161,6 +1165,8 @@ export type Database = {
           send_checklist?: Json | null
           start_time?: string | null
           status?: string | null
+          submission_error?: string | null
+          submission_status?: string | null
           tenant_id?: string
         }
         Relationships: [

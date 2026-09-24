@@ -317,32 +317,9 @@ export function ReportAccordionItem({
     [propertyDetails, savePropertyDetails]
   )
 
-  const currentSnapshot = {
-    attendance_date: report.attendance_date,
-    attendance_time: report.attendance_time,
-    person_met: report.person_met,
-    assessor_name: report.assessor_name,
-    property_address: report.property_address,
-    insured_name: report.insured_name,
-    claim_number: report.claim_number,
-    loss_type: report.loss_type,
-    incident_description: report.incident_description,
-    cause_of_damage: report.cause_of_damage,
-    how_damage_occurred: report.how_damage_occurred,
-    resulting_damage: report.resulting_damage,
-    conclusion: report.conclusion,
-    pre_existing_conditions: report.pre_existing_conditions,
-    maintenance_notes: report.maintenance_notes,
-    raw_report_notes: report.raw_report_notes,
-    additional_notes: report.additional_notes,
-    type_specific_fields: report.type_specific_fields,
-  }
-
   const { scheduleFieldSave, flushSave, saveState } = useReportAutosave({
     reportId: report.id,
     tenantId: report.tenant_id,
-    userId: currentUserId,
-    currentSnapshot,
   })
 
   // Flush any pending debounced save when the component unmounts (Next.js navigation)

@@ -200,6 +200,7 @@ type EditFields = {
   order_sender_name: string
   order_sender_email: string
   invoice_to: string
+  contacts: JobContact[]
 }
 
 function jobToEditFields(job: JobDetails): EditFields {
@@ -224,6 +225,7 @@ function jobToEditFields(job: JobDetails): EditFields {
     order_sender_name: job.order_sender_name ?? '',
     order_sender_email: job.order_sender_email ?? '',
     invoice_to: job.invoice_to ?? '',
+    contacts: applyContactDefaults((job.contacts as unknown as JobContact[]) || []),
   }
 }
 
@@ -279,6 +281,7 @@ function JobDetailsAccordion({
       order_sender_name: vals.order_sender_name || null,
       order_sender_email: vals.order_sender_email || null,
       invoice_to: vals.invoice_to || null,
+      contacts: vals.contacts as unknown as JobDetails['contacts'],
     }
     await supabase.from('jobs').update(patch).eq('id', jobId).eq('tenant_id', tenantId)
     setSaved(prev => ({ ...prev, ...patch }))
@@ -509,7 +512,7 @@ function JobDetailsAccordion({
                 { label: 'Claim Manager Name', field: 'order_sender_name' },
                 { label: 'Claim Manager Email', field: 'order_sender_email' },
                 { label: 'Assigned To', field: 'assigned_to' },
-              ] as { label: string; field: keyof EditFields }[]
+              ] as { label: string; field: Exclude<keyof EditFields, 'contacts'> }[]
             ).map(({ label, field }) => (
               <div key={label} className="ov-detail-row">
                 <span className="ov-detail-label">{label}</span>
@@ -621,7 +624,7 @@ function JobDetailsAccordion({
                 { label: 'Phone', field: 'insured_phone' },
                 { label: 'Email', field: 'insured_email' },
                 { label: 'Address', field: 'property_address' },
-              ] as { label: string; field: keyof EditFields }[]
+              ] as { label: string; field: Exclude<keyof EditFields, 'contacts'> }[]
             ).map(({ label, field }) => (
               <div key={label} className="ov-detail-row">
                 <span className="ov-detail-label">{label}</span>
@@ -644,16 +647,35 @@ function JobDetailsAccordion({
             <div style={accentLabel({ marginTop: 14 })}>Additional Contacts</div>
             {editing ? (
               <ContactsEditor
-                contacts={(job.contacts as unknown as JobContact[]) || []}
-                onChange={(contacts) => {
-                  // Will be saved separately
-                }}
+                contacts={vals.contacts}
+                onChange={(contacts) => setVals(prev => ({ ...prev, contacts }))}
                 hideInsured={true}
               />
             ) : (
-              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
-                {/* Contacts display */}
-              </p>
+              (() => {
+                const additional = saved.contacts as unknown as JobContact[] | null
+                const extras = (additional || []).filter(c => c.slot !== 'insured' && (c.name || c.phone || c.email))
+                if (extras.length === 0) {
+                  return (
+                    <p style={{ fontSize: 12, color: '#9e998f', lineHeight: 1.65, margin: 0 }}>
+                      No additional contacts.
+                    </p>
+                  )
+                }
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {extras.map((c, i) => (
+                      <div key={i} style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65 }}>
+                        <strong>{c.type ? c.type.replace('_', ' ') : 'Contact'}</strong>
+                        {c.name ? ` — ${c.name}` : ''}
+                        {c.phone ? ` · ${c.phone}` : ''}
+                        {c.email ? ` · ${c.email}` : ''}
+                        {c.roles.length > 0 ? ` (${c.roles.join(', ')})` : ''}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()
             )}
 
 

@@ -13,18 +13,9 @@ interface SaveState {
 interface UseReportAutosaveOptions {
   reportId: string
   tenantId: string
-  userId: string
-  currentSnapshot: Record<string, unknown>
-  onVersionCreated?: () => void
 }
 
-export function useReportAutosave({
-  reportId,
-  tenantId,
-  userId,
-  currentSnapshot,
-  onVersionCreated,
-}: UseReportAutosaveOptions) {
+export function useReportAutosave({ reportId, tenantId }: UseReportAutosaveOptions) {
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -37,61 +28,26 @@ export function useReportAutosave({
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const pendingChangesRef = useRef<Record<string, unknown>>({})
-  const previousSnapshotRef = useRef<Record<string, unknown>>(currentSnapshot)
 
   const save = useCallback(
     async (changes: Record<string, unknown>) => {
       setSaveState(s => ({ ...s, status: 'saving' }))
 
       try {
-        // 1. Patch the reports row
-        const { error: updateError } = await supabase
+        const { error } = await supabase
           .from('reports')
           .update(changes)
           .eq('id', reportId)
           .eq('tenant_id', tenantId)
 
-        if (updateError) {
+        if (error) {
           console.error('[ReportAutosave] Update failed - changes keys:', JSON.stringify(Object.keys(changes)))
-          console.error('[ReportAutosave] Update error details:', JSON.stringify({ message: updateError.message, code: updateError.code, details: updateError.details, hint: updateError.hint }))
-          throw updateError
+          console.error('[ReportAutosave] Update error details:', JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }))
+          throw error
         }
 
-        // 2. Determine changed fields for version snapshot
-        const changedFields = Object.keys(changes).filter(
-          key =>
-            JSON.stringify(changes[key]) !==
-            JSON.stringify(previousSnapshotRef.current[key])
-        )
-
-        // 3. Get next version number
-        const { data: versionData } = await supabase
-          .from('report_versions')
-          .select('version_number')
-          .eq('report_id', reportId)
-          .order('version_number', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const nextVersion = (versionData?.version_number ?? 0) + 1
-
-        // 4. Write version snapshot
-        const fullSnapshot = { ...previousSnapshotRef.current, ...changes }
-        await supabase.from('report_versions').insert({
-          tenant_id: tenantId,
-          report_id: reportId,
-          version_number: nextVersion,
-          snapshot: fullSnapshot,
-          changed_fields: changedFields,
-          changed_by: userId,
-        })
-
-        // 5. Update local ref
-        previousSnapshotRef.current = fullSnapshot
         pendingChangesRef.current = {}
-
         setSaveState({ status: 'saved', lastSavedAt: new Date() })
-        onVersionCreated?.()
 
         // Reset to idle after 2s
         setTimeout(() => setSaveState(s => ({ ...s, status: 'idle' })), 2000)
@@ -100,7 +56,7 @@ export function useReportAutosave({
         setSaveState(s => ({ ...s, status: 'error' }))
       }
     },
-    [reportId, tenantId, userId, supabase, onVersionCreated]
+    [reportId, tenantId, supabase]
   )
 
   const scheduleFieldSave = useCallback(
