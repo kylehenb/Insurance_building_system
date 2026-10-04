@@ -555,13 +555,11 @@ export async function POST(
       roofPower: boolean
       weather: boolean
       customNotes: string
-      hospitalName: string
       signedBy: string
     }
     scopeRooms: ScopeRoom[]
     rawReportDump: string
     propDesc: string
-    photoContext: string
     insurer: string
     lossType: string
     roofRawNotes?: string
@@ -582,7 +580,7 @@ export async function POST(
     ppe_confirmed: safetyData?.ppe ?? false,
     asbestos_risk: !(safetyData?.asbestos ?? false),
     roof_access: safetyData?.roofPower ?? false,
-    nearest_hospital: safetyData?.hospitalName ?? null,
+    nearest_hospital: null,
     custom_notes: safetyData?.customNotes ?? null,
     signed_by: safetyData?.signedBy ?? personMet ?? null,
     status: 'confirmed',

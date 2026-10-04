@@ -35,7 +35,7 @@
 .fa-type-badge{display:inline-block;font-family:var(--font-dm-mono),monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;background:var(--black);color:var(--beige);padding:3px 10px;border-radius:var(--radius-sm);margin-top:10px}
 
 /* STEP CARD */
-.fa-sc{margin:16px 12px 0;border-radius:var(--radius);overflow:hidden;background:white;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.fa-sc{margin:16px 12px 0;border-radius:var(--radius);overflow:hidden;background:white;box-shadow:0 2px 12px rgba(0,0,0,.06);scroll-margin-top:68px}
 .fa-sc.locked{opacity:.38;pointer-events:none}
 .fa-sc-head{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--fa-white);border-bottom:1px solid var(--border)}
 .fa-sc-circle{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-dm-mono),monospace;font-size:12px;font-weight:500;flex-shrink:0;transition:all .2s}

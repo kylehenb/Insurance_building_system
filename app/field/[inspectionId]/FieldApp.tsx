@@ -124,7 +124,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [commenceTime, setCommenceTime] = useState('')
   const [chips, setChips] = useState({ general: false, ppe: false, asbestos: false, structural: false, roofPower: false, weather: false })
   const [customSafetyNotes, setCustomSafetyNotes] = useState('')
-  const [hospitalName, setHospitalName] = useState('')
   const [hasSig, setHasSig] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
@@ -137,7 +136,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Photos ───────────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<PhotoEntry[]>([])
-  const [photoContext, setPhotoContext] = useState('')
   const [aiLabeling, setAiLabeling] = useState(false)
   const [aiLabelDone, setAiLabelDone] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -272,8 +270,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
-    raw_report_notes, photoContext,
-    hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step,
+    raw_report_notes,
+    customSafetyNotes, chips, safetyDone, commenceTime, step,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     roofRawNotes, roofPhotoContext,
     msWorksCompleted, msTempFixes, msHours,
@@ -283,7 +281,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     damage_template: damageTemplate, damage_template_saved: damageTemplateSaved,
     roof_damage_template: roofDamageTemplate, roof_damage_template_saved: roofDamageTemplateSaved,
     ms_damage_template: msDamageTemplate, ms_damage_template_saved: msDamageTemplateSaved,
-  }), [raw_report_notes, photoContext, hospitalName, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes, damageTemplate, damageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved])
+  }), [raw_report_notes, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes, damageTemplate, damageTemplateSaved, roofDamageTemplate, roofDamageTemplateSaved, msDamageTemplate, msDamageTemplateSaved])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -316,8 +314,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     const d = initialData.fieldDraft as Record<string, unknown> | null
     if (!d) return
     if (d.raw_report_notes) setRawReportNotes(d.raw_report_notes as string)
-    if (d.photoContext) setPhotoContext(d.photoContext as string)
-    if (d.hospitalName) setHospitalName(d.hospitalName as string)
     if (d.customSafetyNotes) setCustomSafetyNotes(d.customSafetyNotes as string)
     if (d.chips) setChips(d.chips as typeof chips)
     if (d.commenceTime) setCommenceTime(d.commenceTime as string)
@@ -437,23 +433,39 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   const anyProcessing = photos.some(p => p.processing)
 
-  const runAILabels = async () => {
-    if (!photoContext.trim()) { alert('Add a photo description first.'); return }
-    if (!photos.length) { alert('No photos to label.'); return }
-    if (anyProcessing) { alert('Photos are still processing — please wait a moment.'); return }
-    setAiLabeling(true)
+  // Context for photo labeling comes from the raw report dump + whatever scope
+  // line items are filled in, rather than a separate photo-description field.
+  const buildPhotoLabelContext = useCallback(() => {
+    const scopeText = scopeRooms
+      .filter(r => r.name.trim() || r.items.some(i => i.text.trim()))
+      .map(r => `${r.name.trim() || 'Room'}: ${r.items.map(i => i.text).filter(Boolean).join('; ')}`)
+      .join('\n')
+    return [raw_report_notes.trim(), scopeText].filter(Boolean).join('\n\n')
+  }, [raw_report_notes, scopeRooms])
+
+  const fetchAILabels = async (photoCount: number): Promise<string[] | null> => {
     try {
       const res = await fetch(`${base}/ai-label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: photoContext, photoCount: photos.length, jobContext: { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address } }),
+        body: JSON.stringify({ context: buildPhotoLabelContext(), photoCount, jobContext: { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address } }),
       })
       const data = await res.json()
-      if (data.ok && data.labels?.length) {
-        setPhotos(prev => prev.map((p, i) => ({ ...p, label: data.labels[i] ?? p.label })))
-        setAiLabelDone(true)
-      }
+      if (data.ok && data.labels?.length) return data.labels
     } catch { /* fallback: keep existing labels */ }
+    return null
+  }
+
+  const runAILabels = async () => {
+    if (!photos.length) { alert('No photos to label.'); return }
+    if (anyProcessing) { alert('Photos are still processing — please wait a moment.'); return }
+    if (!buildPhotoLabelContext()) { alert('Add some report notes or scope items first so AI has context to label photos.'); return }
+    setAiLabeling(true)
+    const labels = await fetchAILabels(photos.length)
+    if (labels) {
+      setPhotos(prev => prev.map((p, i) => ({ ...p, label: labels[i] ?? p.label })))
+      setAiLabelDone(true)
+    }
     setAiLabeling(false)
   }
 
@@ -481,8 +493,21 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         items: r.items.map(i => i.text).filter(Boolean),
       }))
 
+      // Attempt to auto-label any photos the inspector hasn't already labelled,
+      // using the report dump + scope notes as context, so they arrive on the
+      // desktop with a label the user can correct rather than blank.
+      let fieldPhotosForUpload = photos
+      if (!aiLabelDone && photos.length && !anyProcessing && buildPhotoLabelContext()) {
+        const labels = await fetchAILabels(photos.length)
+        if (labels) {
+          fieldPhotosForUpload = photos.map((p, i) => ({ ...p, label: p.label || labels[i] || p.label }))
+          setPhotos(fieldPhotosForUpload)
+          setAiLabelDone(true)
+        }
+      }
+
       await uploadPhotoEntries([
-        ...photos.map(p => ({ file: p.file, label: p.label })),
+        ...fieldPhotosForUpload.map(p => ({ file: p.file, label: p.label })),
         ...roofPhotos.map(p => ({ file: p.file, label: p.label, isRoofPhoto: true })),
       ], base)
 
@@ -499,13 +524,11 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             roofPower: chips.roofPower,
             weather: chips.weather,
             customNotes: customSafetyNotes,
-            hospitalName,
             signedBy: initialData.inspector ?? '',
           },
           scopeRooms: scopeRoomsPayload,
           rawReportDump: raw_report_notes,
           propDesc: '',
-          photoContext,
           insurer: initialData.insurer ?? '',
           lossType: initialData.lossType ?? '',
           roofRawNotes,
@@ -625,19 +648,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                   </div>
                 ))}
               </div>
-              {/* Hospital */}
-              <div className="fa-fg">
-                <label className="fa-fl">Nearest Hospital</label>
-                <input
-                  className="fa-input"
-                  type="text"
-                  placeholder="Not built yet — enter manually"
-                  value={hospitalName}
-                  onChange={e => { setHospitalName(e.target.value); armDraft() }}
-                  enterKeyHint="next"
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); focusNextInput(e.currentTarget) } }}
-                />
-              </div>
               {/* Custom Notes */}
               <div className="fa-fg">
                 <label className="fa-fl">Additional Safety Notes</label>
@@ -683,11 +693,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                 </div>
                 <button className="fa-sc-edit" onClick={() => setSafetyDone(false)}>Edit</button>
               </div>
-              {hospitalName && (
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
-                  🏥 Nearest hospital: {hospitalName}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -827,20 +832,16 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
         <div className="fa-sc-body">
           {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
-          {/* Photo Context (AI Dark) */}
+          {/* AI Label (uses report notes + scope notes as context) */}
           <div className="fa-ai-dark" style={{ marginBottom: 0 }}>
             <div className="fa-ai-dark-head">
               <span style={{ fontSize: 14 }}>📷</span>
-              <span className="fa-ai-dark-title">Photo Context</span>
+              <span className="fa-ai-dark-title">AI Photo Labelling</span>
             </div>
             <div className="fa-ai-dark-body">
-              <textarea
-                className="fa-ai-dark-ta"
-                placeholder="Describe your photos in order. e.g. 'First is the damaged ceiling in the living room, second shows the water stain on the wall, third is an overview of the roof tiles displaced…'"
-                style={{ minHeight: 80 }}
-                value={photoContext}
-                onChange={e => { setPhotoContext(e.target.value); armDraft() }}
-              />
+              <p style={{ fontSize: 11, color: 'var(--beige-dark)', margin: '0 0 10px' }}>
+                Uses your report notes and scope items as context — photos are also labelled automatically when you submit.
+              </p>
               <button
                 className={`fa-ai-label-btn${aiLabelDone ? ' done' : ''}`}
                 onClick={runAILabels}
