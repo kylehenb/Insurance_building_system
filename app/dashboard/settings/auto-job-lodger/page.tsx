@@ -516,8 +516,7 @@ export default function AutoJobLodgerPage() {
                 />
                 <p className="text-xs text-[#9e998f] mt-1">
                   Available tokens: {'{insurer}'} {'{claim_number}'} {'{insured_name}'}{' '}
-                  {'{property_address}'} {'{work_order_type}'} {'{confidence}'} {'{parse_status}'}{' '}
-                  {'{missing_fields}'}
+                  {'{property_address}'} {'{work_order_type}'} {'{missing_fields}'} {'{review_link}'}
                 </p>
               </div>
 

@@ -4,6 +4,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
+import { notifyJobApproved } from '@/lib/email/notify-job-approved'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -413,6 +414,16 @@ export async function POST(req: NextRequest) {
     }
 
     await recomputeAndSaveStage(jobId)
+
+    await notifyJobApproved({
+      tenantId,
+      jobId,
+      jobNumber,
+      propertyAddress: order.property_address,
+      insuredName: order.insured_name,
+      inspectionId,
+    })
+
     console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
     return NextResponse.json({ jobNumber, jobId })
 

@@ -87,6 +87,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
           .or(
             `job_number.ilike.%${val}%,claim_number.ilike.%${val}%,insured_name.ilike.%${val}%,property_address.ilike.%${val}%,insurer.ilike.%${val}%`
           )
+          .order('created_at', { ascending: false })
           .limit(5)
         setResults(data ?? [])
         setDropOpen(true)

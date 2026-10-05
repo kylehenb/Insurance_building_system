@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { Suspense, useEffect, useState, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
@@ -231,7 +231,16 @@ const greenBtn: React.CSSProperties = {
 }
 
 export default function InsurerOrdersPage() {
+  return (
+    <Suspense fallback={null}>
+      <InsurerOrdersPageContent />
+    </Suspense>
+  )
+}
+
+function InsurerOrdersPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [orders, setOrders] = useState<InsurerOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('all')
@@ -359,6 +368,18 @@ export default function InsurerOrdersPage() {
       }
     }
   }, [tenantId])
+
+  // Deep-link from a notification email: ?open=<orderId> auto-expands and scrolls to that order
+  useEffect(() => {
+    if (loading || orders.length === 0) return
+    const openId = searchParams.get('open')
+    if (!openId || expandedId === openId) return
+    if (!orders.some(o => o.id === openId)) return
+    openAccordion(openId)
+    requestAnimationFrame(() => {
+      document.getElementById(`order-row-${openId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [loading, orders, searchParams, expandedId])
 
   // Debounced link-job search
   useEffect(() => {
@@ -932,6 +953,7 @@ export default function InsurerOrdersPage() {
                     return (
                       <React.Fragment key={order.id}>
                         <tr
+                          id={`order-row-${order.id}`}
                           className="order-row"
                           onClick={() => openAccordion(order.id)}
                           style={{ borderBottom: isOpen ? 'none' : '0.5px solid #f0ece6' }}

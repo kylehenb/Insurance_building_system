@@ -5,7 +5,7 @@ import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 
 const OFFICE_EMAIL = 'office@insurancerepairco.com.au'
-const IRC_MASTER_URL = 'https://insurance-building-system.vercel.app/dashboard/insurer-orders'
+const DEFAULT_APP_URL = 'https://insurance-building-system.vercel.app'
 
 type AutoJobLodgerConfig = {
   notification_enabled: boolean
@@ -15,7 +15,7 @@ type AutoJobLodgerConfig = {
   notify_outside_business_hours: boolean
   notification_subject_success: string
   notification_subject_review: string
-  notification_body_template: string
+  notification_body_template: string | null
 }
 
 function isWithinBusinessHours(): boolean {
@@ -55,17 +55,23 @@ async function fetchConfig(tenantId: string): Promise<AutoJobLodgerConfig | null
   }
 }
 
+// Deep-links straight to the pre-lodged order so it can be approved, edited, or declined in one click
+function reviewLinkFor(orderId: string): string {
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? DEFAULT_APP_URL
+  return `${appBaseUrl}/dashboard/insurer-orders?open=${orderId}`
+}
+
 const DEFAULT_BODY_TEMPLATE = [
+  'A new job has been lodged and is ready for your review.',
+  '',
   'Insurer: {insurer}',
   'Claim: {claim_number}',
   'Insured: {insured_name}',
   'Address: {property_address}',
   'Work type: {work_order_type}',
-  'Confidence: {confidence}%',
-  'Parse status: {parse_status}',
   'Missing fields: {missing_fields}',
   '',
-  `View in IRC Master: ${IRC_MASTER_URL}`,
+  'Review, edit, or decline this job: {review_link}',
 ].join('\n')
 
 export async function sendOrderNotification(
@@ -77,6 +83,7 @@ export async function sendOrderNotification(
   const isNeedsReview = parsed.parseStatus === 'needs_review'
   const inBusinessHours = isWithinBusinessHours()
   const { data } = parsed
+  const reviewLink = reviewLinkFor(orderId)
 
   const config = await fetchConfig(tenantId)
 
@@ -110,9 +117,10 @@ export async function sendOrderNotification(
       '{confidence}': Math.round(parsed.confidence * 100).toString(),
       '{parse_status}': parsed.parseStatus,
       '{missing_fields}': parsed.missingFields.length > 0 ? parsed.missingFields.join(', ') : 'None',
+      '{review_link}': reviewLink,
     }
 
-    const body = replaceTokens(config.notification_body_template, bodyTokens)
+    const body = replaceTokens(config.notification_body_template || DEFAULT_BODY_TEMPLATE, bodyTokens)
 
     try {
       const gmail = getGmailClient()
@@ -136,8 +144,8 @@ export async function sendOrderNotification(
   const insuredName = data.insured_name || 'Unknown'
 
   const subject = isNeedsReview
-    ? `⚠️ Order needs review — ${message.subject}`
-    : `✅ Order parsed — ${claimNum} — ${insuredName}`
+    ? `Order needs review — ${message.subject}`
+    : `New job lodged — ${claimNum} — ${insuredName}`
 
   const bodyTokens: Record<string, string> = {
     '{insurer}': parsed.insurerDetected ?? data.insurer ?? '—',
@@ -148,6 +156,7 @@ export async function sendOrderNotification(
     '{confidence}': Math.round(parsed.confidence * 100).toString(),
     '{parse_status}': parsed.parseStatus,
     '{missing_fields}': parsed.missingFields.length > 0 ? parsed.missingFields.join(', ') : 'None',
+    '{review_link}': reviewLink,
   }
 
   const body = replaceTokens(DEFAULT_BODY_TEMPLATE, bodyTokens)
