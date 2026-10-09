@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, userAgent } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -59,6 +59,27 @@ export async function proxy(request: NextRequest) {
   if (user && pathname === "/login") {
     const dashboardUrl = new URL("/dashboard", request.url);
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Phones opening an order link (e.g. from a notification email) get the
+  // mobile review page. "?desktop=1" lets the user opt back into the full view.
+  const openOrderId = request.nextUrl.searchParams.get("open");
+  if (
+    user &&
+    pathname === "/dashboard/insurer-orders" &&
+    openOrderId &&
+    request.nextUrl.searchParams.get("desktop") !== "1" &&
+    userAgent(request).device.type === "mobile"
+  ) {
+    const mobileUrl = new URL(
+      `/m/insurer-orders/${encodeURIComponent(openOrderId)}`,
+      request.url
+    );
+    const redirectResponse = NextResponse.redirect(mobileUrl);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie);
+    });
+    return redirectResponse;
   }
 
   return supabaseResponse;
