@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
+import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 
 export async function writeFallbackOrder(
   message: ExtractedMessage,
@@ -137,6 +138,28 @@ export async function writeInsurerOrder(
     }
   }
 
+  // --- insurer → client ------------------------------------------------------
+  // Link the order to the matching insurer client so the Insurer dropdown is
+  // pre-selected. The parsed name is often worded differently to the client
+  // record (e.g. "Castle Insurance Pty Ltd" vs "Castle"), so match loosely and
+  // store the client's canonical name.
+  const insurerFields: { client_id?: string; insurer?: string } = {}
+  try {
+    const client = await resolveInsurerClient(supabase, tenantId, {
+      insurer: parsed.data.insurer ?? parsed.insurerDetected,
+      fromEmail: message.fromEmail,
+      fromName: message.fromName,
+      subject: message.subject,
+      body: message.bodyText,
+    })
+    if (client) {
+      insurerFields.client_id = client.id
+      insurerFields.insurer = client.name
+    }
+  } catch (err) {
+    console.error('[order-writer] insurer resolution error (non-fatal):', err)
+  }
+
   // --- insert ----------------------------------------------------------------
   const rawEmailLink =
     parsed.rawEmailLink ??
@@ -147,6 +170,7 @@ export async function writeInsurerOrder(
     .insert({
       tenant_id: tenantId,
       ...parsed.data,
+      ...insurerFields,
       entry_method: 'email',
       parse_status: parsed.parseStatus,
       raw_email_subject: message.subject || null,
