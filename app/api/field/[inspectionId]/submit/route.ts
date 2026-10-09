@@ -5,11 +5,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import Anthropic from '@anthropic-ai/sdk'
 import { notifySubmissionFailure } from '@/lib/email/notify-submission-failure'
+import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
+import { getResponseText } from '@/lib/ai/response-text'
 
 type ServiceClient = SupabaseClient<Database>
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
+
+// Model and effort used to write the BAR and roof reports
+const REPORT_MODEL = 'claude-haiku-5-5'
+const REPORT_EFFORT = 'medium'
 
 interface ScopeRoom {
   room: string
@@ -154,34 +160,40 @@ async function generateBarReport(opts: {
   inspectionId: string
   resolvedReportId: string | null
   rawReportDump: string
+  insurer: string
+  lossType: string
   now: string
 }): Promise<void> {
-  const { service, tenantId, inspectionId, resolvedReportId, rawReportDump, now } = opts
+  const { service, tenantId, inspectionId, resolvedReportId, rawReportDump, insurer, lossType, now } = opts
   if (!resolvedReportId) return
 
-  await service.from('reports').update({
+  const { data: reportRow } = await service.from('reports').update({
     ...(rawReportDump ? { raw_report_notes: rawReportDump } : {}),
     attendance_date: now.split('T')[0],
-  }).eq('id', resolvedReportId).eq('tenant_id', tenantId)
+  }).eq('id', resolvedReportId).eq('tenant_id', tenantId).select('report_type').maybeSingle()
 
   if (!rawReportDump || !rawReportDump.trim()) return
 
   let barSystemPrompt = 'You are an expert building insurance assessor writing professional BAR reports.'
-  try {
-    const { data: pd } = await service
+  const [promptResult, similarReports] = await Promise.all([
+    service
       .from('prompts')
       .select('system_prompt')
       .eq('tenant_id', tenantId)
       .eq('key', 'report_bar')
-      .single()
-    if (pd?.system_prompt) barSystemPrompt = pd.system_prompt
-  } catch { /* use default */ }
+      .maybeSingle(),
+    getSimilarReportsBlock({
+      service, tenantId, reportType: reportRow?.report_type ?? 'BAR', notes: rawReportDump, lossType, insurer, excludeReportId: resolvedReportId,
+    }),
+  ])
+  if (promptResult.data?.system_prompt) barSystemPrompt = promptResult.data.system_prompt
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const barMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    system: barSystemPrompt,
+    model: REPORT_MODEL,
+    max_tokens: 16000,
+    output_config: { effort: REPORT_EFFORT },
+    system: [barSystemPrompt, similarReports].filter(Boolean).join('\n\n'),
     messages: [{
       role: 'user',
       content: `Generate a structured BAR report from the following inspection notes. The inspector has dictated everything into a single note — extract all relevant details including who they met and the property description.
@@ -204,7 +216,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
     }],
   })
 
-  const barText = barMsg.content[0]?.type === 'text' ? barMsg.content[0].text : '{}'
+  const barText = getResponseText(barMsg)
   const barMatch = barText.match(/\{[\s\S]*\}/)
   if (!barMatch) throw new Error('BAR report generation: AI response had no parseable JSON')
 
@@ -289,9 +301,11 @@ async function generateRoofReport(opts: {
   jobId: string
   roofRawNotes: string | undefined
   assessorName: string
+  insurer: string
+  lossType: string
   now: string
 }): Promise<void> {
-  const { service, tenantId, inspectionId, jobId, roofRawNotes, assessorName, now } = opts
+  const { service, tenantId, inspectionId, jobId, roofRawNotes, assessorName, insurer, lossType, now } = opts
   if (!roofRawNotes || !roofRawNotes.trim()) return
 
   const { data: existingRoofReport } = await service
@@ -331,21 +345,25 @@ async function generateRoofReport(opts: {
     .eq('id', roofReportId).eq('tenant_id', tenantId)
 
   let roofSystemPrompt = 'You are an expert building insurance roof assessor writing professional roof inspection reports.'
-  try {
-    const { data: pd } = await service
+  const [promptResult, similarReports] = await Promise.all([
+    service
       .from('prompts')
       .select('system_prompt')
       .eq('tenant_id', tenantId)
       .eq('key', 'report_roof')
-      .single()
-    if (pd?.system_prompt) roofSystemPrompt = pd.system_prompt
-  } catch { /* use default */ }
+      .maybeSingle(),
+    getSimilarReportsBlock({
+      service, tenantId, reportType: 'roof', notes: roofRawNotes, lossType, insurer, excludeReportId: roofReportId,
+    }),
+  ])
+  if (promptResult.data?.system_prompt) roofSystemPrompt = promptResult.data.system_prompt
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const roofMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    system: roofSystemPrompt,
+    model: REPORT_MODEL,
+    max_tokens: 16000,
+    output_config: { effort: REPORT_EFFORT },
+    system: [roofSystemPrompt, similarReports].filter(Boolean).join('\n\n'),
     messages: [{
       role: 'user',
       content: `Generate a structured roof inspection report from the following notes.
@@ -377,7 +395,7 @@ Return ONLY a JSON object with these exact keys (empty string or null if unknown
     }],
   })
 
-  const roofText = roofMsg.content[0]?.type === 'text' ? roofMsg.content[0].text : '{}'
+  const roofText = getResponseText(roofMsg)
   const roofMatch = roofText.match(/\{[\s\S]*\}/)
   if (!roofMatch) throw new Error('Roof report generation: AI response had no parseable JSON')
 
@@ -604,9 +622,9 @@ export async function POST(
   // own table), so it runs in parallel after the response has already been sent to the client.
   after(async () => {
     const results = await Promise.allSettled([
-      generateBarReport({ service, tenantId, inspectionId, resolvedReportId, rawReportDump, now }),
+      generateBarReport({ service, tenantId, inspectionId, resolvedReportId, rawReportDump, insurer, lossType, now }),
       extractPropertyDetails({ service, tenantId, jobId: insp.job_id, rawReportDump }),
-      generateRoofReport({ service, tenantId, inspectionId, jobId: insp.job_id, roofRawNotes, assessorName: userRow.name, now }),
+      generateRoofReport({ service, tenantId, inspectionId, jobId: insp.job_id, roofRawNotes, assessorName: userRow.name, insurer, lossType, now }),
       parseAndInsertScope({ service, tenantId, resolvedQuoteId, scopeRooms, insurer, lossType }),
     ])
 

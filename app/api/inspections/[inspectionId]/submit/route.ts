@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { indexReports } from '@/lib/reports/similar-reports'
 
 export async function POST(
   req: NextRequest,
@@ -112,6 +113,12 @@ export async function POST(
         // Don't fail the whole operation if additional reports fail
       }
     }
+
+    // Fingerprint the now-locked reports for the similar-report lookup
+    // (the index-embeddings cron retries failures)
+    const lockedReportIds = [coreReport.id, ...(additionalReports ?? []).map(r => r.id)]
+    after(() => indexReports(supabase, lockedReportIds).catch(err =>
+      console.error(`[inspection submit ${inspectionId}] fingerprint failed:`, err)))
 
     // TODO: Generate and send email to insurer with compiled package
     // This would involve:

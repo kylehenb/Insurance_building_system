@@ -576,8 +576,10 @@ CREATE TABLE reports (
   pre_existing_conditions TEXT,
   maintenance_notes TEXT,
   raw_report_notes TEXT,                -- raw combined dictation/text dump from field app
-  damage_template TEXT,                -- selected scenario template name
-  damage_template_saved BOOLEAN DEFAULT true, -- whether to persist as a reusable template
+  damage_template TEXT,                -- DEPRECATED (manual template picker removed; unused)
+  damage_template_saved BOOLEAN DEFAULT true, -- DEPRECATED (unused)
+  embedding vector(512),               -- semantic fingerprint for the similar-report lookup (locked reports only)
+  embedded_at TIMESTAMPTZ,             -- when the fingerprint was written; cleared when stale
   -- Type-specific fields stored as JSONB
   -- Storm/Wind keys: hailstone_size, roof_condition_before, preventive_measures,
   --   wind_driven_rain, structural_failures, trees_debris, customer_evidence,
@@ -691,7 +693,9 @@ CREATE TABLE scope_library (
 - `estimated_hours`: seeded during migration where labour rate and quantity allow calculation; blank for items with no reliable time estimate
 - `lag_description` is visible to trades on the work order PDF and trade portal
 
-### 4.12 report_templates
+### 4.12 report_templates (DEPRECATED)
+Replaced by the automatic similar-report lookup (see "Report generation" below). The table is
+no longer read or written and can be dropped once confirmed unused.
 ```sql
 -- Damage scenario templates for AI report generation
 -- Templates are cross-insurer and cross-report-type — they are damage scenarios
@@ -2373,9 +2377,13 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 - Saved to `scope_items` table; quote status auto-updates to `complete` when done
 
 ### Report generation
-- Input: inspection field data + raw report dump notes + report type + damage template
-- Model: claude-sonnet-4-20250514
-- Uses most recent 5 completed reports of the same template as AI examples (self-improving flywheel)
+- Input: inspection field data + raw report dump notes + report type
+- Model: claude-haiku-5-5 (field app submit), claude-sonnet-5-5 (desktop "Generate")
+- Similar-report lookup (lib/reports/similar-reports.ts), no user input required:
+  - Every locked report (`is_locked = true`, not deleted) gets a fingerprint (OpenAI `text-embedding-3-small`, 512 dims) in `reports.embedding`, written straight after locking; the `/api/reports/index-embeddings` cron (every 15 min) retries misses and backfills
+  - A trigger clears the fingerprint when a report is unlocked, deleted or its content changes, so only current, finalised reports are used
+  - On generation the notes are fingerprinted and `match_similar_reports()` returns the 3 closest locked reports of the same type for the tenant (minimum similarity 0.3, newer reports and same insurer ranked slightly higher)
+  - Only the written sections are passed to the AI (never names, addresses or claim numbers), as style and detail references; if nothing is close enough or the lookup fails, generation proceeds without examples
 - Output: all report fields populated
 - Fires automatically on field app submit; multiple report types in one submit fire parallel generation calls
 - Report status auto-updates to `complete` when all fields populated

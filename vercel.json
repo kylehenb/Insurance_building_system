@@ -15,6 +15,10 @@
     {
       "path": "/api/field/submission-watchdog",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/reports/index-embeddings",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

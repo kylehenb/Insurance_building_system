@@ -166,6 +166,7 @@ export function LDRReportForm({ data, locked, onChange, tenantId, reportId, jobI
           rawReportDump: rawDump,
           reportType: 'LDR',
           tenantId,
+          reportId,
         }),
       })
 

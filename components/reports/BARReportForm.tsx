@@ -136,6 +136,7 @@ export function BARReportForm({ data, locked, onChange, tenantId, reportId, jobI
           rawReportDump: rawDump,
           reportType: 'BAR',
           tenantId,
+          reportId,
         }),
       })
 

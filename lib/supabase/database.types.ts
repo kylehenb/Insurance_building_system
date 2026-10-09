@@ -2905,6 +2905,8 @@ export type Database = {
           delete_reason: string | null
           deleted_at: string | null
           deleted_by: string | null
+          embedded_at: string | null
+          embedding: string | null
           doc_storage_path: string | null
           how_damage_occurred: string | null
           id: string
@@ -2946,6 +2948,8 @@ export type Database = {
           delete_reason?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           doc_storage_path?: string | null
           how_damage_occurred?: string | null
           id?: string
@@ -2987,6 +2991,8 @@ export type Database = {
           delete_reason?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           doc_storage_path?: string | null
           how_damage_occurred?: string | null
           id?: string
@@ -4145,6 +4151,22 @@ export type Database = {
       generate_work_order_ref: {
         Args: { p_job_id: string; p_tenant_id: string }
         Returns: string
+      }
+      match_similar_reports: {
+        Args: {
+          p_exclude_report_id?: string
+          p_insurer?: string
+          p_match_count?: number
+          p_min_similarity?: number
+          p_query_embedding: string
+          p_report_type: string
+          p_tenant_id: string
+        }
+        Returns: {
+          id: string
+          score: number
+          similarity: number
+        }[]
       }
       seed_prompts_for_tenant: {
         Args: { p_tenant_id: string }
