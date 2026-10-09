@@ -13,9 +13,8 @@ type ServiceClient = SupabaseClient<Database>
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-// Model and effort used to write the BAR and roof reports
-const REPORT_MODEL = 'claude-haiku-5-5'
-const REPORT_EFFORT = 'medium'
+// Model used for every AI step in field submission
+const FIELD_AI_MODEL = 'claude-haiku-5-5'
 
 interface ScopeRoom {
   room: string
@@ -138,12 +137,15 @@ Example: [{"room":"Living Room","trade":"Plastering","keyword":"ceiling","item_d
     .replace('{scope_notes}', scopeText)
 
   const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
+    model: FIELD_AI_MODEL,
+    max_tokens: 16000,
+    output_config: { effort: 'medium' },
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const text = message.content[0]?.type === 'text' ? message.content[0].text : '[]'
+  // A refusal falls back to the basic one-item-per-line scope, like an unparseable reply
+  let text: string
+  try { text = getResponseText(message) } catch { return [] }
   const match = text.match(/\[[\s\S]*\]/)
   if (!match) return []
 
@@ -190,9 +192,9 @@ async function generateBarReport(opts: {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const barMsg = await anthropic.messages.create({
-    model: REPORT_MODEL,
+    model: FIELD_AI_MODEL,
     max_tokens: 16000,
-    output_config: { effort: REPORT_EFFORT },
+    output_config: { effort: 'medium' },
     system: [barSystemPrompt, similarReports].filter(Boolean).join('\n\n'),
     messages: [{
       role: 'user',
@@ -248,8 +250,9 @@ async function extractPropertyDetails(opts: {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const pdMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
+    model: FIELD_AI_MODEL,
+    max_tokens: 4000,
+    output_config: { effort: 'low' },
     messages: [{
       role: 'user',
       content: `Extract structured property details from the following inspection notes. Return ONLY a JSON object — only include keys where the value can be clearly identified. Omit keys you are uncertain about.
@@ -272,7 +275,7 @@ JSON keys and types:
 }`,
     }],
   })
-  const pdText = pdMsg.content[0]?.type === 'text' ? pdMsg.content[0].text : '{}'
+  const pdText = getResponseText(pdMsg)
   const pdMatch = pdText.match(/\{[\s\S]*\}/)
   if (!pdMatch) return
 
@@ -360,9 +363,9 @@ async function generateRoofReport(opts: {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const roofMsg = await anthropic.messages.create({
-    model: REPORT_MODEL,
+    model: FIELD_AI_MODEL,
     max_tokens: 16000,
-    output_config: { effort: REPORT_EFFORT },
+    output_config: { effort: 'medium' },
     system: [roofSystemPrompt, similarReports].filter(Boolean).join('\n\n'),
     messages: [{
       role: 'user',

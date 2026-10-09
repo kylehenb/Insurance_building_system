@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getResponseText } from '@/lib/ai/response-text'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,12 +54,14 @@ Include 2–5 flags covering what's good and what's missing. Be specific and act
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
+      model: 'claude-haiku-5-5',
+      max_tokens: 4000,
+      // The inspector is waiting on this one — low effort keeps it quick
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const text = message.content[0]?.type === 'text' ? message.content[0].text : '{}'
+    const text = getResponseText(message)
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) return NextResponse.json({ ok: false })
 
