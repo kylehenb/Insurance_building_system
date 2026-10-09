@@ -6,6 +6,7 @@ import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 import { notifyJobApproved } from '@/lib/email/notify-job-approved'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
+import { normaliseLossType } from '@/lib/loss-types'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -237,7 +238,7 @@ export async function POST(req: NextRequest) {
         order_sender_name: order.order_sender_name,
         order_sender_email: order.order_sender_email,
         date_of_loss: order.date_of_loss,
-        loss_type: order.loss_type,
+        loss_type: normaliseLossType(order.loss_type),
         claim_description: order.claim_description,
         special_instructions: order.special_instructions,
         sum_insured: order.sum_insured_building,
@@ -314,7 +315,7 @@ export async function POST(req: NextRequest) {
           property_address: order.property_address,
           insured_name: order.insured_name,
           claim_number: order.claim_number,
-          loss_type: order.loss_type,
+          loss_type: normaliseLossType(order.loss_type),
           created_at: new Date().toISOString(),
         })
         .select('id')

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { Database } from '@/lib/supabase/database.types'
+import { normaliseLossType } from '@/lib/loss-types'
 
 export async function POST(req: NextRequest) {
   try {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
         claim_number: claim_number || null,
         adjuster: adjuster || null,
         adjuster_reference: adjuster_reference || null,
-        loss_type: loss_type || null,
+        loss_type: normaliseLossType(loss_type),
         date_of_loss: date_of_loss || null,
         claim_description: claim_description || null,
         special_instructions: special_instructions || null,

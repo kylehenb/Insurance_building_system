@@ -5,6 +5,7 @@ import { getBrainContext } from '@/lib/brain/getBrainContext'
 import { formatBrainContext } from '@/lib/brain/formatBrainContext'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
+import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -112,7 +113,7 @@ For BAR reports:
   "property_address": "string",
   "insured_name": "string",
   "claim_number": "string",
-  "loss_type": "string",
+  "loss_type": "exactly one of: ${LOSS_TYPES_PROMPT_LIST} — or empty string if unclear",
   "incident_description": "string",
   "cause_of_damage": "string",
   "how_damage_occurred": "string",
@@ -191,6 +192,14 @@ Guidelines:
         { error: 'Failed to parse AI response', details: text },
         { status: 500 }
       )
+    }
+
+    // Loss type comes from the fixed list. Keep the one already on the report (set from the
+    // job when it was lodged); otherwise accept the AI's pick only if it is on the list.
+    if ('loss_type' in reportData) {
+      const lossTypeValue = lossType ?? normaliseLossType(reportData.loss_type)
+      if (lossTypeValue) reportData.loss_type = lossTypeValue
+      else delete reportData.loss_type
     }
 
     return NextResponse.json({ success: true, reportData })

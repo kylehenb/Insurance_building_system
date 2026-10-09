@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { LOSS_TYPES_PROMPT_LIST } from '@/lib/loss-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,8 @@ const READABLE_TABLES = new Set([
 
 const SCHEMA_REFERENCE = `
 DATABASE SCHEMA REFERENCE — use this to know exactly which table and column names to use in tool calls.
+
+loss_type (on jobs, reports and insurer_orders) must be exactly one of: ${LOSS_TYPES_PROMPT_LIST} — or null.
 
 jobs: id, tenant_id, job_number, claim_number, client_id, insurer, adjuster, property_address, insured_name, insured_phone, insured_email, contacts (JSONB array of JobContact objects), adjuster_reference, order_sender_name, order_sender_email, date_of_loss, loss_type, claim_description, special_instructions, sum_insured, excess, assigned_to, status, kpi_contact_due, kpi_booking_due, kpi_visit_due, kpi_report_due, kpi_contacted_at, kpi_booked_at, kpi_visited_at, kpi_reported_at, notes, automation_overrides, created_at
 

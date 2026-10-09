@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { LOSS_TYPES } from '@/lib/loss-types'
 
 type JobType = 'insurance' | 'private'
 
@@ -335,7 +336,13 @@ export default function NewJobPage() {
                   <Field label="Insurer" value={insurer} onChange={setInsurer} placeholder="Insurer name" />
                   <Field label="Invoice To" value={invoiceTo} onChange={setInvoiceTo} placeholder="Trading name to invoice" />
                   <Field label="Claim Number" value={claimNumber} onChange={setClaimNumber} placeholder="CLM-000000" />
-                  <Field label="Loss Type" value={lossType} onChange={setLossType} placeholder="e.g. Water, Fire, Storm" />
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={LABEL_STYLE}>Loss Type</label>
+                    <select value={lossType} onChange={e => setLossType(e.target.value)} style={{ ...FIELD_STYLE, cursor: 'pointer' }}>
+                      <option value="">— Select —</option>
+                      {LOSS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
                   <Field label="Adjuster" value={adjuster} onChange={setAdjuster} placeholder="Adjuster name" />
                   <Field label="Adjuster Reference" value={adjusterRef} onChange={setAdjusterRef} placeholder="Reference number" />
                   <Field label="Date of Loss" type="date" value={dateOfLoss} onChange={setDateOfLoss} />

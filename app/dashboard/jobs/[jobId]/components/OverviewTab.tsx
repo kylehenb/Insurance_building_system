@@ -11,6 +11,7 @@ import { InsurerSelect } from '@/components/clients/InsurerSelect'
 import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
+import { LOSS_TYPES } from '@/lib/loss-types'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -517,12 +518,23 @@ function JobDetailsAccordion({
               <div key={label} className="ov-detail-row">
                 <span className="ov-detail-label">{label}</span>
                 {editing ? (
-                  <input
-                    className="ov-edit-input"
-                    type={field === 'order_sender_email' ? 'email' : 'text'}
-                    value={vals[field] || ''}
-                    onChange={e => set(field, e.target.value)}
-                  />
+                  field === 'loss_type' ? (
+                    <select
+                      className="ov-edit-input"
+                      value={vals.loss_type || ''}
+                      onChange={e => set('loss_type', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {LOSS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      className="ov-edit-input"
+                      type={field === 'order_sender_email' ? 'email' : 'text'}
+                      value={vals[field] || ''}
+                      onChange={e => set(field, e.target.value)}
+                    />
+                  )
                 ) : (
                   <span className="ov-detail-value">{(saved[field as keyof JobDetails] as string) || '—'}</span>
                 )}

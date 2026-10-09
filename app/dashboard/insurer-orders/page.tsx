@@ -10,6 +10,7 @@ import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
 import { InsurerSelect } from '@/components/clients/InsurerSelect'
 import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
+import { LOSS_TYPES } from '@/lib/loss-types'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
@@ -184,6 +185,25 @@ function FEditArea({ label, value, onSave }: { label: string; value: string | nu
         rows={2}
         style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
       />
+    </div>
+  )
+}
+
+// Editable select dropdown for loss type
+function LossTypeSelect({ label, value, onSave }: { label: string; value: string | null; onSave: (val: string) => void }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+        {label}
+      </div>
+      <select
+        value={value ?? ''}
+        onChange={e => onSave(e.target.value)}
+        style={{ ...inputStyle, cursor: 'pointer' }}
+      >
+        <option value="">— Select —</option>
+        {LOSS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
     </div>
   )
 }
@@ -1129,7 +1149,7 @@ function InsurerOrdersPageContent() {
                                         label="Adjuster" value={order.adjuster}
                                         onSave={v => saveField(order.id, 'adjuster', v)}
                                       />
-                                      <FEdit
+                                      <LossTypeSelect
                                         label="Loss Type" value={order.loss_type}
                                         onSave={v => saveField(order.id, 'loss_type', v)}
                                       />
@@ -1574,13 +1594,14 @@ function InsurerOrdersPageContent() {
                   <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     Loss Type
                   </div>
-                  <input
-                    type="text"
+                  <select
                     value={newOrderForm.loss_type}
                     onChange={e => setNewOrderForm(f => ({ ...f, loss_type: e.target.value }))}
-                    placeholder="e.g. Storm, Fire, Water"
-                    style={inputStyle}
-                  />
+                    style={{ ...inputStyle, cursor: 'pointer' }}
+                  >
+                    <option value="">— Select —</option>
+                    {LOSS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
 

@@ -3,6 +3,7 @@ import type { Part } from '@google/genai'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
+import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 
 type InsurerOrderInsert = Database['public']['Tables']['insurer_orders']['Insert']
 
@@ -240,6 +241,7 @@ export async function parseInsurerOrder(
 
   // Extract insurer name from content, not from the client hint
   systemInstruction += '\n\nIMPORTANT: Extract the actual insurer name from the email content (e.g., "Castle", "Allianz", "Suncorp"). Do NOT use the client context/hint text as the insurer name.'
+  systemInstruction += `\n\nloss_type must be exactly one of: ${LOSS_TYPES_PROMPT_LIST}. Pick the closest match to the claim, or null if none is clear.`
 
   // Inject confirmed learning examples for this client
   if (tenantId && clientConfig?.client_id) {
@@ -357,7 +359,7 @@ export async function parseInsurerOrder(
     insured_email: raw.insured_email ?? null,
     property_address: raw.property_address ?? null,
     date_of_loss: raw.date_of_loss ?? null,
-    loss_type: raw.loss_type ?? null,
+    loss_type: normaliseLossType(raw.loss_type),
     claim_description: raw.claim_description ?? null,
     special_instructions: raw.special_instructions ?? null,
     sum_insured_building: parseNumeric(raw.sum_insured_building),
