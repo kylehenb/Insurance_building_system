@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
-import TemplateSelectorField from '@/components/reports/TemplateSelectorField'
 
 interface InitialData {
   inspectionId: string
@@ -450,7 +449,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [insuranceFieldsOpen, setInsuranceFieldsOpen] = useState(false)
   const [autofillScript, setAutofillScript] = useState('')
   const [autofillScriptOpen, setAutofillScriptOpen] = useState(false)
-  const [barDamageTemplate, setBarDamageTemplate] = useState<string | null>(null)
 
   // ─── Make Safe fields ─────────────────────────────────────────────────────
   const [makeSafeFields, setMakeSafeFields] = useState<MakeSafeData>(emptyMakeSafe)
@@ -502,11 +500,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    damage_template: barDamageTemplate,
     roofReportFields, roofFieldsOpen,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, barDamageTemplate, roofReportFields, roofFieldsOpen, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -541,7 +538,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.insuranceFieldsOpen) setInsuranceFieldsOpen(d.insuranceFieldsOpen as boolean)
     if (d.autofillScript) setAutofillScript(d.autofillScript as string)
     if (d.autofillScriptOpen) setAutofillScriptOpen(d.autofillScriptOpen as boolean)
-    if (d.damage_template) setBarDamageTemplate(d.damage_template as string)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
     if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
@@ -1011,18 +1007,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
               {barEnabled && (
                 <div className="mc-pill-body">
 
-                  {/* Damage Scenario Template */}
-                  <div style={{ padding: '16px 16px 0' }}>
-                    <TemplateSelectorField
-                      reportType="BAR"
-                      value={barDamageTemplate}
-                      onChange={name => { setBarDamageTemplate(name); armDraft() }}
-                      onTemplateSaved={name => { setBarDamageTemplate(name); armDraft() }}
-                    />
-                  </div>
-
                   {/* Insurer / Template */}
-                  <div className="fa-fg" style={{ paddingTop: 8 }}>
+                  <div className="fa-fg" style={{ paddingTop: 16 }}>
                     <label className="fa-fl">Insurer / Template</label>
                     <select
                       className="fa-input"

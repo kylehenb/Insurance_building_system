@@ -300,6 +300,7 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
           rawReportDump: rawDump,
           reportType: 'roof',
           tenantId,
+          reportId,
         }),
       })
 

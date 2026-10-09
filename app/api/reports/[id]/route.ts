@@ -1,8 +1,9 @@
 // app/api/reports/[id]/route.ts
 // Handles: PATCH (lock/unlock/reinstate), DELETE (soft delete), POST (duplicate)
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { indexReports } from '@/lib/reports/similar-reports'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -45,6 +46,9 @@ export async function PATCH(
         .update({ is_locked: true })
         .eq('id', reportId)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      // Fingerprint for the similar-report lookup (the index-embeddings cron retries failures)
+      after(() => indexReports(supabase, [reportId]).catch(err =>
+        console.error(`[reports ${reportId}] fingerprint failed:`, err)))
       return NextResponse.json({ success: true, is_locked: true })
     }
 

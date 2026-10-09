@@ -3,115 +3,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getBrainContext } from '@/lib/brain/getBrainContext'
 import { formatBrainContext } from '@/lib/brain/formatBrainContext'
-import { upsertReportTemplate } from '@/app/api/report-templates/route'
+import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
+import { getResponseText } from '@/lib/ai/response-text'
 
 export const dynamic = 'force-dynamic'
-
-const EXAMPLE_SELECT =
-  'report_type, loss_type, incident_description, cause_of_damage, resulting_damage, conclusion, pre_existing_conditions, type_specific_fields'
-
-interface ReportRow {
-  report_type: string
-  loss_type: string | null
-  incident_description: string | null
-  cause_of_damage: string | null
-  resulting_damage: string | null
-  conclusion: string | null
-  pre_existing_conditions: string | null
-  type_specific_fields: Record<string, unknown> | null
-}
-
-async function fetchExamples(
-  supabase: ReturnType<typeof createServiceClient>,
-  tenantId: string,
-  reportType: string,
-  damageTemplate: string,
-  insurer: string | null | undefined
-): Promise<ReportRow[]> {
-  // If insurer is provided, attempt insurer-scoped examples first.
-  // Use them exclusively when we have 2+; otherwise fall back to cross-insurer.
-  if (insurer?.trim()) {
-    const { data: jobRows } = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('insurer', insurer.trim())
-
-    const jobIds = (jobRows ?? []).map(j => j.id as string)
-
-    if (jobIds.length > 0) {
-      const { data: insurerRows } = await supabase
-        .from('reports')
-        .select(EXAMPLE_SELECT)
-        .eq('tenant_id', tenantId)
-        .eq('damage_template', damageTemplate)
-        .eq('report_type', reportType)
-        .eq('status', 'complete')
-        .in('job_id', jobIds)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      const insurerExamples = (insurerRows ?? []) as ReportRow[]
-      if (insurerExamples.length >= 2) {
-        return insurerExamples
-      }
-    }
-  }
-
-  // Cross-insurer fallback: no insurer provided, or < 2 insurer-specific found
-  const { data } = await supabase
-    .from('reports')
-    .select(EXAMPLE_SELECT)
-    .eq('tenant_id', tenantId)
-    .eq('damage_template', damageTemplate)
-    .eq('report_type', reportType)
-    .eq('status', 'complete')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  return (data ?? []) as ReportRow[]
-}
-
-function formatExamples(examples: ReportRow[], insurer: string | null | undefined): string {
-  if (examples.length === 0) {
-    return 'No past reports exist for this damage scenario yet — generate based on the field dump and report type guidelines only.'
-  }
-
-  const scopeNote = insurer?.trim()
-    ? `(insurer: ${insurer.trim()}, most recent first)`
-    : '(cross-insurer, most recent first)'
-
-  const lines: string[] = [
-    `PAST REPORTS FOR THIS DAMAGE SCENARIO ${scopeNote} — use as style and content reference:`,
-    '',
-  ]
-
-  examples.forEach((ex, i) => {
-    lines.push(`Example ${i + 1}:`)
-    lines.push(`- Report Type: ${ex.report_type}`)
-    if (ex.loss_type) lines.push(`- Loss Type: ${ex.loss_type}`)
-    if (ex.incident_description) lines.push(`- Incident Description: ${ex.incident_description}`)
-    if (ex.cause_of_damage) lines.push(`- Cause of Damage: ${ex.cause_of_damage}`)
-    if (ex.resulting_damage) lines.push(`- Resulting Damage: ${ex.resulting_damage}`)
-    if (ex.pre_existing_conditions) lines.push(`- Pre-existing Conditions: ${ex.pre_existing_conditions}`)
-    if (ex.conclusion) lines.push(`- Conclusion: ${ex.conclusion}`)
-    if (ex.type_specific_fields && typeof ex.type_specific_fields === 'object') {
-      const populated = Object.entries(ex.type_specific_fields).filter(
-        ([, v]) => v !== null && v !== '' && v !== undefined
-      )
-      if (populated.length > 0) {
-        lines.push(`- Type-specific Fields: ${populated.map(([k, v]) => `${k}: ${v}`).join(' | ')}`)
-      }
-    }
-    lines.push('')
-  })
-
-  lines.push(
-    'Use the above examples to match the writing style, level of detail, and field structure expected for this damage scenario. Do not copy content — generate fresh content for this specific job.'
-  )
-
-  return lines.join('\n')
-}
 
 export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({
@@ -124,16 +19,12 @@ export async function POST(req: NextRequest) {
       rawReportDump,
       reportType,
       tenantId,
-      damageTemplate,
-      damageTemplateSaved,
-      insurer,
+      reportId,
     } = body as {
       rawReportDump: string
       reportType: string
       tenantId: string
-      damageTemplate?: string | null
-      damageTemplateSaved?: boolean
-      insurer?: string | null
+      reportId?: string | null
     }
 
     if (!rawReportDump) {
@@ -157,10 +48,22 @@ export async function POST(req: NextRequest) {
       default:           promptKey = 'report_bar'
     }
 
-    const templateName = damageTemplate?.trim() ?? null
+    // Loss type and insurer of the report being written, to sharpen the similar-report lookup
+    let lossType: string | null = null
+    let insurer: string | null = null
+    if (reportId) {
+      const { data: reportRow } = await supabase
+        .from('reports')
+        .select('loss_type, jobs(insurer)')
+        .eq('id', reportId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      lossType = reportRow?.loss_type ?? null
+      insurer = (reportRow?.jobs as { insurer: string | null } | null)?.insurer ?? null
+    }
 
-    // Fetch prompt, brain context, and (if template given) insurer-scoped examples in parallel
-    const [promptResult, brainEntries, examples] = await Promise.all([
+    // Fetch prompt, brain context, and the closest past locked reports in parallel
+    const [promptResult, brainEntries, similarReports] = await Promise.all([
       supabase
         .from('prompts')
         .select('system_prompt')
@@ -168,9 +71,9 @@ export async function POST(req: NextRequest) {
         .eq('key', promptKey)
         .single(),
       getBrainContext({ tenantId, promptKey }),
-      templateName
-        ? fetchExamples(supabase, tenantId, reportType, templateName, insurer)
-        : Promise.resolve([] as ReportRow[]),
+      getSimilarReportsBlock({
+        service: supabase, tenantId, reportType, notes: rawReportDump, lossType, insurer, excludeReportId: reportId,
+      }),
     ])
 
     const basePrompt =
@@ -178,9 +81,7 @@ export async function POST(req: NextRequest) {
       'You are an expert building insurance assessor. Generate a professional, detailed report based on the inspection notes provided.'
 
     const brainBlock = formatBrainContext(brainEntries)
-    const examplesBlock = formatExamples(examples, insurer)
-
-    const systemPrompt = [basePrompt, brainBlock, examplesBlock].filter(Boolean).join('\n\n')
+    const systemPrompt = [basePrompt, brainBlock, similarReports].filter(Boolean).join('\n\n')
 
     // Fire and forget — increment times_applied for injected brain entries
     if (brainEntries.length > 0) {
@@ -270,33 +171,26 @@ Guidelines:
 `
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
+      model: 'claude-sonnet-5-5',
+      max_tokens: 16000,
+      output_config: { effort: 'medium' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
 
-    const content = message.content[0]
-    if (content.type !== 'text') {
-      return NextResponse.json({ error: 'Unexpected response format from Claude' }, { status: 500 })
-    }
+    const text = getResponseText(message)
 
     let reportData: Record<string, string>
     try {
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/)
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON found in response')
       reportData = JSON.parse(jsonMatch[0])
     } catch {
-      console.error('Failed to parse Claude response:', content.text)
+      console.error('Failed to parse Claude response:', text)
       return NextResponse.json(
-        { error: 'Failed to parse AI response', details: content.text },
+        { error: 'Failed to parse AI response', details: text },
         { status: 500 }
       )
-    }
-
-    // Auto-create template row if applicable (dedup-safe; templates are cross-insurer)
-    if (damageTemplateSaved !== false && templateName) {
-      void upsertReportTemplate(templateName, reportType, tenantId, supabase)
     }
 
     return NextResponse.json({ success: true, reportData })

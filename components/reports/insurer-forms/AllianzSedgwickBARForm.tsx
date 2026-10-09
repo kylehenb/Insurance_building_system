@@ -145,7 +145,7 @@ export function AllianzSedgwickBARForm({
       const res = await fetch('/api/ai/generate-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawReportDump: rawDump, reportType: 'BAR', tenantId }),
+        body: JSON.stringify({ rawReportDump: rawDump, reportType: 'BAR', tenantId, reportId }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to generate report')

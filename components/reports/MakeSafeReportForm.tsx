@@ -180,6 +180,7 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
           rawReportDump: rawDump,
           reportType: 'make_safe',
           tenantId,
+          reportId,
         }),
       })
 
