@@ -5,6 +5,7 @@ import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 import { notifyJobApproved } from '@/lib/email/notify-job-approved'
+import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -185,10 +186,11 @@ export async function POST(req: NextRequest) {
     const jobNumber = `${prefix}${nextNum}`
     console.log('[lodge] new job number:', jobNumber)
 
-    // Step 4c: Resolve client_id from insurer/adjuster name
-    let resolvedClientId: string | null = null
+    // Step 4c: Resolve client_id — use the order's linked client, else match insurer/adjuster name
+    let resolvedClientId: string | null = order.client_id ?? null
+    let resolvedInsurer: string | null = order.insurer
     const namesToMatch = [order.insurer, order.adjuster].filter((n): n is string => Boolean(n))
-    if (namesToMatch.length > 0) {
+    if (!resolvedClientId && namesToMatch.length > 0) {
       const { data: matchingClients } = await supabase
         .from('clients')
         .select('id, name')
@@ -201,6 +203,19 @@ export async function POST(req: NextRequest) {
         resolvedClientId = insurerMatch?.id ?? matchingClients[0].id
       }
     }
+    if (!resolvedClientId) {
+      const client = await resolveInsurerClient(supabase, tenantId, {
+        insurer: order.insurer,
+        fromEmail: order.order_sender_email,
+        fromName: order.order_sender_name,
+        subject: order.raw_email_subject,
+        body: order.raw_email_body,
+      })
+      if (client) {
+        resolvedClientId = client.id
+        resolvedInsurer = client.name
+      }
+    }
     console.log('[lodge] resolved client_id:', resolvedClientId)
 
     // Step 5: Create job
@@ -211,7 +226,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         job_number: jobNumber,
         claim_number: order.claim_number,
-        insurer: order.insurer,
+        insurer: resolvedInsurer,
         adjuster: order.adjuster,
         property_address: order.property_address,
         insured_name: order.insured_name,
