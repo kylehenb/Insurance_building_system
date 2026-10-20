@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveOwnedScopeItems } from '@/lib/work-orders/scope-item-ownership'
 import { buildWODisplayItems, woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import {
-  generateWorkOrderPdfFooter,
   generateWorkOrderPdfHtml,
   type WorkOrderPdfData,
   type WorkOrderPdfOtherTradeItem,
@@ -14,6 +13,7 @@ import {
   type WorkOrderPdfScopeItem,
 } from '@/lib/documents/work-order-pdf-html'
 import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
+import { loadArialMetricFontCss } from '@/lib/pdf/fonts'
 
 // Work Order PDF — data loading + rendering, kept behind one function boundary
 // (generateWorkOrderPdf) so later automations (email to trade, save to
@@ -183,6 +183,7 @@ export async function loadWorkOrderPdfData(
     workOrderAmount,
     isSent: woIsSent(workOrder),
     logoDataUri: await loadLogoDataUri(),
+    fontFaceCss: await loadArialMetricFontCss(),
     generatedAt: new Date(),
   }
 }
@@ -210,9 +211,8 @@ export async function buildWorkOrderPdf(
 ): Promise<WorkOrderPdfResult> {
   const context = ctx ?? await contextFromSession()
   const data = await loadWorkOrderPdfData(workOrderId, context)
-  const pdf = await renderHtmlToPdf(generateWorkOrderPdfHtml(data), {
-    footerTemplate: generateWorkOrderPdfFooter(data),
-  })
+  // 10mm margins, matching the browser print of the original work order page.
+  const pdf = await renderHtmlToPdf(generateWorkOrderPdfHtml(data), { margin: '10mm' })
   return { pdf, filename: workOrderPdfFilename(data), isSent: data.isSent }
 }
 

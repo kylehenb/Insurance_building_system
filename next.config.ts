@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "/api/work-orders/\\[id\\]/pdf": [
       "./node_modules/@sparticuz/chromium/bin/**",
       "./public/logo-pdf.png",
+      "./lib/pdf/fonts/*.ttf",
     ],
   },
   outputFileTracingExcludes: {

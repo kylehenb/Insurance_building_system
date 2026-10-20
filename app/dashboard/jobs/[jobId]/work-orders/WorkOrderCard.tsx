@@ -554,6 +554,7 @@ export function WorkOrderCard({
   // ── Context menu items ─────────────────────────────────────────────────────
   const ctxItems: { label: string; onClick: () => void; danger?: boolean }[] = [
     { label: 'Add visit', onClick: onAddVisit },
+    { label: 'Print view (old)', onClick: () => window.open(`/print/work-orders/${wo.id}`, '_blank', 'noopener') },
     { label: 'Preview PDF', onClick: () => window.open(`/api/work-orders/${wo.id}/pdf`, '_blank', 'noopener') },
     { label: 'Download PDF', onClick: () => { window.location.href = `/api/work-orders/${wo.id}/pdf?download=1` } },
   ]

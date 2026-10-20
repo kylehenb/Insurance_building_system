@@ -2371,7 +2371,7 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 ### Work Order PDF (built)
 - Route: `GET /api/work-orders/[id]/pdf` — signed-in user required; tenant enforced. Returns `application/pdf`, inline by default, `?download=1` for attachment. Filename: `{WO ref} - {trade} - {site address}.pdf` (plus ` - DRAFT` before sending)
 - `maxDuration = 60`; uses the project's default function memory
-- Template: `lib/documents/work-order-pdf-html.ts` (trade-safe; see WF-8 "Work order PDF content")
+- Template: `lib/documents/work-order-pdf-html.ts` (trade-safe; see WF-8 "Work order PDF content"). Same layout as the original print page, 10mm margins. The Vercel Chromium has no Arial, so Liberation Sans (Arial-metric, SIL OFL; `lib/pdf/fonts/`) is embedded under the family name Arial
 - Reusable hook for automations: `generateWorkOrderPdf(workOrderId, ctx?)` in `lib/work-orders/work-order-pdf.ts` returns a `Buffer`. Without `ctx` it uses the signed-in session; background jobs pass `{ supabase: createServiceClient(), tenantId }`. Not yet wired to email, job_files or Telegram.
 - UI: "Preview PDF" / "Download PDF" on the Work Orders tab table and the work order card menu
 - The older browser-print page `/print/work-orders/[workOrderId]` remains until the new PDF is signed off, then it will be retired

@@ -64,6 +64,8 @@ export interface RenderPdfOptions {
   /** Small HTML snippet rendered in the page footer. Supports Chrome's
    *  <span class="pageNumber"> / <span class="totalPages"> placeholders. */
   footerTemplate?: string
+  /** Page margin on all sides (CSS length). Default 12mm. */
+  margin?: string
 }
 
 export async function renderHtmlToPdf(html: string, options: RenderPdfOptions = {}): Promise<Buffer> {
@@ -83,7 +85,9 @@ export async function renderHtmlToPdf(html: string, options: RenderPdfOptions = 
     const pdfOptions: PDFOptions = {
       format: 'A4',
       printBackground: true,
-      margin: { top: '12mm', right: '0', bottom: options.footerTemplate ? '14mm' : '12mm', left: '0' },
+      margin: options.margin
+        ? { top: options.margin, right: options.margin, bottom: options.margin, left: options.margin }
+        : { top: '12mm', right: '0', bottom: options.footerTemplate ? '14mm' : '12mm', left: '0' },
       displayHeaderFooter: !!options.footerTemplate,
       headerTemplate: '<span></span>',
       footerTemplate: options.footerTemplate ?? '<span></span>',

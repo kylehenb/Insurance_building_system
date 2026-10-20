@@ -14,12 +14,12 @@ describe('generateWorkOrderPdfHtml', () => {
 
   it('hides the amount block when there is no amount', () => {
     const html = generateWorkOrderPdfHtml(workOrderPdfFixture({ workOrderAmount: null }))
-    expect(html).not.toContain('Work order amount')
+    expect(html).not.toContain('ALLOCATED AMOUNT')
   })
 
   it('never prints a dollar figure for other trades', () => {
     const html = generateWorkOrderPdfHtml(workOrderPdfFixture())
-    const otherTrades = html.slice(html.indexOf('Other trades on this job'))
+    const otherTrades = html.slice(html.indexOf('OTHER TRADES ON THIS JOB'))
     expect(otherTrades).toContain('Bright Painting')
     expect(otherTrades).not.toContain('$')
   })
@@ -38,9 +38,9 @@ describe('generateWorkOrderPdfHtml', () => {
 
   it('includes the letterhead, refs and the non-homeowner site contact warning', () => {
     const html = generateWorkOrderPdfHtml(workOrderPdfFixture())
-    expect(html).toContain('Insurance Repair Co Pty Ltd')
+    expect(html).toContain('INSURANCE REPAIR CO PTY LTD')
     expect(html).toContain('ABN 12 686 067 881')
-    expect(html).toContain("Builder's Licence BC105884")
+    expect(html).toContain('BUILDERS LIC. BC105884')
     expect(html).toContain('Duncraig, WA')
     expect(html).toContain('0431 132 077')
     expect(html).toContain('WO-IRC1234-002')
