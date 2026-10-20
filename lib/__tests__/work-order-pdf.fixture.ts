@@ -79,34 +79,12 @@ export function workOrderPdfFixture(overrides: Partial<WorkOrderPdfData> = {}): 
     contact_email: 'jobs@smoothwalls.example',
   } as unknown as Tables['trades']['Row']
 
-  const visit = (n: number, date: string | null, lag: number, desc: string | null) => ({
-    id: `00000000-0000-4000-8000-00000000010${n}`,
-    tenant_id: tenantId,
-    work_order_id: workOrder.id,
-    job_id: jobId,
-    visit_number: n,
-    estimated_hours: 3,
-    scheduled_date: date,
-    scheduled_end_date: null,
-    confirmed_date: null,
-    status: 'unscheduled',
-    lag_days_after: lag,
-    lag_description: desc,
-    gary_triggered_at: null,
-    gary_return_trigger_at: null,
-    trade_confirmed_at: null,
-    notes: null,
-    created_at: null,
-    sequence_order: n,
-  }) as Tables['work_order_visits']['Row']
-
   return {
     workOrder,
     job,
     tenant,
     trade,
     tradeLabel: 'Plasterer',
-    visits: [visit(1, '2026-11-03', 2, 'drying time'), visit(2, null, 0, null)],
     scopeItems: [
       { description: 'Remove and dispose of water damaged ceiling sheet', qty: 12.5, unit: 'm2', room: 'Kitchen' },
       { description: 'Supply and install 10mm plasterboard ceiling', qty: 12.5, unit: 'm2', room: 'Kitchen' },

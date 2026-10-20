@@ -2194,7 +2194,8 @@ Return visit (multi-visit work orders):
 - Trade business name, trade type, work type, ABN and contact details
 - Their scope of works (qty/unit only — no rates), grouped by room; other trades' scope for context (descriptions only, no pricing)
 - Work order amount + GST: `agreed_amount` when set, otherwise this work order's own scope items at the quoted price (same figure as the Work Orders tab Override column). Never `charge_out_amount`, `trade_cost`, rates, markup or margin
-- Scheduled date (earliest visit date, else "To be scheduled"); visit schedule with estimated hours, lag periods and lag descriptions
+- Footer shows the tenant logo (`tenant-assets/{logo_storage_path}`), fetched server-side and embedded
+- No scheduled date or visit schedule (visits are managed via Gary / the trade portal)
 - Access notes & special instructions (`jobs.special_instructions` + work order `text_notes`)
 - DRAFT watermark until the work order is sent (`gary_state` ≠ `not_started`, i.e. after Send & Lock)
 - Planned, not yet included: AI job summary

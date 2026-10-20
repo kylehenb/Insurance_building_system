@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateWorkOrderPdfHtml, getWorkOrderTextNotes, resolveScheduledDate } from '../documents/work-order-pdf-html'
+import { generateWorkOrderPdfHtml, getWorkOrderTextNotes } from '../documents/work-order-pdf-html'
 import { workOrderPdfFixture } from './work-order-pdf.fixture'
 
 describe('generateWorkOrderPdfHtml', () => {
@@ -49,19 +49,21 @@ describe('generateWorkOrderPdfHtml', () => {
     expect(html).toContain('Smooth Walls Plastering')
   })
 
-  it('says "To be scheduled" when no visit has a date', () => {
-    const fixture = workOrderPdfFixture()
-    const html = generateWorkOrderPdfHtml({ ...fixture, visits: fixture.visits.map(v => ({ ...v, scheduled_date: null })) })
-    expect(html).toContain('To be scheduled')
+  it('has no schedule or visits section', () => {
+    const html = generateWorkOrderPdfHtml(workOrderPdfFixture())
+    expect(html).not.toMatch(/Scheduled|To be scheduled|VISITS/)
+  })
+
+  it('uses the tenant logo in the footer and the IRC. badge without one', () => {
+    const withLogo = generateWorkOrderPdfHtml(workOrderPdfFixture({ footerLogoDataUri: 'data:image/png;base64,AAAA' }))
+    expect(withLogo).toContain('alt="Tenant Logo"')
+    const without = generateWorkOrderPdfHtml(workOrderPdfFixture({ footerLogoDataUri: null }))
+    expect(without).not.toContain('alt="Tenant Logo"')
+    expect(without).toContain('>IRC.</div>')
   })
 })
 
 describe('helpers', () => {
-  it('resolveScheduledDate picks the earliest visit date', () => {
-    const fixture = workOrderPdfFixture()
-    expect(resolveScheduledDate(fixture.workOrder, fixture.visits)).toBe('2026-11-03')
-  })
-
   it('getWorkOrderTextNotes never leaks the JSON overlay', () => {
     expect(getWorkOrderTextNotes('{"item_overrides":{"a":{"line_total":500}}}')).toBe('')
     expect(getWorkOrderTextNotes('{"text_notes":" Bring ladder "}')).toBe('Bring ladder')

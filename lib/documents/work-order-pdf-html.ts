@@ -7,8 +7,7 @@ import { getContactsByRole } from '../contacts/defaults'
 //
 // Layout follows the original browser-print work order
 // (lib/documents/work-order-html.ts) so both documents look the same, with
-// additions: DRAFT watermark, scheduled date, visits, trade details and
-// special instructions.
+// additions: DRAFT watermark, trade details and special instructions.
 //
 // PRICING RULE — this document goes to trades. The only dollar figure it may
 // show is the allocated amount: agreed_amount when set, otherwise the total
@@ -19,7 +18,6 @@ import { getContactsByRole } from '../contacts/defaults'
 // Every value interpolated into the HTML goes through esc().
 
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
-type WorkOrderVisit = Database['public']['Tables']['work_order_visits']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
@@ -48,7 +46,6 @@ export interface WorkOrderPdfData {
   tenant: Tenant
   trade: Trade | null
   tradeLabel: string
-  visits: WorkOrderVisit[]
   scopeItems: WorkOrderPdfScopeItem[]
   otherTradeItems: WorkOrderPdfOtherTradeItem[]
   roomDimensions: Record<string, WorkOrderPdfRoomDimensions>
@@ -56,6 +53,8 @@ export interface WorkOrderPdfData {
   workOrderAmount: number | null
   isSent: boolean
   logoDataUri: string | null
+  /** Tenant logo (tenant-assets/{logo_storage_path}) for the footer, as in the original. */
+  footerLogoDataUri?: string | null
   /** @font-face rules for an Arial-metric font (the PDF runtime has no Arial). */
   fontFaceCss?: string | null
   generatedAt: Date
@@ -105,15 +104,6 @@ function formatPhone(phone: string | null): string {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)} ${digits.slice(6)}`
   }
   return phone
-}
-
-// DATE columns ("2026-10-20") are calendar dates — format them in UTC so the
-// day never shifts.
-function formatDateOnly(date: string | null): string {
-  if (!date) return ''
-  const d = new Date(`${date.slice(0, 10)}T00:00:00Z`)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
 function formatGenerated(date: Date): string {
@@ -184,15 +174,6 @@ function resolveSiteContact(job: Job, role: 'primary_site' | 'secondary_site'): 
   return null
 }
 
-function visitDate(visit: WorkOrderVisit): string | null {
-  return visit.confirmed_date ?? visit.scheduled_date ?? null
-}
-
-export function resolveScheduledDate(workOrder: WorkOrder, visits: WorkOrderVisit[]): string | null {
-  const dates = visits.map(visitDate).filter((d): d is string => !!d).sort()
-  return dates[0] ?? workOrder.scheduled_date ?? null
-}
-
 function groupByRoom<T extends { room: string | null }>(items: T[]): Array<[string, T[]]> {
   const groups = new Map<string, T[]>()
   for (const item of items) {
@@ -247,14 +228,13 @@ const TH = 'font-size:8px;font-weight:600;text-transform:uppercase;letter-spacin
 
 export function generateWorkOrderPdfHtml(data: WorkOrderPdfData): string {
   const {
-    workOrder, job, tenant, trade, tradeLabel, visits, scopeItems, otherTradeItems,
-    roomDimensions, workOrderAmount, isSent, logoDataUri, fontFaceCss, generatedAt,
+    workOrder, job, tenant, trade, tradeLabel, scopeItems, otherTradeItems,
+    roomDimensions, workOrderAmount, isSent, logoDataUri, footerLogoDataUri, fontFaceCss, generatedAt,
   } = data
 
   const ref = workOrder.work_order_ref || workOrder.id.slice(0, 8).toUpperCase()
   const companyName = tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'
   const legalName = tenant.name || tenant.trading_name || 'INSURANCE REPAIR CO PTY LTD'
-  const scheduledDate = resolveScheduledDate(workOrder, visits)
   const workTypeLabel = WORK_TYPE_LABELS[workOrder.work_type ?? ''] ?? (workOrder.work_type || '')
   const textNotes = getWorkOrderTextNotes(workOrder.notes)
   const specialInstructions = job.special_instructions?.trim() || ''
@@ -310,27 +290,6 @@ export function generateWorkOrderPdfHtml(data: WorkOrderPdfData): string {
       </tr>`
     }).join('')}`
   }).join('')
-
-  // ── Visits ────────────────────────────────────────────────────────────────
-  const visitRows = (visits.length > 0 ? visits : null)?.map(visit => {
-    const date = visitDate(visit)
-    const lagParts: string[] = []
-    if (visit.lag_days_after && visit.lag_days_after > 0) {
-      lagParts.push(`${visit.lag_days_after} day${visit.lag_days_after === 1 ? '' : 's'} before next visit`)
-    }
-    if (visit.lag_description) lagParts.push(visit.lag_description)
-    return { number: String(visit.visit_number), date, confirmed: !!visit.confirmed_date, hours: visit.estimated_hours, lag: lagParts.join(' — ') }
-  }) ?? [{ number: '1', date: scheduledDate, confirmed: false, hours: null, lag: '' }]
-
-  const visitsHtml = visitRows.map(v => `
-      <tr style="border-bottom:1px solid #f0ece6;">
-        <td style="width:28px;padding:6px 4px;text-align:center;font-family:monospace;font-size:10px;color:#3a3530;">${esc(v.number)}</td>
-        <td style="padding:6px 8px;font-size:10px;color:#3a3530;">
-          ${v.date ? esc(formatDateOnly(v.date)) + (v.confirmed ? ' <span style="font-size:8px;font-weight:700;color:#2d6a4f;">CONFIRMED</span>' : '') : '<span style="color:#9e998f;">To be scheduled</span>'}
-        </td>
-        <td style="width:70px;padding:6px 4px;text-align:center;font-size:10px;color:#3a3530;">${v.hours != null ? `${esc(formatQty(v.hours))} h` : '-'}</td>
-        <td style="padding:6px 8px;font-size:10px;color:#3a3530;">${esc(v.lag) || '-'}</td>
-      </tr>`).join('')
 
   const tradeDetailFields = [
     { label: 'Trade', value: esc(tradeLabel) },
@@ -388,8 +347,6 @@ ${isSent ? '' : '<div class="watermark">DRAFT</div>'}
       <div style="margin-top:6px;">
         ${inlineFields([
           { label: 'Generated', value: esc(formatGenerated(generatedAt)) },
-          { label: 'Scheduled', value: scheduledDate ? esc(formatDateOnly(scheduledDate)) : 'To be scheduled' },
-          { label: 'Visits', value: esc(workOrder.total_visits ?? (visits.length || 1)) },
         ])}
       </div>
       <div style="${SECTION_LABEL}margin-top:12px;margin-bottom:7px;">JOB DETAILS</div>
@@ -474,22 +431,6 @@ ${isSent ? '' : '<div class="watermark">DRAFT</div>'}
       </div>
     </div>` : ''}
 
-    <!-- Visits -->
-    <div class="keep" style="margin-bottom:14px;">
-      <div class="heading" style="${SECTION_LABEL}margin-bottom:8px;">VISITS</div>
-      <table>
-        <thead>
-          <tr style="background:#fafaf8;border-bottom:1px solid #e8e4e0;">
-            <th style="width:28px;text-align:center;padding:6px 4px;${TH}">#</th>
-            <th style="text-align:left;padding:6px 8px;${TH}">Date</th>
-            <th style="width:70px;text-align:center;padding:6px 4px;${TH}">Est. hours</th>
-            <th style="text-align:left;padding:6px 8px;${TH}">Follow-up</th>
-          </tr>
-        </thead>
-        <tbody>${visitsHtml}</tbody>
-      </table>
-    </div>
-
     ${otherTradeItems.length > 0 ? `
     <!-- Other Trades Scope (Context) -->
     <div style="margin-bottom:14px;">
@@ -510,8 +451,11 @@ ${isSent ? '' : '<div class="watermark">DRAFT</div>'}
       </div>
     </div>` : ''}
 
-    <!-- Notes -->
-    <div class="keep" style="margin-bottom:14px;">
+  </div>
+
+  <!-- Notes + footer stay together so the footer never ends up alone on a page -->
+  <div class="keep">
+    <div style="padding:0 20px;margin-bottom:14px;">
       <div style="${SECTION_LABEL}margin-bottom:6px;">NOTES</div>
       <div style="background:#f5f2ee;border-radius:6px;padding:12px 14px;">
         <div style="font-size:10px;color:#3a3530;line-height:1.65;white-space:pre-wrap;">${notesBlocks.length
@@ -520,12 +464,10 @@ ${isSent ? '' : '<div class="watermark">DRAFT</div>'}
       </div>
     </div>
 
-  </div>
-
   <!-- FOOTER -->
-  <div class="keep" style="background:#1a1a1a;padding:9px 16px;display:flex;align-items:center;gap:10px;">
-    ${logoDataUri ? `
-    <img src="${esc(logoDataUri)}" alt="" style="width:26px;height:26px;object-fit:contain;flex-shrink:0;" />` : `
+  <div style="background:#1a1a1a;padding:9px 16px;display:flex;align-items:center;gap:10px;">
+    ${footerLogoDataUri ? `
+    <img src="${esc(footerLogoDataUri)}" alt="Tenant Logo" style="width:26px;height:26px;object-fit:contain;flex-shrink:0;" />` : `
     <div style="width:26px;height:26px;border:1.5px solid #c8b89a;border-radius:50%;display:flex;align-items:center;
       justify-content:center;flex-shrink:0;font-size:9px;font-weight:800;color:#c8b89a;font-style:italic;">IRC.</div>`}
     <div>
@@ -535,6 +477,7 @@ ${isSent ? '' : '<div class="watermark">DRAFT</div>'}
     <div style="width:1px;height:22px;background:#c8b89a;margin:0 4px;flex-shrink:0;"></div>
     <span style="font-size:12px;color:#c8b89a;">${esc(legalName.toUpperCase())} • ABN ${esc(formatAbn(tenant.abn)) || '—'}${tenant.building_licence_number ? ` • BUILDERS LIC. ${esc(tenant.building_licence_number)}` : ''}</span>
     <div style="flex:1;"></div>
+  </div>
   </div>
 
 </div>

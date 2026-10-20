@@ -77,6 +77,25 @@ function loadLogoDataUri(): Promise<string | null> {
   return logoDataUriPromise
 }
 
+// The footer shows the tenant's uploaded logo (Settings → Tenant), as the
+// original print page does. The PDF page can't fetch URLs, so it is downloaded
+// here and embedded. Falls back to the "IRC." badge if missing.
+async function loadTenantLogoDataUri(storagePath: string | null): Promise<string | null> {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!storagePath || !baseUrl) return null
+  const url = `${baseUrl}/storage/v1/object/public/tenant-assets/${storagePath.split('/').map(encodeURIComponent).join('/')}`
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5_000) })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const type = res.headers.get('content-type') ?? ''
+    const mime = type.startsWith('image/') ? type.split(';')[0] : 'image/png'
+    return `data:${mime};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`
+  } catch (err) {
+    console.error('Work order PDF: tenant logo download failed', err)
+    return null
+  }
+}
+
 export async function loadWorkOrderPdfData(
   workOrderId: string,
   ctx: WorkOrderPdfContext
@@ -91,12 +110,9 @@ export async function loadWorkOrderPdfData(
     .maybeSingle()
   if (!workOrder) throw new WorkOrderPdfError('Work order not found', 404)
 
-  const [jobRes, tenantRes, visitsRes, tradesRes, siblingsRes, scopeRes] = await Promise.all([
+  const [jobRes, tenantRes, tradesRes, siblingsRes, scopeRes] = await Promise.all([
     supabase.from('jobs').select('*').eq('id', workOrder.job_id).eq('tenant_id', tenantId).maybeSingle(),
     supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
-    supabase.from('work_order_visits').select('*')
-      .eq('work_order_id', workOrder.id).eq('tenant_id', tenantId)
-      .order('visit_number', { ascending: true }),
     supabase.from('trades').select('*').eq('tenant_id', tenantId),
     workOrder.quote_id
       ? supabase.from('work_orders').select('*').eq('quote_id', workOrder.quote_id).eq('tenant_id', tenantId)
@@ -176,13 +192,13 @@ export async function loadWorkOrderPdfData(
     tenant,
     trade,
     tradeLabel,
-    visits: visitsRes.data ?? [],
     scopeItems,
     otherTradeItems,
     roomDimensions,
     workOrderAmount,
     isSent: woIsSent(workOrder),
     logoDataUri: await loadLogoDataUri(),
+    footerLogoDataUri: await loadTenantLogoDataUri(tenant.logo_storage_path),
     fontFaceCss: await loadArialMetricFontCss(),
     generatedAt: new Date(),
   }
