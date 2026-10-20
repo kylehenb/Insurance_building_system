@@ -8,6 +8,7 @@ import JobSchedule from '@/components/schedule/JobSchedule'
 import { GanttView, type GanttScale } from './GanttView'
 import { BottomPanel } from './BottomPanel'
 import { SendAllModal } from './SendAllModal'
+import { SendWorkOrderModal } from './SendWorkOrderModal'
 import { CancelWorkOrderModal } from './CancelWorkOrderModal'
 import { AddWorkOrderModal } from './AddWorkOrderModal'
 import { CARD_CSS } from './WorkOrderCard'
@@ -84,6 +85,11 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
   const handleCancel = useCallback((id: string) => setCancelTargetId(id), [])
 
   const cancelTarget = cancelTargetId ? workOrders.find(w => w.id === cancelTargetId) : undefined
+
+  // Send & Lock opens the send modal; the server emails then locks
+  const [sendTargetId, setSendTargetId] = useState<string | null>(null)
+  const handleSend = useCallback(async (id: string) => setSendTargetId(id), [])
+  const sendTarget = sendTargetId ? workOrders.find(w => w.id === sendTargetId) : undefined
 
   const handleUpdate = useCallback(
     (
@@ -371,7 +377,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           onAddAdditional={openAddAdditional}
           onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
           onDeleteWorkOrder={mutations.deleteWorkOrder}
-          onLockWorkOrder={mutations.lockWorkOrder}
+          onLockWorkOrder={handleSend}
           onCancelWorkOrder={handleCancel}
           onUpdateScopeItem={mutations.updateScopeItem}
           onSoftDeleteScopeItem={mutations.softDeleteScopeItem}
@@ -391,6 +397,14 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
             setSendModalOpen(false)
           }}
           onCancel={() => setSendModalOpen(false)}
+        />
+      )}
+
+      {sendTarget && (
+        <SendWorkOrderModal
+          workOrder={sendTarget}
+          onSent={() => { setSendTargetId(null); refetch() }}
+          onClose={() => setSendTargetId(null)}
         />
       )}
 

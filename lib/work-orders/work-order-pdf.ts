@@ -61,7 +61,7 @@ async function contextFromSession(): Promise<WorkOrderPdfContext> {
 
 // Matches the trade label the Work Orders tab uses (useWorkOrders.ts) to match
 // a work order to its scope items.
-function tradeLabelFor(wo: WorkOrder, trade: Trade | null): string {
+export function tradeLabelFor(wo: WorkOrder, trade: Trade | null): string {
   return wo.trade_name ?? trade?.primary_trade ?? (wo.work_type === 'make_safe' ? 'Make Safe' : '')
 }
 
@@ -223,10 +223,14 @@ export function workOrderPdfFilename(data: Pick<WorkOrderPdfData, 'workOrder' | 
 
 export async function buildWorkOrderPdf(
   workOrderId: string,
-  ctx?: WorkOrderPdfContext
+  ctx?: WorkOrderPdfContext,
+  options: { asSent?: boolean } = {}
 ): Promise<WorkOrderPdfResult> {
   const context = ctx ?? await contextFromSession()
   const data = await loadWorkOrderPdfData(workOrderId, context)
+  // Sending renders the final copy just before the work order is locked, so
+  // it must not carry the DRAFT watermark.
+  if (options.asSent) data.isSent = true
   // 10mm margins, matching the browser print of the original work order page.
   const pdf = await renderHtmlToPdf(generateWorkOrderPdfHtml(data), { margin: '10mm' })
   return { pdf, filename: workOrderPdfFilename(data), isSent: data.isSent }

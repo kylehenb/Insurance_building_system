@@ -858,10 +858,7 @@ function WORow({
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {!isLocked ? (
               <button
-                onClick={() => {
-                  if (!confirm(`Send and lock this ${wo.tradeTypeLabel || wo.work_type} work order? Scope items will become read-only.`)) return
-                  onLock(wo.id)
-                }}
+                onClick={() => onLock(wo.id)}
                 title="Send and lock work order"
                 style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', border: '1px solid #1e40af', cursor: 'pointer' }}
                 onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#1d3fad' }}
