@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type JobHit = {
@@ -176,6 +177,8 @@ export default function MobileOrderReview({
     if (updateError) {
       setError(updateError.message)
     } else {
+      // Move the order email thread out of the unlinked inbox onto the job
+      await linkOrderThreadsToJob(supabase, order.tenant_id, order.id, job.id)
       setOrder(o => ({ ...o, job_id: job.id, status: 'lodged' }))
       setJobNumber(job.job_number)
       setSheet(null)

@@ -12,14 +12,15 @@
  *   Safe to re-run: rows already attempted (match_candidates set OR
  *   job_id set) are skipped unless rematch is true. Rematch pages with
  *   `after` (a created_at) — keep posting the returned next_after until null.
- *   Returns { attempted, linked, thread_linked, candidates_stored, admin, skipped, errors }
+ *   Also links emails of insurer orders that have since been lodged as jobs.
+ *   Returns { attempted, linked, thread_linked, order_threads_linked, candidates_stored, admin, skipped, errors }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { resolveCommunicationLink } from '@/lib/communications/resolve-link'
-import { linkThreadToJob } from '@/lib/communications/thread-link'
+import { linkOrderThreadsToJob, linkThreadToJob } from '@/lib/communications/thread-link'
 
 const DEFAULT_MAX = 50
 
@@ -112,6 +113,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const comms = (rows as CommRow[]) ?? []
 
+  // Insurer-order emails whose order has since been lodged as a job: link the
+  // email thread to that job (covers orders lodged before thread linking existed).
+  // Orders still pending are left alone — they link when lodged.
+  let order_threads_linked = 0
+  const { data: orderComms } = await supabase
+    .from('communications')
+    .select('insurer_order_id, insurer_orders!inner(job_id)' as never)
+    .is('job_id', null)
+    .not('insurer_order_id' as never, 'is', null)
+    .not('insurer_orders.job_id' as never, 'is', null)
+  const lodged = new Map<string, string>()
+  for (const row of (orderComms as unknown as { insurer_order_id: string; insurer_orders: { job_id: string } }[] | null) ?? []) {
+    lodged.set(row.insurer_order_id, row.insurer_orders.job_id)
+  }
+  for (const [orderId, jobId] of lodged) {
+    await linkOrderThreadsToJob(supabase, tenantId, orderId, jobId)
+    order_threads_linked++
+  }
+
   let linked = 0
   let thread_linked = 0
   let candidates_stored = 0
@@ -170,6 +190,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     attempted: comms.length,
     linked,
     thread_linked,
+    order_threads_linked,
     candidates_stored,
     admin,
     skipped,
