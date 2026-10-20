@@ -6,17 +6,20 @@
  *   eligible = rows with job_id IS NULL that haven't been matched yet.
  *
  * POST /api/communications/match-backfill
- *   Body (optional): { max?: number }  — default 50
- *   Processes up to `max` unlinked rows oldest-first.
+ *   Body (optional): { max?: number, rematch?: boolean }  — default 50
+ *   Processes up to `max` unlinked rows oldest-first: thread → content match →
+ *   unlinked/admin, same as the inbound webhook.
  *   Safe to re-run: rows already attempted (match_candidates set OR
- *   job_id set) are skipped unless re-run is forced.
- *   Returns { attempted, linked, candidates_stored, skipped, errors }
+ *   job_id set) are skipped unless rematch is true. Rematch pages with
+ *   `after` (a created_at) — keep posting the returned next_after until null.
+ *   Returns { attempted, linked, thread_linked, candidates_stored, admin, skipped, errors }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
-import { matchJob } from '@/lib/communications/match-job'
+import { resolveCommunicationLink } from '@/lib/communications/resolve-link'
+import { linkThreadToJob } from '@/lib/communications/thread-link'
 
 const DEFAULT_MAX = 50
 
@@ -25,6 +28,8 @@ type CommRow = {
   subject: string | null
   body_text: string | null
   from_email: string | null
+  thread_id: string | null
+  created_at: string
 }
 
 // ── GET — dry-run count ───────────────────────────────────────────────────────
@@ -70,23 +75,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const tenantId = userSession.tenant_id
 
   let max = DEFAULT_MAX
+  let rematch = false
+  let after: string | null = null
   try {
-    const body = await req.json() as { max?: unknown }
+    const body = await req.json() as { max?: unknown; rematch?: unknown; after?: unknown }
     if (typeof body.max === 'number' && body.max > 0) max = Math.min(body.max, 200)
+    rematch = body.rematch === true
+    if (typeof body.after === 'string' && body.after) after = body.after
   } catch {
     // body is optional
   }
 
   const supabase = await createClient()
 
-  // Fetch eligible rows: unlinked, not yet attempted, inbound emails only
-  const { data: rows, error: fetchErr } = await supabase
+  // Eligible rows: unlinked inbound emails not yet attempted. With rematch,
+  // previously attempted rows are retried too (e.g. after matcher improvements),
+  // excluding insurer-order emails, which are linked when the order is lodged.
+  let query = supabase
     .from('communications')
-    .select('id, subject, body_text, from_email')
+    .select('id, subject, body_text, from_email, thread_id, created_at')
     .is('job_id', null)
-    .is('match_candidates' as never, null)
+    .is('insurer_order_id' as never, null)
     .eq('type', 'email')
     .eq('direction', 'inbound')
+  if (!rematch) query = query.is('match_candidates' as never, null)
+  // Rematch pages through everything oldest-first; pass back next_after to continue
+  if (after) query = query.gt('created_at', after)
+
+  const { data: rows, error: fetchErr } = await query
     .order('created_at', { ascending: true })
     .limit(max)
 
@@ -97,38 +113,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const comms = (rows as CommRow[]) ?? []
 
   let linked = 0
+  let thread_linked = 0
   let candidates_stored = 0
+  let admin = 0
   let skipped = 0
   let errors = 0
 
   for (const comm of comms) {
     try {
-      const match = await matchJob({
+      const link = await resolveCommunicationLink({
+        db: supabase,
+        tenantId,
+        threadId: comm.thread_id,
         subject: comm.subject ?? '',
         body: comm.body_text ?? '',
-        from_email: comm.from_email ?? '',
-        tenant_id: tenantId,
+        fromEmail: comm.from_email ?? '',
       })
 
-      if (match.job_id && match.confidence === 'high') {
+      if (link.job_id) {
         await supabase
           .from('communications')
-          .update({ job_id: match.job_id, match_candidates: null } as never)
+          .update({ job_id: link.job_id, match_candidates: null, source: link.source } as never)
           .eq('id', comm.id)
+        thread_linked += await linkThreadToJob(supabase, tenantId, comm.thread_id, link.job_id)
         linked++
-      } else if (match.candidates.length > 0) {
+      } else if (link.match_candidates && link.match_candidates.length > 0) {
         await supabase
           .from('communications')
-          .update({ match_candidates: match.candidates } as never)
+          .update({ match_candidates: link.match_candidates, source: link.source } as never)
           .eq('id', comm.id)
         candidates_stored++
       } else {
         // Mark as attempted with empty array so we skip it next run
         await supabase
           .from('communications')
-          .update({ match_candidates: [] } as never)
+          .update({ match_candidates: [], source: link.source } as never)
           .eq('id', comm.id)
-        skipped++
+        if (link.source === 'admin') admin++
+        else skipped++
       }
     } catch (err) {
       console.error(`[match-backfill] error on comm ${comm.id}:`, err)
@@ -147,9 +169,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     attempted: comms.length,
     linked,
+    thread_linked,
     candidates_stored,
+    admin,
     skipped,
     errors,
     remaining: remaining ?? 0,
+    // With rematch: pass as `after` to process the next page; null when done
+    next_after: rematch && comms.length === max ? comms[comms.length - 1].created_at : null,
   })
 }

@@ -1,5 +1,8 @@
 import { GoogleGenAI } from '@google/genai'
 import { createClient as createRawClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { extractReferenceTokens } from './references'
+import { compareAddresses, findAddressesInText, parseAddress, type ParsedAddress } from './address'
 
 // Candidate match surfaced to the manual-link UI
 export type JobCandidate = {
@@ -38,7 +41,23 @@ type JobRow = {
   claim_number: string | null
   property_address: string | null
   insured_name: string | null
+  current_stage: string | null
 }
+
+type Hit = JobRow & { matched_on: Set<string> }
+
+const JOB_COLUMNS = 'id, job_number, claim_number, property_address, insured_name, current_stage'
+
+// Stages where a job is finished — used only to break ties between jobs at the same address
+const CLOSED_STAGES = new Set(['complete', 'cancelled'])
+
+// Signals strong enough to auto-link on their own when they point at exactly one job
+const REFERENCE_FIELDS = ['job_number', 'claim_number']
+
+// Body text beyond this is almost always quoted history / signatures
+const BODY_SCAN_CHARS = 4000
+const MAX_ADDRESS_LOOKUPS = 6
+const MAX_CANDIDATES = 5
 
 // Gemini's only role here is text extraction — no confidence asked.
 // Match confidence is computed deterministically after the DB lookup.
@@ -97,41 +116,133 @@ async function extractIdentifiers(
   }
 }
 
-// Deterministic match confidence based on which fields matched and uniqueness.
-// An exact claim_number or job_number match to a single job = high.
-// Address + insured_name together to a single job = high.
-// Any single low-signal field, or multiple jobs matching = low.
-function scoreMatch(
-  extracted: ExtractedIdentifiers,
-  matchedJobs: (JobRow & { matched_on: string[] })[],
-): Array<JobCandidate> {
-  return matchedJobs.map(job => {
-    const matchedOn = job.matched_on
+function addHits(hits: Map<string, Hit>, rows: JobRow[] | null, field: string): void {
+  for (const row of rows ?? []) {
+    const existing = hits.get(row.id)
+    if (existing) existing.matched_on.add(field)
+    else hits.set(row.id, { ...row, matched_on: new Set([field]) })
+  }
+}
 
-    const hasHighSignal =
-      (matchedOn.includes('claim_number') && extracted.claim_number) ||
-      (matchedOn.includes('job_number') && extracted.job_number)
+// Exact (case-insensitive via uppercase tokens) job/claim number lookup
+async function lookupReferences(
+  db: SupabaseClient,
+  tenantId: string,
+  hits: Map<string, Hit>,
+  alnum: string[],
+  digits: string[],
+): Promise<void> {
+  const jobTokens = alnum
+  const claimTokens = [...alnum, ...digits]
+  await Promise.all([
+    jobTokens.length > 0
+      ? db.from('jobs').select(JOB_COLUMNS).eq('tenant_id', tenantId).in('job_number', jobTokens).limit(10)
+          .then(({ data }) => addHits(hits, data as JobRow[] | null, 'job_number'))
+      : null,
+    claimTokens.length > 0
+      ? db.from('jobs').select(JOB_COLUMNS).eq('tenant_id', tenantId).in('claim_number', claimTokens).limit(10)
+          .then(({ data }) => addHits(hits, data as JobRow[] | null, 'claim_number'))
+      : null,
+  ])
+}
 
-    const hasDualLowSignal =
-      matchedOn.includes('property_address') &&
-      matchedOn.includes('insured_name')
+// Address lookup: fetch jobs on the same street name, then compare parsed fields
+async function lookupAddresses(
+  db: SupabaseClient,
+  tenantId: string,
+  hits: Map<string, Hit>,
+  addresses: ParsedAddress[],
+): Promise<void> {
+  const byStreet = new Map<string, ParsedAddress[]>()
+  for (const a of addresses) {
+    const list = byStreet.get(a.street) ?? []
+    list.push(a)
+    byStreet.set(a.street, list)
+  }
 
-    // Uniqueness check: only high-confidence if this is the sole match
-    const isUnique = matchedJobs.length === 1
+  const streets = [...byStreet.keys()].slice(0, MAX_ADDRESS_LOOKUPS)
+  await Promise.all(streets.map(async street => {
+    const { data } = await db
+      .from('jobs')
+      .select(JOB_COLUMNS)
+      .eq('tenant_id', tenantId)
+      .ilike('property_address', `%${street}%`)
+      .limit(25)
 
-    const confidence: 'high' | 'low' =
-      isUnique && (hasHighSignal || hasDualLowSignal) ? 'high' : 'low'
-
-    return {
-      job_id: job.id,
-      job_number: job.job_number,
-      insured_name: job.insured_name,
-      property_address: job.property_address,
-      claim_number: job.claim_number,
-      matched_on: matchedOn,
-      confidence,
+    for (const row of (data as JobRow[] | null) ?? []) {
+      const jobAddr = parseAddress(row.property_address)
+      if (!jobAddr) continue
+      let best: 'exact' | 'street' | null = null
+      for (const emailAddr of byStreet.get(street) ?? []) {
+        const m = compareAddresses(emailAddr, jobAddr)
+        if (m === 'exact') { best = 'exact'; break }
+        if (m === 'street') best = 'street'
+      }
+      if (best === 'exact') addHits(hits, [row], 'property_address')
+      else if (best === 'street') addHits(hits, [row], 'street_name')
     }
-  })
+  }))
+}
+
+async function lookupInsuredName(
+  db: SupabaseClient,
+  tenantId: string,
+  hits: Map<string, Hit>,
+  name: string,
+): Promise<void> {
+  const safe = name.replace(/[%_\\]/g, ' ').trim()
+  if (safe.length < 3) return
+  const { data } = await db
+    .from('jobs')
+    .select(JOB_COLUMNS)
+    .eq('tenant_id', tenantId)
+    .ilike('insured_name', `%${safe}%`)
+    .limit(10)
+  addHits(hits, data as JobRow[] | null, 'insured_name')
+}
+
+// When several jobs share the strongest signal (e.g. two jobs at one address),
+// narrow by insured name, then by open vs closed. Returns the single winner or null.
+function breakTie(tied: Hit[]): Hit | null {
+  if (tied.length === 1) return tied[0]
+  const byName = tied.filter(h => h.matched_on.has('insured_name'))
+  if (byName.length === 1) return byName[0]
+  const pool = byName.length > 1 ? byName : tied
+  const open = pool.filter(h => !CLOSED_STAGES.has(h.current_stage ?? ''))
+  if (open.length === 1) return open[0]
+  return null
+}
+
+// Deterministic auto-link decision. Tiers, strongest first:
+//   1. job_number / claim_number found in the email
+//   2. exact address (number + street + type, suburb agrees)
+//   3. street name + insured name together
+// A tier only auto-links when it resolves to exactly one job (after tie-breaks).
+// Insured name alone, or street name alone, never auto-links.
+function decide(hits: Hit[]): Hit | null {
+  const refHits = hits.filter(h => REFERENCE_FIELDS.some(f => h.matched_on.has(f)))
+  if (refHits.length > 0) return breakTie(refHits)
+
+  const addressHits = hits.filter(h => h.matched_on.has('property_address'))
+  if (addressHits.length > 0) return breakTie(addressHits)
+
+  const streetAndName = hits.filter(h => h.matched_on.has('street_name') && h.matched_on.has('insured_name'))
+  if (streetAndName.length === 1) return streetAndName[0]
+
+  return null
+}
+
+function rank(h: Hit): number {
+  if (REFERENCE_FIELDS.some(f => h.matched_on.has(f))) return 0
+  if (h.matched_on.has('property_address')) return 1
+  if (h.matched_on.has('street_name')) return 2
+  return 3
+}
+
+function normaliseRef(value: string | null): string | null {
+  if (!value) return null
+  const v = value.replace(/\s+/g, '').toUpperCase()
+  return v.length >= 4 ? v : null
 }
 
 export async function matchJob(params: {
@@ -141,102 +252,71 @@ export async function matchJob(params: {
   tenant_id: string
 }): Promise<MatchJobResult> {
   const { subject, body, tenant_id } = params
+  const bodyHead = body.slice(0, BODY_SCAN_CHARS)
 
-  const extracted = await extractIdentifiers(subject, body)
-
-  // Nothing extracted — nothing to match
-  const hasAnything =
-    extracted.claim_number ||
-    extracted.job_number ||
-    extracted.property_address ||
-    extracted.insured_name
-
-  if (!hasAnything) {
-    return { job_id: null, confidence: null, candidates: [] }
-  }
-
-  const rawDb = createRawClient(
+  const db = createRawClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Query by each available identifier separately so we know which field matched
-  const queries: Array<{ field: string; value: string; filter: Record<string, string> }> = []
+  const hits = new Map<string, Hit>()
 
-  if (extracted.claim_number) {
-    queries.push({
-      field: 'claim_number',
-      value: extracted.claim_number,
-      filter: { claim_number: `ilike.${extracted.claim_number}` },
-    })
-  }
-  if (extracted.job_number) {
-    queries.push({
-      field: 'job_number',
-      value: extracted.job_number,
-      filter: { job_number: `ilike.${extracted.job_number}` },
-    })
-  }
-  if (extracted.property_address) {
-    queries.push({
-      field: 'property_address',
-      value: extracted.property_address,
-      filter: { property_address: `ilike.%${extracted.property_address}%` },
-    })
-  }
-  if (extracted.insured_name) {
-    queries.push({
-      field: 'insured_name',
-      value: extracted.insured_name,
-      filter: { insured_name: `ilike.%${extracted.insured_name}%` },
-    })
+  // ── Pass 1: job / claim numbers by pattern — no AI ──────────────────────────
+  const refs = extractReferenceTokens(`${subject}\n${bodyHead}`)
+  await lookupReferences(db, tenant_id, hits, refs.alnum, refs.digits)
+
+  const refHits = [...hits.values()].filter(h => REFERENCE_FIELDS.some(f => h.matched_on.has(f)))
+  if (refHits.length === 1) {
+    return buildResult([...hits.values()], refHits[0])
   }
 
-  // Run queries in parallel, collect hits keyed by job_id
-  const hitMap = new Map<string, JobRow & { matched_on: string[] }>()
-
-  await Promise.all(
-    queries.map(async ({ field, filter }) => {
-      const column = Object.keys(filter)[0]
-      const filterVal = Object.values(filter)[0]
-      // filterVal is like "ilike.%value%" — split on first dot
-      const dotIdx = filterVal.indexOf('.')
-      const op = filterVal.slice(0, dotIdx) as 'ilike'
-      const val = filterVal.slice(dotIdx + 1)
-
-      const { data } = await rawDb
-        .from('jobs')
-        .select('id, job_number, claim_number, property_address, insured_name')
-        .eq('tenant_id', tenant_id)
-        .filter(column, op, val)
-        .limit(10)
-
-      for (const row of (data as JobRow[]) ?? []) {
-        const existing = hitMap.get(row.id)
-        if (existing) {
-          existing.matched_on.push(field)
-        } else {
-          hitMap.set(row.id, { ...row, matched_on: [field] })
-        }
-      }
-    })
-  )
-
-  if (hitMap.size === 0) {
-    return { job_id: null, confidence: null, candidates: [] }
+  // ── Pass 2: AI extraction (best-effort — a failure must not block matching) ─
+  let extracted: ExtractedIdentifiers | null = null
+  try {
+    extracted = await extractIdentifiers(subject, bodyHead)
+  } catch (err) {
+    console.error('[match-job] Gemini extraction failed — continuing with pattern matching only:', err)
   }
 
-  const candidates = scoreMatch(extracted, Array.from(hitMap.values()))
-
-  // Auto-link only when there is exactly one high-confidence match
-  const highConfident = candidates.filter(c => c.confidence === 'high')
-  if (highConfident.length === 1) {
-    return {
-      job_id: highConfident[0].job_id,
-      confidence: 'high',
-      candidates,
-    }
+  if (extracted) {
+    const extraRefs = [normaliseRef(extracted.job_number), normaliseRef(extracted.claim_number)]
+      .filter((r): r is string => r !== null && !refs.alnum.includes(r))
+    if (extraRefs.length > 0) await lookupReferences(db, tenant_id, hits, extraRefs, [])
   }
 
+  // ── Pass 3: addresses (pattern-found + AI-found) and insured name ───────────
+  const addresses: ParsedAddress[] = [
+    ...findAddressesInText(subject),
+    ...findAddressesInText(bodyHead),
+  ]
+  const aiAddress = parseAddress(extracted?.property_address)
+  if (aiAddress) addresses.unshift(aiAddress)
+
+  await Promise.all([
+    addresses.length > 0 ? lookupAddresses(db, tenant_id, hits, addresses) : null,
+    extracted?.insured_name ? lookupInsuredName(db, tenant_id, hits, extracted.insured_name) : null,
+  ])
+
+  const all = [...hits.values()]
+  if (all.length === 0) return { job_id: null, confidence: null, candidates: [] }
+
+  return buildResult(all, decide(all))
+}
+
+function buildResult(all: Hit[], winner: Hit | null): MatchJobResult {
+  const candidates: JobCandidate[] = all
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, MAX_CANDIDATES)
+    .map(h => ({
+      job_id: h.id,
+      job_number: h.job_number,
+      insured_name: h.insured_name,
+      property_address: h.property_address,
+      claim_number: h.claim_number,
+      matched_on: [...h.matched_on],
+      confidence: winner && h.id === winner.id ? 'high' : 'low',
+    }))
+
+  if (winner) return { job_id: winner.id, confidence: 'high', candidates }
   return { job_id: null, confidence: 'low', candidates }
 }

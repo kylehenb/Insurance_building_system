@@ -19,6 +19,10 @@
  *      --project=irc-master
  *
  * 4. Call POST /api/gmail/setup once to register the Gmail watch and seed historyId.
+ *
+ * The watch covers INBOX and SENT. Inbound mail is routed to the order pipeline
+ * or linked to a job; mail sent directly from Gmail is recorded as an outbound
+ * communication so replies to it inherit the job through the thread.
  */
 
 import { NextRequest, NextResponse, after } from 'next/server'
@@ -27,12 +31,14 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
-import { getFullMessage, extractMessageParts, type MessageAttachment } from '@/lib/gmail/messages'
+import { getFullMessage, extractMessageParts, type ExtractedMessage, type MessageAttachment } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
-import { matchJob } from '@/lib/communications/match-job'
+import { resolveCommunicationLink } from '@/lib/communications/resolve-link'
+import { linkThreadToJob, threadExists } from '@/lib/communications/thread-link'
+import { recordSentMessage } from '@/lib/communications/record-sent'
 
 export const maxDuration = 300
 
@@ -261,6 +267,55 @@ async function uploadAttachments(
   return stored
 }
 
+/**
+ * Inserts an inbound (non-order) email as a communication, resolving its job
+ * via thread → content match → unlinked/admin. When content matching links it,
+ * earlier unlinked messages in the same thread are linked too.
+ */
+async function insertLinkedCommunication(
+  db: SupabaseClient,
+  tenantId: string,
+  communicationId: string,
+  msg: ExtractedMessage,
+  storedAttachments: StoredAttachment[],
+): Promise<void> {
+  const link = await resolveCommunicationLink({
+    db,
+    tenantId,
+    threadId: msg.threadId || null,
+    subject: msg.subject,
+    body: msg.bodyText,
+    fromEmail: msg.fromEmail,
+  })
+
+  const { error } = await db.from('communications').insert({
+    id: communicationId,
+    tenant_id: tenantId,
+    job_id: link.job_id,
+    type: 'email',
+    direction: 'inbound',
+    subject: msg.subject,
+    content: msg.bodyText,
+    created_at: msg.receivedAt,
+    thread_id: msg.threadId,
+    from_email: msg.fromEmail,
+    to_email: msg.to,
+    body_text: msg.bodyText,
+    gmail_message_id: msg.gmailMessageId || null,
+    source: link.source,
+    match_candidates: link.match_candidates,
+    attachments: storedAttachments,
+  })
+  if (error) {
+    console.error(`[email-inbound] communications insert failed for ${msg.messageId}:`, error)
+    return
+  }
+
+  if (link.job_id && link.source === 'auto_linked') {
+    await linkThreadToJob(db, tenantId, msg.threadId, link.job_id)
+  }
+}
+
 type PubSubMessage = {
   data: string
   messageId: string
@@ -357,21 +412,26 @@ async function processWebhook(body: PubSubBody): Promise<void> {
   const storedHistoryId = (syncState as { last_history_id: string } | null)?.last_history_id ?? null
   const startHistoryId = storedHistoryId ?? newHistoryId
 
-  // Fetch history since last known id
-  let messageIds: string[] = []
+  // Fetch history since last known id — inbox and sent mail
+  const messageIds: string[] = []
+  const sentMessageIds = new Set<string>()
   try {
     const histRes = await gmail.users.history.list({
       userId: 'me',
       startHistoryId,
       historyTypes: ['messageAdded'],
-      labelId: 'INBOX',
     })
 
     for (const record of histRes.data.history ?? []) {
       for (const added of record.messagesAdded ?? []) {
-        if (added.message?.id) {
-          messageIds.push(added.message.id)
-        }
+        const id = added.message?.id
+        const labels = added.message?.labelIds ?? []
+        if (!id || messageIds.includes(id)) continue
+        if (labels.some(l => l === 'DRAFT' || l === 'SPAM' || l === 'TRASH')) continue
+        const isSent = labels.includes('SENT')
+        if (!isSent && !labels.includes('INBOX')) continue
+        if (isSent) sentMessageIds.add(id)
+        messageIds.push(id)
       }
     }
   } catch (err) {
@@ -406,7 +466,14 @@ async function processWebhook(body: PubSubBody): Promise<void> {
       const raw = await getFullMessage(msgId)
       const msg = await extractMessageParts(raw)
 
-      if (isOwnDomain(msg.fromEmail)) continue
+      if (isOwnDomain(msg.fromEmail)) {
+        // Sent directly from Gmail — record it so the thread is anchored to a job
+        if (sentMessageIds.has(msgId)) {
+          const outcome = await recordSentMessage({ db: rawDb, tenantId, msg, ownDomain: OUR_DOMAIN })
+          console.log(`[email-inbound] sent message ${msgId}: ${outcome}`)
+        }
+        continue
+      }
 
       // Pre-generate the communications row ID so storage paths can be built
       // before we know which branch will handle this message.
@@ -446,32 +513,11 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           continue
         }
 
-        const { data: existingThread } = await supabase
-          .from('communications')
-          .select('id, job_id')
-          .eq('tenant_id', tenantId)
-          .eq('thread_id' as never, msg.threadId as never)
-          .limit(1)
-          .single()
-
-        if (existingThread) {
-          await supabase.from('communications').insert({
-            id: communicationId,
-            tenant_id: tenantId,
-            job_id: existingThread.job_id,
-            type: 'email',
-            direction: 'inbound',
-            subject: msg.subject,
-            content: msg.bodyText,
-            created_at: msg.receivedAt,
-            thread_id: msg.threadId,
-            from_email: msg.fromEmail,
-            to_email: msg.to,
-            body_text: msg.bodyText,
-            gmail_message_id: msg.gmailMessageId || null,
-            source: 'inbound',
-            attachments: storedAttachments,
-          } as never)
+        // A known thread is a follow-up to an order or conversation — never
+        // re-enters the order pipeline. It inherits the thread's job, or is
+        // matched on its own content (which then links the whole thread).
+        if (await threadExists(rawDb, tenantId, msg.threadId)) {
+          await insertLinkedCommunication(rawDb, tenantId, communicationId, msg, storedAttachments)
           continue
         }
       }
@@ -553,43 +599,7 @@ async function processWebhook(body: PubSubBody): Promise<void> {
           }
         }
       } else {
-        let resolvedJobId: string | null = null
-        let matchCandidates: unknown = null
-
-        try {
-          const match = await matchJob({
-            subject: msg.subject,
-            body: msg.bodyText,
-            from_email: msg.fromEmail,
-            tenant_id: tenantId,
-          })
-          if (match.job_id && match.confidence === 'high') {
-            resolvedJobId = match.job_id
-          } else if (match.candidates.length > 0) {
-            matchCandidates = match.candidates
-          }
-        } catch (err) {
-          console.error('[email-inbound] matchJob error:', err)
-        }
-
-        await supabase.from('communications').insert({
-          id: communicationId,
-          tenant_id: tenantId,
-          job_id: resolvedJobId,
-          type: 'email',
-          direction: 'inbound',
-          subject: msg.subject,
-          content: msg.bodyText,
-          created_at: msg.receivedAt,
-          thread_id: msg.threadId,
-          from_email: msg.fromEmail,
-          to_email: msg.to,
-          body_text: msg.bodyText,
-          gmail_message_id: msg.gmailMessageId || null,
-          source: resolvedJobId ? 'auto_linked' : 'unlinked',
-          match_candidates: matchCandidates,
-          attachments: storedAttachments,
-        } as never)
+        await insertLinkedCommunication(rawDb, tenantId, communicationId, msg, storedAttachments)
       }
     } catch (err) {
       console.error(`[email-inbound] error processing message ${msgId}:`, err)

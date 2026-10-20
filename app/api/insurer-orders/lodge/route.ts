@@ -7,6 +7,7 @@ import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 import { notifyJobApproved } from '@/lib/email/notify-job-approved'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 import { normaliseLossType } from '@/lib/loss-types'
+import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
       }
 
       console.log('[lodge] order linked to existing job')
+      await linkOrderThreadsToJob(supabase, tenantId, orderId, existingJobByClaim.id)
       await recomputeAndSaveStage(existingJobByClaim.id)
       return NextResponse.json({
         jobNumber: existingJobByClaim.job_number,
@@ -428,6 +430,9 @@ export async function POST(req: NextRequest) {
       console.error('[lodge] order update error:', updateError)
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
     }
+
+    // Move the order email thread (and any replies) out of the unlinked inbox
+    await linkOrderThreadsToJob(supabase, tenantId, orderId, jobId)
 
     await recomputeAndSaveStage(jobId)
 

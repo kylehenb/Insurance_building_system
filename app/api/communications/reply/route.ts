@@ -88,18 +88,30 @@ export async function POST(req: NextRequest) {
   })
 
   // Send via Gmail — threadId appends to the existing conversation
+  let sentGmailId: string | null = null
   try {
     const gmail = getGmailClient()
-    await gmail.users.messages.send({
+    const sendRes = await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
         raw,
         ...(source.thread_id ? { threadId: source.thread_id } : {}),
       },
     })
+    sentGmailId = sendRes.data.id ?? null
   } catch (err) {
     console.error('[reply] Gmail send error:', err)
     return NextResponse.json({ error: 'Failed to send email' }, { status: 502 })
+  }
+
+  // Mark the sent copy as processed so the Gmail SENT watch doesn't record it twice
+  if (sentGmailId) {
+    await serviceClient
+      .from('processed_gmail_messages' as never)
+      .upsert(
+        { message_id: sentGmailId, processed_at: new Date().toISOString() } as never,
+        { onConflict: 'message_id', ignoreDuplicates: true }
+      )
   }
 
   // Record outbound communication

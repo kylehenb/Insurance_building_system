@@ -64,6 +64,7 @@ interface UnlinkedComm {
   contact_name: string | null
   created_at: string | null
   match_candidates: JobCandidate[] | null
+  source: string | null
 }
 
 interface JobSearchHit {
@@ -168,6 +169,9 @@ export default function DashboardPage() {
 
   // Unlinked inbox
   const [unlinkedComms, setUnlinkedComms] = useState<UnlinkedComm[]>([])
+  // Notifications / compliance / newsletters filtered out of the unlinked inbox
+  const [adminComms, setAdminComms] = useState<UnlinkedComm[]>([])
+  const [showAdminComms, setShowAdminComms] = useState(false)
   const [linkingId, setLinkingId] = useState<string | null>(null)
   const [linkSearch, setLinkSearch] = useState('')
   const [linkResults, setLinkResults] = useState<JobSearchHit[]>([])
@@ -307,27 +311,36 @@ export default function DashboardPage() {
 
   async function fetchUnlinkedComms() {
     if (!tenantId) return
-    const { data } = await supabase
+    // Insurer-order emails are excluded — they're handled in the orders queue
+    // and linked to their job when the order is lodged.
+    const base = () => supabase
       .from('communications')
-      .select('id, subject, content, from_email, contact_name, created_at, match_candidates')
+      .select('id, subject, content, from_email, contact_name, created_at, match_candidates, source')
       .is('job_id', null)
+      .is('insurer_order_id', null)
       .eq('type', 'email')
       .eq('direction', 'inbound')
       .order('created_at', { ascending: false })
       .limit(50)
 
-    if (!data) return
-    setUnlinkedComms(
-      data.map((row) => ({
-        id: row.id,
-        subject: row.subject,
-        content: row.content,
-        from_email: row.from_email,
-        contact_name: row.contact_name,
-        created_at: row.created_at,
-        match_candidates: row.match_candidates as JobCandidate[] | null,
-      }))
-    )
+    const [{ data }, { data: adminData }] = await Promise.all([
+      base().or('source.is.null,source.neq.admin'),
+      base().eq('source', 'admin'),
+    ])
+
+    const toComm = (row: NonNullable<typeof data>[number]): UnlinkedComm => ({
+      id: row.id,
+      subject: row.subject,
+      content: row.content,
+      from_email: row.from_email,
+      contact_name: row.contact_name,
+      created_at: row.created_at,
+      match_candidates: row.match_candidates as JobCandidate[] | null,
+      source: row.source,
+    })
+
+    if (data) setUnlinkedComms(data.map(toComm))
+    if (adminData) setAdminComms(adminData.map(toComm))
   }
 
   // ── Unlinked inbox ───────────────────────────────────────────────────────────
@@ -357,9 +370,12 @@ export default function DashboardPage() {
         body: JSON.stringify({ job_id: jobId }),
       })
       setUnlinkedComms(prev => prev.filter(c => c.id !== commId))
+      setAdminComms(prev => prev.filter(c => c.id !== commId))
       setLinkingId(null)
       setLinkSearch('')
       setLinkResults([])
+      // Linking one email links the rest of its thread — refresh to drop those too
+      fetchUnlinkedComms()
     } finally {
       setLinkSaving(null)
     }
@@ -933,19 +949,28 @@ export default function DashboardPage() {
         </div>
 
         {/* ── UNLINKED INBOX ── */}
-        {unlinkedComms.length > 0 && (
+        {(unlinkedComms.length > 0 || adminComms.length > 0) && (
           <div className="ui-wrap">
             <div className="ui-hdr">
               <div className="ui-hdr-left">
                 <span className="sec-label" style={{ margin: 0 }}>Unlinked inbox</span>
                 <span className="ui-badge">{unlinkedComms.length} unlinked</span>
+                {adminComms.length > 0 && (
+                  <button
+                    className="ui-link-btn"
+                    style={{ marginLeft: 6 }}
+                    onClick={() => setShowAdminComms(v => !v)}
+                  >
+                    {showAdminComms ? 'Hide' : 'Show'} {adminComms.length} admin / notification
+                  </button>
+                )}
               </div>
               <span style={{ fontSize: 12, color: '#b0a898', fontWeight: 300 }}>
                 Emails with no matching job — link manually or auto-suggestions shown below
               </span>
             </div>
 
-            {unlinkedComms.map(comm => {
+            {(showAdminComms ? [...unlinkedComms, ...adminComms] : unlinkedComms).map(comm => {
               const isOpen = linkingId === comm.id
               const isSaving = linkSaving === comm.id
               const candidates = Array.isArray(comm.match_candidates) ? comm.match_candidates : []
@@ -954,7 +979,12 @@ export default function DashboardPage() {
                 <div key={comm.id}>
                   <div className="ui-row">
                     <div style={{ minWidth: 0 }}>
-                      <div className="ui-from">{comm.from_email ?? comm.contact_name ?? 'Unknown sender'}</div>
+                      <div className="ui-from">
+                        {comm.from_email ?? comm.contact_name ?? 'Unknown sender'}
+                        {comm.source === 'admin' && (
+                          <span style={{ fontSize: 10, color: '#b0a898', fontWeight: 700, marginLeft: 6 }}>ADMIN</span>
+                        )}
+                      </div>
                       <div className="ui-subject">{comm.subject ?? '(no subject)'}</div>
                       <div className="ui-preview">{comm.content ?? ''}</div>
                       <div className="ui-age">{timeAgo(comm.created_at ?? '')}</div>

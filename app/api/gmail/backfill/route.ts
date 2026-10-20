@@ -12,11 +12,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getUser } from '@/lib/supabase/get-user'
 import { getGmailClient } from '@/lib/gmail/client'
-import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getFullMessage, extractMessageParts, type ExtractedMessage } from '@/lib/gmail/messages'
+import { resolveCommunicationLink, type CommunicationLink } from '@/lib/communications/resolve-link'
+import { linkThreadToJob, threadExists } from '@/lib/communications/thread-link'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
@@ -149,6 +151,41 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   })
 }
 
+async function insertBackfillCommunication(
+  db: SupabaseClient,
+  tenantId: string,
+  msg: ExtractedMessage,
+): Promise<CommunicationLink> {
+  const link = await resolveCommunicationLink({
+    db,
+    tenantId,
+    threadId: msg.threadId || null,
+    subject: msg.subject,
+    body: msg.bodyText,
+    fromEmail: msg.fromEmail,
+  })
+  await db.from('communications').insert({
+    tenant_id: tenantId,
+    job_id: link.job_id,
+    type: 'email',
+    direction: 'inbound',
+    subject: msg.subject,
+    content: msg.bodyText,
+    created_at: msg.receivedAt,
+    thread_id: msg.threadId,
+    from_email: msg.fromEmail,
+    to_email: msg.to,
+    body_text: msg.bodyText,
+    gmail_message_id: msg.gmailMessageId || null,
+    source: link.source === 'auto_linked' || link.source === 'admin' ? link.source : 'backfill',
+    match_candidates: link.match_candidates,
+  })
+  if (link.job_id && link.source === 'auto_linked') {
+    await linkThreadToJob(db, tenantId, msg.threadId, link.job_id)
+  }
+  return link
+}
+
 // ── POST — process up to `max` messages ───────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -172,7 +209,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-  const supabase = createServiceClient()
   const gmail = getGmailClient()
 
   // Load routing config
@@ -196,7 +232,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   type ResultEntry = {
     messageId: string
-    status: 'skipped_own_domain' | 'thread_continuation' | 'order' | 'unlinked' | 'duplicate' | 'error'
+    status: 'skipped_own_domain' | 'thread_continuation' | 'order' | 'linked' | 'unlinked' | 'duplicate' | 'error'
     detail?: string
   }
   const results: ResultEntry[] = []
@@ -223,39 +259,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         continue
       }
 
-      // Thread continuation — link to existing job if thread already in communications
-      if (msg.threadId) {
-        const { data: existingThread } = await supabase
-          .from('communications')
-          .select('id, job_id')
-          .eq('tenant_id', tenantId)
-          .eq('thread_id' as never, msg.threadId as never)
-          .limit(1)
-          .single()
-
-        if (existingThread) {
-          await supabase.from('communications').insert({
-            tenant_id: tenantId,
-            job_id: existingThread.job_id,
-            type: 'email',
-            direction: 'inbound',
-            subject: msg.subject,
-            content: msg.bodyText,
-            created_at: msg.receivedAt,
-            thread_id: msg.threadId,
-            from_email: msg.fromEmail,
-            to_email: msg.to,
-            body_text: msg.bodyText,
-            gmail_message_id: msg.gmailMessageId || null,
-            source: 'backfill',
-          } as never)
-          results.push({
-            messageId: msgId,
-            status: 'thread_continuation',
-            detail: existingThread.job_id ?? 'unlinked thread',
-          })
-          continue
-        }
+      // Thread continuation — never re-enters the order pipeline; inherits the
+      // thread's job or is matched on content (same as the inbound webhook)
+      if (await threadExists(rawDb, tenantId, msg.threadId)) {
+        const link = await insertBackfillCommunication(rawDb, tenantId, msg)
+        results.push({
+          messageId: msgId,
+          status: 'thread_continuation',
+          detail: link.job_id ?? 'unlinked thread',
+        })
+        continue
       }
 
       // Order routing — same pattern as inbound webhook
@@ -279,22 +292,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           results.push({ messageId: msgId, status: 'error', detail: String(err) })
         }
       } else {
-        await supabase.from('communications').insert({
-          tenant_id: tenantId,
-          job_id: null,
-          type: 'email',
-          direction: 'inbound',
-          subject: msg.subject,
-          content: msg.bodyText,
-          created_at: msg.receivedAt,
-          thread_id: msg.threadId,
-          from_email: msg.fromEmail,
-          to_email: msg.to,
-          body_text: msg.bodyText,
-          gmail_message_id: msg.gmailMessageId || null,
-          source: 'backfill',
-        } as never)
-        results.push({ messageId: msgId, status: 'unlinked' })
+        const link = await insertBackfillCommunication(rawDb, tenantId, msg)
+        results.push({ messageId: msgId, status: link.job_id ? 'linked' : 'unlinked', detail: link.job_id ?? undefined })
       }
     } catch (err) {
       console.error(`[gmail-backfill] error processing ${msgId}:`, err)

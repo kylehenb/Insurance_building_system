@@ -14,7 +14,8 @@ export async function startGmailWatch(): Promise<WatchResult> {
     userId: 'me',
     requestBody: {
       topicName: PUBSUB_TOPIC,
-      labelIds: ['INBOX'],
+      // SENT lets the webhook record mail sent directly from Gmail (see email-inbound)
+      labelIds: ['INBOX', 'SENT'],
     },
   })
 

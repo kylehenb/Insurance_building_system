@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
+import { linkThreadToJob } from '@/lib/communications/thread-link'
 
 type Params = { params: Promise<{ id: string }> }
 
 // PATCH /api/communications/[id]
 // Supported bodies (exactly one field per request):
-//   { job_id: string }       — manual job link from unlinked inbox, clears match_candidates
+//   { job_id: string }       — manual job link from unlinked inbox, clears match_candidates.
+//                              Links every unlinked message in the same Gmail thread too.
 //   { read_at: string }      — mark as read (ISO timestamp); no-op if already read
 //   { is_starred: boolean }  — toggle star
 export async function PATCH(req: NextRequest, { params }: Params): Promise<NextResponse> {
@@ -30,12 +32,17 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     if (typeof body.job_id !== 'string' || !body.job_id) {
       return NextResponse.json({ error: 'job_id must be a non-empty string' }, { status: 400 })
     }
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('communications')
       .update({ job_id: body.job_id, match_candidates: null } as never)
       .eq('id', id)
+      .select('thread_id')
+      .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true })
+
+    const threadId = (updated as { thread_id: string | null } | null)?.thread_id ?? null
+    const threadLinked = await linkThreadToJob(supabase, userSession.tenant_id, threadId, body.job_id)
+    return NextResponse.json({ ok: true, thread_linked: threadLinked })
   }
 
   if ('read_at' in body) {
