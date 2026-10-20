@@ -788,16 +788,34 @@ function WORow({
 
         {/* Preview */}
         <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-          <a
-            href={`/print/work-orders/${wo.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#1a1a1a', color: '#fff', border: '1px solid #1a1a1a', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
-            onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = '#333'; t.style.borderColor = '#333' }}
-            onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.borderColor = '#1a1a1a' }}
-          >
-            Preview
-          </a>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <a
+              href={`/print/work-orders/${wo.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#1a1a1a', color: '#fff', border: '1px solid #1a1a1a', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
+              onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = '#333'; t.style.borderColor = '#333' }}
+              onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.borderColor = '#1a1a1a' }}
+            >
+              Preview
+            </a>
+            <a
+              href={`/api/work-orders/${wo.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open the trade PDF in a new tab"
+              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#1a1a1a', border: '1px solid #ddd8d0', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
+            >
+              Preview PDF
+            </a>
+            <a
+              href={`/api/work-orders/${wo.id}/pdf?download=1`}
+              title="Download the trade PDF"
+              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#1a1a1a', border: '1px solid #ddd8d0', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
+            >
+              Download PDF
+            </a>
+          </div>
         </td>
 
         {/* Actions: Send & Lock + Delete */}

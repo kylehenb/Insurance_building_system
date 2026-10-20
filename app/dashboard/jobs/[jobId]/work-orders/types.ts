@@ -79,8 +79,11 @@ export function getPlacementState(wo: WorkOrderRow, invoices: InvoiceRow[]): Pla
   return 'placed_unsent'
 }
 
-export function woIsSent(wo: WorkOrderRow): boolean {
-  return !!wo.gary_state && wo.gary_state !== 'not_started'
+// Sent = "Send & Lock" has moved Gary off not_started. Trimmed so stray
+// whitespace in the stored value can't make a draft look sent.
+export function woIsSent(wo: Pick<WorkOrderRow, 'gary_state'>): boolean {
+  const state = wo.gary_state?.trim()
+  return !!state && state !== 'not_started'
 }
 
 export function woIsPlaced(wo: WorkOrderRow): boolean {

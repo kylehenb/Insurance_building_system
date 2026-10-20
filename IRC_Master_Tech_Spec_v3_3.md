@@ -3,6 +3,8 @@
 
 **v3.2 changes:** Contacts & Email Routing overhaul — replaced `additional_contacts TEXT` with structured `contacts JSONB` on insurer_orders and jobs; added order sender fields (order_sender_name, order_sender_email, adjuster_reference); added adjuster_submission_email to clients; added Section 4.5a (Contacts Model) and 4.5b (Outbound Email Routing); updated WF-5 email routing logic; updated clients table notes.
 
+**PDF generation update (Oct 2026):** PDF generation moved from the planned Railway Puppeteer service to Vercel Functions (puppeteer-core + @sparticuz/chromium) — see §10. First document built: trade-facing Work Order PDF (`GET /api/work-orders/[id]/pdf`). DocuSeal integration and the `PDF_SERVICE_URL` / `PDF_SERVICE_SECRET` env vars removed; document signing will be rebuilt in-house.
+
 ---
 
 ## 1. Project Overview
@@ -29,7 +31,7 @@ IRC Master is a job management platform for insurance repair businesses. It mana
 | Backend / Database | Supabase (Postgres) | Managed, single project |
 | Auth | Supabase Auth — Magic Link | Persistent sessions |
 | File storage | Supabase Storage | Photos, PDFs, documents |
-| PDF generation | Puppeteer on Railway | Separate small service ~$5-7/month |
+| PDF generation | Vercel Functions — puppeteer-core + @sparticuz/chromium | Runs inside the Next.js app; no separate service |
 | Hosting | Cloudflare Pages (frontend) | Free tier |
 | AI features | Anthropic Claude API | claude-sonnet-4-20250514 |
 | Vision/parsing | Google Gemini Flash 2.0 | Cost-efficient parsing tasks |
@@ -1717,7 +1719,7 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
   /trade-portal/
     /[workOrderToken]/page.tsx   -- public trade portal (token-gated, no login)
   /api/
-    /pdf/route.ts                -- calls Railway Puppeteer service
+    /work-orders/[id]/pdf/route.ts -- GET: live Work Order PDF (headless Chromium on Vercel; ?download=1 to download)
     /ai/parse-scope/route.ts     -- calls Claude API for scope parsing
     /ai/generate-report/route.ts -- calls Claude API for report generation
     /ai/label-photos/route.ts    -- calls Gemini for photo labelling (triggered in field app)
@@ -1744,7 +1746,6 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
       /email-inbound/route.ts    -- inbound email handler; Gemini parses + job-links
     /geocode/route.ts            -- Google Maps Geocoding API (server-side, hides API key)
     /places-autocomplete/route.ts -- Google Places Autocomplete API (server-side, hides API key)
-    /docuseal/send/route.ts      -- Docuseal document signing integration
     /jobs/[jobId]/stage/route.ts -- PATCH: update job current_stage
     /jobs/[jobId]/blueprint/[blueprintId]/confirm/route.ts -- POST: confirm blueprint, generate work orders
     /jobs/[jobId]/work-orders/route.ts -- GET/POST: work orders for a job
@@ -1783,7 +1784,7 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
       /update-status.ts
       /create-record.ts
       /add-note.ts
-      /generate-pdf.ts
+      /generate-pdf.ts           -- calls the shared PDF renderer (lib/pdf) — not yet built
       /schedule-followup.ts
       /notify-internal.ts
   /scheduling/
@@ -2189,10 +2190,14 @@ Return visit (multi-visit work orders):
 - `availability = 'on_pause'` excluded from auto-allocation; still selectable manually
 
 #### Work order PDF content
-- IRC header, Job ID, Work Order ID, Claim #, site address, site contacts
-- Trade name + ABN; their SOW + price; full job SOW (all trades)
-- AI job summary + relevant job notes (access codes, homeowner preferences, insurer instructions)
-- Visit schedule: all planned visits with estimated dates, lag periods, and lag descriptions
+- IRC letterhead (from `tenants`: name, ABN, builder's licence, suburb-only address, email, phone), work order ref, job number, claim #, insurer, site address, site contacts (warns when the site contact is not the homeowner)
+- Trade business name, trade type, work type, ABN and contact details
+- Their scope of works (qty/unit only — no rates), grouped by room; other trades' scope for context (descriptions only, no pricing)
+- Work order amount + GST: `agreed_amount` when set, otherwise this work order's own scope items at the quoted price (same figure as the Work Orders tab Override column). Never `charge_out_amount`, `trade_cost`, rates, markup or margin
+- Scheduled date (earliest visit date, else "To be scheduled"); visit schedule with estimated hours, lag periods and lag descriptions
+- Access notes & special instructions (`jobs.special_instructions` + work order `text_notes`)
+- DRAFT watermark until the work order is sent (`gary_state` ≠ `not_started`, i.e. after Send & Lock)
+- Planned, not yet included: AI job summary
 
 #### AI job summary
 - General summary — same version for all trades
@@ -2353,17 +2358,28 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 ## 10. PDF Generation
 
 ### Architecture
-- Next.js API route `/api/pdf` receives job/report/quote ID
-- Calls Railway Puppeteer service with the relevant HTML template URL
-- Railway renders HTML → returns PDF buffer
-- PDF saved to Supabase Storage
-- Storage URL returned and saved to the relevant record
+- PDFs are rendered inside the Next.js app on Vercel Functions (Node.js runtime, never Edge) with `puppeteer-core` + `@sparticuz/chromium`. There is no separate PDF service.
+- Shared renderer: `lib/pdf/render-html-to-pdf.ts` → `renderHtmlToPdf(html, { footerTemplate })` returns a `Buffer`
+  - On Vercel (`VERCEL` env set): `@sparticuz/chromium` binary
+  - Locally: Chrome at `CHROME_EXECUTABLE_PATH` if set, otherwise the full `puppeteer` devDependency's downloaded Chrome
+  - One browser is reused per warm function instance; each request gets its own page
+  - Page JavaScript is disabled and all network requests are blocked — templates must be self-contained (inline CSS, `data:` URI images)
+- Data is always fetched server-side from Supabase with the user's session (RLS) plus an explicit `tenant_id` filter, rendered to HTML by a server-side template function, and loaded with `page.setContent`. Never screenshot an authenticated URL.
+- `next.config.ts`: `serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium']`; `outputFileTracingIncludes` adds `@sparticuz/chromium/bin/**` and the PDF logo to the PDF route's function bundle
+- PDFs are generated live on every request and not stored by default. Callers that need a stored copy (e.g. save to `job_files` under `tenants/{tenantId}/jobs/{jobId}/docs/`) call the generator function and upload the Buffer themselves.
 
-### Railway Puppeteer service
-- Separate Node.js Express service
-- Single endpoint: `POST /generate` with `{ url, filename }`
-- Launches headless Chromium, renders, returns PDF
-- ~$5-7/month on Railway starter plan
+### Work Order PDF (built)
+- Route: `GET /api/work-orders/[id]/pdf` — signed-in user required; tenant enforced. Returns `application/pdf`, inline by default, `?download=1` for attachment. Filename: `{WO ref} - {trade} - {site address}.pdf` (plus ` - DRAFT` before sending)
+- `maxDuration = 60`; uses the project's default function memory
+- Template: `lib/documents/work-order-pdf-html.ts` (trade-safe; see WF-8 "Work order PDF content")
+- Reusable hook for automations: `generateWorkOrderPdf(workOrderId, ctx?)` in `lib/work-orders/work-order-pdf.ts` returns a `Buffer`. Without `ctx` it uses the signed-in session; background jobs pass `{ supabase: createServiceClient(), tenantId }`. Not yet wired to email, job_files or Telegram.
+- UI: "Preview PDF" / "Download PDF" on the Work Orders tab table and the work order card menu
+- The older browser-print page `/print/work-orders/[workOrderId]` remains until the new PDF is signed off, then it will be retired
+
+### Performance
+- Cold start (first request on a new instance, Chromium decompressed to `/tmp`): ~2–5 s; warm requests ~0.3–0.5 s
+- PDF route function bundle ~74 MB (of Vercel's 250 MB limit), almost all of it `@sparticuz/chromium`
+- Keep `puppeteer-core` pinned to the release whose bundled Chrome major matches `@sparticuz/chromium` (currently puppeteer-core 25.11.0 ↔ Chromium 153)
 
 ---
 
@@ -2525,9 +2541,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 ANTHROPIC_API_KEY=
 GEMINI_API_KEY=
 
-# PDF Service
-PDF_SERVICE_URL=                   # Railway Puppeteer endpoint
-PDF_SERVICE_SECRET=                # shared secret for Railway auth — rotate via Railway dashboard; update Vercel env var to match
+# PDF generation (local development only — not needed on Vercel)
+CHROME_EXECUTABLE_PATH=            # optional: path to a local Chrome/Chromium; if unset, the puppeteer devDependency's Chrome is used
 
 # Gmail API
 GMAIL_CLIENT_ID=
@@ -2548,13 +2563,7 @@ NEXT_PUBLIC_APP_URL=
 
 ### Security notes
 
-**Railway secret rotation (`PDF_SERVICE_SECRET`):**
-The Railway Puppeteer service and the Next.js app share a `PDF_SERVICE_SECRET` to authenticate PDF generation requests. To rotate:
-1. Generate a new secret (e.g. `openssl rand -hex 32`)
-2. Update the Railway service environment variable via the Railway dashboard
-3. Update `PDF_SERVICE_SECRET` in Vercel environment variables
-4. Redeploy both services — Railway redeploys automatically on env var change; trigger a Vercel redeploy via GitHub push or the Vercel dashboard
-5. Old requests in flight using the old secret will fail during the brief overlap — acceptable at this scale; retry from the UI
+**PDF rendering:** Runs in-process on Vercel; no shared secret or external PDF service. The renderer disables page JavaScript and blocks all network requests, and every template escapes interpolated values.
 
 **Supabase service role key:** Never exposed to the browser. Used only in Next.js API routes (server-side). The anon key is safe to expose — RLS enforces all access control.
 
@@ -2619,7 +2628,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 ### Phase 3 — Active features
 15. Claude scope parser
 16. Claude report generator
-17. PDF generation via Railway Puppeteer
+17. PDF generation on Vercel (puppeteer-core + @sparticuz/chromium) — Work Order PDF built; other documents to follow
 18. Photo upload to Supabase Storage
 19. Gemini photo labelling
 
@@ -2684,7 +2693,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 | Multi-tenancy | Shared DB + RLS | Simplest to manage, cheapest, sufficient isolation |
 | Auth | Magic link + persistent session | No passwords, works for non-technical users, field-safe |
 | File storage | Supabase Storage | Co-located with data, RLS isolation, no Google dependency |
-| PDF generation | Railway Puppeteer | Only way to get reliable rich PDF with photos |
+| PDF generation | Vercel Functions + puppeteer-core + @sparticuz/chromium | Real Chromium rendering for rich PDFs with photos, without running and securing a separate service |
 | Report type fields | JSONB column | Avoids 30+ sparse nullable columns per report type |
 | Job numbering | Per-tenant sequence with custom prefix | Supports white-label licensing |
 | Claim number | Universal job key, always checked first | One claim = one job, always |
@@ -2758,7 +2767,6 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 | Multiple reports per submit | Separate dump textarea per report type; parallel AI generation calls | BAR + make safe jobs are common; single submit, multiple outputs |
 | Photo label vocabulary | Standardised labels, not freeform | Consistent labelling enables grouping in photos PDF; freeform labels produce unusable PDFs |
 | Job margin computed view | Postgres view, not stored column | Real-time accuracy; no sync required; view inherits RLS automatically |
-| Railway secret rotation | Manual 3-step process documented | No automated rotation at this scale; documented process prevents ad hoc mistakes |
 | Trade proximity storage | On work_order, not trades table | Distance is job-specific; a trade's proximity changes with each job address |
 | Blueprint draft_data as JSONB | Stored in job_schedule_blueprints before WO creation | Work orders don't exist at draft time; JSONB lets review UI render without creating DB records |
 | Visit structure at work_order_visits level | Separate table, not JSONB on work_orders | Clean per-visit records; Gary state, dates, lag tracked independently; queryable |
@@ -2837,7 +2845,7 @@ Each rule defines an ordered chain of steps executed sequentially by `executor.t
 | `update_status` | Updates a field on `jobs` / `inspections` / `reports` / `quotes` / `work_order_visits` |
 | `create_record` | Creates a new `report`, `work_order`, `work_order_visits`, or `communications` record |
 | `add_note` | Writes a note entry to the `communications` log |
-| `generate_pdf` | Triggers Railway Puppeteer PDF generation |
+| `generate_pdf` | Generates a PDF via the shared Vercel renderer (`lib/pdf`), e.g. `generateWorkOrderPdf` |
 | `schedule_followup` | Writes a new `action_queue` row for a timed follow-up task |
 | `notify_internal` | Creates an in-app alert for the team (no outbound message) |
 | `draft_blueprint` | Triggers AI blueprint draft generation for a job; writes to `job_schedule_blueprints` |
