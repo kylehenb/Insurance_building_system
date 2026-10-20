@@ -36,7 +36,7 @@ export interface WorkOrderMutations {
   reorderVisits:     (orderedVisitIds: Array<{ workOrderId: string; visitNumber: number }>) => Promise<void>
   sendWorkOrder:     (id: string) => Promise<void>
   sendAllUnsent:     () => Promise<void>
-  cancelWorkOrder:   (id: string) => Promise<void>
+  cancelWorkOrder:   (id: string, notifyTrade?: boolean) => Promise<void>
   updateWorkOrder:   (id: string, updates: Partial<WorkOrderRow> & { cushionDays?: number; lagDays?: number; lagDescription?: string; visits?: Array<{ visit_number: number; scheduled_date?: string; estimated_hours?: number; status?: string }> }) => Promise<void>
   setPredecessor:    (id: string, predecessorId: string | null) => Promise<void>
   setParentWorkOrder: (id: string, parentId: string | null, offsetDays: number) => Promise<void>
@@ -383,12 +383,27 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
       fetchData()
     },
 
-    cancelWorkOrder: async (id) => {
+    // Reverts a sent work order to unsent (unlocked, unplaced, pending) so it
+    // can be corrected or reallocated, and logs the cancellation.
+    cancelWorkOrder: async (id, notifyTrade = false) => {
       await supabase
         .from('work_orders')
-        .update({ gary_state: 'not_started', sequence_order: null })
+        .update({ gary_state: 'not_started', status: 'pending', sequence_order: null })
         .eq('id', id)
         .eq('tenant_id', tenantId)
+      // TODO: send the actual cancellation email to the trade once the email
+      // template/sender is built — for now the choice is only recorded here.
+      await supabase.from('communications').insert({
+        tenant_id:     tenantId,
+        job_id:        jobId,
+        work_order_id: id,
+        type:          'portal',
+        direction:     'outbound',
+        contact_type:  'trade',
+        content:       notifyTrade
+          ? 'Work order cancelled — cancellation email requested (email sending not yet connected)'
+          : 'Work order cancelled — no notification sent',
+      })
       fetchData()
     },
 

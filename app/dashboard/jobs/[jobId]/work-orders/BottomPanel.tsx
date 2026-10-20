@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { Lock, Trash2 } from 'lucide-react'
 import { formatEstHours } from '@/lib/utils'
 import {
   type WorkOrderWithDetails,
@@ -61,6 +62,39 @@ function InvoiceChain({ extStatus }: { extStatus: string | null }) {
     <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
       {label}
     </span>
+  )
+}
+
+// Lock icon; the "Locked" label only appears on hover
+function LockedBadge() {
+  const [hover, setHover] = useState(false)
+  return (
+    <span
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-label="Locked"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#eff4ff', color: '#1e40af', border: '1px solid #bfdbfe', cursor: 'default' }}
+    >
+      <Lock size={11} strokeWidth={2.2} />
+      {hover && 'Locked'}
+    </span>
+  )
+}
+
+// Bin icon for cancelling a sent work order; "Cancel" appears on hover
+function CancelWOButton({ onClick }: { onClick: () => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-label="Cancel work order"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: hover ? '#fee2e2' : '#fff', color: '#991b1b', border: '1px solid #fca5a5', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+    >
+      <Trash2 size={11} strokeWidth={2.2} />
+      {hover && 'Cancel'}
+    </button>
   )
 }
 
@@ -609,6 +643,7 @@ function WORow({
   onUpdate,
   onDelete,
   onLock,
+  onCancel,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
@@ -621,6 +656,7 @@ function WORow({
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
+  onCancel: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -806,19 +842,12 @@ function WORow({
               title="Open the trade PDF in a new tab"
               style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#1a1a1a', border: '1px solid #ddd8d0', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
             >
-              Preview PDF
-            </a>
-            <a
-              href={`/api/work-orders/${wo.id}/pdf?download=1`}
-              title="Download the trade PDF"
-              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#1a1a1a', border: '1px solid #ddd8d0', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
-            >
-              Download PDF
+              PDF
             </a>
           </div>
         </td>
 
-        {/* Actions: Send & Lock + Delete */}
+        {/* Actions: Send & Lock + Delete, or Locked + Cancel once sent */}
         <td style={{ ...TD, whiteSpace: 'nowrap' }}>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {!isLocked ? (
@@ -835,9 +864,10 @@ function WORow({
                 Send & Lock
               </button>
             ) : (
-              <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#eff4ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
-                Locked
-              </span>
+              <>
+                <LockedBadge />
+                <CancelWOButton onClick={() => onCancel(wo.id)} />
+              </>
             )}
             {!isLocked && (
               <button
@@ -900,6 +930,7 @@ function WOTable({
   onUpdate,
   onDelete,
   onLock,
+  onCancel,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
@@ -912,6 +943,7 @@ function WOTable({
   onUpdate: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDelete: (id: string) => void
   onLock: (id: string) => void
+  onCancel: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -949,6 +981,7 @@ function WOTable({
             onUpdate={onUpdate}
             onDelete={onDelete}
             onLock={onLock}
+            onCancel={onCancel}
             onUpdateScopeItem={onUpdateScopeItem}
             onSoftDeleteScopeItem={onSoftDeleteScopeItem}
             onCreateScopeItem={onCreateScopeItem}
@@ -1058,6 +1091,7 @@ export interface BottomPanelProps {
   onUpdateWorkOrder: (id: string, updates: Partial<{ trade_id: string | undefined; agreed_amount: number | null; trade_name: string | undefined }>) => void
   onDeleteWorkOrder: (id: string) => Promise<void>
   onLockWorkOrder: (id: string) => Promise<void>
+  onCancelWorkOrder: (id: string) => void
   onUpdateScopeItem: (itemId: string, updates: Partial<ScopeItemRow>) => Promise<void>
   onSoftDeleteScopeItem: (workOrderId: string, scopeItemId: string) => Promise<void>
   onCreateScopeItem: (quoteId: string, tradeLabel: string, workOrderId: string, data: ScopeItemData) => Promise<string | null>
@@ -1079,6 +1113,7 @@ export function BottomPanel({
   onUpdateWorkOrder,
   onDeleteWorkOrder,
   onLockWorkOrder,
+  onCancelWorkOrder,
   onUpdateScopeItem,
   onSoftDeleteScopeItem,
   onCreateScopeItem,
@@ -1177,6 +1212,7 @@ export function BottomPanel({
                     onUpdate={onUpdateWorkOrder}
                     onDelete={onDeleteWorkOrder}
                     onLock={onLockWorkOrder}
+                    onCancel={onCancelWorkOrder}
                     onUpdateScopeItem={onUpdateScopeItem}
                     onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                     onCreateScopeItem={onCreateScopeItem}
@@ -1224,6 +1260,7 @@ export function BottomPanel({
                 onUpdate={onUpdateWorkOrder}
                 onDelete={onDeleteWorkOrder}
                 onLock={onLockWorkOrder}
+                onCancel={onCancelWorkOrder}
                 onUpdateScopeItem={onUpdateScopeItem}
                 onSoftDeleteScopeItem={onSoftDeleteScopeItem}
                 onCreateScopeItem={onCreateScopeItem}

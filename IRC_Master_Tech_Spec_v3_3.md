@@ -1719,7 +1719,7 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
   /trade-portal/
     /[workOrderToken]/page.tsx   -- public trade portal (token-gated, no login)
   /api/
-    /work-orders/[id]/pdf/route.ts -- GET: live Work Order PDF (headless Chromium on Vercel; ?download=1 to download)
+    /work-orders/[id]/pdf/route.ts -- GET: live Work Order PDF (headless Chromium on Vercel; always inline)
     /ai/parse-scope/route.ts     -- calls Claude API for scope parsing
     /ai/generate-report/route.ts -- calls Claude API for report generation
     /ai/label-photos/route.ts    -- calls Gemini for photo labelling (triggered in field app)
@@ -2370,11 +2370,11 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 - PDFs are generated live on every request and not stored by default. Callers that need a stored copy (e.g. save to `job_files` under `tenants/{tenantId}/jobs/{jobId}/docs/`) call the generator function and upload the Buffer themselves.
 
 ### Work Order PDF (built)
-- Route: `GET /api/work-orders/[id]/pdf` — signed-in user required; tenant enforced. Returns `application/pdf`, inline by default, `?download=1` for attachment. Filename: `{WO ref} - {trade} - {site address}.pdf` (plus ` - DRAFT` before sending)
+- Route: `GET /api/work-orders/[id]/pdf` — signed-in user required; tenant enforced. Returns `application/pdf`, always inline. Filename: `{WO ref} - {trade} - {site address}.pdf` (plus ` - DRAFT` before sending)
 - `maxDuration = 60`; uses the project's default function memory
 - Template: `lib/documents/work-order-pdf-html.ts` (trade-safe; see WF-8 "Work order PDF content"). Same layout as the original print page, 10mm margins. The Vercel Chromium has no Arial, so Liberation Sans (Arial-metric, SIL OFL; `lib/pdf/fonts/`) is embedded under the family name Arial
 - Reusable hook for automations: `generateWorkOrderPdf(workOrderId, ctx?)` in `lib/work-orders/work-order-pdf.ts` returns a `Buffer`. Without `ctx` it uses the signed-in session; background jobs pass `{ supabase: createServiceClient(), tenantId }`. Not yet wired to email, job_files or Telegram.
-- UI: "Preview PDF" / "Download PDF" on the Work Orders tab table and the work order card menu
+- UI: "PDF" button on the Work Orders tab table and "Preview PDF" in the work order card menu (opens inline; no download option)
 - The older browser-print page `/print/work-orders/[workOrderId]` remains until the new PDF is signed off, then it will be retired
 
 ### Performance

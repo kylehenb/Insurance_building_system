@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildWorkOrderPdf, WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
 
 // Live Work Order PDF — rendered with headless Chromium on every request,
-// never stored. ?download=1 forces a download; otherwise it opens inline.
+// never stored. Always served inline (opens in the browser's PDF viewer).
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function contentDisposition(type: 'inline' | 'attachment', filename: string): string {
+function contentDisposition(filename: string): string {
   const ascii = filename.replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '')
-  return `${type}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
 }
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
@@ -26,7 +26,6 @@ export async function GET(
   const started = Date.now()
   try {
     const { pdf, filename } = await buildWorkOrderPdf(id)
-    const download = req.nextUrl.searchParams.get('download') === '1'
 
     console.log(`Work order PDF ${id}: ${pdf.length} bytes in ${Date.now() - started}ms`)
 
@@ -34,7 +33,7 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': contentDisposition(download ? 'attachment' : 'inline', filename),
+        'Content-Disposition': contentDisposition(filename),
         'Content-Length': String(pdf.length),
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',

@@ -8,6 +8,7 @@ import JobSchedule from '@/components/schedule/JobSchedule'
 import { GanttView, type GanttScale } from './GanttView'
 import { BottomPanel } from './BottomPanel'
 import { SendAllModal } from './SendAllModal'
+import { CancelWorkOrderModal } from './CancelWorkOrderModal'
 import { AddWorkOrderModal } from './AddWorkOrderModal'
 import { CARD_CSS } from './WorkOrderCard'
 
@@ -38,6 +39,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
   const [view,         setView]         = useState<View>('blueprint')
   const [expandedIds,  setExpandedIds]  = useState<Set<string>>(new Set())
   const [sendModalOpen, setSendModalOpen] = useState(false)
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null)
   const [addModal, setAddModal] = useState<AddModalState>({
     open: false,
     context: { type: 'additional' },
@@ -78,13 +80,10 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
     [workOrders, mutations]
   )
 
-  const handleCancel = useCallback(
-    (id: string) => {
-      if (!confirm('Cancel this work order? Gary SMS will stop immediately.')) return
-      mutations.cancelWorkOrder(id)
-    },
-    [mutations]
-  )
+  // Opens the cancel modal; the actual cancellation happens on confirm there
+  const handleCancel = useCallback((id: string) => setCancelTargetId(id), [])
+
+  const cancelTarget = cancelTargetId ? workOrders.find(w => w.id === cancelTargetId) : undefined
 
   const handleUpdate = useCallback(
     (
@@ -373,6 +372,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           onUpdateWorkOrder={(id, updates) => mutations.updateWorkOrder(id, updates)}
           onDeleteWorkOrder={mutations.deleteWorkOrder}
           onLockWorkOrder={mutations.lockWorkOrder}
+          onCancelWorkOrder={handleCancel}
           onUpdateScopeItem={mutations.updateScopeItem}
           onSoftDeleteScopeItem={mutations.softDeleteScopeItem}
           onCreateScopeItem={mutations.createScopeItem}
@@ -391,6 +391,17 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
             setSendModalOpen(false)
           }}
           onCancel={() => setSendModalOpen(false)}
+        />
+      )}
+
+      {cancelTarget && (
+        <CancelWorkOrderModal
+          workOrder={cancelTarget}
+          onConfirm={async notifyTrade => {
+            setCancelTargetId(null)
+            await mutations.cancelWorkOrder(cancelTarget.id, notifyTrade)
+          }}
+          onClose={() => setCancelTargetId(null)}
         />
       )}
 
