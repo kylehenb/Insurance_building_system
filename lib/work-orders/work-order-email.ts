@@ -1,7 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw } from '@/lib/email/build-raw'
-import { renderTemplate, resolveEmailTemplate } from '@/lib/email/templates'
+import { renderTemplate, resolveEmailTemplate, workOrderTemplateVars } from '@/lib/email/templates'
 import { woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import { buildWorkOrderPdf, tradeLabelFor, type WorkOrderPdfContext } from '@/lib/work-orders/work-order-pdf'
 
@@ -72,18 +72,8 @@ export async function buildWorkOrderEmailDraft(
   const { wo, job, tenant, trade } = await loadSendContext(workOrderId, ctx)
   const template = await resolveEmailTemplate(ctx.supabase, ctx.tenantId, 'work_order', job.client_id)
 
-  const woRef = wo.work_order_ref || `WO-${wo.id.slice(0, 8).toUpperCase()}`
-  const vars = {
-    trade_name:       trade?.business_name ?? '',
-    trade_contact:    trade?.primary_contact?.trim() || trade?.business_name || 'there',
-    trade_type:       tradeLabelFor(wo, trade) || 'the',
-    work_order_ref:   woRef,
-    job_number:       job.job_number,
-    claim_number:     job.claim_number,
-    insured_name:     job.insured_name,
-    property_address: job.property_address,
-    company_name:     tenant.trading_name || tenant.name,
-  }
+  const vars = workOrderTemplateVars({ workOrder: wo, job, tenant, trade, tradeLabel: tradeLabelFor(wo, trade) })
+  const woRef = vars.work_order_ref
 
   // Filename as it will be once sent (no DRAFT suffix)
   const filename = [woRef, trade?.business_name || vars.trade_type, (job.property_address ?? '').slice(0, 80)]

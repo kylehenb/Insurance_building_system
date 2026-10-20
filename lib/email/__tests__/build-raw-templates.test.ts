@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildEmailRaw } from '../build-raw'
-import { BUILT_IN_TEMPLATES, renderTemplate } from '../templates'
+import { BUILT_IN_TEMPLATES, TEMPLATE_TOKENS, renderTemplate } from '../templates'
 
 const decode = (raw: string) => Buffer.from(raw, 'base64url').toString()
 
@@ -35,9 +35,7 @@ describe('renderTemplate', () => {
 
   it('built-in work order template uses only supported tokens', () => {
     const t = BUILT_IN_TEMPLATES.work_order
-    const out = renderTemplate(`${t.subject}\n${t.body}`, Object.fromEntries(
-      ['trade_name', 'trade_contact', 'trade_type', 'work_order_ref', 'job_number', 'claim_number',
-        'insured_name', 'property_address', 'company_name'].map(k => [k, 'v'])))
+    const out = renderTemplate(`${t.subject}\n${t.body}`, Object.fromEntries(TEMPLATE_TOKENS.work_order.map(k => [k.key, 'v'])))
     expect(out).not.toMatch(/\{\w+\}/)
   })
 })

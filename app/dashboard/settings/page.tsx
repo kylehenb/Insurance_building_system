@@ -75,7 +75,7 @@ export default async function SettingsPage() {
     {
       name: 'Email Templates',
       route: '/dashboard/settings/email-templates',
-      description: 'Manage email templates for inspection sends, work orders, invoices, and general use',
+      description: 'Edit the standard wording for emails sent to trades and clients — work orders now, quotes and invoices later',
       icon: <Mail className="w-4 h-4" />,
     },
     {

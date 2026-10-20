@@ -38,13 +38,58 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
   },
 }
 
-/** Tokens each send type supports, for substitution and for the template editor. */
-export const TEMPLATE_TOKENS: Record<EmailSendType, string[]> = {
+export interface TemplateToken {
+  key: string
+  label: string
+  /** Shown in the preview when there's no real record to fill it from */
+  example: string
+}
+
+/** Placeholders each send type supports, for substitution and the template editor. */
+export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
   work_order: [
-    'trade_name', 'trade_contact', 'trade_type', 'work_order_ref',
-    'job_number', 'claim_number', 'insured_name', 'property_address',
-    'company_name',
+    { key: 'trade_contact',    label: 'Trade contact',    example: 'Dave' },
+    { key: 'trade_name',       label: 'Trade business',   example: 'Smith Plumbing Pty Ltd' },
+    { key: 'trade_type',       label: 'Trade type',       example: 'Plumber' },
+    { key: 'work_order_ref',   label: 'Work order ref',   example: 'WO-1042' },
+    { key: 'job_number',       label: 'Job number',       example: 'IRC1042' },
+    { key: 'claim_number',     label: 'Claim number',     example: 'CLM-558213' },
+    { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
+    { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
+    { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
   ],
+}
+
+/** Email types listed in Settings → Email Templates, in display order. */
+export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; description: string }[] = [
+  {
+    sendType: 'work_order',
+    label: 'Work order',
+    description: 'Sent to the trade by Send & Lock, with the work order PDF attached.',
+  },
+]
+
+type WorkOrderVarsInput = {
+  workOrder: { id: string; work_order_ref: string | null }
+  job: { job_number: string; claim_number: string | null; insured_name: string | null; property_address: string | null }
+  tenant: { name: string; trading_name: string | null }
+  trade: { business_name: string | null; primary_contact: string | null } | null
+  tradeLabel: string
+}
+
+/** Placeholder values for a work order email. */
+export function workOrderTemplateVars({ workOrder, job, tenant, trade, tradeLabel }: WorkOrderVarsInput): Record<string, string | null> {
+  return {
+    trade_name:       trade?.business_name ?? '',
+    trade_contact:    trade?.primary_contact?.trim() || trade?.business_name || 'there',
+    trade_type:       tradeLabel || 'the',
+    work_order_ref:   workOrder.work_order_ref || `WO-${workOrder.id.slice(0, 8).toUpperCase()}`,
+    job_number:       job.job_number,
+    claim_number:     job.claim_number,
+    insured_name:     job.insured_name,
+    property_address: job.property_address,
+    company_name:     tenant.trading_name || tenant.name,
+  }
 }
 
 /**
