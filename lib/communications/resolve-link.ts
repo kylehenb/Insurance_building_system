@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { matchJob, type JobCandidate } from './match-job'
-import { findThreadJobId } from './thread-link'
+import { findThreadJobId, isAdminThread } from './thread-link'
 import { isAdminEmail } from './admin-filter'
 
 export type CommunicationLink = {
@@ -54,7 +54,8 @@ export async function resolveCommunicationLink(params: {
     return { job_id: null, source: 'unlinked', match_candidates: candidates }
   }
 
-  if (isAdminEmail({ fromEmail, subject, body })) {
+  // Replies in a thread already filed as admin (automatically or by hand) stay admin
+  if (isAdminEmail({ fromEmail, subject, body }) || await isAdminThread(db, tenantId, threadId)) {
     return { job_id: null, source: 'admin', match_candidates: null }
   }
 

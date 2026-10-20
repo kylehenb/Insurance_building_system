@@ -100,6 +100,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .eq('type', 'email')
     .eq('direction', 'inbound')
   if (!rematch) query = query.is('match_candidates' as never, null)
+  // Admin is never re-matched — it may have been filed by hand
+  query = query.or('source.is.null,source.neq.admin')
   // Rematch pages through everything oldest-first; pass back next_after to continue
   if (after) query = query.gt('created_at', after)
 

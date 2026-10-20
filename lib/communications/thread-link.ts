@@ -103,6 +103,50 @@ export async function linkThreadToJob(
 }
 
 /**
+ * Files every unlinked message in a thread as admin (not job related), or
+ * moves admin messages back to the unlinked inbox. Linked messages are untouched.
+ * Returns the number of rows changed.
+ */
+export async function setThreadCategory(
+  db: SupabaseClient,
+  tenantId: string,
+  threadId: string | null | undefined,
+  category: 'admin' | 'unlinked',
+): Promise<number> {
+  if (!threadId) return 0
+  const { data, error } = await db
+    .from('communications')
+    .update({ source: category })
+    .eq('tenant_id', tenantId)
+    .eq('thread_id', threadId)
+    .is('job_id', null)
+    .or(`source.is.null,source.neq.${category}`)
+    .select('id')
+  if (error) {
+    console.error(`[thread-link] failed to set thread ${threadId} to ${category}:`, error)
+    return 0
+  }
+  return data?.length ?? 0
+}
+
+/** Returns true if an unlinked message in this thread has been filed as admin. */
+export async function isAdminThread(
+  db: SupabaseClient,
+  tenantId: string,
+  threadId: string | null | undefined,
+): Promise<boolean> {
+  if (!threadId) return false
+  const { count } = await db
+    .from('communications')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('thread_id', threadId)
+    .is('job_id', null)
+    .eq('source', 'admin')
+  return (count ?? 0) > 0
+}
+
+/**
  * After an insurer order is lodged/linked to a job, link its email thread(s)
  * so the original order email and any replies leave the unlinked inbox.
  */

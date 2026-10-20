@@ -381,6 +381,27 @@ export default function DashboardPage() {
     }
   }
 
+  // File an unlinked email (and its thread) as admin, or move it back to the inbox
+  async function setCommCategory(commId: string, category: 'admin' | 'unlinked') {
+    setLinkSaving(commId)
+    try {
+      const res = await fetch(`/api/communications/${commId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: category }),
+      })
+      if (!res.ok) return
+      if (linkingId === commId) {
+        setLinkingId(null)
+        setLinkSearch('')
+        setLinkResults([])
+      }
+      await fetchUnlinkedComms()
+    } finally {
+      setLinkSaving(null)
+    }
+  }
+
   // ── AI Chat ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -681,6 +702,13 @@ export default function DashboardPage() {
         .ui-row { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; padding: 11px 14px; border-bottom: 0.5px solid #f5f2ee; }
         .ui-row:last-child { border-bottom: none; }
         .ui-row:hover { background: #faf9f7; }
+        .ui-row.is-admin { background: #f3f5f8; box-shadow: inset 3px 0 0 #8fa0b8; }
+        .ui-row.is-admin:hover { background: #ecf0f5; }
+        .ui-row.is-admin .ui-subject, .ui-row.is-admin .ui-preview { color: #7d8794; }
+        .ui-admin-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #4f6178; background: #e2e8f0; border: 0.5px solid #c3cddb; padding: 1px 6px; border-radius: 20px; margin-left: 6px; vertical-align: 1px; font-family: inherit; }
+        .ui-admin-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid #c3cddb; background: transparent; color: #5b6b80; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; transition: border-color 0.15s; flex-shrink: 0; }
+        .ui-admin-btn:hover { border-color: #8fa0b8; color: #3f4f63; }
+        .ui-admin-btn:disabled, .ui-link-btn:disabled { opacity: 0.5; cursor: default; }
         .ui-from { font-size: 11px; color: #c8b89a; font-weight: 500; margin-bottom: 2px; font-family: 'DM Mono', monospace; }
         .ui-subject { font-size: 13px; color: #1a1a1a; font-weight: 500; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
         .ui-preview { font-size: 12px; color: #7a7167; font-weight: 300; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
@@ -974,22 +1002,29 @@ export default function DashboardPage() {
               const isOpen = linkingId === comm.id
               const isSaving = linkSaving === comm.id
               const candidates = Array.isArray(comm.match_candidates) ? comm.match_candidates : []
+              const isAdmin = comm.source === 'admin'
 
               return (
                 <div key={comm.id}>
-                  <div className="ui-row">
+                  <div className={`ui-row${isAdmin ? ' is-admin' : ''}`}>
                     <div style={{ minWidth: 0 }}>
                       <div className="ui-from">
                         {comm.from_email ?? comm.contact_name ?? 'Unknown sender'}
-                        {comm.source === 'admin' && (
-                          <span style={{ fontSize: 10, color: '#b0a898', fontWeight: 700, marginLeft: 6 }}>ADMIN</span>
-                        )}
+                        {isAdmin && <span className="ui-admin-tag">Admin</span>}
                       </div>
                       <div className="ui-subject">{comm.subject ?? '(no subject)'}</div>
                       <div className="ui-preview">{comm.content ?? ''}</div>
                       <div className="ui-age">{timeAgo(comm.created_at ?? '')}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        className="ui-admin-btn"
+                        disabled={isSaving}
+                        title={isAdmin ? 'Move back to the unlinked inbox' : 'Not job related — file as admin (applies to the whole thread)'}
+                        onClick={() => setCommCategory(comm.id, isAdmin ? 'unlinked' : 'admin')}
+                      >
+                        {isAdmin ? 'Not admin' : 'Mark admin'}
+                      </button>
                       <button
                         className="ui-link-btn"
                         onClick={() => {
