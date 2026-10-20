@@ -366,7 +366,7 @@ export function useWorkOrders(jobId: string, tenantId: string): WorkOrdersData {
           const newGaryState = wo.predecessor_work_order_id ? 'waiting_on_dependent' : 'waiting_reply'
           await supabase
             .from('work_orders')
-            .update({ gary_state: newGaryState })
+            .update({ gary_state: newGaryState, status: 'engaged' })
             .eq('id', wo.id)
             .eq('tenant_id', tenantId)
           await supabase.from('communications').insert({

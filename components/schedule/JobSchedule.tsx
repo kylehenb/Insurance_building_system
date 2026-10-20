@@ -1228,10 +1228,11 @@ function getStatusColor(status: string, garyState: string) {
   if (status === 'works_complete' || status === 'invoice_received') {
     return { circle: '#0284c7', text: '#fff' }
   }
-  if (status === 'engaged' || garyState === 'confirmed') {
+  // 'engaged' only means the work order was sent — confirmation comes from Gary
+  if (garyState === 'confirmed') {
     return { circle: '#16a34a', text: '#fff' }
   }
-  if (garyState === 'waiting_reply' || garyState === 'gary_sent') {
+  if (garyState === 'waiting_reply' || garyState === 'gary_sent' || status === 'engaged') {
     return { circle: '#d97706', text: '#fff' }
   }
   return { circle: '#e5e7eb', text: '#6b7280' }
@@ -1241,7 +1242,7 @@ function getStatusChipConfig(status: string, garyState: string) {
   if (status === 'works_complete' || status === 'invoice_received') {
     return { bg: '#f0f9ff', text: '#0284c7', label: 'Complete' }
   }
-  if (status === 'engaged' || garyState === 'confirmed') {
+  if (garyState === 'confirmed') {
     return { bg: '#f0fdf4', text: '#16a34a', label: 'Confirmed' }
   }
   if (garyState === 'waiting_reply' || garyState === 'gary_sent') {
@@ -1249,6 +1250,9 @@ function getStatusChipConfig(status: string, garyState: string) {
   }
   if (garyState === 'waiting_on_dependent') {
     return { bg: '#faf5ff', text: '#7c3aed', label: 'Blocked' }
+  }
+  if (status === 'engaged') {
+    return { bg: '#fffbeb', text: '#d97706', label: 'Sent' }
   }
   return { bg: '#f9fafb', text: '#6b7280', label: 'Pending' }
 }

@@ -672,8 +672,10 @@ function WORow({
   const color    = getTradeColor(wo.tradeTypeLabel)
   const isLocked = woIsSent(wo)
 
+  // Null when there's no trade invoice yet — nothing to sync, so show a dash
   const xeroStyle =
-    wo.invoice?.accounting_sync_status === 'synced'
+    !wo.invoice ? null
+    : wo.invoice.accounting_sync_status === 'synced'
       ? { bg: '#eaf4ef', color: '#2d6a4f', border: '#a7d4bc', label: 'Synced' }
       : { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: 'Pending' }
 
@@ -817,9 +819,13 @@ function WORow({
 
         {/* Xero */}
         <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 10, background: xeroStyle.bg, color: xeroStyle.color, border: `1px solid ${xeroStyle.border}` }}>
-            {xeroStyle.label}
-          </span>
+          {xeroStyle ? (
+            <span style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 10, background: xeroStyle.bg, color: xeroStyle.color, border: `1px solid ${xeroStyle.border}` }}>
+              {xeroStyle.label}
+            </span>
+          ) : (
+            <span style={{ fontSize: 10, color: '#9a9590' }}>—</span>
+          )}
         </td>
 
         {/* Preview */}
