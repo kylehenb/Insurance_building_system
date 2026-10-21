@@ -117,6 +117,32 @@ html, body { background: #ffffff; }
 .sg-spinner { width: 54px; height: 54px; border: 6px solid #e3ddd3; border-top-color: #111111; border-radius: 50%; margin: 0 auto 18px; animation: sg-spin 0.9s linear infinite; }
 @keyframes sg-spin { to { transform: rotate(360deg); } }
 
+/* The real document pages, with signature boxes on them */
+.sg-pages { max-width: 900px; margin: 8px auto 0; padding: 0 6px; }
+.sg-page { margin: 0 0 18px; }
+.sg-page figcaption { font-size: 15px; color: #555555; font-weight: bold; margin: 0 4px 4px; }
+.sg-sheet { position: relative; height: 0; background: #ffffff; border: 1px solid #cfc8bc; box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
+.sg-sheet-link, .sg-sheet img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.sg-field.sg-onpage { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; z-index: 2; scroll-margin-top: 140px; }
+.sg-onpage .sg-sign-box { position: relative; width: 100%; height: 100%; min-height: 0; padding: 0; border: 2px dashed #b8860b; border-radius: 3px; background: rgba(255, 214, 92, 0.38); font-size: 12px; line-height: 1; color: #5a4300; display: none; }
+.sg-onpage .sg-sign-box:after { content: ''; position: absolute; left: -6px; right: -6px; top: -14px; bottom: -14px; }
+.sg-js .sg-onpage .sg-sign-box { display: block; }
+.sg-onpage.is-current .sg-sign-box { border-color: #0b63c4; border-style: solid; background: rgba(11, 99, 196, 0.12); box-shadow: 0 0 0 3px rgba(11, 99, 196, 0.35); }
+.sg-onpage.is-done .sg-sign-box { border: 1px dashed rgba(46, 125, 50, 0.6); background: rgba(46, 125, 50, 0.05); box-shadow: none; }
+.sg-onpage .sg-sign-placeholder { display: none; }
+.sg-onpage .sg-sign-preview { font-size: 16px; line-height: 1; white-space: nowrap; text-align: left; padding-left: 3px; height: 100%; overflow: hidden; }
+.sg-onpage.is-done .sg-sign-preview { display: flex; align-items: flex-end; }
+.sg-onpage .sg-sign-preview img { max-height: 100%; max-width: 100%; }
+.sg-flag { position: absolute; left: -2px; bottom: 100%; margin-bottom: 3px; background: #b8860b; color: #ffffff; font-size: 15px; font-weight: bold; line-height: 1; padding: 8px 11px; border-radius: 6px 6px 6px 0; white-space: nowrap; display: none; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+.sg-js .sg-onpage .sg-flag { display: block; }
+.sg-onpage.is-current .sg-flag { background: #0b63c4; }
+.sg-onpage.is-done .sg-flag { display: none; }
+.sg-fill { position: absolute; z-index: 1; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif; line-height: 1.1; white-space: nowrap; display: flex; align-items: flex-end; padding-left: 2px; pointer-events: none; }
+.sg-zoom-tip { color: #555555; font-size: 16px; margin: 4px 0 12px; }
+.sg-easy { border: 1px solid #e3ddd3; border-radius: 10px; padding: 0 16px; margin: 0 0 20px; background: #fbf9f5; }
+.sg-easy summary { cursor: pointer; font-weight: bold; color: #0b4a8b; padding: 14px 0; min-height: 48px; }
+.sg-easy[open] summary { border-bottom: 1px solid #e3ddd3; margin-bottom: 8px; }
+
 .sg-status { text-align: left; padding-top: 12px; }
 .sg-status-icon { font-size: 54px; line-height: 1; margin: 28px 0 4px; }
 .sg-contact { margin-top: 28px; padding: 18px 20px; border-radius: 12px; background: #f7f4ef; border: 1px solid #e3ddd3; }

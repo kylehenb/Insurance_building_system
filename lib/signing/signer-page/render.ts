@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
 import { CONSENT_TEXT, SIGNER_CONTACT } from '@/lib/signing/config'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
-import type { SignerExcessInvoice, SignerView } from '@/lib/signing/in-house/signer'
+import type { SignerExcessInvoice, SignerFieldView, SignerView } from '@/lib/signing/in-house/signer'
 import { DEFAULT_SIGNATURE_STYLE, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
-import type { DisplayBlock, SignerCapacity } from '@/lib/signing/types'
+import type { DisplayBlock, PdfRect, SignerCapacity } from '@/lib/signing/types'
 import { SIGNER_SCRIPT } from './script'
 import { SIGNER_CSS } from './styles'
 
@@ -164,6 +164,82 @@ export function renderDocumentBlocks(blocks: DisplayBlock[]): string {
   return `<article class="sg-doc">${html.join('\n')}</article>`
 }
 
+// ── The real document pages ─────────────────────────────────────────────────
+// Images of the exact PDF being signed, with each signature box placed where
+// the signature will be stamped (positions in % of the page, so they scale
+// with the image). Date and printed name previews appear in their blanks
+// once a box is signed.
+
+type PagesBlock = Extract<DisplayBlock, { type: 'pages' }>
+type PageSize = PagesBlock['pages'][number]
+
+function pagesBlockOf(view: SignerView): PagesBlock | null {
+  return view.display.find((b): b is PagesBlock => b.type === 'pages') ?? null
+}
+
+const pct = (v: number) => `${Math.round(v * 100000) / 1000}%`
+
+function rectStyle(rect: PdfRect, page: PageSize): string {
+  const top = (page.heightPt - rect.y - rect.height) / page.heightPt
+  return `left:${pct(rect.x / page.widthPt)};top:${pct(top)};width:${pct(rect.width / page.widthPt)};height:${pct(rect.height / page.heightPt)}`
+}
+
+function pageOverlays(fields: SignerFieldView[], pageIndex: number, page: PageSize): string {
+  const out: string[] = []
+  fields.forEach((field, i) => {
+    const fills: [PdfRect | null | undefined, string][] = [[field.date, 'date'], [field.name, 'name'], [field.representative, 'representative']]
+    for (const [rect, kind] of fills) {
+      if (rect && rect.page === pageIndex) {
+        out.push(`<span class="sg-fill" data-fill="${kind}" data-for="${esc(field.id)}" style="${rectStyle(rect, page)}" aria-hidden="true"></span>`)
+      }
+    }
+    if (field.signature && field.signature.page === pageIndex) {
+      out.push(`<div class="sg-field sg-onpage" id="field-${i + 1}" data-field-id="${esc(field.id)}" data-label="${esc(field.label)}" style="${rectStyle(field.signature, page)}">
+        <span class="sg-flag sg-js-only" aria-hidden="true">✍️ Sign here${fields.length > 1 ? ` (${i + 1} of ${fields.length})` : ''}</span>
+        <button type="button" class="sg-sign-box sg-js-only" aria-label="Signature ${i + 1} of ${fields.length}, ${esc(field.label)}: tap to sign">
+          <span class="sg-sign-placeholder">Tap to sign</span>
+          <span class="sg-sign-preview"></span>
+        </button>
+      </div>`)
+    }
+  })
+  return out.join('\n')
+}
+
+function largePrintBlocks(blocks: DisplayBlock[]): DisplayBlock[] {
+  return blocks
+    .filter(b => b.type !== 'pages')
+    .map(b => (b.type === 'signature'
+      ? { type: 'paragraph' as const, text: `✍️ ${b.label}: you sign this on the document pages above.`, emphasis: true }
+      : b))
+}
+
+function documentPages(view: SignerView, pages: PagesBlock, base: string): string {
+  const total = pages.pages.length
+  const name = view.documentName ?? 'document'
+  const figures = pages.pages.map((page, i) => {
+    const src = `${base}/page/${i + 1}`
+    return `<figure class="sg-page" id="page-${i + 1}">
+    <figcaption>Page ${i + 1} of ${total}</figcaption>
+    <div class="sg-sheet" style="padding-top:${pct(page.heightPt / page.widthPt)}">
+      <a href="${esc(src)}" target="_blank" rel="noopener" class="sg-sheet-link" aria-label="Open page ${i + 1} full size"><img src="${esc(src)}" alt="Page ${i + 1} of the ${esc(name)}"${i > 1 ? ' loading="lazy"' : ''}></a>
+      ${pageOverlays(view.fields, i, page)}
+    </div>
+  </figure>`
+  }).join('\n')
+  return `<section class="sg-pages" aria-label="The ${esc(name)}">
+  ${figures}
+  <p class="sg-nojs-note sg-wrap">Your signature will be added in the boxes above when you tap Finish at the bottom of the page.</p>
+</section>
+<div class="sg-wrap">
+  <p class="sg-zoom-tip">To zoom in, spread two fingers on a page, or tap a page to open it on its own.</p>
+  <details class="sg-easy">
+    <summary>Text too small? Read the same wording in large print</summary>
+    ${renderDocumentBlocks(largePrintBlocks(view.display))}
+  </details>
+</div>`
+}
+
 function signatureForm(action: string, signerName: string, ownerName: string | null): string {
   const styles = SIGNATURE_STYLES.map(style => {
     const checked = style.key === DEFAULT_SIGNATURE_STYLE
@@ -240,15 +316,21 @@ function openFlow(view: SignerView, token: string, errorMessage: string | null, 
   const fieldCount = view.fields.length
   const fonts = Object.fromEntries(SIGNATURE_STYLES.map(s => [s.key, signatureFontFamily(s.key)]))
 
-  return `<div id="sg-root" data-view-url="${esc(`${base}/view`)}" data-fonts="${esc(JSON.stringify(fonts))}" data-has-error="${errorMessage ? '1' : '0'}">
-  <main class="sg-wrap">
+  const pages = pagesBlockOf(view)
+  const documentView = pages && view.fields.every(f => f.signature)
+    ? documentPages(view, pages, base)
+    : `<div class="sg-wrap">${renderDocumentBlocks(view.display)}</div>`
+
+  return `<div id="sg-root" data-view-url="${esc(`${base}/view`)}" data-fonts="${esc(JSON.stringify(fonts))}" data-has-error="${errorMessage ? '1' : '0'}" data-today="${esc(formatSigningDate(new Date()))}" data-owner="${esc(view.ownerName ?? '')}">
+  <main>
+  <div class="sg-wrap">
     ${errorMessage ? `<div class="sg-error" role="alert">${esc(errorMessage)}</div>` : ''}
     <section class="sg-card" aria-labelledby="sg-title">
       <p class="sg-kicker">From ${esc(companyName)}</p>
       <h1 id="sg-title">Please sign your ${esc(view.documentName)}</h1>
       <p>${firstName ? `Hi ${esc(firstName)}. ` : ''}This is for the repairs at <strong>${esc(view.propertyAddress ?? 'your property')}</strong>.</p>
       <ol class="sg-howto">
-        <li>Read the document below.</li>
+        <li>${pages ? 'Read the document below — these are the actual pages you are signing.' : 'Read the document below.'}</li>
         <li>Sign in ${fieldCount === 1 ? '1 place' : `${fieldCount} places`}.</li>
         <li>Tap <strong>Finish</strong>.</li>
       </ol>
@@ -257,11 +339,14 @@ function openFlow(view: SignerView, token: string, errorMessage: string | null, 
       <a href="${esc(`${base}/document`)}" class="sg-btn sg-btn-secondary" target="_blank" rel="noopener">View the full document (PDF)</a>
       ${view.expiresAt ? `<p class="sg-foot">This link works until ${esc(formatSigningDate(view.expiresAt))}.</p>` : ''}
     </section>
-    ${renderDocumentBlocks(view.display)}
+  </div>
+  ${documentView}
+  <div class="sg-wrap">
     ${signatureForm(`${base}/submit`, view.signerName ?? '', view.ownerName)}
     ${view.excessInvoice ? excessInvoiceCard(view.excessInvoice, `${base}/invoice`, false) : ''}
     ${contactBox()}
     <p class="sg-foot">Your signature is added to the document together with the date, time and a record of this device, so it can be checked later.</p>
+  </div>
   </main>
   <div id="sg-bar" class="sg-bar" role="region" aria-label="Signing steps">
     <div class="sg-wrap">

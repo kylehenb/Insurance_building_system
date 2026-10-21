@@ -8,6 +8,8 @@ const CHROMIUM_FILES = [
 ];
 const DOCUMENT_IMAGES = ["./public/logo-pdf.png", "./public/logo-alt.png", "./public/signature.png"];
 const SIGNING_FONTS = ["./lib/signing/fonts/*.ttf", "./lib/pdf/fonts/*.ttf"];
+// pdf.js, run inside Chromium to turn the document's pages into images (lib/pdf/render-pdf-pages.ts)
+const PDFJS_FILES = ["./node_modules/pdfjs-dist/build/pdf.min.mjs", "./node_modules/pdfjs-dist/build/pdf.worker.min.mjs"];
 
 // Full puppeteer is a devDependency used only for local rendering.
 const NO_FULL_PUPPETEER = ["./node_modules/puppeteer/**"];
@@ -22,7 +24,7 @@ const nextConfig: NextConfig = {
     // Send & Lock renders the work order PDF too
     "/api/work-orders/\\[id\\]/send": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     // E-signing: generates the document when a request is created…
-    "/api/signing/jobs/\\[jobId\\]/requests": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
+    "/api/signing/jobs/\\[jobId\\]/requests": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES, ...PDFJS_FILES],
     // Resend re-renders the excess invoice PDF if its stored copy is missing
     "/api/signing/requests/\\[id\\]/\\[action\\]": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     // …and stamps the signature + certificate when the homeowner signs

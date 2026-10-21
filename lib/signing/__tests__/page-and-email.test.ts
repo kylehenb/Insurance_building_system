@@ -85,6 +85,47 @@ describe('signer page', () => {
   })
 })
 
+describe('signer page with the real document pages', () => {
+  const pages = { type: 'pages' as const, pages: [{ widthPt: 595.28, heightPt: 841.89 }, { widthPt: 595.28, heightPt: 841.89 }], imageType: 'image/png' as const }
+  const rect = (page: number, x: number, y: number, width: number, height: number) => ({ page, x, y, width, height })
+  const paged = (overrides: Partial<SignerView> = {}) => view({
+    display: [pages, ...view().display],
+    fields: [
+      { id: 'f1', label: 'Authorise', signature: rect(1, 59.5, 420.945, 238.112, 42.1), date: rect(1, 400, 420, 100, 14), name: rect(1, 60, 400, 150, 14), representative: null },
+    ],
+    ...overrides,
+  })
+
+  it('shows every page image from this link, with the box placed on its page', () => {
+    const html = renderSignerPage(paged(), { token: TOKEN })
+    expect(html).toContain(`src="/api/sign/${TOKEN}/page/1"`)
+    expect(html).toContain(`src="/api/sign/${TOKEN}/page/2"`)
+    expect(html).toContain('Page 2 of 2')
+    const box = html.match(/<div class="sg-field sg-onpage"[^>]*>/g) ?? []
+    expect(box).toHaveLength(1)
+    // x 59.5/595.28 = 10%, top (841.89-420.945-42.1)/841.89 = 45%, width 40%, height 5%
+    expect(box[0]).toContain('left:9.995%;top:44.999%;width:40%;height:5.001%')
+    expect(html.indexOf('id="page-2"')).toBeLessThan(html.indexOf('class="sg-field sg-onpage"'))
+    expect(html).toContain('data-fill="date" data-for="f1"')
+    expect(html).toContain('data-fill="name" data-for="f1"')
+  })
+
+  it('keeps the large-print wording, without a second set of signature boxes', () => {
+    const html = renderSignerPage(paged(), { token: TOKEN })
+    expect(html).toContain('Read the same wording in large print')
+    expect(html).toContain('Authorise: you sign this on the document pages above.')
+    expect(html.match(/class="sg-field/g)).toHaveLength(1)
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+
+  it('falls back to the reading view for requests without page images', () => {
+    const html = renderSignerPage(view(), { token: TOKEN })
+    expect(html).not.toContain('sg-onpage"')
+    expect(html).not.toContain('/page/1')
+    expect(html).toContain('<section class="sg-field" id="field-1"')
+  })
+})
+
 describe('signer page excess invoice', () => {
   const invoice = {
     ref: 'IRC1001-EX',

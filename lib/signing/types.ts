@@ -79,10 +79,12 @@ export interface LocatedSignatureField {
   representative?: PdfRect | null
 }
 
-// ── Mobile reading view ─────────────────────────────────────────────────────
-// The signer reads the document as large, reflowed text on their phone
-// (no pinch-zoom), built from the same data as the PDF. The exact PDF is
-// always one tap away.
+// ── Signer's view of the document ───────────────────────────────────────────
+// The signer sees the real PDF pages (images rendered from the exact source
+// PDF when the request is created — a 'pages' block) with the signature
+// boxes where they will be stamped. The other blocks are the same wording as
+// large, reflowed text: the "large print" version, and the whole view for
+// older requests created before page images existed.
 
 export type DisplayBlock =
   | { type: 'heading'; text: string }
@@ -91,6 +93,7 @@ export type DisplayBlock =
   | { type: 'list'; items: string[]; ordered?: boolean }
   | { type: 'scope'; rooms: { room: string; items: { description: string; qty: string }[] }[] }
   | { type: 'signature'; fieldId: string; label: string; context: string }
+  | { type: 'pages'; pages: { widthPt: number; heightPt: number }[]; imageType: 'image/png' }
 
 /** What the office UI shows for a request (no token, no internals). */
 export interface SigningRequestSummary {

@@ -33,6 +33,8 @@ export const CONSENT_TEXT = 'By tapping Finish you agree to sign this document e
 export const RATE_LIMITS = {
   /** Page loads and PDF opens, per IP */
   viewPerIp: { max: 60, windowSeconds: 10 * 60 },
+  /** Page images on the signer page (one per document page per load), per IP */
+  pageImagesPerIp: { max: 400, windowSeconds: 10 * 60 },
   /** Signature submissions, per IP */
   submitPerIp: { max: 10, windowSeconds: 10 * 60 },
   /** Signature submissions, per link */

@@ -17,7 +17,9 @@ import {
   type SigningProvider,
 } from '@/lib/signing/provider'
 import { loadJobAndTenant, loadRequestForTenant, persistExpiryIfDue } from '@/lib/signing/repository'
-import { downloadSigningPdf, removeSigningPdf, sourcePdfPath, uploadSigningPdf } from '@/lib/signing/storage'
+import { downloadSigningPdf, pageImagePath, removeSigningPdf, sourcePdfPath, uploadSigningFile, uploadSigningPdf } from '@/lib/signing/storage'
+import { renderPdfPages } from '@/lib/pdf/render-pdf-pages'
+import type { DisplayBlock } from '@/lib/signing/types'
 import { generateSigningToken, hashSigningToken, sha256Hex } from '@/lib/signing/tokens'
 import { effectiveStatus, toSigningRequestSummary, type SigningRequestSummary } from '@/lib/signing/types'
 import { signedFilename } from '@/lib/signing/completion'
@@ -37,6 +39,36 @@ function cleanSigner(input: CreateSigningRequestInput['signer']) {
   if (!isValidEmail(email)) throw new SigningError('Enter a valid email address for the signer', 400)
   if (phone && !/^[+\d][\d\s()-]{5,20}$/.test(phone)) throw new SigningError('The phone number doesn’t look right', 400)
   return { name, email, phone }
+}
+
+/**
+ * Images of the exact source pages, so the signer sees the real document.
+ * If rendering or uploading fails the request still works: the signer page
+ * falls back to the large-print reading view.
+ */
+async function storePageImages(
+  service: ReturnType<typeof createServiceClient>,
+  tenantId: string,
+  requestId: string,
+  pdf: Uint8Array,
+): Promise<{ block: Extract<DisplayBlock, { type: 'pages' }> | null; paths: string[] }> {
+  const paths: string[] = []
+  try {
+    const pages = await renderPdfPages(pdf, { format: 'png' })
+    for (let i = 0; i < pages.length; i++) {
+      const pagePath = pageImagePath(tenantId, requestId, i + 1)
+      await uploadSigningFile(service, pagePath, new Uint8Array(pages[i].image), pages[i].contentType)
+      paths.push(pagePath)
+    }
+    return {
+      block: { type: 'pages', pages: pages.map(p => ({ widthPt: p.widthPt, heightPt: p.heightPt })), imageType: 'image/png' },
+      paths,
+    }
+  } catch (err) {
+    console.error(`[signing] page images for ${requestId} failed; using the reading view:`, err)
+    await removeSigningPdf(service, paths)
+    return { block: null, paths: [] }
+  }
 }
 
 export class InHouseSigningProvider implements SigningProvider {
@@ -66,6 +98,8 @@ export class InHouseSigningProvider implements SigningProvider {
     const path = sourcePdfPath(actor.tenantId, requestId)
     const sourceSha256 = sha256Hex(located.pdf)
     await uploadSigningPdf(service, path, located.pdf)
+    const pages = await storePageImages(service, actor.tenantId, requestId, located.pdf)
+    const display: DisplayBlock[] = pages.block ? [pages.block, ...generated.display] : generated.display
 
     const { data: row, error } = await service
       .from('signing_requests')
@@ -84,14 +118,14 @@ export class InHouseSigningProvider implements SigningProvider {
         source_pdf_path: path,
         source_pdf_sha256: sourceSha256,
         fields: located.fields as unknown as Json,
-        display_content: generated.display as unknown as Json,
+        display_content: display as unknown as Json,
         reminders_enabled: input.remindersEnabled !== false,
         created_by: actor.userId,
       })
       .select('*')
       .single()
     if (error || !row) {
-      await removeSigningPdf(service, path)
+      await removeSigningPdf(service, [path, ...pages.paths])
       throw new SigningError(`Could not save the signing request: ${error?.message ?? 'unknown error'}`, 500)
     }
 

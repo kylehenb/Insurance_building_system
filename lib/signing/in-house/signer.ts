@@ -9,10 +9,10 @@ import { checkRateLimit } from '@/lib/signing/rate-limit'
 import { loadJobAndTenant, loadRequestByTokenHash, persistExpiryIfDue } from '@/lib/signing/repository'
 import { ipKey, type RequestMeta } from '@/lib/signing/request-meta'
 import { MAX_TYPED_SIGNATURE_LENGTH, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
-import { downloadSigningPdf, excessInvoicePdfPath, signedPdfPath, uploadSigningPdf } from '@/lib/signing/storage'
+import { downloadSigningFile, downloadSigningPdf, excessInvoicePdfPath, pageImagePath, signedPdfPath, uploadSigningPdf } from '@/lib/signing/storage'
 import { excessDueText } from '@/lib/excess/decision'
 import { hashSigningToken, isWellFormedToken, sha256Hex } from '@/lib/signing/tokens'
-import { printedSignerName, SIGNER_CAPACITY_LABELS, type DisplayBlock, type LocatedSignatureField, type SignerCapacity, type SigningRequestRow } from '@/lib/signing/types'
+import { printedSignerName, SIGNER_CAPACITY_LABELS, type DisplayBlock, type LocatedSignatureField, type PdfRect, type SignerCapacity, type SigningRequestRow } from '@/lib/signing/types'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
 import { PDFDocument } from 'pdf-lib'
 
@@ -21,6 +21,15 @@ import { PDFDocument } from 'pdf-lib'
 // one request's document is ever exposed.
 
 export type SignerLinkState = 'not_found' | 'revoked' | 'expired' | 'signed' | 'open'
+
+export interface SignerFieldView {
+  id: string
+  label: string
+  signature?: PdfRect
+  date?: PdfRect | null
+  name?: PdfRect | null
+  representative?: PdfRect | null
+}
 
 /** The excess invoice emailed with the request, as shown on the signer page. */
 export interface SignerExcessInvoice {
@@ -49,7 +58,8 @@ export interface SignerView {
   /** Signed within the last hour (shows the thank-you screen rather than "already signed") */
   signedRecently: boolean
   display: DisplayBlock[]
-  fields: { id: string; label: string }[]
+  /** Fields in signing order, with where they sit on the page (rects absent on older test fixtures) */
+  fields: SignerFieldView[]
   /** Excess invoice sent with this request (open link, or the thank-you screen) */
   excessInvoice: SignerExcessInvoice | null
 }
@@ -135,7 +145,14 @@ export async function resolveSignerView(token: string, meta: RequestMeta): Promi
     ...base,
     excessInvoice,
     display: Array.isArray(row.display_content) ? (row.display_content as unknown as DisplayBlock[]) : [],
-    fields: fieldsOf(row).map(f => ({ id: f.id, label: f.label })),
+    fields: fieldsOf(row).map(f => ({
+      id: f.id,
+      label: f.label,
+      signature: f.signature,
+      date: f.date,
+      name: f.name,
+      representative: f.representative ?? null,
+    })),
   }
 }
 
@@ -206,6 +223,20 @@ export async function openSourceDocument(token: string, meta: RequestMeta): Prom
     userAgent: meta.userAgent,
   })
   return { pdf, filename: `${signingDocumentLabel(row.document_type)}.pdf` }
+}
+
+/** Image of page n of the document, while the link is open. */
+export async function openPageImage(token: string, pageNumber: number, meta: RequestMeta): Promise<Buffer | null> {
+  const service = createServiceClient()
+  if (!(await checkRateLimit(service, `ip:${ipKey(meta.ip)}:pages`, RATE_LIMITS.pageImagesPerIp))) {
+    throw new SigningError('Too many requests. Please wait a few minutes and try again.', 429)
+  }
+  const row = await findRow(token)
+  if (!row || signerLinkState(row) !== 'open') return null
+  const blocks = Array.isArray(row.display_content) ? (row.display_content as unknown as DisplayBlock[]) : []
+  const pages = blocks.find((b): b is Extract<DisplayBlock, { type: 'pages' }> => b.type === 'pages')
+  if (!pages || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pages.pages.length) return null
+  return downloadSigningFile(service, pageImagePath(row.tenant_id, row.id, pageNumber))
 }
 
 /**

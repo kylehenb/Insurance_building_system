@@ -4,7 +4,9 @@
 // shows the typed-signature fields and a Finish button.
 //
 // It adds: the guided Start → Sign here → Next → Finish bar, the full-screen
-// "your signature" sheet, drawing with a finger, and the view beacon.
+// "your signature" sheet, drawing with a finger, the view beacon, and — on
+// the real document pages — the signature, date and printed name previews in
+// their boxes.
 
 export const SIGNER_SCRIPT = String.raw`
 (function () {
@@ -51,7 +53,7 @@ export const SIGNER_SCRIPT = String.raw`
   var canvas = document.getElementById('sg-canvas');
   var clearBtn = document.getElementById('sg-clear');
 
-  var adopted = null;      // { method, text, style, png }
+  var adopted = null;      // { method, text, style, png, name }
   var mode = 'start';      // start | sign | next | finish
   var pendingField = null; // field waiting for a signature to be adopted
   var submitting = false;
@@ -60,7 +62,9 @@ export const SIGNER_SCRIPT = String.raw`
   function fieldLabel(f) { return f.getAttribute('data-label') || 'Sign'; }
 
   function scrollToEl(el) {
-    var top = el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0) - 16;
+    // A box on a document page: show it a third of the way down, with the page around it
+    var offset = hasClass(el, 'sg-onpage') ? Math.round((window.innerHeight || 600) * 0.3) : 16;
+    var top = el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0) - offset;
     try { window.scrollTo({ top: top, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, top); }
   }
 
@@ -144,6 +148,53 @@ export const SIGNER_SCRIPT = String.raw`
     adoptError.style.display = 'block';
   }
 
+  // ── Previews on the document pages ─────────────────────────────────
+  var fills = toArray(root.querySelectorAll('.sg-fill'));
+  var today = root.getAttribute('data-today') || '';
+  var owner = root.getAttribute('data-owner') || '';
+
+  function currentCapacity() { for (var i = 0; i < capacityInputs.length; i++) if (capacityInputs[i].checked) return capacityInputs[i].value; return 'owner'; }
+  function signerName() { return adopted ? (adopted.name || '') : ''; }
+  function printedName() {
+    var name = signerName(), cap = currentCapacity();
+    if (cap === 'joint_owner') return name + ' (joint owner)';
+    if (cap === 'authorised_person') return owner ? name + ' for ' + owner : name + ' (authorised person)';
+    return name;
+  }
+
+  // Largest font size (px) at which the text fits the box
+  function fitText(el, box, maxRatio) {
+    var size = Math.max(6, Math.floor(box.clientHeight * maxRatio));
+    el.style.fontSize = size + 'px';
+    while (size > 6 && el.scrollWidth > box.clientWidth) { size -= 1; el.style.fontSize = size + 'px'; }
+  }
+
+  function updateFills() {
+    for (var i = 0; i < fills.length; i++) {
+      var span = fills[i], kind = span.getAttribute('data-fill'), text = '';
+      var field = document.querySelector('.sg-field[data-field-id="' + span.getAttribute('data-for') + '"]');
+      if (field && hasClass(field, 'is-done') && adopted) {
+        if (kind === 'date') text = today;
+        else if (kind === 'name') text = printedName();
+        else if (kind === 'representative' && currentCapacity() === 'authorised_person') text = signerName();
+      }
+      setText(span, text);
+      if (text) fitText(span, span, 0.8);
+    }
+  }
+
+  function fitPreview(field) {
+    if (!hasClass(field, 'sg-onpage')) return;
+    var box = field.querySelector('.sg-sign-box');
+    var span = field.querySelector('.sg-sign-preview span');
+    if (box && span) fitText(span, box, 0.85);
+  }
+
+  on(window, 'resize', function () {
+    for (var i = 0; i < fields.length; i++) if (hasClass(fields[i], 'is-done')) fitPreview(fields[i]);
+    updateFills();
+  });
+
   function applyTo(field) {
     var preview = field.querySelector('.sg-sign-preview');
     while (preview.firstChild) preview.removeChild(preview.firstChild);
@@ -160,6 +211,8 @@ export const SIGNER_SCRIPT = String.raw`
     }
     addClass(field, 'is-done');
     removeClass(field, 'is-current');
+    fitPreview(field);
+    updateFills();
     var box = field.querySelector('.sg-sign-box');
     if (box) box.setAttribute('aria-label', fieldLabel(field) + ': signed. Tap to change your signature.');
   }
@@ -181,10 +234,10 @@ export const SIGNER_SCRIPT = String.raw`
     if (name.length < 2) { showAdoptError('Please type your full name.'); try { nameInput.focus(); } catch (e) {} return; }
     if (method === 'drawn') {
       if (!drawing.strokes) { showAdoptError('Please draw your signature in the box, or choose Type.'); return; }
-      adopted = { method: 'drawn', png: exportDrawing() };
+      adopted = { method: 'drawn', png: exportDrawing(), name: name };
       drawnInput.value = adopted.png;
     } else {
-      adopted = { method: 'typed', text: name, style: currentStyle() };
+      adopted = { method: 'typed', text: name, style: currentStyle(), name: name };
       drawnInput.value = '';
     }
     var target = pendingField;
@@ -289,7 +342,9 @@ export const SIGNER_SCRIPT = String.raw`
   // ── Fields, Start and Finish ──────────────────────────────────────
   for (var f = 0; f < fields.length; f++) {
     (function (field) {
-      on(field.querySelector('.sg-sign-box'), 'click', function () { mode = 'sign'; setCurrent(fields.indexOf ? fields.indexOf(field) : 0); signField(field); });
+      var tap = function () { mode = 'sign'; setCurrent(fields.indexOf ? fields.indexOf(field) : 0); signField(field); };
+      on(field.querySelector('.sg-sign-box'), 'click', tap);
+      on(field.querySelector('.sg-flag'), 'click', tap);
     })(fields[f]);
   }
 
