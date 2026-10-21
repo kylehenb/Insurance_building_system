@@ -15,6 +15,9 @@ export interface BuildRawEmailParams {
   /** Space-separated list of Message-IDs for the References header */
   references?: string
   attachments?: EmailAttachment[]
+  /** Optional HTML version of body. The plain-text body is always sent as well
+   *  (multipart/alternative), so mail apps without HTML still get the text. */
+  html?: string
 }
 
 /** Wrap a bare Message-ID string in angle brackets if not already present. */
@@ -39,10 +42,11 @@ function base64Lines(content: Buffer): string {
 /**
  * Builds a base64url-encoded RFC 2822 raw email string suitable for
  * passing to gmail.users.messages.send({ requestBody: { raw } }).
- * With attachments it becomes multipart/mixed; otherwise plain text.
+ * With attachments it becomes multipart/mixed; with html the text and HTML
+ * bodies are multipart/alternative; otherwise plain text.
  */
 export function buildEmailRaw(params: BuildRawEmailParams): string {
-  const { from, to, cc, subject, body, inReplyTo, references, attachments = [] } = params
+  const { from, to, cc, subject, body, inReplyTo, references, attachments = [], html } = params
 
   const headers: string[] = [
     `From: ${from}`,
@@ -60,18 +64,44 @@ export function buildEmailRaw(params: BuildRawEmailParams): string {
     headers.push(`References: ${references}`)
   }
 
-  if (attachments.length === 0) {
+  if (attachments.length === 0 && !html) {
     const raw = [...headers, 'Content-Type: text/plain; charset=utf-8', '', body].join('\r\n')
     return Buffer.from(raw).toString('base64url')
+  }
+
+  const textPart = [
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64Lines(Buffer.from(body)),
+  ]
+
+  // Text + HTML as alternatives of each other
+  let bodyPart = textPart
+  if (html) {
+    const altBoundary = `irc_alt_${crypto.randomUUID().replace(/-/g, '')}`
+    bodyPart = [
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      '',
+      `--${altBoundary}`,
+      ...textPart,
+      `--${altBoundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(Buffer.from(html)),
+      `--${altBoundary}--`,
+    ]
+    if (attachments.length === 0) {
+      const raw = [...headers, ...bodyPart, ''].join('\r\n')
+      return Buffer.from(raw).toString('base64url')
+    }
   }
 
   const boundary = `irc_${crypto.randomUUID().replace(/-/g, '')}`
   const parts: string[] = [
     `--${boundary}`,
-    'Content-Type: text/plain; charset=utf-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    base64Lines(Buffer.from(body)),
+    ...bodyPart,
   ]
   for (const att of attachments) {
     const name = encodeHeaderValue(att.filename.replace(/["\\\r\n]/g, ''))

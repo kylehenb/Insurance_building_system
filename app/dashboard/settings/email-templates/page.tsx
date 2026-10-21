@@ -8,8 +8,10 @@ import type { Database } from '@/lib/supabase/database.types'
 import {
   BUILT_IN_TEMPLATES,
   EMAIL_SEND_TYPES,
+  REQUIRED_TOKENS,
   TEMPLATE_TOKENS,
   renderTemplate,
+  signingTemplateVars,
   workOrderTemplateVars,
   type EmailSendType,
 } from '@/lib/email/templates'
@@ -121,7 +123,30 @@ export default function EmailTemplatesSettingsPage() {
     let cancelled = false
     const examples = Object.fromEntries(TEMPLATE_TOKENS[selection.sendType].map(t => [t.key, t.example]))
 
+    // Signing emails: filled from the most recent job (for this client, when
+    // editing a client version), with example link/dates.
+    const loadSigning = async () => {
+      let q = supabase.from('jobs').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(1)
+      if (selection.clientId) q = q.eq('client_id', selection.clientId)
+      const [{ data: job }, { data: tenant }] = await Promise.all([
+        q.maybeSingle(),
+        supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
+      ])
+      if (!job || !tenant) return null
+      const vars = {
+        ...examples,
+        ...signingTemplateVars({
+          signerName: job.insured_name || examples.signer_name || '',
+          documentName: examples.document_name ?? 'Scope of Works Authorisation',
+          job,
+          tenant,
+        }),
+      }
+      return { vars, source: [job.job_number, job.property_address].filter(Boolean).join(' · ') }
+    }
+
     const load = async () => {
+      if (selection.sendType !== 'work_order') return loadSigning()
       let jobIds: string[] | null = null
       if (selection.clientId) {
         const { data } = await supabase.from('jobs').select('id').eq('tenant_id', tenantId)
@@ -154,6 +179,7 @@ export default function EmailTemplatesSettingsPage() {
   }, [tenantId, selection.sendType, selection.clientId])
 
   const tokens = TEMPLATE_TOKENS[selection.sendType]
+  const missingTokens = (REQUIRED_TOKENS[selection.sendType] ?? []).filter(k => !`${subject}\n${body}`.includes(`{${k}}`))
   const unknownTokens = useMemo(() => {
     const known = new Set(tokens.map(t => t.key))
     const found = [...`${subject}\n${body}`.matchAll(/\{(\w+)\}/g)].map(m => m[1])
@@ -394,6 +420,11 @@ export default function EmailTemplatesSettingsPage() {
                     </button>
                   ))}
                 </div>
+                {missingTokens.length > 0 && (
+                  <p className="text-xs text-[#b45309] mt-2">
+                    This email needs {missingTokens.map(k => `{${k}}`).join(', ')}. If it’s missing, the link is added at the end automatically.
+                  </p>
+                )}
                 {unknownTokens.length > 0 && (
                   <p className="text-xs text-[#b45309] mt-2">
                     Not a recognised placeholder, so it will be sent exactly as typed: {unknownTokens.map(k => `{${k}}`).join(', ')}
@@ -440,6 +471,12 @@ export default function EmailTemplatesSettingsPage() {
                   <div className="px-4 py-4 text-sm text-[#1a1a1a] whitespace-pre-wrap break-words leading-relaxed">{rendered.body}</div>
                   {selection.sendType === 'work_order' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF attached</div>
+                  )}
+                  {selection.sendType === 'signing_request' && (
+                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f]">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>
+                  )}
+                  {selection.sendType === 'signing_completed' && (
+                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Signed PDF (with Signature Certificate) attached</div>
                   )}
                 </div>
               ) : (

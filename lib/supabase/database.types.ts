@@ -3532,6 +3532,244 @@ export type Database = {
           },
         ]
       }
+      signing_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event: string
+          id: string
+          ip: string | null
+          metadata: Json
+          request_id: string
+          tenant_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          request_id: string
+          tenant_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          request_id?: string
+          tenant_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signing_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "signing_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signing_rate_limits: {
+        Row: {
+          bucket_key: string
+          hits: number
+          window_start: string
+        }
+        Insert: {
+          bucket_key: string
+          hits: number
+          window_start: string
+        }
+        Update: {
+          bucket_key?: string
+          hits?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
+      signing_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_content: Json
+          document_title: string
+          document_type: string
+          expires_at: string | null
+          fields: Json
+          id: string
+          job_id: string
+          last_reminded_at: string | null
+          provider: string
+          provider_ref: string | null
+          quote_ids: string[]
+          reminder_count: number
+          revoked_at: string | null
+          revoked_reason: string | null
+          sent_at: string | null
+          signature_method: string | null
+          signature_style: string | null
+          signature_text: string | null
+          signed_at: string | null
+          signed_job_file_id: string | null
+          signed_pdf_path: string | null
+          signed_pdf_sha256: string | null
+          signer_email: string | null
+          signer_ip: string | null
+          signer_name: string
+          signer_phone: string | null
+          signer_user_agent: string | null
+          signing_locked_at: string | null
+          source_pdf_path: string
+          source_pdf_sha256: string
+          stage_confirmed_at: string | null
+          stage_confirmed_by: string | null
+          status: string
+          tenant_id: string
+          token_hash: string | null
+          updated_at: string
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_content?: Json
+          document_title: string
+          document_type: string
+          expires_at?: string | null
+          fields?: Json
+          id?: string
+          job_id: string
+          last_reminded_at?: string | null
+          provider?: string
+          provider_ref?: string | null
+          quote_ids?: string[]
+          reminder_count?: number
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          sent_at?: string | null
+          signature_method?: string | null
+          signature_style?: string | null
+          signature_text?: string | null
+          signed_at?: string | null
+          signed_job_file_id?: string | null
+          signed_pdf_path?: string | null
+          signed_pdf_sha256?: string | null
+          signer_email?: string | null
+          signer_ip?: string | null
+          signer_name: string
+          signer_phone?: string | null
+          signer_user_agent?: string | null
+          signing_locked_at?: string | null
+          source_pdf_path: string
+          source_pdf_sha256: string
+          stage_confirmed_at?: string | null
+          stage_confirmed_by?: string | null
+          status?: string
+          tenant_id: string
+          token_hash?: string | null
+          updated_at?: string
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_content?: Json
+          document_title?: string
+          document_type?: string
+          expires_at?: string | null
+          fields?: Json
+          id?: string
+          job_id?: string
+          last_reminded_at?: string | null
+          provider?: string
+          provider_ref?: string | null
+          quote_ids?: string[]
+          reminder_count?: number
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          sent_at?: string | null
+          signature_method?: string | null
+          signature_style?: string | null
+          signature_text?: string | null
+          signed_at?: string | null
+          signed_job_file_id?: string | null
+          signed_pdf_path?: string | null
+          signed_pdf_sha256?: string | null
+          signer_email?: string | null
+          signer_ip?: string | null
+          signer_name?: string
+          signer_phone?: string | null
+          signer_user_agent?: string | null
+          signing_locked_at?: string | null
+          source_pdf_path?: string
+          source_pdf_sha256?: string
+          stage_confirmed_at?: string | null
+          stage_confirmed_by?: string | null
+          status?: string
+          tenant_id?: string
+          token_hash?: string | null
+          updated_at?: string
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signing_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_requests_signed_job_file_id_fkey"
+            columns: ["signed_job_file_id"]
+            isOneToOne: false
+            referencedRelation: "job_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_requests_stage_confirmed_by_fkey"
+            columns: ["stage_confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signing_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           abn: string | null
@@ -4167,6 +4405,10 @@ export type Database = {
           score: number
           similarity: number
         }[]
+      }
+      signing_rate_limit_hit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number }
+        Returns: boolean
       }
       seed_prompts_for_tenant: {
         Args: { p_tenant_id: string }

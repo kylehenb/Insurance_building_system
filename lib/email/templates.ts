@@ -5,7 +5,7 @@ import type { Database } from '@/lib/supabase/database.types'
 // send_type, optionally overridden per client. Until a tenant has written
 // one, the built-in defaults below are used so sends still work.
 
-export type EmailSendType = 'work_order'
+export type EmailSendType = 'work_order' | 'signing_request' | 'signing_completed'
 
 export interface EmailTemplateContent {
   subject: string
@@ -36,6 +36,40 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       '{company_name}',
     ].join('\n'),
   },
+  signing_request: {
+    name: 'Signature request — default',
+    subject: 'Please sign your {document_name} – {property_address}',
+    body: [
+      'Hi {signer_first_name},',
+      '',
+      '{company_name} is ready to start the repairs at {property_address}. Before we can begin, please read and sign your {document_name}.',
+      '',
+      '{signing_link}',
+      '',
+      'It takes about two minutes on your phone or computer. You don\'t need an account or a password: tap the button, read the document, and sign by typing your name or with your finger.',
+      '',
+      'The link works until {expiry_date}. If you have any questions, call us on {company_phone} or reply to this email.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  signing_completed: {
+    name: 'Signed copy — default',
+    subject: 'Your signed {document_name} – {property_address}',
+    body: [
+      'Hi {signer_first_name},',
+      '',
+      'Thank you for signing your {document_name} for {property_address}. Your signed copy is attached to this email for your records.',
+      '',
+      'Signed: {signed_at}',
+      '',
+      'If you have any questions, call us on {company_phone} or reply to this email.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
 }
 
 export interface TemplateToken {
@@ -58,6 +92,38 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
     { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
   ],
+  signing_request: [
+    { key: 'signing_link',     label: 'Signing link',     example: 'https://app.example.com/sign/…' },
+    { key: 'expiry_date',      label: 'Link expiry date', example: '3 Nov 2026' },
+    { key: 'signer_first_name', label: 'Signer first name', example: 'Jane' },
+    { key: 'signer_name',      label: 'Signer full name', example: 'Jane Citizen' },
+    { key: 'document_name',    label: 'Document name',    example: 'Scope of Works Authorisation' },
+    { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
+    { key: 'job_number',       label: 'Job number',       example: 'IRC1042' },
+    { key: 'claim_number',     label: 'Claim number',     example: 'CLM-558213' },
+    { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
+    { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
+    { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
+    { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+  ],
+  signing_completed: [
+    { key: 'signed_at',        label: 'Signed date/time', example: '21 Oct 2026, 2:05 pm' },
+    { key: 'signer_first_name', label: 'Signer first name', example: 'Jane' },
+    { key: 'signer_name',      label: 'Signer full name', example: 'Jane Citizen' },
+    { key: 'document_name',    label: 'Document name',    example: 'Scope of Works Authorisation' },
+    { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
+    { key: 'job_number',       label: 'Job number',       example: 'IRC1042' },
+    { key: 'claim_number',     label: 'Claim number',     example: 'CLM-558213' },
+    { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
+    { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
+    { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
+    { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+  ],
+}
+
+/** Placeholders a send type can't work without (the editor warns if one is missing). */
+export const REQUIRED_TOKENS: Partial<Record<EmailSendType, string[]>> = {
+  signing_request: ['signing_link'],
 }
 
 /** Email types listed in Settings → Email Templates, in display order. */
@@ -66,6 +132,16 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
     sendType: 'work_order',
     label: 'Work order',
     description: 'Sent to the trade by Send & Lock, with the work order PDF attached.',
+  },
+  {
+    sendType: 'signing_request',
+    label: 'Signature request',
+    description: 'Sent to the homeowner with a secure link to sign the Scope of Works or Building Contract.',
+  },
+  {
+    sendType: 'signing_completed',
+    label: 'Signed copy',
+    description: 'Sent to the homeowner straight after they sign, with the signed PDF attached.',
   },
 ]
 
@@ -89,6 +165,38 @@ export function workOrderTemplateVars({ workOrder, job, tenant, trade, tradeLabe
     insured_name:     job.insured_name,
     property_address: job.property_address,
     company_name:     tenant.trading_name || tenant.name,
+  }
+}
+
+type SigningVarsInput = {
+  signerName: string
+  documentName: string
+  job: { job_number: string; claim_number: string | null; insured_name: string | null; property_address: string | null }
+  tenant: { name: string; trading_name: string | null; contact_phone: string | null; contact_email: string | null }
+  /** signing_request only */
+  signingLink?: string
+  expiryDate?: string
+  /** signing_completed only */
+  signedAt?: string
+}
+
+/** Placeholder values for the signature request / signed copy emails. */
+export function signingTemplateVars(input: SigningVarsInput): Record<string, string | null> {
+  const phone = input.tenant.contact_phone?.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3') ?? null
+  return {
+    signer_name:      input.signerName,
+    signer_first_name: input.signerName.trim().split(/\s+/)[0] || input.signerName,
+    document_name:    input.documentName,
+    property_address: input.job.property_address,
+    job_number:       input.job.job_number,
+    claim_number:     input.job.claim_number,
+    insured_name:     input.job.insured_name,
+    company_name:     input.tenant.trading_name || input.tenant.name,
+    company_phone:    phone,
+    company_email:    input.tenant.contact_email,
+    ...(input.signingLink !== undefined ? { signing_link: input.signingLink } : {}),
+    ...(input.expiryDate !== undefined ? { expiry_date: input.expiryDate } : {}),
+    ...(input.signedAt !== undefined ? { signed_at: input.signedAt } : {}),
   }
 }
 

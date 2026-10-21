@@ -1,9 +1,11 @@
-# IRC Master — Full Technical Specification v3.2
+# IRC Master — Full Technical Specification v3.3
 ## For Windsurf / Cursor AI-Assisted Build
 
 **v3.2 changes:** Contacts & Email Routing overhaul — replaced `additional_contacts TEXT` with structured `contacts JSONB` on insurer_orders and jobs; added order sender fields (order_sender_name, order_sender_email, adjuster_reference); added adjuster_submission_email to clients; added Section 4.5a (Contacts Model) and 4.5b (Outbound Email Routing); updated WF-5 email routing logic; updated clients table notes.
 
 **PDF generation update (Oct 2026):** PDF generation moved from the planned Railway Puppeteer service to Vercel Functions (puppeteer-core + @sparticuz/chromium) — see §10. First document built: trade-facing Work Order PDF (`GET /api/work-orders/[id]/pdf`). DocuSeal integration and the `PDF_SERVICE_URL` / `PDF_SERVICE_SECRET` env vars removed; document signing will be rebuilt in-house.
+
+**E-signing update (Oct 2026):** In-house e-signing module built — see §10a. Homeowners sign the Scope of Works Authorisation (work of $7,500 or less) or the WA Building Contract (over $7,500) from an emailed link, with no account. New tables `signing_requests`, `signing_events`, `signing_rate_limits` (§4.32–4.34), private storage bucket `signed-documents` (§5), new PDF generators for the SOW and Building Contract (§10). No new paid service and no new environment variables.
 
 ---
 
@@ -261,18 +263,18 @@ CREATE TABLE jobs (
   current_stage_updated_at TIMESTAMPTZ,
   override_stage TEXT,                 -- 'on_hold' | 'cancelled' | null (takes precedence over current_stage)
   -- Job playbook fields
-  scope_sent_at TIMESTAMPTZ,          -- set when scope of works document is sent to insured for signature
-  building_contract_sent_at TIMESTAMPTZ, -- set when building contract is sent to insured for signature
+  scope_sent_at TIMESTAMPTZ,          -- PLANNED, not in the live database (Oct 2026). Sign-off sending is tracked by homeowner_signoff_sent_at + signing_requests
+  building_contract_sent_at TIMESTAMPTZ, -- PLANNED, not in the live database (Oct 2026). As above
   building_permit_required BOOLEAN DEFAULT false, -- flag indicating this job requires a council building permit
   building_permit_obtained_at TIMESTAMPTZ, -- set when building permit has been granted
   -- Homeowner sign-off tracking
   homeowner_signoff_sent_at TIMESTAMPTZ,
   homeowner_signoff_received_at TIMESTAMPTZ,
-  homeowner_signoff_method TEXT,
-  homeowner_signoff_notes TEXT,
+  homeowner_signoff_method TEXT,       -- 'electronic_signature' when signed through the e-signing module (§10a); null for paper uploads
+  homeowner_signoff_notes TEXT,        -- e-signing writes who signed, when, and the request id
   -- Completion approval tracking
   completion_approved_at TIMESTAMPTZ,
-  completion_approved_method TEXT,
+  completion_approved_method TEXT,     -- not used by e-signing: completion sign-off (TCC) is a phone/text confirmation, no signature
   completion_approved_notes TEXT,
   -- Property details
   property_type TEXT,                  -- e.g. 'single_storey', 'double_storey', 'commercial'
@@ -1129,6 +1131,8 @@ CREATE TABLE portal_tokens (
 );
 ```
 
+**Status (Oct 2026):** table exists but is empty and unused. The e-signing module does not use it — signing links live in `signing_requests` (hashed tokens, §4.32).
+
 **Auto-revocation trigger:** When a work order status changes to `cancelled`, all associated portal tokens are automatically revoked (`is_active = false`, `revoked_at = now()`). Implemented as a Supabase database trigger — no application code required.
 
 ### 4.22 job_flags
@@ -1526,6 +1530,80 @@ CREATE TABLE inspection_scheduling_rules (
 
 **Index:** `(tenant_id, status, job_id)` — efficient dashboard queries filtering pending items across all jobs.
 
+### 4.32 signing_requests
+```sql
+-- One document sent for signature to one signer (in-house e-signing, §10a).
+-- Writes only through server routes with the service role; signed-in users
+-- have read-only RLS access to their tenant's rows.
+CREATE TABLE signing_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  job_id UUID NOT NULL REFERENCES jobs(id),
+  document_type TEXT NOT NULL,          -- 'scope_of_works' | 'building_contract' (lib/signing/documents/registry.ts)
+  document_title TEXT NOT NULL,
+  quote_ids UUID[] NOT NULL DEFAULT '{}',
+  provider TEXT NOT NULL DEFAULT 'in_house',
+  provider_ref TEXT,                    -- id at a hosted provider, if one is ever used
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | sent | viewed | signed | expired | revoked
+  token_hash TEXT UNIQUE,               -- SHA-256 of the link token; raw token never stored; replaced on resend
+  signer_name TEXT NOT NULL,
+  signer_email TEXT,
+  signer_phone TEXT,
+  expires_at TIMESTAMPTZ,               -- 14 days from each send
+  sent_at TIMESTAMPTZ, viewed_at TIMESTAMPTZ, signed_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ, revoked_reason TEXT,
+  last_reminded_at TIMESTAMPTZ, reminder_count INTEGER NOT NULL DEFAULT 0,
+  source_pdf_path TEXT NOT NULL,        -- signed-documents bucket
+  source_pdf_sha256 TEXT NOT NULL,
+  signed_pdf_path TEXT,
+  signed_pdf_sha256 TEXT,               -- SHA-256 of the complete signed file (incl. certificate)
+  signed_job_file_id UUID REFERENCES job_files(id),
+  fields JSONB NOT NULL DEFAULT '[]',          -- located signature fields (page + rectangle), snapshot at creation
+  display_content JSONB NOT NULL DEFAULT '[]', -- phone reading view, snapshot at creation
+  signature_method TEXT,                -- 'typed' | 'drawn'
+  signature_text TEXT, signature_style TEXT,
+  signer_ip TEXT, signer_user_agent TEXT,
+  signing_locked_at TIMESTAMPTZ,        -- single-use lock while a signature is being processed
+  stage_confirmed_at TIMESTAMPTZ,       -- office confirmed the sign-off and moved the job on
+  stage_confirmed_by UUID REFERENCES users(id),
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+Checks: a `signed` row must have `signed_at`, `signed_pdf_path` and `signed_pdf_sha256`; every row needs an email or phone. Indexes: `(tenant_id, job_id, created_at DESC)`; partial `(tenant_id, sent_at) WHERE status IN ('sent','viewed')` for reminders. RLS: SELECT for the user's tenant only. Migration: `supabase/migrations/20261021_signing_module.sql`.
+
+### 4.33 signing_events
+```sql
+-- Append-only audit trail for signing requests. UPDATE and DELETE are
+-- blocked by a trigger (applies to the service role too).
+CREATE TABLE signing_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID NOT NULL REFERENCES signing_requests(id),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  event TEXT NOT NULL,   -- created | sent | resent | reminded | send_failed | viewed | document_opened
+                         -- | signed | sign_failed | signed_copy_sent | revoked | expired | stage_confirmed
+  ip TEXT,
+  user_agent TEXT,
+  actor_id UUID REFERENCES users(id),   -- office user; null for the signer
+  metadata JSONB NOT NULL DEFAULT '{}', -- e.g. hashes, recipient, error
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+RLS: SELECT for the user's tenant only.
+
+### 4.34 signing_rate_limits
+```sql
+-- Fixed-window rate limiting for the public signing routes. Service role only
+-- (RLS on, no policies). Use through signing_rate_limit_hit(key, max, window_seconds),
+-- which atomically records a hit and returns true while under the limit.
+CREATE TABLE signing_rate_limits (
+  bucket_key TEXT PRIMARY KEY,          -- e.g. 'ip:<sha256>:submit', 'token:<hash>:submit'
+  window_start TIMESTAMPTZ NOT NULL,
+  hits INTEGER NOT NULL
+);
+```
+
 ---
 
 ## 5. Supabase Storage Structure
@@ -1545,6 +1623,9 @@ CREATE TABLE inspection_scheduling_rules (
 ```
 
 Storage RLS mirrors database RLS — users can only access their own tenant's storage bucket paths.
+**Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The `job-files` and `irc-master` storage policies currently check only that the user is signed in, not their tenant; tenant scoping is enforced by the app (paths start `tenants/{tenantId}/` and API routes check the prefix). Tighten before onboarding a second tenant.
+
+**`signed-documents` (private, PDF only, 25 MB):** e-signing source and signed PDFs at `tenants/{tenantId}/signing/{requestId}/source.pdf` and `.../signed.pdf`. No storage policies at all — only the service role can read or write it; office users download through `/api/signing/requests/[id]/document`, which checks their tenant. A copy of every signed PDF also goes to `job-files` at `tenants/{tenantId}/jobs/{jobId}/docs/` with a `job_files` row so it shows in the Files tab.
 
 **Signed URLs:** All files in Supabase Storage are private. The application generates short-lived signed URLs (expiry: 60 minutes) at render time for display and download. Signed URLs are never stored in the database — they are generated on demand. Trade portal file access uses the same signed URL pattern, generated server-side when the portal page loads.
 
@@ -1718,8 +1799,16 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
       /automation/page.tsx       -- automation configuration (via AI chat interface)
   /trade-portal/
     /[workOrderToken]/page.tsx   -- public trade portal (token-gated, no login)
+  /sign/
+    /[token]/route.ts            -- PUBLIC signer page (plain HTML, no React; §10a)
   /api/
     /work-orders/[id]/pdf/route.ts -- GET: live Work Order PDF (headless Chromium on Vercel; always inline)
+    /signing/jobs/[jobId]/requests/route.ts -- GET: job's signing requests + send dialog defaults; POST: generate document, create request, email signer
+    /signing/requests/[id]/route.ts -- GET: status + audit trail
+    /signing/requests/[id]/[action]/route.ts -- POST send | resend | revoke | confirm-stage
+    /signing/requests/[id]/document/route.ts -- GET signed PDF (or ?version=source), from the private bucket
+    /sign/[token]/view|document|submit -- PUBLIC (no login): view beacon, the PDF being signed, the signature form post
+    /sign/fonts/[style]/route.ts -- PUBLIC: self-hosted signature script fonts
     /ai/parse-scope/route.ts     -- calls Claude API for scope parsing
     /ai/generate-report/route.ts -- calls Claude API for report generation
     /ai/label-photos/route.ts    -- calls Gemini for photo labelling (triggered in field app)
@@ -1826,7 +1915,7 @@ The job stage system provides a unified view of where each job is in its lifecyc
 - `quote_sent` - Quote sent to insurer
 - `awaiting_approval` - Awaiting insurer approval
 - `approved_awaiting_signoff` - Approved, awaiting homeowner sign-off
-- `awaiting_signed_document` - Homeowner sign-off in progress
+- `awaiting_signed_document` - Homeowner sign-off in progress (signed electronically via §10a, or a paper copy uploaded with "Receive sign off")
 - `repairs_in_progress` - Repairs underway
 - `ready_to_invoice` - Repairs complete, ready to invoice
 - `complete` - Job complete
@@ -2377,10 +2466,62 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 - UI: "PDF" button on the Work Orders tab table and "Preview PDF" in the work order card menu (opens inline; no download option)
 - The older browser-print page `/print/work-orders/[workOrderId]` remains until the new PDF is signed off, then it will be retired
 
+### Scope of Works and Building Contract PDFs (built, for e-signing)
+- `lib/documents/scope-of-works-pdf.ts` → `buildScopeOfWorksPdf(jobId, quoteIds, ctx, { signingMarkers, requireApproved })` / `generateScopeOfWorksPdf(...)`; template `lib/documents/sow-html.ts`; 10mm margins
+- `lib/documents/building-contract-pdf.ts` → `buildBuildingContractPdf(...)` / `generateBuildingContractPdf(...)`; template `lib/documents/building-contract-html.ts`. The template lays out its own A4 pages, so the PDF has no margin and each page is zoomed to 90% so the two longer schedule pages stay on one sheet
+- Shared data loader `lib/documents/quote-document-data.ts` (job, tenant, quotes, scope items **excluding items the insurer declined**, total incl GST computed as the contract does). Images are embedded as `data:` URIs (`lib/documents/document-assets.ts`)
+- Both templates take optional render settings; with none, the browser print pages (`/print/quotes/[quoteId]/sow`, `/building-contract`) are unchanged. Template "today" dates are formatted in Australia/Perth time
+- **Field markers** (`lib/pdf/field-markers.ts`): with `signingMarkers: true` the owner's signature/date/name blanks contain an invisible link to `https://irc-sign.invalid/field/<name>`. Chrome writes each link into the PDF as an annotation holding its exact page and rectangle, so the signing module finds every blank wherever the content flowed (a long scope pushes the signing page later). The markers are removed before the PDF is stored
+
 ### Performance
 - Cold start (first request on a new instance, Chromium decompressed to `/tmp`): ~2–5 s; warm requests ~0.3–0.5 s
+- `outputFileTracingIncludes` in `next.config.ts` lists every route that renders or stamps a PDF (work order PDF, Send & Lock, e-signing create, e-signing submit, signature fonts)
 - PDF route function bundle ~74 MB (of Vercel's 250 MB limit), almost all of it `@sparticuz/chromium`
 - Keep `puppeteer-core` pinned to the release whose bundled Chrome major matches `@sparticuz/chromium` (currently puppeteer-core 25.11.0 ↔ Chromium 153)
+
+## 10a. E-Signing (in-house)
+
+Homeowners sign the Scope of Works Authorisation or the Building Contract from a link, on any phone or computer, with no account, no app and no paid service. Built to be as easy as DocuSign for an elderly signer on an old phone.
+
+### Document types (config, not components)
+`lib/signing/documents/registry.ts` maps each type to its generator and its signature fields. Field positions live in the type's `fields[]`: each field names the marker it is stamped into (`{ anchor }`) or fixed coordinates (`{ page, x, y, width, height }`, negative page counts from the end). Names/descriptions for the UI are in `catalog.ts` (client-safe).
+
+| Type | When | Signatures |
+|---|---|---|
+| `scope_of_works` — Scope of Works Authorisation | Approved work of $7,500 or less | 1 — owner authorisation, with printed name and date |
+| `building_contract` — Building Contract (WA) | Approved work over $7,500 (Home Building Contracts Act 1991) | 2 — s.6 receipt of documents, and the contract signing page, each with date |
+
+The send dialog suggests the type from the selected quotes' total incl GST (`> $7,500` → contract); the office can override. Completion sign-off (TCC) is a phone/text confirmation and is **not** part of this module. Work order acceptance by trades is deferred.
+
+### Architecture
+- `SigningProvider` interface (`lib/signing/provider.ts`): `createRequest`, `send` (initial / resend / reminder — always a fresh link), `getStatus`, `getSignedDocument`, `revoke`. The only implementation is `InHouseSigningProvider` (`lib/signing/in-house/`). The UI and API routes go through `lib/signing/service.ts` (`getSigningProvider()`, listing, audit trail, send dialog defaults, stage confirmation) and never touch a provider directly. A hosted provider (e.g. Documenso) can be added by implementing the interface, mirroring its state into `signing_requests` / `signing_events`, and calling `recordSignedDocument()` (`lib/signing/completion.ts`) from its webhook — no UI changes.
+- Folder per feature: `lib/signing/` (server), `app/dashboard/jobs/[jobId]/signing/` (office UI), `app/sign/[token]/` and `app/api/sign/` (public), `app/api/signing/` (office API).
+
+### Flow
+1. **Send** — Job page → Signatures tab (or the stage banner's "Send for Signature"): choose approved quotes, document type and signer (defaults to the contact with the `auth` role, else the insured). The server generates the PDF with field markers, locates the fields, stores the source PDF privately with its SHA-256, records the reading-view snapshot, issues a 256-bit random token (only its SHA-256 is stored), emails the link (template `signing_request`) and logs events. Optional checkbox (default on when the job is at `approved_awaiting_signoff`): move the job to `awaiting_signed_document` and set `homeowner_signoff_sent_at` — the same change the old button made.
+2. **Sign** — `/sign/[token]` is a plain HTML page (no React, no Tailwind, one small ES5 script whose hash is the only script the page's CSP allows), so it works on older iOS Safari and Android. It shows the document as large reflowed text (no pinch-zoom), with the exact PDF one tap away. A bottom bar always shows the one next step: Start → Sign here → Next → Finish, with "Signature 1 of 2" progress. Signing defaults to typing the name in one of three self-hosted script fonts (Great Vibes, Allura — SIL OFL; Homemade Apple — Apache 2.0; in `lib/signing/fonts/`), with Draw (finger) as the alternative; style can be changed before adopting. The consent line "By tapping Finish you agree to sign this document electronically." sits above the single Finish button. Without JavaScript the page still works (typed signature + Finish). "Viewed" is recorded by the script, so email link scanners don't count.
+3. **Stamp** — single-use: a row lock (`signing_locked_at`) plus status checks. The source PDF's hash is re-checked, the signature is stamped into every field with pdf-lib (typed: embedded script font, falling back to Liberation Sans for characters the font lacks; drawn: trimmed PNG), the Perth date and printed name go into their blanks, and a small "Signed electronically · date · Ref" caption is added under each signature. A **Signature Certificate** page is appended: document, request ID, signer name/email/phone, method, consent text, signing time in Australia/Perth and UTC, IP, device (parsed) and full user agent, timeline (created/sent/opened/signed), SHA-256 of the source and of the stamped document. The SHA-256 of the complete file is stored in `signed_pdf_sha256` and the audit trail.
+4. **After signing** — signed PDF saved to `signed-documents`; a copy to `job-files` + `job_files` ("Insured signed docs — …"); a `communications` note (type `portal`, source `signing`); `homeowner_signoff_method = 'electronic_signature'` and notes on the job; the signer is emailed the signed copy (template `signing_completed`) and the office gets a copy with the audit summary. Each step is independent; none can undo the signature.
+5. **Confirm** — the job stage is **never moved by a signature**. The stage banner shows an action card ("✓ … signed — View signed PDF — Confirm sign-off & move on"). Confirming sets `homeowner_signoff_received_at` (= signing time) and moves the job to `signed_build_schedule` — the same fields the manual "Receive sign off" upload sets.
+
+### Links and security
+- Default expiry 14 days from each send; 24-hour grace to finish for a signer who opened the link before it expired. Resend and reminders issue a new link (the old one stops working). Revoke keeps the hash so the old link shows "no longer active".
+- Friendly screens for not found / expired / revoked / already signed / thank-you / rate-limited, each with "Call 0431 132 077 · Email office@insurancerepairco.com.au".
+- Public routes use the service role scoped by token hash and expose only that one document. Rate limits (Postgres, `signing_rate_limit_hit`): page/PDF 60 per IP per 10 min; submissions 10 per IP and 5 per link per 10 min.
+- Headers: strict CSP on the signer page; `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`, `Cache-Control: no-store` on signing pages and PDFs. The raw link is never stored: the `communications` copy of the request email has the link replaced with "[secure signing link]".
+- Office routes require a signed-in user and filter every query by their `tenant_id`.
+
+### Emails
+Sent through the existing Gmail API sender as `tenants.contact_email` (office@insurancerepairco.com.au), marked processed so the Gmail SENT watch doesn't record them twice. Templates `signing_request` (subject includes the property address; `{signing_link}` required — appended automatically if a template loses it) and `signing_completed` (signed PDF attached) are editable in Settings → Email Templates (standard and per-client versions). The plain-text template is also sent as a branded HTML version (logo, large "Review and sign" button) via `buildEmailRaw({ html })`. SMS is not sent (no paid SMS service); a channel can be added later in `InHouseSigningProvider.send`.
+
+### Reminders
+`sendSigningReminders({ afterDays = 3, maxReminders = 3, tenantId?, dryRun? })` in `lib/signing/reminders.ts` re-sends open requests with reminder wording. Not on a schedule yet — wire it to a `CRON_SECRET`-checked route in `vercel.json` when wanted.
+
+### Testing
+Unit tests in `lib/signing/__tests__/` (tokens, link states and grace period, signature input validation, field location, stamping, certificate, template/reading-view wording agreement, page escaping and CSP, email templates, HTML email). The signer flow was exercised at 375×667 (typed, drawn, two-field contract, all status screens, no-JavaScript) with Playwright against fixture data.
+
+### Legal notes
+Electronic Transactions Act 2011 (WA): consent, identification method and reliability are covered by the emailed single-use link, the consent line, the audit trail and the certificate. Not covered / to decide: no PKI digital signature (PAdES) on the PDF — integrity relies on the stored SHA-256 and audit trail; the contract PDF references General Conditions and the prescribed s.4(2) notice ("Schedule, pages 12-13") that are not part of the generated document — they must be attached/provided; no identity check beyond control of the email address; deeds, statutory declarations and witnessed documents are out of scope.
 
 ---
 
@@ -2550,7 +2691,7 @@ GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
 GMAIL_REFRESH_TOKEN=
 
-# Twilio
+# Twilio (PLANNED — not used anywhere in the code yet; e-signing is email-only)
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_FROM_NUMBER=
@@ -2559,12 +2700,16 @@ TWILIO_FROM_NUMBER=
 GOOGLE_MAPS_API_KEY=               # Used for trade proximity calculation (Distance Matrix API)
 
 # App
-NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead
 ```
+
+The e-signing module needs no new environment variables (it uses the Supabase service role, Gmail API and `NEXT_PUBLIC_APP_URL`).
 
 ### Security notes
 
 **PDF rendering:** Runs in-process on Vercel; no shared secret or external PDF service. The renderer disables page JavaScript and blocks all network requests, and every template escapes interpolated values.
+
+**E-signing links:** see §10a — hashed single-use tokens, rate-limited public routes, strict CSP, no-referrer.
 
 **Supabase service role key:** Never exposed to the browser. Used only in Next.js API routes (server-side). The anon key is safe to expose — RLS enforces all access control.
 
@@ -2695,6 +2840,9 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 | Auth | Magic link + persistent session | No passwords, works for non-technical users, field-safe |
 | File storage | Supabase Storage | Co-located with data, RLS isolation, no Google dependency |
 | PDF generation | Vercel Functions + puppeteer-core + @sparticuz/chromium | Real Chromium rendering for rich PDFs with photos, without running and securing a separate service |
+| E-signing | In-house (pdf-lib stamping + Signature Certificate) behind a `SigningProvider` interface | No paid service; one-tap signing for elderly homeowners; a hosted provider can be swapped in later without UI changes |
+| Signer page | Plain HTML route handler, not a React page | Works on older phones (Next 16/React 19 need Safari 16.4+); no hydration; strict CSP |
+| Job stage after signing | Office confirms via action card | Deterministic, human-confirmed stage changes |
 | Report type fields | JSONB column | Avoids 30+ sparse nullable columns per report type |
 | Job numbering | Per-tenant sequence with custom prefix | Supports white-label licensing |
 | Claim number | Universal job key, always checked first | One claim = one job, always |
@@ -2799,6 +2947,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 - Xero API setup — not yet configured; required before invoicing module build
 - Inbound email address domain setup (e.g. `jobs@insurancerepair.com.au`) — DNS/forwarding config required
 - Google Maps API key setup — required before blueprint draft generation and proximity calculation can run
+- E-signing: SMS delivery of signing links (needs a paid SMS provider); PAdES digital signature on signed PDFs; attaching the HBCA General Conditions and s.4(2) prescribed notice to the generated Building Contract; whether `Receive sign off` / quote-level "Send for Signature" buttons in the Quotes tab should open the new dialog
 - `scope_library.estimated_hours` seeding — requires review of existing line items to assign time values; partial seeding acceptable at migration time
 
 ---

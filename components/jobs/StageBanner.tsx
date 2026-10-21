@@ -6,6 +6,8 @@ import type { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
 import type { OpenLoop } from '@/lib/jobs/openLoops'
+import { SendForSignatureDialog } from '@/app/dashboard/jobs/[jobId]/signing/SendForSignatureDialog'
+import { SigningStageCard } from '@/app/dashboard/jobs/[jobId]/signing/SigningStageCard'
 
 // These columns are added by migration and not yet in database.types.ts
 type JobStageRow = {
@@ -51,7 +53,7 @@ function getLoopLabelColor(stageKey: JobStageKey): string {
 
 type StageBannerProps = { jobId: string; tenantId: string }
 
-export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
+export default function StageBanner({ jobId }: StageBannerProps) {
   const [row, setRow] = useState<JobStageRow | null>(null)
   const [sendForSignatureVisible, setSendForSignatureVisible] = useState(false)
 
@@ -186,35 +188,6 @@ export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
     }
   }
 
-  const handleSendForSignatureConfirm = async () => {
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/stage`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId,
-          stage: 'awaiting_signed_document',
-        }),
-      })
-      if (res.ok) {
-        // Refresh job data
-        const supabase = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
-        const { data } = await supabase
-          .from('jobs')
-          .select('current_stage, current_stage_updated_at, override_stage')
-          .eq('id', jobId)
-          .single()
-        setRow(data as unknown as JobStageRow | null)
-      }
-    } catch (error) {
-      console.error('Error updating job stage:', error)
-    }
-    setSendForSignatureVisible(false)
-  }
-
   return (
     <div
       style={{
@@ -227,76 +200,16 @@ export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
         fontFamily: 'inherit',
       }}
     >
-      {/* Send for Signature dialog */}
+      {/* Send for Signature dialog (e-signing module) */}
       {sendForSignatureVisible && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.42)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9000,
+        <SendForSignatureDialog
+          jobId={jobId}
+          onClose={() => setSendForSignatureVisible(false)}
+          onSent={() => {
+            setSendForSignatureVisible(false)
+            fetchJobData()
           }}
-          onClick={() => setSendForSignatureVisible(false)}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 12,
-              padding: '32px 36px',
-              maxWidth: 420,
-              width: '90%',
-              textAlign: 'center',
-              fontFamily: 'DM Sans, sans-serif',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ fontSize: 34, marginBottom: 12 }}>✍️</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
-              Send for Signature
-            </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
-              This part of the system is not yet built - it will be a pre drafted email with pre filled docs for the homeowner to sign.
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
-                onClick={() => setSendForSignatureVisible(false)}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSendForSignatureConfirm}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a73e8',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                }}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {/* Section 1 — Stage */}
@@ -451,6 +364,9 @@ export default function StageBanner({ jobId, tenantId }: StageBannerProps) {
             flex: 1,
           }}
         >
+          {/* Signing: signed documents waiting for the office to confirm */}
+          <SigningStageCard jobId={jobId} onConfirmed={fetchJobData} />
+
           {/* Section header */}
           <div
             style={{

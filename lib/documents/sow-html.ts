@@ -1,10 +1,55 @@
 import type { Database } from '@/lib/supabase/database.types'
 import { groupScopeItemsAcrossQuotes, combinedQuoteRefLabel } from './scope-grouping'
+import { fieldMarkerHtml } from '@/lib/pdf/field-markers'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
+
+/**
+ * Optional settings for rendering to PDF (lib/documents/scope-of-works-pdf.ts).
+ * Without them the output is unchanged.
+ */
+export interface SowRenderOptions {
+  /** Header logo. Default '/logo-alt.png' (a data: URI when rendering to PDF) */
+  logoSrc?: string
+  /** Footer tenant logo. Default: the tenant's public tenant-assets URL */
+  footerLogoSrc?: string | null
+  /** IRC authorised signatory's signature image, shown in the builder block */
+  contractorSignatureSrc?: string | null
+  /** Add invisible e-signing field markers (lib/pdf/field-markers.ts) to the owner's blanks */
+  signingMarkers?: boolean
+}
+
+// Wording shared with the e-signing reading view (lib/signing/documents),
+// so the phone view and the PDF say the same thing.
+export const SOW_AGREEMENT =
+  'Insurance Repair Co Pty Ltd (ACN 686 067 881, Builder Licence BC105884, hereinafter referred to as "IRC") '
+  + 'agrees to carry out the repair works described below at the property listed above. These works have been '
+  + 'approved by your insurer in relation to the claim referenced above. This document constitutes your authority '
+  + 'for works to proceed and must be signed prior to commencement.'
+
+export const SOW_CONDITIONS = [
+    'Works will be carried out by tradespeople engaged by IRC. All works are covered by a workmanship warranty from date of completion as stipulated by general consumer laws and the Building Services (Complaint Resolution and Administration) Act.',
+    'The scope above reflects works approved by your insurer. Any additional works identified on site will be referred back to your insurer for approval before proceeding.',
+    'Access to the property must be provided at agreed times. To avoid rescheduling delays, please ensure access can be obtained at those agreed times.',
+    'Your policy excess (if applicable) is payable directly to IRC upon completion of works. IRC will issue a tax invoice for this amount.',
+    'Matching of existing materials (tiles, paint, flooring) is not guaranteed. IRC will make every reasonable effort to match existing finishes.',
+
+]
+
+export const SOW_DECLARATION =
+  'By signing below, the owner/occupant confirms they have read and understood the scope of works and conditions '
+  + 'above, authorise IRC to proceed with the approved works, and acknowledge that they have had the opportunity '
+  + 'to seek independent advice prior to signing.'
+
+/** Field marker names used when signingMarkers is on. */
+export const SOW_MARKERS = {
+  ownerSignature: 'sow_owner_signature',
+  ownerName: 'sow_owner_name',
+  ownerDate: 'sow_owner_date',
+} as const
 
 export function generateSowHtml(params: {
   quotes: Quote[]
@@ -13,16 +58,26 @@ export function generateSowHtml(params: {
   tenant: Tenant & {
     building_licence_number?: string | null
   }
+  render?: SowRenderOptions
 }): string {
-  const { quotes, job, scopeItems, tenant } = params
+  const { quotes, job, scopeItems, tenant, render = {} } = params
+  const logoSrc = render.logoSrc ?? '/logo-alt.png'
+  const footerLogoSrc = render.footerLogoSrc !== undefined
+    ? render.footerLogoSrc
+    : tenant.logo_storage_path
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`
+      : null
+  const marker = (name: string) => (render.signingMarkers ? fieldMarkerHtml(name) : '')
   const isMultiQuote = quotes.length > 1
   const sowReference = isMultiQuote ? `${job.job_number}-SOW` : `${quotes[0].quote_ref}-SOW`
   const quoteRefLabel = combinedQuoteRefLabel(quotes)
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
+    // Perth date, not the server's (Vercel runs in UTC: before 8am Perth
+    // that would be yesterday)
     return new Date(date).toLocaleDateString('en-AU', {
-      day: '2-digit', month: 'short', year: 'numeric',
+      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Australia/Perth',
     })
   }
 
@@ -87,13 +142,7 @@ export function generateSowHtml(params: {
     return roomHeaderHtml + rowsHtml
   }).join('')
 
-  const conditions = [
-    'Works will be carried out by tradespeople engaged by IRC. All works are covered by a workmanship warranty from date of completion as stipulated by general consumer laws and the Building Services (Complaint Resolution and Administration) Act.',
-    'The scope above reflects works approved by your insurer. Any additional works identified on site will be referred back to your insurer for approval before proceeding.',
-    'Access to the property must be provided at agreed times. To avoid rescheduling delays, please ensure access can be obtained at those agreed times.',
-    'Your policy excess (if applicable) is payable directly to IRC upon completion of works. IRC will issue a tax invoice for this amount.',
-    'Matching of existing materials (tiles, paint, flooring) is not guaranteed. IRC will make every reasonable effort to match existing finishes.',
-  ]
+  const conditions = SOW_CONDITIONS
 
   const conditionsHtml = conditions.map((text, idx) => `
   <div style="display:flex;gap:8px;font-size:10px;color:#3a3530;line-height:1.65;
@@ -119,7 +168,7 @@ export function generateSowHtml(params: {
   <div style="display:flex;align-items:stretch;background:white;">
     <div style="width:148px;min-width:148px;padding:14px 8px 14px 20px;
       border-right:1px solid #e0dbd4;">
-      <img src="/logo-alt.png" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
+      <img src="${logoSrc}" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;
         color:#9e998f;font-weight:700;white-space:nowrap;">INSURANCE REPAIR CO</div>
     </div>
@@ -262,10 +311,7 @@ export function generateSowHtml(params: {
     <div style="border:1px solid #e0dbd4;border-radius:6px;border-left:3px solid #c8b89a;
       padding:10px 14px;margin-bottom:14px;">
       <p style="font-size:10px;color:#6a6460;line-height:1.7;margin:0;">
-        By signing below, the owner/occupant confirms they have read and understood
-        the scope of works and conditions above, authorise IRC to proceed with the
-        approved works, and acknowledge that they have had the opportunity to seek
-        independent advice prior to signing.
+        ${SOW_DECLARATION}
       </p>
     </div>
 
@@ -292,6 +338,7 @@ export function generateSowHtml(params: {
               position:relative;">
             <span style="font-size:8px;color:#b0a89e;position:absolute;
               bottom:4px;left:0;">Signature</span>
+            ${marker(SOW_MARKERS.ownerSignature)}
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div
@@ -299,17 +346,19 @@ export function generateSowHtml(params: {
               data-field-type="text"
               data-field-name="Full name"
               data-field-required="true"
-              style="border-bottom:1px solid #e0dbd4;padding-bottom:14px;">
+              style="border-bottom:1px solid #e0dbd4;padding-bottom:14px;position:relative;">
               <span style="font-size:8px;color:#b0a89e;display:block;">
                 Full name (print)</span>
+              ${render.signingMarkers ? `<div style="position:absolute;left:0;right:0;bottom:1px;height:13px;">${marker(SOW_MARKERS.ownerName)}</div>` : ''}
             </div>
             <div
               data-submitter="Owner / Insured"
               data-field-type="date"
               data-field-name="Date"
               data-field-required="true"
-              style="border-bottom:1px solid #e0dbd4;padding-bottom:14px;">
+              style="border-bottom:1px solid #e0dbd4;padding-bottom:14px;position:relative;">
               <span style="font-size:8px;color:#b0a89e;display:block;">Date</span>
+              ${render.signingMarkers ? `<div style="position:absolute;left:0;right:0;bottom:1px;height:13px;">${marker(SOW_MARKERS.ownerDate)}</div>` : ''}
             </div>
           </div>
         </div>
@@ -328,6 +377,8 @@ export function generateSowHtml(params: {
             <span style="font-size:8px;color:#c8b89a;font-style:italic;
               position:absolute;top:0;left:0;">
               Signed on behalf of IRC — authorised signatory</span>
+            ${render.contractorSignatureSrc ? `<img src="${render.contractorSignatureSrc}" alt="Kyle Bindon signature"
+              style="position:absolute;left:0;bottom:14px;height:28px;opacity:0.85;" />` : ''}
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div style="border-bottom:1px solid #f0ece6;padding-bottom:14px;">
@@ -349,8 +400,8 @@ export function generateSowHtml(params: {
   <!-- FOOTER -->
   <div style="background:#1a1a1a;padding:9px 16px;display:flex;align-items:center;
     gap:10px;">
-    ${tenant.logo_storage_path ? `
-    <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}" 
+    ${footerLogoSrc ? `
+    <img src="${footerLogoSrc}"
       alt="Tenant Logo" style="width:26px;height:26px;object-fit:contain;flex-shrink:0;" />
     ` : `
     <div style="width:26px;height:26px;border:1.5px solid #c8b89a;border-radius:50%;

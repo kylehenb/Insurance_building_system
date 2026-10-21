@@ -1,23 +1,55 @@
 import type { Database } from '@/lib/supabase/database.types'
 import { groupScopeItemsAcrossQuotes, combinedQuoteRefLabel } from './scope-grouping'
+import { fieldMarkerHtml } from '@/lib/pdf/field-markers'
 
 type Quote = Database['public']['Tables']['quotes']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Job = Database['public']['Tables']['jobs']['Row']
 
+/**
+ * Optional settings for rendering to PDF (lib/documents/building-contract-pdf.ts).
+ * The print page passes none and gets the original output.
+ */
+export interface BuildingContractRenderOptions {
+  /** Header logo. Default '/logo-alt.png' (a data: URI when rendering to PDF) */
+  logoSrc?: string
+  /** Contractor signature image. Default '/signature.png' */
+  contractorSignatureSrc?: string
+  /** Add invisible e-signing field markers (lib/pdf/field-markers.ts) to the owner's blanks */
+  signingMarkers?: boolean
+}
+
+/** Field marker names used when signingMarkers is on. */
+export const BUILDING_CONTRACT_MARKERS = {
+  receiptSignature: 'contract_receipt_signature',
+  receiptDate: 'contract_receipt_date',
+  ownerSignature: 'contract_owner_signature',
+  ownerDate: 'contract_owner_date',
+} as const
+
 export function generateBuildingContractHtml(params: {
   quotes: Quote[]
   job: Job
   scopeItems: ScopeItem[]
+  render?: BuildingContractRenderOptions
 }): string {
-  const { quotes, job, scopeItems } = params
+  const { quotes, job, scopeItems, render = {} } = params
+  const logoSrc = render.logoSrc ?? '/logo-alt.png'
+  const contractorSignatureSrc = render.contractorSignatureSrc ?? '/signature.png'
+  // An owner blank: plain dotted line, or (for e-signing) a slightly taller
+  // blank with an invisible marker the signature is stamped into.
+  const ownerBlank = (minWidth: number, marker: string, height = 0) => render.signingMarkers
+    ? `<span class="field-blank" style="min-width:${minWidth}px;position:relative;vertical-align:bottom;${height ? `height:${height}px;` : ''}">&nbsp;${fieldMarkerHtml(marker)}</span>`
+    : `<span class="field-blank" style="min-width:${minWidth}px;">&nbsp;</span>`
   const isMultiQuote = quotes.length > 1
   const quoteRefLabel = combinedQuoteRefLabel(quotes)
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
+    // Perth date, not the server's (Vercel runs in UTC: before 8am Perth
+    // that would be yesterday)
     return new Date(date).toLocaleDateString('en-AU', {
-      day: '2-digit', month: 'short', year: 'numeric',
+      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Australia/Perth',
     })
   }
 
@@ -388,7 +420,7 @@ export function generateBuildingContractHtml(params: {
 <div class="page">
   <div class="page-header">
     <div class="logo-block">
-      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <img src="${logoSrc}" alt="Insurance Repair Co" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
     </div>
     <div class="doc-type">
@@ -419,7 +451,9 @@ export function generateBuildingContractHtml(params: {
     <p class="cover-body">To enable repairs to commence at your property, please complete the below steps:</p>
 
     <ul class="cover-list">
-      <li>Review and sign the attached Building Contract, scan and return via email to office@insurancerepairco.com.au</li>
+      <li>${render.signingMarkers
+        ? 'Review and sign this Building Contract electronically using the secure link we emailed you'
+        : 'Review and sign the attached Building Contract, scan and return via email to office@insurancerepairco.com.au'}</li>
       <li>Pay your excess if applicable. (please see separate email regarding this)</li>
       <li>Complete maintenance if applicable as advised (please see separate email regarding this)</li>
     </ul>
@@ -449,7 +483,7 @@ export function generateBuildingContractHtml(params: {
 <div class="page">
   <div class="page-header">
     <div class="logo-block">
-      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <img src="${logoSrc}" alt="Insurance Repair Co" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
       <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
     </div>
@@ -588,7 +622,7 @@ export function generateBuildingContractHtml(params: {
 <div class="page">
   <div class="page-header">
     <div class="logo-block">
-      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <img src="${logoSrc}" alt="Insurance Repair Co" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
       <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
     </div>
@@ -719,7 +753,7 @@ export function generateBuildingContractHtml(params: {
 <div class="page">
   <div class="page-header">
     <div class="logo-block">
-      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <img src="${logoSrc}" alt="Insurance Repair Co" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
       <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
     </div>
@@ -798,7 +832,7 @@ export function generateBuildingContractHtml(params: {
     </div>
 
     <div style="margin-top:12px;font-size:8.5pt;">
-      Signed<span class="field-blank" style="min-width:200px;">&nbsp;</span> (Owner) ${job.insured_name || ''} &nbsp;&nbsp; Date <span class="field-blank" style="min-width:80px;">&nbsp;</span>
+      Signed${ownerBlank(200, BUILDING_CONTRACT_MARKERS.receiptSignature, 26)} (Owner) ${job.insured_name || ''} &nbsp;&nbsp; Date ${ownerBlank(80, BUILDING_CONTRACT_MARKERS.receiptDate)}
     </div>
 
   </div>
@@ -817,7 +851,7 @@ export function generateBuildingContractHtml(params: {
 <div class="page">
   <div class="page-header">
     <div class="logo-block">
-      <img src="/logo-alt.png" alt="Insurance Repair Co" />
+      <img src="${logoSrc}" alt="Insurance Repair Co" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9e998f;font-weight:700;white-space:nowrap;margin-top:4px;">INSURANCE REPAIR CO</div>
       <div style="font-size:7.5pt;color:#555;margin-top:2px;">office@insurancerepairco.com.au</div>
     </div>
@@ -834,11 +868,13 @@ export function generateBuildingContractHtml(params: {
 
       <div class="signing-box">
         <p class="bold">OWNER:</p>
-        <p class="mt8">DATE signed by Owner/s: <span class="field-blank" style="min-width:140px;">&nbsp;</span></p>
+        <p class="mt8">DATE signed by Owner/s: ${ownerBlank(140, BUILDING_CONTRACT_MARKERS.ownerDate)}</p>
         <p class="mt8">${job.insured_name || ''}</p>
         <p style="font-size:7.5pt;color:#555;">(Printed Name of Owner/s)</p>
         <p class="mt8">Authorised Signature/s:</p>
-        <div class="sig-line"></div>
+        ${render.signingMarkers
+          ? `<div class="sig-line" style="position:relative;">${fieldMarkerHtml(BUILDING_CONTRACT_MARKERS.ownerSignature)}</div>`
+          : '<div class="sig-line"></div>'}
         <p class="sig-label">&nbsp;</p>
       </div>
 
@@ -849,7 +885,7 @@ export function generateBuildingContractHtml(params: {
         <p style="font-size:7.5pt;color:#555;">(Printed Name of Contractor)</p>
         <p class="mt8">Authorised Signature/s:</p>
         <div class="sig-line" style="position:relative;">
-          <img src="/signature.png" alt="Kyle Bindon signature" style="position:absolute;top:4px;left:0;height:28px;opacity:0.85;" />
+          <img src="${contractorSignatureSrc}" alt="Kyle Bindon signature" style="position:absolute;top:4px;left:0;height:28px;opacity:0.85;" />
         </div>
         <p class="sig-label">(on behalf of Contractor)</p>
         <p class="mt4">Kyle Bindon</p>

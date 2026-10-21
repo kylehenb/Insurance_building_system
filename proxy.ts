@@ -47,7 +47,11 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/ai/") ||
     pathname.startsWith("/api/webhooks/") ||
-    pathname.startsWith("/api/gmail/");
+    pathname.startsWith("/api/gmail/") ||
+    // E-signing: homeowners sign by link, with no account. These routes look
+    // up the link token themselves and expose only that one document.
+    pathname.startsWith("/sign/") ||
+    pathname.startsWith("/api/sign/");
 
   // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {

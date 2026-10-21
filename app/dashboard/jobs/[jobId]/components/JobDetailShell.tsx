@@ -20,6 +20,7 @@ import { InvoicesTab } from './InvoicesTab'
 import { JobBudgetTab } from './JobBudgetTab'
 import { SafetyTab } from './SafetyTab'
 import { WorkOrdersTab } from '../work-orders/WorkOrdersTab'
+import { SigningTab } from '../signing/SigningTab'
 
 // — Types ——————————————————————————————————————————————————————————
 interface JobHeader {
@@ -68,6 +69,7 @@ const TABS = [
   { id: 'inspections',      label: 'Inspections' },
   { id: 'reports',          label: 'Reports' },
   { id: 'quotes',           label: 'Quotes' },
+  { id: 'signatures',       label: 'Signatures' },
   { id: 'work-orders',      label: 'Work Orders' },
   { id: 'photos',           label: 'Photos' },
   { id: 'files',            label: 'Files' },
@@ -165,6 +167,8 @@ function TabPanel({
       )
     case 'quotes':
       return <QuotesTab jobId={jobId} tenantId={tenantId} />
+    case 'signatures':
+      return <SigningTab jobId={jobId} />
     case 'work-orders':
       return null // rendered outside the padded wrapper below
     case 'photos':
