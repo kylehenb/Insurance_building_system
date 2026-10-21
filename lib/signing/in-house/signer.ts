@@ -9,7 +9,8 @@ import { checkRateLimit } from '@/lib/signing/rate-limit'
 import { loadJobAndTenant, loadRequestByTokenHash, persistExpiryIfDue } from '@/lib/signing/repository'
 import { ipKey, type RequestMeta } from '@/lib/signing/request-meta'
 import { MAX_TYPED_SIGNATURE_LENGTH, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
-import { downloadSigningPdf, signedPdfPath, uploadSigningPdf } from '@/lib/signing/storage'
+import { downloadSigningPdf, excessInvoicePdfPath, signedPdfPath, uploadSigningPdf } from '@/lib/signing/storage'
+import { excessDueText } from '@/lib/excess/decision'
 import { hashSigningToken, isWellFormedToken, sha256Hex } from '@/lib/signing/tokens'
 import { printedSignerName, SIGNER_CAPACITY_LABELS, type DisplayBlock, type LocatedSignatureField, type SignerCapacity, type SigningRequestRow } from '@/lib/signing/types'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
@@ -20,6 +21,17 @@ import { PDFDocument } from 'pdf-lib'
 // one request's document is ever exposed.
 
 export type SignerLinkState = 'not_found' | 'revoked' | 'expired' | 'signed' | 'open'
+
+/** The excess invoice emailed with the request, as shown on the signer page. */
+export interface SignerExcessInvoice {
+  ref: string | null
+  amountIncGst: number
+  /** "on receipt" or "by 4 Nov 2026" */
+  dueText: string
+  /** Only when the office has recorded it paid (accounts are reconciled in batches, so never "unpaid") */
+  paidDate: string | null
+  bank: { bankName: string | null; accountName: string | null; bsb: string | null; accountNumber: string | null } | null
+}
 
 /** Only what the signer page needs. No ids beyond the request, no internals. */
 export interface SignerView {
@@ -38,6 +50,8 @@ export interface SignerView {
   signedRecently: boolean
   display: DisplayBlock[]
   fields: { id: string; label: string }[]
+  /** Excess invoice sent with this request (open link, or the thank-you screen) */
+  excessInvoice: SignerExcessInvoice | null
 }
 
 const EMPTY_VIEW: SignerView = {
@@ -54,6 +68,7 @@ const EMPTY_VIEW: SignerView = {
   signedRecently: false,
   display: [],
   fields: [],
+  excessInvoice: null,
 }
 
 const LOCK_TIMEOUT_MS = 2 * 60_000
@@ -111,12 +126,41 @@ export async function resolveSignerView(token: string, meta: RequestMeta): Promi
     signedRecently: !!row.signed_at && Date.now() - new Date(row.signed_at).getTime() < 60 * 60_000,
     display: [],
     fields: [],
+    excessInvoice: null,
   }
-  if (state !== 'open') return base
+  if (state !== 'open' && !(state === 'signed' && base.signedRecently)) return base
+  const excessInvoice = await loadSignerExcessInvoice(service, row, tenant)
+  if (state !== 'open') return { ...base, excessInvoice }
   return {
     ...base,
+    excessInvoice,
     display: Array.isArray(row.display_content) ? (row.display_content as unknown as DisplayBlock[]) : [],
     fields: fieldsOf(row).map(f => ({ id: f.id, label: f.label })),
+  }
+}
+
+async function loadSignerExcessInvoice(
+  service: ReturnType<typeof createServiceClient>,
+  row: SigningRequestRow,
+  tenant: Awaited<ReturnType<typeof loadJobAndTenant>>['tenant'],
+): Promise<SignerExcessInvoice | null> {
+  if (!row.excess_invoice_id) return null
+  const { data: inv } = await service
+    .from('invoices')
+    .select('invoice_ref, amount_inc_gst, issued_date, paid_date, status')
+    .eq('id', row.excess_invoice_id)
+    .eq('tenant_id', row.tenant_id)
+    .maybeSingle()
+  if (!inv || inv.status === 'draft') return null
+  const hasBank = !!(tenant.bsb || tenant.account_number)
+  return {
+    ref: inv.invoice_ref,
+    amountIncGst: Number(inv.amount_inc_gst ?? 0),
+    dueText: excessDueText(inv.issued_date, tenant.excess_payment_terms),
+    paidDate: inv.paid_date,
+    bank: hasBank
+      ? { bankName: tenant.bank_name, accountName: tenant.account_name, bsb: tenant.bsb, accountNumber: tenant.account_number }
+      : null,
   }
 }
 
@@ -162,6 +206,39 @@ export async function openSourceDocument(token: string, meta: RequestMeta): Prom
     userAgent: meta.userAgent,
   })
   return { pdf, filename: `${signingDocumentLabel(row.document_type)}.pdf` }
+}
+
+/**
+ * The excess invoice exactly as it was emailed, while the link is open (and
+ * for an hour after signing, from the thank-you screen).
+ */
+export async function openExcessInvoice(token: string, meta: RequestMeta): Promise<{ pdf: Buffer; filename: string } | null> {
+  const service = createServiceClient()
+  if (!(await checkRateLimit(service, `ip:${ipKey(meta.ip)}:view`, RATE_LIMITS.viewPerIp))) {
+    throw new SigningError('Too many requests. Please wait a few minutes and try again.', 429)
+  }
+  const row = await findRow(token)
+  if (!row || !row.excess_invoice_id) return null
+  const state = signerLinkState(row)
+  const signedRecently = !!row.signed_at && Date.now() - new Date(row.signed_at).getTime() < 60 * 60_000
+  if (state !== 'open' && !(state === 'signed' && signedRecently)) return null
+
+  const { data: inv } = await service
+    .from('invoices')
+    .select('invoice_ref')
+    .eq('id', row.excess_invoice_id)
+    .eq('tenant_id', row.tenant_id)
+    .maybeSingle()
+  const pdf = await downloadSigningPdf(service, excessInvoicePdfPath(row.tenant_id, row.id))
+  await logSigningEvent(service, {
+    requestId: row.id,
+    tenantId: row.tenant_id,
+    event: 'document_opened',
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+    metadata: { document: 'excess_invoice' },
+  })
+  return { pdf, filename: `Excess invoice${inv?.invoice_ref ? ` ${inv.invoice_ref}` : ''}.pdf` }
 }
 
 export interface SubmitSignatureInput {

@@ -29,6 +29,7 @@ function view(overrides: Partial<SignerView> = {}): SignerView {
       { type: 'signature', fieldId: 'f1', label: 'Authorise', context: 'Sign here' },
     ],
     fields: [{ id: 'f1', label: 'Authorise' }],
+    excessInvoice: null,
     ...overrides,
   }
 }
@@ -84,14 +85,76 @@ describe('signer page', () => {
   })
 })
 
+describe('signer page excess invoice', () => {
+  const invoice = {
+    ref: 'IRC1001-EX',
+    amountIncGst: 500,
+    dueText: 'on receipt',
+    paidDate: null,
+    bank: { bankName: 'CBA', accountName: 'Insurance Repair Co', bsb: '066-000', accountNumber: '1234 5678' },
+  }
+
+  it('shows the invoice, bank details and a download link on an open link', () => {
+    const html = renderSignerPage(view({ excessInvoice: invoice }), { token: TOKEN })
+    expect(html).toContain('Excess invoice IRC1001-EX')
+    expect(html).toContain('$500.00')
+    expect(html).toContain('066-000')
+    expect(html).toContain(`/api/sign/${TOKEN}/invoice`)
+    expect(html.toLowerCase()).not.toContain('unpaid')
+    expect(html).not.toContain('overdue')
+  })
+
+  it('shows paid instead of bank details once recorded paid', () => {
+    const html = renderSignerPage(view({ excessInvoice: { ...invoice, paidDate: '2026-10-25' } }), { token: TOKEN })
+    expect(html).toContain('paid 25 Oct 2026')
+    expect(html).not.toContain('066-000')
+  })
+
+  it('mentions it on the thank-you screen', () => {
+    const html = renderSignerPage(
+      view({ state: 'signed', signedRecently: true, signedAt: '2026-10-21T02:00:00Z', display: [], fields: [], excessInvoice: invoice }),
+      { token: TOKEN, done: '1' },
+    )
+    expect(html).toContain('Thank you, you’ve signed')
+    expect(html).toContain('The only other thing is your excess')
+    expect(html).toContain('066-000')
+  })
+
+  it('has no invoice card without one', () => {
+    expect(renderSignerPage(view(), { token: TOKEN })).not.toContain('Your excess')
+  })
+})
+
 describe('signing emails', () => {
   it('built-in templates use only supported placeholders and include the link', () => {
-    for (const type of ['signing_request', 'signing_completed'] as const) {
+    for (const type of ['signing_request', 'signing_request_excess', 'signing_completed'] as const) {
       const known = new Set(TEMPLATE_TOKENS[type].map(t => t.key))
       const used = [...`${BUILT_IN_TEMPLATES[type].subject}\n${BUILT_IN_TEMPLATES[type].body}`.matchAll(/\{(\w+)\}/g)].map(m => m[1])
       for (const key of used) expect(known.has(key)).toBe(true)
     }
     for (const key of REQUIRED_TOKENS.signing_request ?? []) expect(BUILT_IN_TEMPLATES.signing_request.body).toContain(`{${key}}`)
+    for (const key of REQUIRED_TOKENS.signing_request_excess ?? []) expect(BUILT_IN_TEMPLATES.signing_request_excess.body).toContain(`{${key}}`)
+  })
+
+  it('excess template fills in the invoice details', () => {
+    const vars = signingTemplateVars({
+      signerName: 'Jane Citizen',
+      documentName: 'Scope of Works Authorisation',
+      job: { job_number: 'IRC1', claim_number: null, insured_name: 'Jane', property_address: '1 Example St' },
+      tenant: { name: 'IRC', trading_name: 'Insurance Repair Co', contact_phone: '0431132077', contact_email: 'office@insurancerepairco.com.au' },
+      signingLink: 'https://app/sign/x',
+      expiryDate: '4 Nov 2026',
+      excessAmount: '$500.00',
+      invoiceRef: 'IRC1001-EX',
+      excessDue: 'on receipt',
+    })
+    const subject = renderTemplate(BUILT_IN_TEMPLATES.signing_request_excess.subject, vars)
+    const body = renderTemplate(BUILT_IN_TEMPLATES.signing_request_excess.body, vars)
+    expect(subject).toContain('1 Example St')
+    expect(body).toContain('https://app/sign/x')
+    expect(body).toContain('$500.00')
+    expect(body).toContain('IRC1001-EX')
+    expect(body).not.toMatch(/\{\w+\}/)
   })
 
   it('subject includes the property address', () => {

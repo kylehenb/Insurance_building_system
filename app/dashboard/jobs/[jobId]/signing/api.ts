@@ -1,5 +1,6 @@
 import type { SendDialogDefaults, SendForSignatureResult } from '@/lib/signing/service'
 import type { SigningDocumentTypeKey, SigningEventSummary, SigningRequestSummary } from '@/lib/signing/types'
+import type { ExcessChoice } from '@/lib/excess/decision'
 
 // Browser-side calls to the internal signing API (/api/signing/*). The UI
 // only ever talks to these routes, never to a signing provider.
@@ -26,6 +27,7 @@ export function createAndSend(jobId: string, body: {
   signer: { name: string; email: string; phone: string }
   moveJobToAwaitingStage: boolean
   remindersEnabled: boolean
+  excess: ExcessChoice | null
 }) {
   return call<SendForSignatureResult>(`/api/signing/jobs/${jobId}/requests`, { method: 'POST', body: JSON.stringify(body) })
 }

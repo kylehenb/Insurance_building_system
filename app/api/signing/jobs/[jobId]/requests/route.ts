@@ -3,10 +3,12 @@ import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } f
 import { getSendDialogDefaults, listSigningRequestsForJob, sendForSignature } from '@/lib/signing/service'
 import { SIGNING_DOCUMENT_TYPES } from '@/lib/signing/documents/registry'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
+import { parseExcessChoice } from '@/lib/excess/decision'
 
 // GET  → this job's signing requests, plus defaults for the send dialog
 // POST → generate the document, create the request and email the signer
-//        { documentType, quoteIds, signer: { name, email, phone? }, moveJobToAwaitingStage?, remindersEnabled? }
+//        { documentType, quoteIds, signer: { name, email, phone? }, moveJobToAwaitingStage?, remindersEnabled?,
+//          excess?: ExcessChoice (required for insurance jobs; see lib/excess/decision.ts) }
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -48,6 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   const quoteIds = Array.isArray(body.quoteIds) ? body.quoteIds.filter((id): id is string => isUuid(id as string)) : []
   if (quoteIds.length === 0) return NextResponse.json({ error: 'Choose at least one approved quote' }, { status: 400 })
   const signer = (body.signer ?? {}) as Record<string, unknown>
+  const excess = body.excess == null ? null : parseExcessChoice(body.excess)
+  if (body.excess != null && !excess) return NextResponse.json({ error: 'The excess choice is not valid' }, { status: 400 })
   const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
   try {
@@ -60,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
         signer: { name: str(signer.name), email: str(signer.email), phone: str(signer.phone) || null },
         remindersEnabled: body.remindersEnabled !== false,
       },
-      { moveJobToAwaitingStage: body.moveJobToAwaitingStage === true },
+      { moveJobToAwaitingStage: body.moveJobToAwaitingStage === true, excess },
     )
     return NextResponse.json(result)
   } catch (err) {

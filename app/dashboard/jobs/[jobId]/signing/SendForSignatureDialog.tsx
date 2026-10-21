@@ -6,6 +6,8 @@ import { SIGNING_DOCUMENT_CATALOG, suggestDocumentType } from '@/lib/signing/doc
 import { BUILDING_CONTRACT_THRESHOLD, DEFAULT_EXPIRY_DAYS, REMINDER_DEFAULTS } from '@/lib/signing/config'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { createAndSend, fetchJobSigning, type SendDialogDefaults } from './api'
+import { notifyExcessChanged } from '@/components/jobs/ExcessDecisionBadge'
+import { ExcessStep, excessChoiceFromForm, excessSummary, initialExcessForm, type ExcessFormState } from './ExcessStep'
 
 // Choose the document, the quotes it covers and the signer, then send.
 // The document is generated from the job's approved quotes at send time.
@@ -81,6 +83,7 @@ function SendForm({
   const [phone, setPhone] = useState(defaults.signer.phone)
   const [moveStage, setMoveStage] = useState(defaults.jobStage === 'approved_awaiting_signoff')
   const [reminders, setReminders] = useState(true)
+  const [excessForm, setExcessForm] = useState<ExcessFormState>(() => initialExcessForm(defaults.excess))
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -93,7 +96,10 @@ function SendForm({
 
   const signableQuotes = defaults.quotes.filter(q => q.signable)
   const emailOk = EMAIL_RE.test(email.trim())
-  const canSend = !sending && quoteIds.length > 0 && name.trim().length > 1 && emailOk
+  const excessChoice = excessChoiceFromForm(defaults.excess, excessForm)
+  const excessReady = !defaults.excess.applies || excessChoice !== null
+  const attaching = excessSummary(defaults.excess, excessChoice)
+  const canSend = !sending && quoteIds.length > 0 && name.trim().length > 1 && emailOk && excessReady
 
   const toggleQuote = (id: string) =>
     setQuoteIds(prev => (prev.includes(id) ? prev.filter(q => q !== id) : [...prev, id]))
@@ -108,9 +114,11 @@ function SendForm({
         signer: { name: name.trim(), email: email.trim(), phone: phone.trim() },
         moveJobToAwaitingStage: moveStage,
         remindersEnabled: reminders,
+        excess: defaults.excess.applies ? excessChoice : null,
       })
+      notifyExcessChanged(jobId)
       onSent(
-        `${SIGNING_DOCUMENT_CATALOG[docType].label} emailed to ${result.request.signerEmail}.`
+        `${SIGNING_DOCUMENT_CATALOG[docType].label}${result.excessInvoiceRef ? ` and excess invoice ${result.excessInvoiceRef}` : ''} emailed to ${result.request.signerEmail}.`
         + (result.stageMoved ? ' Job moved to Awaiting Signed Document.' : ''),
       )
     } catch (err) {
@@ -174,6 +182,8 @@ function SendForm({
           )}
         </section>
 
+        <ExcessStep ctx={defaults.excess} form={excessForm} onChange={setExcessForm} />
+
         <section>
           <div className={label}>Signer</div>
           {defaults.signerSource && (
@@ -207,6 +217,15 @@ function SendForm({
           </label>
         )}
 
+        {canSend && (
+          <div className="rounded-md border border-[#e8e4e0] bg-[#fafaf9] px-3 py-2 text-[12px] text-[#3a3530]">
+            Sending: <strong>{SIGNING_DOCUMENT_CATALOG[docType].label}</strong> to sign
+            {attaching && <> + <strong>{attaching}</strong></>} to {email.trim()}
+          </div>
+        )}
+        {defaults.excess.applies && !excessReady && (
+          <p className="text-[12px] text-[#b45309]">Choose what to do about the excess to continue.</p>
+        )}
         {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</div>}
       </div>
 

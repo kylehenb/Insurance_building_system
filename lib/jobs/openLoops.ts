@@ -13,6 +13,7 @@ export type OpenLoopType =
   | 'trade_pricing_dispute'
   | 'invoice_queried'
   | 'close_out_blocker'
+  | 'excess_not_confirmed'
 
 export type OpenLoop = {
   type: OpenLoopType
@@ -95,5 +96,11 @@ export const OPEN_LOOP_CONFIG: Record<
     label: 'Close-Out Blocker',
     urgency: 'urgent',
     actionKey: 'handle_close_out',
+  },
+  // Insurance job with no excess amount and no recorded decision (see lib/excess/decision.ts)
+  excess_not_confirmed: {
+    label: 'Excess Not Confirmed',
+    urgency: 'normal',
+    actionKey: 'handle_excess',
   },
 }

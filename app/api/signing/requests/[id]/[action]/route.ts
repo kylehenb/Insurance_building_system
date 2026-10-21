@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } from '@/lib/signing/http'
-import { confirmSigningStage, getSigningProvider, setRemindersEnabled } from '@/lib/signing/service'
+import { confirmSigningStage, getSigningProvider, resendSigningRequest, setRemindersEnabled } from '@/lib/signing/service'
 
 // POST /api/signing/requests/[id]/send          send a draft
-// POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working)
+// POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working; excess invoice re-attached)
 // POST /api/signing/requests/[id]/revoke        { reason? } stop the link working
 // POST /api/signing/requests/[id]/confirm-stage record the sign-off and move the job on
 // POST /api/signing/requests/[id]/reminders     { enabled } automatic reminders on/off
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       case 'send':
         return NextResponse.json({ request: await provider.send(actor, id) })
       case 'resend':
-        return NextResponse.json({ request: await provider.send(actor, id, { resend: true }) })
+        return NextResponse.json({ request: await resendSigningRequest(actor, id) })
       case 'revoke': {
         const body = await req.json().catch(() => ({})) as { reason?: unknown }
         const reason = typeof body.reason === 'string' ? body.reason : null

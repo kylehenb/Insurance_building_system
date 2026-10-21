@@ -12,6 +12,7 @@ import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
 import { LOSS_TYPES } from '@/lib/loss-types'
+import { ExcessDecisionBadge } from '@/components/jobs/ExcessDecisionBadge'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -584,7 +585,10 @@ function JobDetailsAccordion({
                   placeholder="0.00"
                 />
               ) : (
-                <span className="ov-detail-value">{formatCurrency(saved.excess)}</span>
+                <span className="ov-detail-value">
+                  {formatCurrency(saved.excess)}
+                  <span className="mt-1 block"><ExcessDecisionBadge jobId={jobId} /></span>
+                </span>
               )}
             </div>
 

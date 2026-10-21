@@ -246,7 +246,11 @@ CREATE TABLE jobs (
   claim_description TEXT,
   special_instructions TEXT,
   sum_insured NUMERIC,
-  excess NUMERIC,
+  excess NUMERIC,                      -- policy excess inc GST (blank = not known)
+  excess_decision TEXT,                -- NULL = not confirmed | 'collect' | 'nil' | 'cash_settlement' | 'insurer_waived' | 'already_paid' | 'other'
+  excess_decision_note TEXT,           -- optional, e.g. "fence cash settled"
+  excess_decided_at TIMESTAMPTZ,
+  excess_decided_by UUID REFERENCES users(id),
   assigned_to UUID REFERENCES users(id),
   status TEXT DEFAULT 'active',        -- 'active' | 'on_hold' | 'complete' | 'cancelled'
   -- KPI tracking
@@ -1569,12 +1573,13 @@ CREATE TABLE signing_requests (
   signing_locked_at TIMESTAMPTZ,        -- single-use lock while a signature is being processed
   stage_confirmed_at TIMESTAMPTZ,       -- office confirmed the sign-off and moved the job on
   stage_confirmed_by UUID REFERENCES users(id),
+  excess_invoice_id UUID REFERENCES invoices(id), -- excess invoice emailed with the request, if any
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
-Checks: a `signed` row must have `signed_at`, `signed_pdf_path` and `signed_pdf_sha256`; every row needs an email or phone. Indexes: `(tenant_id, job_id, created_at DESC)`; partial `(tenant_id, sent_at) WHERE status IN ('sent','viewed')` for reminders. RLS: SELECT for the user's tenant only. Migrations: `supabase/migrations/20261021_signing_module.sql` (applied 21 Oct 2026), `20261022_signing_followups.sql` (reminders_enabled, signed_name, signer_capacity; storage tenant scoping).
+Checks: a `signed` row must have `signed_at`, `signed_pdf_path` and `signed_pdf_sha256`; every row needs an email or phone. Indexes: `(tenant_id, job_id, created_at DESC)`; partial `(tenant_id, sent_at) WHERE status IN ('sent','viewed')` for reminders. RLS: SELECT for the user's tenant only. Migrations: `supabase/migrations/20261021_signing_module.sql` (applied 21 Oct 2026), `20261022_signing_followups.sql` (reminders_enabled, signed_name, signer_capacity; storage tenant scoping), `20261025_excess_decision.sql` (`excess_invoice_id`; jobs `excess_decision*`).
 
 ### 4.33 signing_events
 ```sql
@@ -1628,7 +1633,7 @@ CREATE TABLE signing_rate_limits (
 Storage RLS mirrors database RLS — users can only access their own tenant's storage bucket paths.
 **Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The original `job-files` and `irc-master` storage policies check only that the user is signed in; migration `20261022_signing_followups.sql` adds a RESTRICTIVE policy (`private_buckets_tenant_scope`) so signed-in users can only read, write or delete objects under `tenants/{their tenant_id}/` in those two buckets. `photos` is public-read by design; migration `20261023_photos_bucket_tenant_writes.sql` adds RESTRICTIVE insert/update/delete policies so signed-in users can only write to `{tenant_id}/…` (Photos tab and report photo uploads) or `tenants/{tenant_id}/…` (field app) in that bucket — reading is unchanged. `tenant-assets` (public-read logos) gets the same treatment in `20261024_tenant_assets_tenant_writes.sql`: writes only under `tenants/{tenant_id}/…`. All four buckets are now tenant-scoped for signed-in users' writes; `job-files` and `irc-master` reads too.
 
-**`signed-documents` (private, PDF only, 25 MB):** e-signing source and signed PDFs at `tenants/{tenantId}/signing/{requestId}/source.pdf` and `.../signed.pdf`. No storage policies at all — only the service role can read or write it; office users download through `/api/signing/requests/[id]/document`, which checks their tenant. A copy of every signed PDF also goes to `job-files` at `tenants/{tenantId}/jobs/{jobId}/docs/` with a `job_files` row so it shows in the Files tab.
+**`signed-documents` (private, PDF only, 25 MB):** e-signing source and signed PDFs at `tenants/{tenantId}/signing/{requestId}/source.pdf` and `.../signed.pdf`, plus `.../excess-invoice.pdf` (the excess invoice exactly as emailed with the request, served to the signer page). No storage policies at all — only the service role can read or write it; office users download through `/api/signing/requests/[id]/document`, which checks their tenant. A copy of every signed PDF also goes to `job-files` at `tenants/{tenantId}/jobs/{jobId}/docs/` with a `job_files` row so it shows in the Files tab.
 
 **Signed URLs:** All files in Supabase Storage are private. The application generates short-lived signed URLs (expiry: 60 minutes) at render time for display and download. Signed URLs are never stored in the database — they are generated on demand. Trade portal file access uses the same signed URL pattern, generated server-side when the portal page loads.
 
@@ -2517,6 +2522,19 @@ The send dialog suggests the type from the selected quotes' total incl GST (`> $
 
 ### Emails
 Sent through the existing Gmail API sender as `tenants.contact_email` (office@insurancerepairco.com.au), marked processed so the Gmail SENT watch doesn't record them twice. Templates `signing_request` (subject includes the property address; `{signing_link}` required — appended automatically if a template loses it) and `signing_completed` (signed PDF attached) are editable in Settings → Email Templates (standard and per-client versions). The plain-text template is also sent as a branded HTML version (logo, large "Review and sign" button) via `buildEmailRaw({ html })`. SMS is not sent (no paid SMS service); a channel can be added later in `InHouseSigningProvider.send`.
+
+### Excess invoice with the signature request
+Every insurance job must say what happens with the excess before a document can be sent (`lib/excess/`). The send dialog's **Excess** step:
+- excess invoice already raised → attach it (a draft is marked sent) or "Don't attach it (already sent separately)";
+- excess on the job → **Collect** (creates an excess invoice for the amount, editable; a changed amount is saved to the job) or "There's an excess, but don't collect it";
+- no excess on the job → amber warning, then Collect (enter the amount), **Confirm there's no excess**, or don't collect.
+Reasons for not collecting: partial cash settlement (insurer already deducted it — no excess invoice, so the final insurer invoice deducts nothing), insurer waived, already paid, other; the note is always optional. The choice is stored on the job (`jobs.excess_decision*`, shown as "Previously recorded …" next time).
+
+Order of a send with an invoice: create the signing request → create the draft excess invoice (`generateInvoiceRef`) and render its PDF (`lib/documents/invoice-pdf.ts`, same HTML as the print page) → send **one** email with the document link and the invoice PDF attached → only then mark the invoice `sent` (→ `syncInvoiceToAccounting`), record the decision, set `signing_requests.excess_invoice_id` and keep a copy of the PDF. If the email fails, the draft invoice is deleted and the request revoked — nothing is half-sent. Template `signing_request_excess` ("Signature request + excess invoice", editable; tokens `{excess_amount}`, `{invoice_ref}`, `{excess_due}`, due = "on receipt" or "by D Mon YYYY" from `tenants.excess_payment_terms`). Resend re-attaches the same invoice; **reminders never re-attach it and never mention payment** (accounts are reconciled in batches, so the system never claims an invoice is unpaid).
+
+Signer page: an "Your excess" card under the Finish button (amount, due, bank details from the tenant, payment reference, "View the invoice (PDF)" → `/api/sign/[token]/invoice`, "Already paid? Thank you — there's nothing more to do."); if `paid_date` is set it just says paid. Also on the thank-you screen (for an hour after signing).
+
+Office: the stage banner's confirm card adds a neutral line — "Excess invoice X ($N) sent D Mon — check it's been paid before works start", or "Excess paid D Mon" once `paid_date` is set. `ExcessDecisionBadge` (Overview → Excess, Invoices tab) shows the state and lets the office record "No excess" or a not-collecting reason without sending (`GET/POST /api/jobs/[jobId]/excess`). Open loop **Excess Not Confirmed** shows in the stage banner for an insurance job with no excess amount and no decision.
 
 ### Reminders
 Daily Vercel Cron `GET /api/signing/reminders` (01:00 UTC = 9am Perth; `CRON_SECRET` Bearer check) calls `sendSigningReminders()` (`lib/signing/reminders.ts`): an open request still unsigned **7 days** after it was sent or last reminded gets a reminder (subject prefixed "Reminder:", fresh link, expiry reset to 14 days), up to **3** reminders. Off per request: the send dialog's "Send automatic reminders" checkbox (default on) and a toggle on each open request in the Signatures tab (`POST /api/signing/requests/[id]/reminders { enabled }`, logged as `reminders_on` / `reminders_off`).

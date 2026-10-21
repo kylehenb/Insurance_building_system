@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { formatPerthDateTime } from '@/lib/signing/format'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
 import { SIGNER_CAPACITY_LABELS } from '@/lib/signing/types'
+import { excessInvoiceStatusLine } from '@/lib/excess/decision'
 import { documentUrl } from './api'
 import { useJobSigning } from './useJobSigning'
 
@@ -39,6 +40,11 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
           {' · '}{toConfirm.signedAt ? formatPerthDateTime(toConfirm.signedAt) : ''}
         </div>
         <div className="mt-1 text-[#7a6a50]">Check the signed copy, then confirm to move the job to Signed — Build Schedule.</div>
+        {toConfirm.excessInvoice && (
+          <div className={`mt-1 ${toConfirm.excessInvoice.paidDate ? 'text-[#1b5e20]' : 'text-[#7a6a50]'}`}>
+            {excessInvoiceStatusLine(toConfirm.excessInvoice)}
+          </div>
+        )}
         {error && <div className="mt-1 text-red-700">{error}</div>}
         <div className="mt-2 flex flex-wrap gap-2">
           <a

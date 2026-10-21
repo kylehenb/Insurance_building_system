@@ -29,11 +29,26 @@ export interface CreateSigningRequestInput {
   remindersEnabled?: boolean
 }
 
+/** Documents sent in the same email as the signing link. */
+export interface AccompanyingDocuments {
+  /** Excess invoice for the homeowner to pay (email uses the "with excess invoice" template) */
+  excessInvoice?: {
+    ref: string | null
+    amountIncGst: number
+    /** "on receipt" or "by 4 Nov 2026" */
+    dueText: string
+    filename: string
+    pdf: Buffer
+  }
+}
+
 export interface SendSigningRequestOptions {
   /** Send again with a fresh link (the previous link stops working) */
   resend?: boolean
   /** Reminder wording; implies a fresh link like resend */
   reminder?: boolean
+  /** Sent with the link in the same email */
+  accompanying?: AccompanyingDocuments
 }
 
 export interface SignedDocument {

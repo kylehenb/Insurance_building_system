@@ -6,6 +6,17 @@ type InvoiceDeduction = Database['public']['Tables']['invoice_deductions']['Row'
 type Job = Database['public']['Tables']['jobs']['Row']
 type Tenant = Database['public']['Tables']['tenants']['Row']
 
+/**
+ * Optional settings for rendering to PDF (lib/documents/invoice-pdf.ts).
+ * The print page passes none and gets the original output.
+ */
+export interface InvoiceRenderOptions {
+  /** Header logo. Default '/logo-alt.png' (a data: URI when rendering to PDF) */
+  logoSrc?: string
+  /** Footer tenant logo. Default: the tenant's public tenant-assets URL */
+  footerLogoSrc?: string | null
+}
+
 export function generateInvoiceHtml(params: {
   invoice: Invoice
   job: Job
@@ -22,8 +33,15 @@ export function generateInvoiceHtml(params: {
   lineItems: InvoiceLineItem[]
   deductions?: InvoiceDeduction[]
   approvedQuoteRefs?: string[]
+  render?: InvoiceRenderOptions
 }): string {
-  const { invoice, job, tenant, lineItems, deductions = [], approvedQuoteRefs } = params
+  const { invoice, job, tenant, lineItems, deductions = [], approvedQuoteRefs, render = {} } = params
+  const logoSrc = render.logoSrc ?? '/logo-alt.png'
+  const footerLogoSrc = render.footerLogoSrc !== undefined
+    ? render.footerLogoSrc
+    : tenant.logo_storage_path
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`
+      : null
 
   const formatDate = (date: string | null) => {
     if (!date) return ''
@@ -302,7 +320,7 @@ export function generateInvoiceHtml(params: {
   <div style="display:flex;align-items:stretch;background:white;">
     <div style="width:148px;min-width:148px;padding:14px 8px 14px 20px;
       border-right:1px solid #e0dbd4;">
-      <img src="/logo-alt.png" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
+      <img src="${logoSrc}" alt="IRC Logo" style="width:100%;height:auto;display:block;margin-bottom:5px;" />
       <div style="font-size:6.5px;letter-spacing:1.8px;text-transform:uppercase;
         color:#9e998f;font-weight:700;white-space:nowrap;">INSURANCE REPAIR CO</div>
     </div>
@@ -449,8 +467,8 @@ export function generateInvoiceHtml(params: {
   <!-- FOOTER -->
   <div style="background:#1a1a1a;padding:9px 16px;display:flex;align-items:center;
     gap:10px;">
-    ${tenant.logo_storage_path ? `
-    <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}" 
+    ${footerLogoSrc ? `
+    <img src="${footerLogoSrc}"
       alt="Tenant Logo" style="width:26px;height:26px;object-fit:contain;flex-shrink:0;" />
     ` : `
     <div style="width:26px;height:26px;border:1.5px solid #c8b89a;border-radius:50%;

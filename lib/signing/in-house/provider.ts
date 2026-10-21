@@ -157,13 +157,20 @@ export class InHouseSigningProvider implements SigningProvider {
         signingLink: signingLinkFor(token),
         kind: options.reminder ? 'reminder' : options.resend ? 'resend' : 'initial',
         actorId: actor.userId,
+        excessInvoice: options.accompanying?.excessInvoice,
       })
       await logSigningEvent(service, {
         requestId: row.id,
         tenantId: actor.tenantId,
         event: options.reminder ? 'reminded' : options.resend ? 'resent' : 'sent',
         actorId: actor.userId,
-        metadata: { channel: 'email', to: updated.signer_email, expiresAt, gmailId: sent.gmailId },
+        metadata: {
+          channel: 'email',
+          to: updated.signer_email,
+          expiresAt,
+          gmailId: sent.gmailId,
+          ...(options.accompanying?.excessInvoice ? { excessInvoiceRef: options.accompanying.excessInvoice.ref } : {}),
+        },
       })
       return toSigningRequestSummary(updated)
     } catch (err) {

@@ -475,6 +475,9 @@ export default function EmailTemplatesSettingsPage() {
                   {selection.sendType === 'signing_request' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f]">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>
                   )}
+                  {selection.sendType === 'signing_request_excess' && (
+                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
+                  )}
                   {selection.sendType === 'signing_completed' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Signed PDF (with Signature Certificate) attached</div>
                   )}

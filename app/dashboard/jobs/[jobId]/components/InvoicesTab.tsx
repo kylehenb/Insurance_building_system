@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { InvoicesList } from './InvoicesList'
+import { ExcessDecisionBadge } from '@/components/jobs/ExcessDecisionBadge'
 
 interface InvoicesTabProps {
   jobId: string
@@ -136,5 +137,13 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
     )
   }
 
-  return <InvoicesList jobId={jobId} tenantId={tenantId} ctx={ctx} />
+  return (
+    <>
+      <div className="mb-3 flex items-start gap-3 text-[12px]">
+        <span className="pt-0.5 text-[#9e998f]">Excess</span>
+        <ExcessDecisionBadge jobId={jobId} />
+      </div>
+      <InvoicesList jobId={jobId} tenantId={tenantId} ctx={ctx} />
+    </>
+  )
 }

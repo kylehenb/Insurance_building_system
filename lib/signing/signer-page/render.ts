@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { CONSENT_TEXT, SIGNER_CONTACT } from '@/lib/signing/config'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
-import type { SignerView } from '@/lib/signing/in-house/signer'
+import type { SignerExcessInvoice, SignerView } from '@/lib/signing/in-house/signer'
 import { DEFAULT_SIGNATURE_STYLE, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
 import type { DisplayBlock, SignerCapacity } from '@/lib/signing/types'
 import { SIGNER_SCRIPT } from './script'
@@ -82,6 +82,42 @@ function documentFor(view: SignerView): string {
   return view.documentName
     ? `<strong>${esc(view.documentName)}</strong>${view.propertyAddress ? ` for ${esc(view.propertyAddress)}` : ''}`
     : 'document'
+}
+
+const money = (v: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(v)
+
+/**
+ * The excess invoice sent with the document. Deliberately neutral: payments
+ * are reconciled in batches, so the page never says an invoice is unpaid —
+ * only "paid" once the office has recorded it.
+ */
+function excessInvoiceCard(inv: SignerExcessInvoice, downloadUrl: string, afterSigning: boolean): string {
+  const title = `Excess invoice${inv.ref ? ` ${esc(inv.ref)}` : ''}`
+  if (inv.paidDate) {
+    return `<section class="sg-card sg-invoice" aria-label="${title}">
+  <p class="sg-kicker">Your excess</p>
+  <h2>${title}</h2>
+  <p>${esc(money(inv.amountIncGst))} — paid ${esc(formatSigningDate(inv.paidDate))}. Thank you.</p>
+  <a href="${esc(downloadUrl)}" class="sg-btn sg-btn-secondary" target="_blank" rel="noopener">View the invoice (PDF)</a>
+</section>`
+  }
+  const bank = inv.bank
+  const rows = [
+    bank?.accountName ? ['Account name', bank.accountName] : null,
+    bank?.bankName ? ['Bank', bank.bankName] : null,
+    bank?.bsb ? ['BSB', bank.bsb] : null,
+    bank?.accountNumber ? ['Account number', bank.accountNumber] : null,
+    inv.ref ? ['Reference', inv.ref] : null,
+  ].filter((r): r is string[] => !!r)
+  return `<section class="sg-card sg-invoice" aria-label="${title}">
+  <p class="sg-kicker">Your excess</p>
+  <h2>${title}</h2>
+  <p>${afterSigning ? 'As a reminder, your' : 'Your'} insurance excess of <strong>${esc(money(inv.amountIncGst))}</strong> is payable ${esc(inv.dueText)}. This is separate from signing — the invoice is also attached to our email.</p>
+  ${rows.length ? `<p class="sg-label">Pay by bank transfer</p>
+  <dl class="sg-details">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+  <a href="${esc(downloadUrl)}" class="sg-btn sg-btn-secondary" target="_blank" rel="noopener">View the invoice (PDF)</a>
+  <p class="sg-foot">Already paid? Thank you — there’s nothing more to do.</p>
+</section>`
 }
 
 function signatureField(block: Extract<DisplayBlock, { type: 'signature' }>, index: number, total: number): string {
@@ -216,12 +252,14 @@ function openFlow(view: SignerView, token: string, errorMessage: string | null, 
         <li>Sign in ${fieldCount === 1 ? '1 place' : `${fieldCount} places`}.</li>
         <li>Tap <strong>Finish</strong>.</li>
       </ol>
+      ${view.excessInvoice && !view.excessInvoice.paidDate ? `<p>Your excess invoice and how to pay it are at the bottom of this page.</p>` : ''}
       <a href="#field-1" class="sg-btn sg-btn-primary" data-sg-start="1">Start</a>
       <a href="${esc(`${base}/document`)}" class="sg-btn sg-btn-secondary" target="_blank" rel="noopener">View the full document (PDF)</a>
       ${view.expiresAt ? `<p class="sg-foot">This link works until ${esc(formatSigningDate(view.expiresAt))}.</p>` : ''}
     </section>
     ${renderDocumentBlocks(view.display)}
     ${signatureForm(`${base}/submit`, view.signerName ?? '', view.ownerName)}
+    ${view.excessInvoice ? excessInvoiceCard(view.excessInvoice, `${base}/invoice`, false) : ''}
     ${contactBox()}
     <p class="sg-foot">Your signature is added to the document together with the date, time and a record of this device, so it can be checked later.</p>
   </main>
@@ -277,8 +315,9 @@ function bodyFor(view: SignerView | 'rate_limited', options: SignerPageOptions):
           companyName,
           body: statusScreen('✅', 'Thank you, you’ve signed',
             `<p>Your ${documentFor(view)} has been signed.</p>
-             <p>We’ve emailed you a copy of the signed document. There’s nothing else you need to do here — you can close this page.</p>
+             <p>We’ve emailed you a copy of the signed document. ${view.excessInvoice && !view.excessInvoice.paidDate ? 'The only other thing is your excess, below.' : 'There’s nothing else you need to do here — you can close this page.'}</p>
              ${view.signedAt ? `<p class="sg-foot">Signed ${esc(formatPerthDateTime(view.signedAt))}</p>` : ''}
+             ${view.excessInvoice ? excessInvoiceCard(view.excessInvoice, `/api/sign/${encodeURIComponent(options.token)}/invoice`, true) : ''}
              ${contactBox()}`),
         }
       }

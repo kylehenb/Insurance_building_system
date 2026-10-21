@@ -2025,6 +2025,10 @@ export type Database = {
           special_instructions: string | null
           sum_insured: number | null
           tenant_id: string
+          excess_decision: string | null
+          excess_decision_note: string | null
+          excess_decided_at: string | null
+          excess_decided_by: string | null
         }
         Insert: {
           adjuster?: string | null
@@ -2074,6 +2078,10 @@ export type Database = {
           special_instructions?: string | null
           sum_insured?: number | null
           tenant_id: string
+          excess_decision?: string | null
+          excess_decision_note?: string | null
+          excess_decided_at?: string | null
+          excess_decided_by?: string | null
         }
         Update: {
           adjuster?: string | null
@@ -2123,6 +2131,10 @@ export type Database = {
           special_instructions?: string | null
           sum_insured?: number | null
           tenant_id?: string
+          excess_decision?: string | null
+          excess_decision_note?: string | null
+          excess_decided_at?: string | null
+          excess_decided_by?: string | null
         }
         Relationships: [
           {
@@ -3652,6 +3664,7 @@ export type Database = {
           reminders_enabled: boolean
           signed_name: string | null
           signer_capacity: string | null
+          excess_invoice_id: string | null
         }
         Insert: {
           created_at?: string
@@ -3696,6 +3709,7 @@ export type Database = {
           reminders_enabled?: boolean
           signed_name?: string | null
           signer_capacity?: string | null
+          excess_invoice_id?: string | null
         }
         Update: {
           created_at?: string
@@ -3740,6 +3754,7 @@ export type Database = {
           reminders_enabled?: boolean
           signed_name?: string | null
           signer_capacity?: string | null
+          excess_invoice_id?: string | null
         }
         Relationships: [
           {

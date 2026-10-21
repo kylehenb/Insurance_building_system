@@ -5,7 +5,7 @@ import type { Database } from '@/lib/supabase/database.types'
 // send_type, optionally overridden per client. Until a tenant has written
 // one, the built-in defaults below are used so sends still work.
 
-export type EmailSendType = 'work_order' | 'signing_request' | 'signing_completed'
+export type EmailSendType = 'work_order' | 'signing_request' | 'signing_request_excess' | 'signing_completed'
 
 export interface EmailTemplateContent {
   subject: string
@@ -49,6 +49,28 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'It takes about two minutes on your phone or computer. You don\'t need an account or a password: tap the button, read the document, and sign by typing your name or with your finger.',
       '',
       'The link works until {expiry_date}. If you have any questions, call us on {company_phone} or reply to this email.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  signing_request_excess: {
+    name: 'Signature request with excess invoice — default',
+    subject: 'Please sign your {document_name} and pay your excess – {property_address}',
+    body: [
+      'Hi {signer_first_name},',
+      '',
+      '{company_name} is ready to start the repairs at {property_address}. Before we can begin, there are two things to do:',
+      '',
+      '1. Read and sign your {document_name}:',
+      '',
+      '{signing_link}',
+      '',
+      '2. Pay your insurance excess of {excess_amount}. The excess invoice ({invoice_ref}) is attached to this email with our bank details. Payment is due {excess_due}.',
+      '',
+      'Signing takes about two minutes on your phone or computer. You don\'t need an account or a password.',
+      '',
+      'The signing link works until {expiry_date}. If you have any questions, call us on {company_phone} or reply to this email.',
       '',
       'Kind regards,',
       '{company_name}',
@@ -106,6 +128,23 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
   ],
+  signing_request_excess: [
+    { key: 'signing_link',     label: 'Signing link',     example: 'https://app.example.com/sign/…' },
+    { key: 'expiry_date',      label: 'Link expiry date', example: '3 Nov 2026' },
+    { key: 'excess_amount',    label: 'Excess amount',    example: '$500.00' },
+    { key: 'invoice_ref',      label: 'Invoice number',   example: 'INV-IRC1042-2' },
+    { key: 'excess_due',       label: 'Excess due',       example: 'on receipt' },
+    { key: 'signer_first_name', label: 'Signer first name', example: 'Jane' },
+    { key: 'signer_name',      label: 'Signer full name', example: 'Jane Citizen' },
+    { key: 'document_name',    label: 'Document name',    example: 'Scope of Works Authorisation' },
+    { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
+    { key: 'job_number',       label: 'Job number',       example: 'IRC1042' },
+    { key: 'claim_number',     label: 'Claim number',     example: 'CLM-558213' },
+    { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
+    { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
+    { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
+    { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+  ],
   signing_completed: [
     { key: 'signed_at',        label: 'Signed date/time', example: '21 Oct 2026, 2:05 pm' },
     { key: 'signer_first_name', label: 'Signer first name', example: 'Jane' },
@@ -124,6 +163,7 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
 /** Placeholders a send type can't work without (the editor warns if one is missing). */
 export const REQUIRED_TOKENS: Partial<Record<EmailSendType, string[]>> = {
   signing_request: ['signing_link'],
+  signing_request_excess: ['signing_link'],
 }
 
 /** Email types listed in Settings → Email Templates, in display order. */
@@ -137,6 +177,11 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
     sendType: 'signing_request',
     label: 'Signature request',
     description: 'Sent to the homeowner with a secure link to sign the Scope of Works or Building Contract.',
+  },
+  {
+    sendType: 'signing_request_excess',
+    label: 'Signature request + excess invoice',
+    description: 'Used instead of the signature request when an excess invoice is sent with it (invoice PDF attached).',
   },
   {
     sendType: 'signing_completed',
@@ -178,6 +223,10 @@ type SigningVarsInput = {
   expiryDate?: string
   /** signing_completed only */
   signedAt?: string
+  /** signing_request_excess only */
+  excessAmount?: string
+  invoiceRef?: string
+  excessDue?: string
 }
 
 /** Placeholder values for the signature request / signed copy emails. */
@@ -197,6 +246,9 @@ export function signingTemplateVars(input: SigningVarsInput): Record<string, str
     ...(input.signingLink !== undefined ? { signing_link: input.signingLink } : {}),
     ...(input.expiryDate !== undefined ? { expiry_date: input.expiryDate } : {}),
     ...(input.signedAt !== undefined ? { signed_at: input.signedAt } : {}),
+    ...(input.excessAmount !== undefined ? { excess_amount: input.excessAmount } : {}),
+    ...(input.invoiceRef !== undefined ? { invoice_ref: input.invoiceRef } : {}),
+    ...(input.excessDue !== undefined ? { excess_due: input.excessDue } : {}),
   }
 }
 

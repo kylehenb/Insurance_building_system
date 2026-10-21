@@ -1,4 +1,5 @@
 import type { Database } from '@/lib/supabase/database.types'
+import type { ExcessInvoiceSummary } from '@/lib/excess/decision'
 
 // Shared types for the e-signing module. Safe to import from client
 // components: no server-only code here.
@@ -113,6 +114,9 @@ export interface SigningRequestSummary {
   /** Name the signer confirmed when signing, and in what capacity */
   signedName: string | null
   signerCapacity: SignerCapacity | null
+  /** Excess invoice sent with the request (filled in by the listing) */
+  excessInvoiceId: string | null
+  excessInvoice: ExcessInvoiceSummary | null
   hasSignedDocument: boolean
   signedJobFileId: string | null
   stageConfirmedAt: string | null
@@ -160,6 +164,8 @@ export function toSigningRequestSummary(row: SigningRequestRow, now = new Date()
     remindersEnabled: row.reminders_enabled,
     signedName: row.signed_name,
     signerCapacity: (row.signer_capacity as SignerCapacity | null) ?? null,
+    excessInvoiceId: row.excess_invoice_id,
+    excessInvoice: null,
     hasSignedDocument: !!row.signed_pdf_path,
     signedJobFileId: row.signed_job_file_id,
     stageConfirmedAt: row.stage_confirmed_at,

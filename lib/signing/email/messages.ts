@@ -7,9 +7,11 @@ import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
 import type { SigningRequestRow } from '@/lib/signing/types'
 import { renderBrandedEmailHtml } from './html'
 import { sendEmailViaGmail, type SentEmail } from './gmail'
+import type { AccompanyingDocuments } from '@/lib/signing/provider'
 
 // The emails the signing module sends:
-//   1. Signature request (template 'signing_request') — link to sign
+//   1. Signature request (template 'signing_request') — link to sign; or
+//      'signing_request_excess' when an excess invoice goes with it (PDF attached)
 //   2. Signed copy to the signer (template 'signing_completed') — PDF attached,
 //      office BCC'd (office gets its own copy only if the signer can't be emailed)
 // Both templates are editable in Settings → Email Templates.
@@ -97,12 +99,14 @@ export async function sendSigningRequestEmail(service: Service, params: {
   signingLink: string
   kind: RequestEmailKind
   actorId: string | null
+  /** Attached, and the email uses the 'signing_request_excess' template */
+  excessInvoice?: AccompanyingDocuments['excessInvoice']
 }): Promise<SentEmail> {
-  const { request, job, tenant, signingLink, kind } = params
+  const { request, job, tenant, signingLink, kind, excessInvoice } = params
   const to = request.signer_email?.trim()
   if (!to) throw new SigningEmailError('The signer has no email address')
 
-  const template = await resolveEmailTemplate(service, tenant.id, 'signing_request', job.client_id)
+  const template = await resolveEmailTemplate(service, tenant.id, excessInvoice ? 'signing_request_excess' : 'signing_request', job.client_id)
   const documentName = signingDocumentLabel(request.document_type)
   const vars = signingTemplateVars({
     signerName: request.signer_name,
@@ -111,6 +115,11 @@ export async function sendSigningRequestEmail(service: Service, params: {
     tenant,
     signingLink,
     expiryDate: request.expires_at ? formatSigningDate(request.expires_at) : '',
+    ...(excessInvoice ? {
+      excessAmount: new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(excessInvoice.amountIncGst),
+      invoiceRef: excessInvoice.ref ?? 'attached',
+      excessDue: excessInvoice.dueText,
+    } : {}),
   })
 
   let body = renderTemplate(template.body, vars)
@@ -129,7 +138,10 @@ export async function sendSigningRequestEmail(service: Service, params: {
     footerLines: footerLines(tenant),
   })
 
-  const sent = await sendEmailViaGmail(service, { from, to, subject, text: body, html })
+  const attachments = excessInvoice
+    ? [{ filename: excessInvoice.filename, mimeType: 'application/pdf', content: excessInvoice.pdf }]
+    : undefined
+  const sent = await sendEmailViaGmail(service, { from, to, subject, text: body, html, attachments })
   await recordOutboundEmail(service, {
     request,
     sent,
@@ -139,6 +151,9 @@ export async function sendSigningRequestEmail(service: Service, params: {
     text: body.split(signingLink).join(LINK_PLACEHOLDER),
     source: kind === 'reminder' ? 'signing_reminder' : 'signing_request',
     actorId: params.actorId,
+    attachments: excessInvoice
+      ? [{ filename: excessInvoice.filename, storage_path: null, mime_type: 'application/pdf', size_bytes: excessInvoice.pdf.length }]
+      : undefined,
   })
   return sent
 }

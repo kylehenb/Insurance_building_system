@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
     "/api/work-orders/\\[id\\]/send": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     // E-signing: generates the document when a request is created…
     "/api/signing/jobs/\\[jobId\\]/requests": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
+    // Resend re-renders the excess invoice PDF if its stored copy is missing
+    "/api/signing/requests/\\[id\\]/\\[action\\]": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     // …and stamps the signature + certificate when the homeowner signs
     "/api/sign/\\[token\\]/submit": SIGNING_FONTS,
     "/api/sign/fonts/\\[style\\]": SIGNING_FONTS,
@@ -31,6 +33,7 @@ const nextConfig: NextConfig = {
     "/api/work-orders/\\[id\\]/pdf": NO_FULL_PUPPETEER,
     "/api/work-orders/\\[id\\]/send": NO_FULL_PUPPETEER,
     "/api/signing/jobs/\\[jobId\\]/requests": NO_FULL_PUPPETEER,
+    "/api/signing/requests/\\[id\\]/\\[action\\]": NO_FULL_PUPPETEER,
   },
   async headers() {
     // Signing links carry a secret token in the URL: never leak it in a

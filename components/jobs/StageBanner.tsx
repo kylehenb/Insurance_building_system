@@ -5,7 +5,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
-import type { OpenLoop } from '@/lib/jobs/openLoops'
+import { OPEN_LOOP_CONFIG, type OpenLoop } from '@/lib/jobs/openLoops'
+import { excessNeedsConfirming } from '@/lib/excess/decision'
 import { SendForSignatureDialog } from '@/app/dashboard/jobs/[jobId]/signing/SendForSignatureDialog'
 import { SigningStageCard } from '@/app/dashboard/jobs/[jobId]/signing/SigningStageCard'
 
@@ -14,6 +15,9 @@ type JobStageRow = {
   current_stage: string | null
   current_stage_updated_at: string | null
   override_stage: 'on_hold' | 'cancelled' | null
+  job_type?: string | null
+  excess?: number | null
+  excess_decision?: string | null
 }
 
 function getBorderColor(stageKey: JobStageKey): string {
@@ -51,6 +55,10 @@ function getLoopLabelColor(stageKey: JobStageKey): string {
   return '#a07840'
 }
 
+function isCancelledKey(stageKey: JobStageKey): boolean {
+  return stageKey === 'cancelled' || stageKey === 'declined_close_out'
+}
+
 type StageBannerProps = { jobId: string; tenantId: string }
 
 export default function StageBanner({ jobId }: StageBannerProps) {
@@ -65,7 +73,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
     )
     const { data } = await supabase
       .from('jobs')
-      .select('current_stage, current_stage_updated_at, override_stage')
+      .select('current_stage, current_stage_updated_at, override_stage, job_type, excess, excess_decision')
       .eq('id', jobId)
       .single()
     setRow(data as unknown as JobStageRow | null)
@@ -170,8 +178,19 @@ export default function StageBanner({ jobId }: StageBannerProps) {
 
   const config = STAGE_CONFIG[effectiveKey]
 
-  // Open loops are not yet populated from the database
+  // Open loops are not yet populated from the database, apart from the
+  // excess check, which reads straight off the job row (kept live by Realtime)
   const openLoops: OpenLoop[] = []
+  if (
+    !isCancelledKey(effectiveKey) &&
+    excessNeedsConfirming({
+      applies: (row.job_type ?? 'insurance') !== 'private',
+      amount: row.excess != null ? Number(row.excess) : null,
+      decision: (row.excess_decision ?? null) as Parameters<typeof excessNeedsConfirming>[0]['decision'],
+    })
+  ) {
+    openLoops.push({ type: 'excess_not_confirmed', ...OPEN_LOOP_CONFIG.excess_not_confirmed })
+  }
 
   const borderColor = getBorderColor(effectiveKey)
   const sectionLabelColor = getSectionLabelColor(effectiveKey)

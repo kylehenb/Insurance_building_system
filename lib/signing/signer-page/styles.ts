@@ -70,6 +70,7 @@ html, body { background: #ffffff; }
 .sg-js #sg-form { background: none; border: 0; padding: 0; margin: 0; }
 
 .sg-adopt h2 { margin-top: 8px; }
+.sg-invoice h2 { margin-top: 4px; }
 .sg-tabs { display: flex; margin: 8px 0 16px; border: 2px solid #111111; border-radius: 10px; overflow: hidden; }
 .sg-tab { flex: 1 1 0; position: relative; }
 .sg-tab input { position: absolute; opacity: 0; width: 1px; height: 1px; }
