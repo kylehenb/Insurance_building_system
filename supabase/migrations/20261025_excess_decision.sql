@@ -21,4 +21,4 @@ ALTER TABLE jobs
 
 -- The excess invoice that went out with a signing request (null if none)
 ALTER TABLE signing_requests
-  ADD COLUMN IF NOT EXISTS excess_invoice_id UUID REFERENCES invoices(id);
+  ADD COLUMN IF NOT EXISTS excess_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL;

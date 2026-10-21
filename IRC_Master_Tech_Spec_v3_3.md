@@ -1573,7 +1573,7 @@ CREATE TABLE signing_requests (
   signing_locked_at TIMESTAMPTZ,        -- single-use lock while a signature is being processed
   stage_confirmed_at TIMESTAMPTZ,       -- office confirmed the sign-off and moved the job on
   stage_confirmed_by UUID REFERENCES users(id),
-  excess_invoice_id UUID REFERENCES invoices(id), -- excess invoice emailed with the request, if any
+  excess_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL, -- excess invoice emailed with the request, if any
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
