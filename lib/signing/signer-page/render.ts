@@ -3,7 +3,7 @@ import { CONSENT_TEXT, SIGNER_CONTACT } from '@/lib/signing/config'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
 import type { SignerView } from '@/lib/signing/in-house/signer'
 import { DEFAULT_SIGNATURE_STYLE, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
-import type { DisplayBlock } from '@/lib/signing/types'
+import type { DisplayBlock, SignerCapacity } from '@/lib/signing/types'
 import { SIGNER_SCRIPT } from './script'
 import { SIGNER_CSS } from './styles'
 
@@ -128,7 +128,7 @@ export function renderDocumentBlocks(blocks: DisplayBlock[]): string {
   return `<article class="sg-doc">${html.join('\n')}</article>`
 }
 
-function signatureForm(action: string, signerName: string): string {
+function signatureForm(action: string, signerName: string, ownerName: string | null): string {
   const styles = SIGNATURE_STYLES.map(style => {
     const checked = style.key === DEFAULT_SIGNATURE_STYLE
     return `<label class="sg-style${checked ? ' is-checked' : ''}">
@@ -144,13 +144,18 @@ function signatureForm(action: string, signerName: string): string {
         <h2 id="sg-adopt-title">Your signature</h2>
         <button type="button" id="sg-adopt-close" class="sg-btn sg-btn-link sg-js-only">Close</button>
       </div>
+      <label class="sg-label" for="sg-typed-name">Your full name</label>
+      <input id="sg-typed-name" class="sg-input" name="typed_name" value="${esc(signerName)}" autocomplete="name" autocapitalize="words" maxlength="80">
+      <fieldset class="sg-capacity">
+        <legend class="sg-label">Who is signing?</legend>
+        ${capacityOptions(ownerName)}
+      </fieldset>
+      <p class="sg-label" style="margin-top:18px">How would you like to sign?</p>
       <div class="sg-tabs sg-js-only" role="radiogroup" aria-label="How to sign">
         <label class="sg-tab"><input type="radio" name="method" value="typed" checked><span>Type my name</span></label>
         <label class="sg-tab"><input type="radio" name="method" value="drawn"><span>Draw</span></label>
       </div>
       <div class="sg-panel-type">
-        <label class="sg-label" for="sg-typed-name">Your full name</label>
-        <input id="sg-typed-name" class="sg-input" name="typed_name" value="${esc(signerName)}" autocomplete="name" autocapitalize="words" maxlength="80">
         <div class="sg-styles" role="radiogroup" aria-label="Signature style">
           <p class="sg-label">Choose a style</p>
           ${styles}
@@ -177,6 +182,22 @@ function signatureForm(action: string, signerName: string): string {
 </form>`
 }
 
+function capacityOptions(ownerName: string | null): string {
+  const options: { value: SignerCapacity; title: string; hint: string }[] = [
+    { value: 'owner', title: 'I am the owner', hint: ownerName ? `Named on this document as ${ownerName}` : 'Named on this document' },
+    { value: 'joint_owner', title: 'I am a joint owner', hint: 'For example a husband, wife or partner who also owns the property' },
+    {
+      value: 'authorised_person',
+      title: 'I am signing for the owner',
+      hint: `${ownerName ? `On behalf of ${ownerName}. ` : ''}By choosing this you confirm you have the owner’s authority to sign for them.`,
+    },
+  ]
+  return options.map(o => `<label class="sg-choice${o.value === 'owner' ? ' is-checked' : ''}">
+          <input type="radio" name="capacity" value="${o.value}"${o.value === 'owner' ? ' checked' : ''}>
+          <span><strong>${esc(o.title)}</strong><span class="sg-choice-hint">${esc(o.hint)}</span></span>
+        </label>`).join('\n        ')
+}
+
 function openFlow(view: SignerView, token: string, errorMessage: string | null, companyName: string): string {
   const base = `/api/sign/${encodeURIComponent(token)}`
   const firstName = view.signerName?.trim().split(/\s+/)[0] ?? ''
@@ -200,7 +221,7 @@ function openFlow(view: SignerView, token: string, errorMessage: string | null, 
       ${view.expiresAt ? `<p class="sg-foot">This link works until ${esc(formatSigningDate(view.expiresAt))}.</p>` : ''}
     </section>
     ${renderDocumentBlocks(view.display)}
-    ${signatureForm(`${base}/submit`, view.signerName ?? '')}
+    ${signatureForm(`${base}/submit`, view.signerName ?? '', view.ownerName)}
     ${contactBox()}
     <p class="sg-foot">Your signature is added to the document together with the date, time and a record of this device, so it can be checked later.</p>
   </main>

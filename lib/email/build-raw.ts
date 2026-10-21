@@ -8,6 +8,8 @@ export interface BuildRawEmailParams {
   from: string
   to: string
   cc?: string
+  /** Blind copy: added as a Bcc header, which Gmail delivers and strips before sending */
+  bcc?: string
   subject: string
   body: string
   /** RFC 822 Message-ID of the message being replied to, e.g. <CABcd@mail.gmail.com> */
@@ -46,12 +48,13 @@ function base64Lines(content: Buffer): string {
  * bodies are multipart/alternative; otherwise plain text.
  */
 export function buildEmailRaw(params: BuildRawEmailParams): string {
-  const { from, to, cc, subject, body, inReplyTo, references, attachments = [], html } = params
+  const { from, to, cc, bcc, subject, body, inReplyTo, references, attachments = [], html } = params
 
   const headers: string[] = [
     `From: ${from}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
+    ...(bcc ? [`Bcc: ${bcc}`] : []),
     `Subject: ${encodeHeaderValue(subject)}`,
     'MIME-Version: 1.0',
   ]

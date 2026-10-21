@@ -5,7 +5,7 @@ import { logSigningEvent } from './events'
 import { formatPerthDateTime } from './format'
 import { SigningError, type SigningActor } from './provider'
 import { loadRequestForTenant } from './repository'
-import type { SigningRequestRow } from './types'
+import { SIGNER_CAPACITY_LABELS, type SignerCapacity, type SigningRequestRow } from './types'
 
 // Keeps the job's homeowner sign-off fields in step with signing requests.
 //
@@ -17,6 +17,13 @@ import type { SigningRequestRow } from './types'
 type Service = SupabaseClient<Database>
 
 export const SIGNOFF_METHOD_ELECTRONIC = 'electronic_signature'
+
+/** "Jane Citizen (joint owner)" — who signed, for the job notes. */
+function signedByText(request: SigningRequestRow): string {
+  const name = request.signed_name || request.signer_name
+  const capacity = request.signer_capacity as SignerCapacity | null
+  return capacity && capacity !== 'owner' ? `${name} (${SIGNER_CAPACITY_LABELS[capacity].toLowerCase()})` : name
+}
 
 /**
  * Optional, chosen by the office when sending: moves a job waiting on
@@ -50,7 +57,7 @@ export async function recordJobSignoffSigned(service: Service, request: SigningR
     .from('jobs')
     .update({
       homeowner_signoff_method: SIGNOFF_METHOD_ELECTRONIC,
-      homeowner_signoff_notes: `${signingDocumentLabel(request.document_type)} signed electronically by ${request.signer_name} on ${when} (request ${request.id}). Waiting for the office to confirm.`,
+      homeowner_signoff_notes: `${signingDocumentLabel(request.document_type)} signed electronically by ${signedByText(request)} on ${when} (request ${request.id}). Waiting for the office to confirm.`,
     })
     .eq('id', request.job_id)
     .eq('tenant_id', request.tenant_id)
@@ -83,7 +90,7 @@ export async function confirmSignedStage(service: Service, actor: SigningActor, 
       homeowner_signoff_sent_at: job.homeowner_signoff_sent_at ?? request.sent_at,
       homeowner_signoff_received_at: request.signed_at,
       homeowner_signoff_method: SIGNOFF_METHOD_ELECTRONIC,
-      homeowner_signoff_notes: `${signingDocumentLabel(request.document_type)} signed electronically by ${request.signer_name} on ${formatPerthDateTime(request.signed_at)} (request ${request.id}). Confirmed by the office on ${formatPerthDateTime(now)}.`,
+      homeowner_signoff_notes: `${signingDocumentLabel(request.document_type)} signed electronically by ${signedByText(request)} on ${formatPerthDateTime(request.signed_at)} (request ${request.id}). Confirmed by the office on ${formatPerthDateTime(now)}.`,
       current_stage: nextStage,
       current_stage_updated_at: now,
     } as never)

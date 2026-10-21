@@ -7,6 +7,7 @@ import { confirmSignedStage, markJobSignoffSent } from './job-sync'
 import { SigningError, type CreateSigningRequestInput, type SigningActor, type SigningProvider } from './provider'
 import { loadRequestForTenant, persistExpiryIfDue } from './repository'
 import { downloadSigningPdf } from './storage'
+import { logSigningEvent } from './events'
 import {
   toSigningEventSummary,
   toSigningRequestSummary,
@@ -92,6 +93,27 @@ export async function sendForSignature(
 
 export async function confirmSigningStage(actor: SigningActor, requestId: string) {
   return confirmSignedStage(createServiceClient(), actor, requestId)
+}
+
+/** Turns automatic reminders on or off for one request. */
+export async function setRemindersEnabled(actor: SigningActor, requestId: string, enabled: boolean): Promise<SigningRequestSummary> {
+  const service = createServiceClient()
+  await loadRequestForTenant(service, actor.tenantId, requestId)
+  const { data, error } = await service
+    .from('signing_requests')
+    .update({ reminders_enabled: enabled })
+    .eq('id', requestId)
+    .eq('tenant_id', actor.tenantId)
+    .select('*')
+    .single()
+  if (error || !data) throw new SigningError(`Could not update reminders: ${error?.message ?? 'not found'}`, 500)
+  await logSigningEvent(service, {
+    requestId,
+    tenantId: actor.tenantId,
+    event: enabled ? 'reminders_on' : 'reminders_off',
+    actorId: actor.userId,
+  })
+  return toSigningRequestSummary(data)
 }
 
 // ── Send dialog defaults ────────────────────────────────────────────────────

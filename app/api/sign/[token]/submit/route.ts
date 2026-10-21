@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       const v = form.get(k)
       return typeof v === 'string' ? v : null
     }
-    input = { method: str('method'), typedName: str('typed_name'), style: str('style'), drawnPng: str('drawn_png') }
+    input = { method: str('method'), typedName: str('typed_name'), style: str('style'), drawnPng: str('drawn_png'), capacity: str('capacity') }
   } catch {
     page.searchParams.set('error', 'failed')
     return NextResponse.redirect(page, 303)

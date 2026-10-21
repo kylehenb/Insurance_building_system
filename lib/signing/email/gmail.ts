@@ -10,6 +10,7 @@ import { buildEmailRaw, type EmailAttachment } from '@/lib/email/build-raw'
 export interface OutgoingEmail {
   from: string
   to: string
+  bcc?: string
   subject: string
   text: string
   html?: string
@@ -25,6 +26,7 @@ export async function sendEmailViaGmail(service: SupabaseClient<Database>, email
   const raw = buildEmailRaw({
     from: email.from,
     to: email.to,
+    bcc: email.bcc,
     subject: email.subject,
     body: email.text,
     html: email.html,

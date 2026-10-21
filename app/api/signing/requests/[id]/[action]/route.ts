@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } from '@/lib/signing/http'
-import { confirmSigningStage, getSigningProvider } from '@/lib/signing/service'
+import { confirmSigningStage, getSigningProvider, setRemindersEnabled } from '@/lib/signing/service'
 
 // POST /api/signing/requests/[id]/send          send a draft
 // POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working)
 // POST /api/signing/requests/[id]/revoke        { reason? } stop the link working
 // POST /api/signing/requests/[id]/confirm-stage record the sign-off and move the job on
+// POST /api/signing/requests/[id]/reminders     { enabled } automatic reminders on/off
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const ACTIONS = ['send', 'resend', 'revoke', 'confirm-stage'] as const
+const ACTIONS = ['send', 'resend', 'revoke', 'confirm-stage', 'reminders'] as const
 type Action = (typeof ACTIONS)[number]
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; action: string }> }) {
@@ -34,6 +35,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
       case 'confirm-stage':
         return NextResponse.json(await confirmSigningStage(actor, id))
+      case 'reminders': {
+        const body = await req.json().catch(() => ({})) as { enabled?: unknown }
+        if (typeof body.enabled !== 'boolean') return NextResponse.json({ error: 'enabled must be true or false' }, { status: 400 })
+        return NextResponse.json({ request: await setRemindersEnabled(actor, id, body.enabled) })
+      }
     }
   } catch (err) {
     return signingErrorResponse(err, action.replace('-', ' '))

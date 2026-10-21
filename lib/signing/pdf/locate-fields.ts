@@ -26,7 +26,10 @@ export interface SignatureFieldConfig {
   label: string
   signature: FieldPlacement
   date?: FieldPlacement
+  /** Printed name of whoever signed (with joint owner / "for the owner" wording) */
   name?: FieldPlacement
+  /** Filled with the signer's name only when an authorised person signs for the owner */
+  representative?: FieldPlacement
 }
 
 export class FieldLocationError extends Error {
@@ -148,6 +151,7 @@ export async function locateSignatureFields(
     signature: resolvePlacement(cfg.signature, anchors, pageCount, `${cfg.id}.signature`),
     date: cfg.date ? resolvePlacement(cfg.date, anchors, pageCount, `${cfg.id}.date`) : null,
     name: cfg.name ? resolvePlacement(cfg.name, anchors, pageCount, `${cfg.id}.name`) : null,
+    representative: cfg.representative ? resolvePlacement(cfg.representative, anchors, pageCount, `${cfg.id}.representative`) : null,
   }))
 
   return { pdf: await doc.save(), fields }

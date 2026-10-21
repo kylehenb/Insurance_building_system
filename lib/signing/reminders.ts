@@ -5,10 +5,10 @@ import { pruneRateLimits } from './rate-limit'
 import { persistExpiryIfDue } from './repository'
 import { getSigningProvider } from './service'
 
-// Reminders for unsigned requests. Not on a schedule yet: call
-// sendSigningReminders() from a cron route when you're ready
-// (e.g. add { "path": "/api/signing/reminders", "schedule": "0 1 * * *" }
-// to vercel.json with a CRON_SECRET-checked route).
+// Reminders for unsigned requests. Runs daily from Vercel Cron
+// (/api/signing/reminders, see vercel.json): a request still waiting 7 days
+// after it was sent (or last reminded) gets a reminder, up to 3 in total.
+// The office can turn reminders off for a request (reminders_enabled).
 //
 // A reminder emails a fresh link (the previous one stops working) and keeps
 // the expiry 14 days from the reminder. Requests already expired or revoked
@@ -44,6 +44,7 @@ export async function sendSigningReminders(options: ReminderOptions = {}): Promi
     .in('status', ['sent', 'viewed'])
     .lt('sent_at', cutoff.toISOString())
     .lt('reminder_count', maxReminders)
+    .eq('reminders_enabled', true)
   if (options.tenantId) query = query.eq('tenant_id', options.tenantId)
   const { data, error } = await query
   if (error) throw new SigningError(`Reminder query failed: ${error.message}`, 500)

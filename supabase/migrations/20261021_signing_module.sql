@@ -1,4 +1,4 @@
--- In-house e-signing module (tech spec v3.3 §4.30).
+-- In-house e-signing module (tech spec v3.3 §4.32–4.34).
 --
 -- signing_requests  one row per document sent for signature (single signer)
 -- signing_events    append-only audit trail for each request

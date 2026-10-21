@@ -16,7 +16,10 @@ export interface StampInput {
   sourcePdf: Uint8Array
   fields: LocatedSignatureField[]
   signature: SignatureInput
-  signerName: string
+  /** Printed name as it should appear, e.g. "Jane Citizen (joint owner)" or "John Smith for Alex Example" */
+  printedName: string
+  /** The authorised person's own name when they sign for the owner; null otherwise */
+  representativeName: string | null
   signedAt: Date
   requestId: string
 }
@@ -93,7 +96,9 @@ export async function stampSignatures(input: StampInput): Promise<Uint8Array> {
   }
 
   const dateText = formatSigningDate(input.signedAt)
-  const caption = `Signed electronically ${dateText} · Ref ${input.requestId.slice(0, 8).toUpperCase()}`
+  const ref = input.requestId.slice(0, 8).toUpperCase()
+  const fullCaption = `Signed electronically by ${input.printedName} · ${dateText} · Ref ${ref}`
+  const shortCaption = `Signed electronically ${dateText} · Ref ${ref}`
 
   for (const field of input.fields) {
     const page = pages[field.signature.page]
@@ -101,16 +106,22 @@ export async function stampSignatures(input: StampInput): Promise<Uint8Array> {
     drawSignature(page, field.signature, signature)
 
     const captionSize = 5.5
-    page.drawText(caption, {
-      x: field.signature.x + 2,
-      y: Math.max(field.signature.y - captionSize - 1.5, 2),
-      size: captionSize,
-      font: sans,
-      color: CAPTION,
-    })
+    const captionY = Math.max(field.signature.y - captionSize - 1.5, 2)
+    // A printed-name line directly under the signature already says who
+    // signed (and would collide with the caption), so the caption is left off.
+    const nameRightBelow = !!field.name && field.name.page === field.signature.page
+      && field.name.y + field.name.height > captionY - 2 && field.name.y < field.signature.y
+    if (!nameRightBelow) {
+      // Name the signer in the caption when it fits under the signature box
+      const caption = sans.widthOfTextAtSize(fullCaption, captionSize) <= Math.max(field.signature.width, 150) ? fullCaption : shortCaption
+      page.drawText(caption, { x: field.signature.x + 2, y: captionY, size: captionSize, font: sans, color: CAPTION })
+    }
 
     if (field.date) drawFittedText(pages[field.date.page], dateText, field.date, sans, 9)
-    if (field.name) drawFittedText(pages[field.name.page], input.signerName, field.name, sans, 9)
+    if (field.name) drawFittedText(pages[field.name.page], input.printedName, field.name, sans, 9)
+    if (field.representative && input.representativeName) {
+      drawFittedText(pages[field.representative.page], input.representativeName, field.representative, sans, 9)
+    }
   }
 
   return doc.save()

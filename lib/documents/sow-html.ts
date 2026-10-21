@@ -315,8 +315,8 @@ export function generateSowHtml(params: {
       </p>
     </div>
 
-    <!-- Signing -->
-    <div style="margin-bottom:6px;">
+    <!-- Signing (kept on one page so a signature is never split from its name and date) -->
+    <div style="margin-bottom:6px;break-inside:avoid;page-break-inside:avoid;">
       <div style="font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;
         color:#b0a89e;font-weight:700;margin-bottom:10px;">
         AUTHORISATION &amp; SIGNATURES</div>

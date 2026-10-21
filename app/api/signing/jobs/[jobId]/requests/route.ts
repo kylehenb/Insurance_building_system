@@ -6,7 +6,7 @@ import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 
 // GET  → this job's signing requests, plus defaults for the send dialog
 // POST → generate the document, create the request and email the signer
-//        { documentType, quoteIds, signer: { name, email, phone? }, moveJobToAwaitingStage? }
+//        { documentType, quoteIds, signer: { name, email, phone? }, moveJobToAwaitingStage?, remindersEnabled? }
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
         documentType: documentType as SigningDocumentTypeKey,
         quoteIds,
         signer: { name: str(signer.name), email: str(signer.email), phone: str(signer.phone) || null },
+        remindersEnabled: body.remindersEnabled !== false,
       },
       { moveJobToAwaitingStage: body.moveJobToAwaitingStage === true },
     )

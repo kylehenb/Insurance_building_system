@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { generateSigningToken, hashSigningToken, isWellFormedToken, digestsEqual, sha256Hex } from '../tokens'
 import { effectiveStatus } from '../types'
-import { signerLinkState, parseSignatureInput } from '../in-house/signer'
+import { signerLinkState, parseSignatureInput, parseSignerCapacity, parseSignerName } from '../in-house/signer'
+import { printedSignerName } from '../types'
 import { suggestDocumentType } from '../documents/catalog'
 import { describeDevice, formatPerthDateTime, formatSigningDate, formatUtcDateTime } from '../format'
 import { requestMeta } from '../request-meta'
@@ -81,6 +82,23 @@ describe('signature input', () => {
     const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(400)])
     const parsed = parseSignatureInput({ method: 'drawn', typedName: null, style: null, drawnPng: `data:image/png;base64,${png.toString('base64')}` })
     expect(parsed.method).toBe('drawn')
+  })
+})
+
+describe('who signed', () => {
+  it('needs a name for drawn signatures too, and defaults capacity to owner', () => {
+    expect(() => parseSignerName({ method: 'drawn', typedName: '', style: null, drawnPng: null })).toThrow(/full name/)
+    expect(parseSignerName({ method: 'drawn', typedName: ' Jane  Citizen ', style: null, drawnPng: null })).toBe('Jane Citizen')
+    expect(parseSignerCapacity({ method: null, typedName: null, style: null, drawnPng: null })).toBe('owner')
+    expect(parseSignerCapacity({ method: null, typedName: null, style: null, drawnPng: null, capacity: 'joint_owner' })).toBe('joint_owner')
+    expect(parseSignerCapacity({ method: null, typedName: null, style: null, drawnPng: null, capacity: 'admin' })).toBe('owner')
+  })
+
+  it('prints the name with the capacity', () => {
+    expect(printedSignerName('Jane Citizen', 'owner', 'Alex Citizen')).toBe('Jane Citizen')
+    expect(printedSignerName('Jane Citizen', 'joint_owner', 'Alex Citizen')).toBe('Jane Citizen (joint owner)')
+    expect(printedSignerName('John Smith', 'authorised_person', 'Alex Citizen')).toBe('John Smith for Alex Citizen')
+    expect(printedSignerName('John Smith', 'authorised_person', null)).toBe('John Smith (authorised person)')
   })
 })
 

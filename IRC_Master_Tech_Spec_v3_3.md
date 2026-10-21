@@ -1553,6 +1553,7 @@ CREATE TABLE signing_requests (
   sent_at TIMESTAMPTZ, viewed_at TIMESTAMPTZ, signed_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ, revoked_reason TEXT,
   last_reminded_at TIMESTAMPTZ, reminder_count INTEGER NOT NULL DEFAULT 0,
+  reminders_enabled BOOLEAN NOT NULL DEFAULT true, -- automatic reminders; office can switch off per request
   source_pdf_path TEXT NOT NULL,        -- signed-documents bucket
   source_pdf_sha256 TEXT NOT NULL,
   signed_pdf_path TEXT,
@@ -1562,6 +1563,8 @@ CREATE TABLE signing_requests (
   display_content JSONB NOT NULL DEFAULT '[]', -- phone reading view, snapshot at creation
   signature_method TEXT,                -- 'typed' | 'drawn'
   signature_text TEXT, signature_style TEXT,
+  signed_name TEXT,                     -- name the signer confirmed when signing (may differ from signer_name)
+  signer_capacity TEXT,                 -- 'owner' | 'joint_owner' | 'authorised_person'
   signer_ip TEXT, signer_user_agent TEXT,
   signing_locked_at TIMESTAMPTZ,        -- single-use lock while a signature is being processed
   stage_confirmed_at TIMESTAMPTZ,       -- office confirmed the sign-off and moved the job on
@@ -1571,7 +1574,7 @@ CREATE TABLE signing_requests (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
-Checks: a `signed` row must have `signed_at`, `signed_pdf_path` and `signed_pdf_sha256`; every row needs an email or phone. Indexes: `(tenant_id, job_id, created_at DESC)`; partial `(tenant_id, sent_at) WHERE status IN ('sent','viewed')` for reminders. RLS: SELECT for the user's tenant only. Migration: `supabase/migrations/20261021_signing_module.sql`.
+Checks: a `signed` row must have `signed_at`, `signed_pdf_path` and `signed_pdf_sha256`; every row needs an email or phone. Indexes: `(tenant_id, job_id, created_at DESC)`; partial `(tenant_id, sent_at) WHERE status IN ('sent','viewed')` for reminders. RLS: SELECT for the user's tenant only. Migrations: `supabase/migrations/20261021_signing_module.sql` (applied 21 Oct 2026), `20261022_signing_followups.sql` (reminders_enabled, signed_name, signer_capacity; storage tenant scoping).
 
 ### 4.33 signing_events
 ```sql
@@ -1623,7 +1626,7 @@ CREATE TABLE signing_rate_limits (
 ```
 
 Storage RLS mirrors database RLS — users can only access their own tenant's storage bucket paths.
-**Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The `job-files` and `irc-master` storage policies currently check only that the user is signed in, not their tenant; tenant scoping is enforced by the app (paths start `tenants/{tenantId}/` and API routes check the prefix). Tighten before onboarding a second tenant.
+**Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The original `job-files` and `irc-master` storage policies check only that the user is signed in; migration `20261022_signing_followups.sql` adds a RESTRICTIVE policy (`private_buckets_tenant_scope`) so signed-in users can only read, write or delete objects under `tenants/{their tenant_id}/` in those two buckets. `photos` and `tenant-assets` are public-read by design; their write/delete policies are still bucket-wide for any signed-in user (open item, §18).
 
 **`signed-documents` (private, PDF only, 25 MB):** e-signing source and signed PDFs at `tenants/{tenantId}/signing/{requestId}/source.pdf` and `.../signed.pdf`. No storage policies at all — only the service role can read or write it; office users download through `/api/signing/requests/[id]/document`, which checks their tenant. A copy of every signed PDF also goes to `job-files` at `tenants/{tenantId}/jobs/{jobId}/docs/` with a `job_files` row so it shows in the Files tab.
 
@@ -2501,7 +2504,8 @@ The send dialog suggests the type from the selected quotes' total incl GST (`> $
 1. **Send** — Job page → Signatures tab (or the stage banner's "Send for Signature"): choose approved quotes, document type and signer (defaults to the contact with the `auth` role, else the insured). The server generates the PDF with field markers, locates the fields, stores the source PDF privately with its SHA-256, records the reading-view snapshot, issues a 256-bit random token (only its SHA-256 is stored), emails the link (template `signing_request`) and logs events. Optional checkbox (default on when the job is at `approved_awaiting_signoff`): move the job to `awaiting_signed_document` and set `homeowner_signoff_sent_at` — the same change the old button made.
 2. **Sign** — `/sign/[token]` is a plain HTML page (no React, no Tailwind, one small ES5 script whose hash is the only script the page's CSP allows), so it works on older iOS Safari and Android. It shows the document as large reflowed text (no pinch-zoom), with the exact PDF one tap away. A bottom bar always shows the one next step: Start → Sign here → Next → Finish, with "Signature 1 of 2" progress. Signing defaults to typing the name in one of three self-hosted script fonts (Great Vibes, Allura — SIL OFL; Homemade Apple — Apache 2.0; in `lib/signing/fonts/`), with Draw (finger) as the alternative; style can be changed before adopting. The consent line "By tapping Finish you agree to sign this document electronically." sits above the single Finish button. Without JavaScript the page still works (typed signature + Finish). "Viewed" is recorded by the script, so email link scanners don't count.
 3. **Stamp** — single-use: a row lock (`signing_locked_at`) plus status checks. The source PDF's hash is re-checked, the signature is stamped into every field with pdf-lib (typed: embedded script font, falling back to Liberation Sans for characters the font lacks; drawn: trimmed PNG), the Perth date and printed name go into their blanks, and a small "Signed electronically · date · Ref" caption is added under each signature. A **Signature Certificate** page is appended: document, request ID, signer name/email/phone, method, consent text, signing time in Australia/Perth and UTC, IP, device (parsed) and full user agent, timeline (created/sent/opened/signed), SHA-256 of the source and of the stamped document. The SHA-256 of the complete file is stored in `signed_pdf_sha256` and the audit trail.
-4. **After signing** — signed PDF saved to `signed-documents`; a copy to `job-files` + `job_files` ("Insured signed docs — …"); a `communications` note (type `portal`, source `signing`); `homeowner_signoff_method = 'electronic_signature'` and notes on the job; the signer is emailed the signed copy (template `signing_completed`) and the office gets a copy with the audit summary. Each step is independent; none can undo the signature.
+4. **After signing** — signed PDF saved to `signed-documents`; a copy to `job-files` + `job_files` ("Insured signed docs — …"); a `communications` note (type `portal`, source `signing`); `homeowner_signoff_method = 'electronic_signature'` and notes on the job; the signer is emailed the signed copy (template `signing_completed`) with the office **BCC'd**. If the signer has no email or that send fails, the office is sent its own copy asking them to pass it on. Each step is independent; none can undo the signature.
+   **Who signs:** on the signing sheet the signer confirms their full name (pre-filled from the request, editable) and chooses **I am the owner** / **I am a joint owner** (e.g. husband, wife, partner) / **I am signing for the owner** (with "you confirm you have the owner's authority"). The printed name stamped beside the signature reads "Jane Citizen", "Jane Citizen (joint owner)" or "John Smith for Alex Example"; on the Building Contract an authorised person's name also goes into Item 1 *Owner's Representative*, and the signing page gets a "Signed by:" line. Name and capacity are stored (`signed_name`, `signer_capacity`), shown on the certificate ("Signed as", plus "Request sent to" if different) and in the office UI and job notes.
 5. **Confirm** — the job stage is **never moved by a signature**. The stage banner shows an action card ("✓ … signed — View signed PDF — Confirm sign-off & move on"). Confirming sets `homeowner_signoff_received_at` (= signing time) and moves the job to `signed_build_schedule` — the same fields the manual "Receive sign off" upload sets.
 
 ### Links and security
@@ -2515,13 +2519,13 @@ The send dialog suggests the type from the selected quotes' total incl GST (`> $
 Sent through the existing Gmail API sender as `tenants.contact_email` (office@insurancerepairco.com.au), marked processed so the Gmail SENT watch doesn't record them twice. Templates `signing_request` (subject includes the property address; `{signing_link}` required — appended automatically if a template loses it) and `signing_completed` (signed PDF attached) are editable in Settings → Email Templates (standard and per-client versions). The plain-text template is also sent as a branded HTML version (logo, large "Review and sign" button) via `buildEmailRaw({ html })`. SMS is not sent (no paid SMS service); a channel can be added later in `InHouseSigningProvider.send`.
 
 ### Reminders
-`sendSigningReminders({ afterDays = 3, maxReminders = 3, tenantId?, dryRun? })` in `lib/signing/reminders.ts` re-sends open requests with reminder wording. Not on a schedule yet — wire it to a `CRON_SECRET`-checked route in `vercel.json` when wanted.
+Daily Vercel Cron `GET /api/signing/reminders` (01:00 UTC = 9am Perth; `CRON_SECRET` Bearer check) calls `sendSigningReminders()` (`lib/signing/reminders.ts`): an open request still unsigned **7 days** after it was sent or last reminded gets a reminder (subject prefixed "Reminder:", fresh link, expiry reset to 14 days), up to **3** reminders. Off per request: the send dialog's "Send automatic reminders" checkbox (default on) and a toggle on each open request in the Signatures tab (`POST /api/signing/requests/[id]/reminders { enabled }`, logged as `reminders_on` / `reminders_off`).
 
 ### Testing
 Unit tests in `lib/signing/__tests__/` (tokens, link states and grace period, signature input validation, field location, stamping, certificate, template/reading-view wording agreement, page escaping and CSP, email templates, HTML email). The signer flow was exercised at 375×667 (typed, drawn, two-field contract, all status screens, no-JavaScript) with Playwright against fixture data.
 
 ### Legal notes
-Electronic Transactions Act 2011 (WA): consent, identification method and reliability are covered by the emailed single-use link, the consent line, the audit trail and the certificate. Not covered / to decide: no PKI digital signature (PAdES) on the PDF — integrity relies on the stored SHA-256 and audit trail; the contract PDF references General Conditions and the prescribed s.4(2) notice ("Schedule, pages 12-13") that are not part of the generated document — they must be attached/provided; no identity check beyond control of the email address; deeds, statutory declarations and witnessed documents are out of scope.
+Electronic Transactions Act 2011 (WA): consent, identification method and reliability are covered by the emailed single-use link, the consent line, the audit trail and the certificate. Not covered / to decide: no PKI digital signature (PAdES) on the PDF — integrity relies on the stored SHA-256 and audit trail; the contract PDF references the General Conditions and the prescribed s.4(2) *Notice for the Home Owner* (Home Building Contracts Regulations 1992, Schedule 1 — "Schedule, pages 12-13" in the original printed contract) that are not part of the generated 5-page schedule. The owner's s.6 signature acknowledges receipt of that notice, so it must be appended to the document (planned: append supplied PDFs before signing); no identity check beyond control of the email address; deeds, statutory declarations and witnessed documents are out of scope.
 
 ---
 
@@ -2843,6 +2847,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 | E-signing | In-house (pdf-lib stamping + Signature Certificate) behind a `SigningProvider` interface | No paid service; one-tap signing for elderly homeowners; a hosted provider can be swapped in later without UI changes |
 | Signer page | Plain HTML route handler, not a React page | Works on older phones (Next 16/React 19 need Safari 16.4+); no hydration; strict CSP |
 | Job stage after signing | Office confirms via action card | Deterministic, human-confirmed stage changes |
+| Who signs | Signer confirms name + owner / joint owner / authorised person | Spouses and authorised people sign without the office re-sending; recorded on the document and certificate |
 | Report type fields | JSONB column | Avoids 30+ sparse nullable columns per report type |
 | Job numbering | Per-tenant sequence with custom prefix | Supports white-label licensing |
 | Claim number | Universal job key, always checked first | One claim = one job, always |
@@ -2947,6 +2952,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 - Xero API setup — not yet configured; required before invoicing module build
 - Inbound email address domain setup (e.g. `jobs@insurancerepair.com.au`) — DNS/forwarding config required
 - Google Maps API key setup — required before blueprint draft generation and proximity calculation can run
+- Storage: tighten `photos` / `tenant-assets` write and delete policies to the tenant's folder (public read stays)
 - E-signing: SMS delivery of signing links (needs a paid SMS provider); PAdES digital signature on signed PDFs; attaching the HBCA General Conditions and s.4(2) prescribed notice to the generated Building Contract; whether `Receive sign off` / quote-level "Send for Signature" buttons in the Quotes tab should open the new dialog
 - `scope_library.estimated_hours` seeding — requires review of existing line items to assign time values; partial seeding acceptable at migration time
 

@@ -25,11 +25,12 @@ export function createAndSend(jobId: string, body: {
   quoteIds: string[]
   signer: { name: string; email: string; phone: string }
   moveJobToAwaitingStage: boolean
+  remindersEnabled: boolean
 }) {
   return call<SendForSignatureResult>(`/api/signing/jobs/${jobId}/requests`, { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function requestAction(id: string, action: 'send' | 'resend' | 'revoke' | 'confirm-stage', body?: Record<string, unknown>) {
+export function requestAction(id: string, action: 'send' | 'resend' | 'revoke' | 'confirm-stage' | 'reminders', body?: Record<string, unknown>) {
   return call<{ request?: SigningRequestSummary; stage?: string }>(`/api/signing/requests/${id}/${action}`, {
     method: 'POST',
     body: JSON.stringify(body ?? {}),

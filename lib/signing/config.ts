@@ -39,10 +39,10 @@ export const RATE_LIMITS = {
   submitPerToken: { max: 5, windowSeconds: 10 * 60 },
 } as const
 
-/** Reminder defaults (the reminder function is not on a schedule yet). */
+/** Automatic reminders (daily cron: /api/signing/reminders). Off per request via reminders_enabled. */
 export const REMINDER_DEFAULTS = {
   /** Remind when a request has been waiting this many days since sent / last reminder */
-  afterDays: 3,
+  afterDays: 7,
   /** Stop reminding after this many reminders */
   maxReminders: 3,
 } as const

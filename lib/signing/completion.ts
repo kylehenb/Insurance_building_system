@@ -77,8 +77,8 @@ export async function recordSignedDocument(service: Service, request: SigningReq
     type: 'portal',
     direction: 'inbound',
     contact_type: 'insured',
-    contact_name: request.signer_name,
-    content: `${documentName} signed electronically by ${request.signer_name}${request.signed_at ? ` on ${formatPerthDateTime(request.signed_at)}` : ''}. Signed copy saved to Files.`,
+    contact_name: request.signed_name || request.signer_name,
+    content: `${documentName} signed electronically by ${request.signed_name || request.signer_name}${request.signer_capacity === 'joint_owner' ? ' (joint owner)' : request.signer_capacity === 'authorised_person' ? ' (authorised person signing for the owner)' : ''}${request.signed_at ? ` on ${formatPerthDateTime(request.signed_at)}` : ''}. Signed copy saved to Files.`,
     source: 'signing',
     attachments: jobFileStoragePath
       ? [{ filename, storage_path: jobFileStoragePath, mime_type: 'application/pdf', size_bytes: signedPdf.length }]

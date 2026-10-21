@@ -25,6 +25,10 @@ export const BUILDING_CONTRACT_MARKERS = {
   receiptDate: 'contract_receipt_date',
   ownerSignature: 'contract_owner_signature',
   ownerDate: 'contract_owner_date',
+  /** "Signed by" name under the owner's signature (who actually signed, and as what) */
+  ownerSignedBy: 'contract_owner_signed_by',
+  /** Item 1 Owner's Representative: filled when an authorised person signs for the owner */
+  ownerRepresentative: 'contract_owner_representative',
 } as const
 
 export function generateBuildingContractHtml(params: {
@@ -505,6 +509,7 @@ export function generateBuildingContractHtml(params: {
       <tr><td class="label">Phone:</td><td class="value">Mobile: ${job.insured_phone || ''}</td></tr>
       <tr><td class="label">Email:</td><td class="value">${job.insured_email || ''}</td></tr>
       <tr><td class="label">Owner's Representative:</td><td class="value" style="height:28px;">
+        ${render.signingMarkers ? `<div style="position:relative;height:13px;">${fieldMarkerHtml(BUILDING_CONTRACT_MARKERS.ownerRepresentative)}</div>` : ''}
         <span style="font-size:7.5pt;font-style:italic;color:#888;">Printed Name of person authorized by the Owner to act on their behalf</span>
       </td></tr>
       <tr><td class="label">Phone:</td><td class="value">&nbsp;</td></tr>
@@ -875,7 +880,9 @@ export function generateBuildingContractHtml(params: {
         ${render.signingMarkers
           ? `<div class="sig-line" style="position:relative;">${fieldMarkerHtml(BUILDING_CONTRACT_MARKERS.ownerSignature)}</div>`
           : '<div class="sig-line"></div>'}
-        <p class="sig-label">&nbsp;</p>
+        ${render.signingMarkers
+          ? `<p class="sig-label">Signed by: <span style="display:inline-block;position:relative;width:78%;height:12px;vertical-align:bottom;">${fieldMarkerHtml(BUILDING_CONTRACT_MARKERS.ownerSignedBy)}</span></p>`
+          : '<p class="sig-label">&nbsp;</p>'}
       </div>
 
       <div class="signing-box">

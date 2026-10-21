@@ -65,7 +65,7 @@ describe('locateSignatureFields', () => {
 describe('stamping and certificate', () => {
   it('stamps typed and drawn signatures without changing the page count', async () => {
     const { pdf, fields } = await locateSignatureFields(await pdfWithMarkers(), FIELDS)
-    const base = { sourcePdf: pdf, fields, signerName: 'Jane Citizen', signedAt: new Date('2026-10-21T01:00:00Z'), requestId: '12345678-0000-4000-8000-000000000000' }
+    const base = { sourcePdf: pdf, fields, printedName: 'Jane Citizen', representativeName: null, signedAt: new Date('2026-10-21T01:00:00Z'), requestId: '12345678-0000-4000-8000-000000000000' }
 
     const typed = await stampSignatures({ ...base, signature: { method: 'typed', text: 'Jane Citizen', styleKey: 'allura' } })
     expect((await PDFDocument.load(typed)).getPageCount()).toBe(3)
@@ -77,13 +77,23 @@ describe('stamping and certificate', () => {
     expect((await PDFDocument.load(drawn)).getPageCount()).toBe(3)
   })
 
+  it('fills the representative blank only for an authorised person', async () => {
+    const withRep = [{ ...FIELDS[0], representative: { anchor: 'date_b' } }]
+    const { pdf, fields } = await locateSignatureFields(await pdfWithMarkers(), withRep)
+    expect(fields[0].representative).toEqual({ page: 2, x: 100, y: 600, width: 80, height: 12 })
+    const base = { sourcePdf: pdf, fields, signedAt: new Date(), requestId: 'r', signature: { method: 'typed' as const, text: 'John Smith', styleKey: 'allura' } }
+    const owner = await stampSignatures({ ...base, printedName: 'John Smith', representativeName: null })
+    const authorised = await stampSignatures({ ...base, printedName: 'John Smith for Alex Example', representativeName: 'John Smith' })
+    expect(authorised.length).toBeGreaterThan(owner.length)
+  })
+
   it('falls back to a plain font for names the script font cannot draw', async () => {
     const bytes = await loadSignatureFontBytes('great_vibes')
     expect(await fontCoversText(bytes, 'Jane O’Brien-Smith')).toBe(true)
     expect(await fontCoversText(bytes, '王小明')).toBe(false)
     const { pdf, fields } = await locateSignatureFields(await pdfWithMarkers(), FIELDS)
     const stamped = await stampSignatures({
-      sourcePdf: pdf, fields, signerName: 'Nguyễn Văn An', signedAt: new Date(), requestId: 'r',
+      sourcePdf: pdf, fields, printedName: 'Nguyễn Văn An', representativeName: null, signedAt: new Date(), requestId: 'r',
       signature: { method: 'typed', text: 'Nguyễn Văn An', styleKey: 'great_vibes' },
     })
     expect(stamped.length).toBeGreaterThan(pdf.length)
@@ -98,6 +108,8 @@ describe('stamping and certificate', () => {
       propertyAddress: '1 Example St',
       companyName: 'Insurance Repair Co',
       signerName: 'Jane Citizen',
+      signedAs: 'Joint owner',
+      addressedTo: 'Alex Citizen',
       signerEmail: 'jane@example.com',
       signerPhone: null,
       signatureMethod: 'typed',

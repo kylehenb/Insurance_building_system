@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { formatPerthDateTime } from '@/lib/signing/format'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
+import { SIGNER_CAPACITY_LABELS } from '@/lib/signing/types'
 import { documentUrl } from './api'
 import { useJobSigning } from './useJobSigning'
 
@@ -33,7 +34,9 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
       <div className="mb-2 rounded border border-[#b9dfbb] border-l-2 border-l-[#2e7d32] bg-white px-3 py-2.5 text-[12px]">
         <div className="font-semibold text-[#1b5e20]">✓ {signingDocumentLabel(toConfirm.documentType)} signed</div>
         <div className="mt-0.5 text-[#4a3820]">
-          {toConfirm.signerName} · {toConfirm.signedAt ? formatPerthDateTime(toConfirm.signedAt) : ''}
+          {toConfirm.signedName || toConfirm.signerName}
+          {toConfirm.signerCapacity && toConfirm.signerCapacity !== 'owner' ? ` (${SIGNER_CAPACITY_LABELS[toConfirm.signerCapacity].toLowerCase()})` : ''}
+          {' · '}{toConfirm.signedAt ? formatPerthDateTime(toConfirm.signedAt) : ''}
         </div>
         <div className="mt-1 text-[#7a6a50]">Check the signed copy, then confirm to move the job to Signed — Build Schedule.</div>
         {error && <div className="mt-1 text-red-700">{error}</div>}

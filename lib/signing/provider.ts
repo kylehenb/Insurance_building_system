@@ -25,6 +25,8 @@ export interface CreateSigningRequestInput {
     email: string
     phone?: string | null
   }
+  /** Automatic reminders every 7 days (max 3). Default on. */
+  remindersEnabled?: boolean
 }
 
 export interface SendSigningRequestOptions {

@@ -61,6 +61,8 @@ export const buildingContractDocument: SigningDocumentType = {
       label: 'Sign the contract',
       signature: { anchor: BUILDING_CONTRACT_MARKERS.ownerSignature },
       date: { anchor: BUILDING_CONTRACT_MARKERS.ownerDate },
+      name: { anchor: BUILDING_CONTRACT_MARKERS.ownerSignedBy },
+      representative: { anchor: BUILDING_CONTRACT_MARKERS.ownerRepresentative },
     },
   ],
 

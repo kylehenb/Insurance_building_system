@@ -77,6 +77,12 @@ html, body { background: #ffffff; }
 .sg-tab input:checked + span { background: #111111; color: #ffffff; }
 .sg-label { display: block; font-weight: bold; margin-bottom: 6px; }
 .sg-input { display: block; width: 100%; min-height: 56px; font-size: 21px; padding: 10px 14px; border: 2px solid #555555; border-radius: 8px; font-family: inherit; color: #111111; background: #ffffff; }
+.sg-capacity { border: 0; margin: 18px 0 0; padding: 0; min-width: 0; }
+.sg-capacity legend { padding: 0; }
+.sg-choice { display: block; position: relative; border: 2px solid #c9c2b5; border-radius: 10px; margin-bottom: 10px; background: #ffffff; cursor: pointer; padding: 12px 14px 12px 52px; min-height: 56px; }
+.sg-choice input { position: absolute; left: 16px; top: 16px; width: 22px; height: 22px; margin: 0; }
+.sg-choice-hint { display: block; font-size: 16px; color: #555555; line-height: 1.4; margin-top: 2px; }
+.sg-choice.is-checked { border-color: #111111; border-width: 3px; }
 .sg-styles { margin: 16px 0 6px; }
 .sg-style { display: block; position: relative; border: 2px solid #c9c2b5; border-radius: 10px; margin-bottom: 10px; background: #ffffff; cursor: pointer; }
 .sg-style input { position: absolute; left: 16px; top: 50%; margin-top: -11px; width: 22px; height: 22px; }

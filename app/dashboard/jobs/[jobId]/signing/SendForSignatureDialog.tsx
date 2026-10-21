@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { SIGNING_DOCUMENT_CATALOG, suggestDocumentType } from '@/lib/signing/documents/catalog'
-import { BUILDING_CONTRACT_THRESHOLD, DEFAULT_EXPIRY_DAYS } from '@/lib/signing/config'
+import { BUILDING_CONTRACT_THRESHOLD, DEFAULT_EXPIRY_DAYS, REMINDER_DEFAULTS } from '@/lib/signing/config'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { createAndSend, fetchJobSigning, type SendDialogDefaults } from './api'
 
@@ -80,6 +80,7 @@ function SendForm({
   const [email, setEmail] = useState(defaults.signer.email)
   const [phone, setPhone] = useState(defaults.signer.phone)
   const [moveStage, setMoveStage] = useState(defaults.jobStage === 'approved_awaiting_signoff')
+  const [reminders, setReminders] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -106,6 +107,7 @@ function SendForm({
         quoteIds,
         signer: { name: name.trim(), email: email.trim(), phone: phone.trim() },
         moveJobToAwaitingStage: moveStage,
+        remindersEnabled: reminders,
       })
       onSent(
         `${SIGNING_DOCUMENT_CATALOG[docType].label} emailed to ${result.request.signerEmail}.`
@@ -189,6 +191,14 @@ function SendForm({
             Sent by email from the office address. The link works for {DEFAULT_EXPIRY_DAYS} days and can only be used to sign once.
           </p>
         </section>
+
+        <label className="flex items-start gap-2 text-[13px] text-[#3a3530]">
+          <input type="checkbox" checked={reminders} onChange={e => setReminders(e.target.checked)} className="mt-0.5" />
+          <span>
+            Send automatic reminders if not signed
+            <span className="block text-[12px] text-[#9e998f]">Every {REMINDER_DEFAULTS.afterDays} days, up to {REMINDER_DEFAULTS.maxReminders} reminders. You can turn this off later on the Signatures tab.</span>
+          </span>
+        </label>
 
         {defaults.jobStage === 'approved_awaiting_signoff' && (
           <label className="flex items-start gap-2 text-[13px] text-[#3a3530]">

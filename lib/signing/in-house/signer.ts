@@ -11,7 +11,7 @@ import { ipKey, type RequestMeta } from '@/lib/signing/request-meta'
 import { MAX_TYPED_SIGNATURE_LENGTH, SIGNATURE_STYLES } from '@/lib/signing/signature-styles'
 import { downloadSigningPdf, signedPdfPath, uploadSigningPdf } from '@/lib/signing/storage'
 import { hashSigningToken, isWellFormedToken, sha256Hex } from '@/lib/signing/tokens'
-import type { DisplayBlock, LocatedSignatureField, SigningRequestRow } from '@/lib/signing/types'
+import { printedSignerName, SIGNER_CAPACITY_LABELS, type DisplayBlock, type LocatedSignatureField, type SignerCapacity, type SigningRequestRow } from '@/lib/signing/types'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
 import { PDFDocument } from 'pdf-lib'
 
@@ -28,6 +28,8 @@ export interface SignerView {
   documentName: string | null
   documentTitle: string | null
   signerName: string | null
+  /** Owner named on the document (the job's insured), for "signing on behalf of" */
+  ownerName: string | null
   propertyAddress: string | null
   companyName: string | null
   expiresAt: string | null
@@ -44,6 +46,7 @@ const EMPTY_VIEW: SignerView = {
   documentName: null,
   documentTitle: null,
   signerName: null,
+  ownerName: null,
   propertyAddress: null,
   companyName: null,
   expiresAt: null,
@@ -100,6 +103,7 @@ export async function resolveSignerView(token: string, meta: RequestMeta): Promi
     documentName: signingDocumentLabel(row.document_type),
     documentTitle: row.document_title,
     signerName: row.signer_name,
+    ownerName: job.insured_name,
     propertyAddress: job.property_address,
     companyName: tenant.trading_name || tenant.name,
     expiresAt: row.expires_at,
@@ -162,9 +166,26 @@ export async function openSourceDocument(token: string, meta: RequestMeta): Prom
 
 export interface SubmitSignatureInput {
   method: string | null
+  /** The signer's full name (also the typed signature) */
   typedName: string | null
   style: string | null
   drawnPng: string | null
+  /** owner | joint_owner | authorised_person (default owner) */
+  capacity?: string | null
+}
+
+const CAPACITIES: SignerCapacity[] = ['owner', 'joint_owner', 'authorised_person']
+
+/** The signer's confirmed name. Required for both typed and drawn signatures. */
+export function parseSignerName(input: SubmitSignatureInput): string {
+  const name = (input.typedName ?? '').trim().replace(/\s+/g, ' ')
+  if (name.length < 2) throw new SigningError('Please type your full name to sign.', 400)
+  if (name.length > MAX_TYPED_SIGNATURE_LENGTH) throw new SigningError('That name is too long.', 400)
+  return name
+}
+
+export function parseSignerCapacity(input: SubmitSignatureInput): SignerCapacity {
+  return CAPACITIES.find(c => c === input.capacity) ?? 'owner'
 }
 
 export function parseSignatureInput(input: SubmitSignatureInput): SignatureInput {
@@ -173,9 +194,7 @@ export function parseSignatureInput(input: SubmitSignatureInput): SignatureInput
     if (!png) throw new SigningError('Please draw your signature, or type your name instead.', 400)
     return { method: 'drawn', png }
   }
-  const text = (input.typedName ?? '').trim().replace(/\s+/g, ' ')
-  if (text.length < 2) throw new SigningError('Please type your full name to sign.', 400)
-  if (text.length > MAX_TYPED_SIGNATURE_LENGTH) throw new SigningError('That name is too long.', 400)
+  const text = parseSignerName(input)
   const style = SIGNATURE_STYLES.find(s => s.key === input.style)?.key ?? SIGNATURE_STYLES[0].key
   return { method: 'typed', text, styleKey: style }
 }
@@ -201,6 +220,8 @@ export async function submitSignature(token: string, input: SubmitSignatureInput
   if (state !== 'open') throw new SigningError('This signing link has expired.', 410)
 
   const signature = parseSignatureInput(input)
+  const signedName = parseSignerName(input)
+  const capacity = parseSignerCapacity(input)
   const fields = fieldsOf(row)
   if (fields.length === 0) throw new SigningError('This document has no signature boxes. Please contact us.', 500)
 
@@ -223,17 +244,18 @@ export async function submitSignature(token: string, input: SubmitSignatureInput
     if (sha256Hex(sourcePdf) !== claimed.source_pdf_sha256) {
       throw new Error('Source PDF hash does not match the stored hash')
     }
+    const { job, tenant } = await loadJobAndTenant(service, claimed.tenant_id, claimed.job_id)
     const stamped = await stampSignatures({
       sourcePdf: new Uint8Array(sourcePdf),
       fields,
       signature,
-      signerName: claimed.signer_name,
+      printedName: printedSignerName(signedName, capacity, job.insured_name),
+      representativeName: capacity === 'authorised_person' ? signedName : null,
       signedAt,
       requestId: claimed.id,
     })
     const stampedSha256 = sha256Hex(stamped)
     const documentPageCount = (await PDFDocument.load(stamped)).getPageCount()
-    const { job, tenant } = await loadJobAndTenant(service, claimed.tenant_id, claimed.job_id)
 
     const finalPdf = await appendCertificatePage(stamped, {
       requestId: claimed.id,
@@ -241,7 +263,11 @@ export async function submitSignature(token: string, input: SubmitSignatureInput
       jobNumber: job.job_number,
       propertyAddress: job.property_address,
       companyName: tenant.trading_name || tenant.name,
-      signerName: claimed.signer_name,
+      signerName: signedName,
+      signedAs: capacity === 'authorised_person' && job.insured_name
+        ? `${SIGNER_CAPACITY_LABELS[capacity]} (${job.insured_name}). The signer confirmed they have the owner's authority to sign.`
+        : SIGNER_CAPACITY_LABELS[capacity],
+      addressedTo: claimed.signer_name,
       signerEmail: claimed.signer_email,
       signerPhone: claimed.signer_phone,
       signatureMethod: signature.method,
@@ -273,6 +299,8 @@ export async function submitSignature(token: string, input: SubmitSignatureInput
         signature_style: signature.method === 'typed' ? signature.styleKey : null,
         signer_ip: meta.ip,
         signer_user_agent: meta.userAgent,
+        signed_name: signedName,
+        signer_capacity: capacity,
         signing_locked_at: null,
       })
       .eq('id', claimed.id)
@@ -288,6 +316,8 @@ export async function submitSignature(token: string, input: SubmitSignatureInput
       ip: meta.ip,
       userAgent: meta.userAgent,
       metadata: {
+        signedName,
+        capacity,
         method: signature.method,
         style: signature.method === 'typed' ? signature.styleKey : null,
         sourceSha256: claimed.source_pdf_sha256,

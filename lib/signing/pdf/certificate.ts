@@ -17,7 +17,12 @@ export interface CertificateData {
   jobNumber: string | null
   propertyAddress: string | null
   companyName: string
+  /** Name the signer confirmed when signing */
   signerName: string
+  /** e.g. "Joint owner", "Authorised person signing for the owner (Alex Example)" */
+  signedAs: string
+  /** Who the request was addressed to, if different from the signer's confirmed name */
+  addressedTo: string | null
   signerEmail: string | null
   signerPhone: string | null
   signatureMethod: 'typed' | 'drawn'
@@ -126,6 +131,8 @@ export async function appendCertificatePage(pdf: Uint8Array, data: CertificateDa
 
   w.section('Signer')
   w.row('Name', data.signerName)
+  w.row('Signed as', data.signedAs)
+  if (data.addressedTo && data.addressedTo !== data.signerName) w.row('Request sent to', data.addressedTo)
   w.row('Email', data.signerEmail ?? '—')
   w.row('Phone', data.signerPhone ?? '—')
   w.row('Signature', data.signatureMethod === 'typed' ? 'Typed name in a script style, adopted by the signer' : 'Drawn by the signer on their device')

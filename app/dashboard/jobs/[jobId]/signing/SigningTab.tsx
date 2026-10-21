@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Download, FileText, PenLine, RotateCw, Send, XCircle } from 'lucide-react'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
-import type { SigningRequestSummary } from '@/lib/signing/types'
+import { REMINDER_DEFAULTS } from '@/lib/signing/config'
+import { SIGNER_CAPACITY_LABELS, type SigningRequestSummary } from '@/lib/signing/types'
 import { documentUrl } from './api'
 import { SendForSignatureDialog } from './SendForSignatureDialog'
 import { SigningAuditTrail } from './SigningAuditTrail'
@@ -22,10 +23,12 @@ function RequestRow({
   request,
   busy,
   onAction,
+  onToggleReminders,
 }: {
   request: SigningRequestSummary
   busy: boolean
   onAction: (action: 'send' | 'resend' | 'revoke') => void
+  onToggleReminders: (enabled: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   const canResend = request.status === 'sent' || request.status === 'viewed' || request.status === 'expired'
@@ -51,8 +54,11 @@ function RequestRow({
                 Sent {when(request.sentAt)}
                 {request.viewedAt && <> · Opened {when(request.viewedAt)}</>}
                 {request.expiresAt && <> · Link valid until {formatSigningDate(request.expiresAt)}</>}
-                {request.reminderCount > 0 && <> · {request.reminderCount} reminder{request.reminderCount > 1 ? 's' : ''}</>}
+                {request.reminderCount > 0 && <> · {request.reminderCount} reminder{request.reminderCount > 1 ? 's' : ''} sent</>}
               </>
+            )}
+            {request.status === 'signed' && request.signedName && (
+              <> · Signed by {request.signedName}{request.signerCapacity && request.signerCapacity !== 'owner' ? ` (${SIGNER_CAPACITY_LABELS[request.signerCapacity].toLowerCase()})` : ''}</>
             )}
             {request.status === 'expired' && <>Link expired {request.expiresAt ? formatSigningDate(request.expiresAt) : ''}. Resend to issue a new link.</>}
             {request.status === 'revoked' && <>Revoked {when(request.revokedAt)}{request.revokedReason ? ` — ${request.revokedReason}` : ''}</>}
@@ -82,6 +88,19 @@ function RequestRow({
           )}
         </div>
       </div>
+
+      {(request.status === 'sent' || request.status === 'viewed') && (
+        <label className="flex items-center gap-2 border-t border-[#f0ece6] px-4 py-2 text-[12px] text-[#5a5650]">
+          <input
+            type="checkbox"
+            checked={request.remindersEnabled}
+            disabled={busy}
+            onChange={e => onToggleReminders(e.target.checked)}
+          />
+          Automatic reminders every {REMINDER_DEFAULTS.afterDays} days
+          <span className="text-[#9e998f]">({request.reminderCount} of {REMINDER_DEFAULTS.maxReminders} sent)</span>
+        </label>
+      )}
 
       <button
         onClick={() => setOpen(o => !o)}
@@ -151,7 +170,20 @@ export function SigningTab({ jobId }: { jobId: string }) {
       ) : (
         <div className="space-y-3">
           {requests.map(r => (
-            <RequestRow key={r.id} request={r} busy={busyId === r.id} onAction={action => run(r, action)} />
+            <RequestRow
+              key={r.id}
+              request={r}
+              busy={busyId === r.id}
+              onAction={action => run(r, action)}
+              onToggleReminders={async enabled => {
+                try {
+                  await act(r.id, 'reminders', { enabled })
+                  setNotice({ kind: 'ok', text: `Automatic reminders turned ${enabled ? 'on' : 'off'} for ${r.signerName}.` })
+                } catch (err) {
+                  setNotice({ kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
+                }
+              }}
+            />
           ))}
         </div>
       )}

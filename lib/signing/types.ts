@@ -14,6 +14,25 @@ export type SigningDocumentTypeKey = 'scope_of_works' | 'building_contract'
 
 export type SignatureMethod = 'typed' | 'drawn'
 
+/** Who is signing, chosen by the signer on the signing page. */
+export type SignerCapacity = 'owner' | 'joint_owner' | 'authorised_person'
+
+export const SIGNER_CAPACITY_LABELS: Record<SignerCapacity, string> = {
+  owner: 'Owner',
+  joint_owner: 'Joint owner',
+  authorised_person: 'Authorised person signing for the owner',
+}
+
+/**
+ * The name as printed beside a signature: "Jane Citizen", "Jane Citizen
+ * (joint owner)" or "John Smith for Alex Example".
+ */
+export function printedSignerName(name: string, capacity: SignerCapacity | null | undefined, ownerName: string | null | undefined): string {
+  if (capacity === 'joint_owner') return `${name} (joint owner)`
+  if (capacity === 'authorised_person') return ownerName ? `${name} for ${ownerName}` : `${name} (authorised person)`
+  return name
+}
+
 export type SigningEventType =
   | 'created'
   | 'sent'
@@ -29,6 +48,8 @@ export type SigningEventType =
   | 'reminded'
   | 'stage_confirmed'
   | 'rate_limited'
+  | 'reminders_on'
+  | 'reminders_off'
 
 /** A rectangle on a PDF page, in PDF points from the bottom-left corner. */
 export interface PdfRect {
@@ -53,6 +74,8 @@ export interface LocatedSignatureField {
   date: PdfRect | null
   /** Where the signer's printed name is written, if the document has one */
   name: PdfRect | null
+  /** Owner's representative blank, filled only when an authorised person signs (older requests: absent) */
+  representative?: PdfRect | null
 }
 
 // ── Mobile reading view ─────────────────────────────────────────────────────
@@ -86,6 +109,10 @@ export interface SigningRequestSummary {
   revokedReason: string | null
   reminderCount: number
   lastRemindedAt: string | null
+  remindersEnabled: boolean
+  /** Name the signer confirmed when signing, and in what capacity */
+  signedName: string | null
+  signerCapacity: SignerCapacity | null
   hasSignedDocument: boolean
   signedJobFileId: string | null
   stageConfirmedAt: string | null
@@ -130,6 +157,9 @@ export function toSigningRequestSummary(row: SigningRequestRow, now = new Date()
     revokedReason: row.revoked_reason,
     reminderCount: row.reminder_count,
     lastRemindedAt: row.last_reminded_at,
+    remindersEnabled: row.reminders_enabled,
+    signedName: row.signed_name,
+    signerCapacity: (row.signer_capacity as SignerCapacity | null) ?? null,
     hasSignedDocument: !!row.signed_pdf_path,
     signedJobFileId: row.signed_job_file_id,
     stageConfirmedAt: row.stage_confirmed_at,

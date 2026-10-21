@@ -20,6 +20,8 @@ const EVENT_LABELS: Record<string, string> = {
   expired: 'Link expired',
   stage_confirmed: 'Sign-off confirmed by office',
   rate_limited: 'Blocked: too many attempts',
+  reminders_on: 'Automatic reminders turned on',
+  reminders_off: 'Automatic reminders turned off',
 }
 
 function detail(e: SigningEventSummary): string | null {
@@ -31,11 +33,12 @@ function detail(e: SigningEventSummary): string | null {
       return m.to ? `To ${String(m.to)}` : null
     case 'signed':
       return [
+        m.signedName ? `By ${String(m.signedName)}${m.capacity && m.capacity !== 'owner' ? ` (${String(m.capacity).replace('_', ' ')})` : ''}` : null,
         m.method === 'drawn' ? 'Drawn signature' : 'Typed signature',
         typeof m.signedSha256 === 'string' ? `SHA-256 ${m.signedSha256.slice(0, 16)}…` : null,
       ].filter(Boolean).join(' · ')
     case 'signed_copy_sent':
-      return `Signer: ${m.toSigner ? 'sent' : 'not sent'} · Office: ${m.toOffice ? 'sent' : 'not sent'}`
+      return `Signer: ${m.toSigner ? 'sent' : 'not sent'} · Office copy: ${m.toOffice ? 'sent' : 'not sent'}`
     case 'revoked':
       return m.reason ? `Reason: ${String(m.reason)}` : null
     case 'send_failed':

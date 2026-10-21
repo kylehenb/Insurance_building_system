@@ -16,6 +16,7 @@ function view(overrides: Partial<SignerView> = {}): SignerView {
     documentName: 'Scope of Works Authorisation',
     documentTitle: 'Scope of Works Authorisation — 1 Example St',
     signerName: 'Jane Citizen',
+    ownerName: 'Alex Citizen',
     propertyAddress: '1 Example St',
     companyName: 'Insurance Repair Co',
     expiresAt: '2026-11-04T00:00:00Z',
@@ -67,6 +68,16 @@ describe('signer page', () => {
     expect(renderSignerPage('rate_limited', { token: TOKEN })).toContain('Please wait a moment')
   })
 
+  it('asks who is signing, defaulting to the owner, with the owner named', () => {
+    const html = renderSignerPage(view(), { token: TOKEN })
+    expect(html).toContain('name="capacity" value="owner" checked')
+    expect(html).toContain('value="joint_owner"')
+    expect(html).toContain('value="authorised_person"')
+    expect(html).toContain('On behalf of Alex Citizen')
+    // name field comes before the type/draw choice, so it applies to both
+    expect(html.indexOf('id="sg-typed-name"')).toBeLessThan(html.indexOf('name="method"'))
+  })
+
   it('never loads anything from another site', () => {
     const html = renderSignerPage(view(), { token: TOKEN })
     expect(html).not.toMatch(/(src|href)="https?:/)
@@ -108,6 +119,11 @@ describe('signing emails', () => {
     })
     expect(html).toContain('Review and sign</a>')
     expect(html).toContain('Hi &lt;b&gt;Jane&lt;/b&gt;,')
+  })
+
+  it('buildEmailRaw adds a Bcc header for the office copy', () => {
+    const raw = Buffer.from(buildEmailRaw({ from: 'a@b.co', to: 'c@d.co', bcc: 'office@b.co', subject: 'S', body: 'x' }), 'base64url').toString()
+    expect(raw).toContain('Bcc: office@b.co')
   })
 
   it('buildEmailRaw sends text and HTML as alternatives', () => {

@@ -3649,6 +3649,9 @@ export type Database = {
           token_hash: string | null
           updated_at: string
           viewed_at: string | null
+          reminders_enabled: boolean
+          signed_name: string | null
+          signer_capacity: string | null
         }
         Insert: {
           created_at?: string
@@ -3690,6 +3693,9 @@ export type Database = {
           token_hash?: string | null
           updated_at?: string
           viewed_at?: string | null
+          reminders_enabled?: boolean
+          signed_name?: string | null
+          signer_capacity?: string | null
         }
         Update: {
           created_at?: string
@@ -3731,6 +3737,9 @@ export type Database = {
           token_hash?: string | null
           updated_at?: string
           viewed_at?: string | null
+          reminders_enabled?: boolean
+          signed_name?: string | null
+          signer_capacity?: string | null
         }
         Relationships: [
           {

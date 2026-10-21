@@ -47,6 +47,7 @@ export const SIGNER_SCRIPT = String.raw`
   var methodInputs = toArray(form.querySelectorAll('input[name=method]'));
   var styleInputs = toArray(form.querySelectorAll('input[name=style]'));
   var samples = toArray(form.querySelectorAll('.sg-style-sample'));
+  var capacityInputs = toArray(form.querySelectorAll('input[name=capacity]'));
   var canvas = document.getElementById('sg-canvas');
   var clearBtn = document.getElementById('sg-clear');
 
@@ -105,14 +106,20 @@ export const SIGNER_SCRIPT = String.raw`
   function syncStyles() {
     var name = (nameInput && nameInput.value.replace(/^\s+|\s+$/g, '')) || 'Your name';
     for (var i = 0; i < samples.length; i++) setText(samples[i], name);
-    for (var j = 0; j < styleInputs.length; j++) {
-      var label = styleInputs[j].parentNode;
-      if (styleInputs[j].checked) addClass(label, 'is-checked'); else removeClass(label, 'is-checked');
+    var groups = styleInputs.concat(capacityInputs);
+    for (var j = 0; j < groups.length; j++) {
+      var label = groups[j].parentNode;
+      if (groups[j].checked) addClass(label, 'is-checked'); else removeClass(label, 'is-checked');
     }
   }
 
   function syncMethod() {
-    if (currentMethod() === 'drawn') { addClass(adopt, 'is-draw'); setupCanvas(); } else removeClass(adopt, 'is-draw');
+    if (currentMethod() === 'drawn') {
+      addClass(adopt, 'is-draw');
+      setupCanvas();
+      // Bring the drawing box into view on small screens
+      setTimeout(function () { try { canvas.scrollIntoView(false); } catch (e) {} }, 60);
+    } else removeClass(adopt, 'is-draw');
     setText(adoptError, '');
     adoptError.style.display = 'none';
   }
@@ -170,14 +177,14 @@ export const SIGNER_SCRIPT = String.raw`
 
   on(adoptBtn, 'click', function () {
     var method = currentMethod();
+    var name = nameInput.value.replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
+    if (name.length < 2) { showAdoptError('Please type your full name.'); try { nameInput.focus(); } catch (e) {} return; }
     if (method === 'drawn') {
       if (!drawing.strokes) { showAdoptError('Please draw your signature in the box, or choose Type.'); return; }
       adopted = { method: 'drawn', png: exportDrawing() };
       drawnInput.value = adopted.png;
     } else {
-      var text = nameInput.value.replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
-      if (text.length < 2) { showAdoptError('Please type your full name.'); try { nameInput.focus(); } catch (e) {} return; }
-      adopted = { method: 'typed', text: text, style: currentStyle() };
+      adopted = { method: 'typed', text: name, style: currentStyle() };
       drawnInput.value = '';
     }
     var target = pendingField;
@@ -191,6 +198,7 @@ export const SIGNER_SCRIPT = String.raw`
   on(document, 'keydown', function (e) { if ((e.key === 'Escape' || e.keyCode === 27) && hasClass(adopt, 'is-open')) closeAdopt(); });
   for (var m = 0; m < methodInputs.length; m++) on(methodInputs[m], 'change', syncMethod);
   for (var s = 0; s < styleInputs.length; s++) on(styleInputs[s], 'change', syncStyles);
+  for (var c = 0; c < capacityInputs.length; c++) on(capacityInputs[c], 'change', syncStyles);
   on(nameInput, 'input', syncStyles);
   on(nameInput, 'keyup', syncStyles);
 

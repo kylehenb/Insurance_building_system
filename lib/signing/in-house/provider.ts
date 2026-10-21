@@ -85,6 +85,7 @@ export class InHouseSigningProvider implements SigningProvider {
         source_pdf_sha256: sourceSha256,
         fields: located.fields as unknown as Json,
         display_content: generated.display as unknown as Json,
+        reminders_enabled: input.remindersEnabled !== false,
         created_by: actor.userId,
       })
       .select('*')
