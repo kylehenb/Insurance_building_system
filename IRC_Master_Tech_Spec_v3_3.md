@@ -1626,7 +1626,7 @@ CREATE TABLE signing_rate_limits (
 ```
 
 Storage RLS mirrors database RLS — users can only access their own tenant's storage bucket paths.
-**Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The original `job-files` and `irc-master` storage policies check only that the user is signed in; migration `20261022_signing_followups.sql` adds a RESTRICTIVE policy (`private_buckets_tenant_scope`) so signed-in users can only read, write or delete objects under `tenants/{their tenant_id}/` in those two buckets. `photos` and `tenant-assets` are public-read by design; their write/delete policies are still bucket-wide for any signed-in user (open item, §18).
+**Live state (Oct 2026):** buckets are `job-files` (private), `irc-master` (private), `tenant-assets` (public — logos) and `photos` (public). The original `job-files` and `irc-master` storage policies check only that the user is signed in; migration `20261022_signing_followups.sql` adds a RESTRICTIVE policy (`private_buckets_tenant_scope`) so signed-in users can only read, write or delete objects under `tenants/{their tenant_id}/` in those two buckets. `photos` is public-read by design; migration `20261023_photos_bucket_tenant_writes.sql` adds RESTRICTIVE insert/update/delete policies so signed-in users can only write to `{tenant_id}/…` (Photos tab and report photo uploads) or `tenants/{tenant_id}/…` (field app) in that bucket — reading is unchanged. `tenant-assets` (public-read logos) still allows any signed-in user to write anywhere in that bucket (open item, §18).
 
 **`signed-documents` (private, PDF only, 25 MB):** e-signing source and signed PDFs at `tenants/{tenantId}/signing/{requestId}/source.pdf` and `.../signed.pdf`. No storage policies at all — only the service role can read or write it; office users download through `/api/signing/requests/[id]/document`, which checks their tenant. A copy of every signed PDF also goes to `job-files` at `tenants/{tenantId}/jobs/{jobId}/docs/` with a `job_files` row so it shows in the Files tab.
 
@@ -2952,7 +2952,7 @@ Reads each sheet, maps columns to schema, upserts via Supabase client.
 - Xero API setup — not yet configured; required before invoicing module build
 - Inbound email address domain setup (e.g. `jobs@insurancerepair.com.au`) — DNS/forwarding config required
 - Google Maps API key setup — required before blueprint draft generation and proximity calculation can run
-- Storage: tighten `photos` / `tenant-assets` write and delete policies to the tenant's folder (public read stays)
+- Storage: tighten `tenant-assets` write and delete policies to the tenant's folder (public read stays); `photos` done Oct 2026
 - E-signing: SMS delivery of signing links (needs a paid SMS provider); PAdES digital signature on signed PDFs; attaching the HBCA General Conditions and s.4(2) prescribed notice to the generated Building Contract; whether `Receive sign off` / quote-level "Send for Signature" buttons in the Quotes tab should open the new dialog
 - `scope_library.estimated_hours` seeding — requires review of existing line items to assign time values; partial seeding acceptable at migration time
 
