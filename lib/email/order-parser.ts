@@ -4,6 +4,7 @@ import type { ExtractedMessage } from '@/lib/gmail/messages'
 import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 type InsurerOrderInsert = Database['public']['Tables']['insurer_orders']['Insert']
 
@@ -295,7 +296,7 @@ export async function parseInsurerOrder(
   let raw: GeminiRawResult = {}
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_FLASH_MODEL,
       contents: parts,
       config: { systemInstruction },
     })
@@ -313,29 +314,11 @@ export async function parseInsurerOrder(
     raw = JSON.parse(jsonText) as GeminiRawResult
   } catch (err) {
     console.error('[order-parser] Gemini parse error:', err)
-    // On parse failure, conservatively mark as not a new order so no row is written.
-    return {
-      data: {
-        order_sender_name: message.fromName || null,
-        order_sender_email: message.fromEmail || null,
-        insurer: clientConfig?.insurer_hint || null,
-        claim_description: null,
-      },
-      isNewOrder: false,
-      isNewOrderReasoning: 'Gemini call failed — rejecting as a precaution',
-      confidence: 0,
-      missingFields: ['claim_number', 'insured_name', 'property_address', 'claim_description'],
-      parseStatus: 'needs_review',
-      rawEmailLink: null,
-      insurerDetected: clientConfig?.insurer_hint || null,
-      rawEmailBody: message.bodyText || null,
-      emailAttachments: message.attachments.map(a => ({
-        filename: a.filename,
-        mimeType: a.mimeType,
-        size: a.size,
-      })),
-      rawGeminiOutput: null,
-    }
+    // Throw rather than return "not a new order": every caller treats a throw
+    // as a failure it can see (the webhook writes a needs_review order, the
+    // poller labels the email failed). Returning is_new_order=false here once
+    // silently dropped every order email while the model was unavailable.
+    throw new Error(`Gemini could not classify the email: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
   }
 
   // Strict boolean check: only exactly true counts as a new order.

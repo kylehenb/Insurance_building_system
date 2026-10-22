@@ -36,7 +36,7 @@ IRC Master is a job management platform for insurance repair businesses. It mana
 | PDF generation | Vercel Functions — puppeteer-core + @sparticuz/chromium | Runs inside the Next.js app; no separate service |
 | Hosting | Cloudflare Pages (frontend) | Free tier |
 | AI features | Anthropic Claude API | claude-sonnet-4-20250514 |
-| Vision/parsing | Google Gemini Flash 2.0 | Cost-efficient parsing tasks |
+| Vision/parsing | Google Gemini Flash (`GEMINI_FLASH_MODEL` in `lib/ai/gemini.ts`, currently `gemini-3.5-flash`) | Cost-efficient parsing tasks. Every Gemini call names that constant — change it there when Google retires a model (gemini-2.5-flash was shut down on 16 Oct 2026 and silently stopped order emails being classified until 23 Oct) |
 | SMS | Twilio | Stubbed initially |
 | Accounting sync | Xero API | Two-way sync; AP + AR; TPAR via Xero |
 | IDE | Windsurf / Cursor + Clasp | |
@@ -2021,6 +2021,8 @@ The dashboard (`/dashboard`) is the primary work surface for office-based users.
 - Many insurer orders can link to one job (e.g. BAR + make safe sent as separate emails minutes apart)
 - Manual order entry form exists for after-hours phone intake
 - Auto Job Lodger parses emails via Gemini Flash; human review required until near-100% accuracy
+- If the Gemini call fails, `parseInsurerOrder` throws (it does not report "not a new order"): the inbound webhook then writes a `needs_review` order with the subject and Gmail link, the poller labels the email failed, and backfill records an error. A genuine "not a new order" is logged to `ai_audit` (`prompt_key='email_order_parser'`, `outcome='rejected'`) with Gemini's reasoning — check there first when an order email "wasn't picked up"
+- Lodging (Lodge button, and the voice connector's `lodge_order`) is `lodgeInsurerOrder` in `lib/insurer-orders/lodge.ts`; `app/api/insurer-orders/lodge` only maps its `LodgeError`s to responses
 - Geographic flagging (outside service area) is primary rejection case — automatable future
 - Insurer portal double-entry problem noted (Axiom compatibility issue flagged)
 - Work order types: BAR, Make Safe, Roof Report, Specialist Report, Combination/Variation
@@ -2600,6 +2602,10 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `get_signing(job_number)` | read | `listSigningRequestsForJob`, `getSendDialogDefaults` | Each request (document, signer, sent/opened/signed/expired, reminders) and what a new send would use: approved quotes, suggested document (threshold), signer, job stage, and the excess options to ask about |
 | `send_for_signature(job_number, document_type?, quote_ids?, signer_*?, excess?, reminders?, move_job_to_awaiting_stage?, send_anyway?)` | send | `sendForSignature` | Send for Signature dialog defaults (suggested quotes and type, signer, reminders on, stage move only at `approved_awaiting_signoff`). Insurance jobs need an `ExcessChoice` (`parseExcessChoice`); without one the tool returns the excess question. A second request for a document that's still `sent`/`viewed` is refused unless `send_anyway: true` |
 | `resend_signing_request(request_id)` | send | `resendSigningRequest` | Fresh link (old one stops working), excess invoice re-attached if it went originally |
+| `list_insurer_orders()` | read | — | Pending, unlodged orders (newest 20) with claim, insurer, work type, insured, address, excess and what's missing (no claim number blocks lodging) |
+| `find_order_emails(query)` | read | Gmail `messages.list` | Inbox search (last 90 days, excluding our domain) by claim number, name, address or Gmail syntax; says whether each email is already an order, or its thread is on a job |
+| `create_order_from_email(message_id)` | change | `parseInsurerOrder`, `writeInsurerOrder` | For an order email the auto lodger missed: runs the lodger's reader and writer with `isNewOrder` forced true (the reader's reasoning is kept on `ai_audit`). Returns the existing order if the email or claim number already has one. No new-order notification (the user asked for it) |
+| `lodge_order(order_id)` | change | `lodgeInsurerOrder` | Same as the Lodge button, scoped to the tenant. Links to an existing job with the same claim; the same-address-different-claim warning creates nothing and lists the matching jobs |
 
 ### Planned
 1. Email replies (with a job emails read tool), inspection confirm/reschedule, job stage, accounting sync

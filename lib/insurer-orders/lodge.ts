@@ -1,0 +1,478 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/supabase/database.types'
+import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
+import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
+import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
+import { notifyJobApproved } from '@/lib/email/notify-job-approved'
+import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
+import { normaliseLossType } from '@/lib/loss-types'
+import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
+
+// Lodging an insurer order: creates the job (next job number, KPI due dates,
+// client), the inspection/report/quote/invoice its work order type needs, links
+// the order's email thread and notifies the office — or links the order to the
+// job that already has its claim number. Used by the Lodge button
+// (app/api/insurer-orders/lodge) and the voice connector.
+
+// Mapping of report types to reference prefixes
+const REPORT_TYPE_PREFIXES: Record<string, string> = {
+  BAR: 'BAR',
+  storm_wind: 'SW',
+  make_safe: 'MS',
+  roof: 'RR',
+  roof_report: 'RR',
+  specialist: 'SPR',
+  LDR: 'LDR',
+}
+
+export interface LodgeResult {
+  jobNumber: string
+  jobId: string
+  /** The claim number already had a job; the order was linked to it */
+  linkedToExisting?: boolean
+  message?: string
+}
+
+export class LodgeError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    /** Extra response fields, e.g. the address-match warning's matchingJobs */
+    public readonly details: Record<string, unknown> = {},
+  ) {
+    super(message)
+    this.name = 'LodgeError'
+  }
+}
+
+/**
+ * Lodges an order. tenantId, when given, must own the order (the voice
+ * connector passes it; the Lodge button relies on the signed-in session).
+ */
+export async function lodgeInsurerOrder(
+  supabase: SupabaseClient<Database>,
+  orderId: string,
+  options: { tenantId?: string } = {},
+): Promise<LodgeResult> {
+  // Step 2: Fetch insurer_order
+  console.log('[lodge] fetching order', orderId)
+  const { data: order, error: orderError } = await supabase
+    .from('insurer_orders')
+    .select('*')
+    .eq('id', orderId)
+    .single()
+
+  if (orderError || !order) {
+    console.error('[lodge] order fetch error:', orderError)
+    throw new LodgeError('Order not found', 404)
+  }
+
+  if (options.tenantId && order.tenant_id !== options.tenantId) {
+    throw new LodgeError('Order not found', 404)
+  }
+
+  // Step 3: Guard — not already lodged
+  if (order.job_id) {
+    throw new LodgeError('Order already lodged', 400)
+  }
+
+  const tenantId = order.tenant_id
+
+  // Step 4: Get tenant job_prefix + job_sequence
+  console.log('[lodge] fetching tenant', tenantId)
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .select('job_prefix, job_sequence')
+    .eq('id', tenantId)
+    .single()
+
+  if (tenantError || !tenant) {
+    console.error('[lodge] tenant fetch error:', tenantError)
+    throw new LodgeError('Tenant not found', 500)
+  }
+
+  const prefix = tenant.job_prefix
+
+  // Step 4a: Load automation_config for KPI calculations
+  console.log('[lodge] loading automation_config for KPI calculations')
+  const { data: configData, error: configError } = await supabase
+    .from('automation_config')
+    .select('key, value')
+    .eq('tenant_id', tenantId)
+
+  if (configError) {
+    console.error('[lodge] automation_config load error:', configError)
+    throw new LodgeError('Failed to load automation config', 500)
+  }
+
+  const rawConfig: Record<string, string> = {}
+  configData?.forEach(row => {
+    rawConfig[row.key] = row.value
+  })
+
+  const timeConfig = parseTimeConfig(rawConfig)
+  const orderedAt = new Date()
+
+  // Calculate KPI due dates using addDelay
+  const kpi_contact_due = addDelay(timeConfig, orderedAt, 2, 'hours')
+  const kpi_booking_due = addDelay(timeConfig, orderedAt, 24, 'hours')
+  const kpi_visit_due = addDelay(timeConfig, orderedAt, 2, 'business_days')
+  const kpi_report_due = addDelay(timeConfig, orderedAt, 4, 'business_days')
+
+  // Step 4b: Check for existing job with same claim number
+  console.log('[lodge] checking for existing job with claim_number:', order.claim_number)
+  if (!order.claim_number) {
+    throw new LodgeError('Claim number is required', 400)
+  }
+  const { data: existingJobByClaim, error: claimCheckError } = await supabase
+    .from('jobs')
+    .select('id, job_number, claim_number, property_address')
+    .eq('tenant_id', tenantId)
+    .eq('claim_number', order.claim_number)
+    .single()
+
+  if (claimCheckError && claimCheckError.code !== 'PGRST116') {
+    console.error('[lodge] claim number check error:', claimCheckError)
+    throw new LodgeError('Failed to check for existing job', 500)
+  }
+
+  // If job with same claim number exists, attach order to it
+  if (existingJobByClaim) {
+    console.log('[lodge] found existing job with same claim_number:', existingJobByClaim.job_number)
+    
+    // Update insurer_order to link to existing job
+    const { error: linkError } = await supabase
+      .from('insurer_orders')
+      .update({ job_id: existingJobByClaim.id, status: 'linked' })
+      .eq('id', orderId)
+
+    if (linkError) {
+      console.error('[lodge] link error:', linkError)
+      throw new LodgeError('Failed to link to existing job', 500)
+    }
+
+    console.log('[lodge] order linked to existing job')
+    await linkOrderThreadsToJob(supabase, tenantId, orderId, existingJobByClaim.id)
+    await recomputeAndSaveStage(existingJobByClaim.id)
+    return {
+      jobNumber: existingJobByClaim.job_number,
+      jobId: existingJobByClaim.id,
+      linkedToExisting: true,
+      message: 'Order linked to existing job with same claim number'
+    }
+  }
+
+  // Step 4b: Check for existing jobs with same address (different claim number)
+  if (order.property_address) {
+    console.log('[lodge] checking for existing jobs with same address')
+    const { data: jobsByAddress, error: addressCheckError } = await supabase
+      .from('jobs')
+      .select('id, job_number, claim_number, property_address')
+      .eq('tenant_id', tenantId)
+      .eq('property_address', order.property_address)
+      .neq('claim_number', order.claim_number)
+
+    if (addressCheckError) {
+      console.error('[lodge] address check error:', addressCheckError)
+      throw new LodgeError('Failed to check for address duplicates', 500)
+    }
+
+    if (jobsByAddress && jobsByAddress.length > 0) {
+      console.log('[lodge] found existing jobs with same address:', jobsByAddress.length)
+      const matchingJobs = jobsByAddress.map(j => ({
+        jobNumber: j.job_number,
+        claimNumber: j.claim_number
+      }))
+      throw new LodgeError('Address already exists in system', 409, {
+        warning: true,
+        matchingJobs,
+        message: `Found ${jobsByAddress.length} existing job(s) with same property address but different claim number. Please review before proceeding.`
+      })
+    }
+  }
+
+  // Step 4 cont: Compute next job number (mirrors /api/jobs sequence logic)
+  const explicitSequence = (tenant as unknown as { job_sequence: number | null }).job_sequence
+  let currentSequence: number
+  if (explicitSequence != null && explicitSequence > 1) {
+    currentSequence = explicitSequence
+  } else {
+    console.log('[lodge] finding max job number for tenant', tenantId)
+    const { data: existingJobs } = await supabase
+      .from('jobs')
+      .select('job_number')
+      .eq('tenant_id', tenantId)
+      .like('job_number', `${prefix}%`)
+
+    currentSequence = 1000
+    for (const j of existingJobs ?? []) {
+      const match = j.job_number.match(/(\d+)$/)
+      if (match) {
+        const n = parseInt(match[1], 10)
+        if (n > currentSequence) currentSequence = n
+      }
+    }
+  }
+  const nextNum = currentSequence + 1
+  const jobNumber = `${prefix}${nextNum}`
+  console.log('[lodge] new job number:', jobNumber)
+
+  // Step 4c: Resolve client_id — use the order's linked client, else match insurer/adjuster name
+  let resolvedClientId: string | null = order.client_id ?? null
+  let resolvedInsurer: string | null = order.insurer
+  const namesToMatch = [order.insurer, order.adjuster].filter((n): n is string => Boolean(n))
+  if (!resolvedClientId && namesToMatch.length > 0) {
+    const { data: matchingClients } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .in('name', namesToMatch)
+
+    if (matchingClients && matchingClients.length > 0) {
+      const insurerMatch = order.insurer ? matchingClients.find(c => c.name === order.insurer) : null
+      resolvedClientId = insurerMatch?.id ?? matchingClients[0].id
+    }
+  }
+  if (!resolvedClientId) {
+    const client = await resolveInsurerClient(supabase, tenantId, {
+      insurer: order.insurer,
+      fromEmail: order.order_sender_email,
+      fromName: order.order_sender_name,
+      subject: order.raw_email_subject,
+      body: order.raw_email_body,
+    })
+    if (client) {
+      resolvedClientId = client.id
+      resolvedInsurer = client.name
+    }
+  }
+  console.log('[lodge] resolved client_id:', resolvedClientId)
+
+  // Step 5: Create job
+  console.log('[lodge] creating job')
+  const { data: newJob, error: jobError } = await supabase
+    .from('jobs')
+    .insert({
+      tenant_id: tenantId,
+      job_number: jobNumber,
+      claim_number: order.claim_number,
+      insurer: resolvedInsurer,
+      adjuster: order.adjuster,
+      property_address: order.property_address,
+      insured_name: order.insured_name,
+      insured_phone: order.insured_phone,
+      insured_email: order.insured_email,
+      contacts: order.contacts,
+      adjuster_reference: order.adjuster_reference,
+      order_sender_name: order.order_sender_name,
+      order_sender_email: order.order_sender_email,
+      date_of_loss: order.date_of_loss,
+      loss_type: normaliseLossType(order.loss_type),
+      claim_description: order.claim_description,
+      special_instructions: order.special_instructions,
+      sum_insured: order.sum_insured_building,
+      excess: order.excess_building,
+      client_id: resolvedClientId,
+      kpi_contact_due: kpi_contact_due.toISOString(),
+      kpi_booking_due: kpi_booking_due.toISOString(),
+      kpi_visit_due: kpi_visit_due.toISOString(),
+      kpi_report_due: kpi_report_due.toISOString(),
+      created_at: new Date().toISOString(),
+    } as Database['public']['Tables']['jobs']['Insert'])
+    .select('id')
+    .single()
+
+  if (jobError || !newJob) {
+    console.error('[lodge] job create error:', jobError)
+    throw new LodgeError('Failed to create job', 500)
+  }
+
+  const jobId = newJob.id
+  console.log('[lodge] job created:', jobId)
+
+  // Persist sequence so future creations don't need to scan
+  await supabase
+    .from('tenants')
+    .update({ job_sequence: nextNum } as unknown as Database['public']['Tables']['tenants']['Update'])
+    .eq('id', tenantId)
+
+  // Step 6: Conditionally create inspection based on wo_type
+  let inspectionId: string | null = null
+  const wo_type = order.wo_type
+
+  if (wo_type === 'BAR') {
+    console.log('[lodge] creating inspection for wo_type:', wo_type)
+    const { data: newInspection, error: inspError } = await supabase
+      .from('inspections')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        status: 'unscheduled',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (inspError || !newInspection) {
+      console.error('[lodge] inspection create error:', inspError)
+      throw new LodgeError('Failed to create inspection', 500)
+    }
+
+    inspectionId = newInspection.id
+    console.log('[lodge] inspection created:', inspectionId)
+  } else {
+    console.log('[lodge] skipping inspection creation for wo_type:', wo_type)
+  }
+
+  // Step 7: Conditionally create report based on wo_type
+  let reportId: string | null = null
+
+  if (wo_type === 'BAR' || wo_type === 'make_safe' || wo_type === 'roof_report' || wo_type === 'specialist') {
+    console.log('[lodge] creating report for wo_type:', wo_type)
+    const prefix = REPORT_TYPE_PREFIXES[wo_type] || 'RPT'
+    const { data: newReport, error: reportError } = await supabase
+      .from('reports')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        inspection_id: wo_type === 'BAR' ? inspectionId : null,
+        report_type: wo_type,
+        report_ref: `${prefix}-${jobNumber}-1`,
+        version: 1,
+        is_locked: false,
+        status: 'draft',
+        property_address: order.property_address,
+        insured_name: order.insured_name,
+        claim_number: order.claim_number,
+        loss_type: normaliseLossType(order.loss_type),
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (reportError || !newReport) {
+      console.error('[lodge] report create error:', reportError)
+      throw new LodgeError('Failed to create report', 500)
+    }
+
+    reportId = newReport.id
+    console.log('[lodge] report created:', reportId)
+
+    // Step 7b: Auto-create invoice for the report
+    // Fetch property_details from job (may be null at this point, invoice will use default pricing)
+    const { data: jobWithProperty } = await supabase
+      .from('jobs')
+      .select('property_details')
+      .eq('id', jobId)
+      .single()
+
+    // Extract storeys from property_details JSONB if available
+    const propertyDetails = jobWithProperty?.property_details as Record<string, unknown> | null
+    const storeys = propertyDetails?.storeys as string | null
+    let propertyType: string | null = null
+    if (storeys === '2' || storeys === 'double') {
+      propertyType = 'double_storey'
+    } else if (storeys === '1' || storeys === 'single') {
+      propertyType = 'single_storey'
+    }
+
+    const invoiceResult = await createInvoiceForReport(supabase, {
+      tenantId,
+      jobId,
+      reportId,
+      inspectionId: wo_type === 'BAR' ? inspectionId : null,
+      reportType: wo_type,
+      propertyType,
+      propertyAddress: order.property_address,
+      claimNumber: order.claim_number,
+      jobNumber,
+    })
+
+    if (invoiceResult) {
+      console.log('[lodge] auto-created invoice:', invoiceResult.invoiceRef)
+    } else {
+      console.warn('[lodge] failed to auto-create invoice for report')
+    }
+  } else {
+    console.log('[lodge] skipping report creation for wo_type:', wo_type)
+  }
+
+  // Step 8: Conditionally create quote based on wo_type
+  let quoteId: string | null = null
+
+  if (wo_type === 'BAR' || wo_type === 'quote_only') {
+    console.log('[lodge] creating quote for wo_type:', wo_type)
+    const { data: newQuote, error: quoteError } = await supabase
+      .from('quotes')
+      .insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        inspection_id: wo_type === 'BAR' ? inspectionId : null,
+        report_id: wo_type === 'BAR' ? reportId : null,
+        quote_ref: `${jobNumber}-Q01`,
+        quote_type: 'inspection',
+        version: 1,
+        is_active_version: true,
+        is_locked: false,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (quoteError || !newQuote) {
+      console.error('[lodge] quote create error:', quoteError)
+      throw new LodgeError('Failed to create quote', 500)
+    }
+
+    quoteId = newQuote.id
+    console.log('[lodge] quote created:', quoteId)
+  } else {
+    console.log('[lodge] skipping quote creation for wo_type:', wo_type)
+  }
+
+  // Step 9: Update inspection with report_id and quote_id for BAR inspections
+  if (wo_type === 'BAR' && inspectionId && reportId && quoteId) {
+    console.log('[lodge] linking inspection to report and quote')
+    const { error: updateError } = await supabase
+      .from('inspections')
+      .update({ report_id: reportId, quote_id: quoteId })
+      .eq('id', inspectionId)
+
+    if (updateError) {
+      console.error('[lodge] inspection update error:', updateError)
+      throw new LodgeError('Failed to link inspection to report and quote', 500)
+    }
+    console.log('[lodge] inspection linked to report and quote')
+  }
+
+  // Step 9: Update insurer_order
+  console.log('[lodge] updating insurer_order')
+  const { error: updateError } = await supabase
+    .from('insurer_orders')
+    .update({ job_id: jobId, status: 'lodged' })
+    .eq('id', orderId)
+
+  if (updateError) {
+    console.error('[lodge] order update error:', updateError)
+    throw new LodgeError('Failed to update order', 500)
+  }
+
+  // Move the order email thread (and any replies) out of the unlinked inbox
+  await linkOrderThreadsToJob(supabase, tenantId, orderId, jobId)
+
+  await recomputeAndSaveStage(jobId)
+
+  await notifyJobApproved({
+    tenantId,
+    jobId,
+    jobNumber,
+    propertyAddress: order.property_address,
+    insuredName: order.insured_name,
+    inspectionId,
+  })
+
+  console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
+  return { jobNumber, jobId }
+}

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 export async function writeFallbackOrder(
   message: ExtractedMessage,
@@ -59,7 +60,7 @@ export async function writeInsurerOrder(
       .insert({
         tenant_id: tenantId,
         prompt_key: 'email_order_parser',
-        model: 'gemini-2.5-flash',
+        model: GEMINI_FLASH_MODEL,
         category: 'parsing',
         input_summary: `Email: "${message.subject}" from ${message.fromEmail}`,
         output_parsed: {

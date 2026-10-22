@@ -3,6 +3,7 @@ import { createClient as createRawClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractReferenceTokens } from './references'
 import { compareAddresses, findAddressesInText, parseAddress, type ParsedAddress } from './address'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 // Candidate match surfaced to the manual-link UI
 export type JobCandidate = {
@@ -87,7 +88,7 @@ async function extractIdentifiers(
   const ai = new GoogleGenAI({ apiKey })
 
   const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_FLASH_MODEL,
     contents: [
       { text: '\n<email_content>\n' },
       { text: `Subject: ${subject}\n\n${body}` },

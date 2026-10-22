@@ -84,6 +84,7 @@ describe('mcp route', () => {
       'list_job_documents', 'get_document_email', 'send_documents',
       'get_job_excess', 'set_job_excess_decision',
       'get_signing', 'send_for_signature', 'resend_signing_request',
+      'list_insurer_orders', 'find_order_emails', 'create_order_from_email', 'lodge_order',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })

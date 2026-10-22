@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function POST(
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
+  const model = genAI.getGenerativeModel({ model: GEMINI_FLASH_MODEL })
 
   const prompt = `You are labelling photos for a building insurance inspection report. You have not seen the photos themselves — only the inspector's report notes and scope of works below. Infer the most likely rooms/areas and damage types a field inspector would have photographed, in a plausible order.
 

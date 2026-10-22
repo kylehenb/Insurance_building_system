@@ -4,6 +4,7 @@ import { getWorkOrderEmail, sendWorkOrder } from '@/lib/mcp/tools/work-order-sen
 import { getDocumentEmail, listJobDocumentsTool, sendDocuments } from '@/lib/mcp/tools/documents'
 import { getJobExcess, setJobExcessDecision } from '@/lib/mcp/tools/excess'
 import { getSigning, resendSigningRequestTool, sendForSignatureTool } from '@/lib/mcp/tools/signing'
+import { createOrderFromEmail, findOrderEmails, listInsurerOrders, lodgeOrder } from '@/lib/mcp/tools/orders'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -19,4 +20,8 @@ export const MCP_TOOLS: McpTool[] = [
   getSigning,
   sendForSignatureTool,
   resendSigningRequestTool,
+  listInsurerOrders,
+  findOrderEmails,
+  createOrderFromEmail,
+  lodgeOrder,
 ]

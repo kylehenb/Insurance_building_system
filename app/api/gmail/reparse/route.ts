@@ -16,6 +16,7 @@ import { getUser } from '@/lib/supabase/get-user'
 import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const userSession = await getUser()
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
 
       const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_FLASH_MODEL,
         contents: parts,
         config: { systemInstruction: 'Extract claim data as JSON. Return only valid JSON.' },
       })

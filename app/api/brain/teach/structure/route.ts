@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { StructuredTeachOutput } from '@/types/brain'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
+    model: GEMINI_FLASH_MODEL,
     systemInstruction: STRUCTURE_SYSTEM_PROMPT,
   })
 
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
           tenant_id: tenantId,
           category: 'brain_teach',
           prompt_key: 'brain_structure',
-          model: 'gemini-3.5-flash',
+          model: GEMINI_FLASH_MODEL,
           created_by: user.id,
         }),
       })
