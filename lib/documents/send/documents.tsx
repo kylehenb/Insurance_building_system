@@ -5,7 +5,6 @@ import type { DocumentSendType } from '@/lib/email/templates'
 import { QuoteDocument } from '@/components/documents/QuoteDocument'
 import { ReportDocument } from '@/components/documents/ReportDocument'
 import { TccDocument } from '@/components/documents/TccDocument'
-import { PhotosDocument } from '@/components/documents/PhotosDocument'
 import { InvoiceDocument } from '@/components/documents/InvoiceDocument'
 import { renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
 import {
@@ -21,6 +20,7 @@ import {
 import {
   photosPdfFilename,
   quotePdfFilename,
+  renderPhotoPagesPdf,
   reportDocumentName,
   reportPdfFilename,
   tccPdfFilename,
@@ -246,7 +246,7 @@ export async function prepareDocument(ref: DocumentRef, ctx: PrintDataContext): 
         audience: 'insurer',
         vars: {},
         warnings: [],
-        render: () => renderPrintDocumentPdf(<PhotosDocument {...data} />, `Photos ${data.job.job_number}`),
+        render: () => renderPhotoPagesPdf(data),
       }
     }
   }

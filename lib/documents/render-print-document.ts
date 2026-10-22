@@ -51,13 +51,21 @@ async function fetchDataUri(url: string): Promise<string | null> {
   }
 }
 
+/** A photo ready to embed, with its size as displayed (orientation applied). */
+export interface PreparedPhoto {
+  src: string
+  width: number
+  height: number
+}
+
 /**
  * Shrinks large photos in a scratch Chromium page (no network, nothing but
- * this canvas code runs). Orientation is applied as the browser shows it.
- * Returns the originals if anything goes wrong.
+ * this canvas code runs) and measures them. Orientation is applied as the
+ * browser shows it, so width/height are the photo as seen. A photo that
+ * can't be decoded is returned as-is with no size (0 × 0).
  */
-async function downscalePhotos(dataUris: string[]): Promise<string[]> {
-  if (dataUris.length === 0) return dataUris
+async function preparePhotos(dataUris: string[]): Promise<PreparedPhoto[]> {
+  if (dataUris.length === 0) return []
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
@@ -66,14 +74,14 @@ async function downscalePhotos(dataUris: string[]): Promise<string[]> {
       if (request.url().startsWith('data:') || request.url() === 'about:blank') request.continue()
       else request.abort()
     })
-    const results: string[] = []
+    const results: PreparedPhoto[] = []
     for (const src of dataUris) {
       const out = await page.evaluate(async (s: string, maxPx: number, quality: number) => {
         const img = new Image()
         img.src = s
         await img.decode()
         const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight))
-        if (scale === 1 && s.length < 1_500_000) return s
+        if (scale === 1 && s.length < 1_500_000) return { src: s, width: img.naturalWidth, height: img.naturalHeight }
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(img.naturalWidth * scale)
         canvas.height = Math.round(img.naturalHeight * scale)
@@ -81,10 +89,10 @@ async function downscalePhotos(dataUris: string[]): Promise<string[]> {
         g.fillStyle = '#fff'
         g.fillRect(0, 0, canvas.width, canvas.height)
         g.drawImage(img, 0, 0, canvas.width, canvas.height)
-        return canvas.toDataURL('image/jpeg', quality)
+        return { src: canvas.toDataURL('image/jpeg', quality), width: canvas.width, height: canvas.height }
       }, src, MAX_PHOTO_PX, PHOTO_JPEG_QUALITY).catch(err => {
         console.error('[print-document] photo resize failed, using the original', err)
-        return src
+        return { src, width: 0, height: 0 }
       })
       results.push(out)
     }
@@ -92,6 +100,20 @@ async function downscalePhotos(dataUris: string[]): Promise<string[]> {
   } finally {
     await page.close().catch(() => undefined)
   }
+}
+
+/**
+ * Photos from the photos bucket, downloaded, shrunk and measured, in the
+ * order given. null where a photo couldn't be downloaded.
+ */
+export async function loadPhotoImages(storagePaths: string[]): Promise<(PreparedPhoto | null)[]> {
+  const prefix = storagePublicPrefix()
+  if (!prefix) return storagePaths.map(() => null)
+  const downloaded = await Promise.all(storagePaths.map(path =>
+    fetchDataUri(`${prefix}photos/${path.split('/').map(encodeURIComponent).join('/')}`)))
+  const prepared = await preparePhotos(downloaded.filter((v): v is string => !!v))
+  let next = 0
+  return downloaded.map(uri => (uri ? prepared[next++] : null))
 }
 
 /** Replaces every <img src> with a data: URI (public files, tenant logos, photos). */
@@ -117,8 +139,8 @@ export async function embedImages(html: string): Promise<string> {
   }))
 
   const photoUris = photoKeys.map(k => resolved.get(k)).filter((v): v is string => !!v)
-  const shrunk = await downscalePhotos(photoUris)
-  photoKeys.filter(k => resolved.get(k)).forEach((k, i) => resolved.set(k, shrunk[i]))
+  const shrunk = await preparePhotos(photoUris)
+  photoKeys.filter(k => resolved.get(k)).forEach((k, i) => resolved.set(k, shrunk[i].src))
 
   return html.replace(/ src="([^"]*)"/g, (match, raw: string) => {
     if (!resolved.has(raw)) return match
