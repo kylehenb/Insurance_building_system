@@ -87,6 +87,7 @@ describe('mcp route', () => {
       'list_insurer_orders', 'find_order_emails', 'create_order_from_email', 'lodge_order',
       'list_job_emails', 'get_email', 'reply_to_email',
       'read_email_attachment', 'save_email', 'link_email_to_job',
+      'recover_dropped_emails',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })

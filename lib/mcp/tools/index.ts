@@ -8,6 +8,7 @@ import { createOrderFromEmail, findOrderEmails, listInsurerOrders, lodgeOrder } 
 import { getEmail, listJobEmails, replyToEmailTool } from '@/lib/mcp/tools/emails'
 import { readEmailAttachment } from '@/lib/mcp/tools/attachments'
 import { linkEmailToJob, saveEmail } from '@/lib/mcp/tools/inbox'
+import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -33,4 +34,5 @@ export const MCP_TOOLS: McpTool[] = [
   readEmailAttachment,
   saveEmail,
   linkEmailToJob,
+  recoverDroppedEmails,
 ]

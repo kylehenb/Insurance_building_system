@@ -1,15 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI } from '@google/genai'
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 
 // Turns an email attachment into text someone can act on: a short summary of
 // what it is and what it asks for, then its full contents. PDFs (typed or
-// scanned) and images are read by Claude; text files are decoded as they
-// are. Used by the voice connector's read_email_attachment.
+// scanned) and images are read by Gemini Flash — the same model that reads
+// order emails; text files are decoded as they are. Used by the voice
+// connector's read_email_attachment.
 
-const MODEL = 'claude-opus-5-5'
-/** Claude's request limit is 32 MB; base64 adds a third */
-const MAX_PDF_BYTES = 22 * 1024 * 1024
-/** Per-image limit for Claude vision */
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+/** Gemini's inline request limit is 20 MB; base64 adds a third */
+const MAX_PDF_BYTES = 14 * 1024 * 1024
+const MAX_IMAGE_BYTES = 14 * 1024 * 1024
 /** Returned text is cut here so a voice tool result stays usable */
 const MAX_TEXT_CHARS = 30_000
 
@@ -25,7 +25,7 @@ export interface AttachmentFile {
 export interface AttachmentReading {
   text: string
   /** How it was read */
-  method: 'text' | 'claude'
+  method: 'text' | 'gemini'
   truncated: boolean
 }
 
@@ -79,44 +79,34 @@ function cut(text: string): { text: string; truncated: boolean } {
     : { text, truncated: false }
 }
 
-async function readWithClaude(file: AttachmentFile, kind: 'pdf' | 'image'): Promise<AttachmentReading> {
-  const data = file.data.toString('base64')
-  const source: Anthropic.Beta.BetaContentBlockParam = kind === 'pdf'
-    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
-    : { type: 'image', source: { type: 'base64', media_type: imageType(file), data } }
+async function readWithGemini(file: AttachmentFile, kind: 'pdf' | 'image'): Promise<AttachmentReading> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new AttachmentReadError('Attachments can\'t be read right now (GEMINI_API_KEY is not set).')
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  // Server-side fallback (beta): if the model declines, the API re-runs the
-  // request on a fallback model within the same call. The SDK version in use
-  // doesn't type these fields yet, hence the cast.
-  const response = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'low' },
-    system: SYSTEM,
-    messages: [{
-      role: 'user',
-      content: [source, { type: 'text', text: `Attachment file name: ${file.filename}` }],
-    }],
-  } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming)
-
-  if (response.stop_reason === 'refusal') {
-    throw new AttachmentReadError('The attachment could not be read (the AI declined it). Open it in the app instead.')
+  const ai = new GoogleGenAI({ apiKey })
+  let result
+  try {
+    result = await ai.models.generateContent({
+      model: GEMINI_FLASH_MODEL,
+      contents: [
+        { inlineData: { mimeType: kind === 'pdf' ? 'application/pdf' : imageType(file), data: file.data.toString('base64') } },
+        { text: `Attachment file name: ${file.filename}` },
+      ],
+      config: { systemInstruction: SYSTEM },
+    })
+  } catch (err) {
+    console.error(`[attachments] Gemini could not read ${file.filename}:`, err)
+    throw new AttachmentReadError(`${file.filename} couldn't be read just now. Try again, or open it in the app.`)
   }
-  const text = response.content
-    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-    .trim()
-  if (!text) throw new AttachmentReadError('Nothing could be read from the attachment.')
-  const result = cut(text)
-  const truncated = result.truncated || response.stop_reason === 'max_tokens'
+
+  const text = (result.text ?? '').trim()
+  if (!text) throw new AttachmentReadError(`Nothing could be read from ${file.filename}. Open it in the app instead.`)
+  const cutOff = result.candidates?.[0]?.finishReason === 'MAX_TOKENS'
+  const shown = cut(text)
   return {
-    text: response.stop_reason === 'max_tokens' ? `${result.text}\n… (the document is long — this is the first part)` : result.text,
-    method: 'claude',
-    truncated,
+    text: cutOff ? `${shown.text}\n… (the document is long — this is the first part)` : shown.text,
+    method: 'gemini',
+    truncated: shown.truncated || cutOff,
   }
 }
 
@@ -129,11 +119,11 @@ export async function readAttachment(file: AttachmentFile): Promise<AttachmentRe
   }
   if (kind === 'pdf') {
     if (file.data.length > MAX_PDF_BYTES) throw new AttachmentReadError(`${file.filename} is too large to read here (${(file.data.length / 1024 / 1024).toFixed(0)} MB). Open it in the app.`)
-    return readWithClaude(file, 'pdf')
+    return readWithGemini(file, 'pdf')
   }
   if (kind === 'image') {
     if (file.data.length > MAX_IMAGE_BYTES) throw new AttachmentReadError(`${file.filename} is too large to read here (${(file.data.length / 1024 / 1024).toFixed(1)} MB). Open it in the app.`)
-    return readWithClaude(file, 'image')
+    return readWithGemini(file, 'image')
   }
   throw new AttachmentReadError(`${file.filename} is a file type that can't be read here yet (only PDFs, images and text files). Open it in the app.`)
 }
