@@ -29,36 +29,25 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { randomUUID } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
-import { getFullMessage, extractMessageParts, type ExtractedMessage, type MessageAttachment } from '@/lib/gmail/messages'
+import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
-import { resolveCommunicationLink } from '@/lib/communications/resolve-link'
-import { linkThreadToJob, threadExists } from '@/lib/communications/thread-link'
+import { threadExists } from '@/lib/communications/thread-link'
 import { recordSentMessage } from '@/lib/communications/record-sent'
+import { insertLinkedCommunication, uploadAttachments, type StoredAttachment } from '@/lib/communications/inbound-email'
 
 export const maxDuration = 300
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
-
-// Extensions that are never stored regardless of MIME type
-const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.scr', '.js', '.jar', '.msi', '.cmd'])
-const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024 // 50 MB — matches job-files convention
 
 // Castle-specific claim number format (CHCCLM + digits).
 // Used as a corroborating signal in audit logging — not a gate. Won't generalise to
 // other insurer claim formats without extension.
 const CASTLE_CLAIM_RE = /\bCHCCLM\d+\b/i
 
-type StoredAttachment = {
-  filename: string
-  storage_path: string
-  mime_type: string
-  size_bytes: number
-}
 
 type SenderPattern = {
   type: 'domain' | 'email' | 'display_name'
@@ -189,131 +178,6 @@ function isOrderEmailByKeywords(subject: string, keywordRules: EmailKeywordRuleR
 
 function isOwnDomain(email: string): boolean {
   return email.toLowerCase().endsWith(`@${OUR_DOMAIN}`)
-}
-
-function sanitizeAttachmentName(filename: string): string {
-  return filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._\-]/g, '_')
-}
-
-function getExtension(filename: string): string {
-  const dot = filename.lastIndexOf('.')
-  return dot >= 0 ? filename.slice(dot).toLowerCase() : ''
-}
-
-async function uploadAttachments(
-  attachments: MessageAttachment[],
-  tenantId: string,
-  communicationId: string,
-  db: SupabaseClient,
-  msgId: string
-): Promise<StoredAttachment[]> {
-  const stored: StoredAttachment[] = []
-
-  for (const att of attachments) {
-    const ext = getExtension(att.filename)
-
-    if (BLOCKED_EXTENSIONS.has(ext)) {
-      console.warn(
-        `[email-inbound] BLOCKED executable attachment "${att.filename}" ext="${ext}" (msgId=${msgId}) — skipping`
-      )
-      continue
-    }
-
-    if (att.size > MAX_ATTACHMENT_BYTES) {
-      console.warn(
-        `[email-inbound] OVERSIZED attachment "${att.filename}" (${att.size}B > 50MB limit, msgId=${msgId}) — skipping`
-      )
-      continue
-    }
-
-    if (!att.data) {
-      console.warn(
-        `[email-inbound] attachment "${att.filename}" has no data (msgId=${msgId}) — skipping`
-      )
-      continue
-    }
-
-    const sanitized = sanitizeAttachmentName(att.filename)
-    const storagePath = `tenants/${tenantId}/comms/${communicationId}/${Date.now()}-${sanitized}`
-
-    try {
-      const bytes = Buffer.from(att.data, 'base64')
-      const { error: uploadErr } = await db.storage
-        .from('job-files')
-        .upload(storagePath, bytes, { contentType: att.mimeType })
-
-      if (uploadErr) {
-        console.error(
-          `[email-inbound] Storage upload FAILED for "${att.filename}" (msgId=${msgId}):`,
-          uploadErr
-        )
-        continue
-      }
-
-      stored.push({
-        filename: att.filename,
-        storage_path: storagePath,
-        mime_type: att.mimeType,
-        size_bytes: att.size,
-      })
-    } catch (err) {
-      console.error(
-        `[email-inbound] unexpected upload error for "${att.filename}" (msgId=${msgId}):`,
-        err
-      )
-    }
-  }
-
-  return stored
-}
-
-/**
- * Inserts an inbound (non-order) email as a communication, resolving its job
- * via thread → content match → unlinked/admin. When content matching links it,
- * earlier unlinked messages in the same thread are linked too.
- */
-async function insertLinkedCommunication(
-  db: SupabaseClient,
-  tenantId: string,
-  communicationId: string,
-  msg: ExtractedMessage,
-  storedAttachments: StoredAttachment[],
-): Promise<void> {
-  const link = await resolveCommunicationLink({
-    db,
-    tenantId,
-    threadId: msg.threadId || null,
-    subject: msg.subject,
-    body: msg.bodyText,
-    fromEmail: msg.fromEmail,
-  })
-
-  const { error } = await db.from('communications').insert({
-    id: communicationId,
-    tenant_id: tenantId,
-    job_id: link.job_id,
-    type: 'email',
-    direction: 'inbound',
-    subject: msg.subject,
-    content: msg.bodyText,
-    created_at: msg.receivedAt,
-    thread_id: msg.threadId,
-    from_email: msg.fromEmail,
-    to_email: msg.to,
-    body_text: msg.bodyText,
-    gmail_message_id: msg.gmailMessageId || null,
-    source: link.source,
-    match_candidates: link.match_candidates,
-    attachments: storedAttachments,
-  })
-  if (error) {
-    console.error(`[email-inbound] communications insert failed for ${msg.messageId}:`, error)
-    return
-  }
-
-  if (link.job_id && link.source === 'auto_linked') {
-    await linkThreadToJob(db, tenantId, msg.threadId, link.job_id)
-  }
 }
 
 type PubSubMessage = {
@@ -575,6 +439,11 @@ async function processWebhook(body: PubSubBody): Promise<void> {
             // Register this thread so subsequent messages in the same batch
             // are routed to communications rather than re-entering the order pipeline.
             if (msg.threadId) processedOrderThreadIds.add(msg.threadId)
+          } else {
+            // Matched an order rule but isn't a new order (a remittance advice,
+            // a reply on an authorised job…): keep it on the comms log, linked
+            // to its job, rather than dropping it.
+            await insertLinkedCommunication(rawDb, tenantId, communicationId, msg, storedAttachments)
           }
         } catch (err) {
           console.error(`[email-inbound] order pipeline error for ${msgId}:`, err)

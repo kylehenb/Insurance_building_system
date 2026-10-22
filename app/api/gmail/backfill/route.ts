@@ -285,8 +285,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           const orderId = await writeInsurerOrder(parsed, msg, tenantId)
           if (orderId) {
             await sendOrderNotification(orderId, parsed, msg, tenantId)
+            results.push({ messageId: msgId, status: 'order', detail: orderId })
+          } else {
+            // Not a new order — keep it on the comms log, as the webhook does
+            const link = await insertBackfillCommunication(rawDb, tenantId, msg)
+            results.push({ messageId: msgId, status: link.job_id ? 'linked' : 'unlinked', detail: link.job_id ?? undefined })
           }
-          results.push({ messageId: msgId, status: 'order', detail: orderId ?? undefined })
         } catch (err) {
           console.error(`[gmail-backfill] order pipeline error for ${msgId}:`, err)
           results.push({ messageId: msgId, status: 'error', detail: String(err) })

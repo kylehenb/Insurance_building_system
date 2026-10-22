@@ -2022,6 +2022,7 @@ The dashboard (`/dashboard`) is the primary work surface for office-based users.
 - Manual order entry form exists for after-hours phone intake
 - Auto Job Lodger parses emails via Gemini Flash; human review required until near-100% accuracy
 - If the Gemini call fails, `parseInsurerOrder` throws (it does not report "not a new order"): the inbound webhook then writes a `needs_review` order with the subject and Gmail link, the poller labels the email failed, and backfill records an error. A genuine "not a new order" is logged to `ai_audit` (`prompt_key='email_order_parser'`, `outcome='rejected'`) with Gemini's reasoning — check there first when an order email "wasn't picked up"
+- An email that matches an order rule but Gemini says is not a new order (remittance advice, replies on authorised jobs…) is saved to the comms log and linked to its job like any other inbound email (`insertLinkedCommunication`), instead of being dropped as it was before 23 Oct 2026; backfill does the same
 - Lodging (Lodge button, and the voice connector's `lodge_order`) is `lodgeInsurerOrder` in `lib/insurer-orders/lodge.ts`; `app/api/insurer-orders/lodge` only maps its `LodgeError`s to responses
 - Geographic flagging (outside service area) is primary rejection case — automatable future
 - Insurer portal double-entry problem noted (Axiom compatibility issue flagged)
@@ -2609,6 +2610,9 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `list_job_emails(job_number?, limit?)` | read | — | A job's latest emails (both directions) with the new text up to the quoted earlier message; without a job, incoming emails not on a job (last 14 days) |
 | `get_email(email_id)` | read | — | One email in full (6,000 chars), with attachments |
 | `reply_to_email(email_id, body, send_anyway?)` | send | `replyToEmail` | Same as the Reply box (`lib/communications/reply.ts`): same thread, Re: subject, In-Reply-To, office From, `manual_reply` comms row. Incoming emails only; the same text on the same conversation within 10 minutes is refused unless `send_anyway: true` |
+| `read_email_attachment(email_id? \| message_id?, attachment?)` | read | `readAttachment` (`lib/attachments/read.ts`) | PDFs (typed or scanned) and images are read by Claude (`claude-opus-5-5`, effort low, server-side fallback) into "Summary:" + "Contents:" text; text/HTML/CSV decoded locally; Word/Excel not yet. Stored copy (`job-files`) first, else Gmail (`rfc822msgid:` lookup). Several attachments and none named → returns the list to ask. PDF ≤ 22 MB, image ≤ 5 MB, text cut at 30k chars |
+| `save_email(message_id, job_number?)` | change | `uploadAttachments`, `insertLinkedCommunication` (`lib/communications/inbound-email.ts`), `linkThreadToJob` | Saves an inbox email the app never recorded, with attachments, matched to its job as the webhook does (or to `job_number`). Already saved → says where (moves it if `job_number` given). Not for our own emails |
+| `link_email_to_job(email_id, job_number)` | change | `linkThreadToJob` | The unlinked inbox's "Link to job": sets the email's job, clears match candidates, links the rest of the thread |
 
 ### Planned
 1. Inspection confirm/reschedule, job stage, accounting sync, editing an insurer order (e.g. adding a missing claim number), linking an order to an existing job
