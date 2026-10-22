@@ -2595,9 +2595,14 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `list_job_documents(job_number)` | read | `listJobDocuments`, `quoteDocumentTotal` | The send dialog's own list (active quote versions, undeleted reports, unvoided outbound invoices) with status, amount and created date; the job's photo count; the last 5 document emails (from `communications`, `source='document_send'`) |
 | `get_document_email(documents[])` | read | `buildDocumentEmailDraft` | Recipients (insurer routing, or the insured for an excess invoice), subject/body from the template, attachments, the app's warnings, plus "already emailed on … to …" for any attachment sent in the last 60 days, and other documents that could go in the same email |
 | `send_documents(documents[], to?, cc?, subject?, body?, resend?)` | send | `sendDocumentEmail` | Same send as the job's Send: PDFs, comms record, documents marked sent (invoices pushed to accounting). Re-sending is allowed, but the same documents to an overlapping recipient within 10 minutes are refused as a likely retry unless `resend: true` |
+| `get_job_excess(job_number)` | read | `loadExcessContext`, `excessInvoiceStatusLine` | Amount on file, the office's decision (with note, when and who), excess invoices and whether paid |
+| `set_job_excess_decision(job_number, decision, note?)` | change | `recordExcessDecision` | `nil` or a waiver reason (`cash_settlement`, `insurer_waived`, `already_paid`, `other`), as the Excess panel allows. `collect` is recorded by raising an excess invoice (e.g. via `send_for_signature`). Insurance jobs only |
+| `get_signing(job_number)` | read | `listSigningRequestsForJob`, `getSendDialogDefaults` | Each request (document, signer, sent/opened/signed/expired, reminders) and what a new send would use: approved quotes, suggested document (threshold), signer, job stage, and the excess options to ask about |
+| `send_for_signature(job_number, document_type?, quote_ids?, signer_*?, excess?, reminders?, move_job_to_awaiting_stage?, send_anyway?)` | send | `sendForSignature` | Send for Signature dialog defaults (suggested quotes and type, signer, reminders on, stage move only at `approved_awaiting_signoff`). Insurance jobs need an `ExcessChoice` (`parseExcessChoice`); without one the tool returns the excess question. A second request for a document that's still `sent`/`viewed` is refused unless `send_anyway: true` |
+| `resend_signing_request(request_id)` | send | `resendSigningRequest` | Fresh link (old one stops working), excess invoice re-attached if it went originally |
 
 ### Planned
-1. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
+1. Email replies (with a job emails read tool), inspection confirm/reschedule, job stage, accounting sync
 2. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
 
 ---

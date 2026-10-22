@@ -34,8 +34,8 @@ const nextConfig: NextConfig = {
     // Quotes, reports, invoices, TCC and photos emailed from a job, and their preview
     "/api/documents/send": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     "/api/documents/pdf": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
-    // Voice connector: send_work_order renders the work order and photos PDFs
-    "/api/mcp": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
+    // Voice connector: work order, document and signing PDFs (signing also runs pdf.js)
+    "/api/mcp": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES, ...PDFJS_FILES],
   },
   outputFileTracingExcludes: {
     "/api/work-orders/\\[id\\]/pdf": NO_FULL_PUPPETEER,

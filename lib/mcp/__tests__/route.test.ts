@@ -82,6 +82,8 @@ describe('mcp route', () => {
     expect(body.result.tools.map(t => t.name)).toEqual([
       'find_work_orders', 'get_work_order_email', 'send_work_order',
       'list_job_documents', 'get_document_email', 'send_documents',
+      'get_job_excess', 'set_job_excess_decision',
+      'get_signing', 'send_for_signature', 'resend_signing_request',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })
