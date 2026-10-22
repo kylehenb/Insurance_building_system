@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import { PrivateJobPill } from '@/components/jobs/PrivateJobPill'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import ContactsEditor from '@/components/contacts/ContactsEditor'
 import InsurerEmailFields from '@/components/contacts/InsurerEmailFields'
@@ -23,6 +24,7 @@ type JobHit = {
   insured_name: string | null
   property_address: string | null
   claim_number: string | null
+  job_type: string | null
 }
 
 type LearningPromptState = {
@@ -408,7 +410,7 @@ function InsurerOrdersPageContent() {
     const term = linkSearch.trim()
     searchTimer.current = setTimeout(async () => {
       const { data } = await supabase
-        .from('jobs').select('id, job_number, insured_name, property_address, claim_number')
+        .from('jobs').select('id, job_number, insured_name, property_address, claim_number, job_type')
         .eq('tenant_id', tenantId)
         .or(`job_number.ilike.%${term}%,claim_number.ilike.%${term}%`)
         .limit(5)
@@ -1371,6 +1373,7 @@ function InsurerOrdersPageContent() {
                                               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#c8b89a', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                                 {job.job_number}
                                               </span>
+                                              <PrivateJobPill jobType={job.job_type} />
                                               <span style={{ fontSize: 13, color: '#3a3530' }}>{job.insured_name ?? '—'}</span>
                                               <span style={{ fontSize: 12, color: '#b0a898', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
                                                 {job.property_address ?? ''}

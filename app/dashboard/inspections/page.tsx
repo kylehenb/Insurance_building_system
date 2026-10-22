@@ -3,11 +3,12 @@ import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { PrivateJobPill } from "@/components/jobs/PrivateJobPill";
 
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
 
 type InspectionWithRelations = InspectionRow & {
-  jobs: { job_number: string; insurer: string | null } | null;
+  jobs: { job_number: string; insurer: string | null; job_type: string | null } | null;
   users: { name: string } | null;
 };
 
@@ -102,7 +103,7 @@ async function InspectionsListPage() {
     .from("inspections")
     .select(
       `id, inspection_ref, scheduled_date, status, scope_status, report_status, created_at,
-       jobs!job_id(job_number, insurer),
+       jobs!job_id(job_number, insurer, job_type),
        users!inspector_id(name)`
     )
     .eq("tenant_id", tenant_id as string)
@@ -190,7 +191,8 @@ async function InspectionsListPage() {
                         <td className="whitespace-nowrap px-6 py-4">
                           <span className="text-sm text-[#1a1a1a]/70">
                             {insp.jobs?.job_number ?? "-"}
-                          </span>
+                          </span>{" "}
+                          <PrivateJobPill jobType={insp.jobs?.job_type} />
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
                           <span className="text-sm text-[#1a1a1a]/70">

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import { PrivateJobPill } from '@/components/jobs/PrivateJobPill'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +17,7 @@ interface SearchResult {
   job_number: string
   property_address: string | null
   insured_name: string | null
+  job_type: string | null
 }
 
 interface User {
@@ -82,7 +84,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
       debounceRef.current = setTimeout(async () => {
         const { data } = await supabase
           .from('jobs')
-          .select('id, job_number, property_address, insured_name')
+          .select('id, job_number, property_address, insured_name, job_type')
           .eq('tenant_id', tenantId)
           .or(
             `job_number.ilike.%${val}%,claim_number.ilike.%${val}%,insured_name.ilike.%${val}%,property_address.ilike.%${val}%,insurer.ilike.%${val}%`
@@ -233,7 +235,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
         .sd-item { padding: 9px 11px; cursor: pointer; border-bottom: 0.5px solid #262626; transition: background 0.15s; }
         .sd-item:last-child { border-bottom: none; }
         .sd-item:hover { background: #252525; }
-        .sd-job { font-size: 12px; font-weight: 600; color: #c8b89a; font-family: 'DM Mono', monospace; }
+        .sd-job { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #c8b89a; font-family: 'DM Mono', monospace; }
         .sd-addr { font-size: 12px; color: #888; margin-top: 2px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sb-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
         .sb-nav::-webkit-scrollbar { width: 2px; }
@@ -303,7 +305,10 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
           <div className={`search-drop${dropOpen && results.length > 0 ? ' open' : ''}`}>
             {results.map((r) => (
               <div key={r.id} className="sd-item" onMouseDown={() => selectResult(r.id)}>
-                <div className="sd-job">{r.job_number}</div>
+                <div className="sd-job">
+                  {r.job_number}
+                  <PrivateJobPill jobType={r.job_type} tone="dark" />
+                </div>
                 <div className="sd-addr">{r.property_address ?? '—'}</div>
               </div>
             ))}

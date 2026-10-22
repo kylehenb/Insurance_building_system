@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
+import { PrivateJobPill } from '@/components/jobs/PrivateJobPill'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
@@ -13,6 +14,7 @@ type JobHit = {
   insured_name: string | null
   property_address: string | null
   claim_number: string | null
+  job_type: string | null
 }
 type Sheet = 'lodge' | 'reject' | 'link' | null
 
@@ -112,7 +114,7 @@ export default function MobileOrderReview({
     const term = linkSearch.trim()
     searchTimer.current = setTimeout(async () => {
       const { data } = await supabase
-        .from('jobs').select('id, job_number, insured_name, property_address, claim_number')
+        .from('jobs').select('id, job_number, insured_name, property_address, claim_number, job_type')
         .eq('tenant_id', order.tenant_id)
         .or(`job_number.ilike.%${term}%,claim_number.ilike.%${term}%`)
         .limit(8)
@@ -380,7 +382,10 @@ export default function MobileOrderReview({
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 600, color: C.green }}>{job.job_number}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 600, color: C.green }}>{job.job_number}</span>
+                          <PrivateJobPill jobType={job.job_type} />
+                        </span>
                         <span style={{ fontFamily: mono, fontSize: 13, color: C.muted }}>{job.claim_number ?? ''}</span>
                       </div>
                       <div style={{ fontSize: 15, color: C.text, marginTop: 2 }}>{job.insured_name ?? '—'}</div>

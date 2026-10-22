@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { PrivateJobPill } from '@/components/jobs/PrivateJobPill'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +23,7 @@ interface InvoiceRow {
   created_at: string | null
   job_number?: string
   insurer?: string | null
+  job_type?: string | null
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -78,7 +80,7 @@ export default function InvoicesPage() {
     try {
       let query = supabase
         .from('invoices')
-        .select('id, invoice_ref, invoice_type, direction, status, amount_inc_gst, issued_date, job_id, tenant_id, created_at, jobs(job_number, insurer)')
+        .select('id, invoice_ref, invoice_type, direction, status, amount_inc_gst, issued_date, job_id, tenant_id, created_at, jobs(job_number, insurer, job_type)')
         .eq('tenant_id', tenantId)
         .eq('direction', 'outbound')
         .order('created_at', { ascending: false })
@@ -106,6 +108,7 @@ export default function InvoicesPage() {
           created_at: row.created_at as string | null,
           job_number: (job as { job_number?: string } | null)?.job_number,
           insurer: (job as { insurer?: string | null } | null)?.insurer,
+          job_type: (job as { job_type?: string | null } | null)?.job_type,
         }
       })
       setInvoices(rows)
@@ -239,6 +242,7 @@ export default function InvoicesPage() {
                         >
                           {inv.job_number ?? '—'}
                         </span>
+                        {' '}<PrivateJobPill jobType={inv.job_type} />
                       </td>
                       <td>{inv.insurer ?? '—'}</td>
                       <td>

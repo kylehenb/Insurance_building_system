@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import type { JobCandidate } from '@/lib/communications/match-job'
+import { PrivateJobPill } from '@/components/jobs/PrivateJobPill'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 
 const supabase = createBrowserClient<Database>(
@@ -30,6 +31,7 @@ interface FlaggedJob {
   property_address: string | null
   insured_name: string | null
   insurer: string | null
+  job_type: string | null
   override_stage: 'on_hold' | 'cancelled' | null
   current_stage: string | null
   action_count: number
@@ -39,6 +41,7 @@ interface ActionCard {
   id: string
   job_id: string
   job_number: string
+  job_type: string | null
   rule_key: string
   title: string
   description: string | null
@@ -63,7 +66,7 @@ interface UnlinkedComm {
   from_email: string | null
   contact_name: string | null
   created_at: string | null
-  match_candidates: JobCandidate[] | null
+  match_candidates: (JobCandidate & { job_type?: string | null })[] | null
   source: string | null
 }
 
@@ -73,6 +76,7 @@ interface JobSearchHit {
   insured_name: string | null
   property_address: string | null
   claim_number: string | null
+  job_type: string | null
 }
 
 // ── WMO weather codes ────────────────────────────────────────────────────────
@@ -249,7 +253,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     const { data } = await supabase
       .from('job_flags')
-      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage, current_stage)`)
+      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, job_type, override_stage, current_stage)`)
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .limit(20)
@@ -273,6 +277,7 @@ export default function DashboardPage() {
           property_address: job.property_address,
           insured_name: job.insured_name,
           insurer: job.insurer,
+          job_type: job.job_type ?? null,
           override_stage: job.override_stage ?? null,
           current_stage: job.current_stage ?? null,
           action_count: count ?? 0,
@@ -286,7 +291,7 @@ export default function DashboardPage() {
     if (!tenantId) return
     const { data } = await supabase
       .from('action_queue')
-      .select(`*, jobs (job_number, property_address, insured_name)`)
+      .select(`*, jobs (job_number, property_address, insured_name, job_type)`)
       .eq('tenant_id', tenantId)
       .eq('status', 'pending')
       .order('priority', { ascending: true })
@@ -297,6 +302,7 @@ export default function DashboardPage() {
       id: row.id,
       job_id: row.job_id,
       job_number: row.jobs?.job_number ?? '',
+      job_type: row.jobs?.job_type ?? null,
       rule_key: row.rule_key,
       title: row.title,
       description: row.description,
@@ -339,8 +345,25 @@ export default function DashboardPage() {
       source: row.source,
     })
 
-    if (data) setUnlinkedComms(data.map(toComm))
-    if (adminData) setAdminComms(adminData.map(toComm))
+    // Stored match candidates don't carry job_type — look it up so private
+    // jobs can be marked in the suggestions.
+    const candidateIds = [...new Set(
+      [...(data ?? []), ...(adminData ?? [])].flatMap(row =>
+        ((row.match_candidates as JobCandidate[] | null) ?? []).map(c => c.job_id))
+    )]
+    const jobTypes = new Map<string, string | null>()
+    if (candidateIds.length > 0) {
+      const { data: typeRows } = await supabase
+        .from('jobs').select('id, job_type').in('id', candidateIds)
+      for (const r of typeRows ?? []) jobTypes.set(r.id, r.job_type)
+    }
+    const withJobTypes = (comm: UnlinkedComm): UnlinkedComm => ({
+      ...comm,
+      match_candidates: comm.match_candidates?.map(c => ({ ...c, job_type: jobTypes.get(c.job_id) ?? null })) ?? null,
+    })
+
+    if (data) setUnlinkedComms(data.map(toComm).map(withJobTypes))
+    if (adminData) setAdminComms(adminData.map(toComm).map(withJobTypes))
   }
 
   // ── Unlinked inbox ───────────────────────────────────────────────────────────
@@ -352,7 +375,7 @@ export default function DashboardPage() {
     linkSearchTimer.current = setTimeout(async () => {
       const { data } = await supabase
         .from('jobs')
-        .select('id, job_number, insured_name, property_address, claim_number')
+        .select('id, job_number, insured_name, property_address, claim_number, job_type')
         .eq('tenant_id', tenantId)
         .or(`job_number.ilike.%${term}%,claim_number.ilike.%${term}%,insured_name.ilike.%${term}%,property_address.ilike.%${term}%`)
         .limit(5)
@@ -658,7 +681,7 @@ export default function DashboardPage() {
         .aq-type { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #c8b89a; margin-bottom: 4px; font-weight: 400; }
         .aq-title { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 4px; line-height: 1.3; }
         .aq-desc { font-size: 12px; color: #7a7167; line-height: 1.55; font-weight: 300; }
-        .aq-meta { display: flex; gap: 12px; margin-top: 8px; }
+        .aq-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
         .aq-job { font-family: 'DM Mono', monospace; font-size: 10px; color: #c8b89a; }
         .aq-age { font-size: 10px; color: #c8c0b8; font-weight: 300; }
         .aq-right { padding: 15px 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -924,7 +947,10 @@ export default function DashboardPage() {
                             <span className="row-badge amber">{job.action_count}</span>
                           )}
                         </td>
-                        <td><span className="jnum">{job.job_number}</span></td>
+                        <td>
+                          <span className="jnum">{job.job_number}</span>
+                          {' '}<PrivateJobPill jobType={job.job_type} />
+                        </td>
                         <td>{job.property_address ?? '—'}</td>
                         <td>{job.insured_name ?? '—'}</td>
                         <td>{job.insurer ?? '—'}</td>
@@ -1057,6 +1083,7 @@ export default function DashboardPage() {
                               onClick={() => linkCommToJob(comm.id, c.job_id)}
                             >
                               <span className="ui-sug-num">{c.job_number}</span>
+                              <PrivateJobPill jobType={c.job_type} />
                               <span className="ui-sug-name">
                                 {c.insured_name ?? c.property_address ?? c.job_number}
                               </span>
@@ -1101,6 +1128,7 @@ export default function DashboardPage() {
                               onClick={() => linkCommToJob(comm.id, job.id)}
                             >
                               <span className="ui-result-num">{job.job_number}</span>
+                              <PrivateJobPill jobType={job.job_type} />
                               <span className="ui-result-name">{job.insured_name ?? '—'}</span>
                               <span className="ui-result-addr">{job.property_address ?? ''}</span>
                             </button>
@@ -1183,6 +1211,7 @@ export default function DashboardPage() {
                         <div className="aq-desc">{card.description}</div>
                         <div className="aq-meta">
                           <span className="aq-job">{card.job_number}</span>
+                          <PrivateJobPill jobType={card.job_type} />
                           <span className="aq-age">{timeAgo(card.created_at)}</span>
                         </div>
                       </div>
