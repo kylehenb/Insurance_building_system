@@ -108,7 +108,8 @@ export const sendWorkOrder: McpTool = {
     'ONLY call this after get_work_order_email, once you have read back the trade, recipient, amount and any warnings',
     'and the user has clearly said yes. Leave out body and subject to send the standard email.',
     'If the trade has no email address, ask the user who to send it to and pass it as to.',
-    'Call it once per confirmed request — if it returns an error, tell the user what it says instead of retrying.',
+    'One call sends one work order; to send several, read them all back together, get one yes, then call it once for each.',
+    'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
   inputSchema: {
     type: 'object',

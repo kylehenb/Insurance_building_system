@@ -30,7 +30,10 @@ describe('mcp server', () => {
 
   it('calls a tool and returns text plus data', async () => {
     const res = await call('tools/call', { name: 'echo', arguments: { x: 7 } })
-    expect(res).toMatchObject({ result: { content: [{ type: 'text', text: 'got 7' }], structuredContent: { x: 7 }, isError: false } })
+    // The data is repeated as text for clients that only show the model text
+    expect(res).toMatchObject({
+      result: { content: [{ type: 'text', text: 'got 7' }, { type: 'text', text: '{"x":7}' }], structuredContent: { x: 7 }, isError: false },
+    })
     expect(echo.run).toHaveBeenCalledWith({ x: 7 }, ctx)
   })
 
@@ -38,6 +41,7 @@ describe('mcp server', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await call('tools/call', { name: 'broken' }) as { result: { isError: boolean; content: { text: string }[] } }
     expect(res.result.isError).toBe(true)
+    expect(res.result.content).toHaveLength(1)
     expect(res.result.content[0].text).toMatch(/Check the app/)
   })
 

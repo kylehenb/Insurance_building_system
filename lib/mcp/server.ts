@@ -110,7 +110,12 @@ export async function handleMcpMessage(
       return {
         jsonrpc: '2.0', id,
         result: {
-          content: [{ type: 'text', text: out.text }],
+          // The data goes in a text block too: some clients (claude.ai) only
+          // show the model the text, and the ids live in the data.
+          content: [
+            { type: 'text', text: out.text },
+            ...(out.data ? [{ type: 'text', text: JSON.stringify(out.data) }] : []),
+          ],
           ...(out.data ? { structuredContent: out.data } : {}),
           isError: !!out.isError,
         },
