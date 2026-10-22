@@ -2567,6 +2567,37 @@ Electronic Transactions Act 2011 (WA): consent, identification method and reliab
 
 ---
 
+## 10b. Voice Connector (Claude MCP)
+
+Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a custom connector. Claude handles the conversation (asking which job or trade, passing on warnings, confirming before a send); the connector gives it facts and does the action with the app's own code.
+
+### How it's built
+- Route: `POST /api/mcp/[secret]` (`app/api/mcp/[secret]/route.ts`) — MCP over Streamable HTTP, stateless, JSON responses. `GET`/`DELETE` → 405. Public in `proxy.ts`; the route checks the secret itself
+- Protocol: `lib/mcp/server.ts` (`initialize`, `ping`, `tools/list`, `tools/call`; no SDK dependency). `SERVER_INSTRUCTIONS` there tells Claude to keep answers voice-friendly, ask when ambiguous, pass on warnings and confirm before any send or change
+- Auth: `lib/mcp/auth.ts`. The connector URL is `https://<app>/api/mcp/<MCP_CONNECTOR_SECRET>` (claude.ai connectors take OAuth or no auth; a secret URL is enough while there is one user). Wrong or missing secret → 404. The connector acts as `MCP_USER_ID`; its `tenant_id` scopes every query. Uses the service client, so every query must filter `tenant_id`
+- Tools: `lib/mcp/tools/*.ts`, registered in `lib/mcp/tools/index.ts`. Tests in `lib/mcp/__tests__/`
+- Setup: set `MCP_CONNECTOR_SECRET` (32+ random characters, e.g. `openssl rand -hex 32`) and `MCP_USER_ID` in Vercel, deploy, then claude.ai → Settings → Connectors → Add custom connector with the URL. Rotate by changing the secret and re-adding the connector. The secret appears in Vercel request logs — treat log access accordingly
+
+### Rules for tools
+- A tool only calls shared `lib/` functions — the same ones the app's buttons use. No business logic in the tool (e.g. "sent" is `woIsSent`, the amount is `workOrderAmountFor`)
+- Read tools return warnings for the things a person would want flagged (no email address, $0 amount, already sent)
+- Tools that send or change things: annotated `destructiveHint`, refuse what the app would refuse (already sent, no recipient), and their description tells Claude to read back and get a clear yes first
+- No delete tools
+- When a function, status value, template behaviour or table a tool depends on changes, update the tool and its description in the same change (see AGENTS.md)
+
+### Tools
+| Tool | Type | Calls | Notes |
+|---|---|---|---|
+| `find_work_orders(job_number?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders. Without: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
+
+### Planned
+1. Work order send: `get_work_order_email` (`buildWorkOrderEmailDraft`) and `send_work_order` (`sendWorkOrderEmail`, optional body/recipient/photos). Before it ships, make `sendWorkOrderEmail` claim the work order (guarded update off `not_started`) before emailing, so two near-simultaneous sends can't both go
+2. Documents: `list_job_documents`, `preview_document_email` (`buildDocumentEmailDraft`), `send_documents` (`sendDocumentEmail`) — quotes, reports, invoices, excess invoices, TCC, photos
+3. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
+4. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
+
+---
+
 ## 11. AI Features
 
 ### Scope parsing
@@ -2741,6 +2772,10 @@ TWILIO_FROM_NUMBER=
 # Google Maps
 GOOGLE_MAPS_API_KEY=               # Used for trade proximity calculation (Distance Matrix API)
 
+# Claude voice connector (§10b) — leave unset to keep the connector off
+MCP_CONNECTOR_SECRET=              # 32+ random characters; the connector URL is /api/mcp/<this>
+MCP_USER_ID=                       # users.id the connector acts as (its tenant scopes every query)
+
 # App
 NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead
 ```
@@ -2756,6 +2791,8 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 **Supabase service role key:** Never exposed to the browser. Used only in Next.js API routes (server-side). The anon key is safe to expose — RLS enforces all access control.
 
 **Signed URLs:** See Section 5 for signed URL architecture. Never store signed URLs in the database — they are ephemeral.
+
+**Claude voice connector:** the URL secret is the only credential — whoever has the URL can act as `MCP_USER_ID`. See §10b.
 
 **Prompt injection:** See WF-9 for the two-layer defence model applied to all inbound email and SMS parsing.
 

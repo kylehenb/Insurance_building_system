@@ -181,10 +181,7 @@ export async function loadWorkOrderPdfData(
     }
   }
 
-  // Agreed amount when set; otherwise the work order's own items at the quoted
-  // (approved) price — the same fallback as the Work Orders tab Override column.
-  const amount = workOrder.agreed_amount ?? lineItemsTotal
-  const workOrderAmount = workOrder.agreed_amount != null || amount > 0 ? amount : null
+  const workOrderAmount = workOrderAmountFrom(workOrder, lineItemsTotal)
 
   return {
     workOrder,
@@ -202,6 +199,20 @@ export async function loadWorkOrderPdfData(
     fontFaceCss: await loadArialMetricFontCss(),
     generatedAt: new Date(),
   }
+}
+
+// Agreed amount when set; otherwise the work order's own items at the quoted
+// (approved) price — the same fallback as the Work Orders tab Override column.
+// Null when there is nothing to show.
+function workOrderAmountFrom(wo: WorkOrder, lineItemsTotal: number): number | null {
+  const amount = wo.agreed_amount ?? lineItemsTotal
+  return wo.agreed_amount != null || amount > 0 ? amount : null
+}
+
+/** The amount the work order PDF shows, for callers that only need the figure. */
+export function workOrderAmountFor(wo: WorkOrder, trade: Trade | null, quoteScopeItems: ScopeItem[]): number | null {
+  const owned = resolveOwnedScopeItems({ id: wo.id, tradeLabel: tradeLabelFor(wo, trade) || null }, quoteScopeItems)
+  return workOrderAmountFrom(wo, buildWODisplayItems(owned, wo.notes).lineItemsTotal)
 }
 
 function filenamePart(value: string | null | undefined): string {
