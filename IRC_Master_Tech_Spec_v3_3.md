@@ -2573,7 +2573,7 @@ Electronic Transactions Act 2011 (WA): consent, identification method and reliab
 Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a custom connector. Claude handles the conversation (asking which job or trade, passing on warnings, confirming before a send); the connector gives it facts and does the action with the app's own code.
 
 ### How it's built
-- Route: `POST /api/mcp` (`app/api/mcp/route.ts`) — MCP over Streamable HTTP, stateless, JSON responses. `GET`/`DELETE` → 405. Public in `proxy.ts`; the route checks the key itself
+- Route: `POST /api/mcp` (`app/api/mcp/route.ts`) — MCP over Streamable HTTP, stateless, JSON responses. `maxDuration = 120` (document sends render several PDFs); Chromium and the PDF images are traced into it in `next.config.ts`. `GET`/`DELETE` → 405. Public in `proxy.ts`; the route checks the key itself
 - Protocol: `lib/mcp/server.ts` (`initialize`, `ping`, `tools/list`, `tools/call`; no SDK dependency). A tool result is a spoken-style summary plus its data; the data is sent both as `structuredContent` and as a JSON text block, because claude.ai only shows the model the text (ids such as `work_order_id` must reach it). `SERVER_INSTRUCTIONS` there tells Claude to keep answers voice-friendly, ask when ambiguous, pass on warnings and confirm before any send or change
 - Auth: `lib/mcp/auth.ts`. claude.ai sends the key as a request header, `Authorization: Bearer <MCP_CONNECTOR_SECRET>` (a bare key is also accepted); a header stays out of request logs, unlike a secret in the URL. Missing or wrong key → 401, with the reason (never the key) in the Vercel logs. Env values are trimmed. The connector acts as `MCP_USER_ID`; its `tenant_id` scopes every query. Uses the service client, so every query must filter `tenant_id`
 - Tools: `lib/mcp/tools/*.ts`, registered in `lib/mcp/tools/index.ts`. Tests in `lib/mcp/__tests__/`
@@ -2592,11 +2592,13 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `find_work_orders(job_number?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders. Without: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
 | `get_work_order_email(work_order_id)` | read | `buildWorkOrderEmailDraft` | Recipient, amount, warnings, attachments (WO PDF + photos PDF), standard subject/body from the tenant template. Already sent → says it can't be sent again |
 | `send_work_order(work_order_id, to?, subject?, body?, include_photos?)` | send | `sendWorkOrderEmail` | Same send as Auto/Customise send: PDF + photos, communications row, Gary hand-off. Refuses an already-sent work order (409). One work order per call; several can be confirmed with one yes. Description requires a read-back first, and no retry on error |
+| `list_job_documents(job_number)` | read | `listJobDocuments`, `quoteDocumentTotal` | The send dialog's own list (active quote versions, undeleted reports, unvoided outbound invoices) with status, amount and created date; the job's photo count; the last 5 document emails (from `communications`, `source='document_send'`) |
+| `get_document_email(documents[])` | read | `buildDocumentEmailDraft` | Recipients (insurer routing, or the insured for an excess invoice), subject/body from the template, attachments, the app's warnings, plus "already emailed on … to …" for any attachment sent in the last 60 days, and other documents that could go in the same email |
+| `send_documents(documents[], to?, cc?, subject?, body?, resend?)` | send | `sendDocumentEmail` | Same send as the job's Send: PDFs, comms record, documents marked sent (invoices pushed to accounting). Re-sending is allowed, but the same documents to an overlapping recipient within 10 minutes are refused as a likely retry unless `resend: true` |
 
 ### Planned
-1. Documents: `list_job_documents`, `preview_document_email` (`buildDocumentEmailDraft`), `send_documents` (`sendDocumentEmail`) — quotes, reports, invoices, excess invoices, TCC, photos
-2. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
-3. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
+1. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
+2. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
 
 ---
 

@@ -10,7 +10,8 @@ import { MCP_TOOLS } from '@/lib/mcp/tools'
 // GET and DELETE are 405 as the spec allows. A missing or wrong key is 401.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+// Document sends can render several PDFs — same limit as /api/documents/send
+export const maxDuration = 120
 
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: HEADERS })

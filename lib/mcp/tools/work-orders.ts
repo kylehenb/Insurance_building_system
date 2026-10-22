@@ -10,7 +10,7 @@ import { tradeLabelFor, workOrderAmountFor } from '@/lib/work-orders/work-order-
 type WorkOrder = Database['public']['Tables']['work_orders']['Row']
 type Trade = Database['public']['Tables']['trades']['Row']
 type ScopeItem = Database['public']['Tables']['scope_items']['Row']
-type Job = Pick<Database['public']['Tables']['jobs']['Row'], 'id' | 'job_number' | 'property_address' | 'insured_name'>
+export type Job = Pick<Database['public']['Tables']['jobs']['Row'], 'id' | 'job_number' | 'property_address' | 'insured_name'>
 
 const TIME_ZONE = 'Australia/Perth'
 /** Cap on the "everything unsent" list so a voice answer stays short */
@@ -46,7 +46,7 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, m => `\\${m}`)
 export const money = (n: number) =>
   n.toLocaleString('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: n % 1 ? 2 : 0 })
 
-const spokenDate = (iso: string) =>
+export const spokenDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-AU', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' })
 
 async function summarise(wos: WorkOrder[], jobsById: Map<string, Job>, ctx: McpContext): Promise<WorkOrderSummary[]> {
@@ -134,7 +134,8 @@ export async function summariseWorkOrder(workOrderId: string, ctx: McpContext): 
   return summary
 }
 
-async function findJob(jobNumber: string, ctx: McpContext): Promise<{ job: Job | null; closeMatches: string[] }> {
+/** A job by its number (case-insensitive), with close matches when there's no exact one. */
+export async function findJob(jobNumber: string, ctx: McpContext): Promise<{ job: Job | null; closeMatches: string[] }> {
   const { supabase, tenantId } = ctx
   const { data: job, error } = await supabase
     .from('jobs').select(JOB_COLUMNS).eq('tenant_id', tenantId).ilike('job_number', escapeLike(jobNumber)).maybeSingle()

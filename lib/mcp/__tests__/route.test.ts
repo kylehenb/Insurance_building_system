@@ -79,7 +79,10 @@ describe('mcp route', () => {
     expect(list.status).toBe(200)
     expect(list.headers.get('cache-control')).toBe('no-store')
     const body = await list.json() as { result: { tools: { name: string }[] } }
-    expect(body.result.tools.map(t => t.name)).toEqual(['find_work_orders', 'get_work_order_email', 'send_work_order'])
+    expect(body.result.tools.map(t => t.name)).toEqual([
+      'find_work_orders', 'get_work_order_email', 'send_work_order',
+      'list_job_documents', 'get_document_email', 'send_documents',
+    ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })
     expect(note.status).toBe(202)

@@ -157,8 +157,8 @@ async function buildDraft(docs: PreparedDocument[], ctx: PrintDataContext): Prom
   }
 }
 
-/** The job's quotes, reports and invoices, for "Attach another document". */
-async function listJobDocuments(ctx: PrintDataContext, jobId: string): Promise<DocumentEmailAttachment[]> {
+/** The job's quotes, reports and invoices, for "Attach another document" (and the voice connector's document list). */
+export async function listJobDocuments(ctx: PrintDataContext, jobId: string): Promise<DocumentEmailAttachment[]> {
   const { supabase, tenantId } = ctx
   const [quotes, reports, invoices] = await Promise.all([
     supabase.from('quotes').select('id, quote_ref, is_active_version, created_at')
