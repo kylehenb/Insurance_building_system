@@ -502,7 +502,7 @@ export default function EmailTemplatesSettingsPage() {
                   </div>
                   <div className="px-4 py-4 text-sm text-[#1a1a1a] whitespace-pre-wrap break-words leading-relaxed">{rendered.body}</div>
                   {selection.sendType === 'work_order' && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF attached</div>
+                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF and the job's photos PDF attached</div>
                   )}
                   {selection.sendType === 'signing_request' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f]">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>

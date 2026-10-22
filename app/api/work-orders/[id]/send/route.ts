@@ -11,7 +11,9 @@ import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
 
 // GET  → the pre-filled email (from the work_order template) for the send modal
 // POST → send to the trade and lock. Body { mode: 'auto' } sends the template
-//        as-is; { mode: 'custom', to, cc, subject, body } sends the edited copy.
+//        as-is; { mode: 'custom', to, cc, subject, body, includePhotos } sends
+//        the edited copy. The job's photos PDF is attached unless includePhotos
+//        is false.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -56,7 +58,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const parsed = await req.json() as Record<string, unknown>
     if (parsed.mode === 'custom') {
       const str = (k: string) => (typeof parsed[k] === 'string' ? parsed[k] as string : undefined)
-      overrides = { to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body') }
+      overrides = {
+        to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body'),
+        includePhotos: parsed.includePhotos !== false,
+      }
     } else if (parsed.mode !== 'auto') {
       return NextResponse.json({ error: "mode must be 'auto' or 'custom'" }, { status: 400 })
     }

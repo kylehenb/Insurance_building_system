@@ -325,7 +325,7 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
   {
     sendType: 'work_order',
     label: 'Work order',
-    description: 'Sent to the trade by Send & Lock, with the work order PDF attached.',
+    description: "Sent to the trade by Send & Lock, with the work order PDF and the job's photos attached.",
   },
   {
     sendType: 'signing_request',

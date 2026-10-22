@@ -4,13 +4,17 @@ import { buildEmailRaw } from '@/lib/email/build-raw'
 import { renderTemplate, resolveEmailTemplate, workOrderTemplateVars } from '@/lib/email/templates'
 import { woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import { buildWorkOrderPdf, tradeLabelFor, type WorkOrderPdfContext } from '@/lib/work-orders/work-order-pdf'
+import { buildPhotosPdf, photosPdfFilename } from '@/lib/documents/print-document-pdfs'
 
 // Send & Lock: emails the work order PDF to the trade, then locks the work
 // order (hands it to Gary). The draft is built from the tenant's
 // 'work_order' email template so Auto send and Customise send start from the
-// same content.
+// same content. The job's photos go with it as a second PDF (the Photos tab's
+// photo pages) unless Customise send leaves them off.
 
 const FALLBACK_FROM = 'office@insurancerepairco.com.au'
+/** Gmail's limit is 25 MB including encoding overhead (~4/3) */
+const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/
 
 export class WorkOrderEmailError extends Error {
@@ -26,6 +30,8 @@ export interface WorkOrderEmailDraft {
   subject: string
   body: string
   attachmentName: string
+  /** The job's photos PDF attached by default; null when the job has no photos */
+  photos: { count: number; attachmentName: string; jobId: string } | null
   tradeName: string | null
   templateName: string
   /** True when the tenant hasn't written a template yet */
@@ -37,6 +43,8 @@ export interface WorkOrderEmailOverrides {
   cc?: string
   subject?: string
   body?: string
+  /** Attach the job's photos PDF (default true) */
+  includePhotos?: boolean
 }
 
 /** Splits a comma/semicolon separated address list and validates each one. */
@@ -81,12 +89,19 @@ export async function buildWorkOrderEmailDraft(
     .filter(Boolean)
     .join(' - ')
 
+  const { count: photoCount } = await ctx.supabase
+    .from('photos').select('id', { count: 'exact', head: true })
+    .eq('job_id', job.id).eq('tenant_id', ctx.tenantId)
+
   return {
     to: trade?.contact_email?.trim() ?? '',
     cc: '',
     subject: renderTemplate(template.subject, vars),
     body: renderTemplate(template.body, vars),
     attachmentName: `${filename}.pdf`,
+    photos: photoCount
+      ? { count: photoCount, attachmentName: photosPdfFilename({ job }), jobId: job.id }
+      : null,
     tradeName: trade?.business_name ?? null,
     templateName: template.name,
     usingBuiltInTemplate: template.templateId === null,
@@ -118,6 +133,23 @@ export async function sendWorkOrderEmail(
   if (!subject) throw new WorkOrderEmailError('Subject is required', 400)
 
   const { pdf, filename } = await buildWorkOrderPdf(workOrderId, ctx, { asSent: true })
+  const files = [{ filename, pdf }]
+  if (draft.photos && overrides.includePhotos !== false) {
+    try {
+      const photos = await buildPhotosPdf(draft.photos.jobId, [], ctx)
+      files.push({ filename: photos.filename, pdf: photos.pdf })
+    } catch (err) {
+      console.error(`[work-order-email] photos PDF failed for ${workOrderId}:`, err)
+      throw new WorkOrderEmailError('Could not create the photos PDF — nothing was sent. Untick the photos in Customise send to send without them.', 500)
+    }
+  }
+  const totalBytes = files.reduce((sum, f) => sum + f.pdf.length, 0)
+  if (totalBytes > MAX_ATTACHMENT_BYTES) {
+    throw new WorkOrderEmailError(
+      `The attachments come to ${(totalBytes / 1024 / 1024).toFixed(1)} MB, more than email allows. Use Customise send and leave the photos off.`,
+      422,
+    )
+  }
 
   const fromEmail = tenant.contact_email ?? FALLBACK_FROM
   const raw = buildEmailRaw({
@@ -126,7 +158,7 @@ export async function sendWorkOrderEmail(
     cc: cc.length ? cc.join(', ') : undefined,
     subject,
     body,
-    attachments: [{ filename, mimeType: 'application/pdf', content: pdf }],
+    attachments: files.map(f => ({ filename: f.filename, mimeType: 'application/pdf', content: f.pdf })),
   })
 
   let gmailId: string | null = null
@@ -167,15 +199,14 @@ export async function sendWorkOrderEmail(
   // Keep a copy of exactly what was sent on the comms record. Non-fatal: the
   // email has gone and the work order is locked either way.
   const communicationId = crypto.randomUUID()
-  let attachments: { filename: string; storage_path: string | null; mime_type: string; size_bytes: number }[] = [
-    { filename, storage_path: null, mime_type: 'application/pdf', size_bytes: pdf.length },
-  ]
-  const storagePath = `tenants/${tenantId}/comms/${communicationId}/${Date.now()}-${filename.replace(/[^\w.,\- ]/g, '_')}`
-  const { error: uploadErr } = await service.storage
-    .from('job-files')
-    .upload(storagePath, pdf, { contentType: 'application/pdf' })
-  if (uploadErr) console.error(`[work-order-email] PDF copy upload failed for ${workOrderId}:`, uploadErr)
-  else attachments = [{ ...attachments[0], storage_path: storagePath }]
+  const attachments = await Promise.all(files.map(async (f, i) => {
+    const storagePath = `tenants/${tenantId}/comms/${communicationId}/${Date.now()}-${i}-${f.filename.replace(/[^\w.,\- ]/g, '_')}`
+    const { error: uploadErr } = await service.storage
+      .from('job-files')
+      .upload(storagePath, f.pdf, { contentType: 'application/pdf' })
+    if (uploadErr) console.error(`[work-order-email] PDF copy upload failed for ${workOrderId}:`, uploadErr)
+    return { filename: f.filename, storage_path: uploadErr ? null : storagePath, mime_type: 'application/pdf', size_bytes: f.pdf.length }
+  }))
 
   const { error: commErr } = await service.from('communications').insert({
     id:            communicationId,
