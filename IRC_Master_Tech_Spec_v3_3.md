@@ -2572,11 +2572,11 @@ Electronic Transactions Act 2011 (WA): consent, identification method and reliab
 Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a custom connector. Claude handles the conversation (asking which job or trade, passing on warnings, confirming before a send); the connector gives it facts and does the action with the app's own code.
 
 ### How it's built
-- Route: `POST /api/mcp/[secret]` (`app/api/mcp/[secret]/route.ts`) — MCP over Streamable HTTP, stateless, JSON responses. `GET`/`DELETE` → 405. Public in `proxy.ts`; the route checks the secret itself
+- Route: `POST /api/mcp` (`app/api/mcp/route.ts`) — MCP over Streamable HTTP, stateless, JSON responses. `GET`/`DELETE` → 405. Public in `proxy.ts`; the route checks the key itself
 - Protocol: `lib/mcp/server.ts` (`initialize`, `ping`, `tools/list`, `tools/call`; no SDK dependency). `SERVER_INSTRUCTIONS` there tells Claude to keep answers voice-friendly, ask when ambiguous, pass on warnings and confirm before any send or change
-- Auth: `lib/mcp/auth.ts`. The connector URL is `https://<app>/api/mcp/<MCP_CONNECTOR_SECRET>` (claude.ai connectors take OAuth or no auth; a secret URL is enough while there is one user). Wrong or missing secret → 404. The connector acts as `MCP_USER_ID`; its `tenant_id` scopes every query. Uses the service client, so every query must filter `tenant_id`
+- Auth: `lib/mcp/auth.ts`. claude.ai sends the key as a request header, `Authorization: Bearer <MCP_CONNECTOR_SECRET>` (a bare key is also accepted); a header stays out of request logs, unlike a secret in the URL. Missing or wrong key → 401, with the reason (never the key) in the Vercel logs. Env values are trimmed. The connector acts as `MCP_USER_ID`; its `tenant_id` scopes every query. Uses the service client, so every query must filter `tenant_id`
 - Tools: `lib/mcp/tools/*.ts`, registered in `lib/mcp/tools/index.ts`. Tests in `lib/mcp/__tests__/`
-- Setup: set `MCP_CONNECTOR_SECRET` (32+ random characters, e.g. `openssl rand -hex 32`) and `MCP_USER_ID` in Vercel, deploy, then claude.ai → Settings → Connectors → Add custom connector with the URL. Rotate by changing the secret and re-adding the connector. The secret appears in Vercel request logs — treat log access accordingly
+- Setup: set `MCP_CONNECTOR_SECRET` (32+ random characters, e.g. `openssl rand -hex 32`) and `MCP_USER_ID` in Vercel, deploy, then claude.ai → Settings → Connectors → Add custom connector: URL `https://<app>/api/mcp`, Authentication "No sign-in", request header `Authorization` = `Bearer <secret>`. Rotate by changing the secret in Vercel and the header in claude.ai. OAuth is the upgrade path if other staff need their own access
 
 ### Rules for tools
 - A tool only calls shared `lib/` functions — the same ones the app's buttons use. No business logic in the tool (e.g. "sent" is `woIsSent`, the amount is `workOrderAmountFor`)
@@ -2773,7 +2773,7 @@ TWILIO_FROM_NUMBER=
 GOOGLE_MAPS_API_KEY=               # Used for trade proximity calculation (Distance Matrix API)
 
 # Claude voice connector (§10b) — leave unset to keep the connector off
-MCP_CONNECTOR_SECRET=              # 32+ random characters; the connector URL is /api/mcp/<this>
+MCP_CONNECTOR_SECRET=              # 32+ random characters; claude.ai sends it as Authorization: Bearer <this>
 MCP_USER_ID=                       # users.id the connector acts as (its tenant scopes every query)
 
 # App
@@ -2792,7 +2792,7 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 
 **Signed URLs:** See Section 5 for signed URL architecture. Never store signed URLs in the database — they are ephemeral.
 
-**Claude voice connector:** the URL secret is the only credential — whoever has the URL can act as `MCP_USER_ID`. See §10b.
+**Claude voice connector:** the `Authorization` header key is the only credential — whoever has it can act as `MCP_USER_ID`. See §10b.
 
 **Prompt injection:** See WF-9 for the two-layer defence model applied to all inbound email and SMS parsing.
 

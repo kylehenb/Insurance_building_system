@@ -2,11 +2,11 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { McpContext } from '@/lib/mcp/server'
 
-// The voice connector is added in claude.ai as a URL with a secret in the
-// path (/api/mcp/<MCP_CONNECTOR_SECRET>) — claude.ai connectors take either
-// OAuth or no auth, and a single-user app doesn't need OAuth yet. Whoever has
-// the URL can act as MCP_USER_ID, so treat it like a password: rotate it by
-// changing the env var and re-adding the connector.
+// The voice connector is added in claude.ai with "No sign-in" and a request
+// header carrying the key: Authorization: Bearer <MCP_CONNECTOR_SECRET>.
+// A header (unlike a secret in the URL) stays out of request logs. Whoever
+// has the key can act as MCP_USER_ID, so treat it like a password: rotate it
+// by changing the env var and the header value in claude.ai.
 
 /** Shorter secrets are refused so a placeholder can't switch the connector on. */
 const MIN_SECRET_LENGTH = 32
@@ -17,15 +17,33 @@ function secretMatches(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+/** The key from "Authorization: Bearer <key>" (or a bare "<key>"). */
+export function keyFromAuthorization(header: string | null): string {
+  return (header ?? '').trim().replace(/^Bearer\s+/i, '').trim()
+}
+
 /**
- * The connector's context for a request, or null when the secret is wrong or
- * the connector isn't configured (the route answers 404 either way).
+ * The connector's context for a request, or null when the key is wrong or
+ * the connector isn't configured (the route answers 401 either way). The
+ * reason is logged, never the key.
  */
-export async function mcpContextFor(secret: string): Promise<McpContext | null> {
-  const expected = process.env.MCP_CONNECTOR_SECRET ?? ''
-  const userId = process.env.MCP_USER_ID ?? ''
-  if (expected.length < MIN_SECRET_LENGTH || !userId) return null
-  if (!secretMatches(secret, expected)) return null
+export async function mcpContextFor(authorization: string | null): Promise<McpContext | null> {
+  // Trimmed: a value pasted into Vercel can pick up a trailing newline
+  const expected = (process.env.MCP_CONNECTOR_SECRET ?? '').trim()
+  const userId = (process.env.MCP_USER_ID ?? '').trim()
+  if (expected.length < MIN_SECRET_LENGTH || !userId) {
+    console.error('[mcp] connector not configured: MCP_CONNECTOR_SECRET (32+ chars) and MCP_USER_ID are required')
+    return null
+  }
+  const key = keyFromAuthorization(authorization)
+  if (!key) {
+    console.warn('[mcp] request without an Authorization header')
+    return null
+  }
+  if (!secretMatches(key, expected)) {
+    console.warn(`[mcp] wrong key (got ${key.length} chars, expected ${expected.length})`)
+    return null
+  }
 
   const supabase = createServiceClient()
   const { data: user, error } = await supabase

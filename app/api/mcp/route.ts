@@ -4,20 +4,20 @@ import { handleMcpMessage } from '@/lib/mcp/server'
 import { MCP_TOOLS } from '@/lib/mcp/tools'
 
 // Claude voice connector (MCP over Streamable HTTP, stateless). Added in
-// claude.ai → Settings → Connectors as https://<app>/api/mcp/<MCP_CONNECTOR_SECRET>.
+// claude.ai → Settings → Connectors as https://<app>/api/mcp with "No sign-in"
+// and the header Authorization: Bearer <MCP_CONNECTOR_SECRET>.
 // POST carries one JSON-RPC message; there is no server-to-client stream, so
-// GET and DELETE are 405 as the spec allows. A wrong secret is a plain 404.
+// GET and DELETE are 405 as the spec allows. A missing or wrong key is 401.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const HEADERS = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' }
-const notFound = () => NextResponse.json({ error: 'Not found' }, { status: 404, headers: HEADERS })
+const HEADERS = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
+const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: HEADERS })
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ secret: string }> }) {
-  const { secret } = await params
-  const ctx = await mcpContextFor(secret)
-  if (!ctx) return notFound()
+export async function POST(req: NextRequest) {
+  const ctx = await mcpContextFor(req.headers.get('authorization'))
+  if (!ctx) return unauthorized()
 
   let msg: unknown
   try {
@@ -34,9 +34,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sec
   return NextResponse.json(response, { headers: HEADERS })
 }
 
-async function methodNotAllowed(_req: NextRequest, { params }: { params: Promise<{ secret: string }> }) {
-  const { secret } = await params
-  if (!(await mcpContextFor(secret))) return notFound()
+async function methodNotAllowed(req: NextRequest) {
+  if (!(await mcpContextFor(req.headers.get('authorization')))) return unauthorized()
   return new NextResponse(null, { status: 405, headers: { ...HEADERS, Allow: 'POST' } })
 }
 

@@ -49,8 +49,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/ai/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/gmail/") ||
-    // Claude voice connector: authorised by the secret in its URL (lib/mcp/auth.ts)
-    pathname.startsWith("/api/mcp/") ||
+    // Claude voice connector: authorised by its own key header (lib/mcp/auth.ts)
+    pathname === "/api/mcp" ||
     // E-signing: homeowners sign by link, with no account. These routes look
     // up the link token themselves and expose only that one document.
     pathname.startsWith("/sign/") ||
