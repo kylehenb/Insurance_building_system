@@ -17,7 +17,7 @@ function LabelWithTooltip({ children, tooltip }: { children: React.ReactNode; to
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <HelpCircle className="w-4 h-4 text-[#6b6763] cursor-help" />
+            <HelpCircle className="w-4 h-4 text-grey-600 cursor-help" />
           </TooltipTrigger>
           <TooltipContent>
             <p className="max-w-xs">{tooltip}</p>
@@ -171,7 +171,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-[#6b6763]">Loading...</div>
+        <div className="text-grey-600">Loading...</div>
       </div>
     )
   }
@@ -179,17 +179,17 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
   if (!config) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-[#6b6763]">Failed to load settings</div>
+        <div className="text-grey-600">Failed to load settings</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] pb-24">
+    <div className="min-h-screen bg-surface pb-24">
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-[#1a1a1a] mb-2">Automation Config</h1>
-          <p className="text-[#6b6763]">Configure timing, windows, and behaviour for automated communications.</p>
+          <h1 className="text-3xl font-semibold text-ink mb-2">Automation Config</h1>
+          <p className="text-grey-600">Configure timing, windows, and behaviour for automated communications.</p>
         </div>
 
         <Accordion type="multiple" defaultValue={['business-hours', 'waking-hours', 'urgent-mode', 'gary-window']} className="space-y-4">
@@ -208,7 +208,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
               </CardHeader>
               <AccordionContent>
                 <CardContent className="space-y-6">
-                  <p className="text-sm text-[#6b6763]">
+                  <p className="text-sm text-grey-600">
                     Business hours control trade follow-up timelines (Gary escalation deadlines) and gate delivery of trade-facing comms. Messages generated outside these hours queue and deliver when the window reopens.
                   </p>
 
@@ -290,7 +290,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
                         Add holiday
                       </Button>
                     </div>
-                    <p className="text-xs text-[#6b6763]">
+                    <p className="text-xs text-grey-600">
                       Add WA public holidays at the start of each calendar year. These days are excluded from business day calculations.
                     </p>
                   </div>
@@ -314,7 +314,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
               </CardHeader>
               <AccordionContent>
                 <CardContent className="space-y-6">
-                  <p className="text-sm text-[#6b6763]">
+                  <p className="text-sm text-grey-600">
                     Homeowner and insured SMS only sends within these hours, any day of the week. Outside this window, messages queue and deliver at the next opening.
                   </p>
 
@@ -357,7 +357,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
               </CardHeader>
               <AccordionContent>
                 <CardContent className="space-y-6">
-                  <p className="text-sm text-[#6b6763]">
+                  <p className="text-sm text-grey-600">
                     Make safe cascade and emergency dispatch use urgent mode. This is NOT unrestricted — the time limits below still apply to avoid genuinely unsociable hours. Adjust temporarily during CAT events if needed.
                   </p>
 
@@ -439,7 +439,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
                     />
                   </div>
 
-                  <p className="text-sm text-[#6b6763]">
+                  <p className="text-sm text-grey-600">
                     Gary's send window applies to trade-facing SMS. Make safe dispatch uses Urgent Mode above, not this window.
                   </p>
                 </CardContent>
@@ -450,7 +450,7 @@ export default function AutomationSettings({ tenantId }: AutomationSettingsProps
 
         {/* Save Button */}
         {hasUnsavedChanges && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e4e0] p-4">
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-line-3 p-4">
             <div className="max-w-4xl mx-auto flex justify-end gap-3">
               <Button
                 variant="outline"

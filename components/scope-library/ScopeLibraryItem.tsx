@@ -199,12 +199,12 @@ export function ScopeLibraryItemRow({
   const availableInsurers = insurers.filter((ins) => !presentInsurerIds.has(ins.id))
 
   const inputClass =
-    'w-full bg-transparent text-right font-mono text-sm focus:outline-none focus:bg-white focus:border-[#c9a96e] border border-transparent hover:border-[#e0dbd4] rounded px-1 py-0.5 transition-colors'
+    'w-full bg-transparent text-right font-mono text-sm focus:outline-none focus:bg-white focus:border-gold border border-transparent hover:border-line rounded px-1 py-0.5 transition-colors'
 
   const tiers = pricingTiers?.tiers ?? []
 
   return (
-    <div className="group border border-[#e0dbd4] rounded-lg bg-white hover:shadow-sm transition-shadow mb-1">
+    <div className="group border border-line rounded-lg bg-white hover:shadow-sm transition-shadow mb-1">
       {/* Header row */}
       <div
         className="grid items-center gap-1 px-3 py-2 cursor-pointer"
@@ -217,7 +217,7 @@ export function ScopeLibraryItemRow({
           height="14"
           viewBox="0 0 14 14"
           fill="none"
-          className={`text-[#b0a898] transition-transform duration-150 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+          className={`text-faint transition-transform duration-150 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
         >
           <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -228,7 +228,7 @@ export function ScopeLibraryItemRow({
             ref={descRef}
             value={description}
             rows={1}
-            className="w-full bg-transparent text-sm text-[#1a1a1a] resize-none focus:outline-none focus:bg-white border border-transparent hover:border-[#e0dbd4] rounded px-1 py-0.5 transition-colors"
+            className="w-full bg-transparent text-sm text-ink resize-none focus:outline-none focus:bg-white border border-transparent hover:border-line rounded px-1 py-0.5 transition-colors"
             onChange={(e) => {
               e.target.style.height = 'auto'
               e.target.style.height = e.target.scrollHeight + 'px'
@@ -243,7 +243,7 @@ export function ScopeLibraryItemRow({
           <select
             value={unit}
             onChange={(e) => handleUnitChange(e.target.value)}
-            className="w-full text-xs bg-transparent border border-transparent hover:border-[#e0dbd4] focus:border-[#c9a96e] rounded px-1 py-0.5 focus:outline-none focus:bg-white transition-colors text-center"
+            className="w-full text-xs bg-transparent border border-transparent hover:border-line focus:border-gold rounded px-1 py-0.5 focus:outline-none focus:bg-white transition-colors text-center"
           >
             <option value="">—</option>
             {UNITS.map((u) => (
@@ -279,7 +279,7 @@ export function ScopeLibraryItemRow({
         </div>
 
         {/* Total (computed) */}
-        <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+        <div className="w-full text-right font-mono text-sm font-semibold text-body px-1 py-0.5">
           {(() => {
             const l = labour === '' ? null : parseFloat(labour) || null
             const m = materials === '' ? null : parseFloat(materials) || null
@@ -295,7 +295,7 @@ export function ScopeLibraryItemRow({
             value={estHrs}
             onChange={(e) => setEstHrs(e.target.value)}
             onBlur={handleEstHrsBlur}
-            className={`${inputClass} text-[#b0a898]`}
+            className={`${inputClass} text-faint`}
             placeholder="—"
           />
         </div>
@@ -304,7 +304,7 @@ export function ScopeLibraryItemRow({
         <div className="flex items-center gap-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={handleDuplicate}
-            className="opacity-0 group-hover:opacity-100 p-1 text-[#b0a898] hover:text-[#3a3530] rounded transition-all"
+            className="opacity-0 group-hover:opacity-100 p-1 text-faint hover:text-body rounded transition-all"
             title="Duplicate"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -314,7 +314,7 @@ export function ScopeLibraryItemRow({
           </button>
           <button
             onClick={handleDeleteItem}
-            className="opacity-0 group-hover:opacity-100 p-1 text-[#b0a898] hover:text-red-500 rounded transition-all"
+            className="opacity-0 group-hover:opacity-100 p-1 text-faint hover:text-red-500 rounded transition-all"
             title="Archive"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -332,11 +332,11 @@ export function ScopeLibraryItemRow({
 
       {/* Expanded body */}
       {isExpanded && (
-        <div className="border-t border-[#e0dbd4] px-4 pb-4 space-y-4 pt-3">
+        <div className="border-t border-line px-4 pb-4 space-y-4 pt-3">
           {/* Section 1: Meta row */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Price updated</label>
+              <label className="block text-xs font-medium text-body mb-1">Price updated</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -344,44 +344,44 @@ export function ScopeLibraryItemRow({
                   onChange={(e) => setPriceDisplay(e.target.value)}
                   onBlur={handlePriceDateBlur}
                   placeholder="dd/mm/yy"
-                  className="w-24 border border-[#e0dbd4] rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#c9a96e]"
+                  className="w-24 border border-line rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-gold"
                 />
                 {item.price_updated_at && (
-                  <span className="text-xs text-[#b0a898]">{ageLabel(item.price_updated_at)}</span>
+                  <span className="text-xs text-faint">{ageLabel(item.price_updated_at)}</span>
                 )}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Keyword</label>
+              <label className="block text-xs font-medium text-body mb-1">Keyword</label>
               <input
                 type="text"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 onBlur={() => handleMetaBlur('keyword')}
                 placeholder="Unique keyword"
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1 text-xs focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1 text-xs focus:outline-none focus:border-gold"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Site notes</label>
+              <label className="block text-xs font-medium text-body mb-1">Site notes</label>
               <input
                 type="text"
                 value={siteNotes}
                 onChange={(e) => setSiteNotes(e.target.value)}
                 onBlur={() => handleMetaBlur('site_notes')}
                 placeholder="Comma-separated note variants for AI matching"
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1 text-xs focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1 text-xs focus:outline-none focus:border-gold"
               />
             </div>
           </div>
 
           {/* Section 2: Tiered pricing */}
-          <div className="border border-[#e0dbd4] rounded-lg overflow-hidden">
+          <div className="border border-line rounded-lg overflow-hidden">
             <button
               onClick={() => setTiersExpanded((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-[#faf9f7] hover:bg-[#f5f0e8] text-left transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 bg-surface-3 hover:bg-cream text-left transition-colors"
             >
-              <span className="text-xs font-medium text-[#3a3530]">
+              <span className="text-xs font-medium text-body">
                 {tiers.length === 0 ? 'No tiers — flat rate applies' : `${tiers.length} pricing tier${tiers.length !== 1 ? 's' : ''}`}
               </span>
               <svg
@@ -389,7 +389,7 @@ export function ScopeLibraryItemRow({
                 height="12"
                 viewBox="0 0 12 12"
                 fill="none"
-                className={`text-[#b0a898] transition-transform ${tiersExpanded ? 'rotate-180' : ''}`}
+                className={`text-faint transition-transform ${tiersExpanded ? 'rotate-180' : ''}`}
               >
                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -398,7 +398,7 @@ export function ScopeLibraryItemRow({
             {tiersExpanded && (
               <div className="px-3 py-2 space-y-1.5">
                 {tiers.length > 0 && (
-                  <div className="grid gap-1 text-xs text-[#b0a898] font-medium mb-1" style={{ gridTemplateColumns: '28px 80px 80px 80px 28px' }}>
+                  <div className="grid gap-1 text-xs text-faint font-medium mb-1" style={{ gridTemplateColumns: '28px 80px 80px 80px 28px' }}>
                     <div />
                     <div>Up to qty</div>
                     <div>Rate/unit</div>
@@ -408,13 +408,13 @@ export function ScopeLibraryItemRow({
                 )}
                 {tiers.map((tier, idx) => (
                   <div key={idx} className="grid items-center gap-1" style={{ gridTemplateColumns: '28px 80px 80px 80px 28px' }}>
-                    <div className="text-[#b0a898] cursor-grab text-center text-xs">⠿</div>
+                    <div className="text-faint cursor-grab text-center text-xs">⠿</div>
                     <input
                       type={tier.up_to_qty === null ? 'text' : 'number'}
                       value={tier.up_to_qty === null ? '∞' : String(tier.up_to_qty)}
                       readOnly={tier.up_to_qty === null}
                       onChange={(e) => handleTierChange(idx, 'up_to_qty', e.target.value)}
-                      className="border border-[#e0dbd4] rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-[#c9a96e] font-mono"
+                      className="border border-line rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-gold font-mono"
                       placeholder="qty"
                     />
                     <input
@@ -422,7 +422,7 @@ export function ScopeLibraryItemRow({
                       step="0.01"
                       value={String(tier.rate_per_unit)}
                       onChange={(e) => handleTierChange(idx, 'rate_per_unit', e.target.value)}
-                      className="border border-[#e0dbd4] rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-[#c9a96e] font-mono"
+                      className="border border-line rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-gold font-mono"
                       placeholder="0.00"
                     />
                     <input
@@ -430,13 +430,13 @@ export function ScopeLibraryItemRow({
                       step="0.01"
                       value={tier.min_charge !== null && tier.min_charge !== undefined ? String(tier.min_charge) : ''}
                       onChange={(e) => handleTierChange(idx, 'min_charge', e.target.value)}
-                      className="border border-[#e0dbd4] rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-[#c9a96e] font-mono"
+                      className="border border-line rounded px-2 py-1 text-xs text-right focus:outline-none focus:border-gold font-mono"
                       placeholder="—"
                     />
                     {tier.up_to_qty !== null && (
                       <button
                         onClick={() => handleRemoveTier(idx)}
-                        className="text-[#b0a898] hover:text-red-500 transition-colors text-center"
+                        className="text-faint hover:text-red-500 transition-colors text-center"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                           <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -448,7 +448,7 @@ export function ScopeLibraryItemRow({
                 ))}
                 <button
                   onClick={handleAddTier}
-                  className="text-xs text-[#c9a96e] hover:text-[#b8956a] font-medium mt-1"
+                  className="text-xs text-gold hover:text-gold-dark font-medium mt-1"
                 >
                   + Add tier
                 </button>
@@ -457,13 +457,13 @@ export function ScopeLibraryItemRow({
           </div>
 
           {/* Section 3: Insurer Pricing */}
-          <div className="border border-[#e0dbd4] rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-[#faf9f7] border-b border-[#e0dbd4]">
-              <span className="text-xs font-medium text-[#3a3530]">Insurer Pricing</span>
+          <div className="border border-line rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-surface-3 border-b border-line">
+              <span className="text-xs font-medium text-body">Insurer Pricing</span>
               {availableInsurers.length > 0 && (
                 <button
                   onClick={() => setShowAddInsurer((v) => !v)}
-                  className="text-xs text-[#c9a96e] hover:text-[#b8956a] font-medium"
+                  className="text-xs text-gold hover:text-gold-dark font-medium"
                 >
                   + Add insurer
                 </button>
@@ -471,11 +471,11 @@ export function ScopeLibraryItemRow({
             </div>
 
             {showAddInsurer && (
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-[#e0dbd4] bg-[#fffdf9]">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-line bg-[#fffdf9]">
                 <select
                   value={addingInsurerId}
                   onChange={(e) => setAddingInsurerId(e.target.value)}
-                  className="flex-1 border border-[#e0dbd4] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#c9a96e]"
+                  className="flex-1 border border-line rounded px-2 py-1 text-xs focus:outline-none focus:border-gold"
                 >
                   <option value="">Select insurer…</option>
                   {availableInsurers.map((ins) => (
@@ -487,13 +487,13 @@ export function ScopeLibraryItemRow({
                 <button
                   onClick={handleAddInsurer}
                   disabled={!addingInsurerId}
-                  className="px-3 py-1 text-xs font-medium bg-[#c9a96e] text-white rounded disabled:opacity-50"
+                  className="px-3 py-1 text-xs font-medium bg-gold text-white rounded disabled:opacity-50"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => { setShowAddInsurer(false); setAddingInsurerId('') }}
-                  className="text-xs text-[#b0a898] hover:text-[#3a3530]"
+                  className="text-xs text-faint hover:text-body"
                 >
                   Cancel
                 </button>
@@ -501,7 +501,7 @@ export function ScopeLibraryItemRow({
             )}
 
             {overrides.length === 0 && !showAddInsurer && (
-              <div className="px-3 py-3 text-xs text-[#b0a898]">No insurer overrides — base pricing applies.</div>
+              <div className="px-3 py-3 text-xs text-faint">No insurer overrides — base pricing applies.</div>
             )}
 
             {overrides.map((ov) => (

@@ -160,10 +160,10 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
-      <div className="relative bg-[#faf9f7] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-[#e0dbd4]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0dbd4]">
-          <h2 className="text-base font-semibold text-[#1a1a1a]">Import Insurer Pricing CSV</h2>
-          <button onClick={handleClose} className="text-[#b0a898] hover:text-[#1a1a1a] transition-colors">
+      <div className="relative bg-surface-3 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-line">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+          <h2 className="text-base font-semibold text-ink">Import Insurer Pricing CSV</h2>
+          <button onClick={handleClose} className="text-faint hover:text-ink transition-colors">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
@@ -173,11 +173,11 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
         {!result ? (
           <div className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Insurer</label>
+              <label className="block text-xs font-medium text-body mb-1">Insurer</label>
               <select
                 value={selectedInsurerId}
                 onChange={(e) => setSelectedInsurerId(e.target.value)}
-                className="w-full border border-[#e0dbd4] rounded-lg px-3 py-2 text-sm bg-white text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:border-gold"
               >
                 <option value="">Select insurer…</option>
                 {insurers.map((ins) => (
@@ -189,14 +189,14 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">CSV File</label>
+              <label className="block text-xs font-medium text-body mb-1">CSV File</label>
               <input
                 ref={fileRef}
                 type="file"
                 accept=".csv"
-                className="block w-full text-sm text-[#3a3530] file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-[#e0dbd4] file:text-[#3a3530] hover:file:bg-[#c9a96e] hover:file:text-white file:cursor-pointer"
+                className="block w-full text-sm text-body file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-line file:text-body hover:file:bg-gold hover:file:text-white file:cursor-pointer"
               />
-              <p className="mt-1.5 text-xs text-[#b0a898]">Columns: keyword, description, unit, labour, materials, total</p>
+              <p className="mt-1.5 text-xs text-faint">Columns: keyword, description, unit, labour, materials, total</p>
             </div>
 
             {error && (
@@ -206,14 +206,14 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-sm text-[#3a3530] hover:text-[#1a1a1a] transition-colors"
+                className="px-4 py-2 text-sm text-body hover:text-ink transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className="px-4 py-2 text-sm font-medium bg-[#c9a96e] text-white rounded-lg hover:bg-[#b8956a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-gold text-white rounded-lg hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {importing ? 'Importing…' : 'Import'}
               </button>
@@ -229,13 +229,13 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
                 {result.updated} item{result.updated !== 1 ? 's' : ''} updated
               </span>
               {result.unmatched.length > 0 && (
-                <span className="text-sm text-[#b0a898]">{result.unmatched.length} unmatched row{result.unmatched.length !== 1 ? 's' : ''}</span>
+                <span className="text-sm text-faint">{result.unmatched.length} unmatched row{result.unmatched.length !== 1 ? 's' : ''}</span>
               )}
             </div>
 
             {result.unmatched.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-[#3a3530] uppercase tracking-wide mb-3">Unmatched Rows</p>
+                <p className="text-xs font-semibold text-body uppercase tracking-wide mb-3">Unmatched Rows</p>
                 <div className="space-y-3">
                   {result.unmatched.map((csvRow, idx) => {
                     const isResolved = resolvedIndices.has(idx)
@@ -243,13 +243,13 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
                     return (
                       <div
                         key={idx}
-                        className={`border rounded-lg p-3 text-sm ${isResolved ? 'border-green-200 bg-green-50' : 'border-[#e0dbd4] bg-white'}`}
+                        className={`border rounded-lg p-3 text-sm ${isResolved ? 'border-green-200 bg-green-50' : 'border-line bg-white'}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <span className="font-medium text-[#1a1a1a]">{csvRow.keyword || '(no keyword)'}</span>
+                            <span className="font-medium text-ink">{csvRow.keyword || '(no keyword)'}</span>
                             {csvRow.description && (
-                              <span className="ml-2 text-[#b0a898] text-xs">{csvRow.description}</span>
+                              <span className="ml-2 text-faint text-xs">{csvRow.description}</span>
                             )}
                           </div>
                           {isResolved && (
@@ -270,19 +270,19 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
                                 placeholder="Search existing items to map…"
                                 value={mapSearch[idx] ?? ''}
                                 onChange={(e) => handleMapSearch(idx, e.target.value)}
-                                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#c9a96e]"
+                                className="w-full border border-line rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gold"
                               />
                               {(mapResults[idx]?.length ?? 0) > 0 && (
-                                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#e0dbd4] rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto">
                                   {(mapResults[idx] ?? []).map((item) => (
                                     <button
                                       key={item.id}
                                       onClick={() => handleMapToExisting(idx, item.id, csvRow)}
-                                      className="w-full text-left px-3 py-2 text-xs hover:bg-[#f5f0e8] text-[#1a1a1a]"
+                                      className="w-full text-left px-3 py-2 text-xs hover:bg-cream text-ink"
                                     >
                                       <span className="font-medium">{item.keyword ?? '—'}</span>
                                       {item.item_description && (
-                                        <span className="ml-1.5 text-[#b0a898]">{item.item_description}</span>
+                                        <span className="ml-1.5 text-faint">{item.item_description}</span>
                                       )}
                                     </button>
                                   ))}
@@ -292,7 +292,7 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
 
                             <button
                               onClick={() => handleCreateBase(idx, csvRow)}
-                              className="text-xs text-[#c9a96e] hover:text-[#b8956a] font-medium"
+                              className="text-xs text-gold hover:text-gold-dark font-medium"
                             >
                               + Create base item
                             </button>
@@ -308,7 +308,7 @@ export function ScopeLibraryImportModal({ isOpen, tenantId, insurers, onClose, o
             <div className="flex justify-end pt-2">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-sm font-medium bg-[#c9a96e] text-white rounded-lg hover:bg-[#b8956a] transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-gold text-white rounded-lg hover:bg-gold-dark transition-colors"
               >
                 Done
               </button>

@@ -51,8 +51,8 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
         aria-modal="true"
         aria-label="Cancel work order"
         style={{
-          background: '#fff',
-          border: '1px solid #ddd8d0',
+          background: 'var(--paper)',
+          border: '1px solid var(--line-strong)',
           borderRadius: 12,
           width: 420,
           overflow: 'hidden',
@@ -63,7 +63,7 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #e8e4de',
+            borderBottom: '1px solid var(--line-4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -75,12 +75,12 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
             title="Close"
             style={{
               width: 26, height: 26,
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 13,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -92,7 +92,7 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
 
         {/* Body */}
         <div style={{ padding: '16px 18px' }}>
-          <p style={{ fontSize: 12, color: '#5a5650', marginBottom: 14, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12, color: 'var(--body-soft)', marginBottom: 14, lineHeight: 1.6 }}>
             Cancel the <strong>{label}</strong> work order{contractor ? <> sent to <strong>{contractor}</strong></> : null}?
             Gary will stop contacting the trade, and the work order will be unlocked so you can correct or reallocate it.
           </p>
@@ -100,21 +100,21 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
               onClick={() => onConfirm(true)}
-              style={{ ...optionStyle, border: '1px solid #991b1b', background: '#991b1b', color: '#fff' }}
+              style={{ ...optionStyle, border: '1px solid var(--danger-dark)', background: 'var(--danger-dark)', color: 'var(--paper)' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#7f1d1d' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#991b1b' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--danger-dark)' }}
             >
               <div style={{ fontSize: 12, fontWeight: 600 }}>Cancel and send cancellation email</div>
               <div style={{ fontSize: 10, opacity: 0.85, marginTop: 2 }}>Notify the trade that this work order has been cancelled.</div>
             </button>
             <button
               onClick={() => onConfirm(false)}
-              style={{ ...optionStyle, border: '1px solid #fca5a5', background: '#fff', color: '#991b1b' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}
+              style={{ ...optionStyle, border: '1px solid var(--danger-soft)', background: 'var(--paper)', color: 'var(--danger-dark)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger-bg-3)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--paper)' }}
             >
               <div style={{ fontSize: 12, fontWeight: 600 }}>Cancel with no notification</div>
-              <div style={{ fontSize: 10, color: '#5a5650', marginTop: 2 }}>Cancel quietly — the trade is not contacted.</div>
+              <div style={{ fontSize: 10, color: 'var(--body-soft)', marginTop: 2 }}>Cancel quietly — the trade is not contacted.</div>
             </button>
           </div>
         </div>
@@ -123,7 +123,7 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
         <div
           style={{
             padding: '12px 18px',
-            borderTop: '1px solid #e8e4de',
+            borderTop: '1px solid var(--line-4)',
             display: 'flex',
             justifyContent: 'flex-end',
           }}
@@ -135,10 +135,10 @@ export function CancelWorkOrderModal({ workOrder, onConfirm, onClose }: CancelWo
               fontSize: 11,
               fontWeight: 500,
               fontFamily: 'DM Sans, sans-serif',
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
-              background: '#fff',
-              color: '#5a5650',
+              background: 'var(--paper)',
+              color: 'var(--body-soft)',
               cursor: 'pointer',
             }}
           >

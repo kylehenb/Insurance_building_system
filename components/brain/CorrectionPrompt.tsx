@@ -36,7 +36,7 @@ export function CorrectionPrompt({ correction, onClear }: CorrectionPromptProps)
   return (
     <div
       style={{
-        borderLeft: '2px solid #f59e0b',
+        borderLeft: '2px solid var(--warning-bright)',
         background: '#fffbeb',
         padding: '6px 12px',
         fontSize: 12,
@@ -48,10 +48,10 @@ export function CorrectionPrompt({ correction, onClear }: CorrectionPromptProps)
       }}
     >
       {status === 'saved' ? (
-        <span style={{ color: '#2a6b50', fontWeight: 500 }}>✓ Saved</span>
+        <span style={{ color: 'var(--teal)', fontWeight: 500 }}>✓ Saved</span>
       ) : (
         <>
-          <span style={{ color: '#92400e', flex: 1 }}>
+          <span style={{ color: 'var(--warning-dark)', flex: 1 }}>
             You changed a generated value — save as a correction?
           </span>
           <button
@@ -60,7 +60,7 @@ export function CorrectionPrompt({ correction, onClear }: CorrectionPromptProps)
             style={{
               background: 'none',
               border: 'none',
-              color: '#b45309',
+              color: 'var(--warning)',
               cursor: status === 'saving' ? 'not-allowed' : 'pointer',
               fontSize: 12,
               fontWeight: 600,

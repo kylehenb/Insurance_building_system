@@ -258,7 +258,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
     >
       <div
         style={{
-          background: '#ffffff',
+          background: 'var(--paper)',
           borderRadius: 8,
           width: '90%',
           maxWidth: 800,
@@ -268,14 +268,14 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
           fontFamily: 'DM Sans, sans-serif',
         }}
       >
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#1a1a1a' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: 'var(--ink)' }}>
           Import CSV
         </h2>
 
         {!showMapping && previewItems.length === 0 && (
           <>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', display: 'block', marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)', display: 'block', marginBottom: 8 }}>
                 Paste CSV content or upload a file
               </label>
               <textarea
@@ -286,7 +286,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   width: '100%',
                   height: 150,
                   padding: 12,
-                  border: '1px solid #e0dbd4',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   fontSize: 12,
                   fontFamily: 'monospace',
@@ -311,7 +311,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+              <div style={{ marginBottom: 16, padding: 12, background: 'var(--danger-bg-3)', borderRadius: 6, fontSize: 12, color: 'var(--danger-dark)' }}>
                 {error}
               </div>
             )}
@@ -323,9 +323,9 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #e0dbd4',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   cursor: 'pointer',
                 }}
@@ -339,8 +339,8 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a1a1a',
+                  color: 'var(--paper)',
+                  background: 'var(--ink)',
                   border: 'none',
                   borderRadius: 6,
                   cursor: csvText.trim() ? 'pointer' : 'not-allowed',
@@ -355,22 +355,22 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
 
         {showMapping && (
           <>
-            <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 16 }}>
               Map CSV columns to quote fields. Required fields are marked with *.
             </p>
 
-            <div style={{ marginBottom: 16, maxHeight: 300, overflow: 'auto', border: '1px solid #e0dbd4', borderRadius: 6 }}>
+            <div style={{ marginBottom: 16, maxHeight: 300, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead style={{ background: '#f5f0e8', position: 'sticky', top: 0 }}>
+                <thead style={{ background: 'var(--cream)', position: 'sticky', top: 0 }}>
                   <tr>
-                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>CSV Column</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Maps to</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>CSV Column</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Maps to</th>
                   </tr>
                 </thead>
                 <tbody>
                   {headers.map((header, idx) => (
-                    <tr key={header} style={{ borderBottom: '1px solid #e0dbd4' }}>
-                      <td style={{ padding: 10, color: '#3a3530' }}>{header}</td>
+                    <tr key={header} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: 10, color: 'var(--body)' }}>{header}</td>
                       <td style={{ padding: 10 }}>
                         <select
                           value={mapping[idx]?.scopeField || ''}
@@ -378,7 +378,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                           style={{
                             padding: 6,
                             fontSize: 12,
-                            border: '1px solid #e0dbd4',
+                            border: '1px solid var(--line)',
                             borderRadius: 4,
                             minWidth: 150,
                           }}
@@ -404,9 +404,9 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #e0dbd4',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   cursor: 'pointer',
                 }}
@@ -419,8 +419,8 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a1a1a',
+                  color: 'var(--paper)',
+                  background: 'var(--ink)',
                   border: 'none',
                   borderRadius: 6,
                   cursor: 'pointer',
@@ -434,38 +434,38 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
 
         {previewItems.length > 0 && (
           <>
-            <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 16 }}>
               Preview: {previewItems.length} items will be imported
             </p>
 
-            <div style={{ marginBottom: 16, maxHeight: 300, overflow: 'auto', border: '1px solid #e0dbd4', borderRadius: 6 }}>
+            <div style={{ marginBottom: 16, maxHeight: 300, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                <thead style={{ background: '#f5f0e8', position: 'sticky', top: 0 }}>
+                <thead style={{ background: 'var(--cream)', position: 'sticky', top: 0 }}>
                   <tr>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Room</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Trade</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Description</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Qty</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Labour</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Materials</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Total</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Room</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Trade</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Description</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Qty</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Labour</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Materials</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previewItems.slice(0, 20).map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #e0dbd4' }}>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.room || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.trade || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.item_description || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.qty || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.rate_labour || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.rate_materials || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.line_total || '-'}</td>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.room || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.trade || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.item_description || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.qty || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.rate_labour || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.rate_materials || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.line_total || '-'}</td>
                     </tr>
                   ))}
                   {previewItems.length > 20 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: 8, textAlign: 'center', color: '#9e998f' }}>
+                      <td colSpan={7} style={{ padding: 8, textAlign: 'center', color: 'var(--subtle)' }}>
                         ... and {previewItems.length - 20} more items
                       </td>
                     </tr>
@@ -475,7 +475,7 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+              <div style={{ marginBottom: 16, padding: 12, background: 'var(--danger-bg-3)', borderRadius: 6, fontSize: 12, color: 'var(--danger-dark)' }}>
                 {error}
               </div>
             )}
@@ -490,9 +490,9 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #e0dbd4',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   cursor: 'pointer',
                 }}
@@ -505,8 +505,8 @@ export function CsvImportDialog({ isOpen, onClose, onImport, quoteId, tenantId }
                   padding: '8px 16px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a1a1a',
+                  color: 'var(--paper)',
+                  background: 'var(--ink)',
                   border: 'none',
                   borderRadius: 6,
                   cursor: 'pointer',

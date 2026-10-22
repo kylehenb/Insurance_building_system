@@ -117,8 +117,8 @@ const tabs = [
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-3 gap-4">
-      <dt className="text-sm font-medium text-[#1a1a1a]/60">{label}</dt>
-      <dd className="col-span-2 text-sm text-[#1a1a1a]">{value ?? "-"}</dd>
+      <dt className="text-sm font-medium text-ink/60">{label}</dt>
+      <dd className="col-span-2 text-sm text-ink">{value ?? "-"}</dd>
     </div>
   );
 }
@@ -298,13 +298,13 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
   const status = inspection.status ?? 'unscheduled';
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8]">
+    <div className="min-h-screen bg-cream">
       {/* Header Strip */}
-      <div className="bg-white border-b border-[#1a1a1a]/10">
+      <div className="bg-white border-b border-ink/10">
         <div className="px-6 lg:px-8 py-6">
           <Link
             href="/dashboard/inspections"
-            className="inline-flex items-center gap-1 text-sm text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors mb-4"
+            className="inline-flex items-center gap-1 text-sm text-ink/60 hover:text-ink transition-colors mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Inspections
@@ -313,20 +313,20 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-[#1a1a1a]">
+                <h1 className="text-2xl font-bold text-ink">
                   {inspection.inspection_ref ?? "Inspection"}
                 </h1>
                 <StatusBadge status={status} />
                 <button
                   onClick={refreshInspection}
                   disabled={refreshing}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-sm text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-sm text-ink/60 hover:text-ink transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#1a1a1a]/70">
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink/70">
                 {inspection.jobs && (
                   <Link href={`/dashboard/jobs/${inspection.jobs.id}`} className="hover:underline font-medium">
                     {inspection.jobs.job_number}
@@ -341,7 +341,7 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
                 href={`/field/${inspection.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-[#c8b89a] text-sm font-medium rounded-md hover:bg-[#252520] transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-tan text-sm font-medium rounded-md hover:bg-[#252520] transition-colors"
               >
                 <Smartphone className="h-4 w-4" />
                 Open Field App
@@ -351,7 +351,7 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
         </div>
 
         {/* Tab Bar */}
-        <div className="px-6 lg:px-8 border-t border-[#1a1a1a]/10">
+        <div className="px-6 lg:px-8 border-t border-ink/10">
           <nav className="-mb-px flex gap-6 overflow-x-auto">
             {tabs.map((tab, i) => (
               <a
@@ -359,8 +359,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
                 href={`#${tab.id}`}
                 className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors ${
                   i === 0
-                    ? "border-[#1a1a1a] text-[#1a1a1a]"
-                    : "border-transparent text-[#1a1a1a]/50 hover:text-[#1a1a1a] hover:border-[#1a1a1a]/30"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-ink/50 hover:text-ink hover:border-ink/30"
                 }`}
               >
                 {tab.label}
@@ -389,8 +389,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
             <div className="grid gap-6 lg:grid-cols-2">
 
               {/* Scheduling Card */}
-              <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Scheduling</h2>
+              <div className="rounded-lg border border-ink/10 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-ink mb-4">Scheduling</h2>
                 <dl className="space-y-4">
                   <Field label="Inspection Ref" value={inspection.inspection_ref} />
 
@@ -398,35 +398,35 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
                   {isSchedulable ? (
                     <>
                       <div className="grid grid-cols-3 gap-4 items-center">
-                        <dt className="text-sm font-medium text-[#1a1a1a]/60">Scheduled Date</dt>
+                        <dt className="text-sm font-medium text-ink/60">Scheduled Date</dt>
                         <dd className="col-span-2">
                           <input
                             type="date"
                             value={scheduledDate}
                             onChange={e => setScheduledDate(e.target.value)}
-                            className="w-full rounded-md border border-[#1a1a1a]/20 px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#1a1a1a]/20"
+                            className="w-full rounded-md border border-ink/20 px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
                           />
                         </dd>
                       </div>
                       <div className="grid grid-cols-3 gap-4 items-center">
-                        <dt className="text-sm font-medium text-[#1a1a1a]/60">Start Time</dt>
+                        <dt className="text-sm font-medium text-ink/60">Start Time</dt>
                         <dd className="col-span-2">
                           <input
                             type="time"
                             value={startTime}
                             onChange={e => setStartTime(e.target.value)}
-                            className="w-full rounded-md border border-[#1a1a1a]/20 px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#1a1a1a]/20"
+                            className="w-full rounded-md border border-ink/20 px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
                           />
                         </dd>
                       </div>
                       <div className="grid grid-cols-3 gap-4 items-center">
-                        <dt className="text-sm font-medium text-[#1a1a1a]/60">Finish Time</dt>
+                        <dt className="text-sm font-medium text-ink/60">Finish Time</dt>
                         <dd className="col-span-2">
                           <input
                             type="time"
                             value={finishTime}
                             onChange={e => setFinishTime(e.target.value)}
-                            className="w-full rounded-md border border-[#1a1a1a]/20 px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#1a1a1a]/20"
+                            className="w-full rounded-md border border-ink/20 px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
                           />
                         </dd>
                       </div>
@@ -453,12 +453,12 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
                 </dl>
 
                 {/* Action buttons */}
-                <div className="mt-6 pt-5 border-t border-[#1a1a1a]/10">
+                <div className="mt-6 pt-5 border-t border-ink/10">
                   {(status === 'unscheduled' || status === 'reschedule_required') && (
                     <button
                       onClick={handlePropose}
                       disabled={proposing}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-[#c8b89a] text-sm font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-tan text-sm font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50"
                     >
                       <Calendar className="h-4 w-4" />
                       {proposing ? 'Proposing…' : 'Propose Appointment'}
@@ -510,8 +510,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
               </div>
 
               {/* Field App */}
-              <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Field App</h2>
+              <div className="rounded-lg border border-ink/10 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-ink mb-4">Field App</h2>
                 <dl className="space-y-4">
                   <Field label="Safety Confirmed" value={formatDateTime(inspection.safety_confirmed_at)} />
                   <Field label="Form Submitted" value={formatDateTime(inspection.form_submitted_at)} />
@@ -520,8 +520,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
               </div>
 
               {/* Post-submission */}
-              <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Post-submission Status</h2>
+              <div className="rounded-lg border border-ink/10 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-ink mb-4">Post-submission Status</h2>
                 <dl className="space-y-4">
                   <Field label="Scope Status" value={<SubStatusBadge status={inspection.scope_status ?? 'pending'} />} />
                   <Field label="Report Status" value={<SubStatusBadge status={inspection.report_status ?? 'pending'} />} />
@@ -530,8 +530,8 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
               </div>
 
               {/* Notes */}
-              <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">Notes</h2>
+              <div className="rounded-lg border border-ink/10 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-ink mb-4">Notes</h2>
                 <dl className="space-y-4">
                   <Field label="Job" value={inspection.jobs?.job_number ?? "-"} />
                   <Field label="Created" value={formatDateTime(inspection.created_at)} />
@@ -550,11 +550,11 @@ export default function InspectionDetailClient({ initialInspection, tenantId }: 
 
           {tabs.slice(1).map((tab) => (
             <section key={tab.id} id={tab.id} className="scroll-mt-8">
-              <div className="rounded-lg border border-[#1a1a1a]/10 bg-white p-12 shadow-sm">
+              <div className="rounded-lg border border-ink/10 bg-white p-12 shadow-sm">
                 <div className="text-center">
-                  <FileText className="mx-auto h-12 w-12 text-[#1a1a1a]/20" />
-                  <h3 className="mt-4 text-lg font-medium text-[#1a1a1a]">{tab.label}</h3>
-                  <p className="mt-2 text-sm text-[#1a1a1a]/60">Coming soon</p>
+                  <FileText className="mx-auto h-12 w-12 text-ink/20" />
+                  <h3 className="mt-4 text-lg font-medium text-ink">{tab.label}</h3>
+                  <p className="mt-2 text-sm text-ink/60">Coming soon</p>
                 </div>
               </div>
             </section>

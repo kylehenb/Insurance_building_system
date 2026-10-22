@@ -121,20 +121,20 @@ async function InspectionsListPage() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-[#1a1a1a]">Inspections</h1>
-              <p className="mt-1 text-sm text-[#1a1a1a]/60">
+              <h1 className="text-2xl font-semibold text-ink">Inspections</h1>
+              <p className="mt-1 text-sm text-ink/60">
                 All inspections across your jobs
               </p>
             </div>
           </div>
 
           {/* Table */}
-          <div className="mt-8 rounded-lg border border-[#1a1a1a]/10 bg-white shadow-sm overflow-hidden">
+          <div className="mt-8 rounded-lg border border-ink/10 bg-white shadow-sm overflow-hidden">
             {typedInspections.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f5f0e8]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cream">
                   <svg
-                    className="h-8 w-8 text-[#1a1a1a]/40"
+                    className="h-8 w-8 text-ink/40"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -147,15 +147,15 @@ async function InspectionsListPage() {
                     />
                   </svg>
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-[#1a1a1a]">No inspections yet</h3>
-                <p className="mt-2 max-w-sm text-center text-sm text-[#1a1a1a]/60">
+                <h3 className="mt-4 text-lg font-medium text-ink">No inspections yet</h3>
+                <p className="mt-2 max-w-sm text-center text-sm text-ink/60">
                   Inspections are created automatically when a new job is lodged.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#1a1a1a]/10">
-                  <thead className="bg-[#f5f0e8]/50">
+                <table className="min-w-full divide-y divide-ink/10">
+                  <thead className="bg-cream/50">
                     <tr>
                       {[
                         "Inspection Ref",
@@ -169,36 +169,36 @@ async function InspectionsListPage() {
                         <th
                           key={heading}
                           scope="col"
-                          className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[#1a1a1a]/60"
+                          className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-ink/60"
                         >
                           {heading}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1a1a1a]/10 bg-white">
+                  <tbody className="divide-y divide-ink/10 bg-white">
                     {typedInspections.map((insp) => (
-                      <tr key={insp.id} className="hover:bg-[#f5f0e8]/30 transition-colors">
+                      <tr key={insp.id} className="hover:bg-cream/30 transition-colors">
                         <td className="whitespace-nowrap px-6 py-4">
                           <Link
                             href={`/dashboard/inspections/${insp.id}`}
-                            className="text-sm font-medium text-[#1a1a1a] hover:underline"
+                            className="text-sm font-medium text-ink hover:underline"
                           >
                             {insp.inspection_ref ?? "-"}
                           </Link>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/70">
+                          <span className="text-sm text-ink/70">
                             {insp.jobs?.job_number ?? "-"}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/70">
+                          <span className="text-sm text-ink/70">
                             {insp.users?.name ?? "-"}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
-                          <span className="text-sm text-[#1a1a1a]/70">
+                          <span className="text-sm text-ink/70">
                             {formatDate(insp.scheduled_date)}
                           </span>
                         </td>
@@ -220,7 +220,7 @@ async function InspectionsListPage() {
           </div>
 
           {typedInspections.length > 0 && (
-            <div className="mt-4 text-sm text-[#1a1a1a]/60">
+            <div className="mt-4 text-sm text-ink/60">
               Showing {typedInspections.length} inspection
               {typedInspections.length === 1 ? "" : "s"}
             </div>

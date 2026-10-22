@@ -180,7 +180,7 @@ export function RoofReportPreview({
         {/* Controls bar */}
         <div className="mc-rrp-controls" style={{
           position: 'sticky', top: 0, zIndex: 10,
-          background: '#1a1a1a', padding: '10px 20px',
+          background: 'var(--ink)', padding: '10px 20px',
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <button
@@ -192,7 +192,7 @@ export function RoofReportPreview({
           <span style={{ flex: 1 }} />
           <button
             onClick={handlePrint}
-            style={{ background: '#c8b89a', border: 'none', color: '#1a1a1a', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
+            style={{ background: 'var(--tan)', border: 'none', color: 'var(--ink)', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
           >
             Print / Download PDF
           </button>
@@ -207,19 +207,19 @@ export function RoofReportPreview({
           }}>
 
             {/* Header */}
-            <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid #1a1a1a', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>
+            <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid var(--ink)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.3px', marginBottom: 6 }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.3px', marginBottom: 6 }}>
                   Roof Inspection Report
                 </div>
                 {jobLine && (
-                  <div style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
                     {jobLine}
                   </div>
                 )}
               </div>
               <div style={{ textAlign: 'right' as const, flexShrink: 0, fontSize: 11, color: '#444', lineHeight: 1.7 }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a1a', marginBottom: 2 }}>Bindi Co</div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 2 }}>Bindi Co</div>
                 <div>Contact: {ROOFER_NAME}</div>
                 <div>Ph: 0431 132 077</div>
                 <div>E: kyle@binditrades.com.au</div>
@@ -406,8 +406,8 @@ export function RoofReportPreview({
             )}
 
             {/* Footer */}
-            <div style={{ padding: '11px 24px', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 9, color: '#c8b89a', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
+            <div style={{ padding: '11px 24px', background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 9, color: 'var(--tan)', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
                 Bindi Co
               </div>
               <div style={{ fontSize: 9, color: '#777' }}>

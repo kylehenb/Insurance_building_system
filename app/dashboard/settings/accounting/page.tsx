@@ -320,7 +320,7 @@ export default function AccountingSettingsPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <div className="text-sm text-[#9e998f]">Loading...</div>
+        <div className="text-sm text-subtle">Loading...</div>
       </div>
     )
   }
@@ -328,8 +328,8 @@ export default function AccountingSettingsPage() {
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-[#1a1a1a]">Accounting & QuickBooks</h1>
-        <p className="text-sm text-[#9e998f] mt-1">
+        <h1 className="text-2xl font-semibold text-ink">Accounting & QuickBooks</h1>
+        <p className="text-sm text-subtle mt-1">
           Connect QuickBooks Online, map your products and services, and sync invoices and bills.
         </p>
       </div>
@@ -347,21 +347,21 @@ export default function AccountingSettingsPage() {
       )}
 
       {/* Section 1: Connection Status */}
-      <div className="bg-white rounded-lg border border-[#e8e4e0] p-6 mb-6">
-        <h2 className="text-sm font-semibold text-[#1a1a1a] mb-4">Connection Status</h2>
+      <div className="bg-white rounded-lg border border-line-3 p-6 mb-6">
+        <h2 className="text-sm font-semibold text-ink mb-4">Connection Status</h2>
 
         {isConnected ? (
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-[#1a1a1a]">Connected to QuickBooks</span>
+                <span className="text-sm font-medium text-ink">Connected to QuickBooks</span>
               </div>
               {realmId && (
-                <p className="text-xs text-[#9e998f]">Company ID: {realmId}</p>
+                <p className="text-xs text-subtle">Company ID: {realmId}</p>
               )}
               {lastSyncAt && (
-                <p className="text-xs text-[#9e998f] mt-0.5">
+                <p className="text-xs text-subtle mt-0.5">
                   Last updated: {new Date(lastSyncAt).toLocaleString()}
                 </p>
               )}
@@ -378,17 +378,17 @@ export default function AccountingSettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-full bg-[#9e998f]" />
-                <span className="text-sm font-medium text-[#1a1a1a]">Not connected</span>
+                <div className="w-2 h-2 rounded-full bg-subtle" />
+                <span className="text-sm font-medium text-ink">Not connected</span>
               </div>
-              <p className="text-xs text-[#9e998f]">
+              <p className="text-xs text-subtle">
                 Connect QuickBooks Online to sync invoices and bills automatically.
               </p>
             </div>
             <button
               onClick={handleConnect}
               disabled={connectLoading}
-              className="text-sm text-white bg-[#c9a96e] hover:bg-[#b8985f] rounded px-4 py-1.5 transition-colors disabled:opacity-50"
+              className="text-sm text-white bg-gold hover:bg-[#b8985f] rounded px-4 py-1.5 transition-colors disabled:opacity-50"
             >
               {connectLoading ? 'Redirecting...' : 'Connect to QuickBooks'}
             </button>
@@ -398,18 +398,18 @@ export default function AccountingSettingsPage() {
 
       {/* Section 2: Chart of Accounts Mapping */}
       {isConnected && (
-        <div className="bg-white rounded-lg border border-[#e8e4e0] p-6 mb-6">
+        <div className="bg-white rounded-lg border border-line-3 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-[#1a1a1a]">Product & Service Mapping</h2>
-              <p className="text-xs text-[#9e998f] mt-0.5">
+              <h2 className="text-sm font-semibold text-ink">Product & Service Mapping</h2>
+              <p className="text-xs text-subtle mt-0.5">
                 Map each IRC invoice category to a QuickBooks product or service.
               </p>
             </div>
             <button
               onClick={handleSaveMappings}
               disabled={savingMappings}
-              className="text-sm text-white bg-[#c9a96e] hover:bg-[#b8985f] rounded px-4 py-1.5 transition-colors disabled:opacity-50"
+              className="text-sm text-white bg-gold hover:bg-[#b8985f] rounded px-4 py-1.5 transition-colors disabled:opacity-50"
             >
               {savingMappings
                 ? 'Saving...'
@@ -420,26 +420,26 @@ export default function AccountingSettingsPage() {
           </div>
 
           {accounts.length === 0 ? (
-            <p className="text-sm text-[#9e998f]">
+            <p className="text-sm text-subtle">
               No products or services loaded. Ensure QuickBooks is connected and you have active
               Service or Non-Inventory items in your Products & Services list.
             </p>
           ) : (
-            <div className="divide-y divide-[#e8e4e0]">
+            <div className="divide-y divide-line-3">
               {IRC_CATEGORIES.map(({ category, label, description }) => (
                 <div
                   key={category}
                   className="py-3 flex items-center gap-4"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#1a1a1a]">{label}</p>
-                    <p className="text-xs text-[#9e998f]">{description}</p>
+                    <p className="text-sm font-medium text-ink">{label}</p>
+                    <p className="text-xs text-subtle">{description}</p>
                   </div>
                   <div className="w-64">
                     <select
                       value={mappings[category]?.accountId ?? ''}
                       onChange={(e) => handleMappingChange(category, e.target.value)}
-                      className="w-full border border-[#e8e4e0] rounded text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#c9a96e] text-[#1a1a1a]"
+                      className="w-full border border-line-3 rounded text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold text-ink"
                     >
                       <option value="">— select product/service —</option>
                       {accounts.map((account) => (
@@ -459,24 +459,24 @@ export default function AccountingSettingsPage() {
 
       {/* Section 3: Last Sync Status / Failed Invoices */}
       {isConnected && (
-        <div className="bg-white rounded-lg border border-[#e8e4e0] p-6">
-          <h2 className="text-sm font-semibold text-[#1a1a1a] mb-4">Failed Syncs</h2>
+        <div className="bg-white rounded-lg border border-line-3 p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Failed Syncs</h2>
 
           {failedInvoices.length === 0 ? (
-            <p className="text-sm text-[#9e998f]">No failed syncs. All invoices are up to date.</p>
+            <p className="text-sm text-subtle">No failed syncs. All invoices are up to date.</p>
           ) : (
-            <div className="divide-y divide-[#e8e4e0]">
+            <div className="divide-y divide-line-3">
               {failedInvoices.map((inv) => (
                 <div key={inv.id} className="py-3 flex items-start gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#1a1a1a]">
+                    <p className="text-sm font-medium text-ink">
                       {inv.invoice_ref}
                     </p>
                     {inv.accounting_sync_error && (
                       <p className="text-xs text-red-600 mt-0.5">{inv.accounting_sync_error}</p>
                     )}
                     {inv.accounting_last_synced_at && (
-                      <p className="text-xs text-[#9e998f] mt-0.5">
+                      <p className="text-xs text-subtle mt-0.5">
                         Last attempted: {new Date(inv.accounting_last_synced_at).toLocaleString()}
                       </p>
                     )}
@@ -484,7 +484,7 @@ export default function AccountingSettingsPage() {
                   <button
                     onClick={() => handleRetrySync(inv.id)}
                     disabled={retryingId === inv.id}
-                    className="text-xs text-[#c9a96e] hover:text-[#b8985f] border border-[#c9a96e] rounded px-3 py-1 transition-colors disabled:opacity-50 flex-shrink-0"
+                    className="text-xs text-gold hover:text-[#b8985f] border border-gold rounded px-3 py-1 transition-colors disabled:opacity-50 flex-shrink-0"
                   >
                     {retryingId === inv.id ? 'Retrying...' : 'Retry'}
                   </button>
@@ -496,11 +496,11 @@ export default function AccountingSettingsPage() {
       )}
 
       {/* Support contact */}
-      <p className="mt-6 text-xs text-[#9e998f]">
+      <p className="mt-6 text-xs text-subtle">
         Need help?{' '}
         <a
           href="mailto:office@insurancerepairco.com.au"
-          className="underline hover:text-[#3a3530]"
+          className="underline hover:text-body"
         >
           Contact office@insurancerepairco.com.au
         </a>

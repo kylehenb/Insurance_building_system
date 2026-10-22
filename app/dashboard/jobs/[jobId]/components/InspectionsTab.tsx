@@ -419,27 +419,27 @@ function InspectionForm({
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#9e998f]">Attendance</span>
-        {saveLabel && <span className="text-[10px] text-[#9e998f] ml-auto">{saveLabel}</span>}
+        <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-subtle">Attendance</span>
+        {saveLabel && <span className="text-[10px] text-subtle ml-auto">{saveLabel}</span>}
       </div>
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <input
           type="date"
           value={date}
-          className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleChange('scheduled_date', e.target.value, setDate)}
         />
         <input
           type="time"
           value={startTime}
-          className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleStartTimeChange(e.target.value)}
         />
-        <span className="text-[12px] text-[#9e998f]">to</span>
+        <span className="text-[12px] text-subtle">to</span>
         <input
           type="time"
           value={finishTime}
-          className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleFinishTimeChange(e.target.value)}
         />
         <input
@@ -447,13 +447,13 @@ function InspectionForm({
           value={duration}
           min="15"
           step="15"
-          className="w-16 px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="w-16 px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleDurationChange(e.target.value)}
         />
-        <span className="text-[11px] text-[#9e998f]">min</span>
+        <span className="text-[11px] text-subtle">min</span>
         <select
           value={status}
-          className="px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleChange('status', e.target.value, setStatus)}
         >
           <option value="unscheduled">Unscheduled</option>
@@ -470,7 +470,7 @@ function InspectionForm({
           type="text"
           value={assessor}
           placeholder="Assessor"
-          className="w-32 px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none"
+          className="w-32 px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none"
           onChange={e => handleChange('access_notes', e.target.value, setAssessor)}
         />
         <button
@@ -486,7 +486,7 @@ function InspectionForm({
           value={notes}
           rows={1}
           placeholder="Inspection notes..."
-          className="w-full px-2 py-1 text-[12px] border border-[#e0dbd4] rounded focus:border-[#c8b89a] focus:outline-none resize-none"
+          className="w-full px-2 py-1 text-[12px] border border-line rounded focus:border-tan focus:outline-none resize-none"
           onChange={e => handleChange('raw_report_notes', e.target.value, setNotes)}
           onBlur={flushSave}
         />
@@ -494,13 +494,13 @@ function InspectionForm({
 
       {/* Action buttons */}
       {SCHEDULABLE_STATUSES.includes(status) && (
-        <div className="pt-2 border-t border-[#e0dbd4] mt-2">
+        <div className="pt-2 border-t border-line mt-2">
           <div className="flex flex-wrap items-center gap-2">
             {(status === 'unscheduled' || status === 'reschedule_required') && (
               <button
                 onClick={handlePropose}
                 disabled={proposing}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] text-[#c8b89a] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink text-tan text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50"
               >
                 <Calendar size={13} />
                 {proposing ? 'Proposing…' : 'Propose Appointment'}
@@ -600,25 +600,25 @@ function FieldAppSnapshotPanel({
   }
 
   return (
-    <div style={{ border: '1px solid #e4dfd8', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ border: '1px solid var(--line-2)', borderRadius: 8, overflow: 'hidden' }}>
       <button
         onClick={onToggle}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 14px', background: '#f9f7f5', border: 'none', cursor: 'pointer',
+          padding: '10px 14px', background: 'var(--surface-2)', border: 'none', cursor: 'pointer',
           fontFamily: 'DM Sans, sans-serif',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Smartphone size={14} style={{ color: '#c8b89a' }} />
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Field App Submission</span>
-          <span style={{ fontSize: 11, color: '#9e998f' }}>{submittedDate}</span>
+          <Smartphone size={14} style={{ color: 'var(--tan)' }} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)' }}>Field App Submission</span>
+          <span style={{ fontSize: 11, color: 'var(--subtle)' }}>{submittedDate}</span>
         </div>
-        {isExpanded ? <ChevronUp size={14} style={{ color: '#9e998f' }} /> : <ChevronDown size={14} style={{ color: '#9e998f' }} />}
+        {isExpanded ? <ChevronUp size={14} style={{ color: 'var(--subtle)' }} /> : <ChevronDown size={14} style={{ color: 'var(--subtle)' }} />}
       </button>
 
       {isExpanded && (
-        <div style={{ padding: '16px 16px 20px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ padding: '16px 16px 20px', background: 'var(--paper)', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Safety */}
           <div>
@@ -627,8 +627,8 @@ function FieldAppSnapshotPanel({
               {Object.entries(safetyLabels).map(([key, label]) => (
                 <span key={key} style={{
                   padding: '3px 8px', borderRadius: 12, fontSize: 11,
-                  background: chips[key] ? '#e8f5e9' : '#f5f2ee',
-                  color: chips[key] ? '#2e7d32' : '#9e998f',
+                  background: chips[key] ? 'var(--success-bg)' : 'var(--surface)',
+                  color: chips[key] ? 'var(--success)' : 'var(--subtle)',
                 }}>
                   {chips[key] ? '✓ ' : '— '}{label}
                 </span>
@@ -659,13 +659,13 @@ function FieldAppSnapshotPanel({
                 {snapshot.scopeRooms.map((room, i) => {
                   const dims = [room.l, room.w, room.h].filter(Boolean).join('×')
                   return (
-                    <div key={i} style={{ background: '#f9f7f5', borderRadius: 6, padding: '8px 12px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3a3530', marginBottom: 4, fontFamily: 'DM Sans, sans-serif' }}>
-                        {room.name || 'Unnamed room'}{dims ? <span style={{ fontWeight: 400, color: '#9e998f', marginLeft: 6 }}>{dims}m</span> : null}
+                    <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 6, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--body)', marginBottom: 4, fontFamily: 'DM Sans, sans-serif' }}>
+                        {room.name || 'Unnamed room'}{dims ? <span style={{ fontWeight: 400, color: 'var(--subtle)', marginLeft: 6 }}>{dims}m</span> : null}
                       </div>
                       <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {room.items.filter(Boolean).map((item, j) => (
-                          <li key={j} style={{ fontSize: 12, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>{item}</li>
+                          <li key={j} style={{ fontSize: 12, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>{item}</li>
                         ))}
                       </ul>
                     </div>
@@ -679,7 +679,7 @@ function FieldAppSnapshotPanel({
           {snapshot.raw_report_notes && (
             <div>
               <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Raw report notes</div>
-              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: '#f9f7f5', borderRadius: 6, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, color: 'var(--body)', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: 'var(--surface-2)', borderRadius: 6, padding: '10px 12px' }}>
                 {snapshot.raw_report_notes}
               </div>
             </div>
@@ -689,7 +689,7 @@ function FieldAppSnapshotPanel({
           {snapshot.photoContext && (
             <div>
               <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Photo context</div>
-              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif' }}>{snapshot.photoContext}</div>
+              <div style={{ fontSize: 12, color: 'var(--body)', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif' }}>{snapshot.photoContext}</div>
             </div>
           )}
 
@@ -697,7 +697,7 @@ function FieldAppSnapshotPanel({
           {hasRoof && (
             <div>
               <div style={{ ...snapshotLabelStyle, marginBottom: 6 }}>Roof report notes</div>
-              <div style={{ fontSize: 12, color: '#3a3530', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: '#f9f7f5', borderRadius: 6, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, color: 'var(--body)', whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif', background: 'var(--surface-2)', borderRadius: 6, padding: '10px 12px' }}>
                 {snapshot.roofRawNotes}
               </div>
             </div>
@@ -742,12 +742,12 @@ function FieldAppSnapshotPanel({
           )}
 
           {/* Photos link */}
-          <div style={{ paddingTop: 4, borderTop: '1px solid #f0ece6' }}>
+          <div style={{ paddingTop: 4, borderTop: '1px solid var(--line-faint)' }}>
             <a
               href={`/field/${inspectionId}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, color: '#c8b89a', fontFamily: 'DM Sans, sans-serif' }}
+              style={{ fontSize: 12, color: 'var(--tan)', fontFamily: 'DM Sans, sans-serif' }}
             >
               View full field app (read-only) →
             </a>
@@ -1080,14 +1080,14 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
   return (
     <>
       {loading ? (
-        <div className="py-12 text-center text-[13px] text-[#9e998f]">Loading…</div>
+        <div className="py-12 text-center text-[13px] text-subtle">Loading…</div>
       ) : (
         <AccordionList
           title="Inspections"
           action={{ label: '+ New inspection', onClick: () => setShowCreate(true) }}
         >
           {inspectionsWithRelations.length === 0 ? (
-            <div className="px-4 py-8 text-center text-[13px] text-[#9e998f]">
+            <div className="px-4 py-8 text-center text-[13px] text-subtle">
               No inspections yet
             </div>
           ) : (
@@ -1098,20 +1098,20 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                   <div className="flex items-center gap-3 flex-wrap">
                     <span
                       className="text-[13px] font-medium"
-                      style={{ fontFamily: 'DM Mono, monospace', color: '#c8b89a' }}
+                      style={{ fontFamily: 'DM Mono, monospace', color: 'var(--tan)' }}
                     >
                       {inspection.inspection_ref ?? '—'}
                     </span>
-                    <span className="text-[13px] text-[#3a3530]">{typeLabel(inspection)}</span>
-                    <span className="text-[12px] text-[#9e998f]">{formatDate(inspection.scheduled_date)}</span>
+                    <span className="text-[13px] text-body">{typeLabel(inspection)}</span>
+                    <span className="text-[12px] text-subtle">{formatDate(inspection.scheduled_date)}</span>
                     {inspection.start_time && (
-                      <span className="text-[12px] text-[#9e998f]">{formatTime(inspection.start_time)}</span>
+                      <span className="text-[12px] text-subtle">{formatTime(inspection.start_time)}</span>
                     )}
                     {inspection.access_notes && (
-                      <span className="text-[12px] text-[#9e998f]">{inspection.access_notes}</span>
+                      <span className="text-[12px] text-subtle">{inspection.access_notes}</span>
                     )}
                     {inspection.person_met && (
-                      <span className="text-[12px] text-[#9e998f]">{inspection.person_met}</span>
+                      <span className="text-[12px] text-subtle">{inspection.person_met}</span>
                     )}
                     <div className="flex items-center gap-1">
                       {getStatusIcon(inspection.status)}
@@ -1121,7 +1121,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       href={`/field/${inspection.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a1a1a] text-[#c8b89a] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-ink text-tan text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors"
                     >
                       <Smartphone className="h-3.5 w-3.5" />
                       Field App
@@ -1152,11 +1152,11 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                   {/* Inspection Items Section */}
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <FileText size={16} className="text-[#c8b89a]" />
-                      <span className="text-[13px] font-medium text-[#3a3530]">
+                      <FileText size={16} className="text-tan" />
+                      <span className="text-[13px] font-medium text-body">
                         Inspection Items
                       </span>
-                      <span className="text-[11px] text-[#9e998f]">
+                      <span className="text-[11px] text-subtle">
                         ({(coreReport ? 1 : 0) + (coreQuote ? 1 : 0) + (coreInvoice ? 1 : 0) + additionalReports.length + additionalInvoices.length + tradeQuotes.length})
                       </span>
                     </div>
@@ -1194,20 +1194,20 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {coreQuote && (
                         <>
                           <div
-                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            className="flex items-center justify-between p-3 bg-white border border-line-2 rounded-md cursor-pointer hover:bg-surface-2 transition-colors"
                             onClick={() => toggleEditor(inspection.id, 'coreQuote')}
                           >
                             <div className="flex items-center gap-3">
                               <DollarSign size={14} className="text-green-600" />
                               <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{coreQuote.quote_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
+                                <div className="text-[13px] font-medium text-body">{coreQuote.quote_ref}</div>
+                                <div className="text-[11px] text-subtle">{getQuoteTypeLabel(coreQuote.quote_type)}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <StatusPill status={coreQuote.status} />
                               {coreQuote.total_amount && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                <div className="text-[12px] font-medium text-body">
                                   ${coreQuote.total_amount.toLocaleString()}
                                 </div>
                               )}
@@ -1231,20 +1231,20 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {tradeQuotes.map(quote => (
                         <div key={quote.id}>
                           <div
-                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            className="flex items-center justify-between p-3 bg-white border border-line-2 rounded-md cursor-pointer hover:bg-surface-2 transition-colors"
                             onClick={() => toggleEditor(inspection.id, `tradeQuote-${quote.id}`)}
                           >
                             <div className="flex items-center gap-3">
                               <DollarSign size={14} className="text-orange-600" />
                               <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{quote.quote_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{getQuoteTypeLabel(quote.quote_type)}</div>
+                                <div className="text-[13px] font-medium text-body">{quote.quote_ref}</div>
+                                <div className="text-[11px] text-subtle">{getQuoteTypeLabel(quote.quote_type)}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <StatusPill status={quote.status} />
                               {quote.total_amount && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                <div className="text-[12px] font-medium text-body">
                                   ${quote.total_amount.toLocaleString()}
                                 </div>
                               )}
@@ -1270,20 +1270,20 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {coreInvoice && (
                         <>
                           <div
-                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            className="flex items-center justify-between p-3 bg-white border border-line-2 rounded-md cursor-pointer hover:bg-surface-2 transition-colors"
                             onClick={() => toggleEditor(inspection.id, 'coreInvoice')}
                           >
                             <div className="flex items-center gap-3">
                               <DollarSign size={14} className="text-purple-600" />
                               <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{coreInvoice.invoice_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">BAR Fee</div>
+                                <div className="text-[13px] font-medium text-body">{coreInvoice.invoice_ref}</div>
+                                <div className="text-[11px] text-subtle">BAR Fee</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <StatusPill status={coreInvoice.status} />
                               {coreInvoice.amount_ex_gst && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                <div className="text-[12px] font-medium text-body">
                                   ${coreInvoice.amount_ex_gst.toLocaleString()}
                                 </div>
                               )}
@@ -1306,20 +1306,20 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                       {additionalInvoices.map(invoice => (
                         <div key={invoice.id}>
                           <div
-                            className="flex items-center justify-between p-3 bg-white border border-[#e4dfd8] rounded-md cursor-pointer hover:bg-[#f9f7f5] transition-colors"
+                            className="flex items-center justify-between p-3 bg-white border border-line-2 rounded-md cursor-pointer hover:bg-surface-2 transition-colors"
                             onClick={() => toggleEditor(inspection.id, `additionalInvoice-${invoice.id}`)}
                           >
                             <div className="flex items-center gap-3">
                               <DollarSign size={14} className="text-purple-600" />
                               <div>
-                                <div className="text-[13px] font-medium text-[#3a3530]">{invoice.invoice_ref}</div>
-                                <div className="text-[11px] text-[#9e998f]">{invoice.invoice_type}</div>
+                                <div className="text-[13px] font-medium text-body">{invoice.invoice_ref}</div>
+                                <div className="text-[11px] text-subtle">{invoice.invoice_type}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <StatusPill status={invoice.status} />
                               {invoice.amount_ex_gst && (
-                                <div className="text-[12px] font-medium text-[#3a3530]">
+                                <div className="text-[12px] font-medium text-body">
                                   ${invoice.amount_ex_gst.toLocaleString()}
                                 </div>
                               )}
@@ -1342,7 +1342,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
 
                       {/* Add Item Button */}
                       <button
-                        className="w-full px-4 py-2 border border-dashed border-[#c8b89a] rounded text-[12px] text-[#c8b89a] hover:bg-[#f9f7f5] transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 py-2 border border-dashed border-tan rounded text-[12px] text-tan hover:bg-surface-2 transition-colors flex items-center justify-center gap-2"
                         onClick={() => {
                           // TODO: Open modal to add/link items
                           alert('Add/link items functionality coming soon')
@@ -1357,7 +1357,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                   {/* Compile & Submit Button */}
                   <div className="flex justify-end pt-2">
                     <button
-                      className="px-4 py-2 bg-[#1a1a1a] text-[#f5f0e8] text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-ink text-cream text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleCompileAndSubmit(inspection.id)}
                       disabled={submittingInspectionId === inspection.id}
                     >

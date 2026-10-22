@@ -182,7 +182,7 @@ export default function InvoiceLibraryPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: 48, textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
+      <div style={{ padding: 48, textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)' }}>
         Loading…
       </div>
     )
@@ -191,29 +191,29 @@ export default function InvoiceLibraryPage() {
   return (
     <>
       <style>{`
-        .il { padding: 32px 36px 48px; font-family: 'DM Sans', sans-serif; color: #3a3530; }
+        .il { padding: 32px 36px 48px; font-family: 'DM Sans', sans-serif; color: var(--body); }
         .il-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
-        .il-title { font-size: 20px; font-weight: 700; color: #1a1a1a; }
-        .il-sub { font-size: 13px; color: #9e998f; margin-bottom: 28px; }
+        .il-title { font-size: 20px; font-weight: 700; color: var(--ink); }
+        .il-sub { font-size: 13px; color: var(--subtle); margin-bottom: 28px; }
         .il-group { margin-bottom: 32px; }
         .il-group-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .il-group-title { font-size: 13px; font-weight: 600; color: #3a3530; }
-        .il-add-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; background: #fff; color: #3a3530; border: 1px solid #e0dbd4; }
-        .il-add-btn:hover { border-color: #c8b89a; }
-        .il-table-wrap { background: #fff; border: 1px solid #e0dbd4; border-radius: 8px; overflow: hidden; }
+        .il-group-title { font-size: 13px; font-weight: 600; color: var(--body); }
+        .il-add-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; background: var(--paper); color: var(--body); border: 1px solid var(--line); }
+        .il-add-btn:hover { border-color: var(--tan); }
+        .il-table-wrap { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
         .il-table { width: 100%; border-collapse: collapse; }
-        .il-table th { font-size: 11px; font-weight: 600; color: #9e998f; text-align: left; padding: 10px 12px; border-bottom: 1px solid #e0dbd4; background: #fafaf8; }
-        .il-table td { font-size: 13px; color: #3a3530; padding: 10px 12px; border-bottom: 1px solid #f0ece6; vertical-align: middle; }
+        .il-table th { font-size: 11px; font-weight: 600; color: var(--subtle); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-4); }
+        .il-table td { font-size: 13px; color: var(--body); padding: 10px 12px; border-bottom: 1px solid var(--line-faint); vertical-align: middle; }
         .il-table tr:last-child td { border-bottom: none; }
-        .il-input { font-size: 13px; color: #3a3530; background: #f5f2ee; border: 1px solid #e0dbd4; border-radius: 4px; padding: 5px 8px; font-family: 'DM Sans', sans-serif; width: 100%; }
-        .il-input:focus { outline: none; border-color: #c8b89a; }
-        .il-num-input { font-size: 13px; color: #3a3530; background: #f5f2ee; border: 1px solid #e0dbd4; border-radius: 4px; padding: 5px 8px; font-family: 'DM Mono', monospace; width: 80px; text-align: right; }
-        .il-num-input:focus { outline: none; border-color: #c8b89a; }
-        .il-select { font-size: 13px; color: #3a3530; background: #f5f2ee; border: 1px solid #e0dbd4; border-radius: 4px; padding: 5px 8px; font-family: 'DM Sans', sans-serif; }
-        .il-select:focus { outline: none; border-color: #c8b89a; }
+        .il-input { font-size: 13px; color: var(--body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-family: 'DM Sans', sans-serif; width: 100%; }
+        .il-input:focus { outline: none; border-color: var(--tan); }
+        .il-num-input { font-size: 13px; color: var(--body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-family: 'DM Mono', monospace; width: 80px; text-align: right; }
+        .il-num-input:focus { outline: none; border-color: var(--tan); }
+        .il-select { font-size: 13px; color: var(--body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-family: 'DM Sans', sans-serif; }
+        .il-select:focus { outline: none; border-color: var(--tan); }
         .il-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-        .il-save-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; background: #3a3530; color: #fff; border: none; }
-        .il-save-btn:hover { background: #2a2520; }
+        .il-save-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; background: var(--body); color: var(--paper); border: none; }
+        .il-save-btn:hover { background: var(--ink-brown); }
         .il-inactive { opacity: 0.5; }
       `}</style>
 
@@ -233,7 +233,7 @@ export default function InvoiceLibraryPage() {
             </div>
             <div className="il-table-wrap">
               {grouped[type].length === 0 ? (
-                <div style={{ padding: '20px 16px', fontSize: 13, color: '#9e998f' }}>
+                <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--subtle)' }}>
                   No items — click &quot;Add item&quot; to create one.
                 </div>
               ) : (
@@ -314,7 +314,7 @@ export default function InvoiceLibraryPage() {
                                 checked={item.is_active ?? true}
                                 onChange={() => toggleActive(item)}
                               />
-                              <span style={{ fontSize: 12, color: '#9e998f' }}>{item.is_active ? 'Yes' : 'No'}</span>
+                              <span style={{ fontSize: 12, color: 'var(--subtle)' }}>{item.is_active ? 'Yes' : 'No'}</span>
                             </label>
                           </td>
                           <td>

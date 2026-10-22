@@ -69,8 +69,8 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
         alignItems: 'center',
         gap: 10,
         padding: '9px 16px',
-        borderBottom: '0.5px solid #e6dfd0',
-        background: '#fdfcfb',
+        borderBottom: '0.5px solid var(--line-tan)',
+        background: 'var(--surface-7)',
         fontFamily: 'DM Sans, sans-serif',
         position: 'relative',
       }}
@@ -84,22 +84,22 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
             alignItems: 'center',
             gap: 7,
             padding: '7px 12px',
-            background: '#fff',
-            border: '1px solid #e6dfd0',
+            background: 'var(--paper)',
+            border: '1px solid var(--line-tan)',
             borderRadius: 8,
             fontSize: 12.5,
             fontWeight: 600,
             cursor: 'pointer',
-            color: '#1b1712',
+            color: 'var(--ink-warm)',
             fontFamily: 'inherit',
           }}
         >
-          <span style={{ fontSize: 11, color: '#8a8272' }}>▾</span>
+          <span style={{ fontSize: 11, color: 'var(--grey-450)' }}>▾</span>
           Filters
           <span
             style={{
-              background: totalActive > 0 ? '#1c1815' : '#e6dfd0',
-              color: totalActive > 0 ? '#efe9dd' : '#8a8272',
+              background: totalActive > 0 ? '#1c1815' : 'var(--line-tan)',
+              color: totalActive > 0 ? '#efe9dd' : 'var(--grey-450)',
               fontSize: 10,
               fontWeight: 700,
               padding: '1px 6px',
@@ -118,8 +118,8 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
               position: 'absolute',
               top: 36,
               left: 0,
-              background: '#fff',
-              border: '1px solid #e6dfd0',
+              background: 'var(--paper)',
+              border: '1px solid var(--line-tan)',
               borderRadius: 10,
               boxShadow: '0 10px 28px rgba(0,0,0,.10)',
               width: 290,
@@ -129,7 +129,7 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
           >
             {/* Type group */}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: '#8a8272', fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--grey-450)', fontWeight: 700, marginBottom: 8 }}>
                 Type
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -142,13 +142,13 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
                       onClick={() => onChange({ ...filters, types: toggle(filters.types, val) })}
                       style={{
                         padding: '5px 11px',
-                        border: `1px solid ${active ? '#1c1815' : '#e6dfd0'}`,
+                        border: `1px solid ${active ? '#1c1815' : 'var(--line-tan)'}`,
                         borderRadius: 20,
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
-                        background: active ? '#1c1815' : '#fff',
-                        color: active ? '#efe9dd' : '#1b1712',
+                        background: active ? '#1c1815' : 'var(--paper)',
+                        color: active ? '#efe9dd' : 'var(--ink-warm)',
                         fontFamily: 'inherit',
                       }}
                     >
@@ -161,7 +161,7 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
 
             {/* Contact group */}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: '#8a8272', fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--grey-450)', fontWeight: 700, marginBottom: 8 }}>
                 Contact
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -174,13 +174,13 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
                       onClick={() => onChange({ ...filters, contactTypes: toggle(filters.contactTypes, val) })}
                       style={{
                         padding: '5px 11px',
-                        border: `1px solid ${active ? '#1c1815' : '#e6dfd0'}`,
+                        border: `1px solid ${active ? '#1c1815' : 'var(--line-tan)'}`,
                         borderRadius: 20,
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
-                        background: active ? '#1c1815' : '#fff',
-                        color: active ? '#efe9dd' : '#1b1712',
+                        background: active ? '#1c1815' : 'var(--paper)',
+                        color: active ? '#efe9dd' : 'var(--ink-warm)',
                         fontFamily: 'inherit',
                       }}
                     >
@@ -193,7 +193,7 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
 
             {/* Status group */}
             <div>
-              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: '#8a8272', fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--grey-450)', fontWeight: 700, marginBottom: 8 }}>
                 Status
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -209,13 +209,13 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
                       onClick={() => onChange({ ...filters, [key]: !active })}
                       style={{
                         padding: '5px 11px',
-                        border: `1px solid ${active ? activeColor : '#e6dfd0'}`,
+                        border: `1px solid ${active ? activeColor : 'var(--line-tan)'}`,
                         borderRadius: 20,
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
-                        background: active ? activeColor : '#fff',
-                        color: active ? '#fff' : '#1b1712',
+                        background: active ? activeColor : 'var(--paper)',
+                        color: active ? 'var(--paper)' : 'var(--ink-warm)',
                         fontFamily: 'inherit',
                       }}
                     >
@@ -233,14 +233,14 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
                 justifyContent: 'space-between',
                 marginTop: 14,
                 paddingTop: 12,
-                borderTop: '1px solid #e6dfd0',
+                borderTop: '1px solid var(--line-tan)',
               }}
             >
               <button
                 onClick={clearAll}
                 style={{
                   fontSize: 12,
-                  color: '#8a8272',
+                  color: 'var(--grey-450)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
@@ -255,8 +255,8 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: '#fff',
-                  background: '#4a6fd4',
+                  color: 'var(--paper)',
+                  background: 'var(--info-soft)',
                   border: 'none',
                   padding: '5px 14px',
                   borderRadius: 6,
@@ -279,15 +279,15 @@ export function CommsFilterBar({ filters, search, activeCount, onChange, onSearc
         onChange={e => onSearchChange(e.target.value)}
         placeholder="Search…"
         style={{
-          border: '1px solid #e6dfd0',
+          border: '1px solid var(--line-tan)',
           borderRadius: 8,
           padding: '7px 11px',
           fontSize: 12.5,
           fontFamily: 'DM Sans, sans-serif',
           width: 180,
           outline: 'none',
-          color: '#1b1712',
-          background: '#fff',
+          color: 'var(--ink-warm)',
+          background: 'var(--paper)',
         }}
       />
 

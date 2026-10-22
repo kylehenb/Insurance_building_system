@@ -194,7 +194,7 @@ export default function MobileOrderReview({
     <div style={{ minHeight: '100dvh', background: C.bg, fontFamily: font, color: C.text }}>
       {/* Header */}
       <header style={{
-        position: 'sticky', top: 0, zIndex: 10, background: C.text, color: '#f5f2ee',
+        position: 'sticky', top: 0, zIndex: 10, background: C.text, color: 'var(--surface)',
         padding: 'calc(env(safe-area-inset-top) + 12px) 16px 12px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
       }}>
@@ -345,7 +345,7 @@ export default function MobileOrderReview({
                     padding: '12px', fontSize: 16, fontFamily: font, color: C.body, resize: 'vertical', marginBottom: 14,
                   }}
                 />
-                <button style={{ ...bigBtn, background: C.red, color: '#ffffff', opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={handleReject}>
+                <button style={{ ...bigBtn, background: C.red, color: 'var(--paper)', opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={handleReject}>
                   {busy ? 'Rejecting…' : 'Confirm Reject'}
                 </button>
               </>

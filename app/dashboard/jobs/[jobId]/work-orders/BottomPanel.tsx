@@ -55,11 +55,11 @@ function GaryPill({ state }: { state: string | null }) {
 }
 
 function InvoiceChain({ extStatus }: { extStatus: string | null }) {
-  if (!extStatus) return <span style={{ fontSize: 10, color: '#9a9590' }}>—</span>
+  if (!extStatus) return <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>—</span>
   const step = INVOICE_CHAIN_STEPS.find(s => s.key === extStatus)
   const label = step?.label ?? extStatus
   return (
-    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: 'var(--warning-bg)', color: 'var(--warning-dark)', border: '1px solid var(--warning-soft)', whiteSpace: 'nowrap' }}>
       {label}
     </span>
   )
@@ -73,7 +73,7 @@ function LockedBadge() {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-label="Locked"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#eff4ff', color: '#1e40af', border: '1px solid #bfdbfe', cursor: 'default' }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#eff4ff', color: 'var(--info-dark)', border: '1px solid #bfdbfe', cursor: 'default' }}
     >
       <Lock size={11} strokeWidth={2.2} />
       {hover && 'Locked'}
@@ -90,7 +90,7 @@ function CancelWOButton({ onClick }: { onClick: () => void }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-label="Cancel work order"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: hover ? '#fee2e2' : '#fff', color: '#991b1b', border: '1px solid #fca5a5', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: hover ? 'var(--danger-bg-3)' : 'var(--paper)', color: 'var(--danger-dark)', border: '1px solid var(--danger-soft)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
     >
       <Trash2 size={11} strokeWidth={2.2} />
       {hover && 'Cancel'}
@@ -167,7 +167,7 @@ function ScopeItemEditRow({
 
   function readSpan(value: string, mono = false): React.ReactElement {
     return (
-      <span style={{ fontFamily: mono ? 'DM Mono, monospace' : 'DM Sans, sans-serif', fontSize: 10, color: '#5a5650', display: 'block', padding: '3px 4px' }}>
+      <span style={{ fontFamily: mono ? 'DM Mono, monospace' : 'DM Sans, sans-serif', fontSize: 10, color: 'var(--body-soft)', display: 'block', padding: '3px 4px' }}>
         {value || '—'}
       </span>
     )
@@ -178,7 +178,7 @@ function ScopeItemEditRow({
   return (
     <tr style={{ background: rowBg }}>
       {/* Index */}
-      <td style={{ width: 28, padding: '4px 6px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590', textAlign: 'center', textDecoration: deleted ? 'line-through' : 'none' }}>
+      <td style={{ width: 28, padding: '4px 6px', fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--subtle-2)', textAlign: 'center', textDecoration: deleted ? 'line-through' : 'none' }}>
         {index + 1}
       </td>
 
@@ -260,7 +260,7 @@ function ScopeItemEditRow({
 
       {/* Subtotal — read-only, auto-calculated */}
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: deleted ? '#9a9590' : '#5a5650', display: 'block', padding: '3px 4px', textDecoration: deleted ? 'line-through' : 'none' }}>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: deleted ? 'var(--subtle-2)' : 'var(--body-soft)', display: 'block', padding: '3px 4px', textDecoration: deleted ? 'line-through' : 'none' }}>
           {aud.format(computedTotal)}
         </span>
       </td>
@@ -271,7 +271,7 @@ function ScopeItemEditRow({
           <button
             onClick={onToggleDelete}
             title={deleted ? 'Restore item' : 'Remove item'}
-            style={{ fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: deleted ? '#2d6a4f' : '#991b1b', padding: '2px 4px', borderRadius: 3, lineHeight: 1 }}
+            style={{ fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: deleted ? 'var(--forest)' : 'var(--danger-dark)', padding: '2px 4px', borderRadius: 3, lineHeight: 1 }}
           >
             {deleted ? '↩' : '×'}
           </button>
@@ -326,8 +326,8 @@ function NewItemRow({
   }
 
   return (
-    <tr style={{ background: '#f0fdf4', borderTop: '1px dashed #86efac' }}>
-      <td style={{ padding: '4px 6px', width: 28, color: '#9a9590', fontSize: 10, textAlign: 'center' }}>+</td>
+    <tr style={{ background: 'var(--success-bg-2)', borderTop: '1px dashed #86efac' }}>
+      <td style={{ padding: '4px 6px', width: 28, color: 'var(--subtle-2)', fontSize: 10, textAlign: 'center' }}>+</td>
       <td style={{ padding: '4px 6px', minWidth: 160 }}>
         <input
           placeholder={`New ${tradeLabel} item…`}
@@ -356,7 +356,7 @@ function NewItemRow({
         <input type="number" value={form.rate_materials as number} onChange={e => field('rate_materials', e.target.value)} style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', width: 96 }} />
       </td>
       <td style={{ padding: '4px 6px', width: 100 }}>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#5a5650', display: 'block', padding: '3px 4px' }}>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--body-soft)', display: 'block', padding: '3px 4px' }}>
           {aud.format(computedTotal)}
         </span>
       </td>
@@ -371,7 +371,7 @@ function NewItemRow({
             borderRadius: 4,
             border: '1px solid #86efac',
             background: form.item_description.trim() ? '#16a34a' : '#d1fae5',
-            color: form.item_description.trim() ? '#fff' : '#9a9590',
+            color: form.item_description.trim() ? 'var(--paper)' : 'var(--subtle-2)',
             cursor: form.item_description.trim() ? 'pointer' : 'not-allowed',
           }}
         >
@@ -402,15 +402,15 @@ function ClaimItemRow({
   }
 
   return (
-    <tr style={{ background: '#fef3e2', borderTop: '1px dashed #fcd38d' }}>
-      <td style={{ padding: '4px 6px', width: 28, color: '#92400e', fontSize: 10, textAlign: 'center' }}>+</td>
+    <tr style={{ background: 'var(--warning-bg)', borderTop: '1px dashed var(--warning-soft)' }}>
+      <td style={{ padding: '4px 6px', width: 28, color: 'var(--warning-dark)', fontSize: 10, textAlign: 'center' }}>+</td>
       <td colSpan={5} style={{ padding: '4px 6px' }}>
         <select
           value={selected}
           onChange={e => setSelected(e.target.value)}
           style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: 10, padding: '3px 6px', borderRadius: 4,
-            border: '1px solid #fcd38d', background: '#fff', color: '#1a1a1a', width: '100%', maxWidth: 420,
+            border: '1px solid var(--warning-soft)', background: 'var(--paper)', color: 'var(--ink)', width: '100%', maxWidth: 420,
           }}
         >
           <option value="">Add an unallocated item from another trade…</option>
@@ -427,9 +427,9 @@ function ClaimItemRow({
           disabled={!selected}
           style={{
             fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-            border: '1px solid #fcd38d',
-            background: selected ? '#92400e' : '#fde8c8',
-            color: selected ? '#fff' : '#9a9590',
+            border: '1px solid var(--warning-soft)',
+            background: selected ? 'var(--warning-dark)' : '#fde8c8',
+            color: selected ? 'var(--paper)' : 'var(--subtle-2)',
             cursor: selected ? 'pointer' : 'not-allowed',
           }}
         >
@@ -529,7 +529,7 @@ function ScopeItemsEditor({
   let globalIdx = 0
 
   return (
-    <div style={{ background: '#faf8f5', borderTop: '1px solid #e8e4de', overflowX: 'auto' }}>
+    <div style={{ background: 'var(--surface-8)', borderTop: '1px solid var(--line-4)', overflowX: 'auto' }}>
       {/* Shared datalist for room suggestions — one per WO to avoid cross-contamination */}
       <datalist id={datalistId}>
         {roomOptions.map(r => <option key={r} value={r} />)}
@@ -537,10 +537,10 @@ function ScopeItemsEditor({
 
       {isLocked && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', background: '#eff4ff', borderBottom: '1px solid #bfdbfe' }}>
-          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', letterSpacing: '.04em' }}>
+          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: 'var(--info-dark)', color: 'var(--paper)', letterSpacing: '.04em' }}>
             LOCKED
           </span>
-          <span style={{ fontSize: 10, color: '#1e40af' }}>
+          <span style={{ fontSize: 10, color: 'var(--info-dark)' }}>
             This work order has been sent and locked — scope items are read-only.
           </span>
         </div>
@@ -564,7 +564,7 @@ function ScopeItemsEditor({
             return (
               <React.Fragment key={room}>
                 <tr>
-                  <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid #e8e4de', borderTop: '4px solid #faf8f5' }}>
+                  <td colSpan={8} style={{ padding: '4px 10px', background: '#f0ede8', borderBottom: '1px solid var(--line-4)', borderTop: '4px solid var(--surface-8)' }}>
                     {!isLocked && editingRoom === room ? (
                       <input
                         autoFocus
@@ -575,13 +575,13 @@ function ScopeItemsEditor({
                           if (e.key === 'Enter') handleRenameRoom(room, roomItems)
                           if (e.key === 'Escape') setEditingRoom(null)
                         }}
-                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650', background: '#fff', border: '1px solid #c5bfb8', borderRadius: 3, padding: '1px 5px', outline: 'none', width: 140 }}
+                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--body-soft)', background: 'var(--paper)', border: '1px solid #c5bfb8', borderRadius: 3, padding: '1px 5px', outline: 'none', width: 140 }}
                       />
                     ) : (
                       <span
                         title={!isLocked ? 'Click to rename room' : undefined}
                         onClick={!isLocked ? () => { setEditingRoom(room); setEditRoomValue(room) } : undefined}
-                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#5a5650', cursor: !isLocked ? 'text' : 'default' }}
+                        style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--body-soft)', cursor: !isLocked ? 'text' : 'default' }}
                       >
                         {room}
                       </span>
@@ -625,7 +625,7 @@ function ScopeItemsEditor({
         </tbody>
       </table>
       {items.length === 0 && (
-        <div style={{ padding: '8px 16px', fontSize: 10, color: '#9a9590' }}>
+        <div style={{ padding: '8px 16px', fontSize: 10, color: 'var(--subtle-2)' }}>
           No scope items yet — add one above.
         </div>
       )}
@@ -702,13 +702,13 @@ function WORow({
 
   return (
     <>
-      <tr style={{ background: expanded ? '#f5f2ee' : undefined }}>
+      <tr style={{ background: expanded ? 'var(--surface)' : undefined }}>
         {/* Expand toggle */}
         <td style={{ ...TD, width: 28, textAlign: 'center', padding: '6px 4px' }}>
           <button
             onClick={() => setExpanded(e => !e)}
             title={expanded ? 'Collapse scope' : 'Expand scope items'}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: '#9a9590', padding: 2, lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--subtle-2)', padding: 2, lineHeight: 1 }}
           >
             {expanded ? '▼' : '▶'}
           </button>
@@ -728,7 +728,7 @@ function WORow({
                   onUpdate(wo.id, { trade_name: localTradeName || undefined })
                 }
               }}
-              style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', maxWidth: '130px', width: '100%' }}
+              style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--line-strong)', background: 'var(--paper)', color: 'var(--ink)', maxWidth: '130px', width: '100%' }}
             >
               <option value="">Select trade…</option>
               {tradeOptions.map(t => (
@@ -744,7 +744,7 @@ function WORow({
         </td>
 
         {/* Contractor */}
-        <td style={{ ...TD, color: '#1a1a1a', maxWidth: '140px', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+        <td style={{ ...TD, color: 'var(--ink)', maxWidth: '140px', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
           {isEditable ? (
             <select
               value={localTradeId}
@@ -752,7 +752,7 @@ function WORow({
               onBlur={() => {
                 if (localTradeId !== (wo.trade_id || '')) onUpdate(wo.id, { trade_id: localTradeId || undefined })
               }}
-              style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', maxWidth: '140px', width: '100%' }}
+              style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--line-strong)', background: 'var(--paper)', color: 'var(--ink)', maxWidth: '140px', width: '100%' }}
             >
               <option value="">Select contractor...</option>
               {eligibleTrades.map(t => (
@@ -760,7 +760,7 @@ function WORow({
               ))}
             </select>
           ) : (
-            wo.trade?.business_name ?? <span style={{ color: '#991b1b', fontSize: 10 }}>No contractor</span>
+            wo.trade?.business_name ?? <span style={{ color: 'var(--danger-dark)', fontSize: 10 }}>No contractor</span>
           )}
         </td>
 
@@ -774,7 +774,7 @@ function WORow({
         <td style={{ ...MONO }}>{formatEstHours(wo.estimated_hours)}</td>
 
         {/* Lag */}
-        <td style={{ ...MONO, color: wo.lagDays > 0 ? '#92400e' : '#9a9590' }}>
+        <td style={{ ...MONO, color: wo.lagDays > 0 ? 'var(--warning-dark)' : 'var(--subtle-2)' }}>
           {wo.lagDays > 0 ? `${wo.lagDays}d` : '—'}
         </td>
 
@@ -796,10 +796,10 @@ function WORow({
                   const saveValue = (newValue !== null && Math.abs(newValue - wo.lineItemsTotal) < 0.01) ? null : newValue
                   if (saveValue !== wo.agreed_amount) onUpdate(wo.id, { agreed_amount: saveValue })
                 }}
-                style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#fff', color: '#1a1a1a', width: 80 }}
+                style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--line-strong)', background: 'var(--paper)', color: 'var(--ink)', width: 80 }}
               />
               {wo.agreed_amount !== null && Math.abs(wo.agreed_amount - wo.lineItemsTotal) > 0.01 && (
-                <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4, background: 'var(--warning-bg)', color: 'var(--warning-dark)', border: '1px solid var(--warning-soft)', whiteSpace: 'nowrap' }}>
                   Manual
                 </span>
               )}
@@ -824,7 +824,7 @@ function WORow({
               {xeroStyle.label}
             </span>
           ) : (
-            <span style={{ fontSize: 10, color: '#9a9590' }}>—</span>
+            <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>—</span>
           )}
         </td>
 
@@ -835,9 +835,9 @@ function WORow({
               href={`/print/work-orders/${wo.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#1a1a1a', color: '#fff', border: '1px solid #1a1a1a', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
+              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: 'var(--ink)', color: 'var(--paper)', border: '1px solid var(--ink)', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
               onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = '#333'; t.style.borderColor = '#333' }}
-              onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.borderColor = '#1a1a1a' }}
+              onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = 'var(--ink)'; t.style.borderColor = 'var(--ink)' }}
             >
               Preview
             </a>
@@ -846,7 +846,7 @@ function WORow({
               target="_blank"
               rel="noopener noreferrer"
               title="Open the trade PDF in a new tab"
-              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#1a1a1a', border: '1px solid #ddd8d0', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
+              style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--line-strong)', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}
             >
               PDF
             </a>
@@ -860,9 +860,9 @@ function WORow({
               <button
                 onClick={() => onLock(wo.id)}
                 title="Send and lock work order"
-                style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: '#1e40af', color: '#fff', border: '1px solid #1e40af', cursor: 'pointer' }}
+                style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: 'var(--info-dark)', color: 'var(--paper)', border: '1px solid var(--info-dark)', cursor: 'pointer' }}
                 onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#1d3fad' }}
-                onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#1e40af' }}
+                onMouseLeave={e => { const t = e.currentTarget; t.style.background = 'var(--info-dark)' }}
               >
                 Send & Lock
               </button>
@@ -879,9 +879,9 @@ function WORow({
                   onDelete(wo.id)
                 }}
                 title="Delete work order"
-                style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#fff', color: '#991b1b', border: '1px solid #fca5a5', cursor: 'pointer' }}
-                onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#fee2e2' }}
-                onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#fff' }}
+                style={{ fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: 'var(--paper)', color: 'var(--danger-dark)', border: '1px solid var(--danger-soft)', cursor: 'pointer' }}
+                onMouseEnter={e => { const t = e.currentTarget; t.style.background = 'var(--danger-bg-3)' }}
+                onMouseLeave={e => { const t = e.currentTarget; t.style.background = 'var(--paper)' }}
               >
                 Delete
               </button>
@@ -893,7 +893,7 @@ function WORow({
       {/* Expanded scope editor */}
       {expanded && (
         <tr>
-          <td colSpan={15} style={{ padding: 0, borderBottom: '1px solid #e8e4de' }}>
+          <td colSpan={15} style={{ padding: 0, borderBottom: '1px solid var(--line-4)' }}>
             <ScopeItemsEditor
               wo={wo}
               isLocked={isLocked}
@@ -1032,11 +1032,11 @@ function UnallocatedSection({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: '#fef3e2', borderBottom: '1px solid #fcd38d', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: '#92400e', color: '#fff', letterSpacing: '.03em' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: 'var(--warning-bg)', borderBottom: '1px solid var(--warning-soft)', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
+        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'var(--warning-dark)', color: 'var(--paper)', letterSpacing: '.03em' }}>
           Unallocated works
         </span>
-        <span style={{ fontSize: 10, color: '#92400e' }}>
+        <span style={{ fontSize: 10, color: 'var(--warning-dark)' }}>
           {groups.length} trade{groups.length !== 1 ? 's' : ''} without a work order
         </span>
       </div>
@@ -1047,29 +1047,29 @@ function UnallocatedSection({
         const subtotal = items.reduce((s, i) => s + (i.line_total ?? 0), 0)
 
         return (
-          <div key={`${quoteId}:${trade}`} style={{ borderBottom: '1px solid #fcd38d', padding: '10px 20px' }}>
+          <div key={`${quoteId}:${trade}`} style={{ borderBottom: '1px solid var(--warning-soft)', padding: '10px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#92400e' }}>{trade}</span>
-              <span style={{ fontSize: 9, color: '#9a9590', fontFamily: 'DM Mono, monospace' }}>{quoteRef}</span>
-              <span style={{ fontSize: 9, color: '#9a9590', fontFamily: 'DM Mono, monospace' }}>{aud.format(subtotal)} ex GST</span>
-              <span style={{ fontSize: 9, color: '#9a9590' }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--warning-dark)' }}>{trade}</span>
+              <span style={{ fontSize: 9, color: 'var(--subtle-2)', fontFamily: 'DM Mono, monospace' }}>{quoteRef}</span>
+              <span style={{ fontSize: 9, color: 'var(--subtle-2)', fontFamily: 'DM Mono, monospace' }}>{aud.format(subtotal)} ex GST</span>
+              <span style={{ fontSize: 9, color: 'var(--subtle-2)' }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
               <button
                 onClick={() => onAddWorkOrderForTrade(quoteId, trade)}
-                style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 10px', borderRadius: 4, border: '1px solid #fcd38d', background: '#fff', color: '#92400e', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
-                onMouseEnter={e => { const t = e.currentTarget; t.style.background = '#92400e'; t.style.color = '#fff' }}
-                onMouseLeave={e => { const t = e.currentTarget; t.style.background = '#fff'; t.style.color = '#92400e' }}
+                style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 10px', borderRadius: 4, border: '1px solid var(--warning-soft)', background: 'var(--paper)', color: 'var(--warning-dark)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+                onMouseEnter={e => { const t = e.currentTarget; t.style.background = 'var(--warning-dark)'; t.style.color = 'var(--paper)' }}
+                onMouseLeave={e => { const t = e.currentTarget; t.style.background = 'var(--paper)'; t.style.color = 'var(--warning-dark)' }}
               >
                 + Re-add work order
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {items.slice(0, 5).map(item => (
-                <span key={item.id} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#fef3e2', color: '#92400e', border: '1px solid #fcd38d' }}>
+                <span key={item.id} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'var(--warning-bg)', color: 'var(--warning-dark)', border: '1px solid var(--warning-soft)' }}>
                   {item.item_description ?? '(no description)'}
                 </span>
               ))}
               {items.length > 5 && (
-                <span style={{ fontSize: 9, color: '#9a9590' }}>+{items.length - 5} more</span>
+                <span style={{ fontSize: 9, color: 'var(--subtle-2)' }}>+{items.length - 5} more</span>
               )}
             </div>
           </div>
@@ -1157,17 +1157,17 @@ export function BottomPanel({
   }
 
   return (
-    <div style={{ flexShrink: 0, borderTop: '1px solid #ddd8d0', background: '#fff', display: 'flex', flexDirection: 'column', height: 'auto', transition: 'height .2s ease' }}>
+    <div style={{ flexShrink: 0, borderTop: '1px solid var(--line-strong)', background: 'var(--paper)', display: 'flex', flexDirection: 'column', height: 'auto', transition: 'height .2s ease' }}>
       {/* Header */}
       <div
         onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', padding: '7px 20px', background: '#ede9e3', borderBottom: '1px solid #ddd8d0', cursor: 'pointer', gap: 9, userSelect: 'none', flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', padding: '7px 20px', background: '#ede9e3', borderBottom: '1px solid var(--line-strong)', cursor: 'pointer', gap: 9, userSelect: 'none', flexShrink: 0 }}
       >
-        <span style={{ fontSize: 9, color: '#9a9590' }}>{open ? '▲' : '▼'}</span>
-        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.09em', color: '#5a5650', flex: 1 }}>
+        <span style={{ fontSize: 9, color: 'var(--subtle-2)' }}>{open ? '▲' : '▼'}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--body-soft)', flex: 1 }}>
           All work orders — by quote
         </span>
-        <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: '#9a9590' }}>
+        <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: 'var(--subtle-2)' }}>
           {workOrders.length} orders
         </span>
       </div>
@@ -1179,28 +1179,28 @@ export function BottomPanel({
             const qWOs = quotedWOs.filter(wo => wo.quote_id === quote.id)
             return (
               <div key={quote.id}>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: '#f5f2ee', borderBottom: '1px solid #e8e4de', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: '#1a1a1a', color: '#fff', letterSpacing: '.03em' }}>
+                <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: 'var(--surface)', borderBottom: '1px solid var(--line-4)', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
+                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'var(--ink)', color: 'var(--paper)', letterSpacing: '.03em' }}>
                     {quote.quote_ref ?? `Q-${quote.id.slice(0, 8)}`}
                   </span>
-                  <span style={{ fontSize: 10, color: '#9a9590' }}>
+                  <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>
                     {aud.format(quoteTotal(quote.id))} ex GST · {qWOs.length} orders
                   </span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                     <button
                       onClick={handleSyncFromQuote}
                       disabled={syncing}
-                      style={{ padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid #ddd8d0', borderRadius: 4, background: '#fff', color: '#9a9590', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}
-                      onMouseEnter={e => { if (syncing) return; const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.color = '#fff'; t.style.borderColor = '#1a1a1a' }}
-                      onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#fff'; t.style.color = '#9a9590'; t.style.borderColor = '#ddd8d0' }}
+                      style={{ padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid var(--line-strong)', borderRadius: 4, background: 'var(--paper)', color: 'var(--subtle-2)', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}
+                      onMouseEnter={e => { if (syncing) return; const t = e.target as HTMLElement; t.style.background = 'var(--ink)'; t.style.color = 'var(--paper)'; t.style.borderColor = 'var(--ink)' }}
+                      onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = 'var(--paper)'; t.style.color = 'var(--subtle-2)'; t.style.borderColor = 'var(--line-strong)' }}
                     >
                       {syncing ? 'Syncing…' : '↻ Sync from quote'}
                     </button>
                     <button
                       onClick={() => onAddToQuote(quote.id)}
-                      style={{ padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid #ddd8d0', borderRadius: 4, background: '#fff', color: '#9a9590', cursor: 'pointer' }}
-                      onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.color = '#fff'; t.style.borderColor = '#1a1a1a' }}
-                      onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#fff'; t.style.color = '#9a9590'; t.style.borderColor = '#ddd8d0' }}
+                      style={{ padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid var(--line-strong)', borderRadius: 4, background: 'var(--paper)', color: 'var(--subtle-2)', cursor: 'pointer' }}
+                      onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = 'var(--ink)'; t.style.color = 'var(--paper)'; t.style.borderColor = 'var(--ink)' }}
+                      onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = 'var(--paper)'; t.style.color = 'var(--subtle-2)'; t.style.borderColor = 'var(--line-strong)' }}
                     >
                       + Add to quote
                     </button>
@@ -1222,7 +1222,7 @@ export function BottomPanel({
                     onClaimScopeItem={onClaimScopeItem}
                   />
                 ) : (
-                  <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>
+                  <div style={{ padding: '10px 20px', fontSize: 11, color: 'var(--subtle-2)' }}>
                     No work orders for this quote yet.
                   </div>
                 )}
@@ -1240,16 +1240,16 @@ export function BottomPanel({
 
           {/* Additional works */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: '#f5f2ee', borderBottom: '1px solid #e8e4de', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'transparent', border: '1px solid #ddd8d0', color: '#5a5650', letterSpacing: '.03em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '6px 20px', background: 'var(--surface)', borderBottom: '1px solid var(--line-4)', gap: 8, position: 'sticky', top: 0, zIndex: 4 }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'transparent', border: '1px solid var(--line-strong)', color: 'var(--body-soft)', letterSpacing: '.03em' }}>
                 Additional works
               </span>
-              <span style={{ fontSize: 10, color: '#9a9590' }}>Make safes · Specialist reports · Non-quoted</span>
+              <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>Make safes · Specialist reports · Non-quoted</span>
               <button
                 onClick={onAddAdditional}
-                style={{ marginLeft: 'auto', padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid #ddd8d0', borderRadius: 4, background: '#fff', color: '#9a9590', cursor: 'pointer' }}
-                onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = '#1a1a1a'; t.style.color = '#fff'; t.style.borderColor = '#1a1a1a' }}
-                onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = '#fff'; t.style.color = '#9a9590'; t.style.borderColor = '#ddd8d0' }}
+                style={{ marginLeft: 'auto', padding: '2px 9px', fontSize: 10, fontFamily: 'DM Sans, sans-serif', border: '1px solid var(--line-strong)', borderRadius: 4, background: 'var(--paper)', color: 'var(--subtle-2)', cursor: 'pointer' }}
+                onMouseEnter={e => { const t = e.target as HTMLElement; t.style.background = 'var(--ink)'; t.style.color = 'var(--paper)'; t.style.borderColor = 'var(--ink)' }}
+                onMouseLeave={e => { const t = e.target as HTMLElement; t.style.background = 'var(--paper)'; t.style.color = 'var(--subtle-2)'; t.style.borderColor = 'var(--line-strong)' }}
               >
                 + Add
               </button>
@@ -1270,7 +1270,7 @@ export function BottomPanel({
                 onClaimScopeItem={onClaimScopeItem}
               />
             ) : (
-              <div style={{ padding: '10px 20px', fontSize: 11, color: '#9a9590' }}>
+              <div style={{ padding: '10px 20px', fontSize: 11, color: 'var(--subtle-2)' }}>
                 No additional work orders yet.
               </div>
             )}

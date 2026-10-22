@@ -100,8 +100,8 @@ export function QuoteHeader({
         alignItems: 'center',
         gap: 14,
         padding: '10px 20px',
-        background: '#ffffff',
-        borderBottom: '1px solid #e0dbd4',
+        background: 'var(--paper)',
+        borderBottom: '1px solid var(--line)',
         fontFamily: 'DM Sans, sans-serif',
         flexWrap: 'wrap',
       }}
@@ -111,16 +111,16 @@ export function QuoteHeader({
           fontFamily: 'DM Mono, monospace',
           fontSize: 14,
           fontWeight: 600,
-          color: '#c8b89a',
+          color: 'var(--tan)',
           letterSpacing: '0.02em',
         }}
       >
         {quote.quote_ref ?? '—'}
       </span>
 
-      <span style={{ fontSize: 14, color: '#3a3530', fontWeight: 500 }}>
+      <span style={{ fontSize: 14, color: 'var(--body)', fontWeight: 500 }}>
         {fmt(total)}{' '}
-        <span style={{ fontWeight: 400, color: '#9e998f', fontSize: 12 }}>inc GST</span>
+        <span style={{ fontWeight: 400, color: 'var(--subtle)', fontSize: 12 }}>inc GST</span>
       </span>
 
       {/* Status badge — shows "Ready" in green when ready */}
@@ -163,8 +163,8 @@ export function QuoteHeader({
             borderRadius: 20,
             fontSize: 11,
             fontWeight: 500,
-            background: '#f5f2ee',
-            color: '#9e998f',
+            background: 'var(--surface)',
+            color: 'var(--subtle)',
           }}
         >
           Locked — sent
@@ -179,9 +179,9 @@ export function QuoteHeader({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 11,
             fontWeight: 500,
-            color: cashSettlementActive ? '#475569' : '#9e998f',
+            color: cashSettlementActive ? '#475569' : 'var(--subtle)',
             background: cashSettlementActive ? '#f1f5f9' : 'transparent',
-            border: '1px solid ' + (cashSettlementActive ? '#94a3b8' : '#d8d0c8'),
+            border: '1px solid ' + (cashSettlementActive ? '#94a3b8' : 'var(--line-strong-2)'),
             borderRadius: 20,
             padding: '2px 10px',
             cursor: 'pointer',
@@ -205,16 +205,16 @@ export function QuoteHeader({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#ffffff',
-            background: '#2e7d32',
+            color: 'var(--paper)',
+            background: 'var(--success)',
             border: 'none',
             borderRadius: 6,
             padding: '6px 16px',
             cursor: 'pointer',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--success-dark)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--success)')}
         >
           Mark as Ready
         </button>
@@ -228,16 +228,16 @@ export function QuoteHeader({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#3a3530',
-            background: '#f5f2ee',
-            border: '1px solid #d8d0c8',
+            color: 'var(--body)',
+            background: 'var(--surface)',
+            border: '1px solid var(--line-strong-2)',
             borderRadius: 6,
             padding: '6px 16px',
             cursor: 'pointer',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-tan-3)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
         >
           Unlock and Edit
         </button>
@@ -251,8 +251,8 @@ export function QuoteHeader({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#ffffff',
-            background: '#1a73e8',
+            color: 'var(--paper)',
+            background: 'var(--info)',
             border: 'none',
             borderRadius: 6,
             padding: '6px 16px',
@@ -260,7 +260,7 @@ export function QuoteHeader({
             transition: 'background 0.15s',
           }}
           onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--info)')}
         >
           Send it
         </button>
@@ -274,16 +274,16 @@ export function QuoteHeader({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#9e998f',
-            background: '#f5f2ee',
-            border: '1px solid #e0dbd4',
+            color: 'var(--subtle)',
+            background: 'var(--surface)',
+            border: '1px solid var(--line)',
             borderRadius: 6,
             padding: '6px 16px',
             cursor: 'pointer',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-tan-3)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
         >
           Locked
         </button>
@@ -297,15 +297,15 @@ export function QuoteHeader({
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: '#9e998f',
+            color: 'var(--subtle)',
             fontSize: 16,
             padding: '4px 6px',
             borderRadius: 4,
             lineHeight: 1,
             fontFamily: 'DM Sans, sans-serif',
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--body)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--subtle)')}
         >
           •••
         </button>
@@ -317,8 +317,8 @@ export function QuoteHeader({
               top: 'calc(100% + 6px)',
               right: 0,
               zIndex: 500,
-              background: '#ffffff',
-              border: '1px solid #e0dbd4',
+              background: 'var(--paper)',
+              border: '1px solid var(--line)',
               borderRadius: 8,
               boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
               padding: '4px 0',
@@ -338,7 +338,7 @@ export function QuoteHeader({
                 textAlign: 'left',
                 padding: '7px 14px',
                 fontSize: 12,
-                color: '#3a3530',
+                color: 'var(--body)',
                 background: 'transparent',
                 border: 'none',
                 cursor: previewLoading ? 'default' : 'pointer',
@@ -347,10 +347,10 @@ export function QuoteHeader({
                 fontFamily: 'DM Sans, sans-serif',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
             >
-              <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
+              <span style={{ fontSize: 10, color: 'var(--tan)' }}>👁</span>
               <span>{previewLoading ? 'Saving changes…' : 'Preview Quote'}</span>
             </button>
             <button
@@ -366,7 +366,7 @@ export function QuoteHeader({
                 textAlign: 'left',
                 padding: '7px 14px',
                 fontSize: 12,
-                color: '#3a3530',
+                color: 'var(--body)',
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
@@ -374,10 +374,10 @@ export function QuoteHeader({
                 fontFamily: 'DM Sans, sans-serif',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
             >
-              <span style={{ fontSize: 10, color: '#c8b89a' }}>📋</span>
+              <span style={{ fontSize: 10, color: 'var(--tan)' }}>📋</span>
               <span>Telephone Clearance Certificate</span>
             </button>
           </div>

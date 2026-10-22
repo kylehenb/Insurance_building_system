@@ -225,39 +225,39 @@ export function FilesTab({ jobId }: FilesTabProps) {
         {!showUploadForm ? (
           <button
             onClick={() => setShowUploadForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-line text-[13px] text-subtle hover:bg-surface transition-colors"
           >
             <Upload className="h-4 w-4" />
             Upload file
           </button>
         ) : (
           <div
-            className="bg-white border border-[#e0dbd4] rounded-lg p-4"
+            className="bg-white border border-line rounded-lg p-4"
             style={{ maxWidth: '500px' }}
           >
             <div className="mb-3">
-              <label className="block text-[12px] text-[#9e998f] mb-1">Description (optional)</label>
+              <label className="block text-[12px] text-subtle mb-1">Description (optional)</label>
               <input
                 type="text"
                 value={uploadDescription}
                 onChange={(e) => setUploadDescription(e.target.value)}
                 placeholder="e.g., Roof report, Customer complaint"
-                className="w-full px-3 py-2 text-[13px] border border-[#e0dbd4] rounded-md focus:outline-none focus:border-[#c8b89a]"
+                className="w-full px-3 py-2 text-[13px] border border-line rounded-md focus:outline-none focus:border-tan"
                 disabled={uploading}
               />
             </div>
             <div
               className={`mb-3 border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 isDragging
-                  ? 'border-[#c8b89a] bg-[#faf9f7]'
-                  : 'border-[#e0dbd4] hover:border-[#c8b89a]'
+                  ? 'border-tan bg-surface-3'
+                  : 'border-line hover:border-tan'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
-              <Upload className="h-8 w-8 mx-auto mb-2 text-[#9e998f]" />
-              <p className="text-[13px] text-[#9e998f] mb-2">
+              <Upload className="h-8 w-8 mx-auto mb-2 text-subtle" />
+              <p className="text-[13px] text-subtle mb-2">
                 Drag and drop a file here, or click to browse
               </p>
               <input
@@ -273,14 +273,14 @@ export function FilesTab({ jobId }: FilesTabProps) {
                   setShowUploadForm(false)
                   setUploadDescription('')
                 }}
-                className="px-3 py-1.5 text-[12px] text-[#9e998f] hover:text-[#7a6a58] transition-colors"
+                className="px-3 py-1.5 text-[12px] text-subtle hover:text-brown-500 transition-colors"
                 disabled={uploading}
               >
                 Cancel
               </button>
             </div>
             {uploading && (
-              <p className="text-[12px] text-[#c8b89a] mt-2">Uploading...</p>
+              <p className="text-[12px] text-tan mt-2">Uploading...</p>
             )}
           </div>
         )}
@@ -289,44 +289,44 @@ export function FilesTab({ jobId }: FilesTabProps) {
       {/* Files table */}
       {files.length === 0 ? (
         <div
-          className="flex flex-col items-center justify-center py-16 gap-4 bg-white border border-[#e0dbd4] rounded-lg"
+          className="flex flex-col items-center justify-center py-16 gap-4 bg-white border border-line rounded-lg"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
-          <File className="h-12 w-12 text-[#e0dbd4]" />
-          <p className="text-[13px] text-[#9e998f]">No files attached.</p>
+          <File className="h-12 w-12 text-line" />
+          <p className="text-[13px] text-subtle">No files attached.</p>
         </div>
       ) : (
-        <div className="bg-white border border-[#e0dbd4] rounded-lg overflow-hidden">
+        <div className="bg-white border border-line rounded-lg overflow-hidden">
           <table className="w-full">
             <thead>
               <tr
-                className="border-b border-[#e0dbd4]"
-                style={{ background: '#faf9f7' }}
+                className="border-b border-line"
+                style={{ background: 'var(--surface-3)' }}
               >
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium">
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium">
                   Description
                 </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium">
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium">
                   File Name
                 </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium">
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium">
                   Kind
                 </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium">
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium">
                   Added by
                 </th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium">
+                <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium">
                   Date Added
                 </th>
-                <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-[#9e998f] font-medium w-24">
+                <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-subtle font-medium w-24">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
               {files.map((file) => (
-                <tr key={file.id} className="border-b border-[#f0ece6] hover:bg-[#faf9f7] transition-colors">
-                  <td className="px-4 py-3 text-[13px] text-[#3a3530]">
+                <tr key={file.id} className="border-b border-line-faint hover:bg-surface-3 transition-colors">
+                  <td className="px-4 py-3 text-[13px] text-body">
                     {file.description || '—'}
                   </td>
                   <td className="px-4 py-3 text-[13px]">
@@ -338,27 +338,27 @@ export function FilesTab({ jobId }: FilesTabProps) {
                       {file.file_name}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-[#9e998f]">
+                  <td className="px-4 py-3 text-[13px] text-subtle">
                     {file.file_kind}
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-[#3a3530]">
+                  <td className="px-4 py-3 text-[13px] text-body">
                     {file.added_by}
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-[#9e998f]">
+                  <td className="px-4 py-3 text-[13px] text-subtle">
                     {formatDate(file.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleDownload(file)}
-                        className="p-1.5 text-[#9e998f] hover:text-[#7a6a58] hover:bg-[#f0ece6] rounded transition-colors"
+                        className="p-1.5 text-subtle hover:text-brown-500 hover:bg-line-faint rounded transition-colors"
                         title="Download"
                       >
                         <Download className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(file.id)}
-                        className="p-1.5 text-[#9e998f] hover:text-[#a0524a] hover:bg-[#f0ece6] rounded transition-colors"
+                        className="p-1.5 text-subtle hover:text-rust hover:bg-line-faint rounded transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />

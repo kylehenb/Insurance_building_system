@@ -141,7 +141,7 @@ export function InvoiceToSelect({
       <div style={{
         fontSize: 9,
         fontWeight: 600,
-        color: '#b0a898',
+        color: 'var(--faint)',
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
         marginBottom: 3,
@@ -161,7 +161,7 @@ export function InvoiceToSelect({
           {options.map((option) => (
             <SelectItem key={option.trading_name} value={option.trading_name}>
               {option.trading_name}
-              <span style={{ color: '#9e998f', marginLeft: 8, fontSize: 11 }}>
+              <span style={{ color: 'var(--subtle)', marginLeft: 8, fontSize: 11 }}>
                 ({option.type === 'insurer' ? 'Insurer' : 'Adjuster'}: {option.name})
               </span>
             </SelectItem>

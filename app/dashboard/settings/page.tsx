@@ -125,15 +125,15 @@ export default async function SettingsPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-[#1a1a1a]">Settings</h1>
-        <p className="text-sm text-[#9e998f] mt-1">
+        <h1 className="text-2xl font-semibold text-ink">Settings</h1>
+        <p className="text-sm text-subtle mt-1">
           Manage AI configuration, automation rules, and operational defaults.
         </p>
       </div>
 
       {/* Section 1 — AI & Automation */}
       <div className="mb-8">
-        <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+        <h2 className="text-xs text-subtle uppercase tracking-wider mb-3">
           AI & Automation
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -145,7 +145,7 @@ export default async function SettingsPage() {
 
       {/* Section 2 — Operations */}
       <div className="mb-8">
-        <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+        <h2 className="text-xs text-subtle uppercase tracking-wider mb-3">
           Operations
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -157,7 +157,7 @@ export default async function SettingsPage() {
 
       {/* Section 3 — Integrations */}
       <div className="mb-8">
-        <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+        <h2 className="text-xs text-subtle uppercase tracking-wider mb-3">
           Integrations
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -169,7 +169,7 @@ export default async function SettingsPage() {
 
       {/* Section 4 — Account & Tenancy */}
       <div className="mb-8">
-        <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+        <h2 className="text-xs text-subtle uppercase tracking-wider mb-3">
           Account & Tenancy
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -185,19 +185,19 @@ export default async function SettingsPage() {
 function SettingsCard({ card }: { card: SettingsCard }) {
   if (!card.route) {
     return (
-      <div className="bg-white rounded-lg border border-[#e8e4e0] p-4 opacity-60">
+      <div className="bg-white rounded-lg border border-line-3 p-4 opacity-60">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#f5f2ee] flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center flex-shrink-0">
             {card.icon}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-[#1a1a1a] text-sm mb-1">
+            <h3 className="font-semibold text-ink text-sm mb-1">
               {card.name}
             </h3>
-            <p className="text-xs text-[#9e998f]">{card.description}</p>
+            <p className="text-xs text-subtle">{card.description}</p>
           </div>
           <div className="flex-shrink-0">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-[#e8e4e0] text-[#9e998f]">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-line-3 text-subtle">
               CODE ONLY
             </span>
           </div>
@@ -209,20 +209,20 @@ function SettingsCard({ card }: { card: SettingsCard }) {
   return (
     <a
       href={card.route}
-      className="block bg-white rounded-lg border border-[#e8e4e0] p-4 hover:shadow-md transition-shadow"
+      className="block bg-white rounded-lg border border-line-3 p-4 hover:shadow-md transition-shadow"
     >
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#f5f2ee] flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center flex-shrink-0">
           {card.icon}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-[#1a1a1a] text-sm mb-1">
+          <h3 className="font-semibold text-ink text-sm mb-1">
             {card.name}
           </h3>
-          <p className="text-xs text-[#9e998f]">{card.description}</p>
+          <p className="text-xs text-subtle">{card.description}</p>
         </div>
         <div className="flex-shrink-0">
-          <ChevronRight className="w-4 h-4 text-[#c8b89a]" />
+          <ChevronRight className="w-4 h-4 text-tan" />
         </div>
       </div>
     </a>

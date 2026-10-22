@@ -317,11 +317,11 @@ export default function EmailTemplatesSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
+      <div className="min-h-screen bg-surface p-8">
         <div className="max-w-6xl mx-auto">
-          <div className="h-8 bg-[#e8e4e0] rounded w-48 mb-2"></div>
-          <div className="h-4 bg-[#e8e4e0] rounded w-96 mb-8"></div>
-          <div className="h-96 bg-white border border-[#e8e4e0] rounded-lg"></div>
+          <div className="h-8 bg-line-3 rounded w-48 mb-2"></div>
+          <div className="h-4 bg-line-3 rounded w-96 mb-8"></div>
+          <div className="h-96 bg-white border border-line-3 rounded-lg"></div>
         </div>
       </div>
     )
@@ -329,8 +329,8 @@ export default function EmailTemplatesSettingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
-        <div className="max-w-6xl mx-auto text-[#9e998f]">{error}</div>
+      <div className="min-h-screen bg-surface p-8">
+        <div className="max-w-6xl mx-auto text-subtle">{error}</div>
       </div>
     )
   }
@@ -340,16 +340,16 @@ export default function EmailTemplatesSettingsPage() {
   const rendered = preview
     ? { subject: renderTemplate(subject, preview.vars), body: renderTemplate(body, preview.vars) }
     : null
-  const labelCls = 'block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2'
+  const labelCls = 'block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2'
   const versionBtn = (active: boolean) =>
-    `w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${active ? 'bg-[#f5f2ee] text-[#1a1a1a] font-medium' : 'text-[#5a5650] hover:bg-[#fafaf9]'}`
+    `w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${active ? 'bg-surface text-ink font-medium' : 'text-body-soft hover:bg-surface-5'}`
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] p-4 md:p-8">
+    <div className="min-h-screen bg-surface p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-[#1a1a1a]">Email Templates</h1>
-          <p className="text-sm text-[#9e998f] mt-1">
+          <h1 className="text-2xl font-semibold text-ink">Email Templates</h1>
+          <p className="text-sm text-subtle mt-1">
             The standard wording for emails the system sends. Auto send uses it as-is; Customise send starts from it so you can edit a single email without changing the template.
           </p>
         </div>
@@ -360,31 +360,31 @@ export default function EmailTemplatesSettingsPage() {
             {EMAIL_SEND_TYPES.map(type => {
               const active = type.sendType === selection.sendType
               return (
-                <div key={type.sendType} className="bg-white border border-[#e8e4e0] rounded-lg p-3">
+                <div key={type.sendType} className="bg-white border border-line-3 rounded-lg p-3">
                   <button
                     onClick={() => select({ sendType: type.sendType, clientId: null })}
                     className="w-full text-left px-1 mb-2"
                   >
-                    <div className="font-semibold text-sm text-[#1a1a1a]">{type.label}</div>
-                    <div className="text-xs text-[#9e998f] mt-0.5 leading-snug">{type.description}</div>
+                    <div className="font-semibold text-sm text-ink">{type.label}</div>
+                    <div className="text-xs text-subtle mt-0.5 leading-snug">{type.description}</div>
                   </button>
                   {active && (
-                    <div className="space-y-0.5 border-t border-[#e8e4e0] pt-2">
+                    <div className="space-y-0.5 border-t border-line-3 pt-2">
                       <button onClick={() => select({ sendType: type.sendType, clientId: null })} className={versionBtn(selection.clientId === null)}>
                         Standard
-                        <span className="block text-[11px] text-[#9e998f] font-normal">All clients</span>
+                        <span className="block text-[11px] text-subtle font-normal">All clients</span>
                       </button>
                       {versionClientIds.map(id => (
                         <button key={id} onClick={() => select({ sendType: type.sendType, clientId: id })} className={versionBtn(selection.clientId === id)}>
                           {clientName(id)}
-                          {!savedClientIds.includes(id) && <span className="block text-[11px] text-[#b45309] font-normal">Not saved</span>}
+                          {!savedClientIds.includes(id) && <span className="block text-[11px] text-warning font-normal">Not saved</span>}
                         </button>
                       ))}
                       {addableClients.length > 0 && (
                         <select
                           value=""
                           onChange={e => addClientVersion(e.target.value)}
-                          className="w-full mt-2 px-2 py-1.5 text-xs border border-[#e8e4e0] rounded-md bg-[#fafaf9] text-[#5a5650] focus:outline-none focus:border-[#c9a96e]"
+                          className="w-full mt-2 px-2 py-1.5 text-xs border border-line-3 rounded-md bg-surface-5 text-body-soft focus:outline-none focus:border-gold"
                         >
                           <option value="">+ Version for a client…</option>
                           {addableClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -395,23 +395,23 @@ export default function EmailTemplatesSettingsPage() {
                 </div>
               )
             })}
-            <p className="text-xs text-[#9e998f] px-1 leading-relaxed">
+            <p className="text-xs text-subtle px-1 leading-relaxed">
               Quotes, invoices and other emails will appear here as their send buttons are connected.
             </p>
           </aside>
 
           {/* ── Editor and preview ───────────────────────────────────────── */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 min-w-0">
-            <section className="bg-white border border-[#e8e4e0] rounded-lg p-5 min-w-0">
+            <section className="bg-white border border-line-3 rounded-lg p-5 min-w-0">
               <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <span className="font-semibold text-[#1a1a1a]">
+                <span className="font-semibold text-ink">
                   {selection.clientId ? clientName(selection.clientId) : 'Standard'}
                 </span>
                 {usingBuiltIn && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#f5f2ee] text-[#9e998f]">Built-in default — not yet customised</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-surface text-subtle">Built-in default — not yet customised</span>
                 )}
                 {isUnsavedClientVersion && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#fef3e2] text-[#92400e]">Copied from standard — save to use it</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-warning-bg text-warning-dark">Copied from standard — save to use it</span>
                 )}
               </div>
 
@@ -422,7 +422,7 @@ export default function EmailTemplatesSettingsPage() {
                   value={subject}
                   onChange={e => setSubject(e.target.value)}
                   onFocus={() => { lastFocused.current = 'subject' }}
-                  className="w-full p-2.5 border border-[#e8e4e0] rounded-md bg-[#fafaf9] text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e]"
+                  className="w-full p-2.5 border border-line-3 rounded-md bg-surface-5 text-sm text-ink focus:outline-none focus:border-gold"
                 />
               </div>
 
@@ -433,12 +433,12 @@ export default function EmailTemplatesSettingsPage() {
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   onFocus={() => { lastFocused.current = 'body' }}
-                  className="w-full min-h-[300px] p-3 border border-[#e8e4e0] rounded-md bg-[#fafaf9] text-sm text-[#1a1a1a] leading-relaxed focus:outline-none focus:border-[#c9a96e] resize-y"
+                  className="w-full min-h-[300px] p-3 border border-line-3 rounded-md bg-surface-5 text-sm text-ink leading-relaxed focus:outline-none focus:border-gold resize-y"
                 />
               </div>
 
               <div className="mb-4">
-                <div className="text-xs text-[#9e998f] mb-1.5">Insert a placeholder at the cursor:</div>
+                <div className="text-xs text-subtle mb-1.5">Insert a placeholder at the cursor:</div>
                 <div className="flex flex-wrap gap-1.5">
                   {tokens.map(t => (
                     <button
@@ -446,19 +446,19 @@ export default function EmailTemplatesSettingsPage() {
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => insertToken(t.key)}
                       title={`{${t.key}}`}
-                      className="text-xs px-2 py-1 rounded border border-[#e8e4e0] bg-white text-[#5a5650] hover:border-[#c9a96e] hover:text-[#1a1a1a] transition-colors"
+                      className="text-xs px-2 py-1 rounded border border-line-3 bg-white text-body-soft hover:border-gold hover:text-ink transition-colors"
                     >
                       {t.label}
                     </button>
                   ))}
                 </div>
                 {missingTokens.length > 0 && (
-                  <p className="text-xs text-[#b45309] mt-2">
+                  <p className="text-xs text-warning mt-2">
                     This email needs {missingTokens.map(k => `{${k}}`).join(', ')}. If it’s missing, the link is added at the end automatically.
                   </p>
                 )}
                 {unknownTokens.length > 0 && (
-                  <p className="text-xs text-[#b45309] mt-2">
+                  <p className="text-xs text-warning mt-2">
                     Not a recognised placeholder, so it will be sent exactly as typed: {unknownTokens.map(k => `{${k}}`).join(', ')}
                   </p>
                 )}
@@ -466,7 +466,7 @@ export default function EmailTemplatesSettingsPage() {
 
               <div className="flex items-center gap-3 flex-wrap">
                 {(currentRow || selection.clientId) && (
-                  <button onClick={handleRemove} className="text-xs text-[#991b1b] hover:underline">
+                  <button onClick={handleRemove} className="text-xs text-danger-dark hover:underline">
                     {selection.clientId ? 'Delete this version' : 'Reset to built-in'}
                   </button>
                 )}
@@ -474,14 +474,14 @@ export default function EmailTemplatesSettingsPage() {
                   {saveError && <span className="text-xs text-red-600">{saveError}</span>}
                   {saved && <span className="text-xs text-green-600">Saved</span>}
                   {hasChanges && (
-                    <button onClick={discard} className="px-3 py-1.5 text-xs border border-[#e8e4e0] rounded text-[#5a5650] hover:bg-[#fafaf9]">
+                    <button onClick={discard} className="px-3 py-1.5 text-xs border border-line-3 rounded text-body-soft hover:bg-surface-5">
                       Discard changes
                     </button>
                   )}
                   <button
                     onClick={handleSave}
                     disabled={!dirty || saving || !subject.trim()}
-                    className="px-4 py-1.5 text-xs bg-[#c9a96e] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
+                    className="px-4 py-1.5 text-xs bg-gold text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
                   >
                     {saving ? 'Saving…' : 'Save'}
                   </button>
@@ -489,36 +489,36 @@ export default function EmailTemplatesSettingsPage() {
               </div>
             </section>
 
-            <section className="bg-white border border-[#e8e4e0] rounded-lg p-5 min-w-0">
+            <section className="bg-white border border-line-3 rounded-lg p-5 min-w-0">
               <div className={labelCls}>Preview</div>
-              <p className="text-xs text-[#9e998f] mb-4">
+              <p className="text-xs text-subtle mb-4">
                 {preview?.source ? <>Filled in from {preview.source}</> : <>Filled in with example details</>}
               </p>
               {rendered ? (
-                <div className="border border-[#e8e4e0] rounded-md overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#e8e4e0] bg-[#fafaf9]">
-                    <div className="text-[11px] text-[#9e998f]">Subject</div>
-                    <div className="text-sm font-medium text-[#1a1a1a] break-words">{rendered.subject || '—'}</div>
+                <div className="border border-line-3 rounded-md overflow-hidden">
+                  <div className="px-4 py-3 border-b border-line-3 bg-surface-5">
+                    <div className="text-[11px] text-subtle">Subject</div>
+                    <div className="text-sm font-medium text-ink break-words">{rendered.subject || '—'}</div>
                   </div>
-                  <div className="px-4 py-4 text-sm text-[#1a1a1a] whitespace-pre-wrap break-words leading-relaxed">{rendered.body}</div>
+                  <div className="px-4 py-4 text-sm text-ink whitespace-pre-wrap break-words leading-relaxed">{rendered.body}</div>
                   {selection.sendType === 'work_order' && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF attached</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF attached</div>
                   )}
                   {selection.sendType === 'signing_request' && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f]">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>
                   )}
                   {selection.sendType === 'signing_request_excess' && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
                   )}
                   {DOCUMENT_ATTACHMENTS[selection.sendType] && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> {DOCUMENT_ATTACHMENTS[selection.sendType]}</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> {DOCUMENT_ATTACHMENTS[selection.sendType]}</div>
                   )}
                   {selection.sendType === 'signing_completed' && (
-                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Signed PDF (with Signature Certificate) attached</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Signed PDF (with Signature Certificate) attached</div>
                   )}
                 </div>
               ) : (
-                <div className="h-40 bg-[#fafaf9] border border-[#e8e4e0] rounded-md" />
+                <div className="h-40 bg-surface-5 border border-line-3 rounded-md" />
               )}
             </section>
           </div>

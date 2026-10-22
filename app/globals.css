@@ -4,6 +4,179 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * IRC Master colour palette. Change a colour here and it changes everywhere
+ * it is used: inline styles reference these as var(--ink), Tailwind classes
+ * as text-ink / bg-surface / border-line (see @theme below).
+ * "near-duplicate" notes mark colours that could be merged into one later.
+ */
+:root {
+  /* Text & dark fills */
+  --ink:       #1a1a1a; /* primary text, dark buttons and headers */
+  --ink-hover: #2a2a2a; /* hover state of dark buttons */
+  --ink-warm:  #1b1712;
+  --ink-brown: #2a2520;
+  --body:      #3a3530; /* body text */
+  --body-soft: #5a5650;
+  --grey-600:  #6b6763;
+  --grey-500:  #7a6f65;
+  --brown-500: #7a6a58;
+  --grey-450:  #8a8272;
+  --subtle:    #9e998f; /* labels and secondary text */
+  --subtle-2:  #9a9590; /* near-duplicate of subtle */
+  --subtle-3:  #9a9088; /* near-duplicate of subtle */
+  --faint:     #b0a898; /* placeholder and hint text */
+  --faint-2:   #b0a89e; /* near-duplicate of faint */
+  --faint-3:   #b8b0a8;
+  --faint-4:   #c0bab3;
+  --faint-5:   #c8c0b8;
+
+  /* Lines & borders */
+  --line:          #e0dbd4; /* standard border */
+  --line-2:        #e4dfd8; /* near-duplicate of line */
+  --line-3:        #e8e4e0; /* near-duplicate of line-4 */
+  --line-4:        #e8e4de;
+  --line-5:        #e8e3dc;
+  --line-strong:   #ddd8d0; /* input borders */
+  --line-strong-2: #d8d0c8;
+  --line-strong-3: #d4cfc8;
+  --line-tan:      #e6dfd0;
+  --line-tan-2:    #ddd5c8;
+  --line-tan-3:    #e8e0d5;
+  --line-tan-4:    #e8e0d0;
+  --line-tan-5:    #e8ddd0;
+  --line-faint:    #f0ece6; /* row dividers */
+
+  /* Surfaces */
+  --paper:     #ffffff; /* cards, inputs (also written #fff) */
+  --surface:   #f5f2ee; /* page and panel background */
+  --cream:     #f5f0e8; /* text on dark buttons, highlighted panels */
+  --surface-2: #f9f7f5;
+  --surface-3: #faf9f7;
+  --surface-4: #fafaf8;
+  --surface-5: #fafaf9;
+  --surface-6: #fdfdfc;
+  --surface-7: #fdfcfb;
+  --surface-8: #faf8f5;
+  --surface-9: #fdf9f4;
+
+  /* Accents */
+  --tan:       #c8b89a; /* accent text, active states */
+  --gold:      #c9a96e; /* brand gold, focus rings */
+  --gold-dark: #b8956a;
+  --bronze:    #9a7a50;
+
+  /* Status */
+  --success:        #2e7d32;
+  --success-dark:   #1b5e20;
+  --success-bg:     #e8f5e9;
+  --success-bg-2:   #f0fdf4;
+  --teal:           #2a6b50;
+  --forest:         #2d6a4f;
+  --danger:         #c5221f;
+  --danger-strong:  #b91c1c;
+  --danger-dark:    #991b1b;
+  --danger-soft:    #fca5a5;
+  --danger-bg:      #fce8e6;
+  --danger-bg-2:    #fdecea;
+  --danger-bg-3:    #fee2e2;
+  --rust:           #a0524a;
+  --warning:        #b45309;
+  --warning-dark:   #92400e;
+  --warning-bright: #f59e0b;
+  --warning-soft:   #fcd38d;
+  --warning-bg:     #fef3e2;
+  --warning-bg-2:   #fff8e1;
+  --info:           #1a73e8;
+  --info-dark:      #1e40af;
+  --info-soft:      #4a6fd4;
+  --info-bg:        #e8f0fe;
+}
+
+/* Tailwind colour utilities for the palette above (text-ink, bg-surface, ...) */
+@theme inline {
+  /* Text & dark fills */
+  --color-ink:       var(--ink);
+  --color-ink-hover: var(--ink-hover);
+  --color-ink-warm:  var(--ink-warm);
+  --color-ink-brown: var(--ink-brown);
+  --color-body:      var(--body);
+  --color-body-soft: var(--body-soft);
+  --color-grey-600:  var(--grey-600);
+  --color-grey-500:  var(--grey-500);
+  --color-brown-500: var(--brown-500);
+  --color-grey-450:  var(--grey-450);
+  --color-subtle:    var(--subtle);
+  --color-subtle-2:  var(--subtle-2);
+  --color-subtle-3:  var(--subtle-3);
+  --color-faint:     var(--faint);
+  --color-faint-2:   var(--faint-2);
+  --color-faint-3:   var(--faint-3);
+  --color-faint-4:   var(--faint-4);
+  --color-faint-5:   var(--faint-5);
+
+  /* Lines & borders */
+  --color-line:          var(--line);
+  --color-line-2:        var(--line-2);
+  --color-line-3:        var(--line-3);
+  --color-line-4:        var(--line-4);
+  --color-line-5:        var(--line-5);
+  --color-line-strong:   var(--line-strong);
+  --color-line-strong-2: var(--line-strong-2);
+  --color-line-strong-3: var(--line-strong-3);
+  --color-line-tan:      var(--line-tan);
+  --color-line-tan-2:    var(--line-tan-2);
+  --color-line-tan-3:    var(--line-tan-3);
+  --color-line-tan-4:    var(--line-tan-4);
+  --color-line-tan-5:    var(--line-tan-5);
+  --color-line-faint:    var(--line-faint);
+
+  /* Surfaces */
+  --color-paper:     var(--paper);
+  --color-surface:   var(--surface);
+  --color-cream:     var(--cream);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-surface-5: var(--surface-5);
+  --color-surface-6: var(--surface-6);
+  --color-surface-7: var(--surface-7);
+  --color-surface-8: var(--surface-8);
+  --color-surface-9: var(--surface-9);
+
+  /* Accents */
+  --color-tan:       var(--tan);
+  --color-gold:      var(--gold);
+  --color-gold-dark: var(--gold-dark);
+  --color-bronze:    var(--bronze);
+
+  /* Status */
+  --color-success:        var(--success);
+  --color-success-dark:   var(--success-dark);
+  --color-success-bg:     var(--success-bg);
+  --color-success-bg-2:   var(--success-bg-2);
+  --color-teal:           var(--teal);
+  --color-forest:         var(--forest);
+  --color-danger:         var(--danger);
+  --color-danger-strong:  var(--danger-strong);
+  --color-danger-dark:    var(--danger-dark);
+  --color-danger-soft:    var(--danger-soft);
+  --color-danger-bg:      var(--danger-bg);
+  --color-danger-bg-2:    var(--danger-bg-2);
+  --color-danger-bg-3:    var(--danger-bg-3);
+  --color-rust:           var(--rust);
+  --color-warning:        var(--warning);
+  --color-warning-dark:   var(--warning-dark);
+  --color-warning-bright: var(--warning-bright);
+  --color-warning-soft:   var(--warning-soft);
+  --color-warning-bg:     var(--warning-bg);
+  --color-warning-bg-2:   var(--warning-bg-2);
+  --color-info:           var(--info);
+  --color-info-dark:      var(--info-dark);
+  --color-info-soft:      var(--info-soft);
+  --color-info-bg:        var(--info-bg);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -89,9 +89,9 @@ function StatusBadge({ override_stage }: { override_stage: 'on_hold' | 'cancelle
     <span
       className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium"
       style={{
-        background: override_stage === 'on_hold' ? '#fdf5e8' : '#fdecea',
-        color: override_stage === 'on_hold' ? '#8a6020' : '#b91c1c',
-        border: '1px solid #e0dbd4',
+        background: override_stage === 'on_hold' ? '#fdf5e8' : 'var(--danger-bg-2)',
+        color: override_stage === 'on_hold' ? '#8a6020' : 'var(--danger-strong)',
+        border: '1px solid var(--line)',
       }}
     >
       {label}
@@ -113,13 +113,13 @@ function FlagButton({
     <button
       onClick={onToggle}
       disabled={disabled}
-      className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-200 hover:bg-[#f5f2ee] disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-200 hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
       title={isFlagged ? 'Remove flag' : 'Flag this job'}
     >
       <span
         className="text-[16px]"
         style={{
-          color: isFlagged ? '#e24b4a' : '#c8b89a',
+          color: isFlagged ? '#e24b4a' : 'var(--tan)',
           opacity: isFlagged ? 1 : 0.6,
         }}
       >
@@ -261,7 +261,7 @@ export function JobDetailShell({
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#f5f2ee', fontFamily: 'DM Sans, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: 'var(--surface)', fontFamily: 'DM Sans, sans-serif' }}>
       <style>{`
         .jds-tab {
           position: relative;
@@ -277,15 +277,15 @@ export function JobDetailShell({
           font-family: inherit;
         }
         .jds-tab:hover {
-          background: #f5f2ee;
-          color: #1a1a1a;
+          background: var(--surface);
+          color: var(--ink);
         }
         .jds-tab.active {
-          color: #1a1a1a;
-          border-bottom-color: #1a1a1a;
+          color: var(--ink);
+          border-bottom-color: var(--ink);
         }
         .jds-tab.inactive {
-          color: #9e998f;
+          color: var(--subtle);
         }
         .jds-tab.pending:not(.active)::after {
           content: '';
@@ -294,7 +294,7 @@ export function JobDetailShell({
           left: 0;
           right: 0;
           height: 2px;
-          background: #c8b89a;
+          background: var(--tan);
           animation: tab-pulse 0.8s ease-in-out infinite alternate;
         }
         @keyframes tab-pulse {
@@ -304,14 +304,14 @@ export function JobDetailShell({
       `}</style>
 
       {/* ── Job header ─────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#e0dbd4]">
+      <div className="bg-white border-b border-line">
         <div className="px-6 lg:px-8 pt-6 pb-0">
           {/* Title row */}
           <div className="flex items-start justify-between gap-4 mb-3">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h1
-                  className="text-[22px] font-semibold text-[#1a1a1a]"
+                  className="text-[22px] font-semibold text-ink"
                   style={{ fontFamily: 'DM Mono, monospace' }}
                 >
                   {job.job_number}
@@ -340,14 +340,14 @@ export function JobDetailShell({
                 )}
               </div>
               {job.insured_name && (
-                <p className="text-[14px] font-medium text-[#3a3530]">{job.insured_name}</p>
+                <p className="text-[14px] font-medium text-body">{job.insured_name}</p>
               )}
               {job.property_address && (
-                <p className="text-[13px] text-[#9e998f]">{job.property_address}</p>
+                <p className="text-[13px] text-subtle">{job.property_address}</p>
               )}
 
               {/* Compact field strip */}
-              <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-[12px] text-[#9e998f]">
+              <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-[12px] text-subtle">
                 {[
                   { label: 'Insurer',      value: job.insurer },
                   { label: 'Claim #',      value: job.claim_number },
@@ -361,8 +361,8 @@ export function JobDetailShell({
                     key={item.label}
                     className="flex items-center"
                   >
-                    <span className="mr-1 text-[#b0a898]">{item.label}:</span>
-                    <span className="text-[#3a3530]">{item.value || '—'}</span>
+                    <span className="mr-1 text-faint">{item.label}:</span>
+                    <span className="text-body">{item.value || '—'}</span>
                   </span>
                 ))}
               </div>
@@ -390,7 +390,7 @@ export function JobDetailShell({
                         width: 4,
                         height: 4,
                         borderRadius: '50%',
-                        background: '#c8b89a',
+                        background: 'var(--tan)',
                         marginLeft: 5,
                         verticalAlign: 'middle',
                         animation: 'tab-pulse 0.8s ease-in-out infinite alternate',

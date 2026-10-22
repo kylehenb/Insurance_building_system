@@ -466,27 +466,27 @@ export default function TradesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-[#1a1a1a]">Trades</h1>
-            <p className="mt-1 text-sm text-[#1a1a1a]/60">
+            <h1 className="text-2xl font-semibold text-ink">Trades</h1>
+            <p className="mt-1 text-sm text-ink/60">
               Manage your trade contacts and subcontractors
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTradeTypes(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-[#e0dbd4] bg-white px-4 py-2 text-sm font-medium text-[#3a3530] hover:bg-[#f5f0e8] transition-colors"
+              className="inline-flex items-center justify-center rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-body hover:bg-cream transition-colors"
             >
               Trade Types
             </button>
             <button
               onClick={() => setShowCsvImport(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-[#e0dbd4] bg-white px-4 py-2 text-sm font-medium text-[#3a3530] hover:bg-[#f5f0e8] transition-colors"
+              className="inline-flex items-center justify-center rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium text-body hover:bg-cream transition-colors"
             >
               Import CSV
             </button>
             <button
               onClick={handleAdd}
-              className="inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+              className="inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-ink/90 transition-colors"
             >
               Add Trade
             </button>
@@ -496,11 +496,11 @@ export default function TradesPage() {
         {/* Filter Bar */}
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <div>
-            <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Status</label>
+            <label className="block text-xs font-medium text-ink/70 mb-1">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-md border border-[#e0dbd4] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
             >
               <option value="All">All Status</option>
               {STATUS_OPTIONS.map(status => (
@@ -510,32 +510,32 @@ export default function TradesPage() {
           </div>
 
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Search</label>
+            <label className="block text-xs font-medium text-ink/70 mb-1">Search</label>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Trade, business, contact..."
-              className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+              className="w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
             />
           </div>
 
-          <div className="text-sm text-[#1a1a1a]/60 self-end">
+          <div className="text-sm text-ink/60 self-end">
             {filteredItems.length} trade{filteredItems.length !== 1 ? 's' : ''}
           </div>
         </div>
 
         {/* Table */}
-        <div className="mt-4 rounded-lg border border-[#e4dfd8] bg-white shadow-sm overflow-hidden">
+        <div className="mt-4 rounded-lg border border-line-2 bg-white shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <div className="text-sm text-[#b0a898]">Loading...</div>
+              <div className="text-sm text-faint">Loading...</div>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f5f0e8]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cream">
                 <svg
-                  className="h-8 w-8 text-[#1a1a1a]/40"
+                  className="h-8 w-8 text-ink/40"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -548,8 +548,8 @@ export default function TradesPage() {
                   />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-[#1a1a1a]">No trades found</h3>
-              <p className="mt-2 max-w-sm text-center text-sm text-[#1a1a1a]/60">
+              <h3 className="mt-4 text-lg font-medium text-ink">No trades found</h3>
+              <p className="mt-2 max-w-sm text-center text-sm text-ink/60">
                 {items.length === 0
                   ? 'Get started by adding your first trade contact.'
                   : 'Try adjusting your filters to find what you\'re looking for.'}
@@ -557,7 +557,7 @@ export default function TradesPage() {
               {items.length === 0 && (
                 <button
                   onClick={handleAdd}
-                  className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+                  className="mt-6 inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-ink/90 transition-colors"
                 >
                   Add First Trade
                 </button>
@@ -565,140 +565,140 @@ export default function TradesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full divide-y divide-[#f0ece6]" style={{ tableLayout: 'fixed' }}>
-                <thead className="bg-[#fdfdfc]">
+              <table className="w-full divide-y divide-line-faint" style={{ tableLayout: 'fixed' }}>
+                <thead className="bg-surface-6">
                   <tr>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint cursor-pointer hover:text-ink border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.primary_trade, borderRightWidth: '0.2px' }}
                       onClick={() => handleSort('primary_trade')}
                     >
                       Specialties {sortColumn === 'primary_trade' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('primary_trade', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] cursor-pointer hover:text-[#1a1a1a] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint cursor-pointer hover:text-ink border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.business_name, borderRightWidth: '0.5px' }}
                       onClick={() => handleSort('business_name')}
                     >
                       Business Name {sortColumn === 'business_name' && (sortDirection === 'asc' ? '↑' : '↓')}
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('business_name', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.primary_contact, borderRightWidth: '0.5px' }}
                     >
                       Primary Contact
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('primary_contact', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.contact_mobile, borderRightWidth: '0.5px' }}
                     >
                       Mobile
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('contact_mobile', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.priority_rank, borderRightWidth: '0.5px' }}
                     >
                       Priority
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('priority_rank', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.availability, borderRightWidth: '0.5px' }}
                     >
                       Availability
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('availability', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.can_do_make_safe, borderRightWidth: '0.5px' }}
                     >
                       Make Safe
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('can_do_make_safe', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.can_do_reports, borderRightWidth: '0.5px' }}
                     >
                       Reports
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('can_do_reports', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898] border-r border-[#e4dfd8]"
+                      className="px-1.5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint border-r border-line-2"
                       style={{ position: 'relative', width: columnWidths.status, borderRightWidth: '0.5px' }}
                     >
                       Status
                       <div
-                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: '#f5f0e8' }}
+                        style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', cursor: 'col-resize', backgroundColor: 'var(--cream)' }}
                         onMouseDown={(e) => handleResizeStart('status', e)}
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                      className="px-1.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-faint"
                       style={{ width: columnWidths.actions }}
                     >
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#f0ece6] bg-white">
+                <tbody className="divide-y divide-line-faint bg-white">
                   {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#faf9f7] transition-colors">
+                    <tr key={item.id} className="hover:bg-surface-3 transition-colors">
                       <td className="px-1.5 py-3" style={{ width: columnWidths.primary_trade }}>
                         <div className="flex flex-wrap gap-1">
                           {((item as any).trade_specialties as string[] | null)?.length
                             ? ((item as any).trade_specialties as string[]).map((s: string) => (
                                 <span
                                   key={s}
-                                  className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-[#f5f0e8] text-[#3a3530] border border-[#e0dbd4]"
+                                  className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-cream text-body border border-line"
                                 >
                                   {s}
                                 </span>
                               ))
                             : item.primary_trade
                               ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-[#f5f0e8] text-[#3a3530] border border-[#e0dbd4]">
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-cream text-body border border-line">
                                     {item.primary_trade}
                                   </span>
                                 )
-                              : <span className="text-[10px] text-[#b0a898]">—</span>
+                              : <span className="text-[10px] text-faint">—</span>
                           }
                         </div>
                       </td>
@@ -707,7 +707,7 @@ export default function TradesPage() {
                           type="text"
                           defaultValue={item.business_name || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'business_name', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-line bg-white px-1.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.primary_contact }}>
@@ -715,7 +715,7 @@ export default function TradesPage() {
                           type="text"
                           defaultValue={item.primary_contact || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'primary_contact', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-line bg-white px-1.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.contact_mobile }}>
@@ -723,7 +723,7 @@ export default function TradesPage() {
                           type="text"
                           defaultValue={item.contact_mobile || ''}
                           onBlur={(e) => handleInlineEdit(item.id, 'contact_mobile', e.target.value || null)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-line bg-white px-1.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-center" style={{ width: columnWidths.priority_rank }}>
@@ -737,7 +737,7 @@ export default function TradesPage() {
                         <select
                           defaultValue={item.availability || 'maintain_capacity'}
                           onChange={(e) => handleInlineEdit(item.id, 'availability', e.target.value)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-line bg-white px-1.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                         >
                           <option value="more_capacity">More</option>
                           <option value="maintain_capacity">Maintain</option>
@@ -750,7 +750,7 @@ export default function TradesPage() {
                           type="checkbox"
                           defaultChecked={item.can_do_make_safe || false}
                           onChange={(e) => handleInlineEdit(item.id, 'can_do_make_safe', e.target.checked)}
-                          className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                          className="rounded border-line text-gold focus:ring-gold/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3 text-center" style={{ width: columnWidths.can_do_reports }}>
@@ -758,14 +758,14 @@ export default function TradesPage() {
                           type="checkbox"
                           defaultChecked={item.can_do_reports || false}
                           onChange={(e) => handleInlineEdit(item.id, 'can_do_reports', e.target.checked)}
-                          className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                          className="rounded border-line text-gold focus:ring-gold/50"
                         />
                       </td>
                       <td className="whitespace-nowrap px-1.5 py-3" style={{ width: columnWidths.status }}>
                         <select
                           defaultValue={item.status || 'active'}
                           onChange={(e) => handleInlineEdit(item.id, 'status', e.target.value)}
-                          className="w-full rounded border border-[#e0dbd4] bg-white px-1.5 py-1 text-xs text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                          className="w-full rounded border border-line bg-white px-1.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                         >
                           {STATUS_OPTIONS.map(status => (
                             <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
@@ -775,7 +775,7 @@ export default function TradesPage() {
                       <td className="whitespace-nowrap px-1.5 py-3 text-right" style={{ width: columnWidths.actions }}>
                         <button
                           onClick={() => handleEdit(item)}
-                          className="text-[#1a1a1a]/60 hover:text-[#1a1a1a] mr-2"
+                          className="text-ink/60 hover:text-ink mr-2"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -783,7 +783,7 @@ export default function TradesPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(item)}
-                          className="text-[#1a1a1a]/60 hover:text-red-600"
+                          className="text-ink/60 hover:text-red-600"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -802,13 +802,13 @@ export default function TradesPage() {
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4">
+              <h2 className="text-lg font-semibold text-ink mb-4">
                 {editingItem ? 'Edit Trade' : 'Add Trade'}
               </h2>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-2">Trade Specialties *</label>
-                  <div className="rounded-md border border-[#e0dbd4] bg-white p-3 grid grid-cols-3 gap-x-4 gap-y-1.5 max-h-48 overflow-y-auto">
+                  <label className="block text-xs font-medium text-ink/70 mb-2">Trade Specialties *</label>
+                  <div className="rounded-md border border-line bg-white p-3 grid grid-cols-3 gap-x-4 gap-y-1.5 max-h-48 overflow-y-auto">
                     {primaryTradeOptions.map(trade => {
                       const selected = ((formData.trade_specialties as string[] | undefined) ?? []).includes(trade);
                       return (
@@ -825,106 +825,106 @@ export default function TradesPage() {
                                   : current.filter(t => t !== trade),
                               });
                             }}
-                            className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                            className="rounded border-line text-gold focus:ring-gold/50"
                           />
-                          <span className="text-xs text-[#1a1a1a]">{trade}</span>
+                          <span className="text-xs text-ink">{trade}</span>
                         </label>
                       );
                     })}
                   </div>
                   {((formData.trade_specialties as string[] | undefined) ?? []).length > 0 && (
-                    <p className="mt-1 text-[10px] text-[#1a1a1a]/50">
+                    <p className="mt-1 text-[10px] text-ink/50">
                       Primary: {((formData.trade_specialties as string[]) ?? [])[0]}
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Trade Code</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Trade Code</label>
                   <input
                     type="text"
                     value={formData.trade_code || ''}
                     onChange={(e) => setFormData({ ...formData, trade_code: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Business Name *</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Business Name *</label>
                   <input
                     type="text"
                     value={formData.business_name || ''}
                     onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Entity Name</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Entity Name</label>
                   <input
                     type="text"
                     value={formData.entity_name || ''}
                     onChange={(e) => setFormData({ ...formData, entity_name: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">ABN</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">ABN</label>
                   <input
                     type="text"
                     value={formData.abn || ''}
                     onChange={(e) => setFormData({ ...formData, abn: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Primary Contact</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Primary Contact</label>
                   <input
                     type="text"
                     value={formData.primary_contact || ''}
                     onChange={(e) => setFormData({ ...formData, primary_contact: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Address</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Address</label>
                   <input
                     type="text"
                     value={formData.address || ''}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Contact Email</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Contact Email</label>
                   <input
                     type="email"
                     value={formData.contact_email || ''}
                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Contact Mobile</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Contact Mobile</label>
                   <input
                     type="text"
                     value={formData.contact_mobile || ''}
                     onChange={(e) => setFormData({ ...formData, contact_mobile: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Contact Office</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Contact Office</label>
                   <input
                     type="text"
                     value={formData.contact_office || ''}
                     onChange={(e) => setFormData({ ...formData, contact_office: e.target.value || null })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Status</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Status</label>
                   <select
                     value={formData.status || 'active'}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   >
                     {STATUS_OPTIONS.map(status => (
                       <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
@@ -937,26 +937,26 @@ export default function TradesPage() {
                       type="checkbox"
                       checked={formData.can_do_make_safe || false}
                       onChange={(e) => setFormData({ ...formData, can_do_make_safe: e.target.checked })}
-                      className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                      className="rounded border-line text-gold focus:ring-gold/50"
                     />
-                    <span className="text-xs font-medium text-[#1a1a1a]/70">Can Do Make Safe</span>
+                    <span className="text-xs font-medium text-ink/70">Can Do Make Safe</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={formData.can_do_reports || false}
                       onChange={(e) => setFormData({ ...formData, can_do_reports: e.target.checked })}
-                      className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                      className="rounded border-line text-gold focus:ring-gold/50"
                     />
-                    <span className="text-xs font-medium text-[#1a1a1a]/70">Can Do Reports</span>
+                    <span className="text-xs font-medium text-ink/70">Can Do Reports</span>
                   </label>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Availability</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Availability</label>
                   <select
                     value={formData.availability || 'maintain_capacity'}
                     onChange={(e) => setFormData({ ...formData, availability: e.target.value as any })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   >
                     <option value="more_capacity">More Capacity</option>
                     <option value="maintain_capacity">Maintain Capacity</option>
@@ -965,11 +965,11 @@ export default function TradesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Priority Rank</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Priority Rank</label>
                   <select
                     value={formData.priority_rank ?? 3}
                     onChange={(e) => setFormData({ ...formData, priority_rank: parseInt(e.target.value) })}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
                   >
                     <option value={1}>⭐ (1) - Lowest Priority</option>
                     <option value={2}>⭐⭐ (2) - Low Priority</option>
@@ -979,7 +979,7 @@ export default function TradesPage() {
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Service Area</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Service Area</label>
                   <div className="flex flex-wrap gap-2">
                     {['30kms radius'].map((area) => (
                       <label key={area} className="flex items-center gap-2">
@@ -994,21 +994,21 @@ export default function TradesPage() {
                               setFormData({ ...formData, service_area: currentAreas.filter((a) => a !== area) });
                             }
                           }}
-                          className="rounded border-[#e0dbd4] text-[#c9a96e] focus:ring-[#c9a96e]/50"
+                          className="rounded border-line text-gold focus:ring-gold/50"
                         />
-                        <span className="text-xs font-medium text-[#1a1a1a]/70">{area}</span>
+                        <span className="text-xs font-medium text-ink/70">{area}</span>
                       </label>
                     ))}
                   </div>
-                  <p className="text-[10px] text-[#1a1a1a]/50 mt-1">Additional options will be available from tenant settings</p>
+                  <p className="text-[10px] text-ink/50 mt-1">Additional options will be available from tenant settings</p>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[#1a1a1a]/70 mb-1">Notes</label>
+                  <label className="block text-xs font-medium text-ink/70 mb-1">Notes</label>
                   <textarea
                     value={formData.notes || ''}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value || null })}
                     rows={3}
-                    className="w-full rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50 resize-none"
+                    className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50 resize-none"
                   />
                 </div>
               </div>
@@ -1020,14 +1020,14 @@ export default function TradesPage() {
               <div className="mt-6 flex justify-end gap-2">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#3a3530] bg-white border border-[#e0dbd4] rounded-lg hover:bg-[#f5f0e8] transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-body bg-white border border-line rounded-lg hover:bg-cream transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded-lg hover:bg-[#1a1a1a]/90 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-cream bg-ink rounded-lg hover:bg-ink/90 transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -1040,14 +1040,14 @@ export default function TradesPage() {
         {showDeleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-lg font-semibold text-[#1a1a1a] mb-2">Delete Trade</h2>
-              <p className="text-sm text-[#1a1a1a]/70 mb-6">
+              <h2 className="text-lg font-semibold text-ink mb-2">Delete Trade</h2>
+              <p className="text-sm text-ink/70 mb-6">
                 Are you sure you want to delete "{itemToDelete?.business_name}"? This action cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#3a3530] bg-white border border-[#e0dbd4] rounded-lg hover:bg-[#f5f0e8] transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-body bg-white border border-line rounded-lg hover:bg-cream transition-colors"
                 >
                   Cancel
                 </button>

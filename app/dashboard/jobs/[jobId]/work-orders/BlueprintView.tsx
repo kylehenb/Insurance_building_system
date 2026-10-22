@@ -113,7 +113,7 @@ function DroppableColumn({
       ref={setNodeRef}
       style={{
         ...style,
-        outline: isOver ? '2px dashed #c9a96e' : undefined,
+        outline: isOver ? '2px dashed var(--gold)' : undefined,
         outlineOffset: isOver ? -4 : undefined,
         borderRadius: isOver ? 4 : undefined,
       }}
@@ -325,15 +325,15 @@ export function BlueprintView({
           flexDirection: 'column',
           flex: 1,
           overflow: 'hidden',
-          background: '#f5f2ee',
-          borderRight: '1px solid #ddd8d0',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--line-strong)',
         }}
       >
         {/* Column header */}
         <div
           style={{
             padding: '10px 16px 9px',
-            borderBottom: '1px solid #ddd8d0',
+            borderBottom: '1px solid var(--line-strong)',
             display: 'flex',
             alignItems: 'baseline',
             gap: 8,
@@ -347,15 +347,15 @@ export function BlueprintView({
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '.1em',
-              color: '#5a5650',
+              color: 'var(--body-soft)',
             }}
           >
             Unplaced
           </span>
-          <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: '#9a9590' }}>
+          <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: 'var(--subtle-2)' }}>
             {unplaced.length}
           </span>
-          <span style={{ fontSize: 10, color: '#9a9590', marginLeft: 'auto', fontStyle: 'italic' }}>
+          <span style={{ fontSize: 10, color: 'var(--subtle-2)', marginLeft: 'auto', fontStyle: 'italic' }}>
             Drag to placed →
           </span>
         </div>
@@ -376,12 +376,12 @@ export function BlueprintView({
             {unplaced.length === 0 ? (
               <div
                 style={{
-                  border: '1.5px dashed #e8e4de',
+                  border: '1.5px dashed var(--line-4)',
                   borderRadius: 8,
                   padding: 24,
                   textAlign: 'center',
                   fontSize: 11,
-                  color: '#9a9590',
+                  color: 'var(--subtle-2)',
                 }}
               >
                 All work orders placed
@@ -416,19 +416,19 @@ export function BlueprintView({
           flexDirection: 'column',
           flex: 1,
           overflow: 'hidden',
-          background: '#ffffff',
+          background: 'var(--paper)',
         }}
       >
         {/* Column header */}
         <div
           style={{
             padding: '10px 16px 9px',
-            borderBottom: '1px solid #ddd8d0',
+            borderBottom: '1px solid var(--line-strong)',
             display: 'flex',
             alignItems: 'baseline',
             gap: 8,
             flexShrink: 0,
-            background: '#ffffff',
+            background: 'var(--paper)',
           }}
         >
           <span
@@ -437,12 +437,12 @@ export function BlueprintView({
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '.1em',
-              color: '#5a5650',
+              color: 'var(--body-soft)',
             }}
           >
             Placed
           </span>
-          <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: '#9a9590' }}>
+          <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: 'var(--subtle-2)' }}>
             {placed.length}
           </span>
         </div>
@@ -466,12 +466,12 @@ export function BlueprintView({
             {placedItems.length === 0 ? (
               <div
                 style={{
-                  border: '1.5px dashed #e8e4de',
+                  border: '1.5px dashed var(--line-4)',
                   borderRadius: 8,
                   padding: 24,
                   textAlign: 'center',
                   fontSize: 11,
-                  color: '#9a9590',
+                  color: 'var(--subtle-2)',
                 }}
               >
                 Drag work orders here to place them in sequence
@@ -505,20 +505,20 @@ export function BlueprintView({
           <div
             style={{
               padding: '12px 16px',
-              background: '#fff',
-              border: '1px solid #c9a96e',
+              background: 'var(--paper)',
+              border: '1px solid var(--gold)',
               borderRadius: 8,
               boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
               minWidth: 250,
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a' }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>
               {activeWo.trade?.business_name ?? 'No contractor'}
             </div>
-            <div style={{ fontSize: 10, color: '#9a9590', marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: 'var(--subtle-2)', marginTop: 2 }}>
               {activeWo.tradeTypeLabel || activeWo.work_type}
               {activeVisitNumber !== undefined && (
-                <span style={{ marginLeft: 6, color: '#c9a96e' }}>
+                <span style={{ marginLeft: 6, color: 'var(--gold)' }}>
                   (Visit {activeVisitNumber}/{activeWo.total_visits})
                 </span>
               )}

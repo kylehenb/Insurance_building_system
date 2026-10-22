@@ -160,7 +160,7 @@ export function DescriptionSearch({
           width: '100%',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 12,
-          color: '#3a3530',
+          color: 'var(--body)',
           background: 'transparent',
           border: 'none',
           outline: 'none',
@@ -177,7 +177,7 @@ export function DescriptionSearch({
           style={{
             marginTop: 2,
             fontSize: 11,
-            color: '#9e998f',
+            color: 'var(--subtle)',
             fontStyle: 'italic',
             fontFamily: 'DM Sans, sans-serif',
           }}
@@ -193,8 +193,8 @@ export function DescriptionSearch({
             top: 'calc(100% + 4px)',
             left: -10,
             right: -10,
-            background: '#ffffff',
-            border: '1px solid #e0dbd4',
+            background: 'var(--paper)',
+            border: '1px solid var(--line)',
             borderRadius: 6,
             boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
             zIndex: 100,
@@ -217,16 +217,16 @@ export function DescriptionSearch({
                   width: '100%',
                   textAlign: 'left',
                   padding: '8px 12px',
-                  background: idx === activeIdx ? '#f5f2ee' : 'transparent',
+                  background: idx === activeIdx ? 'var(--surface)' : 'transparent',
                   border: 'none',
-                  borderBottom: '1px solid #f5f2ee',
+                  borderBottom: '1px solid var(--surface)',
                   cursor: 'pointer',
                 }}
               >
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#3a3530',
+                    color: 'var(--body)',
                     fontFamily: 'DM Sans, sans-serif',
                     lineHeight: 1.4,
                   }}
@@ -235,18 +235,18 @@ export function DescriptionSearch({
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                   {item.trade && (
-                    <span style={{ fontSize: 11, color: '#9e998f' }}>{item.trade}</span>
+                    <span style={{ fontSize: 11, color: 'var(--subtle)' }}>{item.trade}</span>
                   )}
                   {item.insurer_specific && (
-                    <span style={{ fontSize: 11, color: '#c8b89a' }}>· {item.insurer_specific}</span>
+                    <span style={{ fontSize: 11, color: 'var(--tan)' }}>· {item.insurer_specific}</span>
                   )}
                   {item.rate_labour != null && (
-                    <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
+                    <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Mono, monospace' }}>
                       L: {item.rate_labour}
                     </span>
                   )}
                   {item.rate_materials != null && (
-                    <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>
+                    <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Mono, monospace' }}>
                       M: {item.rate_materials}
                     </span>
                   )}
@@ -259,7 +259,7 @@ export function DescriptionSearch({
           {referenceResults.length > 0 && (
             <>
               {libraryResults.length > 0 && (
-                <div style={{ height: 1, background: '#e0dbd4', margin: '0' }} />
+                <div style={{ height: 1, background: 'var(--line)', margin: '0' }} />
               )}
               <div
                 style={{
@@ -268,7 +268,7 @@ export function DescriptionSearch({
                   fontWeight: 600,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: '#b45309',
+                  color: 'var(--warning)',
                   fontFamily: 'DM Sans, sans-serif',
                   background: '#fef9ec',
                 }}
@@ -303,7 +303,7 @@ export function DescriptionSearch({
                     <div
                       style={{
                         fontSize: 12,
-                        color: '#3a3530',
+                        color: 'var(--body)',
                         fontFamily: 'DM Sans, sans-serif',
                         lineHeight: 1.4,
                       }}
@@ -318,7 +318,7 @@ export function DescriptionSearch({
                           padding: '1px 6px',
                           borderRadius: 10,
                           background: '#fef9ec',
-                          color: '#b45309',
+                          color: 'var(--warning)',
                           border: '1px solid #f0d080',
                           fontFamily: 'DM Sans, sans-serif',
                           whiteSpace: 'nowrap',
@@ -330,7 +330,7 @@ export function DescriptionSearch({
                         <span
                           style={{
                             fontSize: 11,
-                            color: '#9e998f',
+                            color: 'var(--subtle)',
                             fontFamily: 'DM Mono, monospace',
                           }}
                         >

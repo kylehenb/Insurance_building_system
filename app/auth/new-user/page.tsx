@@ -121,26 +121,26 @@ export default function NewUserPage() {
 
   if (isChecking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f0e8] px-4">
+      <div className="flex min-h-screen items-center justify-center bg-cream px-4">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#1a1a1a]" />
-          <p className="mt-4 text-sm text-[#1a1a1a]/70">Checking your account...</p>
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-ink" />
+          <p className="mt-4 text-sm text-ink/70">Checking your account...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f0e8] px-4">
-      <div className="w-full max-w-md space-y-8 rounded-lg border border-[#1a1a1a]/10 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-cream px-4">
+      <div className="w-full max-w-md space-y-8 rounded-lg border border-ink/10 bg-white p-8 shadow-sm">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1a1a1a]">
-            <User className="h-8 w-8 text-[#f5f0e8]" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ink">
+            <User className="h-8 w-8 text-cream" />
           </div>
-          <h1 className="mt-6 text-2xl font-semibold text-[#1a1a1a]">
+          <h1 className="mt-6 text-2xl font-semibold text-ink">
             Complete Your Setup
           </h1>
-          <p className="mt-2 text-sm text-[#1a1a1a]/70">
+          <p className="mt-2 text-sm text-ink/70">
             Welcome to IRC Master! Please enter your details to get started.
           </p>
         </div>
@@ -149,7 +149,7 @@ export default function NewUserPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-[#1a1a1a]/60"
+              className="block text-sm font-medium text-ink/60"
             >
               Email
             </label>
@@ -158,14 +158,14 @@ export default function NewUserPage() {
               type="email"
               disabled
               value={authUser?.email ?? ""}
-              className="mt-2 block w-full rounded-md border border-[#1a1a1a]/10 bg-[#f5f0e8] px-4 py-3 text-[#1a1a1a]/60"
+              className="mt-2 block w-full rounded-md border border-ink/10 bg-cream px-4 py-3 text-ink/60"
             />
           </div>
 
           <div>
             <label
               htmlFor="name"
-              className="block text-sm font-medium text-[#1a1a1a]"
+              className="block text-sm font-medium text-ink"
             >
               Full Name
             </label>
@@ -176,16 +176,16 @@ export default function NewUserPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="John Smith"
-              className="mt-2 block w-full rounded-md border border-[#1a1a1a]/20 bg-white px-4 py-3 text-[#1a1a1a] placeholder:text-[#1a1a1a]/40 focus:border-[#1a1a1a] focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]"
+              className="mt-2 block w-full rounded-md border border-ink/20 bg-white px-4 py-3 text-ink placeholder:text-ink/40 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
             />
           </div>
 
-          <div className="rounded-md bg-[#f5f0e8] p-4">
+          <div className="rounded-md bg-cream p-4">
             <div className="flex items-start gap-3">
-              <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#1a1a1a]/60" />
+              <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-ink/60" />
               <div>
-                <p className="text-sm font-medium text-[#1a1a1a]">Admin Access</p>
-                <p className="text-xs text-[#1a1a1a]/60 mt-1">
+                <p className="text-sm font-medium text-ink">Admin Access</p>
+                <p className="text-xs text-ink/60 mt-1">
                   As the first user, you will be assigned the admin role with full permissions.
                 </p>
               </div>
@@ -202,7 +202,7 @@ export default function NewUserPage() {
           <Button
             type="submit"
             disabled={isLoading || !name.trim()}
-            className="w-full bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#1a1a1a]/90 disabled:opacity-50"
+            className="w-full bg-ink text-cream hover:bg-ink/90 disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -215,7 +215,7 @@ export default function NewUserPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-[#1a1a1a]/50">
+        <p className="mt-6 text-center text-xs text-ink/50">
           By completing setup, you agree to the terms of service.
         </p>
       </div>

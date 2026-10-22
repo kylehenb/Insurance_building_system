@@ -342,7 +342,7 @@ export default function JobSchedule({
           padding: '40px',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9e998f',
+          color: 'var(--subtle)',
         }}
       >
         Loading schedule…
@@ -398,7 +398,7 @@ export default function JobSchedule({
       style={{
         fontFamily: 'DM Sans, sans-serif',
         fontSize: 13,
-        color: '#1a1a1a',
+        color: 'var(--ink)',
       }}
     >
       {isInteractive ? (
@@ -433,7 +433,7 @@ export default function JobSchedule({
               <div
                 style={{
                   marginTop: 24,
-                  borderTop: '2px dashed #e0dbd4',
+                  borderTop: '2px dashed var(--line)',
                   paddingTop: 16,
                   background: '#f9f8f6',
                   borderRadius: 8,
@@ -446,7 +446,7 @@ export default function JobSchedule({
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '2px',
-                    color: '#9e998f',
+                    color: 'var(--subtle)',
                     marginBottom: 12,
                     display: 'flex',
                     alignItems: 'center',
@@ -456,8 +456,8 @@ export default function JobSchedule({
                   Unscheduled
                   <span
                     style={{
-                      background: '#e8e0d0',
-                      color: '#9e998f',
+                      background: 'var(--line-tan-4)',
+                      color: 'var(--subtle)',
                       padding: '2px 8px',
                       borderRadius: 10,
                       fontSize: 9,
@@ -478,8 +478,8 @@ export default function JobSchedule({
             {activeId ? (
               <div
                 style={{
-                  background: '#fff',
-                  border: '1px solid #e0dbd4',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 8,
                   padding: '12px 14px 12px 18px',
                   opacity: 0.8,
@@ -517,7 +517,7 @@ export default function JobSchedule({
             <div
               style={{
                 marginTop: 24,
-                borderTop: '2px dashed #e0dbd4',
+                borderTop: '2px dashed var(--line)',
                 paddingTop: 16,
                 background: '#f9f8f6',
                 borderRadius: 8,
@@ -530,7 +530,7 @@ export default function JobSchedule({
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '2px',
-                  color: '#9e998f',
+                  color: 'var(--subtle)',
                   marginBottom: 12,
                   display: 'flex',
                   alignItems: 'center',
@@ -540,8 +540,8 @@ export default function JobSchedule({
                 Unscheduled
                 <span
                   style={{
-                    background: '#e8e0d0',
-                    color: '#9e998f',
+                    background: 'var(--line-tan-4)',
+                    color: 'var(--subtle)',
                     padding: '2px 8px',
                     borderRadius: 10,
                     fontSize: 9,
@@ -655,7 +655,7 @@ function SortableVisitCard({
             style={{
               width: 2,
               flex: 1,
-              background: '#e0dbd4',
+              background: 'var(--line)',
               marginTop: 4,
               position: 'relative',
             }}
@@ -671,7 +671,7 @@ function SortableVisitCard({
                 height: 0,
                 borderLeft: '4px solid transparent',
                 borderRight: '4px solid transparent',
-                borderTop: '6px solid #e0dbd4',
+                borderTop: '6px solid var(--line)',
               }}
             />
           </div>
@@ -683,8 +683,8 @@ function SortableVisitCard({
         ref={setNodeRef}
         style={{
           flex: 1,
-          background: '#fff',
-          border: '1px solid #e0dbd4',
+          background: 'var(--paper)',
+          border: '1px solid var(--line)',
           borderRadius: 8,
           position: 'relative',
           marginBottom: isLast ? 0 : 16,
@@ -708,7 +708,7 @@ function SortableVisitCard({
             {...listeners}
             style={{
               cursor: 'grab',
-              color: '#9e998f',
+              color: 'var(--subtle)',
               padding: '2px',
               fontSize: 14,
               userSelect: 'none',
@@ -721,7 +721,7 @@ function SortableVisitCard({
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: '#1a1a1a',
+              color: 'var(--ink)',
             }}
           >
             {tradeName}
@@ -732,8 +732,8 @@ function SortableVisitCard({
               fontSize: 8.5,
               textTransform: 'uppercase',
               fontWeight: 700,
-              background: '#e8e0d0',
-              color: '#9e998f',
+              background: 'var(--line-tan-4)',
+              color: 'var(--subtle)',
               padding: '2px 6px',
               borderRadius: 4,
             }}
@@ -748,7 +748,7 @@ function SortableVisitCard({
               style={{
                 padding: '4px 6px',
                 fontSize: 14,
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
@@ -766,8 +766,8 @@ function SortableVisitCard({
                   top: '100%',
                   right: 0,
                   marginTop: 4,
-                  background: '#fff',
-                  border: '1px solid #e0dbd4',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                   zIndex: 10,
@@ -786,7 +786,7 @@ function SortableVisitCard({
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'DM Sans, sans-serif',
-                    color: '#1a1a1a',
+                    color: 'var(--ink)',
                   }}
                 >
                   Scope items
@@ -805,7 +805,7 @@ function SortableVisitCard({
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'DM Sans, sans-serif',
-                    color: '#1a1a1a',
+                    color: 'var(--ink)',
                   }}
                 >
                   Send comms
@@ -821,8 +821,8 @@ function SortableVisitCard({
                   top: '100%',
                   right: 0,
                   marginTop: 4,
-                  background: '#fff',
-                  border: '1px solid #e0dbd4',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                   zIndex: 10,
@@ -836,7 +836,7 @@ function SortableVisitCard({
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    color: '#1a1a1a',
+                    color: 'var(--ink)',
                     marginBottom: 8,
                   }}
                 >
@@ -845,15 +845,15 @@ function SortableVisitCard({
                 <div
                   style={{
                     fontSize: 11,
-                    color: '#9e998f',
+                    color: 'var(--subtle)',
                   }}
                 >
                   {workOrder.scopeItems && workOrder.scopeItems.length > 0 ? (
                     workOrder.scopeItems.map((item: any, i: number) => (
-                      <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: i < workOrder.scopeItems!.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
-                        <div style={{ fontWeight: 500, color: '#1a1a1a' }}>{item.room || 'N/A'}</div>
-                        <div style={{ color: '#9e998f' }}>{item.description || 'N/A'}</div>
-                        <div style={{ fontSize: 10, color: '#9e998f' }}>Qty: {item.quantity || 'N/A'}</div>
+                      <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: i < workOrder.scopeItems!.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                        <div style={{ fontWeight: 500, color: 'var(--ink)' }}>{item.room || 'N/A'}</div>
+                        <div style={{ color: 'var(--subtle)' }}>{item.description || 'N/A'}</div>
+                        <div style={{ fontSize: 10, color: 'var(--subtle)' }}>Qty: {item.quantity || 'N/A'}</div>
                       </div>
                     ))
                   ) : (
@@ -871,7 +871,7 @@ function SortableVisitCard({
               marginLeft: 'auto',
               padding: '4px 8px',
               fontSize: 14,
-              color: '#9e998f',
+              color: 'var(--subtle)',
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
@@ -903,7 +903,7 @@ function SortableVisitCard({
                 height: 20,
                 fontSize: 16,
                 fontWeight: 300,
-                color: '#c9a96e',
+                color: 'var(--gold)',
                 background: '#fef9f0',
                 border: '1px solid #e8d9c0',
                 borderRadius: 4,
@@ -920,7 +920,7 @@ function SortableVisitCard({
             style={{
               fontSize: 10.5,
               fontWeight: 600,
-              color: '#9e998f',
+              color: 'var(--subtle)',
             }}
           >
             v{visitIndex + 1} of {totalVisits}
@@ -930,7 +930,7 @@ function SortableVisitCard({
             <span
               style={{
                 fontSize: 11,
-                color: '#9e998f',
+                color: 'var(--subtle)',
               }}
             >
               · {formatDate(visitDate)}
@@ -941,7 +941,7 @@ function SortableVisitCard({
             <span
               style={{
                 fontSize: 11,
-                color: '#9e998f',
+                color: 'var(--subtle)',
               }}
             >
               · {visit.estimated_hours}h
@@ -972,7 +972,7 @@ function SortableVisitCard({
         >
           <div
             style={{
-              background: '#fff',
+              background: 'var(--paper)',
               padding: '24px',
               borderRadius: 8,
               maxWidth: 400,
@@ -984,7 +984,7 @@ function SortableVisitCard({
               style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: '#1a1a1a',
+                color: 'var(--ink)',
                 marginBottom: 12,
               }}
             >
@@ -993,7 +993,7 @@ function SortableVisitCard({
             <div
               style={{
                 fontSize: 13,
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 marginBottom: 16,
               }}
             >
@@ -1005,8 +1005,8 @@ function SortableVisitCard({
                 padding: '8px 16px',
                 fontSize: 12,
                 fontWeight: 500,
-                color: '#1a1a1a',
-                background: '#e8e0d0',
+                color: 'var(--ink)',
+                background: 'var(--line-tan-4)',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
@@ -1053,11 +1053,11 @@ function UnscheduledCard({
     <div
       ref={setNodeRef}
       style={{
-        background: '#fff',
-        border: '1px dashed #e0dbd4',
+        background: 'var(--paper)',
+        border: '1px dashed var(--line)',
         borderRadius: 7,
         padding: '10px 14px',
-        borderLeft: '3px solid #e0dbd4',
+        borderLeft: '3px solid var(--line)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -1069,7 +1069,7 @@ function UnscheduledCard({
     >
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
             {tradeName}
           </span>
           <span
@@ -1077,8 +1077,8 @@ function UnscheduledCard({
               fontSize: 8.5,
               textTransform: 'uppercase',
               fontWeight: 700,
-              background: '#e8e0d0',
-              color: '#9e998f',
+              background: 'var(--line-tan-4)',
+              color: 'var(--subtle)',
               padding: '2px 6px',
               borderRadius: 4,
             }}
@@ -1090,7 +1090,7 @@ function UnscheduledCard({
           style={{
             fontSize: 10,
             fontStyle: 'italic',
-            color: '#9e998f',
+            color: 'var(--subtle)',
           }}
         >
           Not yet placed in schedule
@@ -1099,7 +1099,7 @@ function UnscheduledCard({
       <button
         style={{
           fontSize: 11,
-          color: '#c9a96e',
+          color: 'var(--gold)',
           background: 'transparent',
           border: '1px solid #e8d9c0',
           borderRadius: 6,
@@ -1134,7 +1134,7 @@ function VisitPill({ visit }: { visit: WorkOrderVisit }) {
           fontFamily: 'DM Mono, monospace',
           fontSize: 10,
           fontWeight: 600,
-          color: '#1a1a1a',
+          color: 'var(--ink)',
         }}
       >
         V{visit.visit_number}
@@ -1160,7 +1160,7 @@ function LagRow({ lagDays, description }: { lagDays: number; description: string
         gap: 6,
         fontSize: 10,
         fontFamily: 'DM Mono, monospace',
-        color: '#9e998f',
+        color: 'var(--subtle)',
         background: '#fef9f0',
         borderLeft: '3px solid #f0ddb8',
         padding: '4px 8px',

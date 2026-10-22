@@ -28,7 +28,7 @@ export function AccordionRow({ summary, children, defaultOpen }: AccordionRowPro
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#faf9f7]"
+        className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-3"
         style={{
           backgroundColor: isOpen ? '#f7f5f1' : undefined,
           fontFamily: 'DM Sans, sans-serif',
@@ -36,7 +36,7 @@ export function AccordionRow({ summary, children, defaultOpen }: AccordionRowPro
       >
         <div className="flex-1 min-w-0">{summary}</div>
         <ChevronDown
-          className="h-4 w-4 text-[#9e998f] flex-shrink-0 ml-3 transition-transform duration-200"
+          className="h-4 w-4 text-subtle flex-shrink-0 ml-3 transition-transform duration-200"
           style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
         />
       </button>

@@ -216,35 +216,35 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
   return (
     <>
       <style>{`
-        .sidebar { width: 220px; min-width: 220px; background: #1a1a1a; display: flex; flex-direction: column; overflow: hidden; height: 100vh; flex-shrink: 0; }
-        .sb-brand { padding: 14px 16px 14px; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; }
+        .sidebar { width: 220px; min-width: 220px; background: var(--ink); display: flex; flex-direction: column; overflow: hidden; height: 100vh; flex-shrink: 0; }
+        .sb-brand { padding: 14px 16px 14px; border-bottom: 0.5px solid var(--ink-hover); flex-shrink: 0; }
         .sb-logo { display: block; width: 138px; height: 138px; margin: 0 auto 10px; object-fit: contain; }
         .sb-wordmark { font-size: 10px; color: #6a6460; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 700; text-align: center; }
-        .sb-ai-toggle { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; letter-spacing: 0.1px; transition: color 0.15s; user-select: none; border: none; background: none; width: 100%; border-bottom: 0.5px solid #2a2a2a; flex-shrink: 0; font-family: inherit; }
+        .sb-ai-toggle { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; letter-spacing: 0.1px; transition: color 0.15s; user-select: none; border: none; background: none; width: 100%; border-bottom: 0.5px solid var(--ink-hover); flex-shrink: 0; font-family: inherit; }
         .sb-ai-toggle:hover { color: #bbb0a8; }
-        .sb-ai-toggle.active { color: #e8e0d5; }
+        .sb-ai-toggle.active { color: var(--line-tan-3); }
         .sb-ai-indicator { width: 6px; height: 6px; border-radius: 50%; margin-left: auto; flex-shrink: 0; transition: background 0.2s; }
-        .sb-search { padding: 14px 14px 12px; flex-shrink: 0; border-bottom: 0.5px solid #2a2a2a; position: relative; }
-        .sb-input { width: 100%; background: transparent; border: none; border-bottom: 0.5px solid #383838; padding: 7px 0; color: #e8e0d5; font-size: 13px; font-family: inherit; font-weight: 500; outline: none; transition: border-color 0.2s; }
+        .sb-search { padding: 14px 14px 12px; flex-shrink: 0; border-bottom: 0.5px solid var(--ink-hover); position: relative; }
+        .sb-input { width: 100%; background: transparent; border: none; border-bottom: 0.5px solid #383838; padding: 7px 0; color: var(--line-tan-3); font-size: 13px; font-family: inherit; font-weight: 500; outline: none; transition: border-color 0.2s; }
         .sb-input::placeholder { color: #4a4540; }
-        .sb-input:focus { border-bottom-color: #c8b89a; }
+        .sb-input:focus { border-bottom-color: var(--tan); }
         .search-drop { background: #1e1e1e; border: 0.5px solid #2e2e2e; border-radius: 6px; margin-top: 6px; display: none; overflow: hidden; position: absolute; left: 14px; right: 14px; z-index: 20; }
         .search-drop.open { display: block; }
         .sd-item { padding: 9px 11px; cursor: pointer; border-bottom: 0.5px solid #262626; transition: background 0.15s; }
         .sd-item:last-child { border-bottom: none; }
         .sd-item:hover { background: #252525; }
-        .sd-job { font-size: 12px; font-weight: 600; color: #c8b89a; font-family: 'DM Mono', monospace; }
+        .sd-job { font-size: 12px; font-weight: 600; color: var(--tan); font-family: 'DM Mono', monospace; }
         .sd-addr { font-size: 12px; color: #888; margin-top: 2px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sb-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
         .sb-nav::-webkit-scrollbar { width: 2px; }
         .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; letter-spacing: 0.1px; transition: color 0.15s; position: relative; user-select: none; text-decoration: none; }
-        .nav-item::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 2.5px; height: 0; background: #c8b89a; border-radius: 0 2px 2px 0; transition: height 0.2s; }
+        .nav-item::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 2.5px; height: 0; background: var(--tan); border-radius: 0 2px 2px 0; transition: height 0.2s; }
         .nav-item:hover { color: #bbb0a8; }
         .nav-item:hover::before { height: 16px; }
-        .nav-item.active { color: #e8e0d5; }
+        .nav-item.active { color: var(--line-tan-3); }
         .nav-item.active::before { height: 22px; }
         .nav-icon { width: 15px; height: 15px; flex-shrink: 0; }
-        .nav-badge { margin-left: auto; background: #c8b89a; color: #1a1a1a; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; min-width: 20px; text-align: center; }
+        .nav-badge { margin-left: auto; background: var(--tan); color: var(--ink); font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; min-width: 20px; text-align: center; }
         .sb-divider { border-top: 0.5px solid #272727; margin: 8px 16px; }
         .util-trigger { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; transition: color 0.2s; user-select: none; }
         .util-trigger:hover { color: #bbb0a8; }
@@ -254,9 +254,9 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
         .util-children.open { max-height: 260px; }
         .util-child { display: flex; align-items: center; gap: 9px; padding: 9px 16px 9px 32px; cursor: pointer; color: #888; font-size: 14px; font-weight: 700; transition: color 0.2s; user-select: none; text-decoration: none; }
         .util-child:hover { color: #bbb0a8; }
-        .util-child.active { color: #e8e0d5; }
+        .util-child.active { color: var(--line-tan-3); }
         .sb-user { border-top: 0.5px solid #252525; padding: 13px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .user-av { width: 32px; height: 32px; border-radius: 50%; background: #242018; border: 0.5px solid rgba(200,184,154,0.267); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #c8b89a; flex-shrink: 0; }
+        .user-av { width: 32px; height: 32px; border-radius: 50%; background: #242018; border: 0.5px solid rgba(200,184,154,0.267); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--tan); flex-shrink: 0; }
         .user-name { font-size: 13px; color: #888; font-weight: 700; }
         .user-role { font-size: 10px; color: #4a4540; margin-top: 1px; font-weight: 500; }
         .signout-btn { margin-left: auto; cursor: pointer; padding: 3px; color: #444; transition: color 0.2s; background: none; border: none; display: flex; align-items: center; }
@@ -284,7 +284,7 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
           IRC Assistant
           <div
             className="sb-ai-indicator"
-            style={{ background: assistantVisible ? '#c8b89a' : '#383838' }}
+            style={{ background: assistantVisible ? 'var(--tan)' : '#383838' }}
           />
         </button>
 

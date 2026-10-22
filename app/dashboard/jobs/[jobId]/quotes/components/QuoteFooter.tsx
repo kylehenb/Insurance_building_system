@@ -124,7 +124,7 @@ function NotesArea({
             fontWeight: 500,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            color: '#b0a89e',
+            color: 'var(--faint-2)',
             fontFamily: 'DM Sans, sans-serif',
           }}
         >
@@ -138,21 +138,21 @@ function NotesArea({
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 11,
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 background: 'none',
-                border: '1px solid #d8d0c8',
+                border: '1px solid var(--line-strong-2)',
                 borderRadius: 4,
                 padding: '2px 9px',
                 cursor: 'pointer',
                 transition: 'border-color 0.15s, color 0.15s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#c8b89a'
-                e.currentTarget.style.color = '#3a3530'
+                e.currentTarget.style.borderColor = 'var(--tan)'
+                e.currentTarget.style.color = 'var(--body)'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#d8d0c8'
-                e.currentTarget.style.color = '#9e998f'
+                e.currentTarget.style.borderColor = 'var(--line-strong-2)'
+                e.currentTarget.style.color = 'var(--subtle)'
               }}
             >
               Insert template ▾
@@ -165,8 +165,8 @@ function NotesArea({
                   bottom: 'calc(100% + 4px)',
                   left: 0,
                   zIndex: 200,
-                  background: '#ffffff',
-                  border: '1px solid #e0dbd4',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                   minWidth: 220,
@@ -184,13 +184,13 @@ function NotesArea({
                       padding: '7px 12px',
                       fontSize: 12,
                       fontFamily: 'DM Sans, sans-serif',
-                      color: '#3a3530',
+                      color: 'var(--body)',
                       background: 'transparent',
                       border: 'none',
                       cursor: 'pointer',
                       borderRadius: 3,
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     {t.title}
@@ -212,9 +212,9 @@ function NotesArea({
           width: '100%',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 12,
-          color: '#3a3530',
-          background: isLocked ? '#f5f2ee' : '#ffffff',
-          border: '1px solid #e0dbd4',
+          color: 'var(--body)',
+          background: isLocked ? 'var(--surface)' : 'var(--paper)',
+          border: '1px solid var(--line)',
           borderRadius: 6,
           padding: '8px 10px',
           outline: 'none',
@@ -261,7 +261,7 @@ function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolea
 
   if (rows.length === 0) {
     return (
-      <p style={{ fontSize: 12, color: '#9e998f', fontFamily: 'DM Sans, sans-serif', margin: 0 }}>
+      <p style={{ fontSize: 12, color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif', margin: 0 }}>
         No items yet.
       </p>
     )
@@ -288,9 +288,9 @@ function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolea
               fontWeight: 600,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: '#9e998f',
+              color: 'var(--subtle)',
               fontFamily: 'DM Sans, sans-serif',
-              border: '1px dashed #d8d0c8',
+              border: '1px dashed var(--line-strong-2)',
               borderRadius: 4,
               padding: '2px 8px',
             }}
@@ -312,9 +312,9 @@ function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolea
                   fontWeight: 500,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: '#b0a89e',
+                  color: 'var(--faint-2)',
                   fontFamily: 'DM Sans, sans-serif',
-                  borderBottom: '1px solid #e8e4e0',
+                  borderBottom: '1px solid var(--line-3)',
                 }}
               >
                 {h}
@@ -327,18 +327,18 @@ function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolea
             const rowMargin = r.tradeCost != null ? r.subtotal - r.tradeCost : null
             return (
               <tr key={r.trade}>
-                <td style={{ padding: '4px 6px', fontSize: 12, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>
                   {r.trade}
                 </td>
-                <td style={{ padding: '4px 6px', fontSize: 12, color: '#9e998f', fontFamily: 'DM Sans, sans-serif', textAlign: 'right' }}>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif', textAlign: 'right' }}>
                   {r.count}
                 </td>
-                <td style={{ padding: '4px 6px', fontSize: 12, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                <td style={{ padding: '4px 6px', fontSize: 12, color: 'var(--body)', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
                   {fmt(r.subtotal)}
                 </td>
                 {isAdmin && (
                   <>
-                    <td style={{ padding: '4px 6px', fontSize: 12, color: '#9e998f', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+                    <td style={{ padding: '4px 6px', fontSize: 12, color: 'var(--subtle)', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
                       {r.tradeCost != null ? fmt(r.tradeCost) : '—'}
                     </td>
                     <td style={{ padding: '4px 6px', fontSize: 12, fontFamily: 'DM Mono, monospace', textAlign: 'right', color: marginColor(rowMargin) }}>
@@ -352,14 +352,14 @@ function TradeSummary({ items, isAdmin }: { items: ScopeItem[]; isAdmin?: boolea
         </tbody>
         {isAdmin && (
           <tfoot>
-            <tr style={{ borderTop: '2px solid #e8e4e0' }}>
-              <td colSpan={2} style={{ padding: '6px 6px', fontSize: 12, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Sans, sans-serif' }}>
+            <tr style={{ borderTop: '2px solid var(--line-3)' }}>
+              <td colSpan={2} style={{ padding: '6px 6px', fontSize: 12, fontWeight: 700, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>
                 Total
               </td>
-              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: 'var(--body)', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
                 {fmt(totalInsurer)}
               </td>
-              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: '#3a3530', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
+              <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, color: 'var(--body)', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>
                 {totalTradeCost != null ? fmt(totalTradeCost) : '—'}
               </td>
               <td style={{ padding: '6px 6px', fontSize: 13, fontWeight: 700, fontFamily: 'DM Mono, monospace', textAlign: 'right', color: marginColor(grossMargin) }}>
@@ -446,8 +446,8 @@ export function QuoteFooter({
   return (
     <div
       style={{
-        borderTop: '1px solid #e0dbd4',
-        background: '#ffffff',
+        borderTop: '1px solid var(--line)',
+        background: 'var(--paper)',
         padding: '14px 20px 18px',
         fontFamily: 'DM Sans, sans-serif',
       }}
@@ -459,21 +459,21 @@ export function QuoteFooter({
           style={{
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 11,
-            color: showTradeSummary ? '#3a3530' : '#9e998f',
+            color: showTradeSummary ? 'var(--body)' : 'var(--subtle)',
             background: 'none',
-            border: '1px solid #e0dbd4',
+            border: '1px solid var(--line)',
             borderRadius: 4,
             padding: '3px 10px',
             cursor: 'pointer',
             transition: 'all 0.15s',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = '#c8b89a'
-            e.currentTarget.style.color = '#3a3530'
+            e.currentTarget.style.borderColor = 'var(--tan)'
+            e.currentTarget.style.color = 'var(--body)'
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = '#e0dbd4'
-            e.currentTarget.style.color = showTradeSummary ? '#3a3530' : '#9e998f'
+            e.currentTarget.style.borderColor = 'var(--line)'
+            e.currentTarget.style.color = showTradeSummary ? 'var(--body)' : 'var(--subtle)'
           }}
         >
           {showTradeSummary ? '▴ Hide trade summary' : '▾ View by Trade'}
@@ -484,8 +484,8 @@ export function QuoteFooter({
         <div
           style={{
             marginBottom: 14,
-            background: '#fafaf8',
-            border: '1px solid #e8e4e0',
+            background: 'var(--surface-4)',
+            border: '1px solid var(--line-3)',
             borderRadius: 6,
             padding: '10px 12px',
           }}
@@ -514,9 +514,9 @@ export function QuoteFooter({
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 11,
                   fontWeight: 500,
-                  color: cashSettlementActive ? '#475569' : '#9e998f',
+                  color: cashSettlementActive ? '#475569' : 'var(--subtle)',
                   background: cashSettlementActive ? '#f1f5f9' : 'transparent',
-                  border: '1px solid ' + (cashSettlementActive ? '#94a3b8' : '#d8d0c8'),
+                  border: '1px solid ' + (cashSettlementActive ? '#94a3b8' : 'var(--line-strong-2)'),
                   borderRadius: 20,
                   padding: '3px 12px',
                   cursor: 'pointer',
@@ -534,20 +534,20 @@ export function QuoteFooter({
           {/* Save status */}
           <div style={{ textAlign: 'right', marginBottom: 10, minHeight: 16 }}>
             {saveStatus === 'saving' && (
-              <span style={{ fontSize: 11, color: '#9e998f' }}>Saving…</span>
+              <span style={{ fontSize: 11, color: 'var(--subtle)' }}>Saving…</span>
             )}
             {saveStatus === 'saved' && (
-              <span style={{ fontSize: 11, color: '#2e7d32' }}>Saved ✓</span>
+              <span style={{ fontSize: 11, color: 'var(--success)' }}>Saved ✓</span>
             )}
             {saveStatus === 'error' && (
-              <span style={{ fontSize: 11, color: '#c5221f' }}>Save failed — retrying</span>
+              <span style={{ fontSize: 11, color: 'var(--danger)' }}>Save failed — retrying</span>
             )}
           </div>
 
           {/* Subtotal */}
           <div style={row}>
-            <span style={{ fontSize: 13, color: '#9e998f' }}>Subtotal</span>
-            <span style={{ fontSize: 13, color: '#3a3530', fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 13, color: 'var(--subtle)' }}>Subtotal</span>
+            <span style={{ fontSize: 13, color: 'var(--body)', fontFamily: 'DM Mono, monospace' }}>
               {fmt(subtotal)}
             </span>
           </div>
@@ -557,7 +557,7 @@ export function QuoteFooter({
             <span
               style={{
                 fontSize: 13,
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2,
@@ -578,9 +578,9 @@ export function QuoteFooter({
                   width: 36,
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 12,
-                  color: '#3a3530',
-                  background: isLocked ? 'transparent' : '#ffffff',
-                  border: isLocked ? 'none' : '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: isLocked ? 'transparent' : 'var(--paper)',
+                  border: isLocked ? 'none' : '1px solid var(--line-strong-2)',
                   borderRadius: 3,
                   outline: 'none',
                   textAlign: 'center',
@@ -590,17 +590,17 @@ export function QuoteFooter({
               />
               %)
             </span>
-            <span style={{ fontSize: 13, color: '#3a3530', fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 13, color: 'var(--body)', fontFamily: 'DM Mono, monospace' }}>
               {fmt(markup)}
             </span>
           </div>
 
           {/* GST */}
           <div style={row}>
-            <span style={{ fontSize: 13, color: '#9e998f' }}>
+            <span style={{ fontSize: 13, color: 'var(--subtle)' }}>
               GST ({(quote.gst_pct * 100).toFixed(0)}%)
             </span>
-            <span style={{ fontSize: 13, color: '#3a3530', fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 13, color: 'var(--body)', fontFamily: 'DM Mono, monospace' }}>
               {fmt(gst)}
             </span>
           </div>
@@ -611,18 +611,18 @@ export function QuoteFooter({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              borderTop: '1px solid #e0dbd4',
+              borderTop: '1px solid var(--line)',
               paddingTop: 10,
               marginTop: 4,
             }}
           >
-            <span style={{ fontSize: 14, color: '#3a3530', fontWeight: 600 }}>
+            <span style={{ fontSize: 14, color: 'var(--body)', fontWeight: 600 }}>
               Total inc GST
             </span>
             <span
               style={{
                 fontSize: 17,
-                color: '#3a3530',
+                color: 'var(--body)',
                 fontWeight: 700,
                 fontFamily: 'DM Mono, monospace',
               }}
@@ -637,7 +637,7 @@ export function QuoteFooter({
               style={{
                 marginTop: 10,
                 paddingTop: 10,
-                borderTop: '1px dashed #e0dbd4',
+                borderTop: '1px dashed var(--line)',
               }}
             >
               <div
@@ -646,7 +646,7 @@ export function QuoteFooter({
                   fontWeight: 500,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: '#b0a89e',
+                  color: 'var(--faint-2)',
                   fontFamily: 'DM Sans, sans-serif',
                   marginBottom: 6,
                 }}
@@ -677,7 +677,7 @@ export function QuoteFooter({
                         paddingTop: isCash ? 8 : 0,
                         paddingLeft: 8,
                         paddingRight: 8,
-                        borderTop: isCash ? '1px solid #e0dbd4' : 'none',
+                        borderTop: isCash ? '1px solid var(--line)' : 'none',
                         borderLeft: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
                         borderRight: `3px solid ${ITEM_TYPE_LABELS[type].border}`,
                       }}
@@ -686,7 +686,7 @@ export function QuoteFooter({
                         style={{
                           fontSize: isCash ? 14 : 12,
                           fontWeight: isCash ? 600 : 400,
-                          color: isCash ? '#3a3530' : '#9e998f',
+                          color: isCash ? 'var(--body)' : 'var(--subtle)',
                         }}
                       >
                         {label}
@@ -695,7 +695,7 @@ export function QuoteFooter({
                         style={{
                           fontSize: isCash ? 17 : 12,
                           fontWeight: isCash ? 700 : 400,
-                          color: '#3a3530',
+                          color: 'var(--body)',
                           fontFamily: 'DM Mono, monospace',
                         }}
                       >
@@ -743,7 +743,7 @@ export function QuoteFooter({
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 8,
               padding: '24px',
               maxWidth: 400,
@@ -756,7 +756,7 @@ export function QuoteFooter({
               style={{
                 fontSize: 16,
                 fontWeight: 600,
-                color: '#3a3530',
+                color: 'var(--body)',
                 marginBottom: 12,
                 margin: 0,
               }}
@@ -766,7 +766,7 @@ export function QuoteFooter({
             <p
               style={{
                 fontSize: 13,
-                color: '#3a3530',
+                color: 'var(--body)',
                 lineHeight: 1.6,
                 marginBottom: 20,
                 margin: 0,
@@ -781,21 +781,21 @@ export function QuoteFooter({
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#c8b89a'
-                  e.currentTarget.style.background = '#f5f2ee'
+                  e.currentTarget.style.borderColor = 'var(--tan)'
+                  e.currentTarget.style.background = 'var(--surface)'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#d8d0c8'
-                  e.currentTarget.style.background = '#ffffff'
+                  e.currentTarget.style.borderColor = 'var(--line-strong-2)'
+                  e.currentTarget.style.background = 'var(--paper)'
                 }}
               >
                 Close
@@ -827,8 +827,8 @@ export function QuoteFooter({
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#2e7d32',
+                  color: 'var(--paper)',
+                  background: 'var(--success)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '8px 20px',
@@ -836,8 +836,8 @@ export function QuoteFooter({
                   transition: 'background 0.15s',
                   opacity: isCloning ? 0.7 : 1,
                 }}
-                onMouseEnter={e => !isCloning && (e.currentTarget.style.background = '#1b5e20')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                onMouseEnter={e => !isCloning && (e.currentTarget.style.background = 'var(--success-dark)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--success)')}
               >
                 {isCloning ? 'Creating...' : 'Duplicate to make changes'}
               </button>

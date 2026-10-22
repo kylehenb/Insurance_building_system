@@ -16,18 +16,18 @@ function SectionHeading({ label, subtitle }: { label: string; subtitle?: string 
   return (
     <div className="mt-8 mb-4">
       <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-[#e4dfd8]" />
+        <div className="h-px flex-1 bg-line-2" />
         <span
-          className="text-[10px] font-semibold tracking-[0.18em] uppercase text-[#c8b89a]"
+          className="text-[10px] font-semibold tracking-[0.18em] uppercase text-tan"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
           {label}
         </span>
-        <div className="h-px flex-1 bg-[#e4dfd8]" />
+        <div className="h-px flex-1 bg-line-2" />
       </div>
       {subtitle && (
         <p
-          className="text-center text-[11px] text-[#b0a898] mt-1"
+          className="text-center text-[11px] text-faint mt-1"
           style={{ fontFamily: 'DM Mono, monospace' }}
         >
           {subtitle}
@@ -40,7 +40,7 @@ function SectionHeading({ label, subtitle }: { label: string; subtitle?: string 
 function FieldLabel({ label }: { label: string }) {
   return (
     <label
-      className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+      className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
       style={{ fontFamily: 'DM Sans, sans-serif' }}
     >
       {label}
@@ -85,9 +85,9 @@ function InlineInput({
       disabled={locked}
       placeholder={placeholder}
       className={`
-        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
-        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white
+        border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+        disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
         transition-colors
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -132,9 +132,9 @@ function InlineTextarea({
       placeholder={placeholder}
       rows={rows}
       className={`
-        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
-        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white
+        border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+        disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
         resize-y transition-colors
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -177,9 +177,9 @@ function DropdownSelect({
       onChange={handleChange}
       disabled={locked}
       className={`
-        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
-        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white
+        border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+        disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
         transition-colors
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -225,8 +225,8 @@ function MultiSelectDropdown({
         disabled={locked}
         className={`
           w-full px-3 py-2 rounded-md border text-[13px] text-left
-          border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-          disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+          border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+          disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
           transition-colors
         `}
         style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -234,18 +234,18 @@ function MultiSelectDropdown({
         {value.length > 0 ? value.join(', ') : (placeholder || 'Select options...')}
       </button>
       {isOpen && !locked && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-[#e4dfd8] rounded-md shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-10 w-full mt-1 bg-white border border-line-2 rounded-md shadow-lg max-h-60 overflow-auto">
           {options.map(option => (
             <label
               key={option}
-              className="flex items-center px-3 py-2 hover:bg-[#f5f2ee] cursor-pointer text-[13px]"
+              className="flex items-center px-3 py-2 hover:bg-surface cursor-pointer text-[13px]"
               style={{ fontFamily: 'DM Sans, sans-serif' }}
             >
               <input
                 type="checkbox"
                 checked={value.includes(option)}
                 onChange={() => toggleOption(option)}
-                className="mr-2 accent-[#c8b89a]"
+                className="mr-2 accent-tan"
               />
               {option}
             </label>
@@ -410,8 +410,8 @@ export function RoofReportForm({ data, locked, onChange, tenantId, reportId, job
               px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
               transition-all duration-200
               ${locked || generating || !str('raw_report_notes').trim()
-                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
-                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
+                ? 'bg-cream text-faint cursor-not-allowed'
+                : 'bg-ink text-cream hover:bg-ink-hover cursor-pointer'
               }
             `}
             style={{ fontFamily: 'DM Sans, sans-serif' }}

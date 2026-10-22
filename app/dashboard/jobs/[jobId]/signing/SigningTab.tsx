@@ -33,21 +33,21 @@ function RequestRow({
   const [open, setOpen] = useState(false)
   const canResend = request.status === 'sent' || request.status === 'viewed' || request.status === 'expired'
   const canRevoke = request.status !== 'signed' && request.status !== 'revoked'
-  const btn = 'inline-flex items-center gap-1.5 rounded-md border border-[#e0dbd4] bg-white px-2.5 py-1.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] disabled:opacity-50'
+  const btn = 'inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-[12px] text-body hover:bg-surface disabled:opacity-50'
 
   return (
-    <div className="rounded-lg border border-[#e0dbd4] bg-white">
+    <div className="rounded-lg border border-line bg-white">
       <div className="flex flex-wrap items-start gap-3 px-4 py-3">
-        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#9e998f]" />
+        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-subtle" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-medium text-[#1a1a1a]">{request.documentTitle}</span>
+            <span className="text-[14px] font-medium text-ink">{request.documentTitle}</span>
             <SigningStatusBadge status={request.status} />
           </div>
           <div className="mt-0.5 text-[12px] text-[#7a7268]">
             {request.signerName} · {request.signerEmail ?? request.signerPhone ?? '—'}
           </div>
-          <div className="mt-1 text-[12px] text-[#9e998f]">
+          <div className="mt-1 text-[12px] text-subtle">
             {request.status === 'signed' && <>Signed {when(request.signedAt)}</>}
             {(request.status === 'sent' || request.status === 'viewed') && (
               <>
@@ -82,7 +82,7 @@ function RequestRow({
             <FileText className="h-3.5 w-3.5" /> {request.status === 'signed' ? 'Unsigned original' : 'Preview'}
           </a>
           {canRevoke && (
-            <button className={`${btn} text-[#991b1b]`} disabled={busy} onClick={() => onAction('revoke')}>
+            <button className={`${btn} text-danger-dark`} disabled={busy} onClick={() => onAction('revoke')}>
               <XCircle className="h-3.5 w-3.5" /> Revoke
             </button>
           )}
@@ -90,7 +90,7 @@ function RequestRow({
       </div>
 
       {(request.status === 'sent' || request.status === 'viewed') && (
-        <label className="flex items-center gap-2 border-t border-[#f0ece6] px-4 py-2 text-[12px] text-[#5a5650]">
+        <label className="flex items-center gap-2 border-t border-line-faint px-4 py-2 text-[12px] text-body-soft">
           <input
             type="checkbox"
             checked={request.remindersEnabled}
@@ -98,13 +98,13 @@ function RequestRow({
             onChange={e => onToggleReminders(e.target.checked)}
           />
           Automatic reminders every {REMINDER_DEFAULTS.afterDays} days
-          <span className="text-[#9e998f]">({request.reminderCount} of {REMINDER_DEFAULTS.maxReminders} sent)</span>
+          <span className="text-subtle">({request.reminderCount} of {REMINDER_DEFAULTS.maxReminders} sent)</span>
         </label>
       )}
 
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center gap-1 border-t border-[#f0ece6] px-4 py-2 text-left text-[12px] text-[#7a7268] hover:bg-[#fafaf9]"
+        className="flex w-full items-center gap-1 border-t border-line-faint px-4 py-2 text-left text-[12px] text-[#7a7268] hover:bg-surface-5"
         aria-expanded={open}
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />} Audit trail
@@ -143,12 +143,12 @@ export function SigningTab({ jobId }: { jobId: string }) {
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[15px] font-semibold text-[#1a1a1a]">Signatures</h2>
-          <p className="text-[12px] text-[#9e998f]">Homeowners sign by email link on any phone or computer — no account needed.</p>
+          <h2 className="text-[15px] font-semibold text-ink">Signatures</h2>
+          <p className="text-[12px] text-subtle">Homeowners sign by email link on any phone or computer — no account needed.</p>
         </div>
         <button
           onClick={() => setDialogOpen(true)}
-          className="inline-flex items-center gap-2 rounded-md bg-[#1a1a1a] px-4 py-2 text-[13px] font-semibold text-[#c9a96e]"
+          className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-[13px] font-semibold text-gold"
         >
           <PenLine className="h-4 w-4" /> Send for signature
         </button>
@@ -162,9 +162,9 @@ export function SigningTab({ jobId }: { jobId: string }) {
       {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</div>}
 
       {loading ? (
-        <div className="h-24 animate-pulse rounded-lg bg-[#f5f2ee]" />
+        <div className="h-24 animate-pulse rounded-lg bg-surface" />
       ) : requests.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[#e0dbd4] px-6 py-10 text-center text-[13px] text-[#9e998f]">
+        <div className="rounded-lg border border-dashed border-line px-6 py-10 text-center text-[13px] text-subtle">
           Nothing has been sent for signature on this job yet.
         </div>
       ) : (

@@ -92,7 +92,7 @@ export function InsurerSelect({ tenantId, value, clientId, onSave, label = 'Insu
       <div style={{
         fontSize: 9,
         fontWeight: 600,
-        color: '#b0a898',
+        color: 'var(--faint)',
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
         marginBottom: 3,
@@ -113,7 +113,7 @@ export function InsurerSelect({ tenantId, value, clientId, onSave, label = 'Insu
             <SelectItem key={insurer.id} value={insurer.name}>
               {insurer.name}
               {insurer.trading_name && insurer.trading_name !== insurer.name && (
-                <span style={{ color: '#9e998f', marginLeft: 8, fontSize: 11 }}>
+                <span style={{ color: 'var(--subtle)', marginLeft: 8, fontSize: 11 }}>
                   ({insurer.trading_name})
                 </span>
               )}

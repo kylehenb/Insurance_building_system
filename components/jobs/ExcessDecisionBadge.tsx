@@ -72,9 +72,9 @@ function statusOf(ctx: ExcessContext): { text: string; tone: Tone } {
 }
 
 const TONE_CLASS: Record<Tone, string> = {
-  ok: 'border-[#b9dfbb] bg-[#f1f8f1] text-[#1b5e20]',
-  warn: 'border-[#f5d9a8] bg-[#fef3e2] text-[#92400e]',
-  muted: 'border-[#e8e4e0] bg-[#faf9f7] text-[#5a5650]',
+  ok: 'border-[#b9dfbb] bg-[#f1f8f1] text-success-dark',
+  warn: 'border-[#f5d9a8] bg-warning-bg text-warning-dark',
+  muted: 'border-line-3 bg-surface-3 text-body-soft',
 }
 
 const SETTABLE: { value: ExcessDecision; label: string }[] = [
@@ -131,17 +131,17 @@ export function ExcessDecisionBadge({ jobId }: { jobId: string }) {
           </button>
         )}
       </div>
-      {ctx.note && !open && <div className="mt-1 text-[#9e998f]">“{ctx.note}”</div>}
+      {ctx.note && !open && <div className="mt-1 text-subtle">“{ctx.note}”</div>}
       {open && (
-        <div className="mt-2 space-y-1 rounded-md border border-[#e8e4e0] bg-white p-2.5">
+        <div className="mt-2 space-y-1 rounded-md border border-line-3 bg-white p-2.5">
           {SETTABLE.map(o => (
-            <label key={o.value} className="flex items-center gap-2 text-[#3a3530]">
+            <label key={o.value} className="flex items-center gap-2 text-body">
               <input type="radio" name={`excess-decision-${jobId}`} checked={choice === o.value} onChange={() => setChoice(o.value)} />
               {o.label}
             </label>
           ))}
           <input
-            className="mt-1 w-full rounded-md border border-[#e0dbd4] px-2 py-1.5 focus:border-[#c8b89a] focus:outline-none"
+            className="mt-1 w-full rounded-md border border-line px-2 py-1.5 focus:border-tan focus:outline-none"
             placeholder="Note (optional)"
             value={note}
             maxLength={1000}
@@ -153,11 +153,11 @@ export function ExcessDecisionBadge({ jobId }: { jobId: string }) {
               type="button"
               onClick={save}
               disabled={!choice || saving}
-              className="rounded bg-[#1a1a1a] px-2.5 py-1 font-semibold text-[#c9a96e] disabled:opacity-50"
+              className="rounded bg-ink px-2.5 py-1 font-semibold text-gold disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="rounded border border-[#e0d8c8] px-2.5 py-1 text-[#3a3530]">
+            <button type="button" onClick={() => setOpen(false)} className="rounded border border-[#e0d8c8] px-2.5 py-1 text-body">
               Cancel
             </button>
           </div>

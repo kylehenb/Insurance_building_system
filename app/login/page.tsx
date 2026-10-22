@@ -41,16 +41,16 @@ export default function LoginPage() {
 
   if (isSent) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f0e8] px-4">
-        <div className="w-full max-w-md space-y-8 rounded-lg border border-[#1a1a1a]/10 bg-white p-8 shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-cream px-4">
+        <div className="w-full max-w-md space-y-8 rounded-lg border border-ink/10 bg-white p-8 shadow-sm">
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1a1a1a]/5">
-              <CheckCircle className="h-8 w-8 text-[#1a1a1a]" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+              <CheckCircle className="h-8 w-8 text-ink" />
             </div>
-            <h2 className="mt-6 text-2xl font-semibold text-[#1a1a1a]">
+            <h2 className="mt-6 text-2xl font-semibold text-ink">
               Check your email
             </h2>
-            <p className="mt-2 text-sm text-[#1a1a1a]/70">
+            <p className="mt-2 text-sm text-ink/70">
               We sent a magic link to <strong>{email}</strong>.<br />
               Click the link in the email to sign in.
             </p>
@@ -62,7 +62,7 @@ export default function LoginPage() {
                 setEmail("");
                 setIsLoading(false);
               }}
-              className="text-sm text-[#1a1a1a]/60 hover:text-[#1a1a1a] underline"
+              className="text-sm text-ink/60 hover:text-ink underline"
             >
               Send to a different email
             </button>
@@ -73,16 +73,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f0e8] px-4">
-      <div className="w-full max-w-md space-y-8 rounded-lg border border-[#1a1a1a]/10 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-cream px-4">
+      <div className="w-full max-w-md space-y-8 rounded-lg border border-ink/10 bg-white p-8 shadow-sm">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1a1a1a]">
-            <Mail className="h-8 w-8 text-[#f5f0e8]" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ink">
+            <Mail className="h-8 w-8 text-cream" />
           </div>
-          <h1 className="mt-6 text-2xl font-semibold text-[#1a1a1a]">
+          <h1 className="mt-6 text-2xl font-semibold text-ink">
             IRC Master
           </h1>
-          <p className="mt-2 text-sm text-[#1a1a1a]/70">
+          <p className="mt-2 text-sm text-ink/70">
             Enter your email to receive a magic link
           </p>
         </div>
@@ -91,7 +91,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-[#1a1a1a]"
+              className="block text-sm font-medium text-ink"
             >
               Email address
             </label>
@@ -102,7 +102,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
-              className="mt-2 block w-full rounded-md border border-[#1a1a1a]/20 bg-white px-4 py-3 text-[#1a1a1a] placeholder:text-[#1a1a1a]/40 focus:border-[#1a1a1a] focus:outline-none focus:ring-1 focus:ring-[#1a1a1a]"
+              className="mt-2 block w-full rounded-md border border-ink/20 bg-white px-4 py-3 text-ink placeholder:text-ink/40 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
             />
           </div>
 
@@ -115,7 +115,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={isLoading || !email}
-            className="w-full bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#1a1a1a]/90 disabled:opacity-50"
+            className="w-full bg-ink text-cream hover:bg-ink/90 disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -128,7 +128,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-[#1a1a1a]/50">
+        <p className="mt-6 text-center text-xs text-ink/50">
           By signing in, you agree to the terms of service.
         </p>
       </div>

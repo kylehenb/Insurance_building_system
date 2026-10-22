@@ -32,10 +32,10 @@ const inputStyle: React.CSSProperties = {
 
 const focusRing = {
   onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = '#c8b89a'
+    e.currentTarget.style.borderColor = 'var(--tan)'
   },
   onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = '#e0dbd4'
+    e.currentTarget.style.borderColor = 'var(--line)'
   },
 }
 
@@ -77,11 +77,11 @@ export function CreateModal({ title, fields, onSubmit, onClose, isOpen }: Create
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0dbd4]">
-          <h2 className="text-[15px] font-semibold text-[#3a3530]">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+          <h2 className="text-[15px] font-semibold text-body">{title}</h2>
           <button
             onClick={onClose}
-            className="text-[#9e998f] hover:text-[#3a3530] transition-colors"
+            className="text-subtle hover:text-body transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -93,7 +93,7 @@ export function CreateModal({ title, fields, onSubmit, onClose, isOpen }: Create
             <div key={field.name}>
               <label
                 htmlFor={field.name}
-                className="block text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-1.5"
+                className="block text-[11px] uppercase tracking-[0.07em] text-subtle mb-1.5"
               >
                 {field.label}
               </label>
@@ -134,7 +134,7 @@ export function CreateModal({ title, fields, onSubmit, onClose, isOpen }: Create
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 text-[13px] text-[#9e998f] hover:text-[#3a3530] transition-colors"
+              className="px-4 py-2 text-[13px] text-subtle hover:text-body transition-colors"
             >
               Cancel
             </button>
@@ -142,7 +142,7 @@ export function CreateModal({ title, fields, onSubmit, onClose, isOpen }: Create
               type="submit"
               disabled={loading}
               className="px-5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
-              style={{ background: loading ? '#b0a898' : '#3a3530' }}
+              style={{ background: loading ? 'var(--faint)' : 'var(--body)' }}
             >
               {loading ? 'Creating…' : 'Create'}
             </button>
