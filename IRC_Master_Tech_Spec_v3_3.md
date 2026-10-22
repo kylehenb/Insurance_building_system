@@ -2606,10 +2606,13 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `find_order_emails(query)` | read | Gmail `messages.list` | Inbox search (last 90 days, excluding our domain) by claim number, name, address or Gmail syntax; says whether each email is already an order, or its thread is on a job |
 | `create_order_from_email(message_id)` | change | `parseInsurerOrder`, `writeInsurerOrder` | For an order email the auto lodger missed: runs the lodger's reader and writer with `isNewOrder` forced true (the reader's reasoning is kept on `ai_audit`). Returns the existing order if the email or claim number already has one. No new-order notification (the user asked for it) |
 | `lodge_order(order_id)` | change | `lodgeInsurerOrder` | Same as the Lodge button, scoped to the tenant. Links to an existing job with the same claim; the same-address-different-claim warning creates nothing and lists the matching jobs |
+| `list_job_emails(job_number?, limit?)` | read | — | A job's latest emails (both directions) with the new text up to the quoted earlier message; without a job, incoming emails not on a job (last 14 days) |
+| `get_email(email_id)` | read | — | One email in full (6,000 chars), with attachments |
+| `reply_to_email(email_id, body, send_anyway?)` | send | `replyToEmail` | Same as the Reply box (`lib/communications/reply.ts`): same thread, Re: subject, In-Reply-To, office From, `manual_reply` comms row. Incoming emails only; the same text on the same conversation within 10 minutes is refused unless `send_anyway: true` |
 
 ### Planned
-1. Email replies (with a job emails read tool), inspection confirm/reschedule, job stage, accounting sync
-2. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
+1. Inspection confirm/reschedule, job stage, accounting sync, editing an insurer order (e.g. adding a missing claim number), linking an order to an existing job
+2. Needs logic moved out of the route into `lib/` first: invoice generation, inspection proposals, AI report generation
 
 ---
 

@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getGmailClient } from '@/lib/gmail/client'
-import { buildEmailRaw, ensureAngleBrackets } from '@/lib/email/build-raw'
+import { createClient } from '@/lib/supabase/server'
+import { ReplyError, replyToEmail } from '@/lib/communications/reply'
 
-const FALLBACK_FROM = 'office@insurancerepairco.com.au'
-
-interface CommRow {
-  job_id: string | null
-  thread_id: string | null
-  from_email: string | null
-  subject: string | null
-  gmail_message_id: string | null
-}
-
+// Reply box on the comms log (see lib/communications/reply.ts).
 export async function POST(req: NextRequest) {
   const userSession = await getUser()
   if (!userSession?.tenant_id) {
@@ -37,101 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // RLS-scoped client — tenant isolation is enforced by the policy
-  const supabase = await createClient()
-
-  const { data: comm, error: commErr } = await supabase
-    .from('communications')
-    .select('job_id,thread_id,from_email,subject,gmail_message_id')
-    .eq('id', commId)
-    .eq('type', 'email')
-    .single()
-
-  if (commErr || !comm) {
-    return NextResponse.json({ error: 'Communication not found' }, { status: 404 })
-  }
-
-  const source = comm as CommRow
-
-  if (!source.from_email) {
-    return NextResponse.json({ error: 'Source email has no from_email — cannot reply' }, { status: 422 })
-  }
-
-  // Resolve tenant From address
-  const serviceClient = createServiceClient()
-  const { data: tenant } = await serviceClient
-    .from('tenants')
-    .select('contact_email')
-    .eq('id', tenantId)
-    .single()
-
-  const fromEmail = (tenant as { contact_email: string | null } | null)?.contact_email ?? FALLBACK_FROM
-
-  // Build Re: subject (avoid double-prefix)
-  const originalSubject = source.subject ?? ''
-  const replySubject = originalSubject.toLowerCase().startsWith('re:')
-    ? originalSubject
-    : `Re: ${originalSubject}`
-
-  // Build RFC 2822 threading headers from gmail_message_id
-  const msgId = source.gmail_message_id
-  const inReplyTo = msgId ? ensureAngleBrackets(msgId) : undefined
-  const references = inReplyTo ?? undefined
-
-  const raw = buildEmailRaw({
-    from: fromEmail,
-    to: source.from_email,
-    subject: replySubject,
-    body,
-    inReplyTo,
-    references,
-  })
-
-  // Send via Gmail — threadId appends to the existing conversation
-  let sentGmailId: string | null = null
   try {
-    const gmail = getGmailClient()
-    const sendRes = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw,
-        ...(source.thread_id ? { threadId: source.thread_id } : {}),
-      },
-    })
-    sentGmailId = sendRes.data.id ?? null
+    // RLS-scoped client, plus the explicit tenant filter in replyToEmail
+    await replyToEmail(await createClient(), tenantId, commId, body)
   } catch (err) {
-    console.error('[reply] Gmail send error:', err)
-    return NextResponse.json({ error: 'Failed to send email' }, { status: 502 })
+    if (err instanceof ReplyError) return NextResponse.json({ error: err.message }, { status: err.status })
+    throw err
   }
-
-  // Mark the sent copy as processed so the Gmail SENT watch doesn't record it twice
-  if (sentGmailId) {
-    await serviceClient
-      .from('processed_gmail_messages' as never)
-      .upsert(
-        { message_id: sentGmailId, processed_at: new Date().toISOString() } as never,
-        { onConflict: 'message_id', ignoreDuplicates: true }
-      )
-  }
-
-  // Record outbound communication
-  const { error: insertErr } = await serviceClient.from('communications').insert({
-    tenant_id: tenantId,
-    job_id: source.job_id,
-    type: 'email',
-    direction: 'outbound',
-    subject: replySubject,
-    content: body,
-    from_email: fromEmail,
-    to_email: source.from_email,
-    thread_id: source.thread_id,
-    source: 'manual_reply',
-  })
-
-  if (insertErr) {
-    console.error('[reply] insert error:', insertErr)
-    // Don't fail the request — email already sent
-  }
-
   return NextResponse.json({ ok: true })
 }
