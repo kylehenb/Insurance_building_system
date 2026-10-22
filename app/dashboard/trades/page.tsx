@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/lib/supabase/database.types';
 import { TradesCsvImportDialog, type TradesImportRow } from './TradesCsvImportDialog';
 import { TradeTypesModal } from './TradeTypesModal';
+import { useCurrentUser } from '@/components/layout/current-user';
 
 type TradesRow = Database['public']['Tables']['trades']['Row'];
 type TradesInsert = Database['public']['Tables']['trades']['Insert'];
@@ -22,12 +22,10 @@ function formatCurrency(value: number | null): string {
 }
 
 export default function TradesPage() {
-  const router = useRouter();
   const [items, setItems] = useState<TradesRow[]>([]);
   const [filteredItems, setFilteredItems] = useState<TradesRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { tenantId, userId } = useCurrentUser();
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -120,18 +118,6 @@ export default function TradesPage() {
   );
 
   // Auth bootstrap
-  useEffect(() => {
-    async function bootstrap() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return }
-      const { data: profile, error } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single();
-      if (error || !profile) { router.push('/login'); return }
-      setTenantId(profile.tenant_id);
-      setUserId(user.id);
-    }
-    bootstrap();
-  }, [router, supabase]);
 
   // Load column widths from database
   useEffect(() => {

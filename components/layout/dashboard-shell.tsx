@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { FloatingAssistant } from '@/components/ai/floating-assistant'
+import { CurrentUserProvider, type CurrentUser } from '@/components/layout/current-user'
 
 interface User {
   name: string
@@ -13,10 +14,11 @@ interface User {
 interface Props {
   user: User
   tenantId: string
+  currentUser: CurrentUser
   children: React.ReactNode
 }
 
-export function DashboardShell({ user, tenantId, children }: Props) {
+export function DashboardShell({ user, tenantId, currentUser, children }: Props) {
   const [assistantVisible, setAssistantVisible] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
@@ -58,6 +60,7 @@ export function DashboardShell({ user, tenantId, children }: Props) {
   }
 
   return (
+    <CurrentUserProvider value={currentUser}>
     <div
       style={{
         display: 'flex',
@@ -84,5 +87,6 @@ export function DashboardShell({ user, tenantId, children }: Props) {
         />
       )}
     </div>
+    </CurrentUserProvider>
   )
 }

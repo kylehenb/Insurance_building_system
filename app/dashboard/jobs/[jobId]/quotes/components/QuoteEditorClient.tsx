@@ -2,8 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createBrowserClient } from '@supabase/ssr'
-import type { Database } from '@/lib/supabase/database.types'
 import { useQuote } from '../hooks/useQuote'
 import type { ScopeItem } from '../hooks/useQuote'
 import { useScopeLibrary } from '../hooks/useScopeLibrary'
@@ -30,6 +28,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 interface JobInfo {
   job_number: string
@@ -297,24 +296,7 @@ function SortableRoomSection({
 // ── Main editor ──────────────────────────────────────────────────────────────
 
 export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuoteUpdated }: QuoteEditorClientProps) {
-  const [isAdmin, setIsAdmin] = useState(false)
-
-  useEffect(() => {
-    const supabase = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .eq('tenant_id', tenantId)
-        .single()
-      if (profile?.role === 'admin') setIsAdmin(true)
-    })
-  }, [tenantId])
+  const isAdmin = useCurrentUser().role === 'admin'
 
   const {
     quote,

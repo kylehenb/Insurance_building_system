@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import type { BrainEntry, BrainReviewQueue } from '@/types/brain'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +36,7 @@ const SECTION_LABEL: Record<ReviewSection, string> = {
 }
 
 export function BrainReviewWidget() {
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [queue, setQueue] = useState<BrainReviewQueue | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -43,22 +44,6 @@ export function BrainReviewWidget() {
   const [editSection, setEditSection] = useState<ReviewSection | null>(null)
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    async function init() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase
-        .from('users')
-        .select('tenant_id')
-        .eq('id', user.id)
-        .single()
-      if (profile) setTenantId((profile as { tenant_id: string }).tenant_id)
-    }
-    init()
-  }, [])
 
   const fetchQueue = useCallback(async () => {
     setLoading(true)

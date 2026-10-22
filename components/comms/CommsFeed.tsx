@@ -1,18 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import type { Database } from '@/lib/supabase/database.types'
 import { CommsItem } from './CommsItem'
 import type { Comm, DisplayItem } from './CommsItem'
 import { CommsFilterBar } from './CommsFilterBar'
 import type { CommsFilters } from './CommsFilterBar'
 import { DEFAULT_FILTERS } from './CommsFilterBar'
-
-const supabase = createBrowserClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { useCurrentUser } from '@/components/layout/current-user'
 
 // ── AI summary types ──────────────────────────────────────────────────────────
 
@@ -316,8 +310,7 @@ function AiPopover({ onSelect, onClose }: { onSelect: (s: AiScope) => void; onCl
 // ── CommsFeed ─────────────────────────────────────────────────────────────────
 
 export function CommsFeed({ jobId }: { jobId: string }) {
-  const [userId, setUserId] = useState<string | null>(null)
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId, userId } = useCurrentUser()
   const [comms, setComms] = useState<Comm[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -331,21 +324,6 @@ export function CommsFeed({ jobId }: { jobId: string }) {
   const [aiLoading, setAiLoading] = useState(false)
 
   // ── Auth bootstrap ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserId(user.id)
-      const { data: profile } = await supabase
-        .from('users')
-        .select('tenant_id')
-        .eq('id', user.id)
-        .single()
-      if (!profile) return
-      setTenantId((profile as { tenant_id: string }).tenant_id)
-    }
-    init()
-  }, [])
 
   const refetch = useCallback(() => setFetchRevision(r => r + 1), [])
 

@@ -8,6 +8,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
 import { STAGE_CONFIG } from "@/lib/jobs/stageConfig";
 import type { JobStageKey } from "@/lib/jobs/getJobStage";
+import { useCurrentUser } from "@/components/layout/current-user";
 
 type JobRow = {
   id: string
@@ -134,7 +135,7 @@ export default function JobsListPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const { tenantId } = useCurrentUser();
   const [activeFilter, setActiveFilter] = useState<StageFilter>('all');
 
   const supabase = createBrowserClient<Database>(
@@ -162,17 +163,6 @@ export default function JobsListPage() {
   }
 
   // Auth bootstrap
-  useEffect(() => {
-    async function bootstrap() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return }
-      const { data: profile, error } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single();
-      if (error || !profile) { router.push('/login'); return }
-      setTenantId(profile.tenant_id);
-    }
-    bootstrap();
-  }, [router, supabase]);
 
   useEffect(() => {
     if (!tenantId) return;

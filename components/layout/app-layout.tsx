@@ -27,6 +27,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <DashboardShell
       user={{ name: user.name, role: roleLabel, initials }}
       tenantId={user.tenant_id}
+      currentUser={{
+        userId: user.id,
+        tenantId: user.tenant_id,
+        role: user.role,
+        canTeach: user.role === 'admin' || user.can_edit_settings === true,
+      }}
     >
       {children}
     </DashboardShell>

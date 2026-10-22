@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { useCurrentUser } from '@/components/layout/current-user'
 import type {
   StructuredTeachOutput,
   SimilarityMatch,
@@ -140,7 +141,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   // Permission gate
-  const [userCanTeach, setUserCanTeach] = useState<boolean | null>(null)
+  const { userId, canTeach: userCanTeach } = useCurrentUser()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -182,23 +183,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       typeof window !== 'undefined' &&
       !!(window.SpeechRecognition || window.webkitSpeechRecognition)
     )
-  }, [])
-
-  // Load permission once on mount
-  useEffect(() => {
-    async function checkPermission() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setUserCanTeach(false); return }
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role, can_edit_settings')
-        .eq('id', user.id)
-        .single()
-      if (!profile) { setUserCanTeach(false); return }
-      const p = profile as { role: string; can_edit_settings: boolean | null }
-      setUserCanTeach(p.role === 'admin' || p.can_edit_settings === true)
-    }
-    checkPermission()
   }, [])
 
   // Persist position
@@ -466,12 +450,10 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   async function loadTemplates() {
     setTemplatesLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
       const { data } = await supabase
         .from('assistant_templates')
         .select('id, title, body')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
       setTemplates((data as Template[]) ?? [])
     } finally {
@@ -481,8 +463,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
 
   async function saveTemplate() {
     if (!formTitle.trim() || !formBody.trim()) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     if (editingTemplate) {
       await supabase
         .from('assistant_templates')
@@ -491,7 +471,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     } else {
       await supabase
         .from('assistant_templates')
-        .insert({ title: formTitle.trim(), body: formBody.trim(), tenant_id: tenantId, user_id: user.id })
+        .insert({ title: formTitle.trim(), body: formBody.trim(), tenant_id: tenantId, user_id: userId })
     }
     setEditingTemplate(null)
     setIsCreating(false)
