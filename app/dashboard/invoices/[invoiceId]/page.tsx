@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,6 +101,7 @@ export default function InvoiceDetailPage() {
 
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [showSend, setShowSend] = useState(false)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
   const [job, setJob] = useState<JobInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -530,6 +532,9 @@ export default function InvoiceDetailPage() {
             {invoice.status === 'draft' && (
               <button className="invd-btn invd-btn-danger" onClick={voidInvoice}>Void</button>
             )}
+            {invoice.status !== 'voided' && invoice.direction === 'outbound' && (
+              <button className="invd-btn invd-btn-secondary" onClick={() => setShowSend(true)}>Email Invoice</button>
+            )}
             <button
               className="invd-btn invd-btn-secondary"
               onClick={() => window.open(`/print/invoices/${invoice.id}`, '_blank')}
@@ -537,6 +542,14 @@ export default function InvoiceDetailPage() {
               Download PDF
             </button>
           </div>
+          {showSend && (
+            <SendDocumentModal
+              documents={[{ kind: 'invoice', id: invoice.id }]}
+              title="Send invoice"
+              onClose={() => setShowSend(false)}
+              onDone={() => { setShowSend(false); load() }}
+            />
+          )}
         </div>
 
         {invoice.status === 'voided' && (

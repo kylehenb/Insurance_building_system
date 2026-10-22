@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
 import { TccModal } from './TccModal'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -911,84 +912,23 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         </div>
       )}
 
-      {/* Send it dialog */}
+      {/* Send it dialog: email the quote PDF to the insurer, or just mark it sent */}
       {sendDialogQuoteId && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.42)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9000,
+        <SendDocumentModal
+          documents={[{ kind: 'quote', id: sendDialogQuoteId }]}
+          title="Send quote"
+          allowMarkSent
+          markSentDescription="Mark the quote as sent and lock it, without emailing it (if you sent it another way)."
+          onClose={() => setSendDialogQuoteId(null)}
+          onDone={async () => {
+            setSendDialogQuoteId(null)
+            // Only change job stage if no quote has already reached sent_awaiting_approval or later
+            if (!hasQuoteReachedStageOrLater('sent_awaiting_approval')) {
+              await handleJobStageChange(jobId, 'sent_awaiting_approval')
+            }
+            load()
           }}
-          onClick={() => setSendDialogQuoteId(null)}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 12,
-              padding: '32px 36px',
-              maxWidth: 380,
-              textAlign: 'center',
-              fontFamily: 'DM Sans, sans-serif',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ fontSize: 34, marginBottom: 12 }}>📧</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
-              Send Quote
-            </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
-              This function is not yet built - please send manually. The quote will be marked as sent and locked.
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
-                onClick={() => setSendDialogQuoteId(null)}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  if (sendDialogQuoteId) {
-                    await handleStatusChange(sendDialogQuoteId, 'sent', true)
-                    // Only change job stage if no quote has already reached sent_awaiting_approval or later
-                    if (!hasQuoteReachedStageOrLater('sent_awaiting_approval')) {
-                      await handleJobStageChange(jobId, 'sent_awaiting_approval')
-                    }
-                    setSendDialogQuoteId(null)
-                  }
-                }}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a73e8',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                }}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {/* Decline dialog */}
@@ -2144,6 +2084,34 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       >
                         <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
                         <span>Preview Quote</span>
+                      </button>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setMenuDropdownId(null)
+                          setSendDialogQuoteId(q.id)
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: '#3a3530',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+                      >
+                        <span style={{ fontSize: 10, color: '#c8b89a' }}>✉</span>
+                        <span>Email Quote…</span>
                       </button>
                       <button
                         onClick={e => {

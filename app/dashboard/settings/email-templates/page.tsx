@@ -10,6 +10,7 @@ import {
   EMAIL_SEND_TYPES,
   REQUIRED_TOKENS,
   TEMPLATE_TOKENS,
+  documentTemplateVars,
   renderTemplate,
   signingTemplateVars,
   workOrderTemplateVars,
@@ -23,6 +24,16 @@ const supabase = createBrowserClient<Database>(
 
 type TemplateRow = Database['public']['Tables']['email_templates']['Row']
 type ClientOption = { id: string; name: string }
+
+// Documents emailed from a job (lib/documents/send) and the attachment each sends
+const DOCUMENT_ATTACHMENTS: Partial<Record<EmailSendType, string>> = {
+  quote: 'Quote PDF attached',
+  report: 'Report PDF attached',
+  invoice: 'Invoice PDF attached',
+  excess_invoice: 'Excess invoice PDF attached',
+  tcc: 'Telephone clearance certificate PDF attached',
+  photos: 'Photos PDF attached',
+}
 
 interface Selection {
   sendType: EmailSendType
@@ -145,7 +156,28 @@ export default function EmailTemplatesSettingsPage() {
       return { vars, source: [job.job_number, job.property_address].filter(Boolean).join(' · ') }
     }
 
+    // Document emails: the most recent job's details, example document values
+    const loadDocument = async () => {
+      let q = supabase.from('jobs').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(1)
+      if (selection.clientId) q = q.eq('client_id', selection.clientId)
+      const [{ data: job }, { data: tenant }] = await Promise.all([
+        q.maybeSingle(),
+        supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
+      ])
+      if (!job || !tenant) return null
+      const contactName = job.order_sender_name?.trim().split(/\s+/)[0] || null
+      const insuredFirst = job.insured_name?.trim().split(/\s+/)[0] || null
+      const vars = {
+        ...examples,
+        ...documentTemplateVars({ job, tenant, contactName }),
+        ...(insuredFirst ? { insured_first_name: insuredFirst } : {}),
+        ...(tenant.accounts_email || tenant.contact_email ? { accounts_email: tenant.accounts_email || tenant.contact_email } : {}),
+      }
+      return { vars, source: [job.job_number, job.property_address].filter(Boolean).join(' · ') }
+    }
+
     const load = async () => {
+      if (selection.sendType in DOCUMENT_ATTACHMENTS) return loadDocument()
       if (selection.sendType !== 'work_order') return loadSigning()
       let jobIds: string[] | null = null
       if (selection.clientId) {
@@ -477,6 +509,9 @@ export default function EmailTemplatesSettingsPage() {
                   )}
                   {selection.sendType === 'signing_request_excess' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
+                  )}
+                  {DOCUMENT_ATTACHMENTS[selection.sendType] && (
+                    <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> {DOCUMENT_ATTACHMENTS[selection.sendType]}</div>
                   )}
                   {selection.sendType === 'signing_completed' && (
                     <div className="px-4 py-2 border-t border-[#e8e4e0] text-xs text-[#9e998f] flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Signed PDF (with Signature Certificate) attached</div>

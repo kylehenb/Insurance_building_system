@@ -5,7 +5,21 @@ import type { Database } from '@/lib/supabase/database.types'
 // send_type, optionally overridden per client. Until a tenant has written
 // one, the built-in defaults below are used so sends still work.
 
-export type EmailSendType = 'work_order' | 'signing_request' | 'signing_request_excess' | 'signing_completed'
+export type EmailSendType =
+  | 'work_order'
+  | 'signing_request'
+  | 'signing_request_excess'
+  | 'signing_completed'
+  // Documents sent from the job (lib/documents/send)
+  | 'quote'
+  | 'report'
+  | 'invoice'
+  | 'excess_invoice'
+  | 'tcc'
+  | 'photos'
+
+/** The send types for documents emailed from the job (lib/documents/send). */
+export type DocumentSendType = Extract<EmailSendType, 'quote' | 'report' | 'invoice' | 'excess_invoice' | 'tcc' | 'photos'>
 
 export interface EmailTemplateContent {
   subject: string
@@ -92,6 +106,108 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       '{company_name}',
     ].join('\n'),
   },
+  quote: {
+    name: 'Quote — default',
+    subject: 'Quote {quote_ref} - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Please find attached our quote {quote_ref} for the repairs at {property_address}.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Please let us know if you have any questions or need anything further to approve the works.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  report: {
+    name: 'Report — default',
+    subject: '{report_name} {report_ref} - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Please find attached our {report_name} for {property_address}.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Please let us know if you have any questions.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  invoice: {
+    name: 'Invoice — default',
+    subject: 'Tax Invoice {invoice_ref} - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Please find attached our tax invoice {invoice_ref} for {invoice_amount} (inc GST) for {property_address}, due {due_date}.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Payment details are on the invoice. Please send remittance to {accounts_email}.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  excess_invoice: {
+    name: 'Excess invoice — default',
+    subject: 'Your insurance excess invoice {invoice_ref} - {property_address}',
+    body: [
+      'Hi {insured_first_name},',
+      '',
+      'Please find attached the invoice for your insurance excess of {invoice_amount} for the repairs at {property_address}. Payment is due {due_date}.',
+      '',
+      'Our bank details are on the invoice. Please use {invoice_ref} as the payment reference.',
+      '',
+      'If you have any questions, call us on {company_phone} or reply to this email.',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  tcc: {
+    name: 'Telephone clearance certificate — default',
+    subject: 'Telephone Clearance Certificate - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'The repairs at {property_address} are complete. Please find attached the telephone clearance certificate confirming the insured is satisfied with the works.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
+  photos: {
+    name: 'Photos — default',
+    subject: 'Photos - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Please find attached photos for {property_address}.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Kind regards,',
+      '{company_name}',
+    ].join('\n'),
+  },
 }
 
 export interface TemplateToken {
@@ -100,6 +216,26 @@ export interface TemplateToken {
   /** Shown in the preview when there's no real record to fill it from */
   example: string
 }
+
+// Placeholders shared by every document sent to the insurer/adjuster.
+const INSURER_DOCUMENT_TOKENS: TemplateToken[] = [
+  { key: 'contact_name',     label: 'Recipient first name', example: 'Casey' },
+  { key: 'claim_number',     label: 'Claim number',     example: 'CLM-558213' },
+  { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
+  { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
+  { key: 'job_number',       label: 'Job number',       example: 'IRC1042' },
+  { key: 'insurer',          label: 'Insurer',          example: 'Example Insurance' },
+  { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
+  { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
+  { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+]
+
+const INVOICE_TOKENS: TemplateToken[] = [
+  { key: 'invoice_ref',      label: 'Invoice number',   example: 'INV-IRC1042-2' },
+  { key: 'invoice_amount',   label: 'Invoice total',    example: '$2,200.00' },
+  { key: 'due_date',         label: 'Due date',         example: '4 Nov 2026' },
+  { key: 'accounts_email',   label: 'Your accounts email', example: 'accounts@insurancerepairco.com.au' },
+]
 
 /** Placeholders each send type supports, for substitution and the template editor. */
 export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
@@ -158,6 +294,24 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
   ],
+  quote: [
+    { key: 'quote_ref',        label: 'Quote number',     example: 'Q-IRC1042-1' },
+    { key: 'quote_total',      label: 'Quote total (inc GST)', example: '$8,250.00' },
+    ...INSURER_DOCUMENT_TOKENS,
+  ],
+  report: [
+    { key: 'report_name',      label: 'Report name',      example: 'Building Assessment Report' },
+    { key: 'report_ref',       label: 'Report number',    example: 'R-IRC1042-BAR' },
+    ...INSURER_DOCUMENT_TOKENS,
+  ],
+  invoice: [...INVOICE_TOKENS, ...INSURER_DOCUMENT_TOKENS],
+  excess_invoice: [
+    { key: 'insured_first_name', label: 'Insured first name', example: 'Jane' },
+    ...INVOICE_TOKENS,
+    ...INSURER_DOCUMENT_TOKENS.filter(t => t.key !== 'contact_name'),
+  ],
+  tcc: [...INSURER_DOCUMENT_TOKENS],
+  photos: [...INSURER_DOCUMENT_TOKENS],
 }
 
 /** Placeholders a send type can't work without (the editor warns if one is missing). */
@@ -188,6 +342,36 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
     label: 'Signed copy',
     description: 'Sent to the homeowner straight after they sign, with the signed PDF attached.',
   },
+  {
+    sendType: 'quote',
+    label: 'Quote',
+    description: 'Sent to the insurer/adjuster with the quote PDF attached.',
+  },
+  {
+    sendType: 'report',
+    label: 'Report',
+    description: 'Sent to the insurer/adjuster with the report PDF (BAR, roof, leak detection, make safe) attached.',
+  },
+  {
+    sendType: 'invoice',
+    label: 'Invoice',
+    description: 'Sent to the insurer/adjuster with the tax invoice PDF attached.',
+  },
+  {
+    sendType: 'excess_invoice',
+    label: 'Excess invoice',
+    description: 'Sent to the homeowner with their excess invoice PDF attached (when sent on its own).',
+  },
+  {
+    sendType: 'tcc',
+    label: 'Telephone clearance certificate',
+    description: 'Sent to the insurer/adjuster with the telephone clearance certificate attached.',
+  },
+  {
+    sendType: 'photos',
+    label: 'Photos',
+    description: 'Sent to the insurer/adjuster with the selected photos as a PDF.',
+  },
 ]
 
 type WorkOrderVarsInput = {
@@ -210,6 +394,28 @@ export function workOrderTemplateVars({ workOrder, job, tenant, trade, tradeLabe
     insured_name:     job.insured_name,
     property_address: job.property_address,
     company_name:     tenant.trading_name || tenant.name,
+  }
+}
+
+type DocumentVarsInput = {
+  job: { job_number: string; claim_number: string | null; insured_name: string | null; property_address: string | null; insurer: string | null }
+  tenant: { name: string; trading_name: string | null; contact_phone: string | null; contact_email: string | null }
+  /** First name of the person the email goes to, when known */
+  contactName: string | null
+}
+
+/** Placeholder values shared by documents emailed from a job (lib/documents/send). */
+export function documentTemplateVars({ job, tenant, contactName }: DocumentVarsInput): Record<string, string | null> {
+  return {
+    contact_name:     contactName || 'team',
+    claim_number:     job.claim_number,
+    insured_name:     job.insured_name,
+    property_address: job.property_address,
+    job_number:       job.job_number,
+    insurer:          job.insurer,
+    company_name:     tenant.trading_name || tenant.name,
+    company_phone:    tenant.contact_phone?.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3') ?? null,
+    company_email:    tenant.contact_email,
   }
 }
 

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { QuoteData, SaveStatus, ScopeItem, ItemType } from '../hooks/useQuote'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -708,117 +709,19 @@ export function QuoteFooter({
         </div>
       </div>
 
-      {/* Send it dialog */}
+      {/* Send it dialog: email the quote PDF to the insurer, or just mark it sent */}
       {showSendDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
+        <SendDocumentModal
+          documents={[{ kind: 'quote', id: quoteId }]}
+          title="Send quote"
+          allowMarkSent
+          markSentDescription="Change the quote to Sent without emailing it (if you sent it another way)."
+          onClose={() => onShowSendDialog?.(false)}
+          onDone={() => {
+            onShowSendDialog?.(false)
+            onQuoteUpdated?.()
           }}
-          onClick={() => onShowSendDialog?.(false)}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 8,
-              padding: '24px',
-              maxWidth: 400,
-              width: '90%',
-              fontFamily: 'DM Sans, sans-serif',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: '#3a3530',
-                marginBottom: 12,
-                margin: 0,
-              }}
-            >
-              Send Quote
-            </h3>
-            <p
-              style={{
-                fontSize: 13,
-                color: '#3a3530',
-                lineHeight: 1.6,
-                marginBottom: 20,
-                margin: 0,
-              }}
-            >
-              Mock send only as this function is not built yet - please send manually - status will still change
-            </p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => onShowSendDialog?.(false)}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #d8d0c8',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#c8b89a'
-                  e.currentTarget.style.background = '#f5f2ee'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#d8d0c8'
-                  e.currentTarget.style.background = '#ffffff'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  onShowSendDialog?.(false)
-                  await onUpdateNotes?.(quote.notes ?? '')
-                  // Update status to sent_to_insurer
-                  await fetch(`/api/quotes/${quoteId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      tenantId,
-                      status: 'sent_to_insurer',
-                    }),
-                  })
-                  onQuoteUpdated?.()
-                }}
-                style={{
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a73e8',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 20px',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {/* Locked dialog */}

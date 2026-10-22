@@ -12,6 +12,7 @@ import {
   Copy,
   Trash2,
   RotateCcw,
+  Send,
 } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { BARReportForm } from './BARReportForm'
@@ -22,6 +23,7 @@ import { AllianzSedgwickBARForm } from './insurer-forms/AllianzSedgwickBARForm'
 import { useReportAutosave } from './useReportAutosave'
 import { PropertyDetails, parsePropertyDetails } from '@/lib/types/property-details'
 import { getInsurerTemplateKey } from '@/lib/insurer-templates'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Report {
@@ -222,6 +224,7 @@ export function ReportAccordionItem({
   const [report, setReport] = useState<Report>(initialReport)
   const [isOpen, setIsOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showSend, setShowSend] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isActioning, setIsActioning] = useState(false)
   const [hasInvoice, setHasInvoice] = useState(false)
@@ -947,7 +950,35 @@ export function ReportAccordionItem({
                 <FileText size={13} />
                 Preview Report PDF
               </button>
+              <button
+                onClick={async () => {
+                  // Save pending edits first so the emailed PDF has them
+                  await flushSave()
+                  setShowSend(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-[12px] font-medium text-white transition-colors"
+                style={{ background: '#1e40af', fontFamily: 'DM Sans, sans-serif' }}
+              >
+                <Send size={13} />
+                Send Report
+              </button>
             </div>
+            {showSend && (
+              <SendDocumentModal
+                documents={[{ kind: 'report', id: report.id }]}
+                title="Send report"
+                allowMarkSent
+                markSentDescription="Mark the report as sent and lock it, without emailing it (if you sent it another way)."
+                onClose={() => setShowSend(false)}
+                onDone={({ statusChanges }) => {
+                  setShowSend(false)
+                  if (statusChanges.length > 0) {
+                    setReport(r => ({ ...r, status: 'sent', is_locked: true }))
+                    onReportUpdate(report.id, { status: 'sent', is_locked: true })
+                  }
+                }}
+              />
+            )}
           </div>
         )}
       </div>

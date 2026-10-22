@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { X, Upload, FileDown, Check, Loader2 } from 'lucide-react'
+import { X, Upload, FileDown, Check, Loader2, Send } from 'lucide-react'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Photo {
@@ -201,6 +202,7 @@ export function PhotosTab({
   const [loading, setLoading] = useState(true)
   const [lightbox, setLightbox] = useState<{ path: string; label: string | null } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showSend, setShowSend] = useState(false)
   const [uploadingPhotos, setUploadingPhotos] = useState<UploadingPhoto[]>([])
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -438,6 +440,29 @@ export function PhotosTab({
                 {selectedCount}/{totalCount}
               </span>
             </button>
+          )}
+          {totalCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowSend(true)}
+              disabled={selectedCount === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: selectedCount > 0 ? '#1e40af' : '#e0dbd4',
+                color: selectedCount > 0 ? '#ffffff' : '#9e998f',
+              }}
+            >
+              <Send className="h-4 w-4" />
+              Email Photos
+            </button>
+          )}
+          {showSend && (
+            <SendDocumentModal
+              documents={[{ kind: 'photos', id: jobId, photoIds: [...selectedIds] }]}
+              title="Send photos"
+              onClose={() => setShowSend(false)}
+              onDone={() => setShowSend(false)}
+            />
           )}
           <button
             type="button"

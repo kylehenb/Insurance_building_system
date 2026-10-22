@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { JobContext } from './InvoicesTab'
 import { InvoiceEditor } from './InvoiceEditor'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
   const [creating, setCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [menuDropdownId, setMenuDropdownId] = useState<string | null>(null)
-  const [statusChangingId, setStatusChangingId] = useState<string | null>(null)
+  const [sendInvoiceId, setSendInvoiceId] = useState<string | null>(null)
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null)
   const initialLoadDone = useRef(false)
 
@@ -204,22 +205,6 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
       setCreating(false)
     }
   }, [jobId, tenantId, load, onInvoiceUpdated])
-
-  // ── Status change handler ─────────────────────────────────────────────────
-
-  const handleStatusChange = useCallback(async (invoiceId: string, newStatus: string) => {
-    setStatusChangingId(invoiceId)
-    try {
-      await fetch(`/api/invoices/${invoiceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, status: newStatus }),
-      })
-      load()
-    } finally {
-      setStatusChangingId(null)
-    }
-  }, [tenantId, load])
 
   // ── Invoice date handler — editable while draft, locked once sent ─────────
 
@@ -513,16 +498,14 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               {/* Quick send button for drafts */}
               {invoice.status === 'draft' && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleStatusChange(invoice.id, 'sent') }}
-                  disabled={statusChangingId === invoice.id}
+                  onClick={(e) => { e.stopPropagation(); setSendInvoiceId(invoice.id) }}
                   style={{
                     fontSize: 11, fontWeight: 500, color: '#fff', background: '#3a3530',
                     border: 'none', borderRadius: 4, padding: '5px 10px',
-                    cursor: statusChangingId === invoice.id ? 'not-allowed' : 'pointer',
-                    opacity: statusChangingId === invoice.id ? 0.6 : 1,
+                    cursor: 'pointer',
                   }}
                 >
-                  {statusChangingId === invoice.id ? '…' : 'Send'}
+                  Send
                 </button>
               )}
 
@@ -549,6 +532,16 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     >
                       PDF Preview
                     </button>
+                    {invoice.status !== 'voided' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSendInvoiceId(invoice.id); setMenuDropdownId(null) }}
+                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#3a3530', background: 'none', border: 'none', cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        Email Invoice…
+                      </button>
+                    )}
                     {invoice.status === 'draft' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(invoice.id, invoice.invoice_ref); setMenuDropdownId(null) }}
@@ -780,6 +773,18 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
             </div>
           </div>
         </div>
+      )}
+
+      {/* Email the invoice (Send), or just mark it sent as the Send button used to */}
+      {sendInvoiceId && (
+        <SendDocumentModal
+          documents={[{ kind: 'invoice', id: sendInvoiceId }]}
+          title="Send invoice"
+          allowMarkSent={invoices.find(i => i.id === sendInvoiceId)?.status === 'draft'}
+          markSentDescription="Mark the invoice as sent and sync it to Xero, without emailing it (what Send did before)."
+          onClose={() => setSendInvoiceId(null)}
+          onDone={() => { setSendInvoiceId(null); load() }}
+        />
       )}
     </div>
   )

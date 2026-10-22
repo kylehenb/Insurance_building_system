@@ -5,8 +5,9 @@ import type { NextConfig } from "next";
 const CHROMIUM_FILES = [
   "./node_modules/@sparticuz/chromium/bin/**",
   "./lib/pdf/fonts/*.ttf",
+  "./lib/pdf/fonts/*.woff2",
 ];
-const DOCUMENT_IMAGES = ["./public/logo-pdf.png", "./public/logo-alt.png", "./public/signature.png"];
+const DOCUMENT_IMAGES = ["./public/logo-pdf.png", "./public/logo-alt.png", "./public/signature.png", "./public/sedgwick-logo.png"];
 const SIGNING_FONTS = ["./lib/signing/fonts/*.ttf", "./lib/pdf/fonts/*.ttf"];
 // pdf.js, run inside Chromium to turn the document's pages into images (lib/pdf/render-pdf-pages.ts)
 const PDFJS_FILES = ["./node_modules/pdfjs-dist/build/pdf.min.mjs", "./node_modules/pdfjs-dist/build/pdf.worker.min.mjs"];
@@ -30,12 +31,17 @@ const nextConfig: NextConfig = {
     // …and stamps the signature + certificate when the homeowner signs
     "/api/sign/\\[token\\]/submit": SIGNING_FONTS,
     "/api/sign/fonts/\\[style\\]": SIGNING_FONTS,
+    // Quotes, reports, invoices, TCC and photos emailed from a job, and their preview
+    "/api/documents/send": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
+    "/api/documents/pdf": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
   },
   outputFileTracingExcludes: {
     "/api/work-orders/\\[id\\]/pdf": NO_FULL_PUPPETEER,
     "/api/work-orders/\\[id\\]/send": NO_FULL_PUPPETEER,
     "/api/signing/jobs/\\[jobId\\]/requests": NO_FULL_PUPPETEER,
     "/api/signing/requests/\\[id\\]/\\[action\\]": NO_FULL_PUPPETEER,
+    "/api/documents/send": NO_FULL_PUPPETEER,
+    "/api/documents/pdf": NO_FULL_PUPPETEER,
   },
   async headers() {
     // Signing links carry a secret token in the URL: never leak it in a

@@ -2481,9 +2481,27 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 - Both templates take optional render settings; with none, the browser print pages (`/print/quotes/[quoteId]/sow`, `/building-contract`) are unchanged. Template "today" dates are formatted in Australia/Perth time
 - **Field markers** (`lib/pdf/field-markers.ts`): with `signingMarkers: true` the owner's signature/date/name blanks contain an invisible link to `https://irc-sign.invalid/field/<name>`. Chrome writes each link into the PDF as an annotation holding its exact page and rectangle, so the signing module finds every blank wherever the content flowed (a long scope pushes the signing page later). The markers are removed before the PDF is stored
 
+### Quote, Report, Invoice, TCC and Photo PDFs — sent from the job (built)
+- These documents were browser print pages (`/print/quotes/[quoteId]`, `/print/reports/[reportId]`, `/print/invoices/[invoiceId]`, `/print/quotes/[quoteId]/tcc`, `/print/jobs/[jobId]/photos`). Each page's layout now lives in one React component in `components/documents/` (`QuoteDocument`, `ReportDocument` incl. `report-templates/AllianzSedgwickTemplate`, `InvoiceDocument`, `TccDocument`, `PhotosDocument`) with its data loader in `lib/documents/print-data.ts`. The print pages render those components (markup unchanged) and stay in place until the emailed PDFs are signed off
+- PDF: `lib/documents/render-print-document.ts` renders the same component to static HTML (`react-dom/server`) and prints it with the shared renderer in the print page's surroundings, so the PDF looks the same as Print / Save as PDF:
+  - the app's CSS for the classes those components use: `app/globals.css` compiled by Tailwind into `lib/pdf/print-page-css.generated.ts` by `node scripts/build-print-css.mjs` (re-run after changing classes in `components/documents`; `lib/pdf/__tests__/print-page-css.test.ts` fails while it is stale)
+  - the root layout's `<html>`/`<body>` classes, 1cm margins (globals `@page`), print media, backgrounds on
+  - the fonts next/font serves (DM Sans, DM Mono, Geist Mono — same files, `lib/pdf/fonts/*.woff2`) plus Times New Roman (Liberation Serif) for text with no font of its own (the app's `--font-sans` refers to itself, so the print pages fall back to the browser's default serif) and Arial (Liberation Sans incl. italics) for the Allianz/Sedgwick template
+  - images embedded as `data:` URIs (public files, tenant logo, photos). Photos are re-encoded in Chromium to at most 1600px / JPEG 85% so photo-heavy PDFs stay emailable
+- Builders: `lib/documents/print-document-pdfs.tsx` (`buildQuotePdf`, `buildReportPdf`, `buildTccPdf`, `buildPhotosPdf`) and `lib/documents/invoice-pdf.ts` (`buildInvoicePdf`, also used by the excess invoice in e-signing). Filenames `{Document} - {ref} - {site address}.pdf`
+- Verified against the print pages rendered in the app (pixel diff, same page count and fonts) for quote, BAR, roof, LDR, make safe, Allianz/Sedgwick BAR, invoice, excess invoice, TCC and photos
+- Sending — `lib/documents/send/` and `POST /api/documents/send` (`mode`: `draft` | `auto` | `custom` | `mark_sent`), preview `GET /api/documents/pdf?kind=&id=` (TCC adds the call details, photos `ids`):
+  - The first document picks the email template and recipients; more documents on the same job can be attached (max 8, 18 MB of PDFs)
+  - Recipients: insurer routing per WF-5 (`resolveInsurerEmailRecipients`); an excess invoice goes to the insured
+  - Templates (Settings → Email Templates): `quote`, `report`, `invoice`, `excess_invoice`, `tcc`, `photos`, with built-in defaults until a tenant saves one
+  - Sent through the Gmail API sender; logged on the job's communications (`source: 'document_send'`) with a stored copy of each PDF
+  - Only after Gmail accepts it: quotes draft/ready → `sent` + locked; reports → `sent` + locked (fingerprinted); draft invoices → `sent` and synced to accounting (`markInvoiceSent`). Statuses never move backwards (an approved quote or paid invoice is left alone); job stage recomputed
+  - **Mark as sent without emailing** does the same status change with no email (the previous behaviour of the quote/invoice Send buttons) and logs a note
+- UI (`components/documents/SendDocumentModal.tsx` — Auto send / Customise send / Mark as sent): quote **Send it** (Quotes tab and quote editor, replacing the mock dialogs) and **Email Quote…** in the quote menu; invoice **Send** and **Email Invoice…** (Invoices tab), **Email Invoice** (invoice page); **Send Report** (report accordion); **Email Certificate** (TCC dialog); **Email Photos** (Photos tab, selected photos). The old print/preview buttons are unchanged
+
 ### Performance
 - Cold start (first request on a new instance, Chromium decompressed to `/tmp`): ~2–5 s; warm requests ~0.3–0.5 s
-- `outputFileTracingIncludes` in `next.config.ts` lists every route that renders or stamps a PDF (work order PDF, Send & Lock, e-signing create, e-signing submit, signature fonts)
+- `outputFileTracingIncludes` in `next.config.ts` lists every route that renders or stamps a PDF (work order PDF, Send & Lock, e-signing create, e-signing submit, signature fonts, document send and preview)
 - PDF route function bundle ~74 MB (of Vercel's 250 MB limit), almost all of it `@sparticuz/chromium`
 - Keep `puppeteer-core` pinned to the release whose bundled Chrome major matches `@sparticuz/chromium` (currently puppeteer-core 25.11.0 ↔ Chromium 153)
 

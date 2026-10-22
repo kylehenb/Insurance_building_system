@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
 
 interface Props {
   quoteId: string
@@ -54,15 +55,32 @@ export function TccModal({ quoteId, onClose }: Props) {
   const [completedBy, setCompletedBy] = useState('Kyle Bindon')
   const [contactMethod, setContactMethod] = useState('Phone call')
 
+  const [emailing, setEmailing] = useState(false)
+
+  // The call details as the certificate prints them
+  const callDetails = () => ({
+    date: formatDateForDisplay(dateContacted),
+    time: formatTimeForDisplay(timeContacted),
+    completedBy,
+    method: contactMethod,
+  })
+
   function handleGenerate() {
-    const params = new URLSearchParams({
-      date: formatDateForDisplay(dateContacted),
-      time: formatTimeForDisplay(timeContacted),
-      completedBy,
-      method: contactMethod,
-    })
+    const params = new URLSearchParams(callDetails())
     window.open(`/print/quotes/${quoteId}/tcc?${params.toString()}`, '_blank')
     onClose()
+  }
+
+  // Email the certificate instead of printing it; closing goes back to the form
+  if (emailing) {
+    return (
+      <SendDocumentModal
+        documents={[{ kind: 'tcc', id: quoteId, tcc: callDetails() }]}
+        title="Send telephone clearance certificate"
+        onClose={() => setEmailing(false)}
+        onDone={onClose}
+      />
+    )
   }
 
   return (
@@ -186,6 +204,22 @@ export function TccModal({ quoteId, onClose }: Props) {
             }}
           >
             Generate Certificate
+          </button>
+          <button
+            onClick={() => setEmailing(true)}
+            style={{
+              padding: '8px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              border: 'none',
+              borderRadius: 6,
+              background: '#1e40af',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            Email Certificate
           </button>
         </div>
       </div>

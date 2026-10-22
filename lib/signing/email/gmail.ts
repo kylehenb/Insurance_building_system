@@ -5,11 +5,13 @@ import { buildEmailRaw, type EmailAttachment } from '@/lib/email/build-raw'
 
 // Sends through the existing Gmail API sender (office@ mailbox), the same
 // way Send & Lock does, and marks the sent message as processed so the
-// Gmail SENT watch doesn't record it a second time.
+// Gmail SENT watch doesn't record it a second time. Also used for documents
+// emailed from a job (lib/documents/send).
 
 export interface OutgoingEmail {
   from: string
   to: string
+  cc?: string
   bcc?: string
   subject: string
   text: string
@@ -26,6 +28,7 @@ export async function sendEmailViaGmail(service: SupabaseClient<Database>, email
   const raw = buildEmailRaw({
     from: email.from,
     to: email.to,
+    cc: email.cc,
     bcc: email.bcc,
     subject: email.subject,
     body: email.text,

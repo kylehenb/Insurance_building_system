@@ -6,7 +6,7 @@
 // 1. Add a new key to InsurerTemplateKey
 // 2. Add a new match condition in getInsurerTemplateKey
 // 3. Create the corresponding form in components/reports/insurer-forms/
-// 4. Create the corresponding PDF template in app/print/reports/[reportId]/templates/
+// 4. Create the corresponding PDF template in components/documents/report-templates/ (rendered by components/documents/ReportDocument.tsx)
 
 export type InsurerTemplateKey = 'default' | 'allianz-sedgwick'
 

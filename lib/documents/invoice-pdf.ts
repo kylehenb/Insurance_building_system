@@ -1,21 +1,18 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createElement } from 'react'
 import type { Database } from '@/lib/supabase/database.types'
-import { generateInvoiceHtml } from '@/lib/documents/invoice-html'
-import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
-import { filenamePart, loadPublicImageDataUri, loadTenantLogoDataUri } from '@/lib/documents/document-assets'
+import { InvoiceDocument } from '@/components/documents/InvoiceDocument'
+import { renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
+import { filenamePart } from '@/lib/documents/document-assets'
+import { loadInvoicePrintData, PrintDataError, type InvoicePrintData, type PrintDataContext } from '@/lib/documents/print-data'
 
-// Invoice PDF — data loading + rendering behind one function boundary, the
-// same pattern as lib/work-orders/work-order-pdf.ts. Uses the same template
-// as the browser print page (/print/invoices/[invoiceId]). Nothing here writes
-// to the database or storage.
+// Invoice PDF — the same component and data as the browser print page
+// (/print/invoices/[invoiceId]), rendered server-side the way the browser
+// prints it (lib/documents/render-print-document.ts). Nothing here writes to
+// the database or storage.
 
 type Invoice = Database['public']['Tables']['invoices']['Row']
 
-export interface InvoicePdfContext {
-  /** The signed-in user's client (RLS applies) or the service client — tenantId is always enforced. */
-  supabase: SupabaseClient<Database>
-  tenantId: string
-}
+export type InvoicePdfContext = PrintDataContext
 
 export class InvoicePdfError extends Error {
   constructor(message: string, public readonly status: 404 | 500) {
@@ -28,6 +25,7 @@ export interface InvoicePdfResult {
   pdf: Buffer
   filename: string
   invoice: Invoice
+  data: InvoicePrintData
 }
 
 export function invoicePdfFilename(invoice: Pick<Invoice, 'invoice_ref' | 'invoice_type' | 'id'>, propertyAddress: string | null): string {
@@ -41,46 +39,15 @@ export function invoicePdfFilename(invoice: Pick<Invoice, 'invoice_ref' | 'invoi
 }
 
 export async function buildInvoicePdf(invoiceId: string, ctx: InvoicePdfContext): Promise<InvoicePdfResult> {
-  const { supabase, tenantId } = ctx
-
-  const { data: invoice } = await supabase
-    .from('invoices').select('*').eq('id', invoiceId).eq('tenant_id', tenantId).maybeSingle()
-  if (!invoice) throw new InvoicePdfError('Invoice not found', 404)
-
-  const [itemsRes, deductionsRes, jobRes, tenantRes, quotesRes] = await Promise.all([
-    supabase.from('invoice_line_items').select('*').eq('invoice_id', invoiceId).eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true }),
-    supabase.from('invoice_deductions').select('*').eq('invoice_id', invoiceId).eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true }),
-    supabase.from('jobs').select('*').eq('id', invoice.job_id).eq('tenant_id', tenantId).maybeSingle(),
-    supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
-    invoice.invoice_type === 'quoted_amounts'
-      ? supabase.from('quotes').select('quote_ref').eq('job_id', invoice.job_id).eq('tenant_id', tenantId)
-          .in('status', ['approved', 'partially_approved']).order('created_at', { ascending: true })
-      : Promise.resolve({ data: [] as { quote_ref: string | null }[] }),
-  ])
-  const job = jobRes.data
-  const tenant = tenantRes.data
-  if (!job) throw new InvoicePdfError('Job not found', 404)
-  if (!tenant) throw new InvoicePdfError('Tenant not found', 404)
-
-  const [logoSrc, footerLogoSrc] = await Promise.all([
-    loadPublicImageDataUri('logo-alt.png'),
-    loadTenantLogoDataUri(tenant.logo_storage_path),
-  ])
-
-  const html = generateInvoiceHtml({
-    invoice,
-    job,
-    tenant,
-    lineItems: itemsRes.data ?? [],
-    deductions: deductionsRes.data ?? [],
-    approvedQuoteRefs: (quotesRes.data ?? []).map(q => q.quote_ref).filter((r): r is string => !!r),
-    render: { logoSrc: logoSrc ?? undefined, footerLogoSrc },
-  })
-
-  const pdf = await renderHtmlToPdf(html, { margin: '10mm' })
-  return { pdf, filename: invoicePdfFilename(invoice, job.property_address), invoice }
+  let data: InvoicePrintData
+  try {
+    data = await loadInvoicePrintData(invoiceId, ctx)
+  } catch (err) {
+    if (err instanceof PrintDataError) throw new InvoicePdfError(err.message, err.status)
+    throw err
+  }
+  const pdf = await renderPrintDocumentPdf(createElement(InvoiceDocument, data), data.invoice.invoice_ref || 'Invoice')
+  return { pdf, filename: invoicePdfFilename(data.invoice, data.job.property_address), invoice: data.invoice, data }
 }
 
 /** Reusable entry point: the PDF bytes only. */
