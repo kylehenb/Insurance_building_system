@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { toUser, type UserSession } from "@/lib/types/user";
 import type { Database } from "./database.types";
@@ -10,18 +11,23 @@ type UserRow = Database["public"]["Tables"]["users"]["Row"];
  * with effective permissions computed.
  *
  * Returns null if no session exists.
+ *
+ * Cached per request: the layout and the page both call this, and only the
+ * first call reaches Supabase.
  */
-export async function getUser(): Promise<UserSession | null> {
+export const getUser = cache(async (): Promise<UserSession | null> => {
   const supabase = await createClient();
 
-  // Get the current auth session
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
+  // Verify the session token. With asymmetric JWT signing keys this is
+  // checked locally; with the legacy shared secret it asks the Auth server.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
 
-  if (!authUser) {
+  if (!claims?.sub) {
     return null;
   }
+
+  const authUser = { id: claims.sub, email: claims.email };
 
   // Use service role to query public.users so that RLS cannot block a user
   // from reading their own profile row.
@@ -59,4 +65,4 @@ export async function getUser(): Promise<UserSession | null> {
     user: toUser(typedUserRow),
     tenant_id: typedUserRow.tenant_id,
   };
-}
+});

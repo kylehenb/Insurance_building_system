@@ -12,6 +12,7 @@ import { InvoiceToSelect } from '@/components/clients/InvoiceToSelect'
 import { JobContact } from '@/lib/types/contacts'
 import { LOSS_TYPES } from '@/lib/loss-types'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -264,7 +265,7 @@ function InsurerOrdersPageContent() {
   const [orders, setOrders] = useState<InsurerOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('all')
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [newOrderOpen, setNewOrderOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortCol, setSortCol] = useState<SortCol>(null)
@@ -329,17 +330,6 @@ function InsurerOrdersPageContent() {
   const promptShownRef = useRef<Record<string, boolean>>({})
 
   // Auth bootstrap
-  useEffect(() => {
-    async function bootstrap() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const { data: profile, error } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single()
-      if (error || !profile) { router.push('/login'); return }
-      setTenantId(profile.tenant_id)
-    }
-    bootstrap()
-  }, [router])
 
   useEffect(() => {
     if (!tenantId) return

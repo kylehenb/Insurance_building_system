@@ -1,46 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import type { ScopeLibraryItem, InsurersOption } from '@/lib/types/scope-library'
 import { ScopeLibraryClient } from '@/components/scope-library/ScopeLibraryClient'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 export default function ScopeLibraryPage() {
-  const router = useRouter()
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [items, setItems] = useState<ScopeLibraryItem[] | null>(null)
   const [insurers, setInsurers] = useState<InsurersOption[] | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Effect 1: auth bootstrap
-  useEffect(() => {
-    const supabase = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.replace('/login')
-        return
-      }
-      supabase
-        .from('users')
-        .select('tenant_id')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data?.tenant_id) {
-            setTenantId(data.tenant_id)
-          } else {
-            router.replace('/login')
-          }
-        })
-    })
-  }, [router])
-
-  // Effect 2: load data when tenantId is set
+  // Load data for the tenant
   useEffect(() => {
     if (!tenantId) return
 

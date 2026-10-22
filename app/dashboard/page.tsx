@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import type { JobCandidate } from '@/lib/communications/match-job'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -179,23 +180,7 @@ export default function DashboardPage() {
   const linkSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auth
-  const [userId, setUserId] = useState<string | null>(null)
-  const [tenantId, setTenantId] = useState<string | null>(null)
-
-  // ── Bootstrap ────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUserId(user.id)
-      const { data: profile } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single()
-      if (!profile) { router.push('/login'); return }
-      setTenantId((profile as { tenant_id: string }).tenant_id)
-    }
-    init()
-  }, [router])
+  const { tenantId, userId } = useCurrentUser()
 
   // ── Weather ──────────────────────────────────────────────────────────────────
 
@@ -256,29 +241,36 @@ export default function DashboardPage() {
 
     if (!data) return
 
-    // For each job, count pending action_queue items
-    const jobs = await Promise.all(
-      data.map(async (row: any) => {
-        const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs
-        if (!job) return null
-        const { count } = await supabase
+    // Pending action_queue items for all flagged jobs, counted per job
+    const jobIds = data.map((row) => row.job_id)
+    const { data: pending } = jobIds.length
+      ? await supabase
           .from('action_queue')
-          .select('*', { count: 'exact', head: true })
-          .eq('job_id', row.job_id)
+          .select('job_id')
+          .in('job_id', jobIds)
           .eq('status', 'pending')
-        return {
-          id: row.job_id,
-          job_id: row.job_id,
-          job_number: job.job_number,
-          property_address: job.property_address,
-          insured_name: job.insured_name,
-          insurer: job.insurer,
-          override_stage: job.override_stage ?? null,
-          current_stage: job.current_stage ?? null,
-          action_count: count ?? 0,
-        } as FlaggedJob
-      })
-    )
+      : { data: [] }
+    const pendingByJob = new Map<string, number>()
+    for (const { job_id } of (pending ?? []) as { job_id: string }[]) {
+      pendingByJob.set(job_id, (pendingByJob.get(job_id) ?? 0) + 1)
+    }
+
+    const jobs = data.map((row: any) => {
+      const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs
+      if (!job) return null
+      const count = pendingByJob.get(row.job_id) ?? 0
+      return {
+        id: row.job_id,
+        job_id: row.job_id,
+        job_number: job.job_number,
+        property_address: job.property_address,
+        insured_name: job.insured_name,
+        insurer: job.insurer,
+        override_stage: job.override_stage ?? null,
+        current_stage: job.current_stage ?? null,
+        action_count: count,
+      } as FlaggedJob
+    })
     setFlaggedJobs(jobs.filter(Boolean) as FlaggedJob[])
   }
 

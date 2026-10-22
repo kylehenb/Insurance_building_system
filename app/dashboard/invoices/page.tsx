@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,25 +53,13 @@ function fmtDate(s: string | null) {
 
 export default function InvoicesPage() {
   const router = useRouter()
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [invoices, setInvoices] = useState<InvoiceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const { data: profile } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single()
-      if (!profile) { router.push('/login'); return }
-      setTenantId((profile as { tenant_id: string }).tenant_id)
-    }
-    init()
-  }, [router])
 
   const loadInvoices = useCallback(async () => {
     if (!tenantId) return

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { Calendar, Clock, Users, Filter } from 'lucide-react'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 type CalendarMode = 'inspections' | 'trades'
 type ViewType = 'week' | 'month'
@@ -69,26 +70,8 @@ export default function GlobalCalendarPage() {
   const [inspections, setInspections] = useState<Inspection[]>([])
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [schedulingRules, setSchedulingRules] = useState<SchedulingRules | null>(null)
-
-  useEffect(() => {
-    async function loadTenant() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('tenant_id')
-          .eq('id', user.id)
-          .single()
-        
-        if (userData?.tenant_id) {
-          setTenantId(userData.tenant_id)
-        }
-      }
-    }
-    loadTenant()
-  }, [supabase])
 
   useEffect(() => {
     if (!tenantId) return

@@ -33,38 +33,40 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
 
   const supabase = await createClient()
 
-  // Fetch job header
-  const { data: jobData, error: jobError } = await supabase
-    .from('jobs')
-    .select(
-      'id,job_number,insured_name,property_address,override_stage,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,claim_description,special_instructions,notes,contacts,adjuster_reference,order_sender_name,order_sender_email,client_id,invoice_to,job_type'
-    )
-    .eq('id', jobId)
-    .eq('tenant_id', tenant_id!)
-    .single()
+  // Job header, pending action count and the user's flag, fetched together
+  const [
+    { data: jobData, error: jobError },
+    { count: pendingCount },
+    { data: flagData },
+  ] = await Promise.all([
+    supabase
+      .from('jobs')
+      .select(
+        'id,job_number,insured_name,property_address,override_stage,insurer,claim_number,loss_type,date_of_loss,adjuster,excess,sum_insured,assigned_to,created_at,tenant_id,insured_phone,insured_email,claim_description,special_instructions,notes,contacts,adjuster_reference,order_sender_name,order_sender_email,client_id,invoice_to,job_type'
+      )
+      .eq('id', jobId)
+      .eq('tenant_id', tenant_id!)
+      .single(),
+    supabase
+      .from('action_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenant_id!)
+      .eq('status', 'pending'),
+    supabase
+      .from('job_flags')
+      .select('id')
+      .eq('job_id', jobId)
+      .eq('user_id', currentUserId)
+      .eq('tenant_id', tenant_id!)
+      .maybeSingle(),
+  ])
 
   if (jobError || !jobData) {
     notFound()
   }
 
   const job = jobData as unknown as JobRow
-
-  // Fetch pending action count
-  const { count: pendingCount } = await supabase
-    .from('action_queue')
-    .select('id', { count: 'exact', head: true })
-    .eq('job_id', jobId)
-    .eq('tenant_id', tenant_id!)
-    .eq('status', 'pending')
-
-  // Fetch flag status for current user
-  const { data: flagData } = await supabase
-    .from('job_flags')
-    .select('id')
-    .eq('job_id', jobId)
-    .eq('user_id', currentUserId)
-    .eq('tenant_id', tenant_id!)
-    .single()
 
   const isFlagged = !!flagData
 

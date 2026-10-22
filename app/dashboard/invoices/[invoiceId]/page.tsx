@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
+import { useCurrentUser } from '@/components/layout/current-user'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -99,7 +100,7 @@ export default function InvoiceDetailPage() {
   const params = useParams<{ invoiceId: string }>()
   const invoiceId = params?.invoiceId ?? ''
 
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { tenantId } = useCurrentUser()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [showSend, setShowSend] = useState(false)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
@@ -112,18 +113,6 @@ export default function InvoiceDetailPage() {
   const libraryRef = useRef<HTMLDivElement>(null)
 
   // ── Auth bootstrap ────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const { data: profile } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single()
-      if (!profile) { router.push('/login'); return }
-      setTenantId((profile as { tenant_id: string }).tenant_id)
-    }
-    init()
-  }, [router])
 
   // ── Data loading ──────────────────────────────────────────────────────────
 

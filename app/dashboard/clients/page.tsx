@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/lib/supabase/database.types';
 import { ClientsCsvImportDialog, type ClientsImportRow } from './ClientsCsvImportDialog';
+import { useCurrentUser } from '@/components/layout/current-user';
 
 type ClientsRow = Database['public']['Tables']['clients']['Row'];
 type ClientsInsert = Database['public']['Tables']['clients']['Insert'];
@@ -48,12 +48,10 @@ function ModalTabButton({ id, label, active, onClick, small = false }: { id: str
 }
 
 export default function ClientsPage() {
-  const router = useRouter();
   const [items, setItems] = useState<ClientsRow[]>([]);
   const [filteredItems, setFilteredItems] = useState<ClientsRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { tenantId, userId } = useCurrentUser();
 
   // Filter state
   const [clientTypeFilter, setClientTypeFilter] = useState<string>('All');
@@ -148,18 +146,6 @@ export default function ClientsPage() {
   );
 
   // Auth bootstrap
-  useEffect(() => {
-    async function bootstrap() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return }
-      const { data: profile, error } = await supabase
-        .from('users').select('tenant_id').eq('id', user.id).single();
-      if (error || !profile) { router.push('/login'); return }
-      setTenantId(profile.tenant_id);
-      setUserId(user.id);
-    }
-    bootstrap();
-  }, [router, supabase]);
 
   // Load column widths from database
   useEffect(() => {
