@@ -63,7 +63,7 @@ export function DashboardShell({ user, tenantId, children }: Props) {
         display: 'flex',
         height: '100vh',
         overflow: 'hidden',
-        background: '#f5f2ee',
+        background: 'var(--surface)',
         fontFamily: "'DM Sans', -apple-system, sans-serif",
       }}
     >

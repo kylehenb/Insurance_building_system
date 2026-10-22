@@ -171,8 +171,8 @@ function OrderForm({
             value={channel}
             style={inputStyle}
             onChange={e => setChannel(e.target.value)}
-            onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-            onBlur={e => (e.currentTarget.style.borderColor = '#e0dbd4')}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'var(--line)')}
           >
             <option value="">Select…</option>
             <option value="Email">Email</option>
@@ -221,12 +221,12 @@ function OrderForm({
       {order.email_attachments && order.email_attachments.length > 0 && (
         <div className="mb-4">
           <label style={labelStyle}>Email Attachments ({order.email_attachments.length})</label>
-          <div className="border border-[#e0dbd4] rounded bg-white p-3">
+          <div className="border border-line rounded bg-white p-3">
             {order.email_attachments.map((attachment, index) => (
-              <div key={index} className="flex items-center justify-between py-2 border-b border-[#f5f2ee] last:border-0">
+              <div key={index} className="flex items-center justify-between py-2 border-b border-surface last:border-0">
                 <div className="flex-1">
-                  <div className="text-sm text-[#3a3530]">{attachment.filename}</div>
-                  <div className="text-xs text-[#9e998f]">
+                  <div className="text-sm text-body">{attachment.filename}</div>
+                  <div className="text-xs text-subtle">
                     {attachment.mimeType} • {(attachment.size / 1024).toFixed(1)} KB
                   </div>
                 </div>
@@ -246,13 +246,13 @@ function OrderForm({
             setNotes(e.target.value)
             scheduleNoteSave(e.target.value)
           }}
-          onFocus={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-          onBlur={e => (e.currentTarget.style.borderColor = '#e0dbd4')}
+          onFocus={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+          onBlur={e => (e.currentTarget.style.borderColor = 'var(--line)')}
         />
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-[#9e998f]">
+        <span className="text-[11px] text-subtle">
           {saving ? 'Saving…' : saved ? 'Saved' : ''}
         </span>
         <div className="flex items-center gap-4">
@@ -267,7 +267,7 @@ function OrderForm({
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-1.5 rounded text-[12px] font-medium text-white transition-colors"
-            style={{ background: '#3a3530' }}
+            style={{ background: 'var(--body)' }}
           >
             {saving ? 'Saving…' : 'Save changes'}
           </button>
@@ -311,13 +311,13 @@ export function InsurerOrdersTab({ jobId, tenantId }: InsurerOrdersTabProps) {
   }
 
   if (loading) {
-    return <div className="py-12 text-center text-[13px] text-[#9e998f]">Loading…</div>
+    return <div className="py-12 text-center text-[13px] text-subtle">Loading…</div>
   }
 
   return (
     <AccordionList title="Insurer Orders">
       {orders.length === 0 ? (
-        <div className="px-4 py-8 text-center text-[13px] text-[#9e998f]">
+        <div className="px-4 py-8 text-center text-[13px] text-subtle">
           No insurer orders linked to this job
         </div>
       ) : (
@@ -328,17 +328,17 @@ export function InsurerOrdersTab({ jobId, tenantId }: InsurerOrdersTabProps) {
               <div className="flex items-center gap-3 flex-wrap">
                 <span
                   className="text-[13px] font-medium"
-                  style={{ fontFamily: 'DM Mono, monospace', color: '#c8b89a' }}
+                  style={{ fontFamily: 'DM Mono, monospace', color: 'var(--tan)' }}
                 >
                   {order.order_ref ?? '—'}
                 </span>
                 {order.wo_type && (
-                  <span className="text-[13px] text-[#3a3530]">{order.wo_type}</span>
+                  <span className="text-[13px] text-body">{order.wo_type}</span>
                 )}
                 {order.insurer && (
-                  <span className="text-[12px] text-[#9e998f]">{order.insurer}</span>
+                  <span className="text-[12px] text-subtle">{order.insurer}</span>
                 )}
-                <span className="text-[12px] text-[#9e998f]">{formatDate(order.created_at)}</span>
+                <span className="text-[12px] text-subtle">{formatDate(order.created_at)}</span>
                 <StatusPill status={order.status} />
               </div>
             }

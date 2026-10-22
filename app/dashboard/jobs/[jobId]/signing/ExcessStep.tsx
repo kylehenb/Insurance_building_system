@@ -85,25 +85,25 @@ export function ExcessStep({
   const set = (patch: Partial<ExcessFormState>) => onChange({ ...form, ...patch })
   const hasAmount = !!ctx.amount && ctx.amount > 0
   const latest = ctx.invoices[0]
-  const label = 'block text-[11px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1.5'
+  const label = 'block text-[11px] uppercase tracking-wider text-subtle font-semibold mb-1.5'
   const option = (active: boolean) =>
-    `flex gap-2 rounded-md border px-3 py-2 text-[13px] ${active ? 'border-[#c9a96e] bg-[#fdfaf4]' : 'border-[#e8e4e0]'}`
+    `flex gap-2 rounded-md border px-3 py-2 text-[13px] ${active ? 'border-gold bg-[#fdfaf4]' : 'border-line-3'}`
 
   const waiver = (
     <label className={option(form.mode === 'not_collecting')}>
       <input type="radio" name="excess-mode" className="mt-0.5" checked={form.mode === 'not_collecting'} onChange={() => set({ mode: 'not_collecting' })} />
       <span className="flex-1">
-        <span className="font-medium text-[#1a1a1a]">There’s an excess, but don’t collect it</span>
+        <span className="font-medium text-ink">There’s an excess, but don’t collect it</span>
         {form.mode === 'not_collecting' && (
           <span className="mt-2 block space-y-1">
             {EXCESS_WAIVER_REASONS.map(r => (
-              <label key={r.value} className="flex items-center gap-2 text-[12px] text-[#3a3530]">
+              <label key={r.value} className="flex items-center gap-2 text-[12px] text-body">
                 <input type="radio" name="excess-reason" checked={form.reason === r.value} onChange={() => set({ reason: r.value })} />
                 {r.label}
               </label>
             ))}
             <input
-              className="mt-1 w-full rounded-md border border-[#e0dbd4] px-2 py-1.5 text-[12px] focus:border-[#c8b89a] focus:outline-none"
+              className="mt-1 w-full rounded-md border border-line px-2 py-1.5 text-[12px] focus:border-tan focus:outline-none"
               placeholder="Note (optional), e.g. fence cash settled, excess deducted by insurer"
               value={form.note}
               onChange={e => set({ note: e.target.value })}
@@ -119,7 +119,7 @@ export function ExcessStep({
       <div className={label}>Excess</div>
 
       {ctx.decision && ctx.decidedAt && (
-        <p className="mb-2 text-[12px] text-[#9e998f]">
+        <p className="mb-2 text-[12px] text-subtle">
           Previously recorded: {EXCESS_DECISION_LABELS[ctx.decision]}
           {ctx.decidedByName ? ` by ${ctx.decidedByName}` : ''} on {formatPerthDateTime(ctx.decidedAt)}
           {ctx.note ? ` — “${ctx.note}”` : ''}
@@ -131,42 +131,42 @@ export function ExcessStep({
           <label className={option(form.mode === 'attach_existing')}>
             <input type="radio" name="excess-mode" className="mt-0.5" checked={form.mode === 'attach_existing'} onChange={() => set({ mode: 'attach_existing' })} />
             <span>
-              <span className="font-medium text-[#1a1a1a]">Attach excess invoice {latest.ref ?? ''} ({fmt(latest.amountIncGst)})</span>
-              <span className="block text-[12px] text-[#9e998f]">
+              <span className="font-medium text-ink">Attach excess invoice {latest.ref ?? ''} ({fmt(latest.amountIncGst)})</span>
+              <span className="block text-[12px] text-subtle">
                 Already raised{latest.status === 'sent' ? ' and sent' : ' (draft — it will be marked sent)'}. No new invoice is created.
               </span>
             </span>
           </label>
           <label className={option(form.mode === 'existing_not_attached')}>
             <input type="radio" name="excess-mode" className="mt-0.5" checked={form.mode === 'existing_not_attached'} onChange={() => set({ mode: 'existing_not_attached' })} />
-            <span className="font-medium text-[#1a1a1a]">Don’t attach it (already sent separately)</span>
+            <span className="font-medium text-ink">Don’t attach it (already sent separately)</span>
           </label>
         </div>
       ) : (
         <div className="space-y-1.5">
           {!hasAmount && (
-            <div className="rounded-md border border-[#f5d9a8] bg-[#fef3e2] px-3 py-2 text-[12px] text-[#92400e]">
+            <div className="rounded-md border border-[#f5d9a8] bg-warning-bg px-3 py-2 text-[12px] text-warning-dark">
               <strong>No excess is recorded for this job.</strong> Check the insurer’s approval before sending.
             </div>
           )}
           <label className={option(form.mode === 'new_invoice')}>
             <input type="radio" name="excess-mode" className="mt-0.5" checked={form.mode === 'new_invoice'} onChange={() => set({ mode: 'new_invoice' })} />
             <span className="flex-1">
-              <span className="font-medium text-[#1a1a1a]">Collect the excess — create and attach an excess invoice</span>
-              <span className="mt-1 flex items-center gap-2 text-[12px] text-[#5a5650]">
+              <span className="font-medium text-ink">Collect the excess — create and attach an excess invoice</span>
+              <span className="mt-1 flex items-center gap-2 text-[12px] text-body-soft">
                 Amount (inc GST) $
                 <input
                   inputMode="decimal"
-                  className="w-28 rounded-md border border-[#e0dbd4] px-2 py-1 text-[13px] focus:border-[#c8b89a] focus:outline-none"
+                  className="w-28 rounded-md border border-line px-2 py-1 text-[13px] focus:border-tan focus:outline-none"
                   value={form.amount}
                   onFocus={() => set({ mode: 'new_invoice' })}
                   onChange={e => set({ mode: 'new_invoice', amount: e.target.value.replace(/[^\d.]/g, '') })}
                   aria-label="Excess amount"
                 />
                 {hasAmount && Number(form.amount) !== ctx.amount && form.amount !== '' && (
-                  <span className="text-[#b45309]">The job’s excess ({fmt(ctx.amount!)}) will be updated</span>
+                  <span className="text-warning">The job’s excess ({fmt(ctx.amount!)}) will be updated</span>
                 )}
-                {!hasAmount && form.amount !== '' && <span className="text-[#9e998f]">Saved to the job</span>}
+                {!hasAmount && form.amount !== '' && <span className="text-subtle">Saved to the job</span>}
               </span>
             </span>
           </label>
@@ -174,8 +174,8 @@ export function ExcessStep({
             <label className={option(form.mode === 'no_excess')}>
               <input type="radio" name="excess-mode" className="mt-0.5" checked={form.mode === 'no_excess'} onChange={() => set({ mode: 'no_excess' })} />
               <span>
-                <span className="font-medium text-[#1a1a1a]">Confirm there’s no excess on this claim</span>
-                <span className="block text-[12px] text-[#9e998f]">Recorded on the job so you’re not asked again.</span>
+                <span className="font-medium text-ink">Confirm there’s no excess on this claim</span>
+                <span className="block text-[12px] text-subtle">Recorded on the job so you’re not asked again.</span>
               </span>
             </label>
           )}

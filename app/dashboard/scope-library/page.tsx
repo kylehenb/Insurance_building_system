@@ -89,7 +89,7 @@ export default function ScopeLibraryPage() {
   if (loading || !tenantId || items === null || insurers === null) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="text-sm text-[#b0a898]">Loading scope library…</div>
+        <div className="text-sm text-faint">Loading scope library…</div>
       </div>
     )
   }
@@ -97,8 +97,8 @@ export default function ScopeLibraryPage() {
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-[#1a1a1a]">Scope Library</h1>
-        <p className="text-sm text-[#b0a898] mt-1">Manage your pricing library for quotes and AI-assisted scope generation.</p>
+        <h1 className="text-xl font-semibold text-ink">Scope Library</h1>
+        <p className="text-sm text-faint mt-1">Manage your pricing library for quotes and AI-assisted scope generation.</p>
       </div>
       <ScopeLibraryClient
         tenantId={tenantId}

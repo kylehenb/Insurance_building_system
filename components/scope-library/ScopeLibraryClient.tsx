@@ -162,7 +162,7 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
         <select
           value={filter.trade}
           onChange={(e) => setFilter((f) => ({ ...f, trade: e.target.value }))}
-          className="border border-[#e0dbd4] rounded-lg px-3 py-2 text-sm bg-white text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e]"
+          className="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:border-gold"
         >
           <option value="">All trades</option>
           {allTrades.map((t) => (
@@ -175,19 +175,19 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
           value={filter.search}
           onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
           placeholder="Search items…"
-          className="flex-1 min-w-[180px] border border-[#e0dbd4] rounded-lg px-3 py-2 text-sm bg-white text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e]"
+          className="flex-1 min-w-[180px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:border-gold"
         />
 
         <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => setShowImport(true)}
-            className="px-3 py-2 text-sm text-[#3a3530] border border-[#e0dbd4] rounded-lg hover:bg-[#f5f0e8] transition-colors"
+            className="px-3 py-2 text-sm text-body border border-line rounded-lg hover:bg-cream transition-colors"
           >
             Import CSV
           </button>
           <button
             onClick={() => setShowAddForm((v) => !v)}
-            className="px-3 py-2 text-sm font-medium bg-[#c9a96e] text-white rounded-lg hover:bg-[#b8956a] transition-colors"
+            className="px-3 py-2 text-sm font-medium bg-gold text-white rounded-lg hover:bg-gold-dark transition-colors"
           >
             + Add Item
           </button>
@@ -196,25 +196,25 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
 
       {/* Add item form */}
       {showAddForm && (
-        <div className="border border-[#c9a96e] rounded-xl bg-[#fffdf9] p-4 space-y-3">
-          <p className="text-xs font-semibold text-[#3a3530] uppercase tracking-wide">New Item</p>
+        <div className="border border-gold rounded-xl bg-[#fffdf9] p-4 space-y-3">
+          <p className="text-xs font-semibold text-body uppercase tracking-wide">New Item</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Description *</label>
+              <label className="block text-xs font-medium text-body mb-1">Description *</label>
               <input
                 type="text"
                 value={newItem.item_description}
                 onChange={(e) => setNewItem((f) => ({ ...f, item_description: e.target.value }))}
                 placeholder="e.g. Remove and replace roof tile"
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-gold"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Trade</label>
+              <label className="block text-xs font-medium text-body mb-1">Trade</label>
               <select
                 value={newItem.trade}
                 onChange={(e) => setNewItem((f) => ({ ...f, trade: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-gold"
               >
                 <option value="">— No trade —</option>
                 {tradeTypes.map((t) => (
@@ -223,21 +223,21 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Keyword</label>
+              <label className="block text-xs font-medium text-body mb-1">Keyword</label>
               <input
                 type="text"
                 value={newItem.keyword}
                 onChange={(e) => setNewItem((f) => ({ ...f, keyword: e.target.value }))}
                 placeholder="Unique keyword"
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-gold"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Unit</label>
+              <label className="block text-xs font-medium text-body mb-1">Unit</label>
               <select
                 value={newItem.unit}
                 onChange={(e) => setNewItem((f) => ({ ...f, unit: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-gold"
               >
                 <option value="">—</option>
                 {UNITS.map((u) => (
@@ -246,46 +246,46 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Labour/unit</label>
+              <label className="block text-xs font-medium text-body mb-1">Labour/unit</label>
               <input
                 type="number"
                 step="0.01"
                 value={newItem.labour_per_unit}
                 onChange={(e) => setNewItem((f) => ({ ...f, labour_per_unit: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-gold"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Materials/unit</label>
+              <label className="block text-xs font-medium text-body mb-1">Materials/unit</label>
               <input
                 type="number"
                 step="0.01"
                 value={newItem.materials_per_unit}
                 onChange={(e) => setNewItem((f) => ({ ...f, materials_per_unit: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-gold"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Total/unit</label>
+              <label className="block text-xs font-medium text-body mb-1">Total/unit</label>
               <input
                 type="number"
                 step="0.01"
                 value={newItem.total_per_unit}
                 onChange={(e) => setNewItem((f) => ({ ...f, total_per_unit: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-gold"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#3a3530] mb-1">Est. hours</label>
+              <label className="block text-xs font-medium text-body mb-1">Est. hours</label>
               <input
                 type="number"
                 step="0.25"
                 value={newItem.estimated_hours}
                 onChange={(e) => setNewItem((f) => ({ ...f, estimated_hours: e.target.value }))}
-                className="w-full border border-[#e0dbd4] rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-[#c9a96e]"
+                className="w-full border border-line rounded px-2.5 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-gold"
                 placeholder="0"
               />
             </div>
@@ -293,14 +293,14 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
           <div className="flex justify-end gap-2">
             <button
               onClick={() => { setShowAddForm(false); setNewItem({ trade: '', keyword: '', item_description: '', unit: '', labour_per_unit: '', materials_per_unit: '', total_per_unit: '', estimated_hours: '' }) }}
-              className="px-3 py-1.5 text-sm text-[#3a3530] hover:text-[#1a1a1a]"
+              className="px-3 py-1.5 text-sm text-body hover:text-ink"
             >
               Cancel
             </button>
             <button
               onClick={handleAddItem}
               disabled={addingItem || !newItem.item_description.trim()}
-              className="px-4 py-1.5 text-sm font-medium bg-[#c9a96e] text-white rounded-lg hover:bg-[#b8956a] disabled:opacity-50 transition-colors"
+              className="px-4 py-1.5 text-sm font-medium bg-gold text-white rounded-lg hover:bg-gold-dark disabled:opacity-50 transition-colors"
             >
               {addingItem ? 'Adding…' : 'Add Item'}
             </button>
@@ -310,7 +310,7 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
 
       {/* Column header */}
       <div
-        className="grid items-center gap-1 px-3 py-1 text-xs font-medium text-[#b0a898] uppercase tracking-wide"
+        className="grid items-center gap-1 px-3 py-1 text-xs font-medium text-faint uppercase tracking-wide"
         style={{ gridTemplateColumns: '24px 1fr 52px 68px 68px 68px 52px 56px' }}
       >
         <div />
@@ -325,7 +325,7 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
 
       {/* Items grouped by trade */}
       {sortedTrades.length === 0 && (
-        <div className="text-sm text-[#b0a898] py-8 text-center">No items found.</div>
+        <div className="text-sm text-faint py-8 text-center">No items found.</div>
       )}
 
       {sortedTrades.map((trade) => {
@@ -337,9 +337,9 @@ export function ScopeLibraryClient({ tenantId, initialItems, insurers }: Props) 
         return (
           <div key={trade} className="space-y-1">
             <div className="flex items-center gap-2 py-1">
-              <span className="text-xs font-semibold text-[#3a3530] uppercase tracking-wide">{trade}</span>
-              <span className="text-xs text-[#b0a898]">{tradeItems.length}</span>
-              <div className="flex-1 h-px bg-[#e0dbd4]" />
+              <span className="text-xs font-semibold text-body uppercase tracking-wide">{trade}</span>
+              <span className="text-xs text-faint">{tradeItems.length}</span>
+              <div className="flex-1 h-px bg-line" />
             </div>
 
             {drafts.map((item) => (

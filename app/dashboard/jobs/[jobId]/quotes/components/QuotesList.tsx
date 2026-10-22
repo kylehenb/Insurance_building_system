@@ -597,7 +597,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           textAlign: 'center',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9e998f',
+          color: 'var(--subtle)',
         }}
       >
         Loading…
@@ -625,7 +625,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 380,
@@ -636,10 +636,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: 34, marginBottom: 12 }}>🚧</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Not yet built
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               This section is not yet built — please build before this can work.
             </p>
             <button
@@ -648,8 +648,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
                 fontWeight: 500,
-                color: '#ffffff',
-                background: '#3a3530',
+                color: 'var(--paper)',
+                background: 'var(--body)',
                 border: 'none',
                 borderRadius: 6,
                 padding: '8px 22px',
@@ -678,7 +678,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 480,
@@ -688,17 +688,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Upload Signed Contracts
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               Drag and drop files here or click to browse your computer.
             </p>
 
             {/* Drop zone */}
             <div
               style={{
-                border: '2px dashed #d8d0c8',
+                border: '2px dashed var(--line-strong-2)',
                 borderRadius: 8,
                 padding: '40px 20px',
                 textAlign: 'center',
@@ -720,10 +720,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
-              <div style={{ fontSize: 13, color: '#3a3530', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--body)', marginBottom: 4 }}>
                 Drop files here or click to browse
               </div>
-              <div style={{ fontSize: 11, color: '#9e998f' }}>
+              <div style={{ fontSize: 11, color: 'var(--subtle)' }}>
                 PDF, DOC, DOCX, JPG, PNG
               </div>
             </div>
@@ -735,9 +735,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #e0dbd4',
+                  color: 'var(--body)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
@@ -766,7 +766,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 480,
@@ -776,17 +776,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Upload Insured Signed Documents
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               Drag and drop files here or click to browse your computer.
             </p>
 
             {/* Drop zone */}
             <div
               style={{
-                border: '2px dashed #d8d0c8',
+                border: '2px dashed var(--line-strong-2)',
                 borderRadius: 8,
                 padding: '40px 20px',
                 textAlign: 'center',
@@ -809,16 +809,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               }}
               onDragOver={e => {
                 e.preventDefault()
-                e.currentTarget.style.borderColor = '#1a73e8'
+                e.currentTarget.style.borderColor = 'var(--info)'
                 e.currentTarget.style.background = '#f0f7ff'
               }}
               onDragLeave={e => {
-                e.currentTarget.style.borderColor = '#d8d0c8'
+                e.currentTarget.style.borderColor = 'var(--line-strong-2)'
                 e.currentTarget.style.background = 'transparent'
               }}
               onDrop={e => {
                 e.preventDefault()
-                e.currentTarget.style.borderColor = '#d8d0c8'
+                e.currentTarget.style.borderColor = 'var(--line-strong-2)'
                 e.currentTarget.style.background = 'transparent'
                 const files = Array.from(e.dataTransfer.files)
                 if (files.length > 0) {
@@ -827,10 +827,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
-              <div style={{ fontSize: 13, color: '#3a3530', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--body)', marginBottom: 4 }}>
                 Drop files here or click to browse
               </div>
-              <div style={{ fontSize: 11, color: '#9e998f' }}>
+              <div style={{ fontSize: 11, color: 'var(--subtle)' }}>
                 PDF, JPG, PNG, DOC, DOCX
               </div>
             </div>
@@ -842,9 +842,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #e0dbd4',
+                  color: 'var(--body)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
@@ -866,8 +866,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 13,
             fontWeight: 500,
-            color: '#ffffff',
-            background: '#3a3530',
+            color: 'var(--paper)',
+            background: 'var(--body)',
             border: 'none',
             borderRadius: 6,
             padding: '7px 16px',
@@ -883,14 +883,14 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       {quotes.length === 0 && (
         <div
           style={{
-            background: '#ffffff',
+            background: 'var(--paper)',
             borderRadius: 8,
             padding: '40px 20px',
             textAlign: 'center',
-            border: '1px solid #e0dbd4',
+            border: '1px solid var(--line)',
           }}
         >
-          <p style={{ fontSize: 13, color: '#9e998f', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--subtle)', marginBottom: 12 }}>
             No quotes yet for this job
           </p>
           <button
@@ -899,9 +899,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             style={{
               fontFamily: 'DM Sans, sans-serif',
               fontSize: 12,
-              color: '#9e998f',
+              color: 'var(--subtle)',
               background: 'none',
-              border: '1px dashed #d8d0c8',
+              border: '1px dashed var(--line-strong-2)',
               borderRadius: 6,
               padding: '6px 16px',
               cursor: 'pointer',
@@ -950,7 +950,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 480,
@@ -960,10 +960,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Reject Quote
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               Please select a reason for rejecting this quote:
             </p>
 
@@ -975,17 +975,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 13,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#ffffff',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 6,
                     padding: '12px 16px',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
                 >
                   Claim denied by insurer
                 </button>
@@ -995,17 +995,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 13,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#ffffff',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 6,
                     padding: '12px 16px',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
                 >
                   Claim cancelled
                 </button>
@@ -1015,24 +1015,24 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 13,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#ffffff',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 6,
                     padding: '12px 16px',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
                 >
                   New quote required
                 </button>
               </div>
             ) : (
               <div>
-                <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 20 }}>
+                <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 20 }}>
                   {declineOption === 'claim_denied' && 'This will reject the quote and mark the job as declined.'}
                   {declineOption === 'claim_cancelled' && 'This will reject the quote and mark the job as declined.'}
                   {declineOption === 'new_quote_required' && 'This will create a new quote by cloning the current one, and mark the current quote as Superseded.'}
@@ -1044,9 +1044,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       fontFamily: 'DM Sans, sans-serif',
                       fontSize: 13,
                       fontWeight: 500,
-                      color: '#3a3530',
-                      background: '#f5f2ee',
-                      border: '1px solid #d8d0c8',
+                      color: 'var(--body)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--line-strong-2)',
                       borderRadius: 6,
                       padding: '8px 20px',
                       cursor: 'pointer',
@@ -1108,8 +1108,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       fontFamily: 'DM Sans, sans-serif',
                       fontSize: 13,
                       fontWeight: 500,
-                      color: '#ffffff',
-                      background: '#c5221f',
+                      color: 'var(--paper)',
+                      background: 'var(--danger)',
                       border: 'none',
                       borderRadius: 6,
                       padding: '8px 20px',
@@ -1141,7 +1141,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 400,
@@ -1151,10 +1151,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Approve Quote
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               How would you like to approve this quote?
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1172,8 +1172,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#2e7d32',
+                  color: 'var(--paper)',
+                  background: 'var(--success)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '12px 16px',
@@ -1181,8 +1181,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   textAlign: 'left',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--success-dark)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--success)')}
               >
                 Approve in full
               </button>
@@ -1208,17 +1208,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 6,
                   padding: '12px 16px',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
               >
                 Partially Approved
               </button>
@@ -1230,9 +1230,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
@@ -1261,7 +1261,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 420,
@@ -1273,10 +1273,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: 34, marginBottom: 12 }}>✍️</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Send for Signature
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 24 }}>
               This part of the system is not yet built - it will be a pre drafted email with pre filled docs for the homeowner to sign.
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -1286,9 +1286,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
@@ -1307,8 +1307,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: '#1a73e8',
+                  color: 'var(--paper)',
+                  background: 'var(--info)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '8px 20px',
@@ -1338,7 +1338,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--paper)',
               borderRadius: 12,
               padding: '32px 36px',
               maxWidth: 600,
@@ -1351,10 +1351,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
               Partially Approved
             </div>
-            <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 20 }}>
               Select which line items to approve:
             </p>
 
@@ -1365,16 +1365,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 12,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 4,
                   padding: '4px 12px',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
               >
                 Tick all
               </button>
@@ -1384,16 +1384,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 12,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#ffffff',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 4,
                   padding: '4px 12px',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8b89a')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = '#d8d0c8')}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--tan)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line-strong-2)')}
               >
                 Clear all
               </button>
@@ -1403,7 +1403,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               style={{
                 flex: 1,
                 overflowY: 'auto',
-                border: '1px solid #e0dbd4',
+                border: '1px solid var(--line)',
                 borderRadius: 6,
                 padding: '12px',
                 marginBottom: 20,
@@ -1417,7 +1417,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     display: 'flex',
                     alignItems: 'center',
                     padding: '8px',
-                    borderBottom: '1px solid #e8e4e0',
+                    borderBottom: '1px solid var(--line-3)',
                     cursor: 'pointer',
                   }}
                   onClick={() => {
@@ -1436,10 +1436,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     style={{ marginRight: 12, cursor: 'pointer' }}
                   />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', marginBottom: 2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)', marginBottom: 2 }}>
                       {item.item_description || 'Untitled item'}
                     </div>
-                    <div style={{ fontSize: 12, color: '#9e998f' }}>
+                    <div style={{ fontSize: 12, color: 'var(--subtle)' }}>
                       {item.room && `Room: ${item.room} • `}
                       Qty: {item.qty} • {fmt(item.line_total || 0)}
                     </div>
@@ -1455,9 +1455,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#3a3530',
-                  background: '#f5f2ee',
-                  border: '1px solid #d8d0c8',
+                  color: 'var(--body)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line-strong-2)',
                   borderRadius: 6,
                   padding: '8px 20px',
                   cursor: 'pointer',
@@ -1506,8 +1506,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#ffffff',
-                  background: selectedLineItems.length > 0 ? '#2e7d32' : '#9e998f',
+                  color: 'var(--paper)',
+                  background: selectedLineItems.length > 0 ? 'var(--success)' : 'var(--subtle)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '8px 20px',
@@ -1542,7 +1542,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
           >
             <div
               style={{
-                background: '#ffffff',
+                background: 'var(--paper)',
                 borderRadius: 12,
                 padding: '32px 36px',
                 maxWidth: 520,
@@ -1555,10 +1555,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
               }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>
                 Select quotes for {docLabel}
               </div>
-              <p style={{ fontSize: 13, color: '#9e998f', lineHeight: 1.5, marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 20 }}>
                 This job has more than one approved quote. Choose which ones this document should cover.
               </p>
 
@@ -1569,9 +1569,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 12,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#ffffff',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 4,
                     padding: '4px 12px',
                     cursor: 'pointer',
@@ -1585,9 +1585,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 12,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#ffffff',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 4,
                     padding: '4px 12px',
                     cursor: 'pointer',
@@ -1601,7 +1601,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 style={{
                   flex: 1,
                   overflowY: 'auto',
-                  border: '1px solid #e0dbd4',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   padding: '12px',
                   marginBottom: 20,
@@ -1615,7 +1615,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       display: 'flex',
                       alignItems: 'center',
                       padding: '8px',
-                      borderBottom: '1px solid #e8e4e0',
+                      borderBottom: '1px solid var(--line-3)',
                       cursor: 'pointer',
                     }}
                     onClick={() => {
@@ -1635,10 +1635,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       style={{ marginRight: 12, cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', marginBottom: 2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)', marginBottom: 2 }}>
                         {aq.quote_ref || 'Untitled quote'}
                       </div>
-                      <div style={{ fontSize: 12, color: '#9e998f' }}>
+                      <div style={{ fontSize: 12, color: 'var(--subtle)' }}>
                         {STATUS_LABELS[normalizeStatus(aq.status)] ?? aq.status} • {fmt(aq.total_amount || 0)}
                       </div>
                     </div>
@@ -1653,9 +1653,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 13,
                     fontWeight: 500,
-                    color: '#3a3530',
-                    background: '#f5f2ee',
-                    border: '1px solid #d8d0c8',
+                    color: 'var(--body)',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line-strong-2)',
                     borderRadius: 6,
                     padding: '8px 20px',
                     cursor: 'pointer',
@@ -1677,8 +1677,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Sans, sans-serif',
                     fontSize: 13,
                     fontWeight: 500,
-                    color: '#ffffff',
-                    background: quotePicker.selectedIds.length > 0 ? '#1a1a1a' : '#9e998f',
+                    color: 'var(--paper)',
+                    background: quotePicker.selectedIds.length > 0 ? 'var(--ink)' : 'var(--subtle)',
                     border: 'none',
                     borderRadius: 6,
                     padding: '8px 20px',
@@ -1708,9 +1708,9 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
             <div
               key={q.id}
               style={{
-                background: '#ffffff',
+                background: 'var(--paper)',
                 borderRadius: 8,
-                border: '1px solid #e0dbd4',
+                border: '1px solid var(--line)',
                 overflow: 'visible',
               }}
             >
@@ -1722,8 +1722,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                   padding: '12px 16px',
                   gap: 10,
                   cursor: 'pointer',
-                  background: normalized === 'ready' ? '#e8f5e9' : isExpanded ? '#fafaf8' : '#ffffff',
-                  borderBottom: isExpanded ? '1px solid #e0dbd4' : 'none',
+                  background: normalized === 'ready' ? 'var(--success-bg)' : isExpanded ? 'var(--surface-4)' : 'var(--paper)',
+                  borderBottom: isExpanded ? '1px solid var(--line)' : 'none',
                   borderRadius: isExpanded ? '8px 8px 0 0' : 8,
                   overflow: 'visible',
                   position: 'relative',
@@ -1736,7 +1736,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     fontFamily: 'DM Mono, monospace',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#c8b89a',
+                    color: 'var(--tan)',
                     minWidth: 110,
                     userSelect: 'none',
                   }}
@@ -1745,12 +1745,12 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 </span>
 
                 {/* Amount */}
-                <span style={{ fontSize: 13, color: '#3a3530', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--body)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                   {displayTotal != null ? `${fmt(displayTotal)} inc GST` : '—'}
                 </span>
 
                 {/* Item count */}
-                <span style={{ fontSize: 12, color: '#9e998f', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, color: 'var(--subtle)', whiteSpace: 'nowrap' }}>
                   {q.item_count} {q.item_count === 1 ? 'item' : 'items'}
                 </span>
 
@@ -1762,8 +1762,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       borderRadius: 4,
                       fontSize: 10,
                       fontWeight: 500,
-                      background: '#fce8e6',
-                      color: '#c5221f',
+                      background: 'var(--danger-bg)',
+                      color: 'var(--danger)',
                       flexShrink: 0,
                     }}
                   >
@@ -1786,8 +1786,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       fontFamily: 'DM Sans, sans-serif',
                       fontSize: 12,
                       fontWeight: 500,
-                      color: '#ffffff',
-                      background: '#2e7d32',
+                      color: 'var(--paper)',
+                      background: 'var(--success)',
                       border: 'none',
                       borderRadius: 6,
                       padding: '6px 16px',
@@ -1795,8 +1795,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       transition: 'background 0.15s',
                       flexShrink: 0,
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--success-dark)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--success)')}
                   >
                     Mark as Ready
                   </button>
@@ -1814,8 +1814,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         fontFamily: 'DM Sans, sans-serif',
                         fontSize: 12,
                         fontWeight: 500,
-                        color: '#ffffff',
-                        background: '#1a73e8',
+                        color: 'var(--paper)',
+                        background: 'var(--info)',
                         border: 'none',
                         borderRadius: 6,
                         padding: '6px 16px',
@@ -1824,7 +1824,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         flexShrink: 0,
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#1557b0')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#1a73e8')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--info)')}
                     >
                       Send it
                     </button>
@@ -1837,17 +1837,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         fontFamily: 'DM Sans, sans-serif',
                         fontSize: 12,
                         fontWeight: 500,
-                        color: '#3a3530',
-                        background: '#f5f2ee',
-                        border: '1px solid #d8d0c8',
+                        color: 'var(--body)',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--line-strong-2)',
                         borderRadius: 6,
                         padding: '6px 16px',
                         cursor: 'pointer',
                         transition: 'all 0.15s',
                         flexShrink: 0,
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-tan-3)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
                     >
                       Unlock and Edit
                     </button>
@@ -1866,8 +1866,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         fontFamily: 'DM Sans, sans-serif',
                         fontSize: 12,
                         fontWeight: 500,
-                        color: '#ffffff',
-                        background: '#2e7d32',
+                        color: 'var(--paper)',
+                        background: 'var(--success)',
                         border: 'none',
                         borderRadius: 6,
                         padding: '6px 16px',
@@ -1875,8 +1875,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         transition: 'background 0.15s',
                         flexShrink: 0,
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#1b5e20')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#2e7d32')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--success-dark)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--success)')}
                     >
                       Approve
                     </button>
@@ -1889,8 +1889,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         fontFamily: 'DM Sans, sans-serif',
                         fontSize: 12,
                         fontWeight: 500,
-                        color: '#ffffff',
-                        background: '#c5221f',
+                        color: 'var(--paper)',
+                        background: 'var(--danger)',
                         border: 'none',
                         borderRadius: 6,
                         padding: '6px 16px',
@@ -1899,7 +1899,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         flexShrink: 0,
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#a81815')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#c5221f')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--danger)')}
                     >
                       Reject
                     </button>
@@ -1922,17 +1922,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           fontSize: 12,
                           fontWeight: 500,
-                          color: '#9e998f',
-                          background: '#f5f2ee',
-                          border: '1px solid #e0dbd4',
+                          color: 'var(--subtle)',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--line)',
                           borderRadius: 6,
                           padding: '6px 16px',
                           cursor: 'pointer',
                           transition: 'background 0.15s',
                           flexShrink: 0,
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                        onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-tan-3)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
                       >
                         Sign off received and filed {signOffFiledDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </button>
@@ -1950,8 +1950,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           fontSize: 12,
                           fontWeight: 500,
-                          color: '#ffffff',
-                          background: currentJobStage === 'awaiting_signed_document' ? '#2e7d32' : '#1a73e8',
+                          color: 'var(--paper)',
+                          background: currentJobStage === 'awaiting_signed_document' ? 'var(--success)' : 'var(--info)',
                           border: 'none',
                           borderRadius: 6,
                           padding: '6px 16px',
@@ -1959,8 +1959,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           transition: 'background 0.15s',
                           flexShrink: 0,
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? '#1b5e20' : '#1557b0')}
-                        onMouseLeave={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? '#2e7d32' : '#1a73e8')}
+                        onMouseEnter={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? 'var(--success-dark)' : '#1557b0')}
+                        onMouseLeave={e => (e.currentTarget.style.background = currentJobStage === 'awaiting_signed_document' ? 'var(--success)' : 'var(--info)')}
                       >
                         {currentJobStage === 'awaiting_signed_document' ? 'Receive sign off' : 'Send for Signature'}
                       </button>
@@ -1975,7 +1975,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       fontFamily: 'DM Sans, sans-serif',
                       fontSize: 12,
                       fontWeight: 500,
-                      color: '#9e998f',
+                      color: 'var(--subtle)',
                       fontStyle: 'italic',
                       flexShrink: 0,
                     }}
@@ -1996,17 +1996,17 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       fontFamily: 'DM Sans, sans-serif',
                       fontSize: 12,
                       fontWeight: 500,
-                      color: '#9e998f',
-                      background: '#f5f2ee',
-                      border: '1px solid #e0dbd4',
+                      color: 'var(--subtle)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--line)',
                       borderRadius: 6,
                       padding: '6px 16px',
                       cursor: 'pointer',
                       transition: 'background 0.15s',
                       flexShrink: 0,
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#e8e0d5')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#f5f2ee')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-tan-3)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
                   >
                     Sent and Locked {new Date(q.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </button>
@@ -2027,7 +2027,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      color: '#9e998f',
+                      color: 'var(--subtle)',
                       fontSize: 16,
                       padding: '4px 6px',
                       borderRadius: 4,
@@ -2035,8 +2035,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       flexShrink: 0,
                       fontFamily: 'DM Sans, sans-serif',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#9e998f')}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--body)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--subtle)')}
                   >
                     •••
                   </button>
@@ -2049,8 +2049,8 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         top: 'calc(100% + 6px)',
                         right: 0,
                         zIndex: 500,
-                        background: '#ffffff',
-                        border: '1px solid #e0dbd4',
+                        background: 'var(--paper)',
+                        border: '1px solid var(--line)',
                         borderRadius: 8,
                         boxShadow: '0 4px 20px rgba(0,0,0,0.13)',
                         padding: '4px 0',
@@ -2071,7 +2071,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: '#3a3530',
+                          color: 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
@@ -2079,10 +2079,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>👁</span>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>👁</span>
                         <span>Preview Quote</span>
                       </button>
                       <button
@@ -2099,7 +2099,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: '#3a3530',
+                          color: 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
@@ -2107,10 +2107,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>✉</span>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>✉</span>
                         <span>Email Quote…</span>
                       </button>
                       <button
@@ -2127,7 +2127,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: '#3a3530',
+                          color: 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
@@ -2135,10 +2135,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>📃</span>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>📃</span>
                         <span>SOW</span>
                       </button>
                       <button
@@ -2156,7 +2156,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: cloningQuoteId === q.id ? '#9e998f' : '#3a3530',
+                          color: cloningQuoteId === q.id ? 'var(--subtle)' : 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: cloningQuoteId === q.id ? 'default' : 'pointer',
@@ -2167,13 +2167,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         }}
                         onMouseEnter={e => {
                           if (cloningQuoteId !== q.id)
-                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                            (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
                         }}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>
                           {cloningQuoteId === q.id ? '⏳' : '📋'}
                         </span>
                         <span>
@@ -2206,7 +2206,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: sowLoading === q.id ? '#9e998f' : '#3a3530',
+                          color: sowLoading === q.id ? 'var(--subtle)' : 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: sowLoading === q.id ? 'default' : 'pointer',
@@ -2217,13 +2217,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         }}
                         onMouseEnter={e => {
                           if (sowLoading !== q.id)
-                            (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                            (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
                         }}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>
                           {sowLoading === q.id ? '⏳' : '📄'}
                         </span>
                         <span>
@@ -2258,7 +2258,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                             textAlign: 'left',
                             padding: '7px 14px',
                             fontSize: 12,
-                            color: sowLoading === q.id ? '#9e998f' : '#3a3530',
+                            color: sowLoading === q.id ? 'var(--subtle)' : 'var(--body)',
                             background: 'transparent',
                             border: 'none',
                             cursor: sowLoading === q.id ? 'default' : 'pointer',
@@ -2269,13 +2269,13 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           }}
                           onMouseEnter={e => {
                             if (sowLoading !== q.id)
-                              (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'
+                              (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'
                           }}
                           onMouseLeave={e => {
                             (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
                           }}
                         >
-                          <span style={{ fontSize: 10, color: '#c8b89a' }}>
+                          <span style={{ fontSize: 10, color: 'var(--tan)' }}>
                             {sowLoading === q.id ? '⏳' : '📋'}
                           </span>
                           <span>
@@ -2297,7 +2297,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           textAlign: 'left',
                           padding: '7px 14px',
                           fontSize: 12,
-                          color: '#3a3530',
+                          color: 'var(--body)',
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
@@ -2305,10 +2305,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                           fontFamily: 'DM Sans, sans-serif',
                           transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#f5f2ee'}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
                         onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
                       >
-                        <span style={{ fontSize: 10, color: '#c8b89a' }}>☎️</span>
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>☎️</span>
                         <span>Telephone Clearance Certificate</span>
                       </button>
                     </div>
@@ -2326,15 +2326,15 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#c0bab3',
+                    color: 'var(--faint-4)',
                     fontSize: 14,
                     padding: '2px 5px',
                     borderRadius: 3,
                     lineHeight: 1,
                     flexShrink: 0,
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#c0bab3')}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--faint-4)')}
                 >
                   ✕
                 </button>
@@ -2342,7 +2342,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 {/* Expand chevron */}
                 <span
                   style={{
-                    color: '#9e998f',
+                    color: 'var(--subtle)',
                     fontSize: 11,
                     transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: 'transform 0.15s ease',

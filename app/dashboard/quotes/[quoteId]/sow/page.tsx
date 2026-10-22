@@ -131,7 +131,7 @@ export default async function SowPrintPage({
   const docDateDisplay = formatDate(new Date().toISOString())
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] print:bg-white">
+    <div className="min-h-screen bg-surface print:bg-white">
       {/* Document container */}
       <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-screen print:shadow-none print:min-h-0">
         <SowPrintButton jobNumber={job.job_number} />
@@ -139,22 +139,22 @@ export default async function SowPrintPage({
         {/* Header - 3-column grid */}
         <div style={{ display: 'flex', alignItems: 'stretch', backgroundColor: 'white' }}>
           {/* Column 1: Logo (148px fixed) */}
-          <div style={{ width: '148px', minWidth: '148px', padding: '14px 8px 14px 20px', borderRight: '1px solid #e0dbd4' }}>
+          <div style={{ width: '148px', minWidth: '148px', padding: '14px 8px 14px 20px', borderRight: '1px solid var(--line)' }}>
             <img src="/logo-alt.png" alt="IRC Logo" style={{ width: '100%', height: 'auto', display: 'block', marginBottom: '5px' }} />
-            <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: '#9e998f', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
+            <div style={{ fontSize: '6.5px', letterSpacing: '1.8px', textTransform: 'uppercase', color: 'var(--subtle)', fontWeight: '700', whiteSpace: 'nowrap' }}>INSURANCE REPAIR CO</div>
           </div>
 
           {/* Column 2: SOW details (flex: 1) */}
-          <div style={{ flex: 1, padding: '14px 10px', borderRight: '1px solid #e0dbd4' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>SOW DETAILS</div>
+          <div style={{ flex: 1, padding: '14px 10px', borderRight: '1px solid var(--line)' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '7px' }}>SOW DETAILS</div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: '#9e998f' }}>SOW Reference: </span>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{quote.quote_ref}-SOW</span>
+                <span style={{ fontSize: '11px', color: 'var(--subtle)' }}>SOW Reference: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>{quote.quote_ref}-SOW</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '11px', color: '#9e998f' }}>Authorised for: </span>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{job.insured_name || '—'}</span>
+                <span style={{ fontSize: '11px', color: 'var(--subtle)' }}>Authorised for: </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>{job.insured_name || '—'}</span>
               </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px', marginTop: '6px' }}>
@@ -162,13 +162,13 @@ export default async function SowPrintPage({
                 { label: 'Doc Date', value: docDateDisplay },
                 { label: 'Quote Ref', value: quote.quote_ref },
               ].filter(f => f.value).map((field, i, arr) => (
-                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
-                  <span style={{ color: '#b0a89e' }}>{field.label}: </span>
-                  <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
+                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <span style={{ color: 'var(--faint-2)' }}>{field.label}: </span>
+                  <span style={{ color: 'var(--body)' }}>{field.value || '—'}</span>
                 </span>
               ))}
             </div>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginTop: '12px', marginBottom: '7px' }}>JOB DETAILS</div>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginTop: '12px', marginBottom: '7px' }}>JOB DETAILS</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '12px' }}>
               {[
                 { label: 'Insurer', value: job.insurer },
@@ -177,9 +177,9 @@ export default async function SowPrintPage({
                 { label: 'Claim #', value: job.claim_number },
                 { label: 'Job #', value: job.job_number },
               ].filter(f => f.value).map((field, i, arr) => (
-                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid #e0dbd4' : 'none' }}>
-                  <span style={{ color: '#b0a89e' }}>{field.label}: </span>
-                  <span style={{ color: '#3a3530' }}>{field.value || '—'}</span>
+                <span key={field.label} style={{ paddingRight: '8px', marginRight: '8px', borderRight: i < arr.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                  <span style={{ color: 'var(--faint-2)' }}>{field.label}: </span>
+                  <span style={{ color: 'var(--body)' }}>{field.value || '—'}</span>
                 </span>
               ))}
             </div>
@@ -187,16 +187,16 @@ export default async function SowPrintPage({
 
           {/* Column 3: Tenant contact (184px fixed) */}
           <div style={{ width: '184px', minWidth: '184px', padding: '14px 26px 14px 10px' }}>
-            <div style={{ fontSize: '9.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '7px' }}>INSURANCE REPAIR CO</div>
-            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.address || '—'}</div>
-            <div style={{ fontSize: '10px', color: '#3a3530', marginBottom: '3px' }}>{tenant.contact_email || '—'}</div>
-            <div style={{ fontSize: '10px', color: '#3a3530' }}>{tenant.contact_phone || '—'}</div>
+            <div style={{ fontSize: '9.5px', letterSpacing: '1.3px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '7px' }}>INSURANCE REPAIR CO</div>
+            <div style={{ fontSize: '10px', color: 'var(--body)', marginBottom: '3px' }}>{tenant.address || '—'}</div>
+            <div style={{ fontSize: '10px', color: 'var(--body)', marginBottom: '3px' }}>{tenant.contact_email || '—'}</div>
+            <div style={{ fontSize: '10px', color: 'var(--body)' }}>{tenant.contact_phone || '—'}</div>
           </div>
         </div>
 
         {/* Form band */}
-        <div style={{ borderTop: '1px solid #e0dbd4', borderBottom: '1px solid #e0dbd4', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
-          <span style={{ fontSize: '28px', fontWeight: '700', color: '#9e998f', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>SCOPE OF WORKS</span>
+        <div style={{ borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '14px' }}>
+          <span style={{ fontSize: '28px', fontWeight: '700', color: 'var(--subtle)', textTransform: 'uppercase', letterSpacing: '2px', whiteSpace: 'nowrap' }}>SCOPE OF WORKS</span>
         </div>
 
         {/* Body */}
@@ -204,49 +204,49 @@ export default async function SowPrintPage({
 
           {/* 1. Agreement section */}
           <div style={{ marginBottom: '14px' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '6px' }}>
               AGREEMENT
             </div>
-            <p style={{ fontSize: '11px', color: '#3a3530', lineHeight: '1.7', marginBottom: '12px' }}>
+            <p style={{ fontSize: '11px', color: 'var(--body)', lineHeight: '1.7', marginBottom: '12px' }}>
               Insurance Repair Co Pty Ltd (ACN 686 067 881, Builder Licence BC105884, hereinafter referred to as{' '}
-              <span style={{ fontWeight: '600', color: '#1a1a1a' }}>&quot;IRC&quot;</span>
+              <span style={{ fontWeight: '600', color: 'var(--ink)' }}>&quot;IRC&quot;</span>
               {' '}agrees to carry out the repair works described below at the property listed above. These works have been approved by your insurer in relation to the claim referenced above. This document constitutes your authority for works to proceed and must be signed prior to commencement.
             </p>
           </div>
 
           {/* 2. Key details box */}
-          <div style={{ background: '#f5f2ee', borderRadius: '6px', padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: '6px', padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
             {/* Left cell */}
             <div>
-              <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '2px' }}>
+              <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '2px' }}>
                 WORKS COMMENCEMENT &amp; ESTIMATED DURATION
               </div>
-              <div style={{ fontSize: '12px', color: '#1a1a1a', fontWeight: '600' }}>Subject to scheduling</div>
+              <div style={{ fontSize: '12px', color: 'var(--ink)', fontWeight: '600' }}>Subject to scheduling</div>
             </div>
             {/* Right cell */}
             <div>
-              <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '2px' }}>
+              <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '2px' }}>
                 EXCESS PAYABLE TO IRC
               </div>
-              <div style={{ fontSize: '12px', color: '#1a1a1a', fontWeight: '600' }}>{excessValue}</div>
+              <div style={{ fontSize: '12px', color: 'var(--ink)', fontWeight: '600' }}>{excessValue}</div>
             </div>
           </div>
 
           {/* 3. Scope of works table */}
           <div style={{ marginBottom: '0' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '6px' }}>
               APPROVED SCOPE OF WORKS
             </div>
 
             {/* Table header */}
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
-                <tr style={{ background: '#fafaf8', borderBottom: '1px solid #e8e4e0' }}>
-                  <th style={{ width: '28px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>#</th>
-                  <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Description of works</th>
-                  <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Qty</th>
-                  <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Unit</th>
-                  <th style={{ width: '80px', textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: '#b0a89e' }}>Trade</th>
+                <tr style={{ background: 'var(--surface-4)', borderBottom: '1px solid var(--line-3)' }}>
+                  <th style={{ width: '28px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--faint-2)' }}>#</th>
+                  <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--faint-2)' }}>Description of works</th>
+                  <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--faint-2)' }}>Qty</th>
+                  <th style={{ width: '44px', textAlign: 'center', padding: '6px 4px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--faint-2)' }}>Unit</th>
+                  <th style={{ width: '80px', textAlign: 'left', padding: '6px 8px', fontSize: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--faint-2)' }}>Trade</th>
                 </tr>
               </thead>
             </table>
@@ -270,12 +270,12 @@ export default async function SowPrintPage({
                 return (
                   <div key={room} style={{ marginBottom: '8px' }}>
                     {/* Room header */}
-                    <div style={{ padding: '4px 12px', borderBottom: '1px solid #e0dbd4', backgroundColor: '#f5f2ee' }}>
-                      <span style={{ fontWeight: '700', color: '#3a3530', fontSize: '12px', textTransform: 'uppercase', fontFamily: 'var(--font-dm-sans)' }}>
+                    <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--line)', backgroundColor: 'var(--surface)' }}>
+                      <span style={{ fontWeight: '700', color: 'var(--body)', fontSize: '12px', textTransform: 'uppercase', fontFamily: 'var(--font-dm-sans)' }}>
                         {room}
                       </span>
                       {hasDimensions && (
-                        <span style={{ fontSize: '12px', color: '#9e998f', fontFamily: 'var(--font-dm-mono)', marginLeft: '8px' }}>{roomSizeStr}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--subtle)', fontFamily: 'var(--font-dm-mono)', marginLeft: '8px' }}>{roomSizeStr}</span>
                       )}
                     </div>
 
@@ -284,12 +284,12 @@ export default async function SowPrintPage({
                         {roomItems.map((item) => {
                           globalCounter++
                           return (
-                            <tr key={item.id} style={{ borderBottom: '1px solid #f0ece6' }}>
-                              <td style={{ width: '28px', padding: '6px 4px', textAlign: 'center', fontFamily: 'var(--font-dm-mono)', fontSize: '10px', color: '#3a3530' }}>{globalCounter}</td>
-                              <td style={{ padding: '6px 8px', fontSize: '10px', color: '#3a3530', lineHeight: '1.5' }}>{item.item_description || '-'}</td>
-                              <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: '#3a3530' }}>{item.qty || '-'}</td>
-                              <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: '#3a3530' }}>{item.unit || '-'}</td>
-                              <td style={{ width: '80px', padding: '6px 8px', fontSize: '10px', color: '#3a3530' }}>{item.trade || '-'}</td>
+                            <tr key={item.id} style={{ borderBottom: '1px solid var(--line-faint)' }}>
+                              <td style={{ width: '28px', padding: '6px 4px', textAlign: 'center', fontFamily: 'var(--font-dm-mono)', fontSize: '10px', color: 'var(--body)' }}>{globalCounter}</td>
+                              <td style={{ padding: '6px 8px', fontSize: '10px', color: 'var(--body)', lineHeight: '1.5' }}>{item.item_description || '-'}</td>
+                              <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: 'var(--body)' }}>{item.qty || '-'}</td>
+                              <td style={{ width: '44px', padding: '6px 4px', textAlign: 'center', fontSize: '10px', color: 'var(--body)' }}>{item.unit || '-'}</td>
+                              <td style={{ width: '80px', padding: '6px 8px', fontSize: '10px', color: 'var(--body)' }}>{item.trade || '-'}</td>
                             </tr>
                           )
                         })}
@@ -303,10 +303,10 @@ export default async function SowPrintPage({
 
           {/* 4. Conditions of works */}
           <div style={{ marginTop: '14px', marginBottom: '14px' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '6px' }}>
               CONDITIONS OF WORKS
             </div>
-            <div style={{ background: '#f5f2ee', borderRadius: '6px', padding: '12px 14px' }}>
+            <div style={{ background: 'var(--surface)', borderRadius: '6px', padding: '12px 14px' }}>
               {[
                 'Works will be carried out by tradespeople engaged by IRC. All works are covered by a workmanship warranty from date of completion as stipulated by general consumer laws and the Building Services (Complaint Resolution and Administration) Act.',
                 'The scope above reflects works approved by your insurer. Any additional works identified on site will be referred back to your insurer for approval before proceeding.',
@@ -314,8 +314,8 @@ export default async function SowPrintPage({
                 'Your policy excess (if applicable) is payable directly to IRC upon completion of works. IRC will issue a tax invoice for this amount.',
                 'Matching of existing materials (tiles, paint, flooring) is not guaranteed. IRC will make every reasonable effort to match existing finishes.',
               ].map((text, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', fontSize: '10px', color: '#3a3530', lineHeight: '1.65', marginBottom: idx < 4 ? '6px' : '0' }}>
-                  <span style={{ color: '#b0a89e', fontFamily: 'var(--font-dm-mono)', flexShrink: 0 }}>{idx + 1}.</span>
+                <div key={idx} style={{ display: 'flex', gap: '8px', fontSize: '10px', color: 'var(--body)', lineHeight: '1.65', marginBottom: idx < 4 ? '6px' : '0' }}>
+                  <span style={{ color: 'var(--faint-2)', fontFamily: 'var(--font-dm-mono)', flexShrink: 0 }}>{idx + 1}.</span>
                   <span>{text}</span>
                 </div>
               ))}
@@ -323,7 +323,7 @@ export default async function SowPrintPage({
           </div>
 
           {/* 5. Declaration */}
-          <div style={{ border: '1px solid #e0dbd4', borderRadius: '6px', borderLeft: '3px solid #c8b89a', padding: '10px 14px', marginBottom: '14px' }}>
+          <div style={{ border: '1px solid var(--line)', borderRadius: '6px', borderLeft: '3px solid var(--tan)', padding: '10px 14px', marginBottom: '14px' }}>
             <p style={{ fontSize: '10px', color: '#6a6460', lineHeight: '1.7', margin: 0 }}>
               By signing below, the owner/occupant confirms they have read and understood the scope of works and conditions above, authorise IRC to proceed with the approved works, and acknowledge that they have had the opportunity to seek independent advice prior to signing.
             </p>
@@ -331,45 +331,45 @@ export default async function SowPrintPage({
 
           {/* 6. Signing section */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '10px' }}>
+            <div style={{ fontSize: '11.5px', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '10px' }}>
               AUTHORISATION &amp; SIGNATURES
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
               {/* LEFT — Owner/Insured */}
-              <div style={{ border: '1px solid #e0dbd4', borderRadius: '6px', padding: '12px 14px' }}>
-                <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '3px' }}>
+              <div style={{ border: '1px solid var(--line)', borderRadius: '6px', padding: '12px 14px' }}>
+                <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '3px' }}>
                   OWNER / INSURED
                 </div>
                 <div style={{ fontSize: '11px', color: '#6a6460', marginBottom: '12px' }}>{job.insured_name || '—'}</div>
 
                 {/* Signature box */}
-                <div style={{ borderBottom: '1px solid #c8b89a', height: '52px', marginBottom: '10px', position: 'relative' }}>
-                  <span style={{ fontSize: '8px', color: '#b0a89e', position: 'absolute', bottom: '4px', left: '0' }}>Signature</span>
+                <div style={{ borderBottom: '1px solid var(--tan)', height: '52px', marginBottom: '10px', position: 'relative' }}>
+                  <span style={{ fontSize: '8px', color: 'var(--faint-2)', position: 'absolute', bottom: '4px', left: '0' }}>Signature</span>
                 </div>
 
                 {/* Sub-row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ borderBottom: '1px solid #e0dbd4', paddingBottom: '14px' }}>
-                    <div style={{ fontSize: '8px', color: '#b0a89e' }}>Full name (print)</div>
+                  <div style={{ borderBottom: '1px solid var(--line)', paddingBottom: '14px' }}>
+                    <div style={{ fontSize: '8px', color: 'var(--faint-2)' }}>Full name (print)</div>
                   </div>
-                  <div style={{ borderBottom: '1px solid #e0dbd4', paddingBottom: '14px' }}>
-                    <div style={{ fontSize: '8px', color: '#b0a89e' }}>Date</div>
+                  <div style={{ borderBottom: '1px solid var(--line)', paddingBottom: '14px' }}>
+                    <div style={{ fontSize: '8px', color: 'var(--faint-2)' }}>Date</div>
                   </div>
                 </div>
               </div>
 
               {/* RIGHT — Builder */}
-              <div style={{ border: '1px solid #e0dbd4', borderRadius: '6px', padding: '12px 14px' }}>
-                <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#b0a89e', fontWeight: '700', marginBottom: '3px' }}>
+              <div style={{ border: '1px solid var(--line)', borderRadius: '6px', padding: '12px 14px' }}>
+                <div style={{ fontSize: '9px', letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--faint-2)', fontWeight: '700', marginBottom: '3px' }}>
                   BUILDER — INSURANCE REPAIR CO PTY LTD
                 </div>
                 <div style={{ fontSize: '11px', color: '#6a6460', marginBottom: '12px' }}>ACN 686 067 881 · Builder Licence BC105884</div>
 
                 {/* Signature box */}
-                <div style={{ borderBottom: '1px solid #e0dbd4', height: '52px', marginBottom: '10px', position: 'relative' }}>
-                  <span style={{ fontSize: '8px', color: '#b0a89e', position: 'absolute', bottom: '4px', left: '0' }}>Signature</span>
-                  <span style={{ fontSize: '8px', color: '#c8b89a', fontStyle: 'italic', position: 'absolute', top: '0', left: '0' }}>
+                <div style={{ borderBottom: '1px solid var(--line)', height: '52px', marginBottom: '10px', position: 'relative' }}>
+                  <span style={{ fontSize: '8px', color: 'var(--faint-2)', position: 'absolute', bottom: '4px', left: '0' }}>Signature</span>
+                  <span style={{ fontSize: '8px', color: 'var(--tan)', fontStyle: 'italic', position: 'absolute', top: '0', left: '0' }}>
                     Signed on behalf of IRC — authorised signatory
                   </span>
                   {/* TODO: Add /signature.png once the file is created */}
@@ -383,13 +383,13 @@ export default async function SowPrintPage({
 
                 {/* Sub-row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ borderBottom: '1px solid #f0ece6', paddingBottom: '14px' }}>
-                    <div style={{ fontSize: '8px', color: '#b0a89e', marginBottom: '2px' }}>Full name (print)</div>
-                    <div style={{ fontSize: '9px', color: '#3a3530' }}>Kyle Bindon</div>
+                  <div style={{ borderBottom: '1px solid var(--line-faint)', paddingBottom: '14px' }}>
+                    <div style={{ fontSize: '8px', color: 'var(--faint-2)', marginBottom: '2px' }}>Full name (print)</div>
+                    <div style={{ fontSize: '9px', color: 'var(--body)' }}>Kyle Bindon</div>
                   </div>
-                  <div style={{ borderBottom: '1px solid #f0ece6', paddingBottom: '14px' }}>
-                    <div style={{ fontSize: '8px', color: '#b0a89e', marginBottom: '2px' }}>Date</div>
-                    <div style={{ fontSize: '9px', color: '#3a3530' }}>{docDateDisplay}</div>
+                  <div style={{ borderBottom: '1px solid var(--line-faint)', paddingBottom: '14px' }}>
+                    <div style={{ fontSize: '8px', color: 'var(--faint-2)', marginBottom: '2px' }}>Date</div>
+                    <div style={{ fontSize: '9px', color: 'var(--body)' }}>{docDateDisplay}</div>
                   </div>
                 </div>
               </div>
@@ -400,7 +400,7 @@ export default async function SowPrintPage({
       </div>{/* end document container */}
 
       {/* Footer */}
-      <div style={{ background: '#1a1a1a', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ background: 'var(--ink)', padding: '9px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         {tenant.logo_storage_path ? (
           <img 
             src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path}`} 
@@ -408,14 +408,14 @@ export default async function SowPrintPage({
             style={{ width: '26px', height: '26px', objectFit: 'contain', flexShrink: 0 }} 
           />
         ) : (
-          <div style={{ width: '26px', height: '26px', border: '1.5px solid #c8b89a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: '#c8b89a', fontStyle: 'italic' }}>IRC.</div>
+          <div style={{ width: '26px', height: '26px', border: '1.5px solid var(--tan)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', fontWeight: '800', color: 'var(--tan)', fontStyle: 'italic' }}>IRC.</div>
         )}
         <div>
-          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#f5f2ee' }}>{tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}</div>
-          <div style={{ fontSize: '10px', color: '#c8b89a' }}>Building &amp; Restoration</div>
+          <div style={{ fontSize: '7.5px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--surface)' }}>{tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD'}</div>
+          <div style={{ fontSize: '10px', color: 'var(--tan)' }}>Building &amp; Restoration</div>
         </div>
-        <div style={{ width: '1px', height: '22px', background: '#c8b89a', margin: '0 4px', flexShrink: 0 }}></div>
-        <span style={{ fontSize: '12px', color: '#c8b89a' }}>{(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}</span>
+        <div style={{ width: '1px', height: '22px', background: 'var(--tan)', margin: '0 4px', flexShrink: 0 }}></div>
+        <span style={{ fontSize: '12px', color: 'var(--tan)' }}>{(tenant.trading_name || tenant.name || 'INSURANCE REPAIR CO PTY LTD').toUpperCase()} • ABN {tenant.abn || '—'} • BUILDERS LIC. {tenant.building_licence_number || '—'}</span>
         <div style={{ flex: 1 }}></div>
       </div>
     </div>

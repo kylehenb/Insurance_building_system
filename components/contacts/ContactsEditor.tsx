@@ -201,7 +201,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
 
       {/* Insured contact */}
       {!hideInsured && (
-        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+        <div style={{ borderBottom: '0.5px solid var(--line-faint)', paddingBottom: 16, marginBottom: 16 }}>
           <div style={{ 
             display: 'flex',
             alignItems: 'center',
@@ -211,7 +211,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
             <div style={{ 
               fontSize: 10, 
               fontWeight: 600, 
-              color: '#9e998f', 
+              color: 'var(--subtle)', 
               textTransform: 'uppercase', 
               letterSpacing: '0.07em'
             }}>
@@ -234,9 +234,9 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                       borderRadius: 4,
-                      border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                      background: hasRole ? '#1a1a1a' : '#f5f0e8',
-                      color: hasRole ? '#f5f2ee' : '#7a6a58',
+                      border: hasRole ? 'none' : '0.5px solid var(--line-2)',
+                      background: hasRole ? 'var(--ink)' : 'var(--cream)',
+                      color: hasRole ? 'var(--surface)' : 'var(--brown-500)',
                       cursor: readOnly ? 'default' : 'pointer',
                       transition: 'all 0.15s ease',
                     }}
@@ -250,7 +250,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Name</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'insured')?.name || ''}
                 onChange={e => {
@@ -258,11 +258,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { name: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Phone</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'insured')?.phone || ''}
                 onChange={e => {
@@ -270,11 +270,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { phone: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Email</Label>
               <Input
                 type="email"
                 value={localContacts.find(c => c.slot === 'insured')?.email || ''}
@@ -283,7 +283,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { email: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
           </div>
@@ -292,7 +292,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
 
       {/* Additional contact 1 */}
       {showAdditional1 && (
-        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+        <div style={{ borderBottom: '0.5px solid var(--line-faint)', paddingBottom: 16, marginBottom: 16 }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -303,7 +303,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
               <div style={{ 
                 fontSize: 10, 
                 fontWeight: 600, 
-                color: '#9e998f', 
+                color: 'var(--subtle)', 
                 textTransform: 'uppercase', 
                 letterSpacing: '0.07em' 
               }}>
@@ -328,9 +328,9 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         borderRadius: 4,
-                        border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                        background: hasRole ? '#1a1a1a' : '#f5f0e8',
-                        color: hasRole ? '#f5f2ee' : '#7a6a58',
+                        border: hasRole ? 'none' : '0.5px solid var(--line-2)',
+                        background: hasRole ? 'var(--ink)' : 'var(--cream)',
+                        color: hasRole ? 'var(--surface)' : 'var(--brown-500)',
                         cursor: readOnly ? 'default' : 'pointer',
                         transition: 'all 0.15s ease',
                       }}
@@ -349,7 +349,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   border: 'none', 
                   cursor: 'pointer', 
                   fontSize: 18, 
-                  color: '#b0a898',
+                  color: 'var(--faint)',
                   padding: 0,
                   lineHeight: 1 
                 }}
@@ -361,7 +361,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Contact Type</Label>
               <Select
                 value={localContacts.find(c => c.slot === 'additional_1')?.type || ''}
                 onValueChange={(value) => {
@@ -370,7 +370,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                 }}
                 disabled={readOnly}
               >
-                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
+                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,7 +383,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
               </Select>
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Name</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'additional_1')?.name || ''}
                 onChange={e => {
@@ -391,11 +391,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { name: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Phone</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'additional_1')?.phone || ''}
                 onChange={e => {
@@ -403,11 +403,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { phone: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Email</Label>
               <Input
                 type="email"
                 value={localContacts.find(c => c.slot === 'additional_1')?.email || ''}
@@ -416,7 +416,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { email: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
           </div>
@@ -425,7 +425,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
 
       {/* Additional contact 2 */}
       {showAdditional2 && (
-        <div style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 16, marginBottom: 16 }}>
+        <div style={{ borderBottom: '0.5px solid var(--line-faint)', paddingBottom: 16, marginBottom: 16 }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -436,7 +436,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
               <div style={{ 
                 fontSize: 10, 
                 fontWeight: 600, 
-                color: '#9e998f', 
+                color: 'var(--subtle)', 
                 textTransform: 'uppercase', 
                 letterSpacing: '0.07em' 
               }}>
@@ -461,9 +461,9 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         borderRadius: 4,
-                        border: hasRole ? 'none' : '0.5px solid #e4dfd8',
-                        background: hasRole ? '#1a1a1a' : '#f5f0e8',
-                        color: hasRole ? '#f5f2ee' : '#7a6a58',
+                        border: hasRole ? 'none' : '0.5px solid var(--line-2)',
+                        background: hasRole ? 'var(--ink)' : 'var(--cream)',
+                        color: hasRole ? 'var(--surface)' : 'var(--brown-500)',
                         cursor: readOnly ? 'default' : 'pointer',
                         transition: 'all 0.15s ease',
                       }}
@@ -482,7 +482,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   border: 'none', 
                   cursor: 'pointer', 
                   fontSize: 18, 
-                  color: '#b0a898',
+                  color: 'var(--faint)',
                   padding: 0,
                   lineHeight: 1 
                 }}
@@ -494,7 +494,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Contact Type</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Contact Type</Label>
               <Select
                 value={localContacts.find(c => c.slot === 'additional_2')?.type || ''}
                 onValueChange={(value) => {
@@ -503,7 +503,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                 }}
                 disabled={readOnly}
               >
-                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}>
+                <SelectTrigger style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -516,7 +516,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
               </Select>
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Name</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Name</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'additional_2')?.name || ''}
                 onChange={e => {
@@ -524,11 +524,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { name: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Phone</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Phone</Label>
               <Input
                 value={localContacts.find(c => c.slot === 'additional_2')?.phone || ''}
                 onChange={e => {
@@ -536,11 +536,11 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { phone: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>Email</Label>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>Email</Label>
               <Input
                 type="email"
                 value={localContacts.find(c => c.slot === 'additional_2')?.email || ''}
@@ -549,7 +549,7 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
                   if (idx !== -1) updateContact(idx, { email: e.target.value })
                 }}
                 disabled={readOnly}
-                style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+                style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
               />
             </div>
           </div>
@@ -563,8 +563,8 @@ export default function ContactsEditor({ contacts, onChange, readOnly = false, h
           onClick={addAdditionalContact}
           style={{
             width: '100%',
-            border: '0.5px dashed #c8b89a',
-            color: '#7a6a58',
+            border: '0.5px dashed var(--tan)',
+            color: 'var(--brown-500)',
             fontSize: 12,
           }}
         >

@@ -231,20 +231,20 @@ export default function MidcityDashboard() {
   const validBulkCount = bulkJobs.filter(j => j.job_number.trim() && j.property_address.trim()).length
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f2ee', fontFamily: 'var(--font-dm-sans), sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface)', fontFamily: 'var(--font-dm-sans), sans-serif' }}>
 
       {/* Header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: '#1a1a1a', padding: '14px 18px',
+        background: 'var(--ink)', padding: '14px 18px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '2px solid #c8b89a',
+        borderBottom: '2px solid var(--tan)',
       }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 22, letterSpacing: 3, color: '#c8b89a' }}>
+          <div style={{ fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 22, letterSpacing: 3, color: 'var(--tan)' }}>
             Bindi Co
           </div>
-          <div style={{ fontFamily: 'var(--font-dm-mono), monospace', fontSize: 9, letterSpacing: 2, color: '#7a6f65', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: 'var(--font-dm-mono), monospace', fontSize: 9, letterSpacing: 2, color: 'var(--grey-500)', textTransform: 'uppercase' }}>
             Midcity Jobs
           </div>
         </div>
@@ -256,8 +256,8 @@ export default function MidcityDashboard() {
             title="Import from screenshot"
             style={{
               width: 40, height: 40, borderRadius: '50%',
-              background: 'transparent', border: '1.5px solid #c8b89a',
-              color: '#c8b89a', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: '1.5px solid var(--tan)',
+              color: 'var(--tan)', display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}
           >
@@ -273,7 +273,7 @@ export default function MidcityDashboard() {
             aria-label="Add job"
             style={{
               width: 40, height: 40, borderRadius: '50%',
-              background: '#c8b89a', border: 'none', color: '#1a1a1a',
+              background: 'var(--tan)', border: 'none', color: 'var(--ink)',
               fontSize: 26, lineHeight: 1, fontWeight: 300,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
@@ -287,12 +287,12 @@ export default function MidcityDashboard() {
       {/* Job list */}
       <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 32 }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 56, color: '#7a6f65', fontSize: 13 }}>Loading…</div>
+          <div style={{ textAlign: 'center', padding: 56, color: 'var(--grey-500)', fontSize: 13 }}>Loading…</div>
         ) : jobs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 72 }}>
             <div style={{ fontSize: 44, marginBottom: 14 }}>📋</div>
-            <div style={{ fontSize: 17, fontWeight: 500, color: '#1a1a1a', marginBottom: 6 }}>No jobs yet</div>
-            <div style={{ fontSize: 13, color: '#7a6f65' }}>Tap + to add your first Midcity job</div>
+            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>No jobs yet</div>
+            <div style={{ fontSize: 13, color: 'var(--grey-500)' }}>Tap + to add your first Midcity job</div>
           </div>
         ) : (
           grouped.map(({ dateKey, jobs: dayJobs }) => (
@@ -300,7 +300,7 @@ export default function MidcityDashboard() {
               <div style={{
                 padding: '16px 18px 6px',
                 fontFamily: 'var(--font-dm-mono), monospace',
-                fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: '#7a6f65',
+                fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--grey-500)',
               }}>
                 {formatSectionDate(dateKey)}
               </div>
@@ -331,25 +331,25 @@ export default function MidcityDashboard() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <span style={{
                           fontFamily: 'var(--font-dm-mono), monospace',
-                          fontSize: 12, fontWeight: 500, color: '#c8b89a',
+                          fontSize: 12, fontWeight: 500, color: 'var(--tan)',
                         }}>
                           {job.job_number ?? '—'}
                         </span>
                         <span style={{
                           fontFamily: 'var(--font-dm-mono), monospace',
-                          fontSize: 10, color: '#b0a898',
+                          fontSize: 10, color: 'var(--faint)',
                         }}>
                           {displayTime}
                         </span>
                       </div>
                       <div style={{
-                        fontSize: 14, color: '#1a1a1a',
+                        fontSize: 14, color: 'var(--ink)',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>
                         {job.property_address ?? '—'}
                       </div>
                     </div>
-                    <div style={{ color: '#c8b89a', fontSize: 20, flexShrink: 0 }}>›</div>
+                    <div style={{ color: 'var(--tan)', fontSize: 20, flexShrink: 0 }}>›</div>
                   </div>
                 )
               })}
@@ -375,13 +375,13 @@ export default function MidcityDashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
               <div style={{
                 fontFamily: 'var(--font-bebas-neue), sans-serif',
-                fontSize: 22, letterSpacing: 2, color: '#1a1a1a',
+                fontSize: 22, letterSpacing: 2, color: 'var(--ink)',
               }}>
                 New Midcity Job
               </div>
               <button
                 onClick={closeModal}
-                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#7a6f65', lineHeight: 1 }}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--grey-500)', lineHeight: 1 }}
               >
                 ✕
               </button>
@@ -392,7 +392,7 @@ export default function MidcityDashboard() {
                 <label style={{
                   display: 'block',
                   fontFamily: 'var(--font-dm-mono), monospace',
-                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#7a6f65',
+                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--grey-500)',
                   marginBottom: 7,
                 }}>
                   Job Number <span style={{ color: '#c0622a' }}>*</span>
@@ -406,9 +406,9 @@ export default function MidcityDashboard() {
                   required
                   style={{
                     width: '100%', padding: '13px 14px',
-                    border: '1.5px solid #ddd5c8', borderRadius: 8,
+                    border: '1.5px solid var(--line-tan-2)', borderRadius: 8,
                     fontSize: 16, fontFamily: 'inherit',
-                    outline: 'none', background: '#faf8f5', color: '#1a1a1a',
+                    outline: 'none', background: 'var(--surface-8)', color: 'var(--ink)',
                   }}
                 />
               </div>
@@ -417,7 +417,7 @@ export default function MidcityDashboard() {
                 <label style={{
                   display: 'block',
                   fontFamily: 'var(--font-dm-mono), monospace',
-                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#7a6f65',
+                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--grey-500)',
                   marginBottom: 7,
                 }}>
                   Property Address <span style={{ color: '#c0622a' }}>*</span>
@@ -430,9 +430,9 @@ export default function MidcityDashboard() {
                   required
                   style={{
                     width: '100%', padding: '13px 14px',
-                    border: '1.5px solid #ddd5c8', borderRadius: 8,
+                    border: '1.5px solid var(--line-tan-2)', borderRadius: 8,
                     fontSize: 16, fontFamily: 'inherit',
-                    outline: 'none', background: '#faf8f5', color: '#1a1a1a',
+                    outline: 'none', background: 'var(--surface-8)', color: 'var(--ink)',
                   }}
                 />
               </div>
@@ -441,11 +441,11 @@ export default function MidcityDashboard() {
                 <label style={{
                   display: 'block',
                   fontFamily: 'var(--font-dm-mono), monospace',
-                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#7a6f65',
+                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--grey-500)',
                   marginBottom: 7,
                 }}>
                   Time{' '}
-                  <span style={{ color: '#b0a898', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  <span style={{ color: 'var(--faint)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                     optional
                   </span>
                 </label>
@@ -456,9 +456,9 @@ export default function MidcityDashboard() {
                   placeholder="e.g. 10:30am"
                   style={{
                     width: '100%', padding: '13px 14px',
-                    border: '1.5px solid #ddd5c8', borderRadius: 8,
+                    border: '1.5px solid var(--line-tan-2)', borderRadius: 8,
                     fontSize: 16, fontFamily: 'inherit',
-                    outline: 'none', background: '#faf8f5', color: '#1a1a1a',
+                    outline: 'none', background: 'var(--surface-8)', color: 'var(--ink)',
                   }}
                 />
               </div>
@@ -478,8 +478,8 @@ export default function MidcityDashboard() {
                 disabled={creating || !canSubmit}
                 style={{
                   width: '100%', padding: '16px 18px',
-                  background: creating || !canSubmit ? '#ddd5c8' : '#1a1a1a',
-                  color: creating || !canSubmit ? '#7a6f65' : '#c8b89a',
+                  background: creating || !canSubmit ? 'var(--line-tan-2)' : 'var(--ink)',
+                  color: creating || !canSubmit ? 'var(--grey-500)' : 'var(--tan)',
                   border: 'none', borderRadius: 8,
                   fontFamily: 'var(--font-bebas-neue), sans-serif',
                   fontSize: 20, letterSpacing: 3,
@@ -513,7 +513,7 @@ export default function MidcityDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <div style={{
                   fontFamily: 'var(--font-bebas-neue), sans-serif',
-                  fontSize: 22, letterSpacing: 2, color: '#1a1a1a',
+                  fontSize: 22, letterSpacing: 2, color: 'var(--ink)',
                 }}>
                   Import Schedule
                 </div>
@@ -523,7 +523,7 @@ export default function MidcityDashboard() {
                   style={{
                     background: 'none', border: 'none', fontSize: 22,
                     cursor: bulkStep === 'parsing' || bulkStep === 'creating' ? 'default' : 'pointer',
-                    color: '#7a6f65', lineHeight: 1,
+                    color: 'var(--grey-500)', lineHeight: 1,
                     opacity: bulkStep === 'parsing' || bulkStep === 'creating' ? 0.4 : 1,
                   }}
                 >
@@ -533,7 +533,7 @@ export default function MidcityDashboard() {
               {bulkStep === 'review' && (
                 <div style={{
                   fontFamily: 'var(--font-dm-mono), monospace',
-                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#7a6f65',
+                  fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--grey-500)',
                   marginBottom: 16,
                 }}>
                   {bulkJobs.length} job{bulkJobs.length !== 1 ? 's' : ''} found — review and confirm
@@ -560,12 +560,12 @@ export default function MidcityDashboard() {
                     onClick={() => fileInputRef.current?.click()}
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
                     style={{
-                      border: '2px dashed #ddd5c8',
+                      border: '2px dashed var(--line-tan-2)',
                       borderRadius: 12,
                       padding: '40px 24px',
                       textAlign: 'center',
                       cursor: 'pointer',
-                      background: '#faf8f5',
+                      background: 'var(--surface-8)',
                     }}
                   >
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c8b89a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 16px', display: 'block' }}>
@@ -573,12 +573,12 @@ export default function MidcityDashboard() {
                       <circle cx="8.5" cy="8.5" r="1.5"/>
                       <polyline points="21 15 16 10 5 21"/>
                     </svg>
-                    <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', marginBottom: 6 }}>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>
                       Tap to select screenshot
                     </div>
                     <div style={{
                       fontFamily: 'var(--font-dm-mono), monospace',
-                      fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#b0a898',
+                      fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--faint)',
                     }}>
                       PNG · JPG · WEBP
                     </div>
@@ -601,15 +601,15 @@ export default function MidcityDashboard() {
                   <div style={{
                     width: 40, height: 40, margin: '0 auto 16px',
                     border: '3px solid #e8e4df',
-                    borderTopColor: '#c8b89a',
+                    borderTopColor: 'var(--tan)',
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                   }} />
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                  <div style={{ fontSize: 15, color: '#1a1a1a', fontWeight: 500, marginBottom: 6 }}>
+                  <div style={{ fontSize: 15, color: 'var(--ink)', fontWeight: 500, marginBottom: 6 }}>
                     Parsing schedule…
                   </div>
-                  <div style={{ fontSize: 12, color: '#7a6f65' }}>
+                  <div style={{ fontSize: 12, color: 'var(--grey-500)' }}>
                     Extracting jobs from your screenshot
                   </div>
                 </div>
@@ -620,8 +620,8 @@ export default function MidcityDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {bulkJobs.map((job, i) => (
                     <div key={i} style={{
-                      background: '#faf8f5',
-                      border: '1.5px solid #ddd5c8',
+                      background: 'var(--surface-8)',
+                      border: '1.5px solid var(--line-tan-2)',
                       borderRadius: 10,
                       padding: '12px 12px 12px 14px',
                     }}>
@@ -633,9 +633,9 @@ export default function MidcityDashboard() {
                           placeholder="Job #"
                           style={{
                             flex: '0 0 100px', padding: '8px 10px',
-                            border: '1px solid #ddd5c8', borderRadius: 6,
+                            border: '1px solid var(--line-tan-2)', borderRadius: 6,
                             fontSize: 13, fontFamily: 'var(--font-dm-mono), monospace',
-                            background: 'white', color: '#1a1a1a', outline: 'none',
+                            background: 'white', color: 'var(--ink)', outline: 'none',
                           }}
                         />
                         <input
@@ -645,18 +645,18 @@ export default function MidcityDashboard() {
                           placeholder="Time"
                           style={{
                             flex: 1, padding: '8px 10px',
-                            border: '1px solid #ddd5c8', borderRadius: 6,
+                            border: '1px solid var(--line-tan-2)', borderRadius: 6,
                             fontSize: 13, fontFamily: 'var(--font-dm-mono), monospace',
-                            background: 'white', color: '#1a1a1a', outline: 'none',
+                            background: 'white', color: 'var(--ink)', outline: 'none',
                           }}
                         />
                         <button
                           onClick={() => removeBulkJob(i)}
                           style={{
                             flexShrink: 0, width: 32, height: 32,
-                            background: 'none', border: '1px solid #ddd5c8',
+                            background: 'none', border: '1px solid var(--line-tan-2)',
                             borderRadius: 6, cursor: 'pointer',
-                            color: '#b0a898', fontSize: 14,
+                            color: 'var(--faint)', fontSize: 14,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
                         >
@@ -670,9 +670,9 @@ export default function MidcityDashboard() {
                         placeholder="Property address"
                         style={{
                           width: '100%', padding: '8px 10px',
-                          border: '1px solid #ddd5c8', borderRadius: 6,
+                          border: '1px solid var(--line-tan-2)', borderRadius: 6,
                           fontSize: 13, fontFamily: 'inherit',
-                          background: 'white', color: '#1a1a1a', outline: 'none',
+                          background: 'white', color: 'var(--ink)', outline: 'none',
                           boxSizing: 'border-box',
                         }}
                       />
@@ -696,11 +696,11 @@ export default function MidcityDashboard() {
                   <div style={{
                     width: 40, height: 40, margin: '0 auto 16px',
                     border: '3px solid #e8e4df',
-                    borderTopColor: '#c8b89a',
+                    borderTopColor: 'var(--tan)',
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                   }} />
-                  <div style={{ fontSize: 15, color: '#1a1a1a', fontWeight: 500 }}>
+                  <div style={{ fontSize: 15, color: 'var(--ink)', fontWeight: 500 }}>
                     Creating jobs…
                   </div>
                 </div>
@@ -715,8 +715,8 @@ export default function MidcityDashboard() {
                   disabled={validBulkCount === 0}
                   style={{
                     width: '100%', padding: '16px 18px',
-                    background: validBulkCount === 0 ? '#ddd5c8' : '#1a1a1a',
-                    color: validBulkCount === 0 ? '#7a6f65' : '#c8b89a',
+                    background: validBulkCount === 0 ? 'var(--line-tan-2)' : 'var(--ink)',
+                    color: validBulkCount === 0 ? 'var(--grey-500)' : 'var(--tan)',
                     border: 'none', borderRadius: 8,
                     fontFamily: 'var(--font-bebas-neue), sans-serif',
                     fontSize: 20, letterSpacing: 3,

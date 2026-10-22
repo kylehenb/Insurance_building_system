@@ -22,14 +22,14 @@ function SectionHeading({ label }: { label: string }) {
   return (
     <div className="mt-8 mb-4">
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-[#e4dfd8]" />
+        <div className="h-px flex-1 bg-line-2" />
         <span
-          className="text-[10px] font-semibold tracking-[0.18em] uppercase text-[#c8b89a]"
+          className="text-[10px] font-semibold tracking-[0.18em] uppercase text-tan"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
           {label}
         </span>
-        <div className="h-px flex-1 bg-[#e4dfd8]" />
+        <div className="h-px flex-1 bg-line-2" />
       </div>
     </div>
   )
@@ -38,7 +38,7 @@ function SectionHeading({ label }: { label: string }) {
 function FieldLabel({ label }: { label: string }) {
   return (
     <label
-      className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+      className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
       style={{ fontFamily: 'DM Sans, sans-serif' }}
     >
       {label}
@@ -67,9 +67,9 @@ function InlineInput({
       disabled={locked}
       placeholder={placeholder}
       className={`
-        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
-        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white
+        border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+        disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
         transition-colors
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -98,9 +98,9 @@ function InlineTextarea({
       placeholder={placeholder}
       rows={rows}
       className={`
-        w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white
-        border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a]
-        disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed
+        w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white
+        border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan
+        disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed
         resize-y transition-colors
       `}
       style={{ fontFamily: 'DM Sans, sans-serif' }}
@@ -128,7 +128,7 @@ function RadioGroup({
         {options.map(opt => (
           <label
             key={opt}
-            className={`flex items-center gap-2 text-[13px] text-[#3a3530] ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            className={`flex items-center gap-2 text-[13px] text-body ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             <input
@@ -137,7 +137,7 @@ function RadioGroup({
               checked={value === opt}
               onChange={() => !locked && onChange(opt)}
               disabled={locked}
-              className="accent-[#c8b89a]"
+              className="accent-tan"
             />
             {opt}
           </label>
@@ -292,8 +292,8 @@ export function MakeSafeReportForm({ data, locked, onChange, tenantId, reportId,
               px-3 py-1.5 rounded-md text-[11px] font-semibold tracking-[0.1em] uppercase
               transition-all duration-200
               ${locked || generating || !str('raw_report_notes').trim()
-                ? 'bg-[#f5f0e8] text-[#b0a898] cursor-not-allowed'
-                : 'bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#2a2a2a] cursor-pointer'
+                ? 'bg-cream text-faint cursor-not-allowed'
+                : 'bg-ink text-cream hover:bg-ink-hover cursor-pointer'
               }
             `}
             style={{ fontFamily: 'DM Sans, sans-serif' }}

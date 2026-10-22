@@ -191,16 +191,16 @@ export default function InvoiceTemplatesSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
+      <div className="min-h-screen bg-surface p-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <div className="h-8 bg-[#e8e4e0] rounded w-48 mb-2"></div>
-            <div className="h-4 bg-[#e8e4e0] rounded w-96"></div>
+            <div className="h-8 bg-line-3 rounded w-48 mb-2"></div>
+            <div className="h-4 bg-line-3 rounded w-96"></div>
           </div>
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="bg-white border border-[#e8e4e0] rounded-lg p-5 mb-4">
-              <div className="h-5 bg-[#e8e4e0] rounded w-64 mb-2"></div>
-              <div className="h-32 bg-[#fafaf9] border border-[#e8e4e0] rounded"></div>
+            <div key={i} className="bg-white border border-line-3 rounded-lg p-5 mb-4">
+              <div className="h-5 bg-line-3 rounded w-64 mb-2"></div>
+              <div className="h-32 bg-surface-5 border border-line-3 rounded"></div>
             </div>
           ))}
         </div>
@@ -210,20 +210,20 @@ export default function InvoiceTemplatesSettingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
+      <div className="min-h-screen bg-surface p-8">
         <div className="max-w-4xl mx-auto">
-          <div className="text-[#9e998f]">{error}</div>
+          <div className="text-subtle">{error}</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] p-8">
+    <div className="min-h-screen bg-surface p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-[#1a1a1a]">Invoice Templates</h1>
-          <p className="text-sm text-[#9e998f] mt-1">
+          <h1 className="text-2xl font-semibold text-ink">Invoice Templates</h1>
+          <p className="text-sm text-subtle mt-1">
             Manage standardized invoice descriptions for common report types. Use placeholders like {'{property_address}'} and {'{claim_number}'} in descriptions — they'll be replaced when creating invoices.
           </p>
         </div>
@@ -240,43 +240,43 @@ export default function InvoiceTemplatesSettingsPage() {
             const dirty = isDirty(template.id)
 
             return (
-              <div key={template.id} className="bg-white border border-[#e8e4e0] rounded-lg p-5">
+              <div key={template.id} className="bg-white border border-line-3 rounded-lg p-5">
                 {/* Header row */}
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="font-semibold text-[#1a1a1a]">{template.template_name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#f5f2ee] text-[#9e998f]">
+                  <span className="font-semibold text-ink">{template.template_name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-surface text-subtle">
                     {TEMPLATE_CODE_DISPLAY[template.template_code] || template.template_code}
                   </span>
-                  <span className="text-xs text-[#9e998f] ml-auto">
+                  <span className="text-xs text-subtle ml-auto">
                     Code: <span className="font-mono">{template.template_code}</span>
                   </span>
                 </div>
 
                 {/* Description field */}
                 <div className="mb-4">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
                     Invoice Description
                   </label>
                   <textarea
                     value={editState.description}
                     onChange={(e) => handleChange(template.id, 'description', e.target.value)}
-                    className="w-full min-h-[80px] p-3 border border-[#e8e4e0] rounded-md bg-[#fafaf9] text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] resize-none"
+                    className="w-full min-h-[80px] p-3 border border-line-3 rounded-md bg-surface-5 text-sm text-ink focus:outline-none focus:border-gold resize-none"
                     placeholder="Enter invoice line item description..."
                   />
-                  <p className="text-xs text-[#9e998f] mt-1">
+                  <p className="text-xs text-subtle mt-1">
                     Available placeholders: {'{property_address}'}, {'{claim_number}'}, {'{job_number}'}, {'{insured_name}'}
                   </p>
                 </div>
 
                 {/* Notes field */}
                 <div className="mb-4">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
                     Default Notes (optional)
                   </label>
                   <textarea
                     value={editState.notes}
                     onChange={(e) => handleChange(template.id, 'notes', e.target.value)}
-                    className="w-full min-h-[60px] p-3 border border-[#e8e4e0] rounded-md bg-[#fafaf9] text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] resize-none"
+                    className="w-full min-h-[60px] p-3 border border-line-3 rounded-md bg-surface-5 text-sm text-ink focus:outline-none focus:border-gold resize-none"
                     placeholder="Optional default notes for this invoice type..."
                   />
                 </div>
@@ -297,7 +297,7 @@ export default function InvoiceTemplatesSettingsPage() {
                   <button
                     onClick={() => handleSave(template.id)}
                     disabled={!dirty || editState.saving}
-                    className="px-4 py-1.5 text-xs bg-[#c9a96e] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
+                    className="px-4 py-1.5 text-xs bg-gold text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
                   >
                     {editState.saving ? 'Saving…' : 'Save'}
                   </button>
@@ -308,8 +308,8 @@ export default function InvoiceTemplatesSettingsPage() {
         </div>
 
         {templates.length === 0 && (
-          <div className="bg-white border border-[#e8e4e0] rounded-lg p-8 text-center">
-            <p className="text-sm text-[#9e998f]">
+          <div className="bg-white border border-line-3 rounded-lg p-8 text-center">
+            <p className="text-sm text-subtle">
               No invoice templates found. Run the seed migration to create default templates.
             </p>
           </div>

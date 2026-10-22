@@ -293,7 +293,7 @@ export function TradesCsvImportDialog({ isOpen, onClose, onImport }: TradesCsvIm
     >
       <div
         style={{
-          background: '#ffffff',
+          background: 'var(--paper)',
           borderRadius: 8,
           width: '90%',
           maxWidth: 900,
@@ -303,10 +303,10 @@ export function TradesCsvImportDialog({ isOpen, onClose, onImport }: TradesCsvIm
           fontFamily: 'DM Sans, sans-serif',
         }}
       >
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4, color: '#1a1a1a' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4, color: 'var(--ink)' }}>
           Import Trades from CSV
         </h2>
-        <p style={{ fontSize: 13, color: '#9e998f', marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: 'var(--subtle)', marginBottom: 16 }}>
           Step {step === 'input' ? 1 : step === 'mapping' ? 2 : 3} of 3 —{' '}
           {step === 'input' ? 'Upload or paste CSV' : step === 'mapping' ? 'Map columns' : 'Review & import'}
         </p>
@@ -315,7 +315,7 @@ export function TradesCsvImportDialog({ isOpen, onClose, onImport }: TradesCsvIm
         {step === 'input' && (
           <>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', display: 'block', marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)', display: 'block', marginBottom: 8 }}>
                 Paste CSV content or upload a file
               </label>
               <textarea
@@ -328,7 +328,7 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
                   width: '100%',
                   height: 160,
                   padding: 12,
-                  border: '1px solid #e0dbd4',
+                  border: '1px solid var(--line)',
                   borderRadius: 6,
                   fontSize: 12,
                   fontFamily: 'monospace',
@@ -352,7 +352,7 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+              <div style={{ marginBottom: 16, padding: 12, background: 'var(--danger-bg-3)', borderRadius: 6, fontSize: 12, color: 'var(--danger-dark)' }}>
                 {error}
               </div>
             )}
@@ -360,14 +360,14 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={handleClose}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#3a3530', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--body)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => parseCSV(csvText)}
                 disabled={!csvText.trim()}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#ffffff', background: '#1a1a1a', border: 'none', borderRadius: 6, cursor: csvText.trim() ? 'pointer' : 'not-allowed', opacity: csvText.trim() ? 1 : 0.5 }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--paper)', background: 'var(--ink)', border: 'none', borderRadius: 6, cursor: csvText.trim() ? 'pointer' : 'not-allowed', opacity: csvText.trim() ? 1 : 0.5 }}
               >
                 Next
               </button>
@@ -378,31 +378,31 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
         {/* Step 2: Mapping */}
         {step === 'mapping' && (
           <>
-            <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 16 }}>
               Map your CSV columns to trades fields. Required fields are marked with *.
             </p>
 
-            <div style={{ marginBottom: 16, maxHeight: 320, overflow: 'auto', border: '1px solid #e0dbd4', borderRadius: 6 }}>
+            <div style={{ marginBottom: 16, maxHeight: 320, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead style={{ background: '#f5f0e8', position: 'sticky', top: 0 }}>
+                <thead style={{ background: 'var(--cream)', position: 'sticky', top: 0 }}>
                   <tr>
-                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>CSV Column</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Preview</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Maps to</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>CSV Column</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Preview</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Maps to</th>
                   </tr>
                 </thead>
                 <tbody>
                   {headers.map((header, idx) => (
-                    <tr key={header} style={{ borderBottom: '1px solid #e0dbd4' }}>
-                      <td style={{ padding: 10, color: '#3a3530', fontWeight: 500 }}>{header}</td>
-                      <td style={{ padding: 10, color: '#9e998f', fontFamily: 'monospace', fontSize: 11 }}>
+                    <tr key={header} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: 10, color: 'var(--body)', fontWeight: 500 }}>{header}</td>
+                      <td style={{ padding: 10, color: 'var(--subtle)', fontFamily: 'monospace', fontSize: 11 }}>
                         {parsedRows[0]?.[header] || '—'}
                       </td>
                       <td style={{ padding: 10 }}>
                         <select
                           value={mapping[idx]?.tradesField || ''}
                           onChange={e => handleMappingChange(idx, e.target.value)}
-                          style={{ padding: 6, fontSize: 12, border: '1px solid #e0dbd4', borderRadius: 4, minWidth: 160 }}
+                          style={{ padding: 6, fontSize: 12, border: '1px solid var(--line)', borderRadius: 4, minWidth: 160 }}
                         >
                           <option value="">-- Ignore --</option>
                           {TRADES_FIELDS.map(field => (
@@ -421,19 +421,19 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={handleClose}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#3a3530', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--body)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => setStep('input')}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#3a3530', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--body)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Back
               </button>
               <button
                 onClick={handleConfirmMapping}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#ffffff', background: '#1a1a1a', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--paper)', background: 'var(--ink)', border: 'none', borderRadius: 6, cursor: 'pointer' }}
               >
                 Preview Import
               </button>
@@ -444,36 +444,36 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
         {/* Step 3: Preview */}
         {step === 'preview' && (
           <>
-            <p style={{ fontSize: 13, color: '#3a3530', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 16 }}>
               {previewItems.length} trade{previewItems.length !== 1 ? 's' : ''} ready to import
             </p>
 
-            <div style={{ marginBottom: 16, maxHeight: 320, overflow: 'auto', border: '1px solid #e0dbd4', borderRadius: 6 }}>
+            <div style={{ marginBottom: 16, maxHeight: 320, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                <thead style={{ background: '#f5f0e8', position: 'sticky', top: 0 }}>
+                <thead style={{ background: 'var(--cream)', position: 'sticky', top: 0 }}>
                   <tr>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Primary Trade</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Business Name</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Contact</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Mobile</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Email</th>
-                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: '#1a1a1a' }}>Status</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Primary Trade</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Business Name</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Contact</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Mobile</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Email</th>
+                    <th style={{ padding: 8, textAlign: 'left', fontWeight: 600, color: 'var(--ink)' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previewItems.slice(0, 20).map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #e0dbd4' }}>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.primary_trade || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.business_name || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.primary_contact || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.contact_mobile || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.contact_email || '-'}</td>
-                      <td style={{ padding: 8, color: '#3a3530' }}>{item.status || '-'}</td>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.primary_trade || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.business_name || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.primary_contact || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.contact_mobile || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.contact_email || '-'}</td>
+                      <td style={{ padding: 8, color: 'var(--body)' }}>{item.status || '-'}</td>
                     </tr>
                   ))}
                   {previewItems.length > 20 && (
                     <tr>
-                      <td colSpan={6} style={{ padding: 8, textAlign: 'center', color: '#9e998f' }}>
+                      <td colSpan={6} style={{ padding: 8, textAlign: 'center', color: 'var(--subtle)' }}>
                         ... and {previewItems.length - 20} more trades
                       </td>
                     </tr>
@@ -483,7 +483,7 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+              <div style={{ marginBottom: 16, padding: 12, background: 'var(--danger-bg-3)', borderRadius: 6, fontSize: 12, color: 'var(--danger-dark)' }}>
                 {error}
               </div>
             )}
@@ -491,20 +491,20 @@ Electrician,Sparky Solutions,EL01,Jane Doe,0423456789,jane@sparky.com.au,456 Hig
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={handleClose}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#3a3530', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--body)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => setStep('mapping')}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#3a3530', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--body)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Back
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing}
-                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: '#ffffff', background: '#1a1a1a', border: 'none', borderRadius: 6, cursor: importing ? 'not-allowed' : 'pointer', opacity: importing ? 0.7 : 1 }}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 500, color: 'var(--paper)', background: 'var(--ink)', border: 'none', borderRadius: 6, cursor: importing ? 'not-allowed' : 'pointer', opacity: importing ? 0.7 : 1 }}
               >
                 {importing ? 'Importing...' : `Import ${previewItems.length} Trade${previewItems.length !== 1 ? 's' : ''}`}
               </button>

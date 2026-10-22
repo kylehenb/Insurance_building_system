@@ -203,8 +203,8 @@ function SummaryPanel({
 }) {
   return (
     <div style={{
-      background: '#fff',
-      border: '1px solid #e6dfd0',
+      background: 'var(--paper)',
+      border: '1px solid var(--line-tan)',
       borderLeft: '4px solid #c9a961',
       borderRadius: 10,
       padding: '16px 20px',
@@ -221,14 +221,14 @@ function SummaryPanel({
         </span>
         <button
           onClick={onClose}
-          style={{ marginLeft: 'auto', cursor: 'pointer', color: '#8a8272', fontSize: 14, background: 'none', border: 'none', padding: 0, lineHeight: 1 }}
+          style={{ marginLeft: 'auto', cursor: 'pointer', color: 'var(--grey-450)', fontSize: 14, background: 'none', border: 'none', padding: 0, lineHeight: 1 }}
         >
           ✕
         </button>
       </div>
 
       {loading ? (
-        <div style={{ fontSize: 13, color: '#8a8272', fontWeight: 300, padding: '8px 0' }}>Generating summary…</div>
+        <div style={{ fontSize: 13, color: 'var(--grey-450)', fontWeight: 300, padding: '8px 0' }}>Generating summary…</div>
       ) : summary ? (
         <>
           {([
@@ -241,7 +241,7 @@ function SummaryPanel({
             if (!bullets || bullets.length === 0) return null
             return (
               <div key={key} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8272', fontWeight: 700, marginBottom: 6 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--grey-450)', fontWeight: 700, marginBottom: 6 }}>
                   {label}
                 </div>
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -286,8 +286,8 @@ function AiPopover({ onSelect, onClose }: { onSelect: (s: AiScope) => void; onCl
     <div
       onClick={e => e.stopPropagation()}
       style={{
-        position: 'absolute', top: 36, right: 0, background: '#fff',
-        border: '1px solid #e6dfd0', borderRadius: 10,
+        position: 'absolute', top: 36, right: 0, background: 'var(--paper)',
+        border: '1px solid var(--line-tan)', borderRadius: 10,
         boxShadow: '0 10px 28px rgba(0,0,0,.10)', width: 248, zIndex: 30, overflow: 'hidden',
       }}
     >
@@ -300,13 +300,13 @@ function AiPopover({ onSelect, onClose }: { onSelect: (s: AiScope) => void; onCl
           onClick={() => onSelect(scope)}
           style={{
             padding: '12px 14px', cursor: 'pointer',
-            borderBottom: scope === 'recent' ? '1px solid #e6dfd0' : 'none',
+            borderBottom: scope === 'recent' ? '1px solid var(--line-tan)' : 'none',
           }}
           onMouseEnter={e => (e.currentTarget.style.background = '#f8f2e3')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--paper)')}
         >
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1b1712' }}>{title}</div>
-          <div style={{ fontSize: 11, color: '#8a8272', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-warm)' }}>{title}</div>
+          <div style={{ fontSize: 11, color: 'var(--grey-450)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
         </div>
       ))}
     </div>
@@ -432,14 +432,14 @@ export function CommsFeed({ jobId }: { jobId: string }) {
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-        <span style={{ fontSize: 11, letterSpacing: '.14em', fontWeight: 700, textTransform: 'uppercase', color: '#8a8272' }}>
+        <span style={{ fontSize: 11, letterSpacing: '.14em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--grey-450)' }}>
           Communications Feed
         </span>
         {!loading && (
-          <span style={{ fontSize: 12, color: '#8a8272' }}>
+          <span style={{ fontSize: 12, color: 'var(--grey-450)' }}>
             {comms.length} total
             {unreadCount > 0 && (
-              <span style={{ color: '#4a6fd4', fontWeight: 700, marginLeft: 6 }}>· {unreadCount} unread</span>
+              <span style={{ color: 'var(--info-soft)', fontWeight: 700, marginLeft: 6 }}>· {unreadCount} unread</span>
             )}
           </span>
         )}
@@ -457,10 +457,10 @@ export function CommsFeed({ jobId }: { jobId: string }) {
       )}
 
       {/* Feed card */}
-      <div style={{ background: '#fff', border: '1px solid #e6dfd0', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--paper)', border: '1px solid var(--line-tan)', borderRadius: 10, overflow: 'hidden' }}>
 
         {/* Toolbar: filters + AI button + search */}
-        <div style={{ display: 'flex', alignItems: 'center', borderBottom: '0.5px solid #e6dfd0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', borderBottom: '0.5px solid var(--line-tan)' }}>
           <div style={{ flex: 1 }}>
             <CommsFilterBar
               filters={filters}
@@ -496,7 +496,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
 
         {/* Body */}
         {loading ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#8a8272', fontWeight: 300 }}>
+          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: 'var(--grey-450)', fontWeight: 300 }}>
             Loading…
           </div>
         ) : fetchError ? (
@@ -504,7 +504,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
             {fetchError}
           </div>
         ) : dayGroups.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#b0a898', fontWeight: 300 }}>
+          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: 'var(--faint)', fontWeight: 300 }}>
             {comms.length === 0 ? 'No communications yet' : 'No results match the current filters'}
           </div>
         ) : (
@@ -516,7 +516,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
                   background: '#efe9dd', padding: '7px 16px',
                   fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
                   textTransform: 'uppercase', color: '#6b6455',
-                  borderBottom: '0.5px solid #e6dfd0',
+                  borderBottom: '0.5px solid var(--line-tan)',
                 }}>
                   {group.label}
                 </div>

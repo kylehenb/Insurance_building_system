@@ -12,9 +12,9 @@ export function SafetyTab({ jobId: _ }: SafetyTabProps) {
       className="flex flex-col items-center justify-center py-16 gap-4"
       style={{ fontFamily: 'DM Sans, sans-serif' }}
     >
-      <p className="text-[13px] text-[#9e998f]">No safety records.</p>
+      <p className="text-[13px] text-subtle">No safety records.</p>
       <button
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] transition-colors"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-line text-[13px] text-subtle hover:bg-surface transition-colors"
       >
         + Add record
       </button>

@@ -656,7 +656,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
               <div style={{ padding: '0 18px 18px' }}>
                 <button
                   onClick={completeSafety}
-                  style={{ width: '100%', padding: '15px 18px', background: hasSig ? '#4a7c59' : '#ddd5c8', color: hasSig ? 'white' : '#7a6f65', border: 'none', borderRadius: 6, fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 20, letterSpacing: '3px', cursor: hasSig ? 'pointer' : 'not-allowed' }}
+                  style={{ width: '100%', padding: '15px 18px', background: hasSig ? '#4a7c59' : 'var(--line-tan-2)', color: hasSig ? 'white' : 'var(--grey-500)', border: 'none', borderRadius: 6, fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 20, letterSpacing: '3px', cursor: hasSig ? 'pointer' : 'not-allowed' }}
                 >
                   Confirm Safety &amp; Commence
                 </button>

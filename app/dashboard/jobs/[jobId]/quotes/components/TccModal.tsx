@@ -98,7 +98,7 @@ export function TccModal({ quoteId, onClose }: Props) {
     >
       <div
         style={{
-          background: '#ffffff',
+          background: 'var(--paper)',
           borderRadius: 10,
           boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
           width: 400,
@@ -108,12 +108,12 @@ export function TccModal({ quoteId, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
             Telephone Clearance Certificate
           </h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9e998f', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--subtle)', fontSize: 18, lineHeight: 1, padding: '2px 4px' }}
           >
             ✕
           </button>
@@ -179,10 +179,10 @@ export function TccModal({ quoteId, onClose }: Props) {
               padding: '8px 16px',
               fontSize: 13,
               fontWeight: 500,
-              border: '1px solid #e0dbd4',
+              border: '1px solid var(--line)',
               borderRadius: 6,
-              background: '#f5f2ee',
-              color: '#3a3530',
+              background: 'var(--surface)',
+              color: 'var(--body)',
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
             }}
@@ -197,8 +197,8 @@ export function TccModal({ quoteId, onClose }: Props) {
               fontWeight: 600,
               border: 'none',
               borderRadius: 6,
-              background: '#1a1a1a',
-              color: '#ffffff',
+              background: 'var(--ink)',
+              color: 'var(--paper)',
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
             }}
@@ -213,8 +213,8 @@ export function TccModal({ quoteId, onClose }: Props) {
               fontWeight: 600,
               border: 'none',
               borderRadius: 6,
-              background: '#1e40af',
-              color: '#ffffff',
+              background: 'var(--info-dark)',
+              color: 'var(--paper)',
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
             }}

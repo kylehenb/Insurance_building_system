@@ -123,17 +123,17 @@ function DeleteModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
-        style={{ border: '0.5px solid #e4dfd8' }}
+        style={{ border: '0.5px solid var(--line-2)' }}
       >
         <div className="px-6 py-5">
           <h3
-            className="text-[14px] font-semibold text-[#3a3530] mb-1"
+            className="text-[14px] font-semibold text-body mb-1"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             Delete Report
           </h3>
           <p
-            className="text-[12px] text-[#b0a898] mb-4"
+            className="text-[12px] text-faint mb-4"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             The report will be soft-deleted and remain visible in the list. An admin can reinstate it.
@@ -148,17 +148,17 @@ function DeleteModal({
                   type="checkbox"
                   checked={deleteInvoice}
                   onChange={e => setDeleteInvoice(e.target.checked)}
-                  className="mt-0.5 accent-[#c8b89a]"
+                  className="mt-0.5 accent-tan"
                 />
                 <div>
                   <span
-                    className="text-[12px] font-medium text-[#3a3530]"
+                    className="text-[12px] font-medium text-body"
                     style={{ fontFamily: 'DM Sans, sans-serif' }}
                   >
                     Also delete the corresponding invoice
                   </span>
                   <p
-                    className="text-[11px] text-[#b0a898] mt-1"
+                    className="text-[11px] text-faint mt-1"
                     style={{ fontFamily: 'DM Sans, sans-serif' }}
                   >
                     When a report is deleted, the corresponding invoice should be deleted too. Only keep the invoice if there is a special circumstance.
@@ -169,7 +169,7 @@ function DeleteModal({
           )}
 
           <label
-            className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+            className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             Reason for deleting
@@ -178,22 +178,22 @@ function DeleteModal({
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-md border border-[#e4dfd8] text-[13px] text-[#3a3530] resize-none focus:outline-none focus:border-[#c8b89a]"
+            className="w-full px-3 py-2 rounded-md border border-line-2 text-[13px] text-body resize-none focus:outline-none focus:border-tan"
             placeholder="e.g. Created in error, duplicate entry..."
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           />
         </div>
-        <div className="flex border-t border-[#e4dfd8]">
+        <div className="flex border-t border-line-2">
           <button
             onClick={onCancel}
-            className="flex-1 py-3 text-[13px] text-[#9a9088] hover:bg-[#f9f7f5] transition-colors"
+            className="flex-1 py-3 text-[13px] text-subtle-3 hover:bg-surface-2 transition-colors"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(reason, deleteInvoice)}
-            className="flex-1 py-3 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors border-l border-[#e4dfd8]"
+            className="flex-1 py-3 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors border-l border-line-2"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             Delete
@@ -354,7 +354,7 @@ export function ReportAccordionItem({
     return (
       <div
         className="rounded-lg overflow-hidden mb-2"
-        style={{ border: '0.5px solid #fca5a5', background: '#fff5f5' }}
+        style={{ border: '0.5px solid var(--danger-soft)', background: '#fff5f5' }}
       >
         <div className="flex items-center gap-3 px-5 py-3">
           <span
@@ -475,20 +475,20 @@ export function ReportAccordionItem({
             className="flex items-center gap-3 flex-1 text-left group"
           >
             <span
-              className="text-[12px] font-semibold text-[#c8b89a] hover:text-[#b0a070] transition-colors"
+              className="text-[12px] font-semibold text-tan hover:text-[#b0a070] transition-colors"
               style={{ fontFamily: 'DM Mono, monospace' }}
             >
               {report.report_ref}
             </span>
             <span
-              className="text-[12px] font-medium text-[#3a3530]"
+              className="text-[12px] font-medium text-body"
               style={{ fontFamily: 'DM Sans, sans-serif' }}
             >
               {TYPE_LABELS[report.report_type] ?? report.report_type}
             </span>
             {report.attendance_date && (
               <span
-                className="text-[12px] text-[#b0a898]"
+                className="text-[12px] text-faint"
                 style={{ fontFamily: 'DM Sans, sans-serif' }}
               >
                 {formatDate(report.attendance_date)}
@@ -496,7 +496,7 @@ export function ReportAccordionItem({
             )}
             {report.person_met && (
               <span
-                className="text-[12px] text-[#b0a898]"
+                className="text-[12px] text-faint"
                 style={{ fontFamily: 'DM Sans, sans-serif' }}
               >
                 {report.person_met}
@@ -506,7 +506,7 @@ export function ReportAccordionItem({
 
           <div className="flex items-center gap-2 ml-auto">
             {saveState.status === 'saving' && (
-              <span className="text-[10px] text-[#b0a898]" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              <span className="text-[10px] text-faint" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                 Saving…
               </span>
             )}
@@ -536,7 +536,7 @@ export function ReportAccordionItem({
                   e.stopPropagation()
                   setMenuOpen(o => !o)
                 }}
-                className="p-1.5 rounded-md text-[#b0a898] hover:text-[#3a3530] hover:bg-[#f0ece6] transition-colors"
+                className="p-1.5 rounded-md text-faint hover:text-body hover:bg-line-faint transition-colors"
               >
                 <MoreHorizontal size={15} />
               </button>
@@ -546,7 +546,7 @@ export function ReportAccordionItem({
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                   <div
                     className="absolute right-0 top-full mt-1 z-20 w-48 rounded-lg shadow-lg overflow-hidden"
-                    style={{ background: '#ffffff', border: '0.5px solid #e4dfd8' }}
+                    style={{ background: 'var(--paper)', border: '0.5px solid var(--line-2)' }}
                   >
                     {!isLocked ? (
                       <button
@@ -563,10 +563,10 @@ export function ReportAccordionItem({
                           onReportUpdate(report.id, { is_locked: true })
                           setIsActioning(false)
                         }}
-                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] transition-colors text-left"
+                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-body hover:bg-surface transition-colors text-left"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
-                        <Lock size={13} className="text-[#b0a898]" />
+                        <Lock size={13} className="text-faint" />
                         Lock report
                       </button>
                     ) : (
@@ -583,10 +583,10 @@ export function ReportAccordionItem({
                           onReportUpdate(report.id, { is_locked: false })
                           setIsActioning(false)
                         }}
-                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] transition-colors text-left"
+                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-body hover:bg-surface transition-colors text-left"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
-                        <Unlock size={13} className="text-[#b0a898]" />
+                        <Unlock size={13} className="text-faint" />
                         Unlock report
                       </button>
                     )}
@@ -596,12 +596,12 @@ export function ReportAccordionItem({
                         setMenuOpen(false)
                         alert('Recent changes — coming soon')
                       }}
-                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] transition-colors text-left"
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-body hover:bg-surface transition-colors text-left"
                       style={{ fontFamily: 'DM Sans, sans-serif' }}
                     >
-                      <Clock size={13} className="text-[#b0a898]" />
+                      <Clock size={13} className="text-faint" />
                       Recent changes
-                      <span className="ml-auto text-[10px] text-[#b0a898]">Soon</span>
+                      <span className="ml-auto text-[10px] text-faint">Soon</span>
                     </button>
 
                     <button
@@ -617,14 +617,14 @@ export function ReportAccordionItem({
                         if (data.report) onReportDuplicated(data.report)
                         setIsActioning(false)
                       }}
-                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] transition-colors text-left"
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[12px] text-body hover:bg-surface transition-colors text-left"
                       style={{ fontFamily: 'DM Sans, sans-serif' }}
                     >
-                      <Copy size={13} className="text-[#b0a898]" />
+                      <Copy size={13} className="text-faint" />
                       Duplicate report
                     </button>
 
-                    <div style={{ borderTop: '0.5px solid #e4dfd8' }} />
+                    <div style={{ borderTop: '0.5px solid var(--line-2)' }} />
 
                     <button
                       onClick={() => {
@@ -644,7 +644,7 @@ export function ReportAccordionItem({
 
             <button
               onClick={() => setIsOpen(o => !o)}
-              className="p-1.5 rounded-md text-[#b0a898] hover:text-[#3a3530] hover:bg-[#f0ece6] transition-colors"
+              className="p-1.5 rounded-md text-faint hover:text-body hover:bg-line-faint transition-colors"
             >
               {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
             </button>
@@ -670,26 +670,26 @@ export function ReportAccordionItem({
             <div
               className="mt-4 mb-6 p-5 rounded-lg"
               style={{
-                background: '#faf8f5',
-                borderLeft: '2px solid #c8b89a',
-                border: '0.5px solid #e4dfd8',
+                background: 'var(--surface-8)',
+                borderLeft: '2px solid var(--tan)',
+                border: '0.5px solid var(--line-2)',
               }}
             >
               <div className="mb-4">
                 <h3
-                  className="text-[12px] font-semibold text-[#3a3530] mb-1"
+                  className="text-[12px] font-semibold text-body mb-1"
                   style={{ fontFamily: 'DM Sans, sans-serif' }}
                 >
                   Property Details
                 </h3>
                 <p
-                  className="text-[11px] text-[#b0a898]"
+                  className="text-[11px] text-faint"
                   style={{ fontFamily: 'DM Sans, sans-serif' }}
                 >
                   Shared across all reports on this job — editing here updates the job record
                 </p>
                 {propertyDetailsSaveState.status === 'saving' && (
-                  <span className="text-[10px] text-[#b0a898] ml-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                  <span className="text-[10px] text-faint ml-2" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                     Saving…
                   </span>
                 )}
@@ -706,14 +706,14 @@ export function ReportAccordionItem({
               </div>
 
               {propertyDetailsLoading ? (
-                <div className="h-32 rounded-lg animate-pulse" style={{ background: '#f0ece6' }} />
+                <div className="h-32 rounded-lg animate-pulse" style={{ background: 'var(--line-faint)' }} />
               ) : (
                 <>
                   {/* Text fields - 2 column grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Building age
@@ -723,14 +723,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.building_age ?? ''}
                         onChange={e => handlePropertyDetailChange('building_age', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. ~30 years"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Condition
@@ -740,14 +740,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.condition ?? ''}
                         onChange={e => handlePropertyDetailChange('condition', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. Good, Fair, Poor"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Roof type
@@ -757,14 +757,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.roof_type ?? ''}
                         onChange={e => handlePropertyDetailChange('roof_type', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. Concrete tile — hip configuration"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Wall type
@@ -774,14 +774,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.wall_type ?? ''}
                         onChange={e => handlePropertyDetailChange('wall_type', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. Brick veneer, Double brick"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Storeys
@@ -791,14 +791,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.storeys ?? ''}
                         onChange={e => handlePropertyDetailChange('storeys', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. 1, 2"
                       />
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Foundation
@@ -808,14 +808,14 @@ export function ReportAccordionItem({
                         value={propertyDetails.foundation ?? ''}
                         onChange={e => handlePropertyDetailChange('foundation', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. Concrete slab, Suspended timber"
                       />
                     </div>
                     <div className="md:col-span-2">
                       <label
-                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[#b0a898] mb-1"
+                        className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-faint mb-1"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                       >
                         Fence
@@ -825,7 +825,7 @@ export function ReportAccordionItem({
                         value={propertyDetails.fence ?? ''}
                         onChange={e => handlePropertyDetailChange('fence', e.target.value)}
                         disabled={isLocked}
-                        className="w-full px-3 py-2 rounded-md border text-[13px] text-[#3a3530] bg-white border-[#e4dfd8] focus:outline-none focus:border-[#c8b89a] focus:ring-1 focus:ring-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-3 py-2 rounded-md border text-[13px] text-body bg-white border-line-2 focus:outline-none focus:border-tan focus:ring-1 focus:ring-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed transition-colors"
                         style={{ fontFamily: 'DM Sans, sans-serif' }}
                         placeholder="e.g. Colourbond — approx. 15 years, None"
                       />
@@ -834,33 +834,33 @@ export function ReportAccordionItem({
 
                   {/* Boolean fields - row of checkboxes */}
                   <div className="flex flex-wrap gap-6">
-                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    <label className="flex items-center gap-2 text-[13px] text-body cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       <input
                         type="checkbox"
                         checked={propertyDetails.pool ?? false}
                         onChange={e => handlePropertyDetailChange('pool', e.target.checked)}
                         disabled={isLocked}
-                        className="accent-[#c8b89a]"
+                        className="accent-tan"
                       />
                       Swimming pool
                     </label>
-                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    <label className="flex items-center gap-2 text-[13px] text-body cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       <input
                         type="checkbox"
                         checked={propertyDetails.detached_garage ?? false}
                         onChange={e => handlePropertyDetailChange('detached_garage', e.target.checked)}
                         disabled={isLocked}
-                        className="accent-[#c8b89a]"
+                        className="accent-tan"
                       />
                       Detached garage
                     </label>
-                    <label className="flex items-center gap-2 text-[13px] text-[#3a3530] cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                    <label className="flex items-center gap-2 text-[13px] text-body cursor-pointer" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       <input
                         type="checkbox"
                         checked={propertyDetails.granny_flat ?? false}
                         onChange={e => handlePropertyDetailChange('granny_flat', e.target.checked)}
                         disabled={isLocked}
-                        className="accent-[#c8b89a]"
+                        className="accent-tan"
                       />
                       Granny flat / outbuilding
                     </label>
@@ -913,7 +913,7 @@ export function ReportAccordionItem({
             {report.report_type === 'specialist' && (
               <div className="pt-6">
                 <p
-                  className="text-[12px] text-[#b0a898]"
+                  className="text-[12px] text-faint"
                   style={{ fontFamily: 'DM Sans, sans-serif' }}
                 >
                   Specialist report template — coming soon.
@@ -934,7 +934,7 @@ export function ReportAccordionItem({
             {/* — Bottom action bar — */}
             <div
               className="flex items-center gap-3 mt-8 pt-5"
-              style={{ borderTop: '0.5px solid #e4dfd8' }}
+              style={{ borderTop: '0.5px solid var(--line-2)' }}
             >
               <button
                 onClick={async () => {
@@ -945,7 +945,7 @@ export function ReportAccordionItem({
                   if (win) win.location.href = `/print/reports/${report.id}`
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-[12px] font-medium text-white transition-colors"
-                style={{ background: '#c8b89a', fontFamily: 'DM Sans, sans-serif' }}
+                style={{ background: 'var(--tan)', fontFamily: 'DM Sans, sans-serif' }}
               >
                 <FileText size={13} />
                 Preview Report PDF
@@ -957,7 +957,7 @@ export function ReportAccordionItem({
                   setShowSend(true)
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-md text-[12px] font-medium text-white transition-colors"
-                style={{ background: '#1e40af', fontFamily: 'DM Sans, sans-serif' }}
+                style={{ background: 'var(--info-dark)', fontFamily: 'DM Sans, sans-serif' }}
               >
                 <Send size={13} />
                 Send Report

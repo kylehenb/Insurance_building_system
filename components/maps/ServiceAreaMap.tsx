@@ -114,21 +114,21 @@ export default function ServiceAreaMap({ suburbs, className = '' }: ServiceAreaM
 
   return (
     <div className={`relative ${className}`}>
-      <div ref={mapRef} className="w-full h-full min-h-[400px] rounded-lg border border-[#e8e4e0]" />
+      <div ref={mapRef} className="w-full h-full min-h-[400px] rounded-lg border border-line-3" />
       {suburbs.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#f5f2ee] rounded-lg">
+        <div className="absolute inset-0 flex items-center justify-center bg-surface rounded-lg">
           <div className="text-center">
-            <p className="text-sm text-[#9e998f]">No suburbs selected</p>
-            <p className="text-xs text-[#9e998f] mt-1">Add suburbs to see them on the map</p>
+            <p className="text-sm text-subtle">No suburbs selected</p>
+            <p className="text-xs text-subtle mt-1">Add suburbs to see them on the map</p>
           </div>
         </div>
       )}
       {suburbs.length > 0 && (
-        <div className="absolute bottom-4 left-4 bg-white border border-[#e8e4e0] rounded-lg px-3 py-2 shadow-lg">
-          <p className="text-xs text-[#6b6763]">
-            <span className="font-semibold text-[#1a1a1a]">{suburbs.length}</span> suburbs selected
+        <div className="absolute bottom-4 left-4 bg-white border border-line-3 rounded-lg px-3 py-2 shadow-lg">
+          <p className="text-xs text-grey-600">
+            <span className="font-semibold text-ink">{suburbs.length}</span> suburbs selected
           </p>
-          <p className="text-xs text-[#9e998f] mt-1">
+          <p className="text-xs text-subtle mt-1">
             {new Set(suburbs.map(s => s.postcode)).size} postcodes
           </p>
         </div>

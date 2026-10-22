@@ -1,12 +1,12 @@
 import type { SigningStatus } from '@/lib/signing/types'
 
 const STYLES: Record<SigningStatus, { label: string; className: string }> = {
-  draft:   { label: 'Draft — not sent', className: 'bg-[#f5f2ee] text-[#7a7268] border-[#e0dbd4]' },
+  draft:   { label: 'Draft — not sent', className: 'bg-surface text-[#7a7268] border-line' },
   sent:    { label: 'Sent',             className: 'bg-[#e8f0fb] text-[#1a4f8b] border-[#c5d8f2]' },
-  viewed:  { label: 'Viewed',           className: 'bg-[#fef3e2] text-[#92400e] border-[#f5d9a8]' },
-  signed:  { label: 'Signed',           className: 'bg-[#e8f5e9] text-[#1b5e20] border-[#b9dfbb]' },
-  expired: { label: 'Expired',          className: 'bg-[#f5f2ee] text-[#7a7268] border-[#e0dbd4]' },
-  revoked: { label: 'Revoked',          className: 'bg-[#fdecea] text-[#991b1b] border-[#f3c5c0]' },
+  viewed:  { label: 'Viewed',           className: 'bg-warning-bg text-warning-dark border-[#f5d9a8]' },
+  signed:  { label: 'Signed',           className: 'bg-success-bg text-success-dark border-[#b9dfbb]' },
+  expired: { label: 'Expired',          className: 'bg-surface text-[#7a7268] border-line' },
+  revoked: { label: 'Revoked',          className: 'bg-danger-bg-2 text-danger-dark border-[#f3c5c0]' },
 }
 
 export function SigningStatusBadge({ status }: { status: SigningStatus }) {

@@ -32,8 +32,8 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
     >
       <div
         style={{
-          background: '#fff',
-          border: '1px solid #ddd8d0',
+          background: 'var(--paper)',
+          border: '1px solid var(--line-strong)',
           borderRadius: 12,
           width: 420,
           overflow: 'hidden',
@@ -44,7 +44,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #e8e4de',
+            borderBottom: '1px solid var(--line-4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -55,12 +55,12 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
             onClick={onCancel}
             style={{
               width: 26, height: 26,
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 13,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -75,7 +75,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
           <p
             style={{
               fontSize: 12,
-              color: '#5a5650',
+              color: 'var(--body-soft)',
               marginBottom: 12,
               lineHeight: 1.6,
             }}
@@ -86,7 +86,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {toSend.length === 0 ? (
-              <p style={{ fontSize: 12, color: '#9a9590', textAlign: 'center', padding: '12px 0' }}>
+              <p style={{ fontSize: 12, color: 'var(--subtle-2)', textAlign: 'center', padding: '12px 0' }}>
                 No unsent placed work orders to send.
               </p>
             ) : (
@@ -105,9 +105,9 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
                       alignItems: 'center',
                       gap: 10,
                       padding: '8px 10px',
-                      border: '1px solid #ddd8d0',
+                      border: '1px solid var(--line-strong)',
                       borderRadius: 6,
-                      background: '#f5f2ee',
+                      background: 'var(--surface)',
                       fontSize: 12,
                     }}
                   >
@@ -121,7 +121,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
                       <div style={{ fontWeight: 500 }}>
                         {wo.tradeTypeLabel || wo.work_type}
                       </div>
-                      <div style={{ color: '#5a5650', fontSize: 11 }}>
+                      <div style={{ color: 'var(--body-soft)', fontSize: 11 }}>
                         {wo.trade?.business_name ?? 'No contractor'}
                       </div>
                     </div>
@@ -129,7 +129,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
                       style={{
                         fontFamily: 'DM Mono, monospace',
                         fontSize: 11,
-                        color: '#5a5650',
+                        color: 'var(--body-soft)',
                       }}
                     >
                       {amount}
@@ -145,7 +145,7 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
         <div
           style={{
             padding: '12px 18px',
-            borderTop: '1px solid #e8e4de',
+            borderTop: '1px solid var(--line-4)',
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 7,
@@ -158,10 +158,10 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
               fontSize: 11,
               fontWeight: 500,
               fontFamily: 'DM Sans, sans-serif',
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
-              background: '#fff',
-              color: '#5a5650',
+              background: 'var(--paper)',
+              color: 'var(--body-soft)',
               cursor: 'pointer',
             }}
           >
@@ -175,9 +175,9 @@ export function SendAllModal({ workOrders, onConfirm, onCancel }: SendAllModalPr
               fontSize: 11,
               fontWeight: 500,
               fontFamily: 'DM Sans, sans-serif',
-              background: toSend.length === 0 ? '#e2ddd6' : '#1a1a1a',
-              color: toSend.length === 0 ? '#9a9590' : '#fff',
-              border: `1px solid ${toSend.length === 0 ? '#ddd8d0' : '#1a1a1a'}`,
+              background: toSend.length === 0 ? '#e2ddd6' : 'var(--ink)',
+              color: toSend.length === 0 ? 'var(--subtle-2)' : 'var(--paper)',
+              border: `1px solid ${toSend.length === 0 ? 'var(--line-strong)' : 'var(--ink)'}`,
               borderRadius: 5,
               cursor: toSend.length === 0 ? 'not-allowed' : 'pointer',
             }}

@@ -705,59 +705,59 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       <style>{`
         .fai-widget {
           position: fixed; z-index: 1000; display: flex; flex-direction: column;
-          background: #fff; border: 0.5px solid #e4dfd8; border-radius: 10px;
+          background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 10px;
           box-shadow: 0 8px 40px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.07);
           overflow: hidden; font-family: 'DM Sans', -apple-system, sans-serif;
         }
         .fai-header {
           display: flex; align-items: center; gap: 8px;
-          padding: 11px 14px 10px; border-bottom: 0.5px solid #f0ece6;
-          background: #fdfdfc; cursor: grab; user-select: none; flex-shrink: 0;
+          padding: 11px 14px 10px; border-bottom: 0.5px solid var(--line-faint);
+          background: var(--surface-6); cursor: grab; user-select: none; flex-shrink: 0;
         }
         .fai-header:active { cursor: grabbing; }
         .fai-drag-dots { display: flex; flex-direction: column; gap: 3px; opacity: 0.35; margin-right: 2px; flex-shrink: 0; }
         .fai-drag-row { display: flex; gap: 3px; }
-        .fai-drag-dot { width: 2.5px; height: 2.5px; border-radius: 50%; background: #9a9088; }
-        .fai-pip { width: 6px; height: 6px; border-radius: 50%; background: #c8b89a; flex-shrink: 0; }
-        .fai-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #c8b89a; font-weight: 700; flex: 1; }
+        .fai-drag-dot { width: 2.5px; height: 2.5px; border-radius: 50%; background: var(--subtle-3); }
+        .fai-pip { width: 6px; height: 6px; border-radius: 50%; background: var(--tan); flex-shrink: 0; }
+        .fai-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--tan); font-weight: 700; flex: 1; }
         .fai-header-btn {
-          background: none; border: none; cursor: pointer; color: #c8b89a;
+          background: none; border: none; cursor: pointer; color: var(--tan);
           padding: 3px 4px; line-height: 1; font-size: 16px; border-radius: 4px;
           transition: color 0.15s, background 0.15s; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
         }
-        .fai-header-btn:hover { color: #7a6a58; background: #f5f0e8; }
-        .fai-header-btn.active { color: #9a7a50; background: #f5f0e8; }
+        .fai-header-btn:hover { color: var(--brown-500); background: var(--cream); }
+        .fai-header-btn.active { color: var(--bronze); background: var(--cream); }
         .fai-close-btn {
-          background: none; border: none; cursor: pointer; color: #c8b89a;
+          background: none; border: none; cursor: pointer; color: var(--tan);
           padding: 3px 4px; line-height: 1; font-size: 16px; border-radius: 4px;
           transition: color 0.15s, background 0.15s; flex-shrink: 0;
         }
-        .fai-close-btn:hover { color: #7a6a58; background: #f5f0e8; }
+        .fai-close-btn:hover { color: var(--brown-500); background: var(--cream); }
 
         /* Mode selector */
         .fai-mode-selector {
-          display: flex; border-bottom: 0.5px solid #f0ece6;
-          background: #fdfdfc; flex-shrink: 0;
+          display: flex; border-bottom: 0.5px solid var(--line-faint);
+          background: var(--surface-6); flex-shrink: 0;
         }
         .fai-mode-btn {
           flex: 1; padding: 7px 0; border: none; background: transparent;
           font-family: inherit; font-size: 10.5px; font-weight: 600;
-          letter-spacing: 0.4px; cursor: pointer; transition: all 0.15s; color: #b8b0a8;
+          letter-spacing: 0.4px; cursor: pointer; transition: all 0.15s; color: var(--faint-3);
         }
-        .fai-mode-btn.active { background: #1a1a1a; color: #f5f0e8; }
-        .fai-mode-btn:not(.active):hover { color: #7a6a58; background: #f5f0e8; }
+        .fai-mode-btn.active { background: var(--ink); color: var(--cream); }
+        .fai-mode-btn:not(.active):hover { color: var(--brown-500); background: var(--cream); }
 
         .fai-messages {
           flex: 1; overflow-y: auto; display: flex; flex-direction: column;
-          gap: 14px; padding: 16px 18px; background: #fff; min-height: 0;
+          gap: 14px; padding: 16px 18px; background: var(--paper); min-height: 0;
         }
         .fai-messages::-webkit-scrollbar { width: 3px; }
-        .fai-messages::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+        .fai-messages::-webkit-scrollbar-thumb { background: var(--line-5); border-radius: 2px; }
 
         .fai-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 8px; padding: 24px 0; }
         .fai-empty-icon { font-size: 24px; opacity: 0.2; }
-        .fai-empty-text { font-size: 13px; color: #9a9088; font-weight: 400; text-align: center; }
+        .fai-empty-text { font-size: 13px; color: var(--subtle-3); font-weight: 400; text-align: center; }
         .fai-empty-sub { font-size: 11px; color: #c0b8b0; font-weight: 300; text-align: center; line-height: 1.5; }
 
         .fai-bubble { display: flex; gap: 8px; align-items: flex-start; max-width: 86%; }
@@ -769,43 +769,43 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           display: flex; align-items: center; justify-content: center;
           font-size: 9px; font-weight: 700; margin-top: 2px;
         }
-        .fai-avatar.user { background: #2e2820; color: #c8b89a; border: 0.5px solid rgba(200,184,154,0.2); }
-        .fai-avatar.assistant { background: #f5f0e8; color: #9a7a50; border: 0.5px solid #e8ddd0; font-size: 12px; }
+        .fai-avatar.user { background: #2e2820; color: var(--tan); border: 0.5px solid rgba(200,184,154,0.2); }
+        .fai-avatar.assistant { background: var(--cream); color: var(--bronze); border: 0.5px solid var(--line-tan-5); font-size: 12px; }
 
         .fai-bubble-inner { display: flex; flex-direction: column; max-width: 100%; gap: 8px; }
         .fai-bubble-text {
           padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.65;
           font-weight: 400; white-space: pre-wrap; word-break: break-word;
         }
-        .fai-bubble.user .fai-bubble-text { background: #1a1a1a; color: #e8e0d5; border-radius: 10px 10px 3px 10px; }
-        .fai-bubble.assistant .fai-bubble-text { background: #f7f5f2; color: #2a2520; border-radius: 10px 10px 10px 3px; border: 0.5px solid #e8e3dc; }
+        .fai-bubble.user .fai-bubble-text { background: var(--ink); color: var(--line-tan-3); border-radius: 10px 10px 3px 10px; }
+        .fai-bubble.assistant .fai-bubble-text { background: #f7f5f2; color: var(--ink-brown); border-radius: 10px 10px 10px 3px; border: 0.5px solid var(--line-5); }
 
         .fai-input-wrap {
-          padding: 12px 14px 14px; border-top: 0.5px solid #f0ece6;
-          background: #fdfdfc; flex-shrink: 0; position: relative;
+          padding: 12px 14px 14px; border-top: 0.5px solid var(--line-faint);
+          background: var(--surface-6); flex-shrink: 0; position: relative;
         }
         .fai-input-row {
           display: flex; align-items: flex-end; gap: 0;
           background: #f7f5f2; border-radius: 10px;
-          border: 0.5px solid #e4dfd8; transition: border-color 0.2s; overflow: hidden;
+          border: 0.5px solid var(--line-2); transition: border-color 0.2s; overflow: hidden;
         }
-        .fai-input-row:focus-within { border-color: #c8b89a; }
+        .fai-input-row:focus-within { border-color: var(--tan); }
         .fai-textarea {
           flex: 1; background: transparent; border: none;
-          padding: 10px 13px; color: #1a1a1a; font-size: 13px;
+          padding: 10px 13px; color: var(--ink); font-size: 13px;
           font-family: inherit; font-weight: 400; outline: none;
           resize: none; line-height: 1.55; min-height: 42px; max-height: 120px;
         }
-        .fai-textarea::placeholder { color: #b8b0a8; }
+        .fai-textarea::placeholder { color: var(--faint-3); }
         .fai-send-btn {
-          background: #1a1a1a; border: none; margin: 7px 8px 7px 0;
+          background: var(--ink); border: none; margin: 7px 8px 7px 0;
           width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0; transition: background 0.15s; align-self: flex-end;
         }
-        .fai-send-btn:hover { background: #2a2a2a; }
+        .fai-send-btn:hover { background: var(--ink-hover); }
         .fai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .fai-hint { font-size: 10px; color: #c8c0b8; text-align: right; margin-top: 5px; font-weight: 300; }
+        .fai-hint { font-size: 10px; color: var(--faint-5); text-align: right; margin-top: 5px; font-weight: 300; }
 
         .fai-resize-handle {
           position: absolute; bottom: 0; right: 0;
@@ -816,118 +816,118 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         .fai-resize-handle:hover .fai-resize-icon { opacity: 0.6; }
 
         /* Templates panel */
-        .fai-templates-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; }
+        .fai-templates-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--paper); }
         .fai-templates-header {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px 10px; border-bottom: 0.5px solid #f0ece6; flex-shrink: 0;
+          padding: 12px 16px 10px; border-bottom: 0.5px solid var(--line-faint); flex-shrink: 0;
         }
-        .fai-templates-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #9a9088; font-weight: 700; }
+        .fai-templates-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--subtle-3); font-weight: 700; }
         .fai-new-btn {
           font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer;
-          font-family: inherit; font-weight: 600; border: 1px solid #c8b89a;
-          background: transparent; color: #7a6a58; transition: all 0.15s;
+          font-family: inherit; font-weight: 600; border: 1px solid var(--tan);
+          background: transparent; color: var(--brown-500); transition: all 0.15s;
         }
-        .fai-new-btn:hover { background: #f5f0e8; }
+        .fai-new-btn:hover { background: var(--cream); }
         .fai-templates-list { flex: 1; overflow-y: auto; padding: 8px 0; min-height: 0; }
         .fai-templates-list::-webkit-scrollbar { width: 3px; }
-        .fai-templates-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+        .fai-templates-list::-webkit-scrollbar-thumb { background: var(--line-5); border-radius: 2px; }
         .fai-template-item {
           display: flex; align-items: flex-start; gap: 8px;
-          padding: 10px 16px; border-bottom: 0.5px solid #f5f2ee;
+          padding: 10px 16px; border-bottom: 0.5px solid var(--surface);
           cursor: pointer; transition: background 0.12s;
         }
-        .fai-template-item:hover { background: #faf8f5; }
+        .fai-template-item:hover { background: var(--surface-8); }
         .fai-template-item:last-child { border-bottom: none; }
         .fai-template-text { flex: 1; min-width: 0; }
-        .fai-template-title { font-size: 13px; font-weight: 600; color: #2a2520; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .fai-template-preview { font-size: 11px; color: #9a9088; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-template-title { font-size: 13px; font-weight: 600; color: var(--ink-brown); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-template-preview { font-size: 11px; color: var(--subtle-3); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .fai-template-actions { display: flex; gap: 2px; flex-shrink: 0; margin-top: 1px; }
         .fai-tpl-icon-btn {
-          background: none; border: none; cursor: pointer; color: #c8b89a;
+          background: none; border: none; cursor: pointer; color: var(--tan);
           padding: 3px; border-radius: 4px; line-height: 1; transition: color 0.15s, background 0.15s;
           display: flex; align-items: center; justify-content: center;
         }
-        .fai-tpl-icon-btn:hover { color: #7a6a58; background: #f0ece6; }
-        .fai-tpl-icon-btn.danger:hover { color: #a0524a; background: #fdf0ee; }
+        .fai-tpl-icon-btn:hover { color: var(--brown-500); background: var(--line-faint); }
+        .fai-tpl-icon-btn.danger:hover { color: var(--rust); background: #fdf0ee; }
         .fai-delete-confirm {
           display: flex; align-items: center; gap: 8px;
-          padding: 6px 16px 10px; font-size: 11px; color: #7a6a58;
-          border-bottom: 0.5px solid #f5f2ee; background: #fdf9f4;
+          padding: 6px 16px 10px; font-size: 11px; color: var(--brown-500);
+          border-bottom: 0.5px solid var(--surface); background: var(--surface-9);
         }
         .fai-delete-confirm-btn {
           font-size: 11px; padding: 3px 10px; border-radius: 12px; cursor: pointer;
           font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s;
         }
-        .fai-delete-confirm-btn.confirm { background: #a0524a; color: #fff; border-color: #a0524a; }
+        .fai-delete-confirm-btn.confirm { background: var(--rust); color: var(--paper); border-color: var(--rust); }
         .fai-delete-confirm-btn.confirm:hover { background: #8a4440; }
-        .fai-delete-confirm-btn.cancel { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
-        .fai-delete-confirm-btn.cancel:hover { border-color: #9a9088; }
-        .fai-templates-empty { padding: 32px 16px; text-align: center; color: #b8b0a8; font-size: 12px; line-height: 1.6; }
-        .fai-template-form { padding: 14px 16px; border-bottom: 0.5px solid #f0ece6; background: #faf8f5; flex-shrink: 0; }
-        .fai-form-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 5px; display: block; }
+        .fai-delete-confirm-btn.cancel { background: transparent; color: var(--brown-500); border-color: var(--line-strong-3); }
+        .fai-delete-confirm-btn.cancel:hover { border-color: var(--subtle-3); }
+        .fai-templates-empty { padding: 32px 16px; text-align: center; color: var(--faint-3); font-size: 12px; line-height: 1.6; }
+        .fai-template-form { padding: 14px 16px; border-bottom: 0.5px solid var(--line-faint); background: var(--surface-8); flex-shrink: 0; }
+        .fai-form-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--subtle-3); font-weight: 700; margin-bottom: 5px; display: block; }
         .fai-form-input {
-          width: 100%; box-sizing: border-box; background: #fff; border: 0.5px solid #e4dfd8;
+          width: 100%; box-sizing: border-box; background: var(--paper); border: 0.5px solid var(--line-2);
           border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
-          color: #1a1a1a; outline: none; transition: border-color 0.2s; margin-bottom: 10px;
+          color: var(--ink); outline: none; transition: border-color 0.2s; margin-bottom: 10px;
         }
-        .fai-form-input:focus { border-color: #c8b89a; }
+        .fai-form-input:focus { border-color: var(--tan); }
         .fai-form-textarea {
-          width: 100%; box-sizing: border-box; background: #fff; border: 0.5px solid #e4dfd8;
+          width: 100%; box-sizing: border-box; background: var(--paper); border: 0.5px solid var(--line-2);
           border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
-          color: #1a1a1a; outline: none; transition: border-color 0.2s; resize: vertical;
+          color: var(--ink); outline: none; transition: border-color 0.2s; resize: vertical;
           min-height: 80px; line-height: 1.5; margin-bottom: 10px;
         }
-        .fai-form-textarea:focus { border-color: #c8b89a; }
+        .fai-form-textarea:focus { border-color: var(--tan); }
         .fai-form-btns { display: flex; gap: 6px; }
         .fai-form-btn {
           font-size: 11px; padding: 4px 14px; border-radius: 20px; cursor: pointer;
           font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s;
         }
-        .fai-form-btn.primary { background: #2a6b50; color: #fff; border-color: #2a6b50; }
+        .fai-form-btn.primary { background: var(--teal); color: var(--paper); border-color: var(--teal); }
         .fai-form-btn.primary:hover { background: #235a42; }
-        .fai-form-btn.secondary { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
-        .fai-form-btn.secondary:hover { border-color: #9a9088; }
+        .fai-form-btn.secondary { background: transparent; color: var(--brown-500); border-color: var(--line-strong-3); }
+        .fai-form-btn.secondary:hover { border-color: var(--subtle-3); }
 
         /* Slash popover */
         .fai-slash-popover {
           position: absolute; bottom: calc(100% + 6px); left: 14px; right: 14px;
-          background: #fff; border: 0.5px solid #e4dfd8; border-radius: 8px;
+          background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 8px;
           box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 10; overflow: hidden;
           max-height: 200px; display: flex; flex-direction: column;
         }
         .fai-slash-list { overflow-y: auto; }
         .fai-slash-list::-webkit-scrollbar { width: 3px; }
-        .fai-slash-list::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
-        .fai-slash-item { padding: 8px 12px; cursor: pointer; transition: background 0.1s; border-bottom: 0.5px solid #f5f2ee; }
+        .fai-slash-list::-webkit-scrollbar-thumb { background: var(--line-5); border-radius: 2px; }
+        .fai-slash-item { padding: 8px 12px; cursor: pointer; transition: background 0.1s; border-bottom: 0.5px solid var(--surface); }
         .fai-slash-item:last-child { border-bottom: none; }
-        .fai-slash-item:hover, .fai-slash-item.selected { background: #f5f0e8; }
-        .fai-slash-item-title { font-size: 12px; font-weight: 600; color: #2a2520; }
-        .fai-slash-item-preview { font-size: 11px; color: #9a9088; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .fai-slash-empty { padding: 12px; font-size: 12px; color: #b8b0a8; text-align: center; }
+        .fai-slash-item:hover, .fai-slash-item.selected { background: var(--cream); }
+        .fai-slash-item-title { font-size: 12px; font-weight: 600; color: var(--ink-brown); }
+        .fai-slash-item-preview { font-size: 11px; color: var(--subtle-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fai-slash-empty { padding: 12px; font-size: 12px; color: var(--faint-3); text-align: center; }
 
         /* File attachment */
         .fai-file-preview { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
-        .fai-file-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 0.5px solid #e4dfd8; flex-shrink: 0; }
+        .fai-file-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 0.5px solid var(--line-2); flex-shrink: 0; }
         .fai-file-pill {
           display: flex; align-items: center; gap: 6px;
-          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 20px;
-          padding: 4px 10px; font-size: 11px; color: #7a6a58; font-weight: 500;
+          background: var(--cream); border: 0.5px solid var(--line-2); border-radius: 20px;
+          padding: 4px 10px; font-size: 11px; color: var(--brown-500); font-weight: 500;
           max-width: calc(100% - 28px); overflow: hidden;
         }
         .fai-file-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .fai-file-remove { background: none; border: none; cursor: pointer; color: #b8b0a8; padding: 0; line-height: 1; font-size: 13px; flex-shrink: 0; transition: color 0.15s; }
-        .fai-file-remove:hover { color: #7a6a58; }
+        .fai-file-remove { background: none; border: none; cursor: pointer; color: var(--faint-3); padding: 0; line-height: 1; font-size: 13px; flex-shrink: 0; transition: color 0.15s; }
+        .fai-file-remove:hover { color: var(--brown-500); }
         .fai-attach-btn {
-          background: none; border: none; cursor: pointer; color: #c8b89a;
+          background: none; border: none; cursor: pointer; color: var(--tan);
           padding: 0 6px 0 10px; align-self: flex-end; height: 46px;
           display: flex; align-items: center; justify-content: center;
           transition: color 0.15s; flex-shrink: 0;
         }
-        .fai-attach-btn:hover { color: #7a6a58; }
+        .fai-attach-btn:hover { color: var(--brown-500); }
         .fai-file-bubble-pill {
           display: inline-flex; align-items: center; gap: 4px;
-          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 12px;
-          padding: 2px 8px; font-size: 11px; color: #7a6a58; font-weight: 500;
+          background: var(--cream); border: 0.5px solid var(--line-2); border-radius: 12px;
+          padding: 2px 8px; font-size: 11px; color: var(--brown-500); font-weight: 500;
           margin-top: 4px; max-width: 180px; overflow: hidden;
         }
         .fai-file-bubble-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -935,55 +935,55 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         /* Teach mode */
         .fai-coming-soon {
           flex: 1; display: flex; align-items: center; justify-content: center;
-          font-size: 13px; color: #b8b0a8; background: #fff;
+          font-size: 13px; color: var(--faint-3); background: var(--paper);
         }
         .fai-teach-panel {
-          flex: 1; overflow-y: auto; background: #fff; min-height: 0;
+          flex: 1; overflow-y: auto; background: var(--paper); min-height: 0;
         }
         .fai-teach-panel::-webkit-scrollbar { width: 3px; }
-        .fai-teach-panel::-webkit-scrollbar-thumb { background: #e8e3dc; border-radius: 2px; }
+        .fai-teach-panel::-webkit-scrollbar-thumb { background: var(--line-5); border-radius: 2px; }
 
         .fai-teach-section { padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 12px; }
 
-        .fai-teach-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #9a9088; font-weight: 700; margin-bottom: 4px; display: block; }
+        .fai-teach-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--subtle-3); font-weight: 700; margin-bottom: 4px; display: block; }
         .fai-teach-textarea {
           width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 10px 12px;
-          font-size: 13px; font-family: inherit; color: #1a1a1a; outline: none;
+          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 10px 12px;
+          font-size: 13px; font-family: inherit; color: var(--ink); outline: none;
           transition: border-color 0.2s; resize: vertical; line-height: 1.55;
           min-height: 90px;
         }
-        .fai-teach-textarea:focus { border-color: #c8b89a; background: #fff; }
-        .fai-teach-textarea::placeholder { color: #b8b0a8; }
+        .fai-teach-textarea:focus { border-color: var(--tan); background: var(--paper); }
+        .fai-teach-textarea::placeholder { color: var(--faint-3); }
         .fai-teach-input {
           width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 8px 12px;
-          font-size: 12px; font-family: inherit; color: #1a1a1a; outline: none;
+          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 8px 12px;
+          font-size: 12px; font-family: inherit; color: var(--ink); outline: none;
           transition: border-color 0.2s;
         }
-        .fai-teach-input:focus { border-color: #c8b89a; background: #fff; }
-        .fai-teach-input::placeholder { color: #b8b0a8; }
+        .fai-teach-input:focus { border-color: var(--tan); background: var(--paper); }
+        .fai-teach-input::placeholder { color: var(--faint-3); }
         .fai-teach-select {
           width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid #e4dfd8; border-radius: 8px; padding: 7px 10px;
-          font-size: 12px; font-family: inherit; color: #1a1a1a; outline: none;
+          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 7px 10px;
+          font-size: 12px; font-family: inherit; color: var(--ink); outline: none;
           transition: border-color 0.2s; cursor: pointer;
         }
-        .fai-teach-select:focus { border-color: #c8b89a; }
+        .fai-teach-select:focus { border-color: var(--tan); }
 
         .fai-teach-btn {
           font-family: inherit; font-size: 12px; font-weight: 600;
           border-radius: 8px; border: none; cursor: pointer; padding: 9px 16px;
           transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
         }
-        .fai-teach-btn.primary { background: #1a1a1a; color: #f5f0e8; }
-        .fai-teach-btn.primary:hover { background: #2a2a2a; }
+        .fai-teach-btn.primary { background: var(--ink); color: var(--cream); }
+        .fai-teach-btn.primary:hover { background: var(--ink-hover); }
         .fai-teach-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-        .fai-teach-btn.success { background: #2a6b50; color: #fff; }
+        .fai-teach-btn.success { background: var(--teal); color: var(--paper); }
         .fai-teach-btn.success:hover { background: #235a42; }
         .fai-teach-btn.success:disabled { opacity: 0.45; cursor: not-allowed; }
-        .fai-teach-btn.outline { background: transparent; color: #7a6a58; border: 1px solid #d4cfc8; }
-        .fai-teach-btn.outline:hover { border-color: #9a9088; }
+        .fai-teach-btn.outline { background: transparent; color: var(--brown-500); border: 1px solid var(--line-strong-3); }
+        .fai-teach-btn.outline:hover { border-color: var(--subtle-3); }
         .fai-teach-btn.sm { font-size: 11px; padding: 5px 10px; border-radius: 6px; }
 
         /* Mic button */
@@ -991,50 +991,50 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           position: absolute; top: 8px; right: 8px;
           width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          background: #f0ece6; color: #9a9088; transition: all 0.15s;
+          background: var(--line-faint); color: var(--subtle-3); transition: all 0.15s;
           font-size: 13px;
         }
-        .fai-mic-btn:hover { background: #e8e3dc; color: #7a6a58; }
-        .fai-mic-btn.listening { background: #fdf0ee; color: #a0524a; animation: fai-mic-pulse 1.4s ease-in-out infinite; }
+        .fai-mic-btn:hover { background: var(--line-5); color: var(--brown-500); }
+        .fai-mic-btn.listening { background: #fdf0ee; color: var(--rust); animation: fai-mic-pulse 1.4s ease-in-out infinite; }
         @keyframes fai-mic-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(160,82,74,0.4); }
           50% { box-shadow: 0 0 0 5px rgba(160,82,74,0); }
         }
-        .fai-interim { font-size: 11px; color: #b8b0a8; font-style: italic; min-height: 16px; line-height: 1.4; }
+        .fai-interim { font-size: 11px; color: var(--faint-3); font-style: italic; min-height: 16px; line-height: 1.4; }
 
         /* Review card */
         .fai-review-card {
-          border: 0.5px solid #e4dfd8; border-radius: 8px; background: #fdfdfc;
+          border: 0.5px solid var(--line-2); border-radius: 8px; background: var(--surface-6);
           overflow: hidden;
         }
-        .fai-review-header { padding: 12px 14px; border-bottom: 0.5px solid #f0ece6; }
-        .fai-review-title { font-size: 13px; font-weight: 700; color: #2a2520; }
-        .fai-review-trigger { font-size: 11px; color: #7a6a58; margin-top: 4px; line-height: 1.5; }
-        .fai-review-section { padding: 10px 14px; border-bottom: 0.5px solid #f0ece6; }
+        .fai-review-header { padding: 12px 14px; border-bottom: 0.5px solid var(--line-faint); }
+        .fai-review-title { font-size: 13px; font-weight: 700; color: var(--ink-brown); }
+        .fai-review-trigger { font-size: 11px; color: var(--brown-500); margin-top: 4px; line-height: 1.5; }
+        .fai-review-section { padding: 10px 14px; border-bottom: 0.5px solid var(--line-faint); }
         .fai-review-section:last-child { border-bottom: none; }
-        .fai-review-section-label { font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; color: #b8b0a8; font-weight: 700; margin-bottom: 6px; }
-        .fai-review-step { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; color: #2a2520; line-height: 1.5; }
-        .fai-review-step-num { color: #c8b89a; font-weight: 700; flex-shrink: 0; min-width: 16px; }
+        .fai-review-section-label { font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint-3); font-weight: 700; margin-bottom: 6px; }
+        .fai-review-step { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--ink-brown); line-height: 1.5; }
+        .fai-review-step-num { color: var(--tan); font-weight: 700; flex-shrink: 0; min-width: 16px; }
         .fai-review-chips { display: flex; flex-wrap: wrap; gap: 4px; }
         .fai-review-chip {
-          background: #f5f0e8; border: 0.5px solid #e4dfd8; border-radius: 20px;
-          padding: 2px 8px; font-size: 10px; color: #7a6a58; font-weight: 500;
+          background: var(--cream); border: 0.5px solid var(--line-2); border-radius: 20px;
+          padding: 2px 8px; font-size: 10px; color: var(--brown-500); font-weight: 500;
           display: inline-flex; align-items: center; gap: 4px;
         }
         .fai-chip-remove {
-          background: none; border: none; cursor: pointer; color: #b8b0a8;
+          background: none; border: none; cursor: pointer; color: var(--faint-3);
           padding: 0; line-height: 1; font-size: 11px; transition: color 0.15s;
         }
-        .fai-chip-remove:hover { color: #a0524a; }
-        .fai-review-vars { font-size: 11px; color: #9a9088; font-family: 'DM Mono', monospace; }
+        .fai-chip-remove:hover { color: var(--rust); }
+        .fai-review-vars { font-size: 11px; color: var(--subtle-3); font-family: 'DM Mono', monospace; }
 
         .fai-similar-header { font-size: 11px; color: #c8844a; font-weight: 600; margin: 4px 0; display: flex; align-items: center; gap: 6px; }
         .fai-similar-card {
-          border: 0.5px solid #f0ece6; border-radius: 6px; padding: 10px 12px;
-          background: #fdf9f4; margin-bottom: 6px;
+          border: 0.5px solid var(--line-faint); border-radius: 6px; padding: 10px 12px;
+          background: var(--surface-9); margin-bottom: 6px;
         }
-        .fai-similar-title { font-size: 12px; font-weight: 600; color: #2a2520; margin-bottom: 2px; }
-        .fai-similar-meta { font-size: 10px; color: #9a9088; margin-bottom: 6px; }
+        .fai-similar-title { font-size: 12px; font-weight: 600; color: var(--ink-brown); margin-bottom: 2px; }
+        .fai-similar-meta { font-size: 10px; color: var(--subtle-3); margin-bottom: 6px; }
         .fai-similar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
         .fai-review-actions { display: flex; gap: 8px; margin-top: 12px; }
@@ -1044,14 +1044,14 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           padding: 14px; text-align: center;
         }
         .fai-teach-confirm-icon { font-size: 22px; margin-bottom: 6px; }
-        .fai-teach-confirm-text { font-size: 13px; font-weight: 600; color: #2a6b50; margin-bottom: 4px; }
+        .fai-teach-confirm-text { font-size: 13px; font-weight: 600; color: var(--teal); margin-bottom: 4px; }
         .fai-teach-confirm-sub { font-size: 11px; color: #4a8a68; }
 
-        .fai-teach-error { font-size: 11px; color: #a0524a; background: #fdf0ee; border: 0.5px solid #e8c8c4; border-radius: 6px; padding: 8px 10px; }
+        .fai-teach-error { font-size: 11px; color: var(--rust); background: #fdf0ee; border: 0.5px solid #e8c8c4; border-radius: 6px; padding: 8px 10px; }
 
         .fai-structuring { padding: 24px 16px; text-align: center; }
-        .fai-structuring-text { font-size: 13px; color: #7a6a58; font-style: italic; }
-        .fai-structuring-sub { font-size: 11px; color: #b8b0a8; margin-top: 4px; }
+        .fai-structuring-text { font-size: 13px; color: var(--brown-500); font-style: italic; }
+        .fai-structuring-sub { font-size: 11px; color: var(--faint-3); margin-top: 4px; }
       `}</style>
 
       <div
@@ -1191,12 +1191,12 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                   <div className="fai-bubble assistant">
                     <div className="fai-avatar assistant">⬡</div>
                     <div className="fai-bubble-inner">
-                      <div className="fai-bubble-text" style={{ color: '#9a9088', fontStyle: 'italic' }}>{thinkingText}</div>
+                      <div className="fai-bubble-text" style={{ color: 'var(--subtle-3)', fontStyle: 'italic' }}>{thinkingText}</div>
                       {actionChecklist.length > 0 && (
                         <div style={{ marginTop: '8px', padding: '8px 0' }}>
                           {actionChecklist.map((item) => (
-                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7a6a58', marginBottom: '4px' }}>
-                              <span style={{ color: item.completed ? '#2a6b50' : '#c8b89a' }}>{item.completed ? '✓' : '○'}</span>
+                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brown-500)', marginBottom: '4px' }}>
+                              <span style={{ color: item.completed ? 'var(--teal)' : 'var(--tan)' }}>{item.completed ? '✓' : '○'}</span>
                               <span style={{ textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.6 : 1 }}>{item.text}</span>
                             </div>
                           ))}
@@ -1448,7 +1448,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                         <option value="correction">Correction</option>
                       </select>
                     ) : (
-                      <div style={{ fontSize: 12, color: '#7a6a58', textTransform: 'capitalize' }}>{displayOutput.category}</div>
+                      <div style={{ fontSize: 12, color: 'var(--brown-500)', textTransform: 'capitalize' }}>{displayOutput.category}</div>
                     )}
                   </div>
                 </div>
@@ -1480,7 +1480,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                         </div>
                       </div>
                     ))}
-                    <div style={{ fontSize: 11, color: '#9a9088', marginTop: 4 }}>Or save as new below ↓</div>
+                    <div style={{ fontSize: 11, color: 'var(--subtle-3)', marginTop: 4 }}>Or save as new below ↓</div>
                   </div>
                 )}
 
@@ -1513,7 +1513,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
                   <div className="fai-teach-confirm-sub">IRC will use this next time.</div>
                 </div>
                 {savedResult && (
-                  <div style={{ fontSize: 10, color: '#b8b0a8', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: 'var(--faint-3)', textAlign: 'center' }}>
                     Entry ID: {savedResult.brainEntryId.slice(0, 8)}…
                     {savedResult.playbookId && ` · Playbook: ${savedResult.playbookId.slice(0, 8)}…`}
                   </div>

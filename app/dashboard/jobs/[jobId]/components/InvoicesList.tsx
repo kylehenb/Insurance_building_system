@@ -234,7 +234,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
   if (loading) {
     return (
-      <div style={{ padding: '32px 0', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
+      <div style={{ padding: '32px 0', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)' }}>
         Loading…
       </div>
     )
@@ -249,10 +249,10 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
           onClick={() => setCreateModalOpen(false)}
         >
           <div
-            style={{ background: '#fff', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', fontFamily: 'DM Sans, sans-serif', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+            style={{ background: 'var(--paper)', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', fontFamily: 'DM Sans, sans-serif', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530', marginBottom: 20 }}>Create Invoice</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)', marginBottom: 20 }}>Create Invoice</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {/* Assessment (BAR) */}
@@ -260,15 +260,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!barReport || hasAssessment}
                 onClick={() => createInvoice('assessment', { reportId: barReport?.id })}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!barReport || hasAssessment) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!barReport || hasAssessment) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!barReport || hasAssessment) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!barReport || hasAssessment) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!barReport || hasAssessment) ? 'var(--subtle)' : 'var(--body)' }}>
                   Assessment (BAR)
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!barReport ? 'No BAR report exists for this job' : hasAssessment ? 'Assessment invoice already exists' : 'Single charge from rate config'}
                 </div>
               </button>
@@ -278,15 +278,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!makeSafeReport || hasMakeSafe}
                 onClick={() => createInvoice('make_safe', { reportId: makeSafeReport?.id })}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!makeSafeReport || hasMakeSafe) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!makeSafeReport || hasMakeSafe) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!makeSafeReport || hasMakeSafe) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!makeSafeReport || hasMakeSafe) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!makeSafeReport || hasMakeSafe) ? 'var(--subtle)' : 'var(--body)' }}>
                   Make Safe
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!makeSafeReport ? 'No make safe report exists for this job' : hasMakeSafe ? 'Make safe invoice already exists' : 'Single charge from rate config'}
                 </div>
               </button>
@@ -296,15 +296,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!roofReport || hasRoof}
                 onClick={() => createInvoice('roof', { reportId: roofReport?.id })}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!roofReport || hasRoof) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!roofReport || hasRoof) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!roofReport || hasRoof) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!roofReport || hasRoof) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!roofReport || hasRoof) ? 'var(--subtle)' : 'var(--body)' }}>
                   Roof Report
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!roofReport ? 'No roof report exists for this job' : hasRoof ? 'Roof invoice already exists' : 'Single charge from rate config'}
                 </div>
               </button>
@@ -314,15 +314,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!leakDetectionReport || hasLeakDetection}
                 onClick={() => createInvoice('leak_detection', { reportId: leakDetectionReport?.id })}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!leakDetectionReport || hasLeakDetection) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!leakDetectionReport || hasLeakDetection) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!leakDetectionReport || hasLeakDetection) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!leakDetectionReport || hasLeakDetection) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!leakDetectionReport || hasLeakDetection) ? 'var(--subtle)' : 'var(--body)' }}>
                   Leak Detection Report
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!leakDetectionReport ? 'No leak detection report exists for this job' : hasLeakDetection ? 'Leak detection invoice already exists' : 'Single charge from rate config'}
                 </div>
               </button>
@@ -332,15 +332,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!job.excess || hasExcess}
                 onClick={() => createInvoice('excess', { excessAmountIncGst: job.excess! })}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!job.excess || hasExcess) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!job.excess || hasExcess) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!job.excess || hasExcess) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!job.excess || hasExcess) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!job.excess || hasExcess) ? 'var(--subtle)' : 'var(--body)' }}>
                   Excess
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!job.excess ? 'No excess amount on this job' : hasExcess ? 'Excess invoice already exists' : `${fmt(job.excess)} (inc GST)`}
                 </div>
               </button>
@@ -350,15 +350,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!approvedQuotes.length || hasQuotedAmounts}
                 onClick={() => createInvoice('quoted_amounts')}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!approvedQuotes.length || hasQuotedAmounts) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!approvedQuotes.length || hasQuotedAmounts) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!approvedQuotes.length || hasQuotedAmounts) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!approvedQuotes.length || hasQuotedAmounts) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!approvedQuotes.length || hasQuotedAmounts) ? 'var(--subtle)' : 'var(--body)' }}>
                   Quoted Amounts
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!approvedQuotes.length
                     ? 'No approved quotes for this job'
                     : hasQuotedAmounts
@@ -372,15 +372,15 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 disabled={!hasAdditionalItems || hasVariations}
                 onClick={() => createInvoice('variations')}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: (!hasAdditionalItems || hasVariations) ? '#f5f2ee' : '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: (!hasAdditionalItems || hasVariations) ? 'var(--surface)' : 'var(--paper)',
                   cursor: (!hasAdditionalItems || hasVariations) ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: (!hasAdditionalItems || hasVariations) ? '#9e998f' : '#3a3530' }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: (!hasAdditionalItems || hasVariations) ? 'var(--subtle)' : 'var(--body)' }}>
                   Additional Items / Variations
                 </div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   {!hasAdditionalItems
                     ? 'No additional works or variations in work orders'
                     : hasVariations
@@ -393,13 +393,13 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               <button
                 onClick={() => createInvoice('custom')}
                 style={{
-                  textAlign: 'left', padding: '12px 16px', border: '1px solid #e0dbd4',
-                  borderRadius: 8, background: '#fff',
+                  textAlign: 'left', padding: '12px 16px', border: '1px solid var(--line)',
+                  borderRadius: 8, background: 'var(--paper)',
                   cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Custom</div>
-                <div style={{ fontSize: 11, color: '#9e998f', marginTop: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)' }}>Custom</div>
+                <div style={{ fontSize: 11, color: 'var(--subtle)', marginTop: 2 }}>
                   Blank invoice with custom line items and builder&apos;s margin
                 </div>
               </button>
@@ -407,7 +407,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
             <button
               onClick={() => setCreateModalOpen(false)}
-              style={{ marginTop: 20, fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#9e998f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              style={{ marginTop: 20, fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: 'var(--subtle)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
               Cancel
             </button>
@@ -417,7 +417,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--body)' }}>
           Invoices ({invoices.length})
         </div>
         <button
@@ -425,7 +425,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
           disabled={creating}
           style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: 13, fontWeight: 500,
-            color: '#ffffff', background: '#3a3530', border: 'none', borderRadius: 6,
+            color: 'var(--paper)', background: 'var(--body)', border: 'none', borderRadius: 6,
             padding: '8px 16px', cursor: creating ? 'not-allowed' : 'pointer',
             opacity: creating ? 0.6 : 1,
           }}
@@ -436,10 +436,10 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
       {/* Empty state */}
       {invoices.length === 0 && (
-        <div style={{ padding: '48px 24px', textAlign: 'center', background: '#f5f2ee', borderRadius: 8 }}>
+        <div style={{ padding: '48px 24px', textAlign: 'center', background: 'var(--surface)', borderRadius: 8 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
-          <div style={{ fontSize: 14, color: '#3a3530', marginBottom: 4 }}>No invoices yet</div>
-          <div style={{ fontSize: 12, color: '#9e998f' }}>Create an invoice to track payments for this job</div>
+          <div style={{ fontSize: 14, color: 'var(--body)', marginBottom: 4 }}>No invoices yet</div>
+          <div style={{ fontSize: 12, color: 'var(--subtle)' }}>Create an invoice to track payments for this job</div>
         </div>
       )}
 
@@ -452,7 +452,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
           <div
             key={invoice.id}
             style={{
-              background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 8,
+              background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8,
               marginBottom: 10, overflow: 'hidden',
             }}
           >
@@ -471,12 +471,12 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               }}
             >
               {/* Invoice ref */}
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#3a3530', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)', flex: 1 }}>
                 {invoice.invoice_ref ?? 'Draft Invoice'}
               </div>
 
               {/* Type badge */}
-              <div style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: '#e8e0d0', color: '#3a3530' }}>
+              <div style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: 'var(--line-tan-4)', color: 'var(--body)' }}>
                 {TYPE_LABELS[invoice.invoice_type] ?? invoice.invoice_type}
               </div>
 
@@ -486,12 +486,12 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               </div>
 
               {/* Amount */}
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#3a3530', minWidth: 90, textAlign: 'right' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--body)', minWidth: 90, textAlign: 'right' }}>
                 {fmt(invoice.amount_inc_gst ?? 0)}
               </div>
 
               {/* Expand/collapse icon */}
-              <div style={{ fontSize: 12, color: '#9e998f', transition: 'transform 0.2s', transform: expandedInvoiceId === invoice.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <div style={{ fontSize: 12, color: 'var(--subtle)', transition: 'transform 0.2s', transform: expandedInvoiceId === invoice.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 ▼
               </div>
 
@@ -500,7 +500,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 <button
                   onClick={(e) => { e.stopPropagation(); setSendInvoiceId(invoice.id) }}
                   style={{
-                    fontSize: 11, fontWeight: 500, color: '#fff', background: '#3a3530',
+                    fontSize: 11, fontWeight: 500, color: 'var(--paper)', background: 'var(--body)',
                     border: 'none', borderRadius: 4, padding: '5px 10px',
                     cursor: 'pointer',
                   }}
@@ -513,7 +513,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
               <div style={{ position: 'relative' }} data-menu-dropdown>
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuDropdownId(menuDropdownId === invoice.id ? null : invoice.id) }}
-                  style={{ fontSize: 16, color: '#9e998f', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
+                  style={{ fontSize: 16, color: 'var(--subtle)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
                 >
                   •••
                 </button>
@@ -521,13 +521,13 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                 {menuDropdownId === invoice.id && (
                   <div style={{
                     position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                    background: '#fff', border: '1px solid #e0dbd4', borderRadius: 6,
+                    background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6,
                     boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150,
                   }}>
                     <button
                       onClick={(e) => { e.stopPropagation(); window.open(`/print/invoices/${invoice.id}`, '_blank'); setMenuDropdownId(null) }}
-                      style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#3a3530', background: 'none', border: 'none', cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                      style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--body)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       PDF Preview
@@ -535,8 +535,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     {invoice.status !== 'voided' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setSendInvoiceId(invoice.id); setMenuDropdownId(null) }}
-                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#3a3530', background: 'none', border: 'none', cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--body)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         Email Invoice…
@@ -545,8 +545,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     {invoice.status === 'draft' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(invoice.id, invoice.invoice_ref); setMenuDropdownId(null) }}
-                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: '#c5221f', background: 'none', border: 'none', cursor: 'pointer', borderTop: '1px solid #e0dbd4' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#fce8e6')}
+                        style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', borderTop: '1px solid var(--line)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--danger-bg)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         Delete
@@ -559,7 +559,7 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
 
             {/* Accordion content - inline invoice editor */}
             {expandedInvoiceId === invoice.id && (
-              <div style={{ borderTop: '1px solid #e0dbd4', padding: '16px' }}>
+              <div style={{ borderTop: '1px solid var(--line)', padding: '16px' }}>
                 <div onClick={(e) => e.stopPropagation()}>
                   {editingInvoiceId === invoice.id ? (
                     <InvoiceEditor
@@ -581,30 +581,30 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                     <div>
                       {/* Invoice date — editable while draft, locked once sent */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                        <span style={{ fontSize: 12, color: '#9e998f' }}>Invoice Date</span>
+                        <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Invoice Date</span>
                         {invoice.status === 'draft' ? (
                           <input
                             type="date"
                             defaultValue={invoice.issued_date ? invoice.issued_date.slice(0, 10) : ''}
                             onChange={e => handleIssuedDateChange(invoice.id, e.target.value)}
-                            style={{ fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
+                            style={{ fontSize: 13, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
                           />
                         ) : (
-                          <span style={{ fontSize: 13, color: '#3a3530', fontWeight: 500 }}>{fmtDate(invoice.issued_date)}</span>
+                          <span style={{ fontSize: 13, color: 'var(--body)', fontWeight: 500 }}>{fmtDate(invoice.issued_date)}</span>
                         )}
                       </div>
 
                       {/* Line items preview — grouped by quote when an invoice spans more than one */}
                       {invoice.line_items.length > 0 ? (
                         <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
+                          <div style={{ fontSize: 12, color: 'var(--subtle)', marginBottom: 8 }}>Line Items</div>
                           {(() => {
                             const groups = groupLineItemsByQuote(invoice.line_items)
                             const showGroupHeadings = groups.length > 1
                             return groups.map((group, groupIndex) => (
                               <div key={group.label + groupIndex}>
                                 {showGroupHeadings && (
-                                  <div style={{ padding: '6px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#9e998f' }}>
+                                  <div style={{ padding: '6px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--subtle)' }}>
                                     {group.label}
                                   </div>
                                 )}
@@ -616,8 +616,8 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                                       justifyContent: 'space-between',
                                       padding: '8px 0',
                                       fontSize: 13,
-                                      color: '#3a3530',
-                                      borderBottom: '1px solid #e8e0d0',
+                                      color: 'var(--body)',
+                                      borderBottom: '1px solid var(--line-tan-4)',
                                     }}
                                   >
                                     <div style={{ flex: 1 }}>{item.description}</div>
@@ -630,13 +630,13 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                           })()}
                         </div>
                       ) : (
-                        <div style={{ fontSize: 13, color: '#9e998f', marginBottom: 16 }}>No line items</div>
+                        <div style={{ fontSize: 13, color: 'var(--subtle)', marginBottom: 16 }}>No line items</div>
                       )}
 
                       {/* Deductions preview — read-only; edited from the invoice editor */}
                       {invoice.deductions.length > 0 && (
                         <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Deductions</div>
+                          <div style={{ fontSize: 12, color: 'var(--subtle)', marginBottom: 8 }}>Deductions</div>
                           {invoice.deductions.map((deduction) => (
                             <div
                               key={deduction.id}
@@ -645,12 +645,12 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                                 justifyContent: 'space-between',
                                 padding: '8px 0',
                                 fontSize: 13,
-                                color: '#3a3530',
-                                borderBottom: '1px solid #e8e0d0',
+                                color: 'var(--body)',
+                                borderBottom: '1px solid var(--line-tan-4)',
                               }}
                             >
                               <div style={{ flex: 1 }}>{deduction.description || 'Deduction'}</div>
-                              <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500, color: '#c5221f' }}>{fmt(-deduction.amount_inc_gst)}</div>
+                              <div style={{ minWidth: 90, textAlign: 'right', fontWeight: 500, color: 'var(--danger)' }}>{fmt(-deduction.amount_inc_gst)}</div>
                             </div>
                           ))}
                         </div>
@@ -663,24 +663,24 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                         const markup = Math.round(lineSub * pct * 100) / 100
                         return (
                           <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--subtle)' }}>
                               <span>Subtotal</span>
-                              <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(lineSub)}</span>
+                              <span style={{ color: 'var(--body)', fontSize: 13 }}>{fmt(lineSub)}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--subtle)' }}>
                               <span>Builder&apos;s Margin ({(pct * 100).toFixed(1)}%)</span>
-                              <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(markup)}</span>
+                              <span style={{ color: 'var(--body)', fontSize: 13 }}>{fmt(markup)}</span>
                             </div>
                           </>
                         )
                       })()}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--subtle)' }}>
                         <span>Subtotal (ex GST)</span>
-                        <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.amount_ex_gst ?? 0)}</span>
+                        <span style={{ color: 'var(--body)', fontSize: 13 }}>{fmt(invoice.amount_ex_gst ?? 0)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: '#9e998f' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--subtle)' }}>
                         <span>GST (10%)</span>
-                        <span style={{ color: '#3a3530', fontSize: 13 }}>{fmt(invoice.gst ?? 0)}</span>
+                        <span style={{ color: 'var(--body)', fontSize: 13 }}>{fmt(invoice.gst ?? 0)}</span>
                       </div>
                       {(() => {
                         const excessDeduction = invoice.invoice_type === 'quoted_amounts'
@@ -690,25 +690,25 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                           const grossIncGst = (invoice.amount_ex_gst ?? 0) + (invoice.gst ?? 0)
                           return (
                             <>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4', marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Total (inc GST)</span>
-                                <span style={{ fontSize: 14, fontWeight: 500, color: '#3a3530' }}>{fmt(grossIncGst)}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--line)', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)' }}>Total (inc GST)</span>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--body)' }}>{fmt(grossIncGst)}</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: 12, color: '#9e998f' }}>Less: Excess payment received</span>
-                                <span style={{ fontSize: 13, color: '#c5221f' }}>{fmt(-excessDeduction)}</span>
+                                <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Less: Excess payment received</span>
+                                <span style={{ fontSize: 13, color: 'var(--danger)' }}>{fmt(-excessDeduction)}</span>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #3a3530' }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Final Invoice Total (inc GST)</span>
-                                <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid var(--body)' }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--body)' }}>Final Invoice Total (inc GST)</span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
                               </div>
                             </>
                           )
                         }
                         return (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
-                            <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--line)' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--body)' }}>Total (inc GST)</span>
+                            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>{fmt(invoice.amount_inc_gst ?? 0)}</span>
                           </div>
                         )
                       })()}
@@ -721,18 +721,18 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                             marginTop: 16,
                             fontFamily: 'DM Sans, sans-serif',
                             fontSize: 13,
-                            color: '#3a3530',
-                            background: '#ffffff',
-                            border: '1px solid #e0dbd4',
+                            color: 'var(--body)',
+                            background: 'var(--paper)',
+                            border: '1px solid var(--line)',
                             borderRadius: 6,
                             padding: '8px 16px',
                             cursor: 'pointer',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#c8b89a'
+                            e.currentTarget.style.borderColor = 'var(--tan)'
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#e0dbd4'
+                            e.currentTarget.style.borderColor = 'var(--line)'
                           }}
                         >
                           Edit Invoice
@@ -750,24 +750,24 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
       {/* Running totals */}
       {invoices.length > 0 && (
         <div style={{
-          marginTop: 20, background: '#fafaf8', border: '1px solid #e0dbd4', borderRadius: 8,
+          marginTop: 20, background: 'var(--surface-4)', border: '1px solid var(--line)', borderRadius: 8,
           padding: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16,
         }}>
           <div>
-            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Approved Quote</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>
+            <div style={{ fontSize: 11, color: 'var(--subtle)', marginBottom: 4 }}>Approved Quote</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>
               {approvedAmount > 0 ? fmt(approvedAmount) : '—'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Total Invoiced</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(totalInvoiced)}</div>
+            <div style={{ fontSize: 11, color: 'var(--subtle)', marginBottom: 4 }}>Total Invoiced</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>{fmt(totalInvoiced)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Balance Remaining</div>
+            <div style={{ fontSize: 11, color: 'var(--subtle)', marginBottom: 4 }}>Balance Remaining</div>
             <div style={{
               fontSize: 15, fontWeight: 600,
-              color: balance < 0 ? '#c5221f' : balance === 0 ? '#2e7d32' : '#3a3530',
+              color: balance < 0 ? 'var(--danger)' : balance === 0 ? 'var(--success)' : 'var(--body)',
             }}>
               {approvedAmount > 0 ? fmt(balance) : '—'}
             </div>

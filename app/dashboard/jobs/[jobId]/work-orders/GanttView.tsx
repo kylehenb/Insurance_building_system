@@ -136,14 +136,14 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
         overflow: 'auto',
         display: 'flex',
         flexDirection: 'column',
-        background: '#fff',
+        background: 'var(--paper)',
       }}
     >
       {/* Header */}
       <div
         style={{
           display: 'flex',
-          borderBottom: '1px solid #ddd8d0',
+          borderBottom: '1px solid var(--line-strong)',
           background: '#ede9e3',
           flexShrink: 0,
           position: 'sticky',
@@ -160,8 +160,8 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '.08em',
-            color: '#9a9590',
-            borderRight: '1px solid #ddd8d0',
+            color: 'var(--subtle-2)',
+            borderRight: '1px solid var(--line-strong)',
           }}
         >
           {cfg.header}
@@ -174,9 +174,9 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                 flex: 1,
                 fontSize: 9,
                 fontWeight: 500,
-                color: '#9a9590',
+                color: 'var(--subtle-2)',
                 padding: '6px 6px',
-                borderRight: '1px solid #e8e4de',
+                borderRight: '1px solid var(--line-4)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 letterSpacing: '.03em',
@@ -196,7 +196,7 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
               padding: '40px 20px',
               textAlign: 'center',
               fontSize: 12,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
             }}
           >
             No placed work orders to display
@@ -213,7 +213,7 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                 key={wo.id}
                 style={{
                   display: 'flex',
-                  borderBottom: '1px solid #e8e4de',
+                  borderBottom: '1px solid var(--line-4)',
                   minHeight: 50,
                   position: 'relative',
                 }}
@@ -224,12 +224,12 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                     width: 170,
                     minWidth: 170,
                     padding: '8px 12px',
-                    borderRight: '1px solid #e8e4de',
+                    borderRight: '1px solid var(--line-4)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
                     gap: 2,
-                    background: '#fff',
+                    background: 'var(--paper)',
                   }}
                 >
                   <div
@@ -238,12 +238,12 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                       fontWeight: 600,
                       textTransform: 'uppercase',
                       letterSpacing: '.09em',
-                      color: '#9a9590',
+                      color: 'var(--subtle-2)',
                     }}
                   >
                     {wo.tradeTypeLabel || wo.work_type}
                   </div>
-                  <div style={{ fontSize: 12, color: '#1a1a1a' }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink)' }}>
                     {wo.trade?.business_name?.split(' ')[0] ?? '—'}
                   </div>
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -255,7 +255,7 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                           borderRadius: 3,
                           border: '1px solid #bfdbfe',
                           background: '#eff4ff',
-                          color: '#1e40af',
+                          color: 'var(--info-dark)',
                         }}
                       >
                         V{wo.current_visit}/{wo.total_visits}
@@ -267,9 +267,9 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                           fontSize: 9,
                           padding: '1px 5px',
                           borderRadius: 3,
-                          border: '1px solid #fca5a5',
+                          border: '1px solid var(--danger-soft)',
                           background: '#fff0f0',
-                          color: '#991b1b',
+                          color: 'var(--danger-dark)',
                         }}
                       >
                         Ext
@@ -283,7 +283,7 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                   style={{
                     flex: 1,
                     position: 'relative',
-                    background: '#fff',
+                    background: 'var(--paper)',
                   }}
                 >
                   {/* Grid lines */}
@@ -297,7 +297,7 @@ export function GanttView({ workOrders, scale }: GanttViewProps) {
                           bottom: 0,
                           left: `${((i + 1) / cfg.cols.length) * 100}%`,
                           width: 1,
-                          background: '#e8e4de',
+                          background: 'var(--line-4)',
                           pointerEvents: 'none',
                         }}
                       />

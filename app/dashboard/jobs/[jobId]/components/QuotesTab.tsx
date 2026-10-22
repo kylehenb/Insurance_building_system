@@ -49,7 +49,7 @@ export function QuotesTab({ jobId, tenantId }: QuotesTabProps) {
           textAlign: 'center',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9e998f',
+          color: 'var(--subtle)',
         }}
       >
         Loading…

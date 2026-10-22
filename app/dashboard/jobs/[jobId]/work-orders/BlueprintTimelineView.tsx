@@ -694,19 +694,19 @@ export function BlueprintTimelineView({
           minWidth: 170,
           display: 'flex',
           flexDirection: 'column',
-          background: '#f5f2ee',
-          borderRight: '1px solid #ddd8d0',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--line-strong)',
         }}
       >
         <div
           style={{
             padding: '6px 12px',
-            borderBottom: '1px solid #ddd8d0',
+            borderBottom: '1px solid var(--line-strong)',
             fontSize: 9,
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '.08em',
-            color: '#9a9590',
+            color: 'var(--subtle-2)',
             background: '#ede9e3',
           }}
         >
@@ -733,11 +733,11 @@ export function BlueprintTimelineView({
               style={{
                 padding: '8px 10px',
                 borderRadius: 6,
-                background: '#fff',
-                border: '1px solid #e8e4de',
+                background: 'var(--paper)',
+                border: '1px solid var(--line-4)',
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#1a1a1a',
+                color: 'var(--ink)',
                 cursor: 'grab',
                 userSelect: 'none',
               }}
@@ -805,8 +805,8 @@ export function BlueprintTimelineView({
         }}
         style={{
           flex: 1,
-          background: '#fff',
-          borderLeft: '1px solid #e8e4de',
+          background: 'var(--paper)',
+          borderLeft: '1px solid var(--line-4)',
           position: 'relative',
           height: '500px',
         }}
@@ -833,7 +833,7 @@ export function BlueprintTimelineView({
               position: 'fixed',
               left: contextMenu.x,
               top: contextMenu.y,
-              background: '#fff',
+              background: 'var(--paper)',
               border: '1px solid #ddd',
               borderRadius: 6,
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -850,7 +850,7 @@ export function BlueprintTimelineView({
                 borderBottom: '1px solid #f0f0f0',
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--paper)'}
             >
               Add visit
             </div>
@@ -863,7 +863,7 @@ export function BlueprintTimelineView({
                 color: '#ef4444',
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--paper)'}
             >
               Delete visit
             </div>
@@ -875,7 +875,7 @@ export function BlueprintTimelineView({
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--paper)'}
             >
               Set dependency
             </div>

@@ -82,7 +82,7 @@ function DimInput({
           style={{
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 10,
-            color: '#9e998f',
+            color: 'var(--subtle)',
             userSelect: 'none',
           }}
         >
@@ -124,9 +124,9 @@ function DimInput({
           width: 44,
           fontFamily: 'DM Mono, monospace',
           fontSize: 11,
-          color: '#3a3530',
+          color: 'var(--body)',
           background: 'rgba(255,255,255,0.6)',
-          border: '1px solid #d8d0c8',
+          border: '1px solid var(--line-strong-2)',
           borderRadius: 4,
           padding: '2px 5px',
           textAlign: 'center',
@@ -189,8 +189,8 @@ function CalcPanel({ l, w, h }: { l: number | null; w: number | null; h: number 
         top: 'calc(100% + 6px)',
         left: 0,
         zIndex: 200,
-        background: '#ffffff',
-        border: '1px solid #d8d0c8',
+        background: 'var(--paper)',
+        border: '1px solid var(--line-strong-2)',
         borderRadius: 6,
         boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
         padding: '10px 14px',
@@ -203,7 +203,7 @@ function CalcPanel({ l, w, h }: { l: number | null; w: number | null; h: number 
           fontWeight: 500,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: '#b0a89e',
+          color: 'var(--faint-2)',
           fontFamily: 'DM Sans, sans-serif',
           marginBottom: 8,
         }}
@@ -221,11 +221,11 @@ function CalcPanel({ l, w, h }: { l: number | null; w: number | null; h: number 
             marginBottom: 5,
           }}
         >
-          <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Sans, sans-serif' }}>
+          <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}>
             {r.label}
           </span>
           <span
-            style={{ fontSize: 11, color: '#3a3530', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}
+            style={{ fontSize: 11, color: 'var(--body)', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}
           >
             {r.value}
           </span>
@@ -299,7 +299,7 @@ function SortableLineItemRow({
             left: 0,
             right: 0,
             height: 2,
-            background: '#c8b89a',
+            background: 'var(--tan)',
             borderRadius: 1,
             pointerEvents: 'none',
             zIndex: 10,
@@ -516,7 +516,7 @@ export function RoomSection({
       {/* Room header bar */}
       <div
         style={{
-          background: '#e8e0d5',
+          background: 'var(--line-tan-3)',
           display: 'flex',
           alignItems: 'center',
           padding: '7px 14px',
@@ -531,7 +531,7 @@ export function RoomSection({
             {...dragHandleListeners}
             style={{
               cursor: 'grab',
-              color: '#b0a89e',
+              color: 'var(--faint-2)',
               fontSize: 14,
               lineHeight: 1,
               padding: '2px 2px',
@@ -567,9 +567,9 @@ export function RoomSection({
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
                 fontWeight: 600,
-                color: '#3a3530',
-                background: '#ffffff',
-                border: '1px solid #c8b89a',
+                color: 'var(--body)',
+                background: 'var(--paper)',
+                border: '1px solid var(--tan)',
                 borderRadius: 4,
                 padding: '3px 6px',
                 outline: 'none',
@@ -582,7 +582,7 @@ export function RoomSection({
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
                 fontWeight: 600,
-                color: '#3a3530',
+                color: 'var(--body)',
                 cursor: isLocked ? 'default' : 'pointer',
               }}
             >
@@ -593,11 +593,11 @@ export function RoomSection({
           {/* Dimensions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <DimInput value={l} label="L" onChange={v => onUpdateDimensions(name, { room_length: v })} />
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
+            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--subtle)' }}>×</span>
             <DimInput value={w} label="" onChange={v => onUpdateDimensions(name, { room_width: v })} />
-            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9e998f' }}>×</span>
+            <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--subtle)' }}>×</span>
             <DimInput value={h} label="" onChange={v => onUpdateDimensions(name, { room_height: v })} />
-            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: '#9e998f', userSelect: 'none' }}>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: 'var(--subtle)', userSelect: 'none' }}>
               m
             </span>
 
@@ -610,7 +610,7 @@ export function RoomSection({
                   background: showCalc ? 'rgba(200,184,154,0.18)' : 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: showCalc ? '#c8b89a' : '#b0a89e',
+                  color: showCalc ? 'var(--tan)' : 'var(--faint-2)',
                   padding: '2px 4px',
                   borderRadius: 3,
                   lineHeight: 1,
@@ -618,8 +618,8 @@ export function RoomSection({
                   alignItems: 'center',
                   transition: 'color 0.1s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#c8b89a')}
-                onMouseLeave={e => { e.currentTarget.style.color = showCalc ? '#c8b89a' : '#b0a89e' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--tan)')}
+                onMouseLeave={e => { e.currentTarget.style.color = showCalc ? 'var(--tan)' : 'var(--faint-2)' }}
               >
                 <CalcIcon />
               </button>
@@ -638,7 +638,7 @@ export function RoomSection({
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#b0a89e',
+                color: 'var(--faint-2)',
                 fontSize: 16,
                 padding: '2px 5px',
                 borderRadius: 3,
@@ -646,8 +646,8 @@ export function RoomSection({
                 fontFamily: 'monospace',
                 transition: 'color 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#b0a89e')}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--faint-2)')}
             >
               ×
             </button>
@@ -659,7 +659,7 @@ export function RoomSection({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#9e998f',
+              color: 'var(--subtle)',
               fontSize: 11,
               padding: '2px 5px',
               borderRadius: 3,
@@ -680,8 +680,8 @@ export function RoomSection({
             style={{
               display: 'grid',
               gridTemplateColumns: GRID,
-              background: '#fafaf8',
-              borderBottom: '1px solid #e8e4e0',
+              background: 'var(--surface-4)',
+              borderBottom: '1px solid var(--line-3)',
             }}
           >
             {COL_HEADERS.map((h, i) => (
@@ -694,9 +694,9 @@ export function RoomSection({
                   fontWeight: 400,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
-                  color: '#b0a89e',
+                  color: 'var(--faint-2)',
                   textAlign: i === 0 ? 'center' : i === COL_HEADERS.length - 1 ? 'left' : 'right',
-                  borderRight: i < COL_HEADERS.length - 1 ? '1px solid #f0ece6' : 'none',
+                  borderRight: i < COL_HEADERS.length - 1 ? '1px solid var(--line-faint)' : 'none',
                 }}
               >
                 {h}
@@ -757,8 +757,8 @@ export function RoomSection({
               {activeItem ? (
                 <div
                   style={{
-                    background: '#ffffff',
-                    border: '1px solid #c8b89a',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--tan)',
                     borderRadius: 4,
                     boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                     opacity: 0.9,
@@ -799,21 +799,21 @@ export function RoomSection({
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: 12,
-                  color: '#9e998f',
+                  color: 'var(--subtle)',
                   background: 'none',
-                  border: '1px dashed #d8d0c8',
+                  border: '1px dashed var(--line-strong-2)',
                   borderRadius: 4,
                   padding: '5px 14px',
                   cursor: 'pointer',
                   transition: 'border-color 0.15s, color 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#c8b89a'
+                  e.currentTarget.style.borderColor = 'var(--tan)'
                   e.currentTarget.style.color = '#6b6560'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#d8d0c8'
-                  e.currentTarget.style.color = '#9e998f'
+                  e.currentTarget.style.borderColor = 'var(--line-strong-2)'
+                  e.currentTarget.style.color = 'var(--subtle)'
                 }}
               >
                 + Add Item to {name || 'Room'}

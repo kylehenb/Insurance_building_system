@@ -63,8 +63,8 @@ function PermitAlert({
       style={{
         margin: '0 0 0 0',
         background: '#fffbeb',
-        border: '1px solid #f59e0b',
-        borderLeft: '4px solid #f59e0b',
+        border: '1px solid var(--warning-bright)',
+        borderLeft: '4px solid var(--warning-bright)',
         borderRadius: 6,
         padding: '14px 18px',
         fontFamily: 'DM Sans, sans-serif',
@@ -74,7 +74,7 @@ function PermitAlert({
         style={{
           fontSize: 13,
           fontWeight: 600,
-          color: '#92400e',
+          color: 'var(--warning-dark)',
           marginBottom: 8,
         }}
       >
@@ -85,7 +85,7 @@ function PermitAlert({
           margin: '0 0 10px 0',
           paddingLeft: 18,
           fontSize: 12,
-          color: '#b45309',
+          color: 'var(--warning)',
           lineHeight: 1.7,
         }}
       >
@@ -100,8 +100,8 @@ function PermitAlert({
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
             fontWeight: 500,
-            color: '#ffffff',
-            background: '#b45309',
+            color: 'var(--paper)',
+            background: 'var(--warning)',
             border: 'none',
             borderRadius: 5,
             padding: '6px 14px',
@@ -115,9 +115,9 @@ function PermitAlert({
           style={{
             fontFamily: 'DM Sans, sans-serif',
             fontSize: 12,
-            color: '#92400e',
+            color: 'var(--warning-dark)',
             background: 'transparent',
-            border: '1px solid #f59e0b',
+            border: '1px solid var(--warning-bright)',
             borderRadius: 5,
             padding: '6px 14px',
             cursor: 'pointer',
@@ -509,7 +509,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
           height: 200,
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9e998f',
+          color: 'var(--subtle)',
         }}
       >
         Loading quote…
@@ -530,10 +530,10 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
           fontFamily: 'DM Sans, sans-serif',
         }}
       >
-        <p style={{ fontSize: 13, color: '#c5221f' }}>{error ?? 'Quote not found'}</p>
+        <p style={{ fontSize: 13, color: 'var(--danger)' }}>{error ?? 'Quote not found'}</p>
         <Link
           href={`/dashboard/jobs/${jobId}?tab=quotes`}
-          style={{ fontSize: 12, color: '#9e998f' }}
+          style={{ fontSize: 12, color: 'var(--subtle)' }}
         >
           ← Back to quotes
         </Link>
@@ -544,7 +544,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   return (
     <div
       style={{
-        background: '#f5f2ee',
+        background: 'var(--surface)',
         minHeight: '100%',
         fontFamily: 'DM Sans, sans-serif',
       }}
@@ -556,8 +556,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         <>
           <div
             style={{
-              background: '#ffffff',
-              borderBottom: '1px solid #e0dbd4',
+              background: 'var(--paper)',
+              borderBottom: '1px solid var(--line)',
               padding: '8px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -569,7 +569,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 12,
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
@@ -578,8 +578,8 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
             >
               ← {job.job_number}
             </Link>
-            <span style={{ color: '#e0dbd4', fontSize: 12 }}>/</span>
-            <span style={{ fontSize: 12, color: '#3a3530' }}>
+            <span style={{ color: 'var(--line)', fontSize: 12 }}>/</span>
+            <span style={{ fontSize: 12, color: 'var(--body)' }}>
               {quote.quote_ref ?? 'Quote'}
             </span>
           </div>
@@ -602,7 +602,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
       )}
 
       {/* Content */}
-      <div style={{ background: '#f5f2ee' }}>
+      <div style={{ background: 'var(--surface)' }}>
         {/* Rooms with items */}
         <DndContext
           sensors={roomSensors}
@@ -684,21 +684,21 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
-                color: '#9e998f',
-                background: '#ffffff',
-                border: '1px solid #e0dbd4',
+                color: 'var(--subtle)',
+                background: 'var(--paper)',
+                border: '1px solid var(--line)',
                 borderRadius: 6,
                 padding: '8px 18px',
                 cursor: 'pointer',
                 transition: 'border-color 0.15s, color 0.15s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#c8b89a'
-                e.currentTarget.style.color = '#3a3530'
+                e.currentTarget.style.borderColor = 'var(--tan)'
+                e.currentTarget.style.color = 'var(--body)'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#e0dbd4'
-                e.currentTarget.style.color = '#9e998f'
+                e.currentTarget.style.borderColor = 'var(--line)'
+                e.currentTarget.style.color = 'var(--subtle)'
               }}
             >
               + Add New Room
@@ -708,21 +708,21 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontSize: 13,
-                color: '#9e998f',
-                background: '#ffffff',
-                border: '1px solid #e0dbd4',
+                color: 'var(--subtle)',
+                background: 'var(--paper)',
+                border: '1px solid var(--line)',
                 borderRadius: 6,
                 padding: '8px 18px',
                 cursor: 'pointer',
                 transition: 'border-color 0.15s, color 0.15s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#c8b89a'
-                e.currentTarget.style.color = '#3a3530'
+                e.currentTarget.style.borderColor = 'var(--tan)'
+                e.currentTarget.style.color = 'var(--body)'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#e0dbd4'
-                e.currentTarget.style.color = '#9e998f'
+                e.currentTarget.style.borderColor = 'var(--line)'
+                e.currentTarget.style.color = 'var(--subtle)'
               }}
             >
               Import CSV

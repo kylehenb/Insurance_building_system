@@ -50,14 +50,14 @@ export function SendForSignatureDialog({
         style={{ fontFamily: 'DM Sans, sans-serif' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#e8e4e0] px-6 py-4">
-          <h2 id="send-signature-title" className="text-[16px] font-semibold text-[#1a1a1a]">Send for signature</h2>
-          <button onClick={onClose} className="rounded p-1 text-[#9e998f] hover:bg-[#f5f2ee]" aria-label="Close"><X className="h-4 w-4" /></button>
+        <div className="flex items-center justify-between border-b border-line-3 px-6 py-4">
+          <h2 id="send-signature-title" className="text-[16px] font-semibold text-ink">Send for signature</h2>
+          <button onClick={onClose} className="rounded p-1 text-subtle hover:bg-surface" aria-label="Close"><X className="h-4 w-4" /></button>
         </div>
         {defaults ? (
           <SendForm jobId={jobId} defaults={defaults} onClose={onClose} onSent={onSent} />
         ) : (
-          <div className="px-6 py-10 text-center text-[13px] text-[#9e998f]">{loadError ?? 'Loading…'}</div>
+          <div className="px-6 py-10 text-center text-[13px] text-subtle">{loadError ?? 'Loading…'}</div>
         )}
       </div>
     </div>
@@ -127,8 +127,8 @@ function SendForm({
     }
   }
 
-  const label = 'block text-[11px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1.5'
-  const input = 'w-full px-3 py-2 text-[13px] border border-[#e0dbd4] rounded-md bg-white focus:outline-none focus:border-[#c8b89a]'
+  const label = 'block text-[11px] uppercase tracking-wider text-subtle font-semibold mb-1.5'
+  const input = 'w-full px-3 py-2 text-[13px] border border-line rounded-md bg-white focus:outline-none focus:border-tan'
 
   return (
     <>
@@ -136,18 +136,18 @@ function SendForm({
         <section>
           <div className={label}>Approved quotes to include</div>
           {signableQuotes.length === 0 ? (
-            <p className="text-[13px] text-[#b45309]">This job has no approved quotes yet. Approve a quote first.</p>
+            <p className="text-[13px] text-warning">This job has no approved quotes yet. Approve a quote first.</p>
           ) : (
             <div className="space-y-1.5">
               {signableQuotes.map(q => (
-                <label key={q.id} className="flex items-center gap-2 rounded-md border border-[#e8e4e0] px-3 py-2 text-[13px] hover:bg-[#fafaf9]">
+                <label key={q.id} className="flex items-center gap-2 rounded-md border border-line-3 px-3 py-2 text-[13px] hover:bg-surface-5">
                   <input type="checkbox" checked={quoteIds.includes(q.id)} onChange={() => toggleQuote(q.id)} />
-                  <span className="font-medium text-[#1a1a1a]">{q.ref ?? 'Quote'}</span>
-                  <span className="text-[#9e998f]">{q.status === 'partially_approved' ? 'Partially approved' : 'Approved'}</span>
-                  <span className="ml-auto font-mono text-[12px] text-[#3a3530]">{fmt(q.totalInclGst)}</span>
+                  <span className="font-medium text-ink">{q.ref ?? 'Quote'}</span>
+                  <span className="text-subtle">{q.status === 'partially_approved' ? 'Partially approved' : 'Approved'}</span>
+                  <span className="ml-auto font-mono text-[12px] text-body">{fmt(q.totalInclGst)}</span>
                 </label>
               ))}
-              <div className="flex justify-between px-1 pt-1 text-[12px] text-[#5a5650]">
+              <div className="flex justify-between px-1 pt-1 text-[12px] text-body-soft">
                 <span>Total incl GST (items declined by the insurer are left out)</span>
                 <span className="font-mono font-semibold">{fmt(total)}</span>
               </div>
@@ -159,7 +159,7 @@ function SendForm({
           <div className={label}>Document</div>
           <div className="space-y-1.5">
             {Object.values(SIGNING_DOCUMENT_CATALOG).map(entry => (
-              <label key={entry.key} className={`flex gap-2 rounded-md border px-3 py-2 text-[13px] ${docType === entry.key ? 'border-[#c9a96e] bg-[#fdfaf4]' : 'border-[#e8e4e0]'}`}>
+              <label key={entry.key} className={`flex gap-2 rounded-md border px-3 py-2 text-[13px] ${docType === entry.key ? 'border-gold bg-[#fdfaf4]' : 'border-line-3'}`}>
                 <input
                   type="radio"
                   name="signing-doc-type"
@@ -168,15 +168,15 @@ function SendForm({
                   className="mt-0.5"
                 />
                 <span>
-                  <span className="font-medium text-[#1a1a1a]">{entry.label}</span>
-                  {entry.key === suggested && <span className="ml-2 rounded-full bg-[#e8f5e9] px-2 py-0.5 text-[10px] font-semibold text-[#1b5e20]">Suggested</span>}
-                  <span className="block text-[12px] text-[#9e998f]">{entry.description}</span>
+                  <span className="font-medium text-ink">{entry.label}</span>
+                  {entry.key === suggested && <span className="ml-2 rounded-full bg-success-bg px-2 py-0.5 text-[10px] font-semibold text-success-dark">Suggested</span>}
+                  <span className="block text-[12px] text-subtle">{entry.description}</span>
                 </span>
               </label>
             ))}
           </div>
           {docType !== suggested && quoteIds.length > 0 && (
-            <p className="mt-2 text-[12px] text-[#b45309]">
+            <p className="mt-2 text-[12px] text-warning">
               The selected total is {fmt(total)}. Work over {fmt(BUILDING_CONTRACT_THRESHOLD)} normally needs a Building Contract.
             </p>
           )}
@@ -187,7 +187,7 @@ function SendForm({
         <section>
           <div className={label}>Signer</div>
           {defaults.signerSource && (
-            <p className="mb-2 text-[12px] text-[#9e998f]">Filled in from the job’s {defaults.signerSource}.</p>
+            <p className="mb-2 text-[12px] text-subtle">Filled in from the job’s {defaults.signerSource}.</p>
           )}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -197,44 +197,44 @@ function SendForm({
             <input className={input} placeholder="Mobile (optional, for the record)" value={phone} onChange={e => setPhone(e.target.value)} aria-label="Signer mobile" />
           </div>
           {email && !emailOk && <p className="mt-1 text-[12px] text-red-600">That email address doesn’t look right.</p>}
-          <p className="mt-2 text-[12px] text-[#9e998f]">
+          <p className="mt-2 text-[12px] text-subtle">
             Sent by email from the office address. The link works for {DEFAULT_EXPIRY_DAYS} days and can only be used to sign once.
           </p>
         </section>
 
-        <label className="flex items-start gap-2 text-[13px] text-[#3a3530]">
+        <label className="flex items-start gap-2 text-[13px] text-body">
           <input type="checkbox" checked={reminders} onChange={e => setReminders(e.target.checked)} className="mt-0.5" />
           <span>
             Send automatic reminders if not signed
-            <span className="block text-[12px] text-[#9e998f]">Every {REMINDER_DEFAULTS.afterDays} days, up to {REMINDER_DEFAULTS.maxReminders} reminders. You can turn this off later on the Signatures tab.</span>
+            <span className="block text-[12px] text-subtle">Every {REMINDER_DEFAULTS.afterDays} days, up to {REMINDER_DEFAULTS.maxReminders} reminders. You can turn this off later on the Signatures tab.</span>
           </span>
         </label>
 
         {defaults.jobStage === 'approved_awaiting_signoff' && (
-          <label className="flex items-start gap-2 text-[13px] text-[#3a3530]">
+          <label className="flex items-start gap-2 text-[13px] text-body">
             <input type="checkbox" checked={moveStage} onChange={e => setMoveStage(e.target.checked)} className="mt-0.5" />
             <span>Move the job to <strong>Awaiting Signed Document</strong> once sent</span>
           </label>
         )}
 
         {canSend && (
-          <div className="rounded-md border border-[#e8e4e0] bg-[#fafaf9] px-3 py-2 text-[12px] text-[#3a3530]">
+          <div className="rounded-md border border-line-3 bg-surface-5 px-3 py-2 text-[12px] text-body">
             Sending: <strong>{SIGNING_DOCUMENT_CATALOG[docType].label}</strong> to sign
             {attaching && <> + <strong>{attaching}</strong></>} to {email.trim()}
           </div>
         )}
         {defaults.excess.applies && !excessReady && (
-          <p className="text-[12px] text-[#b45309]">Choose what to do about the excess to continue.</p>
+          <p className="text-[12px] text-warning">Choose what to do about the excess to continue.</p>
         )}
         {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</div>}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-[#e8e4e0] px-6 py-4">
-        <button onClick={onClose} className="rounded-md border border-[#d8d0c8] bg-[#f5f2ee] px-4 py-2 text-[13px] font-medium text-[#3a3530]">Cancel</button>
+      <div className="flex items-center justify-end gap-2 border-t border-line-3 px-6 py-4">
+        <button onClick={onClose} className="rounded-md border border-line-strong-2 bg-surface px-4 py-2 text-[13px] font-medium text-body">Cancel</button>
         <button
           onClick={send}
           disabled={!canSend}
-          className="rounded-md bg-[#1a1a1a] px-4 py-2 text-[13px] font-semibold text-[#c9a96e] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-ink px-4 py-2 text-[13px] font-semibold text-gold disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sending ? 'Generating and sending…' : 'Send for signature'}
         </button>

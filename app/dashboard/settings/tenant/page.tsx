@@ -553,15 +553,15 @@ export default function TenantSettingsPage() {
   // ── Loading skeleton ───────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f5f2ee]">
-        <div className="text-[#9e998f] text-sm">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-surface">
+        <div className="text-subtle text-sm">Loading...</div>
       </div>
     )
   }
 
   // ── Render ─────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f5f2ee] pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       {/* CAT Active Banner */}
       {activeCatAreas.length > 0 && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
@@ -576,11 +576,11 @@ export default function TenantSettingsPage() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Page header */}
         <div className="mb-8">
-          <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <p className="text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Settings
           </p>
-          <h1 className="text-3xl font-semibold text-[#1a1a1a]">Tenant Settings</h1>
-          <p className="text-sm text-[#9e998f] mt-1">
+          <h1 className="text-3xl font-semibold text-ink">Tenant Settings</h1>
+          <p className="text-sm text-subtle mt-1">
             Business profile, job numbering, and service area configuration.
           </p>
         </div>
@@ -642,18 +642,18 @@ export default function TenantSettingsPage() {
                 SECTION 1 — TENANT PROFILE
             ════════════════════════════════════════════════════ */}
             <section id="tenant-profile" className="scroll-mt-6">
-              <div className="bg-white border border-[#e8e4e0] rounded-lg p-6">
+              <div className="bg-white border border-line-3 rounded-lg p-6">
                 <div className="mb-6">
-                  <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                  <p className="text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                     Account
                   </p>
-                  <h2 className="text-xl font-semibold text-[#1a1a1a]">Tenant Profile</h2>
+                  <h2 className="text-xl font-semibold text-ink">Tenant Profile</h2>
                 </div>
 
                 <div className="grid grid-cols-2 gap-5">
                   {/* Business name */}
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Business name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -662,13 +662,13 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, name: e.target.value }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* Trading name */}
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Trading name
                     </label>
                     <input
@@ -678,13 +678,13 @@ export default function TenantSettingsPage() {
                         setProfileForm((prev) => ({ ...prev, trading_name: e.target.value }))
                       }
                       placeholder="Optional"
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* ABN */}
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       ABN
                     </label>
                     <input
@@ -695,10 +695,10 @@ export default function TenantSettingsPage() {
                       }
                       placeholder="11 digits"
                       maxLength={14}
-                      className={`w-full border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] ${
+                      className={`w-full border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold ${
                         profileForm.abn && !isValidAbn(profileForm.abn)
                           ? 'border-red-400'
-                          : 'border-[#e8e4e0]'
+                          : 'border-line-3'
                       }`}
                     />
                     {profileForm.abn && !isValidAbn(profileForm.abn) && (
@@ -708,20 +708,20 @@ export default function TenantSettingsPage() {
 
                   {/* Plan badge */}
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Plan
                     </label>
                     <div className="flex items-center h-9">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] uppercase tracking-wide">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-surface border border-line-3 text-body uppercase tracking-wide">
                         {profileForm.plan || 'Unknown'}
                       </span>
-                      <span className="ml-2 text-xs text-[#9e998f]">Read-only</span>
+                      <span className="ml-2 text-xs text-subtle">Read-only</span>
                     </div>
                   </div>
 
                   {/* Job prefix */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Job number prefix
                     </label>
                     <input
@@ -735,7 +735,7 @@ export default function TenantSettingsPage() {
                       }
                       maxLength={6}
                       placeholder="e.g. IRC"
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                     <p className="text-xs text-amber-600 mt-1">
                       Changing this prefix affects future job numbers only — existing job numbers
@@ -745,7 +745,7 @@ export default function TenantSettingsPage() {
 
                   {/* Job sequence */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Last job sequence number
                     </label>
                     <input
@@ -758,7 +758,7 @@ export default function TenantSettingsPage() {
                           job_sequence: parseInt(e.target.value) || 1,
                         }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                     <p className="text-xs text-amber-600 mt-1">
                       The next job will be {profileForm.job_prefix || 'PREFIX'}{profileForm.job_sequence + 1}. Only set this if you need to correct the sequence — setting it lower than existing jobs may cause duplicates.
@@ -767,7 +767,7 @@ export default function TenantSettingsPage() {
 
                   {/* Primary email */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Primary Email
                     </label>
                     <input
@@ -776,13 +776,13 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, contact_email: e.target.value }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* Accounts email */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Accounts Email
                     </label>
                     <input
@@ -792,13 +792,13 @@ export default function TenantSettingsPage() {
                         setProfileForm((prev) => ({ ...prev, accounts_email: e.target.value }))
                       }
                       placeholder="For invoices and payments"
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* Auto Job Lodger monitored email */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Auto Job Lodger Monitored Email
                     </label>
                     <div className="flex items-center h-9">
@@ -806,17 +806,17 @@ export default function TenantSettingsPage() {
                         type="email"
                         value="office@insurancerepairco.com.au"
                         disabled
-                        className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-[#f5f2ee] text-[#9e998f] cursor-not-allowed"
+                        className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-surface text-subtle cursor-not-allowed"
                       />
                     </div>
-                    <p className="text-xs text-[#9e998f] mt-1">
+                    <p className="text-xs text-subtle mt-1">
                       Read-only — configured on backend for email parsing
                     </p>
                   </div>
 
                   {/* Contact phone */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Contact phone
                     </label>
                     <input
@@ -825,13 +825,13 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, contact_phone: e.target.value }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* Building licence # */}
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Building licence #
                     </label>
                     <input
@@ -840,13 +840,13 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, building_licence_number: e.target.value }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-gold"
                     />
                   </div>
 
                   {/* Business address */}
                   <div className="col-span-2">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                       Business address
                     </label>
                     <textarea
@@ -855,13 +855,13 @@ export default function TenantSettingsPage() {
                       onChange={(e) =>
                         setProfileForm((prev) => ({ ...prev, address: e.target.value }))
                       }
-                      className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
+                      className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold resize-none"
                     />
                   </div>
 
                   {/* Logo upload */}
                   <div className="col-span-2">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
                       Logo
                     </label>
                     <div className="flex items-start gap-6">
@@ -870,7 +870,7 @@ export default function TenantSettingsPage() {
                           <img
                             src={logoDisplayUrl}
                             alt="Company logo"
-                            className="h-24 w-auto border border-[#e8e4e0] rounded-lg object-contain bg-white p-2 shadow-sm"
+                            className="h-24 w-auto border border-line-3 rounded-lg object-contain bg-white p-2 shadow-sm"
                             onError={(e) => {
                               console.error('Failed to load logo image:', logoDisplayUrl)
                               e.currentTarget.style.display = 'none'
@@ -878,12 +878,12 @@ export default function TenantSettingsPage() {
                           />
                         </div>
                       ) : (
-                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-[#e8e4e0] rounded-lg bg-[#f5f2ee] flex items-center justify-center">
-                          <span className="text-xs text-[#9e998f]">No logo</span>
+                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-line-3 rounded-lg bg-surface flex items-center justify-center">
+                          <span className="text-xs text-subtle">No logo</span>
                         </div>
                       )}
                       <div className="flex-1">
-                        <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-[#3a3530] border border-[#e8e4e0] rounded px-3 py-1.5 hover:bg-[#f5f2ee] transition-colors">
+                        <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-body border border-line-3 rounded px-3 py-1.5 hover:bg-surface transition-colors">
                           {logoUploading ? 'Uploading...' : logoDisplayUrl ? 'Replace logo' : 'Upload logo'}
                           <input
                             type="file"
@@ -893,7 +893,7 @@ export default function TenantSettingsPage() {
                             disabled={logoUploading || !tenantId}
                           />
                         </label>
-                        <p className="text-xs text-[#9e998f] mt-1">
+                        <p className="text-xs text-subtle mt-1">
                           PNG, JPG or SVG. Stored to tenant-assets bucket.
                         </p>
                         {profileForm.logo_storage_path && (
@@ -907,7 +907,7 @@ export default function TenantSettingsPage() {
 
                   {/* Alternative logo upload */}
                   <div className="col-span-2">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
                       Alternative Logo
                     </label>
                     <div className="flex items-start gap-6">
@@ -916,7 +916,7 @@ export default function TenantSettingsPage() {
                           <img
                             src={alternativeLogoDisplayUrl}
                             alt="Alternative company logo"
-                            className="h-24 w-auto border border-[#e8e4e0] rounded-lg object-contain bg-white p-2 shadow-sm"
+                            className="h-24 w-auto border border-line-3 rounded-lg object-contain bg-white p-2 shadow-sm"
                             onError={(e) => {
                               console.error('Failed to load alternative logo image:', alternativeLogoDisplayUrl)
                               e.currentTarget.style.display = 'none'
@@ -924,12 +924,12 @@ export default function TenantSettingsPage() {
                           />
                         </div>
                       ) : (
-                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-[#e8e4e0] rounded-lg bg-[#f5f2ee] flex items-center justify-center">
-                          <span className="text-xs text-[#9e998f]">No logo</span>
+                        <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-line-3 rounded-lg bg-surface flex items-center justify-center">
+                          <span className="text-xs text-subtle">No logo</span>
                         </div>
                       )}
                       <div className="flex-1">
-                        <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-[#3a3530] border border-[#e8e4e0] rounded px-3 py-1.5 hover:bg-[#f5f2ee] transition-colors">
+                        <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-body border border-line-3 rounded px-3 py-1.5 hover:bg-surface transition-colors">
                           {alternativeLogoUploading ? 'Uploading...' : alternativeLogoDisplayUrl ? 'Replace alternative logo' : 'Upload alternative logo'}
                           <input
                             type="file"
@@ -939,7 +939,7 @@ export default function TenantSettingsPage() {
                             disabled={alternativeLogoUploading || !tenantId}
                           />
                         </label>
-                        <p className="text-xs text-[#9e998f] mt-1">
+                        <p className="text-xs text-subtle mt-1">
                           Optional secondary logo (e.g., for dark mode or specialized documents).
                         </p>
                         {profileForm.alternative_logo_storage_path && (
@@ -952,14 +952,14 @@ export default function TenantSettingsPage() {
                   </div>
 
                   {/* Financial details */}
-                  <div className="col-span-2 mt-6 pt-6 border-t border-[#e8e4e0]">
-                    <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-4">
+                  <div className="col-span-2 mt-6 pt-6 border-t border-line-3">
+                    <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-4">
                       Financial Details
                     </label>
                     <div className="grid grid-cols-2 gap-5">
                       {/* BSB */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           BSB
                         </label>
                         <input
@@ -970,13 +970,13 @@ export default function TenantSettingsPage() {
                           }
                           placeholder="6 digits"
                           maxLength={6}
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-gold"
                         />
                       </div>
 
                       {/* Account Number */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           Account Number
                         </label>
                         <input
@@ -986,13 +986,13 @@ export default function TenantSettingsPage() {
                             setProfileForm((prev) => ({ ...prev, account_number: e.target.value }))
                           }
                           placeholder="Account number"
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white font-mono focus:outline-none focus:ring-1 focus:ring-gold"
                         />
                       </div>
 
                       {/* Bank Name */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           Bank Name
                         </label>
                         <input
@@ -1002,13 +1002,13 @@ export default function TenantSettingsPage() {
                             setProfileForm((prev) => ({ ...prev, bank_name: e.target.value }))
                           }
                           placeholder="e.g. Commonwealth Bank"
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                         />
                       </div>
 
                       {/* Account Name */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           Account Name
                         </label>
                         <input
@@ -1018,13 +1018,13 @@ export default function TenantSettingsPage() {
                             setProfileForm((prev) => ({ ...prev, account_name: e.target.value }))
                           }
                           placeholder="Account holder name"
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                         />
                       </div>
 
                       {/* Invoice Payment Terms */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           Invoice Payment Terms (days)
                         </label>
                         <input
@@ -1034,14 +1034,14 @@ export default function TenantSettingsPage() {
                           onChange={(e) =>
                             setProfileForm((prev) => ({ ...prev, invoice_payment_terms: parseInt(e.target.value) || 0 }))
                           }
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                         />
-                        <p className="text-xs text-[#9e998f] mt-1">Days for standard invoices</p>
+                        <p className="text-xs text-subtle mt-1">Days for standard invoices</p>
                       </div>
 
                       {/* Excess Payment Terms */}
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                           Excess Payment Terms (days)
                         </label>
                         <input
@@ -1051,16 +1051,16 @@ export default function TenantSettingsPage() {
                           onChange={(e) =>
                             setProfileForm((prev) => ({ ...prev, excess_payment_terms: parseInt(e.target.value) || 0 }))
                           }
-                          className="w-full border border-[#e8e4e0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                          className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                         />
-                        <p className="text-xs text-[#9e998f] mt-1">Days for excess invoices (0 = due immediately)</p>
+                        <p className="text-xs text-subtle mt-1">Days for excess invoices (0 = due immediately)</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Save button */}
-                <div className="mt-6 flex items-center justify-between pt-4 border-t border-[#e8e4e0]">
+                <div className="mt-6 flex items-center justify-between pt-4 border-t border-line-3">
                   {profileSaveStatus !== 'idle' && (
                     <span
                       className={`text-sm ${
@@ -1078,7 +1078,7 @@ export default function TenantSettingsPage() {
                     <button
                       onClick={handleSaveProfile}
                       disabled={profileSaving}
-                      className="bg-[#c9a96e] text-white px-5 py-2 rounded text-sm font-medium hover:bg-[#b8965e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="bg-gold text-white px-5 py-2 rounded text-sm font-medium hover:bg-[#b8965e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {profileSaving ? 'Saving...' : 'Save Profile'}
                     </button>
@@ -1092,11 +1092,11 @@ export default function TenantSettingsPage() {
             ════════════════════════════════════════════════════ */}
             <section id="service-areas" className="scroll-mt-6">
               <div className="mb-2">
-                <p className="text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+                <p className="text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
                   Operations
                 </p>
-                <h2 className="text-xl font-semibold text-[#1a1a1a]">Service Areas</h2>
-                <p className="text-sm text-[#9e998f] mt-1">
+                <h2 className="text-xl font-semibold text-ink">Service Areas</h2>
+                <p className="text-sm text-subtle mt-1">
                   Configure where your team operates. Incoming insurer orders will be matched
                   against these zones to determine service type (Standard, Extended, CAT, or
                   Outside Area).
@@ -1105,11 +1105,11 @@ export default function TenantSettingsPage() {
 
               {/* ── 2a. Radius-Based Zones ── */}
               <div id="radius-zones" className="scroll-mt-6 mt-6">
-                <div className="bg-white border border-[#e8e4e0] rounded-lg p-6">
-                  <h3 className="text-base font-semibold text-[#1a1a1a] mb-1">
+                <div className="bg-white border border-line-3 rounded-lg p-6">
+                  <h3 className="text-base font-semibold text-ink mb-1">
                     Radius-Based Zones
                   </h3>
-                  <p className="text-sm text-[#9e998f] mb-4">
+                  <p className="text-sm text-subtle mb-4">
                     Define one or more base locations (office, depot). Jobs within the standard
                     radius are Standard service. Jobs in the outer ring are Extended service and
                     require approval before lodging.
@@ -1131,7 +1131,7 @@ export default function TenantSettingsPage() {
 
                   <button
                     onClick={addRadiusZone}
-                    className="mt-4 text-sm text-[#c9a96e] hover:text-[#b8965e] font-medium"
+                    className="mt-4 text-sm text-gold hover:text-[#b8965e] font-medium"
                   >
                     + Add another base location
                   </button>
@@ -1140,11 +1140,11 @@ export default function TenantSettingsPage() {
 
               {/* ── 2b. Specific Service Areas ── */}
               <div id="specific-areas" className="scroll-mt-6 mt-4">
-                <div className="bg-white border border-[#e8e4e0] rounded-lg p-6">
-                  <h3 className="text-base font-semibold text-[#1a1a1a] mb-1">
+                <div className="bg-white border border-line-3 rounded-lg p-6">
+                  <h3 className="text-base font-semibold text-ink mb-1">
                     Specific Service Areas
                   </h3>
-                  <p className="text-sm text-[#9e998f] mb-4">
+                  <p className="text-sm text-subtle mb-4">
                     Tag specific suburbs and postcodes. Useful for corridor-style coverage areas
                     or specific town groupings outside a simple radius.
                   </p>
@@ -1162,10 +1162,10 @@ export default function TenantSettingsPage() {
 
                   {/* Interactive Map Visualization */}
                   {serviceAreaConfig.specific_areas.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-[#e8e4e0]">
+                    <div className="mt-6 pt-6 border-t border-line-3">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-[#1a1a1a]">Service Area Map</h4>
-                        <span className="text-xs text-[#9e998f]">
+                        <h4 className="text-sm font-semibold text-ink">Service Area Map</h4>
+                        <span className="text-xs text-subtle">
                           {serviceAreaConfig.specific_areas.reduce((sum, area) => sum + area.suburbs.length, 0)} suburbs across {serviceAreaConfig.specific_areas.length} areas
                         </span>
                       </div>
@@ -1178,7 +1178,7 @@ export default function TenantSettingsPage() {
 
                   <button
                     onClick={addSpecificArea}
-                    className="mt-4 text-sm text-[#c9a96e] hover:text-[#b8965e] font-medium"
+                    className="mt-4 text-sm text-gold hover:text-[#b8965e] font-medium"
                   >
                     + Add specific area
                   </button>
@@ -1187,11 +1187,11 @@ export default function TenantSettingsPage() {
 
               {/* ── 2c. CAT Service Areas ── */}
               <div id="cat-areas" className="scroll-mt-6 mt-4">
-                <div className="bg-white border border-[#e8e4e0] rounded-lg p-6">
-                  <h3 className="text-base font-semibold text-[#1a1a1a] mb-1">
+                <div className="bg-white border border-line-3 rounded-lg p-6">
+                  <h3 className="text-base font-semibold text-ink mb-1">
                     CAT Service Areas
                   </h3>
-                  <p className="text-sm text-[#9e998f] mb-4">
+                  <p className="text-sm text-subtle mb-4">
                     Areas activated only during declared catastrophe events. Toggle an area active
                     to apply it to incoming orders. Inactive CAT areas are saved but not applied.
                   </p>
@@ -1209,7 +1209,7 @@ export default function TenantSettingsPage() {
 
                   <button
                     onClick={addCatArea}
-                    className="mt-4 text-sm text-[#c9a96e] hover:text-[#b8965e] font-medium"
+                    className="mt-4 text-sm text-gold hover:text-[#b8965e] font-medium"
                   >
                     + Add CAT area
                   </button>
@@ -1217,7 +1217,7 @@ export default function TenantSettingsPage() {
               </div>
 
               {/* Save Service Areas button */}
-              <div className="mt-4 bg-white border border-[#e8e4e0] rounded-lg px-6 py-4 flex items-center justify-between">
+              <div className="mt-4 bg-white border border-line-3 rounded-lg px-6 py-4 flex items-center justify-between">
                 {serviceAreaSaveStatus !== 'idle' && (
                   <span
                     className={`text-sm ${
@@ -1233,7 +1233,7 @@ export default function TenantSettingsPage() {
                   <button
                     onClick={handleSaveServiceAreas}
                     disabled={serviceAreaSaving}
-                    className="bg-[#c9a96e] text-white px-5 py-2 rounded text-sm font-medium hover:bg-[#b8965e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="bg-gold text-white px-5 py-2 rounded text-sm font-medium hover:bg-[#b8965e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {serviceAreaSaving ? 'Saving...' : 'Save Service Areas'}
                   </button>
@@ -1271,8 +1271,8 @@ function NavItem({
         small ? 'text-xs' : ''
       } ${
         active
-          ? 'text-[#c9a96e] bg-[#fdf8f0] font-medium'
-          : 'text-[#6b6763] hover:text-[#1a1a1a] hover:bg-[#f5f2ee]'
+          ? 'text-gold bg-[#fdf8f0] font-medium'
+          : 'text-grey-600 hover:text-ink hover:bg-surface'
       }`}
     >
       {label}
@@ -1306,10 +1306,10 @@ function RadiusZoneCard({
       : null
 
   return (
-    <div className="border border-[#e8e4e0] rounded-lg p-4">
+    <div className="border border-line-3 rounded-lg p-4">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 mr-4">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Zone label
           </label>
           <input
@@ -1317,12 +1317,12 @@ function RadiusZoneCard({
             value={zone.label}
             onChange={(e) => onChange({ ...zone, label: e.target.value })}
             placeholder="e.g. Perth CBD Office"
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
         </div>
         <button
           onClick={onDelete}
-          className="text-[#b0a89e] hover:text-red-500 text-lg leading-none mt-5 transition-colors"
+          className="text-faint-2 hover:text-red-500 text-lg leading-none mt-5 transition-colors"
           title="Delete zone"
         >
           ×
@@ -1331,7 +1331,7 @@ function RadiusZoneCard({
 
       {/* Base address — fuzzy search via Places Autocomplete */}
       <div className="mb-3">
-        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
           Base address
         </label>
         <AddressSearch
@@ -1345,7 +1345,7 @@ function RadiusZoneCard({
       {/* Radius inputs */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Standard service radius (km)
           </label>
           <input
@@ -1353,14 +1353,14 @@ function RadiusZoneCard({
             min={1}
             value={zone.standard_km}
             onChange={(e) => onChange({ ...zone, standard_km: parseInt(e.target.value) || 1 })}
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
-          <p className="text-xs text-[#9e998f] mt-0.5">
+          <p className="text-xs text-subtle mt-0.5">
             Jobs within this distance are Standard service.
           </p>
         </div>
         <div className="bg-[#f0f7ff] rounded-lg p-2.5">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Extended service radius (km)
           </label>
           <input
@@ -1368,9 +1368,9 @@ function RadiusZoneCard({
             min={1}
             value={zone.extended_km}
             onChange={(e) => onChange({ ...zone, extended_km: parseInt(e.target.value) || 1 })}
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
-          <p className="text-xs text-[#9e998f] mt-0.5">
+          <p className="text-xs text-subtle mt-0.5">
             Beyond standard radius, within this additional distance — Extended, requires approval.
           </p>
         </div>
@@ -1383,11 +1383,11 @@ function RadiusZoneCard({
           alt={`Map for ${zone.label || 'zone'}`}
           width={400}
           height={160}
-          className="w-full max-w-[400px] h-[160px] object-cover rounded border border-[#e8e4e0]"
+          className="w-full max-w-[400px] h-[160px] object-cover rounded border border-line-3"
         />
       ) : (
-        <div className="w-full max-w-[400px] h-[160px] bg-[#f5f2ee] rounded border border-[#e8e4e0] flex items-center justify-center">
-          <span className="text-xs text-[#9e998f]">
+        <div className="w-full max-w-[400px] h-[160px] bg-surface rounded border border-line-3 flex items-center justify-center">
+          <span className="text-xs text-subtle">
             {zone.address.trim()
               ? geocodingState === 'loading'
                 ? 'Geocoding address…'
@@ -1489,11 +1489,11 @@ function SpecificAreaCard({
   )
 
   return (
-    <div className="border border-[#e8e4e0] rounded-lg p-4">
+    <div className="border border-line-3 rounded-lg p-4">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 mr-4">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Area label
           </label>
           <input
@@ -1501,12 +1501,12 @@ function SpecificAreaCard({
             value={area.label}
             onChange={(e) => onChange({ ...area, label: e.target.value })}
             placeholder="e.g. South West Corridor"
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
         </div>
         <button
           onClick={onDelete}
-          className="text-[#b0a89e] hover:text-red-500 text-lg leading-none mt-5 transition-colors"
+          className="text-faint-2 hover:text-red-500 text-lg leading-none mt-5 transition-colors"
           title="Delete area"
         >
           ×
@@ -1516,11 +1516,11 @@ function SpecificAreaCard({
       {/* Suburbs section */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold">
             Suburbs / Postcodes
           </label>
           {area.suburbs.length > 0 && (
-            <span className="text-xs bg-[#f5f2ee] border border-[#e8e4e0] px-2 py-0.5 rounded-full text-[#6b6763]">
+            <span className="text-xs bg-surface border border-line-3 px-2 py-0.5 rounded-full text-grey-600">
               {area.suburbs.length} suburb{area.suburbs.length !== 1 ? 's' : ''} tagged
             </span>
           )}
@@ -1532,10 +1532,10 @@ function SpecificAreaCard({
             {completeLgaGroups.map(({ lga, suburbs: lgaSuburbs }) => (
               <div
                 key={lga}
-                className="border border-[#c9a96e] rounded-lg p-2.5 bg-[#fdf8f0]"
+                className="border border-gold rounded-lg p-2.5 bg-[#fdf8f0]"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-[#c9a96e]">{lga}</span>
+                  <span className="text-xs font-semibold text-gold">{lga}</span>
                   <button
                     onClick={() => {
                       if (window.confirm(`Remove all ${lgaSuburbs.length} suburbs in ${lga}?`)) {
@@ -1545,7 +1545,7 @@ function SpecificAreaCard({
                         })
                       }
                     }}
-                    className="text-[10px] text-[#9e998f] hover:text-red-500 transition-colors"
+                    className="text-[10px] text-subtle hover:text-red-500 transition-colors"
                   >
                     Remove LGA
                   </button>
@@ -1554,12 +1554,12 @@ function SpecificAreaCard({
                   {lgaSuburbs.map((s) => (
                     <span
                       key={`${s.suburb}-${s.postcode}`}
-                      className="inline-flex items-center gap-1 bg-white border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded"
+                      className="inline-flex items-center gap-1 bg-white border border-line-3 text-body text-xs px-2 py-0.5 rounded"
                     >
                       {s.suburb} {s.postcode}
                       <button
                         onClick={() => removeSuburb(s)}
-                        className="text-[#9e998f] hover:text-[#1a1a1a] leading-none"
+                        className="text-subtle hover:text-ink leading-none"
                         title={`Remove ${s.suburb} (will break LGA group)`}
                       >
                         ×
@@ -1578,12 +1578,12 @@ function SpecificAreaCard({
             {individualSuburbs.map((s) => (
               <span
                 key={`${s.suburb}-${s.postcode}`}
-                className="inline-flex items-center gap-1 bg-[#f5f2ee] border border-[#e8e4e0] text-[#3a3530] text-xs px-2 py-0.5 rounded"
+                className="inline-flex items-center gap-1 bg-surface border border-line-3 text-body text-xs px-2 py-0.5 rounded"
               >
                 {s.suburb} {s.postcode}
                 <button
                   onClick={() => removeSuburb(s)}
-                  className="text-[#9e998f] hover:text-[#1a1a1a] leading-none"
+                  className="text-subtle hover:text-ink leading-none"
                 >
                   ×
                 </button>
@@ -1602,25 +1602,25 @@ function SpecificAreaCard({
         <div ref={lgaSelectorRef} className="relative mt-2">
           <button
             onClick={() => setShowLgaSelector(!showLgaSelector)}
-            className="text-xs text-[#6b6763] border border-[#e8e4e0] rounded px-2.5 py-1 hover:bg-[#f5f2ee] transition-colors"
+            className="text-xs text-grey-600 border border-line-3 rounded px-2.5 py-1 hover:bg-surface transition-colors"
           >
             + Add by LGA
           </button>
           {showLgaSelector && (
-            <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-[#e8e4e0] rounded-lg shadow-lg z-30">
-              <div className="p-2 border-b border-[#e8e4e0]">
+            <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-line-3 rounded-lg shadow-lg z-30">
+              <div className="p-2 border-b border-line-3">
                 <input
                   type="text"
                   value={lgaQuery}
                   onChange={(e) => setLgaQuery(e.target.value)}
                   placeholder="Search LGA name…"
                   autoFocus
-                  className="w-full text-xs border border-[#e8e4e0] rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                  className="w-full text-xs border border-line-3 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                 />
               </div>
               <div className="max-h-56 overflow-y-auto">
                 {filteredLgas.length === 0 ? (
-                  <p className="text-xs text-[#9e998f] px-3 py-2">No LGAs match</p>
+                  <p className="text-xs text-subtle px-3 py-2">No LGAs match</p>
                 ) : (
                   filteredLgas.map((preset) => {
                     const alreadyAdded = preset.suburbs.every((ps) =>
@@ -1634,14 +1634,14 @@ function SpecificAreaCard({
                           if (!alreadyAdded) addLga(preset)
                         }}
                         disabled={alreadyAdded}
-                        className={`block w-full text-left px-3 py-2 text-xs border-b border-[#f5f2ee] last:border-0 transition-colors ${
+                        className={`block w-full text-left px-3 py-2 text-xs border-b border-surface last:border-0 transition-colors ${
                           alreadyAdded
-                            ? 'text-[#9e998f] cursor-not-allowed'
-                            : 'text-[#1a1a1a] hover:bg-[#f5f2ee]'
+                            ? 'text-subtle cursor-not-allowed'
+                            : 'text-ink hover:bg-surface'
                         }`}
                       >
                         <span className="font-medium">{preset.lga}</span>
-                        <span className="text-[#9e998f] ml-1">
+                        <span className="text-subtle ml-1">
                           {alreadyAdded ? '✓ added' : `${preset.suburbs.length} suburbs`}
                         </span>
                       </button>
@@ -1656,7 +1656,7 @@ function SpecificAreaCard({
 
       {/* Extended buffer */}
       <div className="bg-[#f0f7ff] rounded-lg p-2.5">
-        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
           Extended service buffer (km)
         </label>
         <input
@@ -1664,9 +1664,9 @@ function SpecificAreaCard({
           min={0}
           value={area.extended_km}
           onChange={(e) => onChange({ ...area, extended_km: parseInt(e.target.value) || 0 })}
-          className="w-32 border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+          className="w-32 border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
         />
-        <p className="text-xs text-[#9e998f] mt-0.5">
+        <p className="text-xs text-subtle mt-0.5">
           Jobs outside tagged suburbs but within this distance from any tagged suburb boundary are
           Extended service. Uses suburb centre coordinates as the reference point.
         </p>
@@ -1729,10 +1729,10 @@ function SuburbAutocomplete({
         }}
         onFocus={() => setShowDropdown(true)}
         placeholder="Search suburb name or postcode to add…"
-        className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+        className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
       />
       {showDropdown && filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-20 max-h-48 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line-3 rounded shadow-lg z-20 max-h-48 overflow-y-auto">
           {filtered.map((s) => (
             <button
               key={`${s.suburb}-${s.postcode}`}
@@ -1740,10 +1740,10 @@ function SuburbAutocomplete({
                 e.preventDefault()
                 handleSelect(s)
               }}
-              className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] text-[#1a1a1a]"
+              className="block w-full text-left px-3 py-2 text-sm hover:bg-surface text-ink"
             >
               {s.suburb}{' '}
-              <span className="text-[#9e998f]">
+              <span className="text-subtle">
                 {s.state} {s.postcode}
               </span>
             </button>
@@ -1820,7 +1820,7 @@ function AddressSearch({
         {/* Search icon */}
         <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
           <svg
-            className="w-4 h-4 text-[#9e998f]"
+            className="w-4 h-4 text-subtle"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1840,19 +1840,19 @@ function AddressSearch({
           onChange={handleChange}
           onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
           placeholder="Search any Australian address (street, suburb, postcode)…"
-          className="w-full border border-[#e8e4e0] rounded pl-10 pr-32 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+          className="w-full border border-line-3 rounded pl-10 pr-32 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
         />
         
         {/* Right side indicators */}
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
           {/* Google Places badge */}
           {suggestions.length > 0 && geocodingState === 'idle' && (
-            <span className="text-[10px] text-[#9e998f] bg-[#f5f2ee] px-1.5 py-0.5 rounded">
+            <span className="text-[10px] text-subtle bg-surface px-1.5 py-0.5 rounded">
               Google Places
             </span>
           )}
           {geocodingState === 'loading' && (
-            <span className="text-xs text-[#c9a96e]">Searching…</span>
+            <span className="text-xs text-gold">Searching…</span>
           )}
           {geocodingState === 'success' && (
             <span className="text-green-500 text-sm" title="Address geocoded successfully">
@@ -1868,9 +1868,9 @@ function AddressSearch({
       </div>
       
       {showDropdown && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e4e0] rounded shadow-lg z-30 max-h-52 overflow-y-auto">
-          <div className="px-3 py-2 border-b border-[#f5f2ee] bg-[#f5f2ee]">
-            <p className="text-[10px] text-[#9e998f]">Suggestions from Google Places</p>
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-line-3 rounded shadow-lg z-30 max-h-52 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-surface bg-surface">
+            <p className="text-[10px] text-subtle">Suggestions from Google Places</p>
           </div>
           {suggestions.map((s) => (
             <button
@@ -1879,11 +1879,11 @@ function AddressSearch({
                 e.preventDefault()
                 handleSelect(s)
               }}
-              className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f5f2ee] border-b border-[#f5f2ee] last:border-0"
+              className="block w-full text-left px-3 py-2 text-sm hover:bg-surface border-b border-surface last:border-0"
             >
-              <span className="text-[#1a1a1a] font-medium">{s.main_text}</span>
+              <span className="text-ink font-medium">{s.main_text}</span>
               {s.secondary_text && (
-                <span className="text-[#9e998f] text-xs ml-2">{s.secondary_text}</span>
+                <span className="text-subtle text-xs ml-2">{s.secondary_text}</span>
               )}
             </button>
           ))}
@@ -1907,11 +1907,11 @@ function CatAreaCard({
   onDelete: () => void
 }) {
   return (
-    <div className="border border-[#e8e4e0] rounded-lg p-4 border-l-4" style={{ borderLeftColor: '#d97706' }}>
+    <div className="border border-line-3 rounded-lg p-4 border-l-4" style={{ borderLeftColor: '#d97706' }}>
       {/* Header row */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 mr-4">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             CAT area label
           </label>
           <input
@@ -1919,19 +1919,19 @@ function CatAreaCard({
             value={area.label}
             onChange={(e) => onChange({ ...area, label: e.target.value })}
             placeholder="e.g. Cyclone Zone — North WA"
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
         </div>
 
         {/* Is active toggle */}
         <div className="flex flex-col items-end gap-1">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold">
             Active
           </label>
           <button
             onClick={() => onChange({ ...area, is_active: !area.is_active })}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              area.is_active ? 'bg-amber-500' : 'bg-[#e8e4e0]'
+              area.is_active ? 'bg-amber-500' : 'bg-line-3'
             }`}
           >
             <span
@@ -1947,7 +1947,7 @@ function CatAreaCard({
 
         <button
           onClick={onDelete}
-          className="text-[#b0a89e] hover:text-red-500 text-lg leading-none mt-5 ml-2 transition-colors"
+          className="text-faint-2 hover:text-red-500 text-lg leading-none mt-5 ml-2 transition-colors"
           title="Delete CAT area"
         >
           ×
@@ -1956,29 +1956,29 @@ function CatAreaCard({
 
       {/* Coverage type */}
       <div className="mb-3">
-        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
           Coverage type
         </label>
         <div className="flex gap-4">
-          <label className="flex items-center gap-1.5 text-sm text-[#3a3530] cursor-pointer">
+          <label className="flex items-center gap-1.5 text-sm text-body cursor-pointer">
             <input
               type="radio"
               name={`cat-type-${area.id}`}
               value="state"
               checked={area.type === 'state'}
               onChange={() => onChange({ ...area, type: 'state', region_description: '' })}
-              className="accent-[#c9a96e]"
+              className="accent-gold"
             />
             Entire state(s)
           </label>
-          <label className="flex items-center gap-1.5 text-sm text-[#3a3530] cursor-pointer">
+          <label className="flex items-center gap-1.5 text-sm text-body cursor-pointer">
             <input
               type="radio"
               name={`cat-type-${area.id}`}
               value="region"
               checked={area.type === 'region'}
               onChange={() => onChange({ ...area, type: 'region' })}
-              className="accent-[#c9a96e]"
+              className="accent-gold"
             />
             Specific regions within state(s)
           </label>
@@ -1988,7 +1988,7 @@ function CatAreaCard({
       {/* Region description (if region type) */}
       {area.type === 'region' && (
         <div className="mb-3">
-          <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
             Region description
           </label>
           <input
@@ -1996,19 +1996,19 @@ function CatAreaCard({
             value={area.region_description}
             onChange={(e) => onChange({ ...area, region_description: e.target.value })}
             placeholder="e.g. North of Tropic of Capricorn, Pilbara and Kimberley regions."
-            className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+            className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
           />
         </div>
       )}
 
       {/* State selection */}
       <div className="mb-3">
-        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-2">
+        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2">
           States
         </label>
         <div className="flex flex-wrap gap-3">
           {AUSTRALIAN_STATES.map((state) => (
-            <label key={state} className="flex items-center gap-1.5 text-sm text-[#3a3530] cursor-pointer">
+            <label key={state} className="flex items-center gap-1.5 text-sm text-body cursor-pointer">
               <input
                 type="checkbox"
                 checked={area.states.includes(state)}
@@ -2018,7 +2018,7 @@ function CatAreaCard({
                     : area.states.filter((s) => s !== state)
                   onChange({ ...area, states: next })
                 }}
-                className="accent-[#c9a96e]"
+                className="accent-gold"
               />
               {state}
             </label>
@@ -2028,7 +2028,7 @@ function CatAreaCard({
 
       {/* Activation notes */}
       <div>
-        <label className="block text-[10px] uppercase tracking-wider text-[#9e998f] font-semibold mb-1">
+        <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
           Activation notes
         </label>
         <textarea
@@ -2036,7 +2036,7 @@ function CatAreaCard({
           value={area.notes}
           onChange={(e) => onChange({ ...area, notes: e.target.value })}
           placeholder="e.g. Activate only on declared CAT event — approval required before lodging."
-          className="w-full border border-[#e8e4e0] rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#c9a96e] resize-none"
+          className="w-full border border-line-3 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold resize-none"
         />
       </div>
     </div>

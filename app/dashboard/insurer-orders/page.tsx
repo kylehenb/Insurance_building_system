@@ -70,13 +70,13 @@ function fuzzyMatch(order: InsurerOrder, query: string): boolean {
 function WoTypeBadge({ type }: { type: string | null }) {
   const lower = type?.toLowerCase()
   if (lower === 'make safe')
-    return <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Make Safe</span>
+    return <span style={{ background: 'var(--danger-bg-2)', color: 'var(--danger-strong)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Make Safe</span>
   if (lower === 'bar')
-    return <span style={{ background: '#e8f0fe', color: '#1a56db', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>BAR</span>
+    return <span style={{ background: 'var(--info-bg)', color: '#1a56db', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>BAR</span>
   if (lower === 'roof report')
     return <span style={{ background: '#f0eef8', color: '#4a42a0', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Roof Report</span>
   if (lower === 'quote only')
-    return <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Quote Only</span>
+    return <span style={{ background: '#fef3c7', color: 'var(--warning-dark)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Quote Only</span>
   return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{type ?? 'Other'}</span>
 }
 
@@ -84,7 +84,7 @@ function ParseStatusBadge({ parseStatus, entryMethod }: { parseStatus: string | 
   if (parseStatus === 'auto_parsed')
     return <span style={{ background: '#e6f4ed', color: '#1e5e3c', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Auto-parsed</span>
   if (parseStatus === 'needs_review')
-    return <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Needs review</span>
+    return <span style={{ background: '#fef3c7', color: 'var(--warning-dark)', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Needs review</span>
   if (parseStatus === 'manual_entry' || entryMethod === 'manual')
     return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Manual</span>
   return null
@@ -94,9 +94,9 @@ function StatusBadge({ status }: { status: string | null }) {
   if (status === 'pending')
     return <span style={{ background: '#fdf5e8', color: '#8a6020', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Pending</span>
   if (status === 'lodged')
-    return <span style={{ background: '#eaf3f0', color: '#2a6b50', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Lodged</span>
+    return <span style={{ background: '#eaf3f0', color: 'var(--teal)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Lodged</span>
   if (status === 'rejected')
-    return <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Rejected</span>
+    return <span style={{ background: 'var(--danger-bg-2)', color: 'var(--danger-strong)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Rejected</span>
   return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{status ?? '—'}</span>
 }
 
@@ -107,7 +107,7 @@ function SkeletonRow() {
         <td key={i} style={{ padding: '12px 12px' }}>
           <div style={{
             height: 13, borderRadius: 4,
-            background: 'linear-gradient(90deg, #f0ece6 25%, #e8e3dc 50%, #f0ece6 75%)',
+            background: 'linear-gradient(90deg, var(--line-faint) 25%, var(--line-5) 50%, var(--line-faint) 75%)',
             backgroundSize: '200% 100%',
             animation: 'pulse 1.4s ease-in-out infinite',
             width: i === 3 ? '80%' : '65%',
@@ -122,10 +122,10 @@ function SkeletonRow() {
 function F({ label, children, mono }: { label: string; children: React.ReactNode; mono?: boolean }) {
   return (
     <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
         {label}
       </div>
-      <div style={{ fontSize: 14, color: '#1a1a1a', fontFamily: mono ? "'DM Mono', monospace" : undefined }}>
+      <div style={{ fontSize: 14, color: 'var(--ink)', fontFamily: mono ? "'DM Mono', monospace" : undefined }}>
         {children}
       </div>
     </div>
@@ -153,7 +153,7 @@ function FEdit({
   useEffect(() => { setDraft(value ?? '') }, [value])
   return (
     <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
         {label}
       </div>
       <input
@@ -161,7 +161,7 @@ function FEdit({
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => onSave(draft)}
-        onFocus={e => (e.target.style.borderColor = '#c8b89a')}
+        onFocus={e => (e.target.style.borderColor = 'var(--tan)')}
         style={{ ...inputStyle, fontFamily: mono ? "'DM Mono', monospace" : "'DM Sans', sans-serif" }}
       />
     </div>
@@ -174,14 +174,14 @@ function FEditArea({ label, value, onSave }: { label: string; value: string | nu
   useEffect(() => { setDraft(value ?? '') }, [value])
   return (
     <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
         {label}
       </div>
       <textarea
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => onSave(draft)}
-        onFocus={e => (e.target.style.borderColor = '#c8b89a')}
+        onFocus={e => (e.target.style.borderColor = 'var(--tan)')}
         rows={2}
         style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
       />
@@ -193,7 +193,7 @@ function FEditArea({ label, value, onSave }: { label: string; value: string | nu
 function LossTypeSelect({ label, value, onSave }: { label: string; value: string | null; onSave: (val: string) => void }) {
   return (
     <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
         {label}
       </div>
       <select
@@ -224,7 +224,7 @@ function WoTypeSelect({ label, value, onSave }: { label: string; value: string |
   
   return (
     <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
         {label}
       </div>
       <select
@@ -781,8 +781,8 @@ function InsurerOrdersPageContent() {
   const pillInactive: React.CSSProperties = { ...pillBase, background: 'transparent', color: '#9a9088', border: '1px solid #e0dbd4' }
 
   function SortIndicator({ col }: { col: SortCol }) {
-    if (sortCol !== col) return <span style={{ marginLeft: 4, color: '#d4cfc8', fontSize: 9 }}>⇅</span>
-    return <span style={{ marginLeft: 4, color: '#c8b89a', fontSize: 9 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
+    if (sortCol !== col) return <span style={{ marginLeft: 4, color: 'var(--line-strong-3)', fontSize: 9 }}>⇅</span>
+    return <span style={{ marginLeft: 4, color: 'var(--tan)', fontSize: 9 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
   }
 
   const thStyle: React.CSSProperties = {
@@ -792,19 +792,19 @@ function InsurerOrdersPageContent() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f2ee', fontFamily: "'DM Sans', sans-serif", color: '#3a3530' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface)', fontFamily: "'DM Sans', sans-serif", color: 'var(--body)' }}>
       <style>{`
         @keyframes pulse {
           0%, 100% { background-position: 200% 0; }
           50% { background-position: -200% 0; }
         }
-        .order-row:hover td { background: #faf9f7 !important; }
+        .order-row:hover td { background: var(--surface-3) !important; }
         .order-row { cursor: pointer; }
-        .chevron { display: inline-block; transition: transform 0.2s; font-size: 10px; color: #b0a898; }
+        .chevron { display: inline-block; transition: transform 0.2s; font-size: 10px; color: var(--faint); }
         .chevron.open { transform: rotate(90deg); }
         .sort-th { cursor: pointer; user-select: none; }
-        .sort-th:hover { color: #7a6a58 !important; }
-        .fedit-input:focus { border-color: #c8b89a !important; outline: none; }
+        .sort-th:hover { color: var(--brown-500) !important; }
+        .fedit-input:focus { border-color: var(--tan) !important; outline: none; }
       `}</style>
 
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '36px 28px 60px' }}>
@@ -812,7 +812,7 @@ function InsurerOrdersPageContent() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Insurer Orders</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>Insurer Orders</h1>
             <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
               {(['all', 'pending', 'lodged', 'rejected'] as FilterStatus[]).map(f => (
                 <button key={f} style={filter === f ? pillActive : pillInactive} onClick={() => setFilter(f)}>
@@ -824,7 +824,7 @@ function InsurerOrdersPageContent() {
           <button
             onClick={() => setNewOrderOpen(true)}
             style={{
-              background: '#1a1a1a', color: '#f5f2ee', border: 'none', borderRadius: 8,
+              background: 'var(--ink)', color: 'var(--surface)', border: 'none', borderRadius: 8,
               padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               fontFamily: "'DM Sans', sans-serif", marginTop: 4,
             }}
@@ -841,13 +841,13 @@ function InsurerOrdersPageContent() {
             { label: 'Make Safes', value: makeSafeCount },
           ].map(card => (
             <div key={card.label} style={{
-              background: '#ffffff', border: '0.5px solid #e4dfd8', borderRadius: 8,
-              padding: '14px 20px', borderLeft: '3px solid #c8b89a', minWidth: 120,
+              background: 'var(--paper)', border: '0.5px solid var(--line-2)', borderRadius: 8,
+              padding: '14px 20px', borderLeft: '3px solid var(--tan)', minWidth: 120,
             }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', lineHeight: 1 }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', lineHeight: 1 }}>
                 {loading ? '—' : card.value}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 5 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 5 }}>
                 {card.label}
               </div>
             </div>
@@ -862,14 +862,14 @@ function InsurerOrdersPageContent() {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 marginBottom: 12, padding: '10px 16px',
-                background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6,
+                background: '#fffbeb', border: '1px solid var(--warning-bright)', borderRadius: 6,
               }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#92400e' }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--warning-dark)' }}>
                   {needsReviewCount} order{needsReviewCount !== 1 ? 's' : ''} need review before lodging
                 </span>
                 <button
                   onClick={() => setFilter('pending')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#92400e', fontWeight: 600, padding: 0, fontFamily: "'DM Sans', sans-serif" }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--warning-dark)', fontWeight: 600, padding: 0, fontFamily: "'DM Sans', sans-serif" }}
                 >
                   View pending →
                 </button>
@@ -894,16 +894,16 @@ function InsurerOrdersPageContent() {
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search orders…"
               style={{
-                width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 6,
+                width: '100%', border: '0.5px solid var(--line-2)', borderRadius: 6,
                 padding: '9px 12px 9px 32px', fontSize: 13,
-                fontFamily: "'DM Sans', sans-serif", color: '#3a3530',
-                background: '#ffffff', boxSizing: 'border-box', outline: 'none',
+                fontFamily: "'DM Sans', sans-serif", color: 'var(--body)',
+                background: 'var(--paper)', boxSizing: 'border-box', outline: 'none',
               }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#b0a898', fontSize: 14, padding: 0, lineHeight: 1 }}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--faint)', fontSize: 14, padding: 0, lineHeight: 1 }}
               >
                 ×
               </button>
@@ -912,7 +912,7 @@ function InsurerOrdersPageContent() {
         </div>
 
         {/* Table */}
-        <div style={{ background: '#ffffff', border: '0.5px solid #e4dfd8', borderRadius: 8, overflow: 'clip' }}>
+        <div style={{ background: 'var(--paper)', border: '0.5px solid var(--line-2)', borderRadius: 8, overflow: 'clip' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
               <colgroup>
@@ -928,7 +928,7 @@ function InsurerOrdersPageContent() {
                 <col style={{ width: 28 }} />
               </colgroup>
               <thead>
-                <tr style={{ background: '#fdfdfc', borderBottom: '0.5px solid #e4dfd8' }}>
+                <tr style={{ background: 'var(--surface-6)', borderBottom: '0.5px solid var(--line-2)' }}>
                   <th style={thStyle}>Order Ref</th>
                   <th style={thStyle}>Claim #</th>
                   <th style={thStyle}>Insured</th>
@@ -958,7 +958,7 @@ function InsurerOrdersPageContent() {
                   Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ padding: '48px 16px', textAlign: 'center', color: '#b0a898', fontSize: 13 }}>
+                    <td colSpan={10} style={{ padding: '48px 16px', textAlign: 'center', color: 'var(--faint)', fontSize: 13 }}>
                       {searchQuery ? 'No orders match your search' : 'No orders found'}
                     </td>
                   </tr>
@@ -976,10 +976,10 @@ function InsurerOrdersPageContent() {
                           id={`order-row-${order.id}`}
                           className="order-row"
                           onClick={() => openAccordion(order.id)}
-                          style={{ borderBottom: isOpen ? 'none' : '0.5px solid #f0ece6' }}
+                          style={{ borderBottom: isOpen ? 'none' : '0.5px solid var(--line-faint)' }}
                         >
                           <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', overflow: 'hidden', background: rowBg, borderLeft: leftBorder }}>
-                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#c8b89a', fontWeight: 500 }}>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: 'var(--tan)', fontWeight: 500 }}>
                               {order.order_ref ?? order.id.slice(-8)}
                             </span>
                           </td>
@@ -1003,7 +1003,7 @@ function InsurerOrdersPageContent() {
                                 ].filter(Boolean) as string[]
                                 if (missing.length === 0) return null
                                 return (
-                                  <span style={{ fontSize: 10, color: '#b0a898' }}>
+                                  <span style={{ fontSize: 10, color: 'var(--faint)' }}>
                                     Missing: {missing.join(', ')}
                                   </span>
                                 )
@@ -1021,7 +1021,7 @@ function InsurerOrdersPageContent() {
                           <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', overflow: 'hidden', background: rowBg }}>
                             <WoTypeBadge type={order.wo_type} />
                           </td>
-                          <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', fontSize: 12, color: '#b0a898', background: rowBg }}>
+                          <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--faint)', background: rowBg }}>
                             {formatDate(order.date_of_loss)}
                           </td>
                           <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', background: rowBg }}>
@@ -1031,7 +1031,7 @@ function InsurerOrdersPageContent() {
                             {order.job_id ? (
                               <button
                                 onClick={e => { e.stopPropagation(); router.push(`/dashboard/jobs/${order.job_id}`) }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#c8b89a', display: 'flex', alignItems: 'center' }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--tan)', display: 'flex', alignItems: 'center' }}
                                 title={jobNum ?? 'View linked job'}
                               >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1040,7 +1040,7 @@ function InsurerOrdersPageContent() {
                                 </svg>
                               </button>
                             ) : (
-                              <span style={{ color: '#b0a898' }}>—</span>
+                              <span style={{ color: 'var(--faint)' }}>—</span>
                             )}
                           </td>
                           <td style={{ padding: '12px 8px', textAlign: 'center', background: rowBg }}>
@@ -1051,10 +1051,10 @@ function InsurerOrdersPageContent() {
                         {/* Expanded panel */}
                         {isOpen && (
                           <tr>
-                            <td colSpan={10} style={{ padding: 0, borderBottom: '0.5px solid #e4dfd8' }}>
+                            <td colSpan={10} style={{ padding: 0, borderBottom: '0.5px solid var(--line-2)' }}>
                               <div style={{
-                                background: isLinked ? '#f0fbf5' : '#fdfcfb',
-                                borderTop: isLinked ? '2px solid #b8e0c8' : '0.5px solid #f0ece6',
+                                background: isLinked ? '#f0fbf5' : 'var(--surface-7)',
+                                borderTop: isLinked ? '2px solid #b8e0c8' : '0.5px solid var(--line-faint)',
                                 padding: '14px 20px',
                               }}>
 
@@ -1190,24 +1190,24 @@ function InsurerOrdersPageContent() {
                                   />
                                   
                                   {/* Raw Email Fields */}
-                                  <div style={{ border: '1px solid #e4dfd8', borderRadius: 6, padding: 12, background: '#faf9f7' }}>
-                                    <div style={{ fontSize: 11, fontWeight: 600, color: '#b0a898', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  <div style={{ border: '1px solid var(--line-2)', borderRadius: 6, padding: 12, background: 'var(--surface-3)' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--faint)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                       Raw Email Data
                                     </div>
                                     
                                     {/* Raw Email Subject */}
                                     {order.raw_email_subject && (
                                       <div style={{ marginBottom: 12 }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 3 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', marginBottom: 3 }}>
                                           Email Subject
                                         </div>
                                         <div style={{
                                           padding: '8px 10px',
-                                          background: '#ffffff',
-                                          border: '0.5px solid #e4dfd8',
+                                          background: 'var(--paper)',
+                                          border: '0.5px solid var(--line-2)',
                                           borderRadius: 4,
                                           fontSize: 13,
-                                          color: '#1a1a1a',
+                                          color: 'var(--ink)',
                                           fontFamily: "'DM Sans', sans-serif",
                                           whiteSpace: 'pre-wrap'
                                         }}>
@@ -1219,7 +1219,7 @@ function InsurerOrdersPageContent() {
                                     {/* Raw Email Body */}
                                     {order.raw_email_body && (
                                       <div style={{ marginBottom: 12 }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 3 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', marginBottom: 3 }}>
                                           Email Body
                                         </div>
                                         <textarea
@@ -1229,11 +1229,11 @@ function InsurerOrdersPageContent() {
                                           style={{
                                             width: '100%',
                                             padding: '8px 10px',
-                                            background: '#ffffff',
-                                            border: '0.5px solid #e4dfd8',
+                                            background: 'var(--paper)',
+                                            border: '0.5px solid var(--line-2)',
                                             borderRadius: 4,
                                             fontSize: 12,
-                                            color: '#1a1a1a',
+                                            color: 'var(--ink)',
                                             fontFamily: "'DM Mono', monospace",
                                             resize: 'vertical',
                                             whiteSpace: 'pre-wrap',
@@ -1247,18 +1247,18 @@ function InsurerOrdersPageContent() {
                                     {/* Email Attachments */}
                                     {order.email_attachments && Array.isArray(order.email_attachments) && order.email_attachments.length > 0 && (
                                       <div>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', marginBottom: 6 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', marginBottom: 6 }}>
                                           Attachments ({order.email_attachments.length})
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                           {order.email_attachments.map((attachment: any, index: number) => (
                                             <div key={index} style={{
                                               padding: '6px 10px',
-                                              background: '#ffffff',
-                                              border: '0.5px solid #e4dfd8',
+                                              background: 'var(--paper)',
+                                              border: '0.5px solid var(--line-2)',
                                               borderRadius: 4,
                                               fontSize: 12,
-                                              color: '#3a3530',
+                                              color: 'var(--body)',
                                               display: 'flex',
                                               alignItems: 'center',
                                               gap: 8
@@ -1269,7 +1269,7 @@ function InsurerOrdersPageContent() {
                                               </svg>
                                               <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 500 }}>{attachment.filename}</div>
-                                                <div style={{ fontSize: 10, color: '#b0a898' }}>
+                                                <div style={{ fontSize: 10, color: 'var(--faint)' }}>
                                                   {attachment.mimeType} • {Math.round(attachment.size / 1024)}KB
                                                 </div>
                                               </div>
@@ -1286,19 +1286,19 @@ function InsurerOrdersPageContent() {
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                     {isLinked ? (
                                       order.status === 'rejected' ? (
-                                        <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>✗ Rejected</span>
+                                        <span style={{ background: 'var(--danger-bg-2)', color: 'var(--danger-strong)', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>✗ Rejected</span>
                                       ) : order.status === 'lodged' ? (
                                         <>
-                                          <span style={{ background: '#eaf3f0', color: '#2a6b50', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>
+                                          <span style={{ background: '#eaf3f0', color: 'var(--teal)', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>
                                             ✓ Lodged as {jobNum ?? '…'}
                                           </span>
                                           <button onClick={() => router.push(`/dashboard/jobs/${order.job_id}`)} style={ghostBtn}>Open Job →</button>
                                         </>
                                       ) : (
-                                        <button onClick={() => setRejectOpen(v => !v)} style={{ ...ghostBtn, color: '#b91c1c' }}>Reject</button>
+                                        <button onClick={() => setRejectOpen(v => !v)} style={{ ...ghostBtn, color: 'var(--danger-strong)' }}>Reject</button>
                                       )
                                     ) : order.status === 'rejected' ? (
-                                      <span style={{ background: '#fdecea', color: '#b91c1c', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>✗ Rejected</span>
+                                      <span style={{ background: 'var(--danger-bg-2)', color: 'var(--danger-strong)', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 20 }}>✗ Rejected</span>
                                     ) : (
                                       <>
                                         <button
@@ -1308,29 +1308,29 @@ function InsurerOrdersPageContent() {
                                         >
                                           {lodging ? 'Lodging…' : 'Lodge Order'}
                                         </button>
-                                        <button onClick={() => setRejectOpen(v => !v)} disabled={lodging} style={{ ...ghostBtn, color: '#b91c1c', opacity: lodging ? 0.5 : 1 }}>Reject</button>
+                                        <button onClick={() => setRejectOpen(v => !v)} disabled={lodging} style={{ ...ghostBtn, color: 'var(--danger-strong)', opacity: lodging ? 0.5 : 1 }}>Reject</button>
                                         <button onClick={() => setLinkOpen(v => !v)} disabled={lodging} style={{ ...ghostBtn, opacity: lodging ? 0.5 : 1 }}>Link to existing job</button>
                                       </>
                                     )}
                                   </div>
 
                                   {lodgeError && (
-                                    <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c' }}>{lodgeError}</div>
+                                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger-strong)' }}>{lodgeError}</div>
                                   )}
 
                                   {/* Reject inline form */}
                                   {rejectOpen && order.status !== 'rejected' && (
-                                    <div style={{ marginTop: 12, padding: '14px 16px', background: '#fdfcfb', border: '0.5px solid #e4dfd8', borderRadius: 6 }}>
-                                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>Reason for rejection</div>
+                                    <div style={{ marginTop: 12, padding: '14px 16px', background: 'var(--surface-7)', border: '0.5px solid var(--line-2)', borderRadius: 6 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>Reason for rejection</div>
                                       <textarea
                                         value={rejectReason}
                                         onChange={e => setRejectReason(e.target.value)}
                                         rows={2}
                                         placeholder="Optional reason…"
                                         style={{
-                                          width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 4,
+                                          width: '100%', border: '0.5px solid var(--line-2)', borderRadius: 4,
                                           padding: '8px 10px', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-                                          color: '#3a3530', resize: 'vertical', boxSizing: 'border-box',
+                                          color: 'var(--body)', resize: 'vertical', boxSizing: 'border-box',
                                         }}
                                       />
                                       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1342,21 +1342,21 @@ function InsurerOrdersPageContent() {
 
                                   {/* Link to existing job */}
                                   {linkOpen && !isLinked && (
-                                    <div style={{ marginTop: 12, padding: '14px 16px', background: '#fdfcfb', border: '0.5px solid #e4dfd8', borderRadius: 6 }}>
-                                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3a3530', marginBottom: 8 }}>Search by job number or claim number</div>
+                                    <div style={{ marginTop: 12, padding: '14px 16px', background: 'var(--surface-7)', border: '0.5px solid var(--line-2)', borderRadius: 6 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--body)', marginBottom: 8 }}>Search by job number or claim number</div>
                                       <input
                                         type="text"
                                         value={linkSearch}
                                         onChange={e => setLinkSearch(e.target.value)}
                                         placeholder="e.g. IRC1008 or CLM-12345"
                                         style={{
-                                          width: '100%', border: '0.5px solid #e4dfd8', borderRadius: 4,
+                                          width: '100%', border: '0.5px solid var(--line-2)', borderRadius: 4,
                                           padding: '8px 10px', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-                                          color: '#3a3530', boxSizing: 'border-box',
+                                          color: 'var(--body)', boxSizing: 'border-box',
                                         }}
                                       />
                                       {linkResults.length > 0 && (
-                                        <div style={{ marginTop: 6, border: '0.5px solid #e4dfd8', borderRadius: 4, overflow: 'hidden' }}>
+                                        <div style={{ marginTop: 6, border: '0.5px solid var(--line-2)', borderRadius: 4, overflow: 'hidden' }}>
                                           {linkResults.map(job => (
                                             <button
                                               key={job.id}
@@ -1364,15 +1364,15 @@ function InsurerOrdersPageContent() {
                                               style={{
                                                 display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                                                 padding: '10px 12px', background: 'none', border: 'none',
-                                                borderBottom: '0.5px solid #f0ece6', cursor: 'pointer',
+                                                borderBottom: '0.5px solid var(--line-faint)', cursor: 'pointer',
                                                 textAlign: 'left', fontFamily: "'DM Sans', sans-serif",
                                               }}
                                             >
-                                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#c8b89a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: 'var(--tan)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                                 {job.job_number}
                                               </span>
-                                              <span style={{ fontSize: 13, color: '#3a3530' }}>{job.insured_name ?? '—'}</span>
-                                              <span style={{ fontSize: 12, color: '#b0a898', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                                              <span style={{ fontSize: 13, color: 'var(--body)' }}>{job.insured_name ?? '—'}</span>
+                                              <span style={{ fontSize: 12, color: 'var(--faint)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
                                                 {job.property_address ?? ''}
                                               </span>
                                             </button>
@@ -1400,7 +1400,7 @@ function InsurerOrdersPageContent() {
       {learningPrompt && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 60,
-          background: '#1a1a1a', color: '#f5f2ee',
+          background: 'var(--ink)', color: 'var(--surface)',
           padding: '14px 24px',
           display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.18)',
@@ -1426,8 +1426,8 @@ function InsurerOrdersPageContent() {
             onClick={handleSaveLearningExample}
             disabled={!learningPrompt.confirmedError || learningPrompt.saving}
             style={{
-              background: learningPrompt.confirmedError ? '#2a6b50' : '#3a3a3a',
-              color: '#ffffff', border: 'none', borderRadius: 6,
+              background: learningPrompt.confirmedError ? 'var(--teal)' : '#3a3a3a',
+              color: 'var(--paper)', border: 'none', borderRadius: 6,
               padding: '7px 14px', fontSize: 12, fontWeight: 600,
               cursor: learningPrompt.confirmedError ? 'pointer' : 'not-allowed',
               fontFamily: "'DM Sans', sans-serif",
@@ -1457,7 +1457,7 @@ function InsurerOrdersPageContent() {
       {saveToast && (
         <div style={{
           position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 70,
-          background: '#2a6b50', color: '#ffffff', borderRadius: 8,
+          background: 'var(--teal)', color: 'var(--paper)', borderRadius: 8,
           padding: '10px 20px', fontSize: 13, fontWeight: 500,
           boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
           fontFamily: "'DM Sans', sans-serif",
@@ -1476,16 +1476,16 @@ function InsurerOrdersPageContent() {
           />
           <div style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
-            background: '#ffffff', borderLeft: '1px solid #e4dfd8', zIndex: 50,
+            background: 'var(--paper)', borderLeft: '1px solid var(--line-2)', zIndex: 50,
             padding: '36px 32px', fontFamily: "'DM Sans', sans-serif",
             boxShadow: '-4px 0 24px rgba(0,0,0,0.08)', overflowY: 'auto',
           }}>
-            <div style={{ fontSize: 12, color: '#b0a898', marginBottom: 8 }}>New Order</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', marginBottom: 24 }}>Create Insurer Order</div>
+            <div style={{ fontSize: 12, color: 'var(--faint)', marginBottom: 8 }}>New Order</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginBottom: 24 }}>Create Insurer Order</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Claim Number
                 </div>
                 <input
@@ -1507,7 +1507,7 @@ function InsurerOrdersPageContent() {
               />
 
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Work Order Type
                 </div>
                 <select
@@ -1526,7 +1526,7 @@ function InsurerOrdersPageContent() {
               </div>
 
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Property Address
                 </div>
                 <input
@@ -1539,7 +1539,7 @@ function InsurerOrdersPageContent() {
               </div>
 
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Insured Name
                 </div>
                 <input
@@ -1553,7 +1553,7 @@ function InsurerOrdersPageContent() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     Phone
                   </div>
                   <input
@@ -1565,7 +1565,7 @@ function InsurerOrdersPageContent() {
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     Email
                   </div>
                   <input
@@ -1580,7 +1580,7 @@ function InsurerOrdersPageContent() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     Date of Loss
                   </div>
                   <input
@@ -1591,7 +1591,7 @@ function InsurerOrdersPageContent() {
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                     Loss Type
                   </div>
                   <select
@@ -1606,7 +1606,7 @@ function InsurerOrdersPageContent() {
               </div>
 
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Claim Description
                 </div>
                 <textarea
@@ -1619,7 +1619,7 @@ function InsurerOrdersPageContent() {
               </div>
 
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#b0a898', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                   Special Instructions
                 </div>
                 <textarea
@@ -1632,7 +1632,7 @@ function InsurerOrdersPageContent() {
               </div>
 
               {createError && (
-                <div style={{ fontSize: 12, color: '#b91c1c', padding: '8px 12px', background: '#fdecea', borderRadius: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--danger-strong)', padding: '8px 12px', background: 'var(--danger-bg-2)', borderRadius: 4 }}>
                   {createError}
                 </div>
               )}
@@ -1643,7 +1643,7 @@ function InsurerOrdersPageContent() {
                   disabled={creatingOrder}
                   style={{
                     flex: 1,
-                    background: '#1a1a1a', color: '#f5f2ee', border: 'none', borderRadius: 8,
+                    background: 'var(--ink)', color: 'var(--surface)', border: 'none', borderRadius: 8,
                     padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                     fontFamily: "'DM Sans', sans-serif", opacity: creatingOrder ? 0.5 : 1,
                   }}
