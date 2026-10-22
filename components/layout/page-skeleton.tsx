@@ -2,7 +2,7 @@
 // The sidebar stays in place; only the content area shows these blocks.
 
 function Block({ width, height }: { width: number | string; height: number }) {
-  return <div style={{ width, height, borderRadius: 6, background: '#e8e4e0' }} />
+  return <div style={{ width, height, borderRadius: 6, background: 'var(--line-3)' }} />
 }
 
 export function PageSkeleton({ rows = 8 }: { rows?: number }) {
@@ -17,7 +17,7 @@ export function PageSkeleton({ rows = 8 }: { rows?: number }) {
         <Block width={220} height={22} />
         <Block width={140} height={12} />
       </div>
-      <div style={{ background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <Block width={90} height={12} />
