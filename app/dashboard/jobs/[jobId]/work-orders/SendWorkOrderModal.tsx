@@ -16,13 +16,15 @@ interface Draft {
   subject: string
   body: string
   attachmentName: string
+  photos: { count: number; attachmentName: string; jobId: string } | null
   tradeName: string | null
   templateName: string
   usingBuiltInTemplate: boolean
 }
 
 // Send & Lock: Auto send emails the template as-is; Customise send opens the
-// same pre-filled email for editing first. Either way the work order locks
+// same pre-filled email for editing first. The job's photos PDF is attached by
+// default (Customise send can leave it off). Either way the work order locks
 // only once the email has gone. Backdrop, × and Escape close without sending.
 export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrderModalProps) {
   const [step, setStep]       = useState<'choose' | 'customise'>('choose')
@@ -35,6 +37,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
   const [cc, setCc]           = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody]       = useState('')
+  const [includePhotos, setIncludePhotos] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -66,7 +69,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
       const res = await fetch(`/api/work-orders/${workOrder.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'auto' ? { mode } : { mode, to, cc, subject, body }),
+        body: JSON.stringify(mode === 'auto' ? { mode } : { mode, to, cc, subject, body, includePhotos }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Failed to send work order')
@@ -198,7 +201,8 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
             <>
               <p style={{ fontSize: 12, color: 'var(--body-soft)', marginBottom: 14, lineHeight: 1.6 }}>
                 Send the <strong>{label}</strong> work order{contractor ? <> to <strong>{contractor}</strong></> : null}
-                {hasEmail ? <> at <strong>{draft.to}</strong></> : null}? Once sent, the work order locks and its scope items become read-only.
+                {hasEmail ? <> at <strong>{draft.to}</strong></> : null}
+                {draft.photos ? <>, with the job&apos;s {draft.photos.count} photo{draft.photos.count === 1 ? '' : 's'} attached</> : null}? Once sent, the work order locks and its scope items become read-only.
               </p>
               {!hasEmail && (
                 <p style={{ fontSize: 11, color: 'var(--warning-dark)', background: 'var(--warning-bg)', border: '1px solid var(--warning-soft)', borderRadius: 6, padding: '8px 10px', marginBottom: 12, lineHeight: 1.5 }}>
@@ -264,7 +268,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                 />
               </div>
               <div>
-                <label style={fieldLabel}>Attachment</label>
+                <label style={fieldLabel}>{draft.photos ? 'Attachments' : 'Attachment'}</label>
                 <a
                   href={`/api/work-orders/${workOrder.id}/pdf`}
                   target="_blank"
@@ -275,6 +279,28 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                   <Paperclip size={12} />
                   {draft.attachmentName}
                 </a>
+                {draft.photos && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={includePhotos}
+                      onChange={e => setIncludePhotos(e.target.checked)}
+                      disabled={sending}
+                      title="Attach the job's photos"
+                      style={{ margin: 0 }}
+                    />
+                    <a
+                      href={`/api/documents/pdf?kind=photos&id=${draft.photos.jobId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Preview the photos PDF"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink)', textDecoration: 'none', padding: '4px 8px', border: '1px solid var(--line-strong)', borderRadius: 5, background: 'var(--surface-3)', opacity: includePhotos ? 1 : 0.45 }}
+                    >
+                      <Paperclip size={12} />
+                      {draft.photos.attachmentName} ({draft.photos.count} photo{draft.photos.count === 1 ? '' : 's'})
+                    </a>
+                  </div>
+                )}
               </div>
               <p style={{ fontSize: 10, color: 'var(--subtle-2)', lineHeight: 1.5 }}>
                 Changes here apply to this email only. Edit the standard wording in Settings → Email Templates.

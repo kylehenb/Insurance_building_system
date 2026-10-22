@@ -3,7 +3,7 @@ import * as fx from '@/lib/__tests__/print-documents.fixture'
 
 // The page is printed by Chromium elsewhere; here: the HTML it is given.
 
-const evaluate = vi.fn(async (_fn: unknown, src: string) => `${src}#shrunk`)
+const evaluate = vi.fn(async (_fn: unknown, src: string) => ({ src: `${src}#shrunk`, width: 4, height: 3 }))
 vi.mock('@/lib/pdf/render-html-to-pdf', () => ({
   renderHtmlToPdf: vi.fn(),
   getBrowser: async () => ({
