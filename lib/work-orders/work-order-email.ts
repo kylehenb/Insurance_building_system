@@ -161,6 +161,23 @@ export async function sendWorkOrderEmail(
     attachments: files.map(f => ({ filename: f.filename, mimeType: 'application/pdf', content: f.pdf })),
   })
 
+  // Claim the work order before emailing, so two sends close together (a
+  // double click, a voice retry, the app and the voice connector) can't both
+  // email the trade: only one update can move it off not_started. The loose
+  // match also takes a stray newline in gary_state, as woIsSent does.
+  const { data: claimed, error: claimErr } = await supabase
+    .from('work_orders')
+    .update({ gary_state: 'sending' })
+    .eq('id', workOrderId)
+    .eq('tenant_id', tenantId)
+    .or('gary_state.is.null,gary_state.like.not_started*')
+    .select('id')
+  if (claimErr) {
+    console.error(`[work-order-email] claim failed for ${workOrderId}:`, claimErr)
+    throw new WorkOrderEmailError('Could not start the send — nothing was sent', 500)
+  }
+  if (!claimed?.length) throw new WorkOrderEmailError('This work order has already been sent', 409)
+
   let gmailId: string | null = null
   let threadId: string | null = null
   try {
@@ -169,6 +186,13 @@ export async function sendWorkOrderEmail(
     threadId = res.data.threadId ?? null
   } catch (err) {
     console.error(`[work-order-email] Gmail send failed for ${workOrderId}:`, err)
+    const { error: releaseErr } = await supabase
+      .from('work_orders')
+      .update({ gary_state: 'not_started' })
+      .eq('id', workOrderId)
+      .eq('tenant_id', tenantId)
+      .eq('gary_state', 'sending')
+    if (releaseErr) console.error(`[work-order-email] release failed for ${workOrderId}:`, releaseErr)
     throw new WorkOrderEmailError('Failed to send email — the work order has not been locked', 502)
   }
 

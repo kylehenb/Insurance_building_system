@@ -2471,6 +2471,7 @@ Level changes are deliberate decisions — not automatic. Promotion to the next 
 - `maxDuration = 60`; uses the project's default function memory
 - Template: `lib/documents/work-order-pdf-html.ts` (trade-safe; see WF-8 "Work order PDF content"). Same layout as the original print page, 10mm margins. The Vercel Chromium has no Arial, so Liberation Sans (Arial-metric, SIL OFL; `lib/pdf/fonts/`) is embedded under the family name Arial
 - Reusable hook for automations: `generateWorkOrderPdf(workOrderId, ctx?)` in `lib/work-orders/work-order-pdf.ts` returns a `Buffer`. Without `ctx` it uses the signed-in session; background jobs pass `{ supabase: createServiceClient(), tenantId }`. Not yet wired to email, job_files or Telegram.
+- Send & Lock claims the work order before emailing (a guarded update from `not_started` to `sending`), so two sends close together — a double click, or the app and the voice connector — can't both email the trade; the loser gets 409. If Gmail refuses the email the claim is released back to `not_started`; once Gmail accepts it the work order moves to `waiting_reply` / `waiting_on_dependent` as before
 - Send & Lock (`lib/work-orders/work-order-email.ts`) emails the work order PDF plus, by default, a Photos PDF of all the job's photos (the Photos tab's photo pages, `buildPhotosPdf`). Customise send can untick the photos; jobs with no photos send the work order alone. If the photos PDF can't be made, or the attachments exceed 18 MB, nothing is sent and the work order stays unlocked
 - UI: "PDF" button on the Work Orders tab table and "Preview PDF" in the work order card menu (opens inline; no download option)
 - The older browser-print page `/print/work-orders/[workOrderId]` remains until the new PDF is signed off, then it will be retired
@@ -2589,12 +2590,13 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | Tool | Type | Calls | Notes |
 |---|---|---|---|
 | `find_work_orders(job_number?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders. Without: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
+| `get_work_order_email(work_order_id)` | read | `buildWorkOrderEmailDraft` | Recipient, amount, warnings, attachments (WO PDF + photos PDF), standard subject/body from the tenant template. Already sent → says it can't be sent again |
+| `send_work_order(work_order_id, to?, subject?, body?, include_photos?)` | send | `sendWorkOrderEmail` | Same send as Auto/Customise send: PDF + photos, communications row, Gary hand-off. Refuses an already-sent work order (409). Description requires a read-back and a clear yes first, and no retry on error |
 
 ### Planned
-1. Work order send: `get_work_order_email` (`buildWorkOrderEmailDraft`) and `send_work_order` (`sendWorkOrderEmail`, optional body/recipient/photos). Before it ships, make `sendWorkOrderEmail` claim the work order (guarded update off `not_started`) before emailing, so two near-simultaneous sends can't both go
-2. Documents: `list_job_documents`, `preview_document_email` (`buildDocumentEmailDraft`), `send_documents` (`sendDocumentEmail`) — quotes, reports, invoices, excess invoices, TCC, photos
-3. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
-4. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
+1. Documents: `list_job_documents`, `preview_document_email` (`buildDocumentEmailDraft`), `send_documents` (`sendDocumentEmail`) — quotes, reports, invoices, excess invoices, TCC, photos
+2. Email replies, inspection confirm/reschedule, job stage, excess, signing requests, accounting sync
+3. Needs logic moved out of the route into `lib/` first: invoice generation, insurer order lodging, inspection proposals, AI report generation
 
 ---
 

@@ -22,6 +22,7 @@ export type TradeAvailability =
 
 export type WorkOrderGaryState =
   | "not_started"
+  | "sending"
   | "waiting_on_dependent"
   | "waiting_reply"
   | "booking_proposed"

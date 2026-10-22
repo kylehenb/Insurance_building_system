@@ -10,7 +10,7 @@ export type TradeRow          = Database['public']['Tables']['trades']['Row']
 
 // ─── Domain enums ─────────────────────────────────────────────────────────────
 export type WorkOrderStatus  = 'pending' | 'engaged' | 'works_complete' | 'invoice_received'
-export type GaryState        = 'not_started' | 'waiting_on_dependent' | 'waiting_reply' | 'booking_proposed' | 'confirmed' | 'return_visit_pending' | 'complete'
+export type GaryState        = 'not_started' | 'sending' | 'waiting_on_dependent' | 'waiting_reply' | 'booking_proposed' | 'confirmed' | 'return_visit_pending' | 'complete'
 export type ProximityRange   = 'standard' | 'extended'
 export type VisitStatus      = 'unscheduled' | 'gary_sent' | 'proposed' | 'confirmed' | 'complete'
 export type PlacementState   = 'unplaced' | 'placed_unsent' | 'placed_sent' | 'placed_complete'
@@ -111,6 +111,7 @@ export function mergeCushionDays(notes: string | null, days: number): string {
 // ─── Gary state display labels ────────────────────────────────────────────────
 export const GARY_STATE_LABELS: Record<string, string> = {
   not_started:          'Not started',
+  sending:              'Sending…',
   waiting_on_dependent: 'Waiting on prior trade',
   waiting_reply:        'Awaiting reply',
   booking_proposed:     'Proposed',

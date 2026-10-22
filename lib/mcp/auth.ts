@@ -17,9 +17,9 @@ function secretMatches(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
-/** The key from "Authorization: Bearer <key>" (or a bare "<key>"). */
+/** The key from "Authorization: Bearer <key>" — also "Bearer<key>", "Bearer: <key>" or a bare "<key>". */
 export function keyFromAuthorization(header: string | null): string {
-  return (header ?? '').trim().replace(/^Bearer\s+/i, '').trim()
+  return (header ?? '').trim().replace(/^Bearer[\s:]*/i, '').trim()
 }
 
 /**

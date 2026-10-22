@@ -43,7 +43,7 @@ export function normaliseJobNumber(value: string): string {
 /** ilike treats % and _ as wildcards */
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, m => `\\${m}`)
 
-const money = (n: number) =>
+export const money = (n: number) =>
   n.toLocaleString('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: n % 1 ? 2 : 0 })
 
 const spokenDate = (iso: string) =>
@@ -118,6 +118,20 @@ function describe(s: WorkOrderSummary): string {
   const amount = s.amount ? money(s.amount) : '$0'
   const state = s.sent ? 'sent' : 'not sent'
   return `- ${who}, ${amount}, ${state}.${s.warnings.length ? ' ' + s.warnings.join(' ') : ''}`
+}
+
+/** One work order's summary (same facts and warnings as find_work_orders), or null if it isn't this tenant's. */
+export async function summariseWorkOrder(workOrderId: string, ctx: McpContext): Promise<WorkOrderSummary | null> {
+  const { supabase, tenantId } = ctx
+  const { data: wo, error } = await supabase
+    .from('work_orders').select('*').eq('tenant_id', tenantId).eq('id', workOrderId).maybeSingle()
+  if (error) throw error
+  if (!wo) return null
+  const { data: job, error: jobErr } = await supabase
+    .from('jobs').select(JOB_COLUMNS).eq('tenant_id', tenantId).eq('id', wo.job_id).maybeSingle()
+  if (jobErr) throw jobErr
+  const [summary] = await summarise([wo], new Map(job ? [[job.id, job]] : []), ctx)
+  return summary
 }
 
 async function findJob(jobNumber: string, ctx: McpContext): Promise<{ job: Job | null; closeMatches: string[] }> {
