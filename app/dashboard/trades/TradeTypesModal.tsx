@@ -110,10 +110,10 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="bg-white rounded-lg p-6 w-full max-w-sm flex flex-col" style={{ maxHeight: '70vh' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">Manage Trade Types</h2>
+            <h2 className="text-lg font-semibold text-ink">Manage Trade Types</h2>
             <button
               onClick={onClose}
-              className="text-[#1a1a1a]/40 hover:text-[#1a1a1a] transition-colors"
+              className="text-ink/40 hover:text-ink transition-colors"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -127,18 +127,18 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto rounded-lg border border-[#e4dfd8] divide-y divide-[#f0ece6]">
+          <div className="flex-1 overflow-y-auto rounded-lg border border-line-2 divide-y divide-line-faint">
             {loading ? (
-              <div className="flex items-center justify-center py-8 text-sm text-[#b0a898]">Loading...</div>
+              <div className="flex items-center justify-center py-8 text-sm text-faint">Loading...</div>
             ) : tradeTypes.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-sm text-[#b0a898]">No trade types yet</div>
+              <div className="flex items-center justify-center py-8 text-sm text-faint">No trade types yet</div>
             ) : (
               tradeTypes.map(item => (
-                <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#faf9f7] group">
+                <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-3 group">
                   {editingId === item.id ? (
                     <input
                       ref={editInputRef}
-                      className="flex-1 rounded border border-[#c9a96e] px-2 py-0.5 text-sm text-[#1a1a1a] focus:outline-none focus:ring-1 focus:ring-[#c9a96e]"
+                      className="flex-1 rounded border border-gold px-2 py-0.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-gold"
                       value={editingValue}
                       onChange={e => setEditingValue(e.target.value)}
                       onBlur={() => handleRename(item)}
@@ -149,7 +149,7 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
                     />
                   ) : (
                     <span
-                      className="flex-1 text-sm text-[#1a1a1a] cursor-pointer"
+                      className="flex-1 text-sm text-ink cursor-pointer"
                       onClick={() => { setEditingId(item.id); setEditingValue(item.trade_type) }}
                       title="Click to rename"
                     >
@@ -158,7 +158,7 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
                   )}
                   <button
                     onClick={() => { setEditingId(item.id); setEditingValue(item.trade_type) }}
-                    className="text-[#1a1a1a]/30 hover:text-[#1a1a1a] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    className="text-ink/30 hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     title="Rename"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -167,7 +167,7 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(item)}
-                    className="text-[#1a1a1a]/30 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    className="text-ink/30 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     title="Delete"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -186,12 +186,12 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
               placeholder="New trade type..."
-              className="flex-1 rounded-md border border-[#e0dbd4] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/50"
+              className="flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/50"
             />
             <button
               onClick={handleAdd}
               disabled={adding || !newName.trim()}
-              className="px-4 py-2 text-sm font-medium text-[#f5f0e8] bg-[#1a1a1a] rounded-lg hover:bg-[#1a1a1a]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-cream bg-ink rounded-lg hover:bg-ink/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add
             </button>
@@ -202,17 +202,17 @@ export function TradeTypesModal({ isOpen, onClose, onChanged }: TradeTypesModalP
       {deleteConfirm && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm">
-            <h3 className="text-base font-semibold text-[#1a1a1a] mb-2">Delete Trade Type</h3>
-            <p className="text-sm text-[#1a1a1a]/70 mb-1">
+            <h3 className="text-base font-semibold text-ink mb-2">Delete Trade Type</h3>
+            <p className="text-sm text-ink/70 mb-1">
               Delete <strong>{deleteConfirm.trade_type}</strong>?
             </p>
-            <p className="text-xs text-[#1a1a1a]/50 mb-5">
+            <p className="text-xs text-ink/50 mb-5">
               Existing contractors assigned to this type will keep their current assignment, but it will no longer appear as an option when adding new contractors.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-sm font-medium text-[#3a3530] bg-white border border-[#e0dbd4] rounded-lg hover:bg-[#f5f0e8] transition-colors"
+                className="px-4 py-2 text-sm font-medium text-body bg-white border border-line rounded-lg hover:bg-cream transition-colors"
               >
                 Cancel
               </button>

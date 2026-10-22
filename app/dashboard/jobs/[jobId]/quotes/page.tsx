@@ -29,7 +29,7 @@ export default async function QuotesPage({ params }: Props) {
   return (
     <div
       style={{
-        background: '#f5f2ee',
+        background: 'var(--surface)',
         minHeight: '100vh',
         fontFamily: 'DM Sans, sans-serif',
       }}
@@ -37,8 +37,8 @@ export default async function QuotesPage({ params }: Props) {
       {/* Page header */}
       <div
         style={{
-          background: '#ffffff',
-          borderBottom: '1px solid #e0dbd4',
+          background: 'var(--paper)',
+          borderBottom: '1px solid var(--line)',
           padding: '12px 24px',
           display: 'flex',
           alignItems: 'center',
@@ -52,19 +52,19 @@ export default async function QuotesPage({ params }: Props) {
               fontFamily: 'DM Mono, monospace',
               fontSize: 13,
               fontWeight: 600,
-              color: '#c8b89a',
+              color: 'var(--tan)',
               textDecoration: 'none',
             }}
           >
             {job.job_number}
           </a>
-          <span style={{ color: '#e0dbd4', fontSize: 14 }}>/</span>
+          <span style={{ color: 'var(--line)', fontSize: 14 }}>/</span>
           <span
             style={{
               fontFamily: 'DM Sans, sans-serif',
               fontSize: 13,
               fontWeight: 600,
-              color: '#3a3530',
+              color: 'var(--body)',
             }}
           >
             Quotes
@@ -72,7 +72,7 @@ export default async function QuotesPage({ params }: Props) {
         </div>
 
         {job.insured_name && (
-          <span style={{ fontSize: 12, color: '#9e998f' }}>{job.insured_name}</span>
+          <span style={{ fontSize: 12, color: 'var(--subtle)' }}>{job.insured_name}</span>
         )}
       </div>
 

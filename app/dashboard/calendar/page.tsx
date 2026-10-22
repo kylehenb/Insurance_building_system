@@ -198,28 +198,28 @@ export default function GlobalCalendarPage() {
   const unscheduledInspections = inspections.filter(i => !i.scheduled_date)
 
   return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#1a1a1a' }}>
+    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--ink)' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>
           Calendar
         </h1>
-        <p style={{ color: '#9e998f', fontSize: 14 }}>
+        <p style={{ color: 'var(--subtle)', fontSize: 14 }}>
           Schedule inspections and track trade work
         </p>
       </div>
 
       {/* Mode Toggle */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 8, background: '#f5f0e8', padding: 4, borderRadius: 8, width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 8, background: 'var(--cream)', padding: 4, borderRadius: 8, width: 'fit-content' }}>
           <button
             onClick={() => setMode('inspections')}
             style={{
               padding: '8px 16px',
               fontSize: 13,
               fontWeight: 500,
-              background: mode === 'inspections' ? '#1a1a1a' : 'transparent',
-              color: mode === 'inspections' ? '#f5f0e8' : '#1a1a1a',
+              background: mode === 'inspections' ? 'var(--ink)' : 'transparent',
+              color: mode === 'inspections' ? 'var(--cream)' : 'var(--ink)',
               border: 'none',
               borderRadius: 6,
               cursor: 'pointer',
@@ -238,8 +238,8 @@ export default function GlobalCalendarPage() {
               padding: '8px 16px',
               fontSize: 13,
               fontWeight: 500,
-              background: mode === 'trades' ? '#1a1a1a' : 'transparent',
-              color: mode === 'trades' ? '#f5f0e8' : '#1a1a1a',
+              background: mode === 'trades' ? 'var(--ink)' : 'transparent',
+              color: mode === 'trades' ? 'var(--cream)' : 'var(--ink)',
               border: 'none',
               borderRadius: 6,
               cursor: 'pointer',
@@ -256,7 +256,7 @@ export default function GlobalCalendarPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#9e998f' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--subtle)' }}>
           Loading…
         </div>
       ) : mode === 'inspections' ? (
@@ -463,7 +463,7 @@ function InspectionsCalendar({
       <div style={{ flex: 1 }}>
         {/* Header with view toggle */}
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Clock size={16} style={{ color: '#9e998f' }} />
+          <Clock size={16} style={{ color: 'var(--subtle)' }} />
           
           {/* Navigation buttons */}
           <button
@@ -480,8 +480,8 @@ function InspectionsCalendar({
               padding: '4px 8px',
               fontSize: 12,
               background: 'transparent',
-              color: '#1a1a1a',
-              border: '1px solid #e0dbd4',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
@@ -496,8 +496,8 @@ function InspectionsCalendar({
               padding: '4px 8px',
               fontSize: 12,
               background: 'transparent',
-              color: '#1a1a1a',
-              border: '1px solid #e0dbd4',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
@@ -520,8 +520,8 @@ function InspectionsCalendar({
               padding: '4px 8px',
               fontSize: 12,
               background: 'transparent',
-              color: '#1a1a1a',
-              border: '1px solid #e0dbd4',
+              color: 'var(--ink)',
+              border: '1px solid var(--line)',
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
@@ -544,9 +544,9 @@ function InspectionsCalendar({
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 500,
-                background: viewType === 'week' ? '#1a1a1a' : 'transparent',
-                color: viewType === 'week' ? '#f5f0e8' : '#1a1a1a',
-                border: '1px solid #e0dbd4',
+                background: viewType === 'week' ? 'var(--ink)' : 'transparent',
+                color: viewType === 'week' ? 'var(--cream)' : 'var(--ink)',
+                border: '1px solid var(--line)',
                 borderRadius: 4,
                 cursor: 'pointer',
                 fontFamily: 'DM Sans, sans-serif',
@@ -560,9 +560,9 @@ function InspectionsCalendar({
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 500,
-                background: viewType === 'month' ? '#1a1a1a' : 'transparent',
-                color: viewType === 'month' ? '#f5f0e8' : '#1a1a1a',
-                border: '1px solid #e0dbd4',
+                background: viewType === 'month' ? 'var(--ink)' : 'transparent',
+                color: viewType === 'month' ? 'var(--cream)' : 'var(--ink)',
+                border: '1px solid var(--line)',
                 borderRadius: 4,
                 cursor: 'pointer',
                 fontFamily: 'DM Sans, sans-serif',
@@ -573,7 +573,7 @@ function InspectionsCalendar({
           </div>
           
           {schedulingRules && (
-            <span style={{ marginLeft: 16, fontSize: 11, color: '#9e998f' }}>
+            <span style={{ marginLeft: 16, fontSize: 11, color: 'var(--subtle)' }}>
               Max: {schedulingRules.max_daily_inspections}/day · {schedulingRules.scheduling_mode} mode
             </span>
           )}
@@ -599,9 +599,9 @@ function InspectionsCalendar({
                       textAlign: 'center',
                       fontWeight: 600,
                       fontSize: 12,
-                      background: isWeekendDay ? '#f5f0e8' : '#fff',
-                      borderBottom: '1px solid #e0dbd4',
-                      borderRight: '1px solid #e0dbd4',
+                      background: isWeekendDay ? 'var(--cream)' : 'var(--paper)',
+                      borderBottom: '1px solid var(--line)',
+                      borderRight: '1px solid var(--line)',
                       minHeight: 60,
                       position: 'relative',
                     }}
@@ -615,10 +615,10 @@ function InspectionsCalendar({
                       handleDragEnd(date, null)
                     }}
                   >
-                    <div style={{ color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
+                    <div style={{ color: isWeekendDay ? 'var(--subtle)' : 'var(--ink)' }}>
                       {date.toLocaleDateString('en-AU', { weekday: 'short' })}
                     </div>
-                    <div style={{ fontSize: 11, color: isWeekendDay ? '#9e998f' : '#1a1a1a' }}>
+                    <div style={{ fontSize: 11, color: isWeekendDay ? 'var(--subtle)' : 'var(--ink)' }}>
                       {date.getDate()}
                     </div>
                     {dayInspectionsNoTime.length > 0 && (
@@ -662,7 +662,7 @@ function InspectionsCalendar({
                     style={{
                       padding: '4px 8px',
                       fontSize: 10,
-                      color: '#9e998f',
+                      color: 'var(--subtle)',
                       textAlign: 'right',
                       borderBottom: '1px solid #f0ebe4',
                       height: 30,
@@ -694,11 +694,11 @@ function InspectionsCalendar({
                         style={{
                           padding: 2,
                           borderBottom: '1px solid #f0ebe4',
-                          borderRight: '1px solid #e0dbd4',
-                          background: isWeekendDay ? '#f9f8f6' : '#fff',
+                          borderRight: '1px solid var(--line)',
+                          background: isWeekendDay ? '#f9f8f6' : 'var(--paper)',
                           height: 30,
                           position: 'relative',
-                          ...(draggedInspection ? { background: isWeekendDay ? '#f0ebe4' : '#f5f0e8' } : {}),
+                          ...(draggedInspection ? { background: isWeekendDay ? '#f0ebe4' : 'var(--cream)' } : {}),
                         }}
                       >
                         {slotInspections.map(inspection => {
@@ -747,7 +747,7 @@ function InspectionsCalendar({
                   textAlign: 'center',
                   fontWeight: 600,
                   fontSize: 12,
-                  background: '#f5f0e8',
+                  background: 'var(--cream)',
                 }}
               >
                 {day}
@@ -769,12 +769,12 @@ function InspectionsCalendar({
                   style={{
                     minHeight: 80,
                     padding: 4,
-                    background: isCurrentMonth ? '#fff' : '#f9f8f6',
-                    border: '1px solid #e0dbd4',
-                    ...(isWeekendDay ? { background: isCurrentMonth ? '#f5f0e8' : '#ebe6de' } : {}),
+                    background: isCurrentMonth ? 'var(--paper)' : '#f9f8f6',
+                    border: '1px solid var(--line)',
+                    ...(isWeekendDay ? { background: isCurrentMonth ? 'var(--cream)' : '#ebe6de' } : {}),
                   }}
                 >
-                  <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, color: isCurrentMonth ? '#1a1a1a' : '#9e998f' }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 4, color: isCurrentMonth ? 'var(--ink)' : 'var(--subtle)' }}>
                     {date.getDate()}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -821,13 +821,13 @@ function InspectionsCalendar({
       {unscheduledInspections.length > 0 && (
         <div style={{ width: 300, flexShrink: 0 }}>
           <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Filter size={16} style={{ color: '#9e998f' }} />
+            <Filter size={16} style={{ color: 'var(--subtle)' }} />
             <span style={{ fontWeight: 600, fontSize: 14 }}>
               Unscheduled ({unscheduledInspections.length})
             </span>
           </div>
 
-          <div style={{ background: '#f9f8f6', border: '1px solid #e0dbd4', borderRadius: 8, padding: 16, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+          <div style={{ background: '#f9f8f6', border: '1px solid var(--line)', borderRadius: 8, padding: 16, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {unscheduledInspections.map(inspection => (
                 <div
@@ -835,8 +835,8 @@ function InspectionsCalendar({
                   draggable
                   onDragStart={() => handleDragStart(inspection)}
                   style={{
-                    background: '#fff',
-                    border: '1px solid #e0dbd4',
+                    background: 'var(--paper)',
+                    border: '1px solid var(--line)',
                     borderRadius: 6,
                     padding: 10,
                     cursor: 'grab',
@@ -846,10 +846,10 @@ function InspectionsCalendar({
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>
                     {inspection.jobs.job_number}
                   </div>
-                  <div style={{ color: '#1a1a1a', marginBottom: 4 }}>
+                  <div style={{ color: 'var(--ink)', marginBottom: 4 }}>
                     {inspection.jobs.insured_name}
                   </div>
-                  <div style={{ color: '#9e998f', fontSize: 11 }}>
+                  <div style={{ color: 'var(--subtle)', fontSize: 11 }}>
                     {inspection.jobs.property_address}
                   </div>
                 </div>
@@ -864,7 +864,7 @@ function InspectionsCalendar({
 
 function TradesCalendar({ workOrders }: { workOrders: WorkOrder[] }) {
   return (
-    <div style={{ padding: 40, textAlign: 'center', color: '#9e998f' }}>
+    <div style={{ padding: 40, textAlign: 'center', color: 'var(--subtle)' }}>
       <div style={{ fontSize: 16, marginBottom: 8 }}>Trades Calendar</div>
       <div style={{ fontSize: 13 }}>
         This view will show work orders in a timeline format.

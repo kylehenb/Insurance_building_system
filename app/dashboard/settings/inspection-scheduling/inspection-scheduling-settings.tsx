@@ -19,7 +19,7 @@ function LabelWithTooltip({ children, tooltip }: { children: React.ReactNode; to
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <HelpCircle className="w-4 h-4 text-[#6b6763] cursor-help" />
+            <HelpCircle className="w-4 h-4 text-grey-600 cursor-help" />
           </TooltipTrigger>
           <TooltipContent>
             <p className="max-w-xs">{tooltip}</p>
@@ -99,7 +99,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-[#6b6763]">Loading...</div>
+        <div className="text-grey-600">Loading...</div>
       </div>
     )
   }
@@ -107,17 +107,17 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
   if (!rules) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-[#6b6763]">Failed to load settings</div>
+        <div className="text-grey-600">Failed to load settings</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] pb-24">
+    <div className="min-h-screen bg-surface pb-24">
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-[#1a1a1a] mb-2">Inspection Scheduling</h1>
-          <p className="text-[#6b6763]">Rules applied when the auto-scheduler proposes inspection runs.</p>
+          <h1 className="text-3xl font-semibold text-ink mb-2">Inspection Scheduling</h1>
+          <p className="text-grey-600">Rules applied when the auto-scheduler proposes inspection runs.</p>
         </div>
 
         <Accordion type="multiple" defaultValue={['mode-capacity']} className="space-y-4">
@@ -152,7 +152,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                         <SelectItem value="manual">Manual</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-sm text-[#6b6763]">
+                    <p className="text-sm text-grey-600">
                       {rules.scheduling_mode === 'quiet' && 'Hold jobs until a cluster forms or the hold period expires. Best for low-volume periods.'}
                       {rules.scheduling_mode === 'busy' && 'Schedule immediately if the job is within the busy radius of an existing run job.'}
                       {rules.scheduling_mode === 'cat_event' && 'Zone and cluster rules suspended. Maximise daily throughput.'}
@@ -188,9 +188,9 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.auto_mode_trigger_count}
                           onChange={(e) => updateRule('auto_mode_trigger_count', parseInt(e.target.value) || 0)}
                         />
-                        <span className="text-sm text-[#6b6763]">jobs</span>
+                        <span className="text-sm text-grey-600">jobs</span>
                       </div>
-                      <p className="text-xs text-[#6b6763]">Set to 0 to disable auto-switching</p>
+                      <p className="text-xs text-grey-600">Set to 0 to disable auto-switching</p>
                     </div>
 
                     <div className="space-y-2">
@@ -224,7 +224,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.overflow_radius_km}
                           onChange={(e) => updateRule('overflow_radius_km', parseFloat(e.target.value) || 5)}
                         />
-                        <span className="text-sm text-[#6b6763]">km</span>
+                        <span className="text-sm text-grey-600">km</span>
                       </div>
                     </div>
 
@@ -237,7 +237,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.quiet_mode_hold_days}
                           onChange={(e) => updateRule('quiet_mode_hold_days', parseInt(e.target.value) || 3)}
                         />
-                        <span className="text-sm text-[#6b6763]">days</span>
+                        <span className="text-sm text-grey-600">days</span>
                       </div>
                     </div>
 
@@ -250,7 +250,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.busy_mode_radius_km}
                           onChange={(e) => updateRule('busy_mode_radius_km', parseFloat(e.target.value) || 20)}
                         />
-                        <span className="text-sm text-[#6b6763]">km</span>
+                        <span className="text-sm text-grey-600">km</span>
                       </div>
                     </div>
                   </div>
@@ -281,7 +281,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                       value={rules.service_area_postcodes.join(', ')}
                       onChange={(e) => updateRule('service_area_postcodes', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
                     />
-                    <p className="text-sm text-[#6b6763]">Leave empty to accept all postcodes</p>
+                    <p className="text-sm text-grey-600">Leave empty to accept all postcodes</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -294,7 +294,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.cluster_radius_km}
                           onChange={(e) => updateRule('cluster_radius_km', parseFloat(e.target.value) || 15)}
                         />
-                        <span className="text-sm text-[#6b6763]">km</span>
+                        <span className="text-sm text-grey-600">km</span>
                       </div>
                     </div>
 
@@ -329,10 +329,10 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     />
                   </div>
 
-                  <div className="p-4 bg-[#f5f2ee] rounded-md">
+                  <div className="p-4 bg-surface rounded-md">
                     <p className="text-sm font-medium mb-2">Zone-Day Rules</p>
-                    <p className="text-sm text-[#6b6763] mb-2">Define named zones, their postcodes, and which days of the week they are scheduled.</p>
-                    <p className="text-xs text-[#6b6763]">Zone configuration UI coming in next update. Currently configured via API.</p>
+                    <p className="text-sm text-grey-600 mb-2">Define named zones, their postcodes, and which days of the week they are scheduled.</p>
+                    <p className="text-xs text-grey-600">Zone configuration UI coming in next update. Currently configured via API.</p>
                   </div>
                 </CardContent>
               </AccordionContent>
@@ -364,9 +364,9 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.kpi_override_hours}
                           onChange={(e) => updateRule('kpi_override_hours', parseFloat(e.target.value) || 8)}
                         />
-                        <span className="text-sm text-[#6b6763]">hours</span>
+                        <span className="text-sm text-grey-600">hours</span>
                       </div>
-                      <p className="text-xs text-[#6b6763]">Jump the queue when a job is within X hours of its KPI visit deadline</p>
+                      <p className="text-xs text-grey-600">Jump the queue when a job is within X hours of its KPI visit deadline</p>
                     </div>
 
                     <div className="space-y-2">
@@ -378,16 +378,16 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.days_since_lodged_escalation}
                           onChange={(e) => updateRule('days_since_lodged_escalation', parseInt(e.target.value) || 3)}
                         />
-                        <span className="text-sm text-[#6b6763]">days</span>
+                        <span className="text-sm text-grey-600">days</span>
                       </div>
-                      <p className="text-xs text-[#6b6763]">Escalate priority after a job has been unscheduled for X days</p>
+                      <p className="text-xs text-grey-600">Escalate priority after a job has been unscheduled for X days</p>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-[#f5f2ee] rounded-md">
+                  <div className="p-4 bg-surface rounded-md">
                     <p className="text-sm font-medium mb-2">Insurer-Specific SLA Rules</p>
-                    <p className="text-sm text-[#6b6763] mb-2">Override scheduling priority for specific insurers.</p>
-                    <p className="text-xs text-[#6b6763]">Insurer SLA configuration UI coming in next update. Currently configured via API.</p>
+                    <p className="text-sm text-grey-600 mb-2">Override scheduling priority for specific insurers.</p>
+                    <p className="text-xs text-grey-600">Insurer SLA configuration UI coming in next update. Currently configured via API.</p>
                   </div>
                 </CardContent>
               </AccordionContent>
@@ -437,7 +437,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.inspection_buffer_minutes}
                           onChange={(e) => updateRule('inspection_buffer_minutes', parseInt(e.target.value) || 30)}
                         />
-                        <span className="text-sm text-[#6b6763]">minutes</span>
+                        <span className="text-sm text-grey-600">minutes</span>
                       </div>
                     </div>
 
@@ -450,7 +450,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.vulnerable_person_extra_minutes}
                           onChange={(e) => updateRule('vulnerable_person_extra_minutes', parseInt(e.target.value) || 15)}
                         />
-                        <span className="text-sm text-[#6b6763]">minutes</span>
+                        <span className="text-sm text-grey-600">minutes</span>
                       </div>
                     </div>
                   </div>
@@ -477,7 +477,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                     </div>
                   </div>
 
-                  <div className="p-4 bg-[#f5f2ee] rounded-md">
+                  <div className="p-4 bg-surface rounded-md">
                     <p className="text-sm font-medium mb-2">Peak Hour Traffic Rules</p>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -487,14 +487,14 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           onCheckedChange={(checked) => updateRule('peak_hour_config', { ...rules.peak_hour_config, enabled: checked })}
                         />
                       </div>
-                      <p className="text-xs text-[#6b6763]">Full peak hour configuration UI coming in next update. Currently configured via API.</p>
+                      <p className="text-xs text-grey-600">Full peak hour configuration UI coming in next update. Currently configured via API.</p>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-[#f5f2ee] rounded-md">
+                  <div className="p-4 bg-surface rounded-md">
                     <p className="text-sm font-medium mb-2">Inspection Time Blocks</p>
-                    <p className="text-sm text-[#6b6763] mb-2">Estimated duration per job type. Used to build the daily run schedule.</p>
-                    <p className="text-xs text-[#6b6763]">Job type duration configuration UI coming in next update. Currently configured via API.</p>
+                    <p className="text-sm text-grey-600 mb-2">Estimated duration per job type. Used to build the daily run schedule.</p>
+                    <p className="text-xs text-grey-600">Job type duration configuration UI coming in next update. Currently configured via API.</p>
                   </div>
                 </CardContent>
               </AccordionContent>
@@ -557,7 +557,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                         value={rules.repeat_reschedule_threshold}
                         onChange={(e) => updateRule('repeat_reschedule_threshold', parseInt(e.target.value) || 2)}
                       />
-                      <p className="text-xs text-[#6b6763]">After this many cancellations, flag for phone call instead of SMS</p>
+                      <p className="text-xs text-grey-600">After this many cancellations, flag for phone call instead of SMS</p>
                     </div>
                   </div>
                 </CardContent>
@@ -589,7 +589,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                         value={rules.new_order_hold_minutes}
                         onChange={(e) => updateRule('new_order_hold_minutes', parseInt(e.target.value) || 30)}
                       />
-                      <p className="text-xs text-[#6b6763]">Hold window after new order arrives before scheduling</p>
+                      <p className="text-xs text-grey-600">Hold window after new order arrives before scheduling</p>
                     </div>
 
                     <div className="space-y-2">
@@ -600,7 +600,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                         value={rules.cat_cluster_order_count}
                         onChange={(e) => updateRule('cat_cluster_order_count', parseInt(e.target.value) || 5)}
                       />
-                      <p className="text-xs text-[#6b6763]">Orders from same postcode cluster to trigger CAT mode</p>
+                      <p className="text-xs text-grey-600">Orders from same postcode cluster to trigger CAT mode</p>
                     </div>
 
                     <div className="space-y-2">
@@ -611,7 +611,7 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                         value={rules.cat_cluster_window_hours}
                         onChange={(e) => updateRule('cat_cluster_window_hours', parseInt(e.target.value) || 2)}
                       />
-                      <p className="text-xs text-[#6b6763]">Time window for CAT cluster detection</p>
+                      <p className="text-xs text-grey-600">Time window for CAT cluster detection</p>
                     </div>
                   </div>
 
@@ -655,9 +655,9 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.confirmation_threshold_pct}
                           onChange={(e) => updateRule('confirmation_threshold_pct', parseInt(e.target.value) || 60)}
                         />
-                        <span className="text-sm text-[#6b6763]">%</span>
+                        <span className="text-sm text-grey-600">%</span>
                       </div>
-                      <p className="text-xs text-[#6b6763]">Lock and finalise run only once this % of insureds have confirmed</p>
+                      <p className="text-xs text-grey-600">Lock and finalise run only once this % of insureds have confirmed</p>
                     </div>
 
                     <div className="space-y-2">
@@ -669,9 +669,9 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
                           value={rules.arrival_window_minutes}
                           onChange={(e) => updateRule('arrival_window_minutes', parseInt(e.target.value) || 120)}
                         />
-                        <span className="text-sm text-[#6b6763]">minutes</span>
+                        <span className="text-sm text-grey-600">minutes</span>
                       </div>
-                      <p className="text-xs text-[#6b6763]">Width of arrival window communicated to insured</p>
+                      <p className="text-xs text-grey-600">Width of arrival window communicated to insured</p>
                     </div>
                   </div>
 
@@ -704,10 +704,10 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
               </CardHeader>
               <AccordionContent>
                 <CardContent>
-                  <div className="p-4 bg-[#f5f2ee] rounded-md">
+                  <div className="p-4 bg-surface rounded-md">
                     <p className="text-sm font-medium mb-2">Inspector Configuration</p>
-                    <p className="text-sm text-[#6b6763] mb-2">Configure per-inspector rules, availability windows, and home base.</p>
-                    <p className="text-xs text-[#6b6763]">Inspector configuration UI coming in next update. Currently configured via API.</p>
+                    <p className="text-sm text-grey-600 mb-2">Configure per-inspector rules, availability windows, and home base.</p>
+                    <p className="text-xs text-grey-600">Inspector configuration UI coming in next update. Currently configured via API.</p>
                   </div>
                 </CardContent>
               </AccordionContent>
@@ -719,12 +719,12 @@ export default function InspectionSchedulingSettings({ tenantId }: InspectionSch
       {/* Fixed save button */}
       <div className="fixed bottom-6 right-6 flex items-center gap-3">
         {hasUnsavedChanges && (
-          <span className="text-sm text-[#6b6763]">Unsaved changes</span>
+          <span className="text-sm text-grey-600">Unsaved changes</span>
         )}
         <Button
           onClick={handleSave}
           disabled={!hasUnsavedChanges || saving}
-          className="bg-[#1a1a1a] text-white hover:bg-[#2a2a2a]"
+          className="bg-ink text-white hover:bg-ink-hover"
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>

@@ -29,12 +29,12 @@ export function AccordionList({ title, action, children }: AccordionListProps) {
 
   return (
     <AccordionContext.Provider value={{ openId, setOpenId }}>
-      <div className="bg-white rounded-lg border border-[#e0dbd4] overflow-hidden">
+      <div className="bg-white rounded-lg border border-line overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#e0dbd4]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line">
           <span
             style={{ fontFamily: 'DM Sans, sans-serif' }}
-            className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] font-medium"
+            className="text-[11px] uppercase tracking-[0.07em] text-subtle font-medium"
           >
             {title}
           </span>
@@ -42,7 +42,7 @@ export function AccordionList({ title, action, children }: AccordionListProps) {
             <button
               onClick={action.onClick}
               style={{ fontFamily: 'DM Sans, sans-serif' }}
-              className="text-[11px] text-[#c8b89a] hover:text-[#b0a88a] transition-colors"
+              className="text-[11px] text-tan hover:text-[#b0a88a] transition-colors"
             >
               {action.label}
             </button>
@@ -50,7 +50,7 @@ export function AccordionList({ title, action, children }: AccordionListProps) {
         </div>
 
         {/* Rows */}
-        <div className="divide-y divide-[#f0ece6]">{children}</div>
+        <div className="divide-y divide-line-faint">{children}</div>
       </div>
     </AccordionContext.Provider>
   )

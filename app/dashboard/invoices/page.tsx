@@ -125,28 +125,28 @@ export default function InvoicesPage() {
       <style>{`
         .inv-page { padding: 32px 36px 48px; font-family: 'DM Sans', sans-serif; }
         .inv-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; }
-        .inv-title { font-size: 22px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.3px; }
+        .inv-title { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.3px; }
         .inv-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-        .inv-filter-btn { font-size: 12px; padding: 5px 14px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 500; border: 1px solid #e0dbd4; background: transparent; color: #9e998f; transition: all 0.15s; white-space: nowrap; }
-        .inv-filter-btn:hover { border-color: #c8b89a; color: #3a3530; }
-        .inv-filter-btn.active { background: #3a3530; color: #fff; border-color: #3a3530; }
-        .inv-select { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid #e0dbd4; background: #fff; color: #3a3530; font-family: inherit; }
-        .inv-date-input { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid #e0dbd4; background: #fff; color: #3a3530; font-family: inherit; }
-        .inv-sep { width: 1px; height: 20px; background: #e0dbd4; }
-        .inv-table-wrap { background: #fff; border: 1px solid #e0dbd4; border-radius: 8px; overflow: hidden; }
+        .inv-filter-btn { font-size: 12px; padding: 5px 14px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 500; border: 1px solid var(--line); background: transparent; color: var(--subtle); transition: all 0.15s; white-space: nowrap; }
+        .inv-filter-btn:hover { border-color: var(--tan); color: var(--body); }
+        .inv-filter-btn.active { background: var(--body); color: var(--paper); border-color: var(--body); }
+        .inv-select { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--paper); color: var(--body); font-family: inherit; }
+        .inv-date-input { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--paper); color: var(--body); font-family: inherit; }
+        .inv-sep { width: 1px; height: 20px; background: var(--line); }
+        .inv-table-wrap { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
         .inv-table { width: 100%; border-collapse: collapse; }
-        .inv-table th { font-size: 11px; font-weight: 600; color: #9e998f; text-align: left; padding: 10px 14px; border-bottom: 1px solid #e0dbd4; background: #fafaf8; white-space: nowrap; }
-        .inv-table td { font-size: 13px; color: #3a3530; padding: 12px 14px; border-bottom: 1px solid #f0ece6; }
+        .inv-table th { font-size: 11px; font-weight: 600; color: var(--subtle); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-4); white-space: nowrap; }
+        .inv-table td { font-size: 13px; color: var(--body); padding: 12px 14px; border-bottom: 1px solid var(--line-faint); }
         .inv-table tr:last-child td { border-bottom: none; }
-        .inv-table tbody tr:hover td { background: #faf9f7; cursor: pointer; }
+        .inv-table tbody tr:hover td { background: var(--surface-3); cursor: pointer; }
         .inv-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
-        .inv-type-badge { background: #e8e0d0; color: #3a3530; }
-        .inv-mono { font-family: 'DM Mono', monospace; font-size: 12px; color: #c8b89a; }
+        .inv-type-badge { background: var(--line-tan-4); color: var(--body); }
+        .inv-mono { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--tan); }
         .inv-amount { font-weight: 600; }
-        .inv-action-btn { font-size: 11px; font-weight: 500; color: #fff; background: #3a3530; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
-        .inv-action-btn:hover { background: #2a2520; }
-        .inv-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: #9e998f; }
-        .inv-loading { padding: 48px 24px; text-align: center; font-size: 13px; color: #9e998f; }
+        .inv-action-btn { font-size: 11px; font-weight: 500; color: var(--paper); background: var(--body); border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+        .inv-action-btn:hover { background: var(--ink-brown); }
+        .inv-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--subtle); }
+        .inv-loading { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--subtle); }
       `}</style>
 
       <div className="inv-page">
@@ -184,7 +184,7 @@ export default function InvoicesPage() {
             onChange={e => setDateFrom(e.target.value)}
             title="Invoice date from"
           />
-          <span style={{ fontSize: 12, color: '#9e998f' }}>to</span>
+          <span style={{ fontSize: 12, color: 'var(--subtle)' }}>to</span>
           <input
             type="date"
             className="inv-date-input"

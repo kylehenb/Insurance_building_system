@@ -28,7 +28,7 @@ export default function InsurerEmailFields({
       <div style={{ 
         fontSize: 10, 
         fontWeight: 600, 
-        color: '#9e998f', 
+        color: 'var(--subtle)', 
         textTransform: 'uppercase', 
         letterSpacing: '0.07em',
         marginBottom: 12 
@@ -38,7 +38,7 @@ export default function InsurerEmailFields({
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 12 }}>
         <div>
-          <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>
+          <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>
             Order Sender Name
           </Label>
           <Input
@@ -46,11 +46,11 @@ export default function InsurerEmailFields({
             onChange={e => onChange('orderSenderName', e.target.value)}
             disabled={readOnly}
             placeholder="e.g. James Hollis"
-            style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+            style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
           />
         </div>
         <div>
-          <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>
+          <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>
             Order Sender Email
           </Label>
           <Input
@@ -59,13 +59,13 @@ export default function InsurerEmailFields({
             onChange={e => onChange('orderSenderEmail', e.target.value)}
             disabled={readOnly}
             placeholder="e.g. james.hollis@sedgwick.com"
-            style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+            style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
           />
         </div>
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>
+        <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>
           Adjuster Reference
         </Label>
         <Input
@@ -73,7 +73,7 @@ export default function InsurerEmailFields({
           onChange={e => onChange('adjusterReference', e.target.value)}
           disabled={readOnly}
           placeholder="Adjuster's own reference/claim number"
-          style={{ fontSize: 13, border: '0.5px solid #e4dfd8' }}
+          style={{ fontSize: 13, border: '0.5px solid var(--line-2)' }}
         />
       </div>
 
@@ -82,14 +82,14 @@ export default function InsurerEmailFields({
         <div style={{ 
           marginTop: 16, 
           padding: '12px', 
-          background: '#faf9f7', 
-          border: '0.5px solid #e4dfd8', 
+          background: 'var(--surface-3)', 
+          border: '0.5px solid var(--line-2)', 
           borderRadius: 6 
         }}>
           <div style={{ 
             fontSize: 9, 
             fontWeight: 600, 
-            color: '#b0a898', 
+            color: 'var(--faint)', 
             textTransform: 'uppercase', 
             letterSpacing: '0.06em',
             marginBottom: 8 
@@ -99,7 +99,7 @@ export default function InsurerEmailFields({
 
           {adjusterSubmissionEmail && (
             <div style={{ marginBottom: 8 }}>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>
                 Adjuster Firm Submission Email
               </Label>
               <Input
@@ -107,9 +107,9 @@ export default function InsurerEmailFields({
                 disabled
                 style={{ 
                   fontSize: 13, 
-                  border: '0.5px solid #e4dfd8',
-                  background: '#f5f2ee',
-                  color: '#6b6763',
+                  border: '0.5px solid var(--line-2)',
+                  background: 'var(--surface)',
+                  color: 'var(--grey-600)',
                 }}
               />
             </div>
@@ -117,7 +117,7 @@ export default function InsurerEmailFields({
 
           {insurerSubmissionEmail && (
             <div>
-              <Label style={{ fontSize: 11, color: '#b0a898', marginBottom: 4, display: 'block' }}>
+              <Label style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 4, display: 'block' }}>
                 Insurer Submission Email
               </Label>
               <Input
@@ -125,9 +125,9 @@ export default function InsurerEmailFields({
                 disabled
                 style={{ 
                   fontSize: 13, 
-                  border: '0.5px solid #e4dfd8',
-                  background: '#f5f2ee',
-                  color: '#6b6763',
+                  border: '0.5px solid var(--line-2)',
+                  background: 'var(--surface)',
+                  color: 'var(--grey-600)',
                 }}
               />
             </div>

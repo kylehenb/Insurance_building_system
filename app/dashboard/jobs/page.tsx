@@ -79,13 +79,13 @@ const FILTER_TABS: { key: StageFilter; label: string }[] = [
 
 function StagePill({ currentStage }: { currentStage: string | null }) {
   if (!currentStage) {
-    return <span style={{ color: '#b0a898', fontSize: 11 }}>—</span>
+    return <span style={{ color: 'var(--faint)', fontSize: 11 }}>—</span>
   }
   const config = currentStage in STAGE_CONFIG
     ? STAGE_CONFIG[currentStage as JobStageKey]
     : null
   if (!config) {
-    return <span style={{ color: '#b0a898', fontSize: 11 }}>{currentStage}</span>
+    return <span style={{ color: 'var(--faint)', fontSize: 11 }}>{currentStage}</span>
   }
   const isOnHold = currentStage === 'on_hold'
   const isCancelled = currentStage === 'cancelled'
@@ -181,21 +181,21 @@ export default function JobsListPage() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-[#1a1a1a]">Jobs</h1>
-              <p className="mt-1 text-sm text-[#1a1a1a]/60">
+              <h1 className="text-2xl font-semibold text-ink">Jobs</h1>
+              <p className="mt-1 text-sm text-ink/60">
                 Manage insurance repair jobs for your organization
               </p>
             </div>
             <Link
               href="/dashboard/jobs/new"
-              className="inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+              className="inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-ink/90 transition-colors"
             >
               New Job
             </Link>
           </div>
 
           {/* Stage filter tabs */}
-          <div className="mt-6 flex gap-1 border-b border-[#e4dfd8]">
+          <div className="mt-6 flex gap-1 border-b border-line-2">
             {FILTER_TABS.map((tab) => {
               const isActive = tab.key === activeFilter
               return (
@@ -210,10 +210,10 @@ export default function JobsListPage() {
                     padding: '7px 14px',
                     fontSize: 13,
                     fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#1a1a1a' : '#9e8060',
+                    color: isActive ? 'var(--ink)' : '#9e8060',
                     background: 'none',
                     border: 'none',
-                    borderBottom: isActive ? '2px solid #c9a96e' : '2px solid transparent',
+                    borderBottom: isActive ? '2px solid var(--gold)' : '2px solid transparent',
                     cursor: 'pointer',
                     marginBottom: -1,
                     fontFamily: 'inherit',
@@ -227,17 +227,17 @@ export default function JobsListPage() {
           </div>
 
           {/* Jobs Table */}
-          <div className="mt-4 rounded-lg border border-[#e4dfd8] bg-white shadow-sm overflow-hidden">
+          <div className="mt-4 rounded-lg border border-line-2 bg-white shadow-sm overflow-hidden">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <div className="text-sm text-[#b0a898]">Loading...</div>
+                <div className="text-sm text-faint">Loading...</div>
               </div>
             ) : jobs.length === 0 ? (
               /* Empty State */
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f5f0e8]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cream">
                   <svg
-                    className="h-8 w-8 text-[#1a1a1a]/40"
+                    className="h-8 w-8 text-ink/40"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -250,8 +250,8 @@ export default function JobsListPage() {
                     />
                   </svg>
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-[#1a1a1a]">No jobs yet</h3>
-                <p className="mt-2 max-w-sm text-center text-sm text-[#1a1a1a]/60">
+                <h3 className="mt-4 text-lg font-medium text-ink">No jobs yet</h3>
+                <p className="mt-2 max-w-sm text-center text-sm text-ink/60">
                   {activeFilter === 'all'
                     ? 'Get started by creating your first job. Jobs help you track insurance repair work from intake through completion.'
                     : 'No jobs match the selected filter.'}
@@ -259,7 +259,7 @@ export default function JobsListPage() {
                 {activeFilter === 'all' && (
                   <Link
                     href="/dashboard/jobs/new"
-                    className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1a1a1a] px-4 py-2 text-sm font-medium text-[#f5f0e8] hover:bg-[#1a1a1a]/90 transition-colors"
+                    className="mt-6 inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-ink/90 transition-colors"
                   >
                     Create First Job
                   </Link>
@@ -268,66 +268,66 @@ export default function JobsListPage() {
             ) : (
               /* Table */
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#f0ece6]">
-                  <thead className="bg-[#fdfdfc]">
+                <table className="min-w-full divide-y divide-line-faint">
+                  <thead className="bg-surface-6">
                     <tr>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Job Number
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Insured Name
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Property Address
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Insurer
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Stage
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[#b0a898]"
+                        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-faint"
                       >
                         Created
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#f0ece6] bg-white">
+                  <tbody className="divide-y divide-line-faint bg-white">
                     {jobs.map((job: JobRow) => (
                       <tr
                         key={job.id}
                         onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
-                        className="hover:bg-[#faf9f7] transition-colors cursor-pointer"
+                        className="hover:bg-surface-3 transition-colors cursor-pointer"
                       >
                         <td className="whitespace-nowrap px-3 py-3">
-                          <span className="text-xs font-medium text-[#c8b89a]">
+                          <span className="text-xs font-medium text-tan">
                             {job.job_number}
                           </span>
                         </td>
                         <td className="px-3 py-3">
-                          <span className="text-xs text-[#1a1a1a]">
+                          <span className="text-xs text-ink">
                             {job.insured_name || "-"}
                           </span>
                         </td>
                         <td className="px-3 py-3">
-                          <span className="text-xs text-[#1a1a1a]/70 max-w-xs truncate block">
+                          <span className="text-xs text-ink/70 max-w-xs truncate block">
                             {job.property_address || "-"}
                           </span>
                         </td>
@@ -347,7 +347,7 @@ export default function JobsListPage() {
                               Private
                             </span>
                           ) : (
-                            <span className="text-xs text-[#1a1a1a]/70">
+                            <span className="text-xs text-ink/70">
                               {job.insurer || "-"}
                             </span>
                           )}
@@ -356,7 +356,7 @@ export default function JobsListPage() {
                           <StagePill currentStage={job.current_stage} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <span className="text-xs text-[#b0a898]">
+                          <span className="text-xs text-faint">
                             {formatDate(job.created_at)}
                           </span>
                         </td>
@@ -370,7 +370,7 @@ export default function JobsListPage() {
 
           {/* Summary */}
           {jobs.length > 0 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-[#1a1a1a]/60">
+            <div className="mt-4 flex items-center justify-between text-sm text-ink/60">
               <span>
                 Showing {jobs.length} job{jobs.length === 1 ? "" : "s"}
               </span>

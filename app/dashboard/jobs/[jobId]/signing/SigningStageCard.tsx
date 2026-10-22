@@ -32,8 +32,8 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
       }
     }
     return (
-      <div className="mb-2 rounded border border-[#b9dfbb] border-l-2 border-l-[#2e7d32] bg-white px-3 py-2.5 text-[12px]">
-        <div className="font-semibold text-[#1b5e20]">✓ {signingDocumentLabel(toConfirm.documentType)} signed</div>
+      <div className="mb-2 rounded border border-[#b9dfbb] border-l-2 border-l-success bg-white px-3 py-2.5 text-[12px]">
+        <div className="font-semibold text-success-dark">✓ {signingDocumentLabel(toConfirm.documentType)} signed</div>
         <div className="mt-0.5 text-[#4a3820]">
           {toConfirm.signedName || toConfirm.signerName}
           {toConfirm.signerCapacity && toConfirm.signerCapacity !== 'owner' ? ` (${SIGNER_CAPACITY_LABELS[toConfirm.signerCapacity].toLowerCase()})` : ''}
@@ -41,7 +41,7 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
         </div>
         <div className="mt-1 text-[#7a6a50]">Check the signed copy, then confirm to move the job to Signed — Build Schedule.</div>
         {toConfirm.excessInvoice && (
-          <div className={`mt-1 ${toConfirm.excessInvoice.paidDate ? 'text-[#1b5e20]' : 'text-[#7a6a50]'}`}>
+          <div className={`mt-1 ${toConfirm.excessInvoice.paidDate ? 'text-success-dark' : 'text-[#7a6a50]'}`}>
             {excessInvoiceStatusLine(toConfirm.excessInvoice)}
           </div>
         )}
@@ -51,14 +51,14 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
             href={documentUrl(toConfirm.id, 'signed')}
             target="_blank"
             rel="noopener"
-            className="rounded border border-[#e0d8c8] bg-white px-2.5 py-1 font-medium text-[#3a3530] hover:bg-[#f5f0e8]"
+            className="rounded border border-[#e0d8c8] bg-white px-2.5 py-1 font-medium text-body hover:bg-cream"
           >
             View signed PDF
           </a>
           <button
             onClick={confirm}
             disabled={busyId === toConfirm.id}
-            className="rounded bg-[#1a1a1a] px-2.5 py-1 font-semibold text-[#c9a96e] disabled:opacity-50"
+            className="rounded bg-ink px-2.5 py-1 font-semibold text-gold disabled:opacity-50"
           >
             {busyId === toConfirm.id ? 'Confirming…' : 'Confirm sign-off & move on'}
           </button>
@@ -69,7 +69,7 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
 
   if (outstanding) {
     return (
-      <div className="mb-2 rounded border border-[#e8dfc8] border-l-2 border-l-[#c9a96e] bg-white px-3 py-2 text-[11px] text-[#4a3820]">
+      <div className="mb-2 rounded border border-[#e8dfc8] border-l-2 border-l-gold bg-white px-3 py-2 text-[11px] text-[#4a3820]">
         <span className="font-medium">{signingDocumentLabel(outstanding.documentType)}</span>
         {' '}— {outstanding.status === 'viewed' ? 'opened by' : 'sent to'} {outstanding.signerName}
         {outstanding.status === 'viewed' && outstanding.viewedAt ? ` (${formatPerthDateTime(outstanding.viewedAt)})` : ''}

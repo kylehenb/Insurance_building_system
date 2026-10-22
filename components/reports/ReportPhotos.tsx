@@ -106,8 +106,8 @@ function PhotoCard({
           height: 190,
           overflow: 'hidden',
           borderRadius: 8,
-          background: '#f5f2ee',
-          border: isDragOver && !isDragged ? '2px dashed #c8b89a' : '1px solid #e0dbd4',
+          background: 'var(--surface)',
+          border: isDragOver && !isDragged ? '2px dashed var(--tan)' : '1px solid var(--line)',
           cursor: locked ? 'default' : 'grab',
         }}
       >
@@ -129,7 +129,7 @@ function PhotoCard({
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px] bg-[#f5f2ee]">
+          <div className="w-full h-full flex items-center justify-center text-subtle text-[11px] bg-surface">
             Loading
           </div>
         )}
@@ -178,7 +178,7 @@ function PhotoCard({
         onChange={handleLabelChange}
         disabled={locked}
         placeholder="Add label..."
-        className="mt-2 w-full px-2 py-1.5 rounded border border-[#e0dbd4] text-[11px] text-[#3a3530] bg-white focus:outline-none focus:border-[#c8b89a] disabled:bg-[#f9f7f5] disabled:text-[#b0a898] disabled:cursor-not-allowed"
+        className="mt-2 w-full px-2 py-1.5 rounded border border-line text-[11px] text-body bg-white focus:outline-none focus:border-tan disabled:bg-surface-2 disabled:text-faint disabled:cursor-not-allowed"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       />
     </div>
@@ -205,11 +205,11 @@ function UploadingPhotoCard({
 
   return (
     <div className="relative group">
-      <div style={{ position: 'relative', height: 190, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0dbd4', background: '#f5f2ee' }}>
+      <div style={{ position: 'relative', height: 190, overflow: 'hidden', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface)' }}>
         {uploadingPhoto.status === 'uploading' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <Loader2 className="h-8 w-8 text-[#c8b89a] animate-spin mb-2" />
-            <div className="text-[11px] text-[#9e998f]">Uploading...</div>
+            <Loader2 className="h-8 w-8 text-tan animate-spin mb-2" />
+            <div className="text-[11px] text-subtle">Uploading...</div>
           </div>
         )}
         {uploadingPhoto.status === 'success' && uploadingPhoto.thumbnailUrl && (
@@ -223,7 +223,7 @@ function UploadingPhotoCard({
         {uploadingPhoto.status === 'error' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-[11px] text-red-500 p-2 text-center">
             <div className="font-semibold mb-1">Upload failed</div>
-            <div className="text-[#b0a898]">{uploadingPhoto.error || 'Try again'}</div>
+            <div className="text-faint">{uploadingPhoto.error || 'Try again'}</div>
           </div>
         )}
         <button
@@ -238,7 +238,7 @@ function UploadingPhotoCard({
         value={label}
         onChange={handleLabelChange}
         placeholder="Add label..."
-        className="mt-2 w-full px-2 py-1.5 rounded border border-[#e0dbd4] text-[11px] text-[#3a3530] bg-white focus:outline-none focus:border-[#c8b89a]"
+        className="mt-2 w-full px-2 py-1.5 rounded border border-line text-[11px] text-body bg-white focus:outline-none focus:border-tan"
         style={{ fontFamily: 'DM Sans, sans-serif' }}
       />
     </div>
@@ -482,7 +482,7 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-[13px] text-[#9e998f]">
+      <div className="py-8 text-center text-[13px] text-subtle">
         Loading photos…
       </div>
     )
@@ -511,14 +511,14 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
       {/* Upload button */}
       {!locked && (
         <div className="flex justify-between items-center mb-4">
-          <div className="text-[12px] text-[#b0a898]">
+          <div className="text-[12px] text-faint">
             {uploadingPhotos.filter(p => p.status === 'uploading').length > 0 &&
               `${uploadingPhotos.filter(p => p.status === 'uploading').length} uploading...`}
           </div>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-line text-[13px] text-subtle hover:bg-surface cursor-pointer transition-colors"
           >
             <Upload className="h-4 w-4" />
             Upload photos
@@ -538,9 +538,9 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
         <div
           className="py-12 text-center text-[13px] border-2 border-dashed rounded-lg transition-colors"
           style={{
-            borderColor: isDraggingFile ? '#c8b89a' : '#e0dbd4',
-            color: isDraggingFile ? '#c8b89a' : '#9e998f',
-            background: isDraggingFile ? '#fdf9f4' : 'transparent',
+            borderColor: isDraggingFile ? 'var(--tan)' : 'var(--line)',
+            color: isDraggingFile ? 'var(--tan)' : 'var(--subtle)',
+            background: isDraggingFile ? 'var(--surface-9)' : 'transparent',
           }}
         >
           {isDraggingFile ? 'Drop photos here' : 'No photos added yet — drag photos here or use the button above'}
@@ -549,9 +549,9 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
         <div
           className="rounded-lg transition-colors"
           style={{
-            outline: isDraggingFile ? '2px dashed #c8b89a' : 'none',
+            outline: isDraggingFile ? '2px dashed var(--tan)' : 'none',
             outlineOffset: '6px',
-            background: isDraggingFile ? '#fdf9f4' : 'transparent',
+            background: isDraggingFile ? 'var(--surface-9)' : 'transparent',
           }}
         >
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>

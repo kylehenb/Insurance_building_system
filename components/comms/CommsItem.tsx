@@ -111,7 +111,7 @@ function StarBtn({ starred, onToggle }: { starred: boolean; onToggle: () => void
         border: 'none',
         cursor: 'pointer',
         fontSize: 15,
-        color: starred ? '#c9973a' : '#e6dfd0',
+        color: starred ? '#c9973a' : 'var(--line-tan)',
         padding: '0 2px',
         flexShrink: 0,
         lineHeight: 1,
@@ -159,9 +159,9 @@ function AttachmentChips({ raw, commId }: { raw: Json | null; commId: string }) 
             disabled={!clickable}
             style={{
               fontSize: 10,
-              color: s === 'error' ? '#c05a4a' : '#7a6a58',
-              background: s === 'error' ? '#fbeeeb' : '#f5f2ee',
-              border: `0.5px solid ${s === 'error' ? '#fca5a5' : '#e6dfd0'}`,
+              color: s === 'error' ? '#c05a4a' : 'var(--brown-500)',
+              background: s === 'error' ? '#fbeeeb' : 'var(--surface)',
+              border: `0.5px solid ${s === 'error' ? 'var(--danger-soft)' : 'var(--line-tan)'}`,
               borderRadius: 4,
               padding: '2px 8px',
               fontFamily: 'DM Mono, monospace',
@@ -221,25 +221,25 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
       }}
     >
       <div style={{
-        background: '#fff', borderRadius: 10, width: 580, maxWidth: '92vw',
-        border: '0.5px solid #e6dfd0', overflow: 'hidden', display: 'flex',
+        background: 'var(--paper)', borderRadius: 10, width: 580, maxWidth: '92vw',
+        border: '0.5px solid var(--line-tan)', overflow: 'hidden', display: 'flex',
         flexDirection: 'column', maxHeight: '80vh', fontFamily: 'DM Sans, sans-serif',
       }}>
         <div style={{
-          padding: '14px 20px', borderBottom: '0.5px solid #f0ece6',
+          padding: '14px 20px', borderBottom: '0.5px solid var(--line-faint)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: '#fdfdfc', flexShrink: 0,
+          background: 'var(--surface-6)', flexShrink: 0,
         }}>
           <span style={{ fontSize: 13, fontWeight: 500 }}>Reply</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b0a898', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--faint)', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
         </div>
         {[
           { label: 'To', value: comm.from_email ?? '' },
           { label: 'Subject', value: replySubject },
         ].map(({ label, value }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', borderBottom: '0.5px solid #f5f2ee', flexShrink: 0 }}>
-            <span style={{ fontSize: 10, color: '#b0a898', fontWeight: 500, padding: '9px 14px', minWidth: 60, letterSpacing: '.5px', textTransform: 'uppercase' }}>{label}</span>
-            <span style={{ flex: 1, padding: '9px 10px 9px 0', fontSize: 13, color: '#3a3530', fontWeight: 300 }}>{value}</span>
+          <div key={label} style={{ display: 'flex', alignItems: 'center', borderBottom: '0.5px solid var(--surface)', flexShrink: 0 }}>
+            <span style={{ fontSize: 10, color: 'var(--faint)', fontWeight: 500, padding: '9px 14px', minWidth: 60, letterSpacing: '.5px', textTransform: 'uppercase' }}>{label}</span>
+            <span style={{ flex: 1, padding: '9px 10px 9px 0', fontSize: 13, color: 'var(--body)', fontWeight: 300 }}>{value}</span>
           </div>
         ))}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -249,16 +249,16 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
             placeholder="Write your reply…"
             style={{
               flex: 1, width: '100%', border: 'none', padding: '16px 20px',
-              fontSize: 13, color: '#1a1a1a', fontFamily: 'DM Sans, sans-serif',
+              fontSize: 13, color: 'var(--ink)', fontFamily: 'DM Sans, sans-serif',
               fontWeight: 300, resize: 'none', outline: 'none', lineHeight: 1.75,
-              minHeight: 180, background: '#fff', boxSizing: 'border-box',
+              minHeight: 180, background: 'var(--paper)', boxSizing: 'border-box',
             }}
             autoFocus
           />
         </div>
         <div style={{
-          padding: '12px 20px', borderTop: '0.5px solid #f0ece6',
-          display: 'flex', gap: 8, alignItems: 'center', background: '#fdfdfc', flexShrink: 0,
+          padding: '12px 20px', borderTop: '0.5px solid var(--line-faint)',
+          display: 'flex', gap: 8, alignItems: 'center', background: 'var(--surface-6)', flexShrink: 0,
         }}>
           <button
             onClick={handleSend}
@@ -267,13 +267,13 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
               fontSize: 11, padding: '5px 18px', borderRadius: 20,
               cursor: sending || !body.trim() ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', fontWeight: 600, border: '1px solid transparent',
-              background: '#2a6b50', color: '#fff', borderColor: '#2a6b50',
+              background: 'var(--teal)', color: 'var(--paper)', borderColor: 'var(--teal)',
               opacity: sending || !body.trim() ? 0.5 : 1,
             }}
           >
             {sending ? 'Sending…' : 'Send'}
           </button>
-          <button onClick={onClose} disabled={sending} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, border: '0.5px solid #d4cfc8', background: 'transparent', color: '#7a6a58' }}>
+          <button onClick={onClose} disabled={sending} style={{ fontSize: 11, padding: '5px 14px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, border: '0.5px solid var(--line-strong-3)', background: 'transparent', color: 'var(--brown-500)' }}>
             Cancel
           </button>
           {error && <span style={{ fontSize: 11, color: '#c05a4a', marginLeft: 4 }}>{error}</span>}
@@ -317,14 +317,14 @@ function RowShell({ type, isUnread, isStarred, expanded, onToggleStar, onClick, 
       }}
     >
       <StarBtn starred={isStarred} onToggle={onToggleStar} />
-      <span style={{ width: 16, textAlign: 'center', fontSize: 12, flexShrink: 0, color: isSysStyle ? '#b7b0a0' : '#8a8272' }}>
+      <span style={{ width: 16, textAlign: 'center', fontSize: 12, flexShrink: 0, color: isSysStyle ? '#b7b0a0' : 'var(--grey-450)' }}>
         {TYPE_ICON[type] ?? '•'}
       </span>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
         {gistSlot}
       </div>
       {rightSlot}
-      <span style={{ width: 48, flexShrink: 0, fontSize: 11, color: isUnread ? '#8a8272' : '#b7b0a0', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>
+      <span style={{ width: 48, flexShrink: 0, fontSize: 11, color: isUnread ? 'var(--grey-450)' : '#b7b0a0', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>
         {formatTime(time)}
       </span>
       <span style={{
@@ -340,7 +340,7 @@ function RowShell({ type, isUnread, isStarred, expanded, onToggleStar, onClick, 
 
 function DetailShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ padding: '10px 16px 16px 52px', background: '#fff' }}>
+    <div style={{ padding: '10px 16px 16px 52px', background: 'var(--paper)' }}>
       {children}
     </div>
   )
@@ -355,7 +355,7 @@ function BadgeRow({ type, direction }: { type: string; direction: string | null 
         {label}
       </span>
       {direction && (
-        <span style={{ fontSize: 11, color: '#8a8272' }}>
+        <span style={{ fontSize: 11, color: 'var(--grey-450)' }}>
           {direction === 'inbound' ? '↙ Inbound' : '↗ Outbound'}
         </span>
       )}
@@ -389,14 +389,14 @@ function SingleItem({ comm, onMarkRead, onToggleStar, onReplySent }: SingleItemP
         fontWeight: unread ? 800 : 600,
         fontSize: 12.5,
         flexShrink: 0,
-        color: unread ? '#1b1712' : '#57503f',
+        color: unread ? 'var(--ink-warm)' : '#57503f',
         whiteSpace: 'nowrap',
       }}>
         {comm.contact_name ?? comm.from_email ?? 'Unknown'}
       </span>
       <span style={{
         fontSize: 12.5,
-        color: (comm.type === 'portal' || comm.type === 'system') ? '#b7b0a0' : (unread ? '#1b1712' : '#847c6a'),
+        color: (comm.type === 'portal' || comm.type === 'system') ? '#b7b0a0' : (unread ? 'var(--ink-warm)' : '#847c6a'),
         fontWeight: unread ? 600 : 400,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
@@ -421,7 +421,7 @@ function SingleItem({ comm, onMarkRead, onToggleStar, onReplySent }: SingleItemP
   )
 
   return (
-    <div style={{ borderBottom: '0.5px solid #f0ece6' }}>
+    <div style={{ borderBottom: '0.5px solid var(--line-faint)' }}>
       <RowShell
         type={comm.type}
         isUnread={unread}
@@ -453,21 +453,21 @@ function SingleItem({ comm, onMarkRead, onToggleStar, onReplySent }: SingleItemP
           <BadgeRow type={comm.type} direction={comm.direction} />
 
           {(comm.contact_name || comm.contact_type) && (
-            <div style={{ fontSize: 11.5, color: '#8a8272', marginBottom: 8 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--grey-450)', marginBottom: 8 }}>
               {comm.contact_name}{comm.contact_type ? ` · ${comm.contact_type}` : ''}
             </div>
           )}
 
           {comm.type === 'email' && (comm.from_email || comm.to_email) && (
-            <div style={{ marginBottom: 10, padding: '9px 12px', background: '#faf8f3', border: '0.5px solid #e6dfd0', borderRadius: 8, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
-              {comm.from_email && <div><span style={{ color: '#8a8272', display: 'inline-block', width: 60 }}>From</span>{comm.from_email}</div>}
-              {comm.to_email && <div><span style={{ color: '#8a8272', display: 'inline-block', width: 60 }}>To</span>{comm.to_email}</div>}
-              <div><span style={{ color: '#8a8272', display: 'inline-block', width: 60 }}>Date</span>{formatFullDate(comm.created_at)}</div>
+            <div style={{ marginBottom: 10, padding: '9px 12px', background: '#faf8f3', border: '0.5px solid var(--line-tan)', borderRadius: 8, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+              {comm.from_email && <div><span style={{ color: 'var(--grey-450)', display: 'inline-block', width: 60 }}>From</span>{comm.from_email}</div>}
+              {comm.to_email && <div><span style={{ color: 'var(--grey-450)', display: 'inline-block', width: 60 }}>To</span>{comm.to_email}</div>}
+              <div><span style={{ color: 'var(--grey-450)', display: 'inline-block', width: 60 }}>Date</span>{formatFullDate(comm.created_at)}</div>
             </div>
           )}
 
           {comm.type === 'email' && comm.subject && (
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: '#1b1712' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--ink-warm)' }}>
               {comm.subject}
             </div>
           )}
@@ -486,8 +486,8 @@ function SingleItem({ comm, onMarkRead, onToggleStar, onReplySent }: SingleItemP
                 onClick={e => { e.stopPropagation(); setReplyOpen(true) }}
                 style={{
                   fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 6,
-                  cursor: 'pointer', border: '1px solid #4a6fd4', background: '#fff',
-                  color: '#4a6fd4', fontFamily: 'inherit',
+                  cursor: 'pointer', border: '1px solid var(--info-soft)', background: 'var(--paper)',
+                  color: 'var(--info-soft)', fontFamily: 'inherit',
                 }}
               >
                 ↩ Reply
@@ -531,17 +531,17 @@ function ThreadItem({ comms, latest, onMarkRead, onToggleStar, onReplySent }: Th
 
   const gist = (
     <>
-      <span style={{ fontWeight: hasUnread ? 800 : 600, fontSize: 12.5, flexShrink: 0, color: hasUnread ? '#1b1712' : '#57503f', whiteSpace: 'nowrap' }}>
+      <span style={{ fontWeight: hasUnread ? 800 : 600, fontSize: 12.5, flexShrink: 0, color: hasUnread ? 'var(--ink-warm)' : '#57503f', whiteSpace: 'nowrap' }}>
         {latest.subject ? `Re: ${latest.subject.replace(/^re:\s*/i, '')}` : (latest.contact_name ?? latest.from_email ?? 'Email thread')}
       </span>
-      <span style={{ fontSize: 12.5, color: hasUnread ? '#1b1712' : '#847c6a', fontWeight: hasUnread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <span style={{ fontSize: 12.5, color: hasUnread ? 'var(--ink-warm)' : '#847c6a', fontWeight: hasUnread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {comms.map(c => c.content ?? '').filter(Boolean).join(' / ')}
       </span>
     </>
   )
 
   const rightSlot = (
-    <span style={{ fontSize: 11, color: '#8a8272', background: '#faf8f3', padding: '2px 7px', borderRadius: 10, flexShrink: 0, border: '0.5px solid #e6dfd0' }}>
+    <span style={{ fontSize: 11, color: 'var(--grey-450)', background: '#faf8f3', padding: '2px 7px', borderRadius: 10, flexShrink: 0, border: '0.5px solid var(--line-tan)' }}>
       {comms.length} messages
     </span>
   )
@@ -552,7 +552,7 @@ function ThreadItem({ comms, latest, onMarkRead, onToggleStar, onReplySent }: Th
   }
 
   return (
-    <div style={{ borderBottom: '0.5px solid #f0ece6' }}>
+    <div style={{ borderBottom: '0.5px solid var(--line-faint)' }}>
       <RowShell
         type="email"
         isUnread={hasUnread}
@@ -568,14 +568,14 @@ function ThreadItem({ comms, latest, onMarkRead, onToggleStar, onReplySent }: Th
       {expanded && (
         <DetailShell>
           <BadgeRow type="email" direction={null} />
-          <div style={{ borderLeft: '2px solid #e6dfd0', paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ borderLeft: '2px solid var(--line-tan)', paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {comms.map(c => (
               <div key={c.id}>
-                <div style={{ fontSize: 11, color: '#8a8272', marginBottom: 3 }}>
+                <div style={{ fontSize: 11, color: 'var(--grey-450)', marginBottom: 3 }}>
                   {formatFullDate(c.created_at)} · {c.from_email ?? c.contact_name ?? 'Unknown'} → {c.to_email ?? '?'}
                 </div>
                 {c.subject && (
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#1b1712', marginBottom: 3 }}>{c.subject}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-warm)', marginBottom: 3 }}>{c.subject}</div>
                 )}
                 <div style={{ fontSize: 13, color: '#3a352c', lineHeight: 1.55, fontWeight: 300, whiteSpace: 'pre-wrap' }}>
                   {c.body_text ?? c.content}
@@ -588,7 +588,7 @@ function ThreadItem({ comms, latest, onMarkRead, onToggleStar, onReplySent }: Th
             <div style={{ marginTop: 12 }}>
               <button
                 onClick={e => { e.stopPropagation(); setReplyOpen(true) }}
-                style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', border: '1px solid #4a6fd4', background: '#fff', color: '#4a6fd4', fontFamily: 'inherit' }}
+                style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--info-soft)', background: 'var(--paper)', color: 'var(--info-soft)', fontFamily: 'inherit' }}
               >
                 ↩ Reply to thread
               </button>
@@ -618,7 +618,7 @@ function SysGroupItem({ comms }: { comms: Comm[] }) {
   )
 
   return (
-    <div style={{ borderBottom: '0.5px solid #f0ece6' }}>
+    <div style={{ borderBottom: '0.5px solid var(--line-faint)' }}>
       <RowShell
         type={comms[0].type}
         isUnread={false}
@@ -635,7 +635,7 @@ function SysGroupItem({ comms }: { comms: Comm[] }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {comms.map(c => (
               <div key={c.id} style={{ fontSize: 12.5, lineHeight: 1.6, color: '#57503f' }}>
-                <span style={{ color: '#8a8272', fontFamily: 'DM Mono, monospace', fontSize: 11, marginRight: 8 }}>
+                <span style={{ color: 'var(--grey-450)', fontFamily: 'DM Mono, monospace', fontSize: 11, marginRight: 8 }}>
                   {c.created_at ? new Date(c.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) : '—'}
                 </span>
                 <span style={{ fontWeight: 600 }}>{c.content ?? c.type}</span>

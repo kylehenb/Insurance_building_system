@@ -64,18 +64,18 @@ export function SigningAuditTrail({ requestId, refreshKey }: { requestId: string
   }, [requestId, refreshKey])
 
   if (error) return <p className="text-[12px] text-red-600">{error}</p>
-  if (!events) return <p className="text-[12px] text-[#9e998f]">Loading audit trail…</p>
-  if (events.length === 0) return <p className="text-[12px] text-[#9e998f]">No events yet.</p>
+  if (!events) return <p className="text-[12px] text-subtle">Loading audit trail…</p>
+  if (events.length === 0) return <p className="text-[12px] text-subtle">No events yet.</p>
 
   return (
-    <ol className="space-y-2 border-l-2 border-[#e8e4e0] pl-4">
+    <ol className="space-y-2 border-l-2 border-line-3 pl-4">
       {events.map(e => (
         <li key={e.id} className="text-[12px]">
-          <div className="font-medium text-[#1a1a1a]">{EVENT_LABELS[e.event] ?? e.event}</div>
+          <div className="font-medium text-ink">{EVENT_LABELS[e.event] ?? e.event}</div>
           <div className="text-[#7a7268]">{formatPerthDateTime(e.createdAt)}</div>
-          {detail(e) && <div className="text-[#5a5650]">{detail(e)}</div>}
+          {detail(e) && <div className="text-body-soft">{detail(e)}</div>}
           {(e.ip || e.userAgent) && (
-            <div className="text-[#9e998f]">
+            <div className="text-subtle">
               {[e.ip, e.userAgent ? describeDevice(e.userAgent) : null].filter(Boolean).join(' · ')}
             </div>
           )}

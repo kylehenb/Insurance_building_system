@@ -80,17 +80,17 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
   }
 
   const inputClass =
-    'w-full bg-transparent text-right font-mono text-sm focus:outline-none focus:bg-white focus:border-[#c9a96e] border border-transparent hover:border-[#e0dbd4] rounded px-1 py-0.5 transition-colors'
+    'w-full bg-transparent text-right font-mono text-sm focus:outline-none focus:bg-white focus:border-gold border border-transparent hover:border-line rounded px-1 py-0.5 transition-colors'
 
   const mainRow = (
     <div
-      className="group grid items-center gap-1 px-3 py-2 hover:bg-[#f5f0e8] transition-colors"
+      className="group grid items-center gap-1 px-3 py-2 hover:bg-cream transition-colors"
       style={{ gridTemplateColumns: '120px 1fr 52px 68px 68px 68px 52px 56px' }}
     >
       {/* Name */}
       <div className="min-w-0">
-        <div className="font-semibold text-sm text-[#1a1a1a] truncate">{insurerName}</div>
-        {split && <div className="text-xs text-[#b0a898]">Labour</div>}
+        <div className="font-semibold text-sm text-ink truncate">{insurerName}</div>
+        {split && <div className="text-xs text-faint">Labour</div>}
       </div>
 
       {/* Description wording */}
@@ -99,7 +99,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
           ref={descRef}
           value={split ? wordingLabour : wordingSingle}
           placeholder={split ? 'Labour wording…' : 'Override wording…'}
-          className="w-full bg-transparent text-sm text-[#1a1a1a] resize-none focus:outline-none focus:bg-white border border-transparent hover:border-[#e0dbd4] rounded px-1 py-0.5 transition-colors"
+          className="w-full bg-transparent text-sm text-ink resize-none focus:outline-none focus:bg-white border border-transparent hover:border-line rounded px-1 py-0.5 transition-colors"
           rows={1}
           onChange={(e) => {
             e.target.style.height = 'auto'
@@ -115,7 +115,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
       </div>
 
       {/* Unit (inherit from base) */}
-      <div className="text-xs text-[#b0a898] text-center">{baseItem.unit ?? '—'}</div>
+      <div className="text-xs text-faint text-center">{baseItem.unit ?? '—'}</div>
 
       {/* Labour */}
       <input
@@ -141,7 +141,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
       />
 
       {/* Total (computed) */}
-      <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+      <div className="w-full text-right font-mono text-sm font-semibold text-body px-1 py-0.5">
         {(() => {
           const l = labour === '' ? null : parseFloat(labour) || null
           const m = materials === '' ? null : parseFloat(materials) || null
@@ -154,7 +154,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
         <button
           onClick={toggleSplit}
           title={split ? 'Remove split' : 'Split labour / materials'}
-          className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${split ? 'text-[#7c3aed]' : 'text-[#b0a898] hover:text-[#7c3aed]'}`}
+          className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${split ? 'text-[#7c3aed]' : 'text-faint hover:text-[#7c3aed]'}`}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -172,7 +172,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
       <div className="flex justify-center">
         <button
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 p-1 text-[#b0a898] hover:text-red-500 rounded transition-all"
+          className="opacity-0 group-hover:opacity-100 p-1 text-faint hover:text-red-500 rounded transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path
@@ -190,13 +190,13 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
 
   const materialsSubRow = split ? (
     <div
-      className="group grid items-center gap-1 px-3 py-1.5 border-t border-dashed border-[#e0dbd4] hover:bg-[#f5f0e8] transition-colors"
+      className="group grid items-center gap-1 px-3 py-1.5 border-t border-dashed border-line hover:bg-cream transition-colors"
       style={{ gridTemplateColumns: '120px 1fr 52px 68px 68px 68px 52px 56px' }}
     >
       {/* Name dimmed */}
       <div className="min-w-0 opacity-35">
-        <div className="font-semibold text-sm text-[#1a1a1a] truncate">{insurerName}</div>
-        <div className="text-xs text-[#b0a898]">Materials</div>
+        <div className="font-semibold text-sm text-ink truncate">{insurerName}</div>
+        <div className="text-xs text-faint">Materials</div>
       </div>
 
       {/* Description */}
@@ -204,7 +204,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
         <textarea
           value={wordingMaterials}
           placeholder="Materials wording…"
-          className="w-full bg-transparent text-sm text-[#1a1a1a] resize-none focus:outline-none focus:bg-white border border-transparent hover:border-[#e0dbd4] rounded px-1 py-0.5 transition-colors"
+          className="w-full bg-transparent text-sm text-ink resize-none focus:outline-none focus:bg-white border border-transparent hover:border-line rounded px-1 py-0.5 transition-colors"
           rows={1}
           onChange={(e) => {
             e.target.style.height = 'auto'
@@ -216,7 +216,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
       </div>
 
       {/* Unit */}
-      <div className="text-xs text-[#b0a898] text-center">{baseItem.unit ?? '—'}</div>
+      <div className="text-xs text-faint text-center">{baseItem.unit ?? '—'}</div>
 
       {/* Labour disabled */}
       <div />
@@ -233,7 +233,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
       />
 
       {/* Total (computed) */}
-      <div className="w-full text-right font-mono text-sm font-semibold text-[#3a3530] px-1 py-0.5">
+      <div className="w-full text-right font-mono text-sm font-semibold text-body px-1 py-0.5">
         {(() => {
           const l = labour === '' ? null : parseFloat(labour) || null
           const m = materials === '' ? null : parseFloat(materials) || null
@@ -247,7 +247,7 @@ export function ScopeLibraryOverrideRow({ override, baseItem, onUpdate, onDelete
   ) : null
 
   return (
-    <div className="border-t border-[#e0dbd4]">
+    <div className="border-t border-line">
       {mainRow}
       {materialsSubRow}
     </div>

@@ -401,7 +401,7 @@ export default function InvoiceDetailPage() {
 
   if (loading || !invoice) {
     return (
-      <div style={{ padding: '48px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
+      <div style={{ padding: '48px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)' }}>
         {loading ? 'Loading…' : 'Invoice not found'}
       </div>
     )
@@ -431,61 +431,61 @@ export default function InvoiceDetailPage() {
   return (
     <>
       <style>{`
-        .invd { padding: 32px 36px 48px; font-family: 'DM Sans', sans-serif; color: #3a3530; }
+        .invd { padding: 32px 36px 48px; font-family: 'DM Sans', sans-serif; color: var(--body); }
         .invd-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
-        .invd-ref { font-size: 20px; font-weight: 700; color: #1a1a1a; font-family: 'DM Mono', monospace; }
+        .invd-ref { font-size: 20px; font-weight: 700; color: var(--ink); font-family: 'DM Mono', monospace; }
         .invd-badge { font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; }
-        .invd-back { font-size: 12px; color: #9e998f; cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; margin-right: 4px; }
-        .invd-back:hover { color: #3a3530; }
+        .invd-back { font-size: 12px; color: var(--subtle); cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; margin-right: 4px; }
+        .invd-back:hover { color: var(--body); }
         .invd-actions { margin-left: auto; display: flex; gap: 8px; }
         .invd-btn { font-size: 12px; font-weight: 500; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; border: 1px solid transparent; }
-        .invd-btn-primary { background: #3a3530; color: #fff; }
-        .invd-btn-primary:hover { background: #2a2520; }
-        .invd-btn-secondary { background: #fff; color: #3a3530; border-color: #e0dbd4; }
-        .invd-btn-secondary:hover { border-color: #c8b89a; }
-        .invd-btn-danger { background: #fff; color: #c5221f; border-color: #fce8e6; }
-        .invd-btn-danger:hover { background: #fce8e6; }
+        .invd-btn-primary { background: var(--body); color: var(--paper); }
+        .invd-btn-primary:hover { background: var(--ink-brown); }
+        .invd-btn-secondary { background: var(--paper); color: var(--body); border-color: var(--line); }
+        .invd-btn-secondary:hover { border-color: var(--tan); }
+        .invd-btn-danger { background: var(--paper); color: var(--danger); border-color: var(--danger-bg); }
+        .invd-btn-danger:hover { background: var(--danger-bg); }
         .invd-body { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; }
         @media (max-width: 900px) { .invd-body { grid-template-columns: 1fr; } }
-        .invd-card { background: #fff; border: 1px solid #e0dbd4; border-radius: 8px; overflow: hidden; }
-        .invd-card-title { font-size: 11px; font-weight: 600; color: #9e998f; padding: 12px 16px; border-bottom: 1px solid #e0dbd4; background: #fafaf8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .invd-card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+        .invd-card-title { font-size: 11px; font-weight: 600; color: var(--subtle); padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-4); text-transform: uppercase; letter-spacing: 0.5px; }
         .invd-table { width: 100%; border-collapse: collapse; }
-        .invd-table th { font-size: 11px; font-weight: 600; color: #9e998f; text-align: left; padding: 10px 12px; border-bottom: 1px solid #e0dbd4; background: #fafaf8; }
+        .invd-table th { font-size: 11px; font-weight: 600; color: var(--subtle); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-4); }
         .invd-table th.right { text-align: right; }
-        .invd-table td { font-size: 13px; color: #3a3530; padding: 10px 12px; border-bottom: 1px solid #f0ece6; vertical-align: middle; }
+        .invd-table td { font-size: 13px; color: var(--body); padding: 10px 12px; border-bottom: 1px solid var(--line-faint); vertical-align: middle; }
         .invd-table tr:last-child td { border-bottom: none; }
-        .invd-input { width: 100%; font-size: 13px; color: #3a3530; background: transparent; border: none; padding: 0; font-family: 'DM Sans', sans-serif; }
-        .invd-input:focus { outline: 1px solid #c8b89a; border-radius: 3px; background: #fffef9; padding: 2px 4px; }
-        .invd-num-input { width: 70px; font-size: 13px; color: #3a3530; background: #f5f2ee; border: 1px solid #e0dbd4; border-radius: 4px; padding: 4px 8px; text-align: right; font-family: 'DM Mono', monospace; }
-        .invd-num-input:focus { outline: none; border-color: #c8b89a; }
-        .invd-del-btn { background: none; border: none; cursor: pointer; color: #c0bab3; font-size: 14px; padding: 2px 4px; border-radius: 3px; }
-        .invd-del-btn:hover { color: #c5221f; }
+        .invd-input { width: 100%; font-size: 13px; color: var(--body); background: transparent; border: none; padding: 0; font-family: 'DM Sans', sans-serif; }
+        .invd-input:focus { outline: 1px solid var(--tan); border-radius: 3px; background: #fffef9; padding: 2px 4px; }
+        .invd-num-input { width: 70px; font-size: 13px; color: var(--body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; text-align: right; font-family: 'DM Mono', monospace; }
+        .invd-num-input:focus { outline: none; border-color: var(--tan); }
+        .invd-del-btn { background: none; border: none; cursor: pointer; color: var(--faint-4); font-size: 14px; padding: 2px 4px; border-radius: 3px; }
+        .invd-del-btn:hover { color: var(--danger); }
         .invd-totals { padding: 16px; }
         .invd-total-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
-        .invd-total-label { font-size: 12px; color: #9e998f; }
-        .invd-total-val { font-size: 13px; color: #3a3530; font-family: 'DM Mono', monospace; }
-        .invd-total-final { border-top: 1px solid #e0dbd4; margin-top: 8px; padding-top: 12px; }
-        .invd-total-final .invd-total-label { font-size: 13px; font-weight: 600; color: #3a3530; }
-        .invd-total-final .invd-total-val { font-size: 15px; font-weight: 700; color: #3a3530; }
-        .invd-save-status { padding: 10px 16px; font-size: 11px; border-top: 1px solid #e0dbd4; }
-        .invd-add-bar { padding: 12px 16px; display: flex; gap: 8px; border-top: 1px solid #e0dbd4; }
-        .invd-add-btn { font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; background: #fff; color: #3a3530; border: 1px solid #e0dbd4; }
-        .invd-add-btn:hover { border-color: #c8b89a; }
-        .invd-meta-row { display: flex; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #f0ece6; font-size: 13px; }
+        .invd-total-label { font-size: 12px; color: var(--subtle); }
+        .invd-total-val { font-size: 13px; color: var(--body); font-family: 'DM Mono', monospace; }
+        .invd-total-final { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 12px; }
+        .invd-total-final .invd-total-label { font-size: 13px; font-weight: 600; color: var(--body); }
+        .invd-total-final .invd-total-val { font-size: 15px; font-weight: 700; color: var(--body); }
+        .invd-save-status { padding: 10px 16px; font-size: 11px; border-top: 1px solid var(--line); }
+        .invd-add-bar { padding: 12px 16px; display: flex; gap: 8px; border-top: 1px solid var(--line); }
+        .invd-add-btn { font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; background: var(--paper); color: var(--body); border: 1px solid var(--line); }
+        .invd-add-btn:hover { border-color: var(--tan); }
+        .invd-meta-row { display: flex; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--line-faint); font-size: 13px; }
         .invd-meta-row:last-child { border-bottom: none; }
-        .invd-meta-label { color: #9e998f; font-size: 12px; }
-        .invd-meta-val { color: #3a3530; font-weight: 500; }
-        .invd-inclusive-notice { margin: 0 16px 12px; padding: 10px 14px; background: #fff8e1; border: 1px solid #f0c040; border-radius: 6px; font-size: 12px; color: #b45309; }
-        .lib-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #e0dbd4; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 100; min-width: 260px; max-height: 260px; overflow-y: auto; }
-        .lib-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f5f2ee; }
+        .invd-meta-label { color: var(--subtle); font-size: 12px; }
+        .invd-meta-val { color: var(--body); font-weight: 500; }
+        .invd-inclusive-notice { margin: 0 16px 12px; padding: 10px 14px; background: var(--warning-bg-2); border: 1px solid #f0c040; border-radius: 6px; font-size: 12px; color: var(--warning); }
+        .lib-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 100; min-width: 260px; max-height: 260px; overflow-y: auto; }
+        .lib-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--surface); }
         .lib-item:last-child { border-bottom: none; }
-        .lib-item:hover { background: #f5f2ee; }
-        .lib-item-name { color: #3a3530; font-weight: 500; }
-        .lib-item-meta { font-size: 11px; color: #9e998f; margin-top: 2px; }
-        .voided-banner { background: #fce8e6; border: 1px solid #f5a0a0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #c5221f; margin-bottom: 16px; font-weight: 500; }
-        .invd-row-incomplete { background: #fafaf8; }
-        .invd-struck { text-decoration: line-through; color: #9e998f !important; }
-        .invd-muted { color: #9e998f; }
+        .lib-item:hover { background: var(--surface); }
+        .lib-item-name { color: var(--body); font-weight: 500; }
+        .lib-item-meta { font-size: 11px; color: var(--subtle); margin-top: 2px; }
+        .voided-banner { background: var(--danger-bg); border: 1px solid #f5a0a0; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--danger); margin-bottom: 16px; font-weight: 500; }
+        .invd-row-incomplete { background: var(--surface-4); }
+        .invd-struck { text-decoration: line-through; color: var(--subtle) !important; }
+        .invd-muted { color: var(--subtle); }
         .invd-cb-cell { padding-left: 12px !important; }
       `}</style>
 
@@ -494,7 +494,7 @@ export default function InvoiceDetailPage() {
         <div className="invd-header">
           <button className="invd-back" onClick={() => router.push('/dashboard/invoices')}>← Invoices</button>
           <span className="invd-ref">{invoice.invoice_ref ?? 'Draft Invoice'}</span>
-          <span className="invd-badge" style={{ background: '#e8e0d0', color: '#3a3530' }}>
+          <span className="invd-badge" style={{ background: 'var(--line-tan-4)', color: 'var(--body)' }}>
             {TYPE_LABELS[invoice.invoice_type] ?? invoice.invoice_type}
           </span>
           <span className="invd-badge" style={{ background: statusStyle.bg, color: statusStyle.text }}>
@@ -502,7 +502,7 @@ export default function InvoiceDetailPage() {
           </span>
           {job && (
             <span
-              style={{ fontSize: 12, color: '#9e998f', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ fontSize: 12, color: 'var(--subtle)', cursor: 'pointer', textDecoration: 'underline' }}
               onClick={() => router.push(`/dashboard/jobs/${invoice.job_id}`)}
             >
               {job.job_number ?? 'Job'}
@@ -572,7 +572,7 @@ export default function InvoiceDetailPage() {
                 <tbody>
                   {lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={(isLocked ? 0 : 2) + (isInclusive ? 3 : 4)} style={{ textAlign: 'center', color: '#9e998f', padding: '24px' }}>
+                      <td colSpan={(isLocked ? 0 : 2) + (isInclusive ? 3 : 4)} style={{ textAlign: 'center', color: 'var(--subtle)', padding: '24px' }}>
                         No line items
                       </td>
                     </tr>
@@ -589,7 +589,7 @@ export default function InvoiceDetailPage() {
                               checked={!isIncomplete}
                               onChange={e => toggleCompleted(item.id, e.target.checked)}
                               title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
-                              style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
+                              style={{ cursor: 'pointer', width: 14, height: 14, accentColor: 'var(--body)' }}
                             />
                           </td>
                         )}
@@ -678,7 +678,7 @@ export default function InvoiceDetailPage() {
                     {libraryOpen && (
                       <div className="lib-popover">
                         {libraryItems.length === 0 ? (
-                          <div style={{ padding: '16px', fontSize: 13, color: '#9e998f' }}>
+                          <div style={{ padding: '16px', fontSize: 13, color: 'var(--subtle)' }}>
                             No library items — add some in Settings → Invoice Library.
                           </div>
                         ) : (
@@ -699,7 +699,7 @@ export default function InvoiceDetailPage() {
               )}
 
               {/* Save status */}
-              <div className="invd-save-status" style={{ color: saveStatus === 'saved' ? '#2e7d32' : saveStatus === 'error' ? '#c5221f' : '#9e998f' }}>
+              <div className="invd-save-status" style={{ color: saveStatus === 'saved' ? 'var(--success)' : saveStatus === 'error' ? 'var(--danger)' : 'var(--subtle)' }}>
                 {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? 'Saving…' : 'Error saving changes'}
               </div>
             </div>
@@ -732,10 +732,10 @@ export default function InvoiceDetailPage() {
                               step="0.5"
                               onBlur={e => updateMarkupPct(parseFloat(e.target.value) || 0)}
                             />
-                            <span style={{ fontSize: 12, color: '#9e998f' }}>%</span>
+                            <span style={{ fontSize: 12, color: 'var(--subtle)' }}>%</span>
                           </span>
                         ) : (
-                          <span style={{ color: '#3a3530' }}>({(markupPct * 100).toFixed(1)}%)</span>
+                          <span style={{ color: 'var(--body)' }}>({(markupPct * 100).toFixed(1)}%)</span>
                         )}
                       </span>
                       <span className="invd-total-val">{fmt(markupAmount)}</span>
@@ -766,7 +766,7 @@ export default function InvoiceDetailPage() {
                     <span className="invd-meta-label">Job</span>
                     <span
                       className="invd-meta-val"
-                      style={{ cursor: 'pointer', color: '#1a73e8' }}
+                      style={{ cursor: 'pointer', color: 'var(--info)' }}
                       onClick={() => router.push(`/dashboard/jobs/${invoice.job_id}`)}
                     >
                       {job.job_number ?? '—'}
@@ -813,18 +813,18 @@ export default function InvoiceDetailPage() {
               {invoice.report_id && (
                 <div className="invd-meta-row">
                   <span className="invd-meta-label">Report</span>
-                  <span className="invd-meta-val" style={{ fontSize: 11, color: '#9e998f' }}>Linked</span>
+                  <span className="invd-meta-val" style={{ fontSize: 11, color: 'var(--subtle)' }}>Linked</span>
                 </div>
               )}
               {invoice.work_order_id && (
                 <div className="invd-meta-row">
                   <span className="invd-meta-label">Work Order</span>
-                  <span className="invd-meta-val" style={{ fontSize: 11, color: '#9e998f' }}>Linked</span>
+                  <span className="invd-meta-val" style={{ fontSize: 11, color: 'var(--subtle)' }}>Linked</span>
                 </div>
               )}
               {invoice.notes && (
-                <div style={{ padding: '10px 16px', fontSize: 12, color: '#3a3530', borderTop: '1px solid #f0ece6' }}>
-                  <div style={{ fontSize: 11, color: '#9e998f', marginBottom: 4 }}>Notes</div>
+                <div style={{ padding: '10px 16px', fontSize: 12, color: 'var(--body)', borderTop: '1px solid var(--line-faint)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--subtle)', marginBottom: 4 }}>Notes</div>
                   {invoice.notes}
                 </div>
               )}

@@ -113,7 +113,7 @@ function Thumbnail({
   return (
     <div
       className="relative aspect-square rounded-lg overflow-hidden"
-      style={{ background: '#f0ece6' }}
+      style={{ background: 'var(--line-faint)' }}
     >
       <button
         type="button"
@@ -128,7 +128,7 @@ function Thumbnail({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#9e998f] text-[11px]">
+          <div className="w-full h-full flex items-center justify-center text-subtle text-[11px]">
             Loading
           </div>
         )}
@@ -151,8 +151,8 @@ function Thumbnail({
         onClick={(e) => { e.stopPropagation(); onToggleSelect() }}
         className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full flex items-center justify-center transition-all"
         style={{
-          background: selected ? '#1a1a1a' : 'rgba(255,255,255,0.85)',
-          border: `1.5px solid ${selected ? '#1a1a1a' : 'rgba(0,0,0,0.2)'}`,
+          background: selected ? 'var(--ink)' : 'rgba(255,255,255,0.85)',
+          border: `1.5px solid ${selected ? 'var(--ink)' : 'rgba(0,0,0,0.2)'}`,
           boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
         }}
       >
@@ -167,12 +167,12 @@ function UploadingThumbnail({ photo }: { photo: UploadingPhoto }) {
   return (
     <div
       className="relative aspect-square rounded-lg overflow-hidden flex flex-col items-center justify-center gap-1"
-      style={{ background: '#f0ece6' }}
+      style={{ background: 'var(--line-faint)' }}
     >
       {photo.status === 'uploading' ? (
         <>
-          <Loader2 className="h-5 w-5 text-[#9e998f] animate-spin" />
-          <p className="text-[10px] text-[#9e998f] px-2 text-center truncate w-full">{photo.fileName}</p>
+          <Loader2 className="h-5 w-5 text-subtle animate-spin" />
+          <p className="text-[10px] text-subtle px-2 text-center truncate w-full">{photo.fileName}</p>
         </>
       ) : (
         <>
@@ -379,7 +379,7 @@ export function PhotosTab({
 
   if (loading) {
     return (
-      <div className="py-12 text-center text-[13px] text-[#9e998f]">Loading photos…</div>
+      <div className="py-12 text-center text-[13px] text-subtle">Loading photos…</div>
     )
   }
 
@@ -397,7 +397,7 @@ export function PhotosTab({
         <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center"
           style={{ background: 'rgba(245,242,238,0.85)' }}
         >
-          <div className="flex flex-col items-center gap-3 text-[#3a3530]">
+          <div className="flex flex-col items-center gap-3 text-body">
             <Upload className="h-10 w-10" />
             <p className="text-[15px] font-medium">Drop photos to upload</p>
           </div>
@@ -416,7 +416,7 @@ export function PhotosTab({
                   : new Set(allPhotos.map(p => p.id))
               )
             }
-            className="text-[12px] text-[#9e998f] hover:text-[#3a3530] transition-colors"
+            className="text-[12px] text-subtle hover:text-body transition-colors"
           >
             {selectedCount === totalCount ? 'Deselect all' : 'Select all'}
           </button>
@@ -430,8 +430,8 @@ export function PhotosTab({
               disabled={selectedCount === 0}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: selectedCount > 0 ? '#1a1a1a' : '#e0dbd4',
-                color: selectedCount > 0 ? '#f5f2ee' : '#9e998f',
+                background: selectedCount > 0 ? 'var(--ink)' : 'var(--line)',
+                color: selectedCount > 0 ? 'var(--surface)' : 'var(--subtle)',
               }}
             >
               <FileDown className="h-4 w-4" />
@@ -448,8 +448,8 @@ export function PhotosTab({
               disabled={selectedCount === 0}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: selectedCount > 0 ? '#1e40af' : '#e0dbd4',
-                color: selectedCount > 0 ? '#ffffff' : '#9e998f',
+                background: selectedCount > 0 ? 'var(--info-dark)' : 'var(--line)',
+                color: selectedCount > 0 ? 'var(--paper)' : 'var(--subtle)',
               }}
             >
               <Send className="h-4 w-4" />
@@ -467,7 +467,7 @@ export function PhotosTab({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e0dbd4] text-[13px] text-[#9e998f] hover:bg-[#f5f2ee] cursor-pointer transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-line text-[13px] text-subtle hover:bg-surface cursor-pointer transition-colors"
           >
             <Upload className="h-4 w-4" />
             Upload photos
@@ -486,7 +486,7 @@ export function PhotosTab({
       {!hasContent ? (
         <div
           className="py-16 flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors"
-          style={{ borderColor: '#e0dbd4', color: '#9e998f' }}
+          style={{ borderColor: 'var(--line)', color: 'var(--subtle)' }}
         >
           <Upload className="h-8 w-8 opacity-40" />
           <p className="text-[13px]">No photos yet — drag &amp; drop or click Upload photos</p>
@@ -495,7 +495,7 @@ export function PhotosTab({
         <div className="space-y-8">
           {groups.map(group => (
             <div key={group.key}>
-              <h3 className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-3">
+              <h3 className="text-[11px] uppercase tracking-[0.07em] text-subtle mb-3">
                 {group.label}
               </h3>
               <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
@@ -514,7 +514,7 @@ export function PhotosTab({
 
           {uploadingPhotos.length > 0 && (
             <div>
-              <h3 className="text-[11px] uppercase tracking-[0.07em] text-[#9e998f] mb-3">
+              <h3 className="text-[11px] uppercase tracking-[0.07em] text-subtle mb-3">
                 Uploading
               </h3>
               <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>

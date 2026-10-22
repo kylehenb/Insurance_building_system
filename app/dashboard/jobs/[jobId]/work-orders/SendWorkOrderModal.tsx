@@ -145,8 +145,8 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
         aria-modal="true"
         aria-label="Send work order"
         style={{
-          background: '#fff',
-          border: '1px solid #ddd8d0',
+          background: 'var(--paper)',
+          border: '1px solid var(--line-strong)',
           borderRadius: 12,
           width: step === 'customise' ? 600 : 420,
           maxWidth: 'calc(100vw - 32px)',
@@ -161,7 +161,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #e8e4de',
+            borderBottom: '1px solid var(--line-4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -176,12 +176,12 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
             title="Close"
             style={{
               width: 26, height: 26,
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
               background: 'transparent',
               cursor: sending ? 'default' : 'pointer',
               fontSize: 13,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -194,18 +194,18 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
         {/* Body */}
         <div style={{ padding: '16px 18px', overflowY: 'auto' }}>
           {loadError ? (
-            <p style={{ fontSize: 12, color: '#991b1b', lineHeight: 1.6 }}>{loadError}</p>
+            <p style={{ fontSize: 12, color: 'var(--danger-dark)', lineHeight: 1.6 }}>{loadError}</p>
           ) : !draft ? (
-            <p style={{ fontSize: 12, color: '#9a9590' }}>Preparing email…</p>
+            <p style={{ fontSize: 12, color: 'var(--subtle-2)' }}>Preparing email…</p>
           ) : step === 'choose' ? (
             <>
-              <p style={{ fontSize: 12, color: '#5a5650', marginBottom: 14, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 12, color: 'var(--body-soft)', marginBottom: 14, lineHeight: 1.6 }}>
                 Send the <strong>{label}</strong> work order{contractor ? <> to <strong>{contractor}</strong></> : null}
                 {hasEmail ? <> at <strong>{draft.to}</strong></> : null}
                 {draft.photos ? <>, with the job&apos;s {draft.photos.count} photo{draft.photos.count === 1 ? '' : 's'} attached</> : null}? Once sent, the work order locks and its scope items become read-only.
               </p>
               {!hasEmail && (
-                <p style={{ fontSize: 11, color: '#92400e', background: '#fef3e2', border: '1px solid #fcd38d', borderRadius: 6, padding: '8px 10px', marginBottom: 12, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 11, color: 'var(--warning-dark)', background: 'var(--warning-bg)', border: '1px solid var(--warning-soft)', borderRadius: 6, padding: '8px 10px', marginBottom: 12, lineHeight: 1.5 }}>
                   This trade has no email address. Use Customise send to enter one, or add it to the trade first.
                 </p>
               )}
@@ -216,14 +216,14 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                   disabled={!hasEmail || sending}
                   style={{
                     ...optionStyle,
-                    border: '1px solid #1e40af',
-                    background: '#1e40af',
-                    color: '#fff',
+                    border: '1px solid var(--info-dark)',
+                    background: 'var(--info-dark)',
+                    color: 'var(--paper)',
                     opacity: !hasEmail ? 0.45 : 1,
                     cursor: !hasEmail || sending ? 'default' : 'pointer',
                   }}
                   onMouseEnter={e => { if (hasEmail && !sending) e.currentTarget.style.background = '#1d3fad' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#1e40af' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--info-dark)' }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{sending ? 'Sending…' : 'Auto send'}</div>
                   <div style={{ fontSize: 10, opacity: 0.85, marginTop: 2 }}>
@@ -233,12 +233,12 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                 <button
                   onClick={() => setStep('customise')}
                   disabled={sending}
-                  style={{ ...optionStyle, border: '1px solid #bfdbfe', background: '#fff', color: '#1e40af' }}
+                  style={{ ...optionStyle, border: '1px solid #bfdbfe', background: 'var(--paper)', color: 'var(--info-dark)' }}
                   onMouseEnter={e => { if (!sending) e.currentTarget.style.background = '#eff6ff' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--paper)' }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 600 }}>Customise send</div>
-                  <div style={{ fontSize: 10, color: '#5a5650', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: 'var(--body-soft)', marginTop: 2 }}>
                     Review and edit the recipient, subject and message before sending.
                   </div>
                 </button>
@@ -274,7 +274,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Preview the PDF (the DRAFT watermark is removed on the copy that is sent)"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#1a1a1a', textDecoration: 'none', padding: '4px 8px', border: '1px solid #ddd8d0', borderRadius: 5, background: '#faf9f7' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink)', textDecoration: 'none', padding: '4px 8px', border: '1px solid var(--line-strong)', borderRadius: 5, background: 'var(--surface-3)' }}
                 >
                   <Paperclip size={12} />
                   {draft.attachmentName}
@@ -294,7 +294,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Preview the photos PDF"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#1a1a1a', textDecoration: 'none', padding: '4px 8px', border: '1px solid #ddd8d0', borderRadius: 5, background: '#faf9f7', opacity: includePhotos ? 1 : 0.45 }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink)', textDecoration: 'none', padding: '4px 8px', border: '1px solid var(--line-strong)', borderRadius: 5, background: 'var(--surface-3)', opacity: includePhotos ? 1 : 0.45 }}
                     >
                       <Paperclip size={12} />
                       {draft.photos.attachmentName} ({draft.photos.count} photo{draft.photos.count === 1 ? '' : 's'})
@@ -302,14 +302,14 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                   </div>
                 )}
               </div>
-              <p style={{ fontSize: 10, color: '#9a9590', lineHeight: 1.5 }}>
+              <p style={{ fontSize: 10, color: 'var(--subtle-2)', lineHeight: 1.5 }}>
                 Changes here apply to this email only. Edit the standard wording in Settings → Email Templates.
               </p>
             </div>
           )}
 
           {sendError && (
-            <p style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, padding: '8px 10px', marginTop: 12, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 11, color: 'var(--danger-dark)', background: 'var(--danger-bg-3)', border: '1px solid var(--danger-soft)', borderRadius: 6, padding: '8px 10px', marginTop: 12, lineHeight: 1.5 }}>
               {sendError}
             </p>
           )}
@@ -319,7 +319,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
         <div
           style={{
             padding: '12px 18px',
-            borderTop: '1px solid #e8e4de',
+            borderTop: '1px solid var(--line-4)',
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 8,
@@ -336,9 +336,9 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                 style={{
                   ...footerBtn,
                   fontWeight: 600,
-                  background: '#1e40af',
-                  borderColor: '#1e40af',
-                  color: '#fff',
+                  background: 'var(--info-dark)',
+                  borderColor: 'var(--info-dark)',
+                  color: 'var(--paper)',
                   opacity: !to.trim() || !subject.trim() ? 0.45 : 1,
                   cursor: sending || !to.trim() || !subject.trim() ? 'default' : 'pointer',
                 }}

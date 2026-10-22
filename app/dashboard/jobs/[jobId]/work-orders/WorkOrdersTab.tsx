@@ -155,7 +155,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           height: '100%',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9a9590',
+          color: 'var(--subtle-2)',
         }}
       >
         Loading work orders…
@@ -173,7 +173,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           height: '100%',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#991b1b',
+          color: 'var(--danger-dark)',
         }}
       >
         Error: {error}
@@ -193,16 +193,16 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           height: '100%',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#1a1a1a',
-          background: '#f5f2ee',
+          color: 'var(--ink)',
+          background: 'var(--surface)',
           overflow: 'hidden',
         }}
       >
         {/* ── View toggle bar ─────────────────────────────────────────────── */}
         <div
           style={{
-            background: '#fff',
-            borderBottom: '1px solid #ddd8d0',
+            background: 'var(--paper)',
+            borderBottom: '1px solid var(--line-strong)',
             padding: '10px 24px',
             display: 'flex',
             alignItems: 'center',
@@ -213,8 +213,8 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
           <div
             style={{
               display: 'flex',
-              background: '#f5f2ee',
-              border: '1px solid #ddd8d0',
+              background: 'var(--surface)',
+              border: '1px solid var(--line-strong)',
               borderRadius: 8,
               padding: 3,
               gap: 2,
@@ -229,8 +229,8 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
                   fontSize: 11,
                   fontWeight: 500,
                   fontFamily: 'DM Sans, sans-serif',
-                  background: view === v ? '#1a1a1a' : 'transparent',
-                  color: view === v ? '#fff' : '#9a9590',
+                  background: view === v ? 'var(--ink)' : 'transparent',
+                  color: view === v ? 'var(--paper)' : 'var(--subtle-2)',
                   border: 'none',
                   borderRadius: 6,
                   cursor: 'pointer',
@@ -261,8 +261,8 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               padding: 0,
               fontSize: 14,
               background: 'transparent',
-              color: '#9a9590',
-              border: '1px solid #ddd8d0',
+              color: 'var(--subtle-2)',
+              border: '1px solid var(--line-strong)',
               borderRadius: 6,
               cursor: isLoading ? 'default' : 'pointer',
               opacity: isLoading ? 0.5 : 1,
@@ -270,12 +270,12 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
             }}
             onMouseEnter={e => {
               if (isLoading) return
-              e.currentTarget.style.background = '#f5f2ee'
-              e.currentTarget.style.color = '#1a1a1a'
+              e.currentTarget.style.background = 'var(--surface)'
+              e.currentTarget.style.color = 'var(--ink)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.color = '#9a9590'
+              e.currentTarget.style.color = 'var(--subtle-2)'
             }}
           >
             <span
@@ -322,8 +322,8 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
         {view === 'blueprint' && (
           <div
             style={{
-              borderTop: '1px solid #ddd8d0',
-              background: '#fff',
+              borderTop: '1px solid var(--line-strong)',
+              background: 'var(--paper)',
               padding: '10px 24px',
               display: 'flex',
               alignItems: 'center',
@@ -331,7 +331,7 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 11, color: '#9a9590' }}>{sendBarInfo}</span>
+            <span style={{ fontSize: 11, color: 'var(--subtle-2)' }}>{sendBarInfo}</span>
             <div style={{ flex: 1 }} />
             <button
               onClick={() => setSendModalOpen(true)}
@@ -340,8 +340,8 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
                 fontSize: 12,
                 fontWeight: 500,
                 fontFamily: 'DM Sans, sans-serif',
-                background: '#1a1a1a',
-                color: '#fff',
+                background: 'var(--ink)',
+                color: 'var(--paper)',
                 border: 'none',
                 borderRadius: 6,
                 cursor: 'pointer',
@@ -350,12 +350,12 @@ export function WorkOrdersTab({ jobId, tenantId }: WorkOrdersTabProps) {
               }}
               onMouseEnter={e => {
                 const t = e.currentTarget
-                t.style.background = '#2a2a2a'
+                t.style.background = 'var(--ink-hover)'
                 t.style.boxShadow  = '0 2px 8px rgba(0,0,0,.15)'
               }}
               onMouseLeave={e => {
                 const t = e.currentTarget
-                t.style.background = '#1a1a1a'
+                t.style.background = 'var(--ink)'
                 t.style.boxShadow  = ''
               }}
             >

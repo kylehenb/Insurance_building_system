@@ -235,17 +235,17 @@ export default function PromptsSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
+      <div className="min-h-screen bg-surface p-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <div className="h-8 bg-[#e8e4e0] rounded w-48 mb-2"></div>
-            <div className="h-4 bg-[#e8e4e0] rounded w-96"></div>
+            <div className="h-8 bg-line-3 rounded w-48 mb-2"></div>
+            <div className="h-4 bg-line-3 rounded w-96"></div>
           </div>
           {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white border border-[#e8e4e0] rounded-lg p-5 mb-4">
-              <div className="h-5 bg-[#e8e4e0] rounded w-64 mb-2"></div>
-              <div className="h-4 bg-[#e8e4e0] rounded w-48 mb-4"></div>
-              <div className="h-32 bg-[#fafaf9] border border-[#e8e4e0] rounded"></div>
+            <div key={i} className="bg-white border border-line-3 rounded-lg p-5 mb-4">
+              <div className="h-5 bg-line-3 rounded w-64 mb-2"></div>
+              <div className="h-4 bg-line-3 rounded w-48 mb-4"></div>
+              <div className="h-32 bg-surface-5 border border-line-3 rounded"></div>
             </div>
           ))}
         </div>
@@ -255,27 +255,27 @@ export default function PromptsSettingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f2ee] p-8">
+      <div className="min-h-screen bg-surface p-8">
         <div className="max-w-4xl mx-auto">
-          <div className="text-[#9e998f]">{error}</div>
+          <div className="text-subtle">{error}</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f2ee] p-8">
+    <div className="min-h-screen bg-surface p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-[#1a1a1a]">AI Prompt Library</h1>
-          <p className="text-sm text-[#9e998f] mt-1">
+          <h1 className="text-2xl font-semibold text-ink">AI Prompt Library</h1>
+          <p className="text-sm text-subtle mt-1">
             Edit the system prompts used across all AI features. Changes take effect immediately — no code deploy required.
           </p>
         </div>
 
         {sortedCategories.map(category => (
           <div key={category} className="mb-6">
-            <h2 className="text-xs text-[#9e998f] uppercase tracking-wider mb-3">
+            <h2 className="text-xs text-subtle uppercase tracking-wider mb-3">
               {CATEGORY_DISPLAY_NAMES[category] || category}
             </h2>
             <div className="space-y-4">
@@ -284,27 +284,27 @@ export default function PromptsSettingsPage() {
                 const dirty = isDirty(prompt.id)
 
                 return (
-                  <div key={prompt.id} className="bg-white border border-[#e8e4e0] rounded-lg p-5">
+                  <div key={prompt.id} className="bg-white border border-line-3 rounded-lg p-5">
                     {/* Header row */}
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span className="font-semibold text-[#1a1a1a]">{prompt.name}</span>
-                      <span className="text-xs text-[#9e998f] font-mono">{prompt.key}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-[#f5f2ee] text-[#9e998f]">
+                      <span className="font-semibold text-ink">{prompt.name}</span>
+                      <span className="text-xs text-subtle font-mono">{prompt.key}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-surface text-subtle">
                         {CATEGORY_DISPLAY_NAMES[prompt.category] || prompt.category}
                       </span>
                       {prompt.report_type && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-[#f5f2ee] text-[#9e998f]">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-surface text-subtle">
                           {prompt.report_type}
                         </span>
                       )}
-                      <span className="text-xs text-[#9e998f] ml-auto">
+                      <span className="text-xs text-subtle ml-auto">
                         Updated {formatTimeAgo(prompt.updated_at)}
                       </span>
                     </div>
 
                     {/* Notes field */}
                     {prompt.notes && (
-                      <div className="text-xs text-[#9e998f] italic mb-3">{prompt.notes}</div>
+                      <div className="text-xs text-subtle italic mb-3">{prompt.notes}</div>
                     )}
 
                     {/* Prompt editor */}
@@ -316,7 +316,7 @@ export default function PromptsSettingsPage() {
                         target.style.height = 'auto'
                         target.style.height = `${target.scrollHeight}px`
                       }}
-                      className="w-full min-h-[160px] p-3 border border-[#e8e4e0] rounded-md bg-[#fafaf9] font-mono text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] resize-none"
+                      className="w-full min-h-[160px] p-3 border border-line-3 rounded-md bg-surface-5 font-mono text-sm text-ink focus:outline-none focus:border-gold resize-none"
                       style={{ fontFamily: 'DM Mono, monospace' }}
                     />
 
@@ -336,7 +336,7 @@ export default function PromptsSettingsPage() {
                       {prompt.previous_prompt && (
                         <button
                           onClick={() => setRevertModal({ promptId: prompt.id, promptName: prompt.name })}
-                          className="px-3 py-1.5 text-xs border border-[#e8e4e0] rounded text-[#9e998f] hover:bg-[#f5f2ee] transition-colors"
+                          className="px-3 py-1.5 text-xs border border-line-3 rounded text-subtle hover:bg-surface transition-colors"
                         >
                           Revert to previous
                         </button>
@@ -344,7 +344,7 @@ export default function PromptsSettingsPage() {
                       <button
                         onClick={() => handleSave(prompt.id)}
                         disabled={!dirty || editState.saving}
-                        className="px-4 py-1.5 text-xs bg-[#c9a96e] text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
+                        className="px-4 py-1.5 text-xs bg-gold text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#b8985e] transition-colors"
                       >
                         {editState.saving ? 'Saving…' : 'Save'}
                       </button>
@@ -361,14 +361,14 @@ export default function PromptsSettingsPage() {
       {revertModal.promptId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[#1a1a1a] mb-2">Revert prompt?</h3>
-            <p className="text-sm text-[#9e998f] mb-6">
+            <h3 className="text-lg font-semibold text-ink mb-2">Revert prompt?</h3>
+            <p className="text-sm text-subtle mb-6">
               This will restore the previous version of this prompt. Your current version will become the new 'previous' — you can revert again if needed.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setRevertModal({ promptId: null, promptName: '' })}
-                className="px-4 py-2 text-sm border border-[#e8e4e0] rounded text-[#1a1a1a] hover:bg-[#f5f2ee] transition-colors"
+                className="px-4 py-2 text-sm border border-line-3 rounded text-ink hover:bg-surface transition-colors"
               >
                 Cancel
               </button>

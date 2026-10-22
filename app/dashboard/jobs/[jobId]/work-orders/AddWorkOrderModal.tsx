@@ -63,8 +63,8 @@ export function AddWorkOrderModal({
     >
       <div
         style={{
-          background: '#fff',
-          border: '1px solid #ddd8d0',
+          background: 'var(--paper)',
+          border: '1px solid var(--line-strong)',
           borderRadius: 12,
           width: 420,
           overflow: 'hidden',
@@ -75,7 +75,7 @@ export function AddWorkOrderModal({
         <div
           style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #e8e4de',
+            borderBottom: '1px solid var(--line-4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -86,12 +86,12 @@ export function AddWorkOrderModal({
             onClick={onCancel}
             style={{
               width: 26, height: 26,
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 13,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -103,35 +103,35 @@ export function AddWorkOrderModal({
 
         {/* Body */}
         <div style={{ padding: '16px 18px' }}>
-          <p style={{ fontSize: 12, color: '#5a5650', marginBottom: 12 }}>{subtitle}</p>
+          <p style={{ fontSize: 12, color: 'var(--body-soft)', marginBottom: 12 }}>{subtitle}</p>
 
           {isQuote ? (
             <div
               onClick={() => handleOpt('repair')}
               style={{
                 padding: '9px 11px',
-                border: '1px solid #ddd8d0',
+                border: '1px solid var(--line-strong)',
                 borderRadius: 6,
                 cursor: 'pointer',
                 fontSize: 12,
-                background: '#f5f2ee',
+                background: 'var(--surface)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2,
               }}
               onMouseEnter={e => {
                 const t = e.currentTarget as HTMLElement
-                t.style.borderColor = '#1a1a1a'
-                t.style.background  = '#fff'
+                t.style.borderColor = 'var(--ink)'
+                t.style.background  = 'var(--paper)'
               }}
               onMouseLeave={e => {
                 const t = e.currentTarget as HTMLElement
-                t.style.borderColor = '#ddd8d0'
-                t.style.background  = '#f5f2ee'
+                t.style.borderColor = 'var(--line-strong)'
+                t.style.background  = 'var(--surface)'
               }}
             >
               <div>Blank work order</div>
-              <small style={{ fontSize: 10, color: '#9a9590' }}>Non-quoted — manual pricing</small>
+              <small style={{ fontSize: 10, color: 'var(--subtle-2)' }}>Non-quoted — manual pricing</small>
             </div>
           ) : (
             <div
@@ -147,28 +147,28 @@ export function AddWorkOrderModal({
                   onClick={() => handleOpt(opt.workType)}
                   style={{
                     padding: '9px 11px',
-                    border: '1px solid #ddd8d0',
+                    border: '1px solid var(--line-strong)',
                     borderRadius: 6,
                     cursor: 'pointer',
                     fontSize: 12,
-                    background: '#f5f2ee',
+                    background: 'var(--surface)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 2,
                   }}
                   onMouseEnter={e => {
                     const t = e.currentTarget as HTMLElement
-                    t.style.borderColor = '#1a1a1a'
-                    t.style.background  = '#fff'
+                    t.style.borderColor = 'var(--ink)'
+                    t.style.background  = 'var(--paper)'
                   }}
                   onMouseLeave={e => {
                     const t = e.currentTarget as HTMLElement
-                    t.style.borderColor = '#ddd8d0'
-                    t.style.background  = '#f5f2ee'
+                    t.style.borderColor = 'var(--line-strong)'
+                    t.style.background  = 'var(--surface)'
                   }}
                 >
                   <div>{opt.label}</div>
-                  <small style={{ fontSize: 10, color: '#9a9590' }}>{opt.description}</small>
+                  <small style={{ fontSize: 10, color: 'var(--subtle-2)' }}>{opt.description}</small>
                 </div>
               ))}
             </div>
@@ -179,7 +179,7 @@ export function AddWorkOrderModal({
         <div
           style={{
             padding: '12px 18px',
-            borderTop: '1px solid #e8e4de',
+            borderTop: '1px solid var(--line-4)',
             display: 'flex',
             justifyContent: 'flex-end',
           }}
@@ -191,10 +191,10 @@ export function AddWorkOrderModal({
               fontSize: 11,
               fontWeight: 500,
               fontFamily: 'DM Sans, sans-serif',
-              border: '1px solid #ddd8d0',
+              border: '1px solid var(--line-strong)',
               borderRadius: 5,
-              background: '#fff',
-              color: '#5a5650',
+              background: 'var(--paper)',
+              color: 'var(--body-soft)',
               cursor: 'pointer',
             }}
           >

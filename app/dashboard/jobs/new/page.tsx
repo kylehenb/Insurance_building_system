@@ -59,8 +59,8 @@ function Field({
         placeholder={placeholder}
         required={required}
         style={FIELD_STYLE}
-        onFocus={e => ((e.target as HTMLInputElement).style.borderColor = '#c8b89a')}
-        onBlur={e => ((e.target as HTMLInputElement).style.borderColor = '#e4dfd8')}
+        onFocus={e => ((e.target as HTMLInputElement).style.borderColor = 'var(--tan)')}
+        onBlur={e => ((e.target as HTMLInputElement).style.borderColor = 'var(--line-2)')}
       />
     </div>
   )
@@ -86,8 +86,8 @@ function TextareaField({
         placeholder={placeholder}
         rows={3}
         style={{ ...FIELD_STYLE, resize: 'vertical', lineHeight: 1.6 }}
-        onFocus={e => ((e.target as HTMLTextAreaElement).style.borderColor = '#c8b89a')}
-        onBlur={e => ((e.target as HTMLTextAreaElement).style.borderColor = '#e4dfd8')}
+        onFocus={e => ((e.target as HTMLTextAreaElement).style.borderColor = 'var(--tan)')}
+        onBlur={e => ((e.target as HTMLTextAreaElement).style.borderColor = 'var(--line-2)')}
       />
     </div>
   )
@@ -185,7 +185,7 @@ export default function NewJobPage() {
       style={{
         fontFamily: 'DM Sans, sans-serif',
         minHeight: '100vh',
-        background: '#faf9f7',
+        background: 'var(--surface-3)',
         padding: '32px 24px',
       }}
     >
@@ -193,15 +193,15 @@ export default function NewJobPage() {
         {/* Back link */}
         <Link
           href="/dashboard/jobs"
-          style={{ fontSize: 13, color: '#9e998f', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 24 }}
+          style={{ fontSize: 13, color: 'var(--subtle)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 24 }}
         >
           ← Jobs
         </Link>
 
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginBottom: 6, letterSpacing: -0.5 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', marginBottom: 6, letterSpacing: -0.5 }}>
           New Job
         </h1>
-        <p style={{ fontSize: 13, color: '#9e998f', marginBottom: 28 }}>
+        <p style={{ fontSize: 13, color: 'var(--subtle)', marginBottom: 28 }}>
           Create a job manually. Insurance jobs come from insurer orders; use this for private homeowner work.
         </p>
 
@@ -210,8 +210,8 @@ export default function NewJobPage() {
           style={{
             display: 'flex',
             gap: 0,
-            background: '#fff',
-            border: '0.5px solid #e4dfd8',
+            background: 'var(--paper)',
+            border: '0.5px solid var(--line-2)',
             borderRadius: 8,
             padding: 4,
             marginBottom: 28,
@@ -232,8 +232,8 @@ export default function NewJobPage() {
                 fontFamily: 'inherit',
                 cursor: 'pointer',
                 transition: 'all 0.15s',
-                background: jobType === type ? '#1a1a1a' : 'transparent',
-                color: jobType === type ? '#f5f0e8' : '#9e998f',
+                background: jobType === type ? 'var(--ink)' : 'transparent',
+                color: jobType === type ? 'var(--cream)' : 'var(--subtle)',
               }}
             >
               {type === 'insurance' ? 'Insurance' : 'Private / Homeowner'}
@@ -244,8 +244,8 @@ export default function NewJobPage() {
         <form onSubmit={handleSubmit}>
           <div
             style={{
-              background: '#fff',
-              border: '0.5px solid #e4dfd8',
+              background: 'var(--paper)',
+              border: '0.5px solid var(--line-2)',
               borderRadius: 8,
               padding: '24px',
               marginBottom: 16,
@@ -256,7 +256,7 @@ export default function NewJobPage() {
               <div
                 style={{
                   background: '#faf5ee',
-                  border: '0.5px solid #e8ddd0',
+                  border: '0.5px solid var(--line-tan-5)',
                   borderRadius: 6,
                   padding: '10px 14px',
                   marginBottom: 20,
@@ -275,7 +275,7 @@ export default function NewJobPage() {
                 fontSize: 10,
                 textTransform: 'uppercase',
                 letterSpacing: '0.07em',
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 fontWeight: 600,
                 marginBottom: 14,
               }}
@@ -323,7 +323,7 @@ export default function NewJobPage() {
                     fontSize: 10,
                     textTransform: 'uppercase',
                     letterSpacing: '0.07em',
-                    color: '#9e998f',
+                    color: 'var(--subtle)',
                     fontWeight: 600,
                     marginTop: 8,
                     marginBottom: 14,
@@ -390,13 +390,13 @@ export default function NewJobPage() {
           {error && (
             <div
               style={{
-                background: '#fdecea',
+                background: 'var(--danger-bg-2)',
                 border: '0.5px solid #f5c6c2',
                 borderRadius: 6,
                 padding: '10px 14px',
                 marginBottom: 16,
                 fontSize: 13,
-                color: '#b91c1c',
+                color: 'var(--danger-strong)',
               }}
             >
               {error}
@@ -408,9 +408,9 @@ export default function NewJobPage() {
               href="/dashboard/jobs"
               style={{
                 fontSize: 13,
-                color: '#9a9088',
+                color: 'var(--subtle-3)',
                 background: 'transparent',
-                border: '1px solid #e8e3dc',
+                border: '1px solid var(--line-5)',
                 borderRadius: 20,
                 padding: '8px 20px',
                 cursor: 'pointer',
@@ -428,9 +428,9 @@ export default function NewJobPage() {
               disabled={submitting || !insuredName.trim() || !propertyAddress.trim()}
               style={{
                 fontSize: 13,
-                color: '#fff',
-                background: '#2a6b50',
-                border: '1px solid #2a6b50',
+                color: 'var(--paper)',
+                background: 'var(--teal)',
+                border: '1px solid var(--teal)',
                 borderRadius: 20,
                 padding: '8px 24px',
                 cursor: submitting ? 'not-allowed' : 'pointer',

@@ -215,7 +215,7 @@ export function ReportsTab({
     <div className="px-0 py-2">
       <div className="flex items-center justify-between mb-4">
         <span
-          className="text-[11px] text-[#b0a898] uppercase tracking-widest"
+          className="text-[11px] text-faint uppercase tracking-widest"
           style={{ fontFamily: 'DM Sans, sans-serif' }}
         >
           {reports.filter(r => !r.deleted_at).length} report
@@ -226,7 +226,7 @@ export function ReportsTab({
           <button
             onClick={() => setShowNewReportMenu(o => !o)}
             disabled={isCreating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-[#3a3530] border border-[#e4dfd8] bg-white hover:bg-[#f5f2ee] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-body border border-line-2 bg-white hover:bg-surface transition-colors"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             <Plus size={13} />
@@ -238,16 +238,16 @@ export function ReportsTab({
               <div className="fixed inset-0 z-10" onClick={() => setShowNewReportMenu(false)} />
               <div
                 className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg shadow-lg overflow-hidden"
-                style={{ background: '#ffffff', border: '0.5px solid #e4dfd8' }}
+                style={{ background: 'var(--paper)', border: '0.5px solid var(--line-2)' }}
               >
                 {REPORT_TYPE_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
                     onClick={() => handleCreateReport(opt.value)}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 text-[12px] text-[#3a3530] hover:bg-[#f5f2ee] transition-colors text-left"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-[12px] text-body hover:bg-surface transition-colors text-left"
                     style={{ fontFamily: 'DM Sans, sans-serif' }}
                   >
-                    <FileText size={12} className="text-[#b0a898]" />
+                    <FileText size={12} className="text-faint" />
                     {opt.label}
                   </button>
                 ))}
@@ -263,18 +263,18 @@ export function ReportsTab({
             <div
               key={i}
               className="h-12 rounded-lg animate-pulse"
-              style={{ background: '#f0ece6' }}
+              style={{ background: 'var(--line-faint)' }}
             />
           ))}
         </div>
       ) : reports.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center py-12 text-center"
-          style={{ border: '0.5px dashed #e4dfd8', borderRadius: 10 }}
+          style={{ border: '0.5px dashed var(--line-2)', borderRadius: 10 }}
         >
-          <FileText size={24} className="text-[#e4dfd8] mb-3" />
+          <FileText size={24} className="text-line-2 mb-3" />
           <p
-            className="text-[13px] text-[#b0a898]"
+            className="text-[13px] text-faint"
             style={{ fontFamily: 'DM Sans, sans-serif' }}
           >
             No reports yet

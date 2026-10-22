@@ -126,7 +126,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
           width: 365.0625,
           minWidth: 365.0625,
           borderLeft: `3px solid ${borderColor}`,
-          backgroundColor: '#f5f0e8',
+          backgroundColor: 'var(--cream)',
           display: 'flex',
           flexDirection: 'column',
           fontFamily: 'inherit',
@@ -154,7 +154,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
             style={{
               fontSize: 17,
               fontWeight: 500,
-              color: '#1a1a1a',
+              color: 'var(--ink)',
               marginBottom: 4,
               letterSpacing: '-0.2px',
             }}
@@ -213,7 +213,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
         width: 365.0625,
         minWidth: 365.0625,
         borderLeft: `3px solid ${borderColor}`,
-        backgroundColor: '#f5f0e8',
+        backgroundColor: 'var(--cream)',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'inherit',
@@ -296,8 +296,8 @@ export default function StageBanner({ jobId }: StageBannerProps) {
               type="button"
               style={{
                 backgroundColor: 'transparent',
-                color: '#c9a96e',
-                border: '1px solid #c9a96e',
+                color: 'var(--gold)',
+                border: '1px solid var(--gold)',
                 borderRadius: 4,
                 padding: '6px 12px',
                 fontSize: 13,
@@ -345,8 +345,8 @@ export default function StageBanner({ jobId }: StageBannerProps) {
               type="button"
               onClick={handlePrimaryAction}
               style={{
-                backgroundColor: '#1a1a1a',
-                color: '#c9a96e',
+                backgroundColor: 'var(--ink)',
+                color: 'var(--gold)',
                 border: 'none',
                 borderRadius: 4,
                 padding: '6px 12px',
@@ -370,7 +370,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
           style={{
             padding: '10px 16px 14px',
             fontSize: 13,
-            color: '#b0a898',
+            color: 'var(--faint)',
             fontStyle: 'italic',
           }}
         >
@@ -451,8 +451,8 @@ export default function StageBanner({ jobId }: StageBannerProps) {
                       padding: '6px 9px',
                       backgroundColor: 'white',
                       borderRadius: 4,
-                      border: isUrgent ? '0.5px solid #fca5a5' : '0.5px solid #e8dfc8',
-                      borderLeft: isUrgent ? '2px solid #ef4444' : '2px solid #c9a96e',
+                      border: isUrgent ? '0.5px solid var(--danger-soft)' : '0.5px solid #e8dfc8',
+                      borderLeft: isUrgent ? '2px solid #ef4444' : '2px solid var(--gold)',
                     }}
                   >
                     <div
@@ -460,7 +460,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
                         width: 5,
                         height: 5,
                         borderRadius: '50%',
-                        backgroundColor: isUrgent ? '#ef4444' : '#c9a96e',
+                        backgroundColor: isUrgent ? '#ef4444' : 'var(--gold)',
                         flexShrink: 0,
                       }}
                     />

@@ -18,23 +18,23 @@ export const CARD_CSS = `
   .wo-field-input {
     font-size: 12px;
     font-family: 'DM Mono', monospace;
-    color: #1a1a1a;
+    color: var(--ink);
     border: none;
-    border-bottom: 1px solid #ddd8d0;
+    border-bottom: 1px solid var(--line-strong);
     background: transparent;
     outline: none;
     padding: 0 0 1px;
     transition: border-color .15s;
   }
-  .wo-field-input:focus { border-bottom-color: #c9a96e; }
-  .wo-field-input:disabled { color: #9a9590; border-bottom-color: transparent; }
-  .wo-field-input::placeholder { color: #9a9590; }
+  .wo-field-input:focus { border-bottom-color: var(--gold); }
+  .wo-field-input:disabled { color: var(--subtle-2); border-bottom-color: transparent; }
+  .wo-field-input::placeholder { color: var(--subtle-2); }
   .wo-select {
     font-size: 12px;
     font-family: 'DM Sans', sans-serif;
     border: none;
     background: transparent;
-    color: #1a1a1a;
+    color: var(--ink);
     cursor: pointer;
     padding: 0;
     width: 100%;
@@ -49,10 +49,10 @@ export const CARD_CSS = `
   .wo-dep-select {
     font-size: 11px;
     font-family: 'DM Sans', sans-serif;
-    border: 1px solid #ddd8d0;
+    border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: #ede9e3;
-    color: #5a5650;
+    color: var(--body-soft);
     padding: 2px 7px;
     cursor: pointer;
     outline: none;
@@ -103,7 +103,7 @@ function FieldGroup({
           fontSize: 9,
           textTransform: 'uppercase',
           letterSpacing: '.07em',
-          color: '#9a9590',
+          color: 'var(--subtle-2)',
           fontWeight: 500,
         }}
       >
@@ -120,7 +120,7 @@ function FieldDivider() {
       style={{
         width: 1,
         height: 32,
-        background: '#e8e4de',
+        background: 'var(--line-4)',
         alignSelf: 'center',
         flexShrink: 0,
       }}
@@ -152,11 +152,11 @@ function CtxMenu({
         style={{
           padding: '3px 7px',
           fontSize: 12,
-          border: '1px solid #ddd8d0',
+          border: '1px solid var(--line-strong)',
           borderRadius: 5,
           background: 'transparent',
           cursor: 'pointer',
-          color: '#9a9590',
+          color: 'var(--subtle-2)',
           letterSpacing: '.05em',
           lineHeight: 1,
         }}
@@ -169,8 +169,8 @@ function CtxMenu({
             position: 'absolute',
             right: 0,
             top: 'calc(100% + 4px)',
-            background: '#fff',
-            border: '1px solid #ddd8d0',
+            background: 'var(--paper)',
+            border: '1px solid var(--line-strong)',
             borderRadius: 8,
             minWidth: 165,
             zIndex: 80,
@@ -189,12 +189,12 @@ function CtxMenu({
                 padding: '7px 13px',
                 fontSize: 12,
                 cursor: 'pointer',
-                color: item.danger ? '#991b1b' : '#1a1a1a',
+                color: item.danger ? 'var(--danger-dark)' : 'var(--ink)',
                 background: 'transparent',
                 border: 'none',
                 fontFamily: 'DM Sans, sans-serif',
               }}
-              onMouseEnter={e => { (e.target as HTMLElement).style.background = '#f5f2ee' }}
+              onMouseEnter={e => { (e.target as HTMLElement).style.background = 'var(--surface)' }}
               onMouseLeave={e => { (e.target as HTMLElement).style.background = 'transparent' }}
             >
               {item.label}
@@ -248,8 +248,8 @@ function CardDetail({
     <div
       style={{
         padding: '10px 12px 10px 28px',
-        background: '#f5f2ee',
-        borderTop: '1px solid #e8e4de',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--line-4)',
       }}
     >
       {/* Field row */}
@@ -302,7 +302,7 @@ function CardDetail({
                 debounce(() => onUpdate({ cushionDays: isNaN(v) ? 1 : v }))
               }}
             />
-            <span style={{ fontSize: 10, color: '#9a9590' }}>d</span>
+            <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>d</span>
           </div>
         </FieldGroup>
 
@@ -320,7 +320,7 @@ function CardDetail({
                 debounce(() => onUpdate({ lagDays: isNaN(v) ? 0 : v }))
               }}
             />
-            <span style={{ fontSize: 10, color: '#9a9590' }}>
+            <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>
               d{wo.lagDescription ? ` · ${wo.lagDescription}` : ''}
             </span>
           </div>
@@ -333,7 +333,7 @@ function CardDetail({
             style={{
               fontSize: 12,
               fontFamily: 'DM Mono, monospace',
-              color: '#1a1a1a',
+              color: 'var(--ink)',
             }}
           >
             {quotedAmount}
@@ -383,7 +383,7 @@ function CardDetail({
             gap: 6,
             marginTop: 10,
             fontSize: 11,
-            color: '#9a9590',
+            color: 'var(--subtle-2)',
           }}
         >
           <span style={{ fontSize: 10 }}>After:</span>
@@ -407,14 +407,14 @@ function CardDetail({
 
       {/* Line items */}
       {wo.scopeItems.length > 0 && (
-        <div style={{ marginTop: 10, borderTop: '1px solid #e8e4de', paddingTop: 8 }}>
+        <div style={{ marginTop: 10, borderTop: '1px solid var(--line-4)', paddingTop: 8 }}>
           <div
             style={{
               fontSize: 9,
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '.08em',
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               marginBottom: 5,
             }}
           >
@@ -427,9 +427,9 @@ function CardDetail({
                 display: 'flex',
                 gap: 8,
                 padding: '3px 0',
-                borderBottom: '1px solid #e8e4de',
+                borderBottom: '1px solid var(--line-4)',
                 fontSize: 11,
-                color: '#5a5650',
+                color: 'var(--body-soft)',
               }}
             >
               <span style={{ flex: 1 }}>{si.item_description ?? '—'}</span>
@@ -437,7 +437,7 @@ function CardDetail({
                 style={{
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 10,
-                  color: '#9a9590',
+                  color: 'var(--subtle-2)',
                 }}
               >
                 {si.qty} {si.unit}
@@ -452,15 +452,15 @@ function CardDetail({
               ? null
               : wo.scopeItems.reduce((s, si) => s + (si.trade_rate_total ?? 0) * (si.qty ?? 0), 0)
             return (
-              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e8e4de' }}>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--line-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#5a5650' }}>Trade Payment</span>
-                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--body-soft)' }}>Trade Payment</span>
+                  <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>
                     {tradePayment != null ? aud.format(tradePayment) : '—'}
                   </span>
                 </div>
                 {hasNullRate && (
-                  <div style={{ fontSize: 10, color: '#b45309', marginTop: 3 }}>
+                  <div style={{ fontSize: 10, color: 'var(--warning)', marginTop: 3 }}>
                     ⚠ Some items have no trade rate set
                   </div>
                 )}
@@ -542,13 +542,13 @@ export function WorkOrderCard({
   if (complete)
     chips.push(<span key="complete" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569' }}>Complete</span>)
   else if (sent)
-    chips.push(<span key="sent" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #a7d4bc', background: '#eaf4ef', color: '#2d6a4f' }}>Sent</span>)
+    chips.push(<span key="sent" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #a7d4bc', background: '#eaf4ef', color: 'var(--forest)' }}>Sent</span>)
   if (wo.proximity_range === 'extended')
-    chips.push(<span key="ext" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff0f0', color: '#991b1b' }}>Extended range</span>)
+    chips.push(<span key="ext" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid var(--danger-soft)', background: '#fff0f0', color: 'var(--danger-dark)' }}>Extended range</span>)
   if (visitNumber !== undefined) {
-    chips.push(<span key="visit" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #c9a96e', background: '#fef9e7', color: '#92400e' }}>Visit {visitNumber}/{wo.total_visits}</span>)
+    chips.push(<span key="visit" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid var(--gold)', background: '#fef9e7', color: 'var(--warning-dark)' }}>Visit {visitNumber}/{wo.total_visits}</span>)
   } else if ((wo.total_visits ?? 1) > 1) {
-    chips.push(<span key="visits" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid #ddd8d0', background: '#f5f2ee', color: '#5a5650' }}>{wo.current_visit}/{wo.total_visits} visits</span>)
+    chips.push(<span key="visits" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--body-soft)' }}>{wo.current_visit}/{wo.total_visits} visits</span>)
   }
 
   // ── Context menu items ─────────────────────────────────────────────────────
@@ -570,8 +570,8 @@ export function WorkOrderCard({
           style={{
             padding: '4px 12px', fontSize: 11, fontWeight: 500,
             fontFamily: 'DM Sans, sans-serif',
-            background: '#1a1a1a', color: '#fff',
-            border: '1px solid #1a1a1a', borderRadius: 5, cursor: 'pointer',
+            background: 'var(--ink)', color: 'var(--paper)',
+            border: '1px solid var(--ink)', borderRadius: 5, cursor: 'pointer',
           }}
         >
           Place →
@@ -583,18 +583,18 @@ export function WorkOrderCard({
             style={{
               padding: '4px 12px', fontSize: 11, fontWeight: 500,
               fontFamily: 'DM Sans, sans-serif',
-              background: '#e2ddd6', color: '#9a9590',
-              border: '1px solid #ddd8d0', borderRadius: 5, cursor: 'not-allowed',
+              background: '#e2ddd6', color: 'var(--subtle-2)',
+              border: '1px solid var(--line-strong)', borderRadius: 5, cursor: 'not-allowed',
             }}
           >
             Place →
           </button>
-          <div style={{ fontSize: 10, color: '#991b1b', marginTop: 3 }}>{gateReason}</div>
+          <div style={{ fontSize: 10, color: 'var(--danger-dark)', marginTop: 3 }}>{gateReason}</div>
         </div>
       )
     }
     if (complete) {
-      return <span style={{ fontSize: 10, color: '#9a9590' }}>Invoiced</span>
+      return <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>Invoiced</span>
     }
     if (!sent) {
       return (
@@ -603,8 +603,8 @@ export function WorkOrderCard({
           style={{
             padding: '4px 12px', fontSize: 11, fontWeight: 500,
             fontFamily: 'DM Sans, sans-serif',
-            background: '#1a1a1a', color: '#fff',
-            border: '1px solid #1a1a1a', borderRadius: 5, cursor: 'pointer',
+            background: 'var(--ink)', color: 'var(--paper)',
+            border: '1px solid var(--ink)', borderRadius: 5, cursor: 'pointer',
           }}
         >
           Send
@@ -617,8 +617,8 @@ export function WorkOrderCard({
         style={{
           padding: '4px 12px', fontSize: 11, fontWeight: 500,
           fontFamily: 'DM Sans, sans-serif',
-          color: '#991b1b', border: '1px solid #fca5a5',
-          background: '#fff', borderRadius: 5, cursor: 'pointer',
+          color: 'var(--danger-dark)', border: '1px solid var(--danger-soft)',
+          background: 'var(--paper)', borderRadius: 5, cursor: 'pointer',
         }}
       >
         Cancel
@@ -674,7 +674,7 @@ export function WorkOrderCard({
             style={{
               fontFamily: 'DM Mono, monospace',
               fontSize: 10,
-              color: '#9a9590',
+              color: 'var(--subtle-2)',
               minWidth: 16,
               flexShrink: 0,
             }}
@@ -689,9 +689,9 @@ export function WorkOrderCard({
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>
                 {wo.trade?.business_name ?? (
-                  <span style={{ color: '#9a9590', fontWeight: 400, fontStyle: 'italic' }}>
+                  <span style={{ color: 'var(--subtle-2)', fontWeight: 400, fontStyle: 'italic' }}>
                     No contractor
                   </span>
                 )}
@@ -699,7 +699,7 @@ export function WorkOrderCard({
               <span
                 style={{
                   fontSize: 10,
-                  color: '#9a9590',
+                  color: 'var(--subtle-2)',
                   textTransform: 'uppercase',
                   letterSpacing: '.07em',
                 }}
@@ -720,32 +720,32 @@ export function WorkOrderCard({
                 style={{
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 11,
-                  color: '#1a1a1a',
+                  color: 'var(--ink)',
                 }}
               >
                 {amountDisplay}
               </span>
-              <span style={{ color: '#ddd8d0', fontSize: 10 }}>·</span>
+              <span style={{ color: 'var(--line-strong)', fontSize: 10 }}>·</span>
               <span
                 style={{
                   fontFamily: 'DM Mono, monospace',
                   fontSize: 11,
-                  color: '#5a5650',
+                  color: 'var(--body-soft)',
                 }}
               >
                 {wo.estimated_hours != null ? `${formatEstHours(wo.estimated_hours)}h` : '—'}
               </span>
               {wo.lagDays > 0 && (
                 <>
-                  <span style={{ color: '#ddd8d0', fontSize: 10 }}>·</span>
+                  <span style={{ color: 'var(--line-strong)', fontSize: 10 }}>·</span>
                   <span
                     style={{
                       fontSize: 9,
                       padding: '1px 5px',
                       borderRadius: 4,
-                      border: '1px solid #fcd38d',
-                      background: '#fef3e2',
-                      color: '#92400e',
+                      border: '1px solid var(--warning-soft)',
+                      background: 'var(--warning-bg)',
+                      color: 'var(--warning-dark)',
                     }}
                   >
                     {wo.lagDays}d lag
@@ -754,15 +754,15 @@ export function WorkOrderCard({
               )}
               {predWo && (
                 <>
-                  <span style={{ color: '#ddd8d0', fontSize: 10 }}>·</span>
-                  <span style={{ fontSize: 10, color: '#9a9590' }}>
+                  <span style={{ color: 'var(--line-strong)', fontSize: 10 }}>·</span>
+                  <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>
                     after {predWo.tradeTypeLabel || predWo.work_type}
                   </span>
                 </>
               )}
               {chips.length > 0 && (
                 <>
-                  <span style={{ color: '#ddd8d0', fontSize: 10 }}>·</span>
+                  <span style={{ color: 'var(--line-strong)', fontSize: 10 }}>·</span>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{chips}</div>
                 </>
               )}
@@ -778,7 +778,7 @@ export function WorkOrderCard({
             <ActionBtn />
             <CtxMenu items={ctxItems} />
           </div>
-          <span style={{ fontSize: 10, color: '#9a9590', marginLeft: 2 }}>
+          <span style={{ fontSize: 10, color: 'var(--subtle-2)', marginLeft: 2 }}>
             {isExpanded ? '▲' : '▼'}
           </span>
         </div>
@@ -819,7 +819,7 @@ export function WorkOrderCard({
         borderRadius: 8,
         overflow: 'hidden',
         background: '#ede9e3',
-        border: '1px solid #ddd8d0',
+        border: '1px solid var(--line-strong)',
         cursor: dragHandleProps ? 'grab' : 'grab',
       }}
     >
@@ -835,7 +835,7 @@ export function WorkOrderCard({
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '.1em',
-                color: '#9a9590',
+                color: 'var(--subtle-2)',
               }}
             >
               {wo.tradeTypeLabel || wo.work_type || 'Work order'}
@@ -887,7 +887,7 @@ export function WorkOrderCard({
                     onUpdate({ cushionDays: isNaN(v) ? 1 : v })
                   }}
                 />
-                <span style={{ fontSize: 10, color: '#9a9590' }}>d</span>
+                <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>d</span>
               </div>
             </FieldGroup>
             <FieldDivider />
@@ -903,12 +903,12 @@ export function WorkOrderCard({
                     onUpdate({ lagDays: isNaN(v) ? 0 : v })
                   }}
                 />
-                <span style={{ fontSize: 10, color: '#9a9590' }}>d</span>
+                <span style={{ fontSize: 10, color: 'var(--subtle-2)' }}>d</span>
               </div>
             </FieldGroup>
             <FieldDivider />
             <FieldGroup label="Quoted">
-              <div style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: '#1a1a1a' }}>
+              <div style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--ink)' }}>
                 {wo.quotedAllowance > 0 ? aud.format(wo.quotedAllowance) : '—'}
               </div>
             </FieldGroup>
@@ -957,7 +957,7 @@ export function WorkOrderCard({
               gap: 6,
               marginTop: 7,
               paddingTop: 6,
-              borderTop: '1px solid #e8e4de',
+              borderTop: '1px solid var(--line-4)',
             }}
           >
             <button
@@ -965,7 +965,7 @@ export function WorkOrderCard({
               style={{
                 fontSize: 10,
                 fontFamily: 'DM Sans, sans-serif',
-                color: '#9a9590',
+                color: 'var(--subtle-2)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -987,7 +987,7 @@ export function WorkOrderCard({
 
       {/* Line items (expandable) */}
       {isExpanded && wo.scopeItems.length > 0 && (
-        <div style={{ borderTop: '1px solid #e8e4de', padding: '7px 12px 8px 28px', background: '#f5f2ee' }}>
+        <div style={{ borderTop: '1px solid var(--line-4)', padding: '7px 12px 8px 28px', background: 'var(--surface)' }}>
           {wo.scopeItems.map(si => (
             <div
               key={si.id}
@@ -995,13 +995,13 @@ export function WorkOrderCard({
                 display: 'flex',
                 gap: 8,
                 padding: '3px 0',
-                borderBottom: '1px solid #e8e4de',
+                borderBottom: '1px solid var(--line-4)',
                 fontSize: 11,
-                color: '#5a5650',
+                color: 'var(--body-soft)',
               }}
             >
               <span style={{ flex: 1 }}>{si.item_description ?? '—'}</span>
-              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: '#9a9590' }}>
+              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--subtle-2)' }}>
                 {si.qty} {si.unit}
               </span>
             </div>

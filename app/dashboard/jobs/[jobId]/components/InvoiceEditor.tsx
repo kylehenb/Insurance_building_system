@@ -394,7 +394,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f' }}>
+      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)' }}>
         Loading invoice…
       </div>
     )
@@ -404,27 +404,27 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
       {/* Invoice date — editable while draft, locked once sent */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 12, color: '#9e998f' }}>Invoice Date</span>
+        <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Invoice Date</span>
         <input
           type="date"
           defaultValue={invoice?.issued_date ? invoice.issued_date.slice(0, 10) : ''}
           onChange={e => updateIssuedDate(e.target.value)}
-          style={{ fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
+          style={{ fontSize: 13, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '4px 8px', fontFamily: 'DM Sans, sans-serif' }}
         />
       </div>
 
       {/* Line items */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Line Items</div>
+        <div style={{ fontSize: 12, color: 'var(--subtle)', marginBottom: 8 }}>Line Items</div>
 
         {lineItems.length === 0 ? (
-          <div style={{ padding: '20px', background: '#f5f2ee', borderRadius: 6, textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
+          <div style={{ padding: '20px', background: 'var(--surface)', borderRadius: 6, textAlign: 'center', fontSize: 13, color: 'var(--subtle)' }}>
             No line items yet. Add items to build your invoice.
           </div>
         ) : (
-          <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
+          <div style={{ background: 'var(--paper)', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--line)' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: 'var(--subtle)', borderBottom: '1px solid var(--line)', background: 'var(--surface-4)' }}>
               <div />
               <div>Description</div>
               <div style={{ textAlign: 'right' }}>Qty</div>
@@ -436,8 +436,8 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
             {lineItemGroups.map((group, groupIndex) => (
               <div key={group.label + groupIndex}>
                 {showGroupHeadings && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '7px 16px', background: '#fafaf8', borderBottom: '1px solid #e8e0d0' }}>
-                    <div style={{ gridColumn: '2 / -1', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#9e998f' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '20px 3fr 1fr 1fr 1fr 40px', gap: 12, padding: '7px 16px', background: 'var(--surface-4)', borderBottom: '1px solid var(--line-tan-4)' }}>
+                    <div style={{ gridColumn: '2 / -1', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--subtle)' }}>
                       {group.label}
                     </div>
                   </div>
@@ -455,9 +455,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                         gap: 12,
                         padding: '12px 16px',
                         fontSize: 13,
-                        borderBottom: isLastOverall ? 'none' : '1px solid #e8e0d0',
+                        borderBottom: isLastOverall ? 'none' : '1px solid var(--line-tan-4)',
                         alignItems: 'center',
-                        background: isIncomplete ? '#fafaf8' : 'transparent',
+                        background: isIncomplete ? 'var(--surface-4)' : 'transparent',
                       }}
                     >
                       {/* Completed checkbox */}
@@ -467,14 +467,14 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                           checked={!isIncomplete}
                           onChange={e => toggleCompleted(item.id, e.target.checked)}
                           title={isIncomplete ? 'Mark as completed' : 'Mark as not completed'}
-                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: '#3a3530' }}
+                          style={{ cursor: 'pointer', width: 14, height: 14, accentColor: 'var(--body)' }}
                         />
                       </div>
 
                       {/* Description */}
                       <div>
                         {isIncomplete ? (
-                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>
+                          <span style={{ fontSize: 13, color: 'var(--subtle)', textDecoration: 'line-through' }}>
                             {item.description || 'Item description'}
                           </span>
                         ) : (
@@ -483,7 +483,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                             value={item.description}
                             onChange={(e) => updateItem(item.id, { description: e.target.value })}
                             placeholder="Item description"
-                            style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
+                            style={{ width: '100%', fontSize: 13, color: 'var(--body)', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
                           />
                         )}
                       </div>
@@ -491,7 +491,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       {/* Qty */}
                       <div style={{ textAlign: 'right' }}>
                         {isIncomplete ? (
-                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{item.quantity}</span>
+                          <span style={{ fontSize: 13, color: 'var(--subtle)', textDecoration: 'line-through' }}>{item.quantity}</span>
                         ) : (
                           <input
                             type="number"
@@ -499,7 +499,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                             onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
                             min="0"
                             step="0.01"
-                            style={{ width: '60px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                            style={{ width: '60px', fontSize: 13, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                           />
                         )}
                       </div>
@@ -507,7 +507,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       {/* Amount (unit price) */}
                       <div style={{ textAlign: 'right' }}>
                         {isIncomplete ? (
-                          <span style={{ fontSize: 13, color: '#9e998f', textDecoration: 'line-through' }}>{fmt(item.unit_price)}</span>
+                          <span style={{ fontSize: 13, color: 'var(--subtle)', textDecoration: 'line-through' }}>{fmt(item.unit_price)}</span>
                         ) : (
                           <input
                             type="number"
@@ -515,14 +515,14 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                             onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
                             min="0"
                             step="0.01"
-                            style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                            style={{ width: '90px', fontSize: 13, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                           />
                         )}
                       </div>
 
                       {/* Line total (read-only) */}
                       <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: 13, color: isIncomplete ? '#9e998f' : '#3a3530', textDecoration: isIncomplete ? 'line-through' : 'none' }}>
+                        <span style={{ fontSize: 13, color: isIncomplete ? 'var(--subtle)' : 'var(--body)', textDecoration: isIncomplete ? 'line-through' : 'none' }}>
                           {fmt(item.line_total)}
                         </span>
                       </div>
@@ -531,9 +531,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       <div style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => deleteItem(item.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--faint-4)', fontSize: 14, padding: '2px', borderRadius: 3 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--faint-4)')}
                         >
                           ✕
                         </button>
@@ -550,9 +550,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       {/* Add item button */}
       <button
         onClick={addItem}
-        style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginBottom: 20 }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#c8b89a'; e.currentTarget.style.color = '#3a3530' }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e0dbd4'; e.currentTarget.style.color = '#9e998f' }}
+        style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginBottom: 20 }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--tan)'; e.currentTarget.style.color = 'var(--body)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--subtle)' }}
       >
         + Add Line Item
       </button>
@@ -560,15 +560,15 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       {/* Deductions — quoted_amounts invoices only (e.g. policy excess already paid) */}
       {invoice?.invoice_type === 'quoted_amounts' && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: '#9e998f', marginBottom: 8 }}>Deductions</div>
+          <div style={{ fontSize: 12, color: 'var(--subtle)', marginBottom: 8 }}>Deductions</div>
 
           {deductions.length === 0 ? (
-            <div style={{ padding: '20px', background: '#f5f2ee', borderRadius: 6, textAlign: 'center', fontSize: 13, color: '#9e998f' }}>
+            <div style={{ padding: '20px', background: 'var(--surface)', borderRadius: 6, textAlign: 'center', fontSize: 13, color: 'var(--subtle)' }}>
               No deductions yet.
             </div>
           ) : (
-            <div style={{ background: '#ffffff', borderRadius: 6, overflow: 'hidden', border: '1px solid #e0dbd4' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#9e998f', borderBottom: '1px solid #e0dbd4', background: '#fafaf8' }}>
+            <div style={{ background: 'var(--paper)', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--line)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 40px', gap: 12, padding: '10px 16px', fontSize: 11, fontWeight: 600, color: 'var(--subtle)', borderBottom: '1px solid var(--line)', background: 'var(--surface-4)' }}>
                 <div>Description</div>
                 <div style={{ textAlign: 'right' }}>Amount</div>
                 <div />
@@ -583,7 +583,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                     gap: 12,
                     padding: '12px 16px',
                     fontSize: 13,
-                    borderBottom: index < deductions.length - 1 ? '1px solid #e8e0d0' : 'none',
+                    borderBottom: index < deductions.length - 1 ? '1px solid var(--line-tan-4)' : 'none',
                     alignItems: 'center',
                   }}
                 >
@@ -593,7 +593,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       value={deduction.description}
                       onChange={(e) => updateDeduction(deduction.id, { description: e.target.value })}
                       placeholder="Deduction description"
-                      style={{ width: '100%', fontSize: 13, color: '#3a3530', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
+                      style={{ width: '100%', fontSize: 13, color: 'var(--body)', background: 'transparent', border: 'none', padding: 0, fontFamily: 'DM Sans, sans-serif' }}
                     />
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -603,15 +603,15 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       onChange={(e) => updateDeduction(deduction.id, { amount_inc_gst: parseFloat(e.target.value) || 0 })}
                       min="0"
                       step="0.01"
-                      style={{ width: '90px', fontSize: 13, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
+                      style={{ width: '90px', fontSize: 13, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '4px 8px', textAlign: 'right', fontFamily: 'DM Sans, sans-serif' }}
                     />
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <button
                       onClick={() => deleteDeduction(deduction.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0bab3', fontSize: 14, padding: '2px', borderRadius: 3 }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = '#c5221f')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = '#c0bab3')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--faint-4)', fontSize: 14, padding: '2px', borderRadius: 3 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--faint-4)')}
                     >
                       ✕
                     </button>
@@ -623,9 +623,9 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
           <button
             onClick={addDeduction}
-            style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#9e998f', background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginTop: 10 }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#c8b89a'; e.currentTarget.style.color = '#3a3530' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e0dbd4'; e.currentTarget.style.color = '#9e998f' }}
+            style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'var(--subtle)', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', marginTop: 10 }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--tan)'; e.currentTarget.style.color = 'var(--body)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--subtle)' }}
           >
             + Add Deduction
           </button>
@@ -633,18 +633,18 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       )}
 
       {/* Totals */}
-      <div style={{ background: '#ffffff', border: '1px solid #e0dbd4', borderRadius: 6, padding: '16px' }}>
+      <div style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: '16px' }}>
         {hasBuilderMargin && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#9e998f' }}>Subtotal</span>
-              <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(lineSubtotal)}</span>
+              <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Subtotal</span>
+              <span style={{ fontSize: 13, color: 'var(--body)' }}>{fmt(lineSubtotal)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#9e998f', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--subtle)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 Builder&apos;s Margin
                 {invoice?.invoice_type === 'quoted_amounts' ? (
-                  <span style={{ fontSize: 12, color: '#9e998f' }}>{(markupPct * 100).toFixed(1)}%</span>
+                  <span style={{ fontSize: 12, color: 'var(--subtle)' }}>{(markupPct * 100).toFixed(1)}%</span>
                 ) : (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                     <input
@@ -654,46 +654,46 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
                       min="0"
                       step="0.5"
                       onBlur={(e) => updateMarkupPct(parseFloat(e.target.value) || 0)}
-                      style={{ width: 52, fontSize: 12, color: '#3a3530', background: '#f5f2ee', border: '1px solid #e0dbd4', borderRadius: 4, padding: '3px 6px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}
+                      style={{ width: 52, fontSize: 12, color: 'var(--body)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 4, padding: '3px 6px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}
                     />
-                    <span style={{ fontSize: 11, color: '#9e998f' }}>%</span>
+                    <span style={{ fontSize: 11, color: 'var(--subtle)' }}>%</span>
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(markupAmount)}</span>
+              <span style={{ fontSize: 13, color: 'var(--body)' }}>{fmt(markupAmount)}</span>
             </div>
           </>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: '#9e998f' }}>Subtotal (ex GST)</span>
-          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(invoice?.invoice_type === 'excess' ? (invoice.amount_ex_gst ?? 0) : exGst)}</span>
+          <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Subtotal (ex GST)</span>
+          <span style={{ fontSize: 13, color: 'var(--body)' }}>{fmt(invoice?.invoice_type === 'excess' ? (invoice.amount_ex_gst ?? 0) : exGst)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: '#9e998f' }}>GST (10%)</span>
-          <span style={{ fontSize: 13, color: '#3a3530' }}>{fmt(gstAmount)}</span>
+          <span style={{ fontSize: 12, color: 'var(--subtle)' }}>GST (10%)</span>
+          <span style={{ fontSize: 13, color: 'var(--body)' }}>{fmt(gstAmount)}</span>
         </div>
         {excessDeductionIncGst > 0 ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#3a3530' }}>Total (inc GST)</span>
-              <span style={{ fontSize: 14, fontWeight: 500, color: '#3a3530' }}>{fmt(total)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--line)', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--body)' }}>Total (inc GST)</span>
+              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--body)' }}>{fmt(total)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#9e998f' }}>Less: Excess payment received</span>
-              <span style={{ fontSize: 13, color: '#c5221f' }}>{fmt(-excessDeductionIncGst)}</span>
+              <span style={{ fontSize: 12, color: 'var(--subtle)' }}>Less: Excess payment received</span>
+              <span style={{ fontSize: 13, color: 'var(--danger)' }}>{fmt(-excessDeductionIncGst)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #3a3530' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Final Invoice Total (inc GST)</span>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(Math.round((total - excessDeductionIncGst) * 100) / 100)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid var(--body)' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--body)' }}>Final Invoice Total (inc GST)</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>{fmt(Math.round((total - excessDeductionIncGst) * 100) / 100)}</span>
             </div>
           </>
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #e0dbd4' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3530' }}>Total (inc GST)</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#3a3530' }}>{fmt(total)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--line)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--body)' }}>Total (inc GST)</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--body)' }}>{fmt(total)}</span>
           </div>
         )}
-        <div style={{ marginTop: 12, fontSize: 11, color: saveStatus === 'saved' ? '#2e7d32' : saveStatus === 'error' ? '#c5221f' : '#9e998f' }}>
+        <div style={{ marginTop: 12, fontSize: 11, color: saveStatus === 'saved' ? 'var(--success)' : saveStatus === 'error' ? 'var(--danger)' : 'var(--subtle)' }}>
           {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? 'Saving…' : 'Error saving changes'}
         </div>
       </div>

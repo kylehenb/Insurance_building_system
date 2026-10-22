@@ -129,7 +129,7 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
           textAlign: 'center',
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 13,
-          color: '#9e998f',
+          color: 'var(--subtle)',
         }}
       >
         Loading…
@@ -140,7 +140,7 @@ export function InvoicesTab({ jobId, tenantId }: InvoicesTabProps) {
   return (
     <>
       <div className="mb-3 flex items-start gap-3 text-[12px]">
-        <span className="pt-0.5 text-[#9e998f]">Excess</span>
+        <span className="pt-0.5 text-subtle">Excess</span>
         <ExcessDecisionBadge jobId={jobId} />
       </div>
       <InvoicesList jobId={jobId} tenantId={tenantId} ctx={ctx} />

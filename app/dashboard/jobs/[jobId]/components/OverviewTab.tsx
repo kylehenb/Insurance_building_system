@@ -102,17 +102,17 @@ function inferCardType(ruleKey: string): string {
 // ── Shared CSS ─────────────────────────────────────────────────────────────
 
 const OVERVIEW_CSS = `
-  .ov-detail-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #f0ece6; }
+  .ov-detail-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--line-faint); }
   .ov-detail-row:last-child { border-bottom: none; }
-  .ov-detail-label { width: 120px; flex-shrink: 0; font-size: 12px; color: #9e998f; padding-top: 3px; }
-  .ov-detail-value { font-size: 13px; color: #3a3530; }
-  .ov-edit-input { font-size: 13px; color: #1a1a1a; border: 0.5px solid #e4dfd8; border-radius: 5px; padding: 3px 8px; background: #fdfcfb; font-family: inherit; outline: none; flex: 1; transition: border-color 0.15s; }
-  .ov-edit-input:focus { border-color: #c8b89a; background: #fff; }
-  .ov-edit-textarea { font-size: 12px; color: #1a1a1a; border: 0.5px solid #e4dfd8; border-radius: 5px; padding: 6px 8px; background: #fdfcfb; font-family: inherit; outline: none; width: 100%; resize: vertical; line-height: 1.6; min-height: 68px; transition: border-color 0.15s; }
-  .ov-edit-textarea:focus { border-color: #c8b89a; background: #fff; }
+  .ov-detail-label { width: 120px; flex-shrink: 0; font-size: 12px; color: var(--subtle); padding-top: 3px; }
+  .ov-detail-value { font-size: 13px; color: var(--body); }
+  .ov-edit-input { font-size: 13px; color: var(--ink); border: 0.5px solid var(--line-2); border-radius: 5px; padding: 3px 8px; background: var(--surface-7); font-family: inherit; outline: none; flex: 1; transition: border-color 0.15s; }
+  .ov-edit-input:focus { border-color: var(--tan); background: var(--paper); }
+  .ov-edit-textarea { font-size: 12px; color: var(--ink); border: 0.5px solid var(--line-2); border-radius: 5px; padding: 6px 8px; background: var(--surface-7); font-family: inherit; outline: none; width: 100%; resize: vertical; line-height: 1.6; min-height: 68px; transition: border-color 0.15s; }
+  .ov-edit-textarea:focus { border-color: var(--tan); background: var(--paper); }
 
   .aq-list { display: flex; flex-direction: column; gap: 10px; }
-  .aq-card { background: #fff; border: 0.5px solid #e4dfd8; border-radius: 8px; overflow: hidden; transition: border-color 0.2s, opacity 0.35s, max-height 0.5s; }
+  .aq-card { background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 8px; overflow: hidden; transition: border-color 0.2s, opacity 0.35s, max-height 0.5s; }
   .aq-card:hover { border-color: #d0cbc4; }
   .aq-card.snoozed { opacity: 0.45; }
   .aq-card.removing { opacity: 0; max-height: 0; }
@@ -122,61 +122,61 @@ const OVERVIEW_CSS = `
   .aq-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
   .dot-hi { background: #d4524a; } .dot-md { background: #d4924a; } .dot-lo { background: #5a9a52; }
   .aq-body { flex: 1; min-width: 0; }
-  .aq-type { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #c8b89a; margin-bottom: 4px; font-weight: 400; }
-  .aq-title { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 4px; line-height: 1.3; }
+  .aq-type { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tan); margin-bottom: 4px; font-weight: 400; }
+  .aq-title { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 4px; line-height: 1.3; }
   .aq-desc { font-size: 12px; color: #7a7167; line-height: 1.55; font-weight: 300; }
   .aq-meta { display: flex; gap: 12px; margin-top: 8px; }
-  .aq-job { font-family: 'DM Mono', monospace; font-size: 10px; color: #c8b89a; }
-  .aq-age { font-size: 10px; color: #c8c0b8; font-weight: 300; }
+  .aq-job { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--tan); }
+  .aq-age { font-size: 10px; color: var(--faint-5); font-weight: 300; }
   .aq-right { padding: 15px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .ai-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #c8b89a; display: flex; align-items: center; gap: 5px; }
-  .ai-pip { width: 5px; height: 5px; border-radius: 50%; background: #c8b89a; flex-shrink: 0; }
-  .ai-text { font-size: 12px; color: #3a3530; line-height: 1.55; font-weight: 300; flex: 1; }
+  .ai-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tan); display: flex; align-items: center; gap: 5px; }
+  .ai-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--tan); flex-shrink: 0; }
+  .ai-text { font-size: 12px; color: var(--body); line-height: 1.55; font-weight: 300; flex: 1; }
   .btn-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .btn { font-size: 11px; padding: 5px 14px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 600; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; line-height: 1.4; }
-  .btn-confirm { background: #2a6b50; color: #fff; border-color: #2a6b50; }
+  .btn-confirm { background: var(--teal); color: var(--paper); border-color: var(--teal); }
   .btn-confirm:hover { background: #235a42; }
-  .btn-edit { background: transparent; color: #7a6a58; border-color: #d4cfc8; }
-  .btn-edit:hover { border-color: #9a7a50; color: #9a7a50; }
-  .btn-snooze { background: transparent; color: #9a9088; border-color: #e8e3dc; }
-  .btn-snooze:hover { color: #5a534a; border-color: #c8c0b8; }
-  .btn-dismiss { background: transparent; border: none; color: #c8c0b8; font-size: 16px; padding: 3px 5px; cursor: pointer; line-height: 1; }
-  .btn-dismiss:hover { color: #a0524a; }
-  .inline-edit { border-top: 0.5px solid #f0ece6; padding: 13px 16px; background: #fdfcfb; }
-  .ie-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #b8b0a8; margin-bottom: 9px; font-weight: 500; }
-  .ie-input { font-size: 12px; padding: 6px 11px; border: 0.5px solid #e4dfd8; border-radius: 6px; background: #fff; color: #1a1a1a; font-family: inherit; font-weight: 300; outline: none; transition: border-color 0.2s; }
-  .ie-input:focus { border-color: #c8b89a; }
+  .btn-edit { background: transparent; color: var(--brown-500); border-color: var(--line-strong-3); }
+  .btn-edit:hover { border-color: var(--bronze); color: var(--bronze); }
+  .btn-snooze { background: transparent; color: var(--subtle-3); border-color: var(--line-5); }
+  .btn-snooze:hover { color: #5a534a; border-color: var(--faint-5); }
+  .btn-dismiss { background: transparent; border: none; color: var(--faint-5); font-size: 16px; padding: 3px 5px; cursor: pointer; line-height: 1; }
+  .btn-dismiss:hover { color: var(--rust); }
+  .inline-edit { border-top: 0.5px solid var(--line-faint); padding: 13px 16px; background: var(--surface-7); }
+  .ie-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint-3); margin-bottom: 9px; font-weight: 500; }
+  .ie-input { font-size: 12px; padding: 6px 11px; border: 0.5px solid var(--line-2); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: inherit; font-weight: 300; outline: none; transition: border-color 0.2s; }
+  .ie-input:focus { border-color: var(--tan); }
   .ie-actions { display: flex; gap: 6px; margin-top: 10px; }
-  .steps-edit { border-top: 0.5px solid #f0ece6; padding: 13px 16px; background: #fdfcfb; }
-  .step-row { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 0.5px solid #f5f2ee; }
+  .steps-edit { border-top: 0.5px solid var(--line-faint); padding: 13px 16px; background: var(--surface-7); }
+  .step-row { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 0.5px solid var(--surface); }
   .step-row:last-of-type { border-bottom: none; }
-  .step-txt { font-size: 12px; color: #3a3530; line-height: 1.45; flex: 1; font-weight: 300; }
-  .step-n { width: 17px; height: 17px; border-radius: 50%; background: #f0ece6; color: #9a9088; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-  .step-cb { width: 14px; height: 14px; accent-color: #c8b89a; flex-shrink: 0; margin-top: 2px; cursor: pointer; }
-  .step-edit-icon { color: #c8b89a; font-size: 13px; cursor: pointer; padding: 0 3px; opacity: 0.6; transition: opacity 0.15s; background: none; border: none; }
+  .step-txt { font-size: 12px; color: var(--body); line-height: 1.45; flex: 1; font-weight: 300; }
+  .step-n { width: 17px; height: 17px; border-radius: 50%; background: var(--line-faint); color: var(--subtle-3); font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-cb { width: 14px; height: 14px; accent-color: var(--tan); flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+  .step-edit-icon { color: var(--tan); font-size: 13px; cursor: pointer; padding: 0 3px; opacity: 0.6; transition: opacity 0.15s; background: none; border: none; }
   .step-edit-icon:hover { opacity: 1; }
-  .step-inline-input { flex: 1; font-size: 11px; padding: 5px 8px; border: 0.5px solid #c8b89a; border-radius: 5px; background: #fff; color: #1a1a1a; font-family: inherit; outline: none; }
-  .ai-recheck { font-size: 10px; color: #9a7a50; margin-top: 5px; font-style: italic; }
-  .snooze-bar { font-size: 11px; color: #9a9088; background: #faf9f7; padding: 8px 16px; border-top: 0.5px solid #f0ece6; font-weight: 300; }
-  .snooze-undo { cursor: pointer; color: #c8b89a; border-bottom: 0.5px solid #c8b89a; background: none; border-left: none; border-right: none; border-top: none; font-family: inherit; font-size: 11px; padding: 0; }
-  .aq-empty { padding: 32px; text-align: center; font-size: 13px; color: #b0a898; font-weight: 300; background: #fff; border: 0.5px solid #e4dfd8; border-radius: 8px; }
+  .step-inline-input { flex: 1; font-size: 11px; padding: 5px 8px; border: 0.5px solid var(--tan); border-radius: 5px; background: var(--paper); color: var(--ink); font-family: inherit; outline: none; }
+  .ai-recheck { font-size: 10px; color: var(--bronze); margin-top: 5px; font-style: italic; }
+  .snooze-bar { font-size: 11px; color: var(--subtle-3); background: var(--surface-3); padding: 8px 16px; border-top: 0.5px solid var(--line-faint); font-weight: 300; }
+  .snooze-undo { cursor: pointer; color: var(--tan); border-bottom: 0.5px solid var(--tan); background: none; border-left: none; border-right: none; border-top: none; font-family: inherit; font-size: 11px; padding: 0; }
+  .aq-empty { padding: 32px; text-align: center; font-size: 13px; color: var(--faint); font-weight: 300; background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 8px; }
   .sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-  .sort-label { font-size: 11px; color: #b0a898; font-weight: 500; }
-  .sort-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 600; border: 0.5px solid #e0dbd4; background: transparent; color: #9a9088; transition: all 0.15s; white-space: nowrap; }
-  .sort-btn:hover { border-color: #c8b89a; color: #7a6a58; }
-  .sort-btn.active { background: #1a1a1a; color: #c8b89a; border-color: #1a1a1a; }
+  .sort-label { font-size: 11px; color: var(--faint); font-weight: 500; }
+  .sort-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-family: inherit; font-weight: 600; border: 0.5px solid var(--line); background: transparent; color: var(--subtle-3); transition: all 0.15s; white-space: nowrap; }
+  .sort-btn:hover { border-color: var(--tan); color: var(--brown-500); }
+  .sort-btn.active { background: var(--ink); color: var(--tan); border-color: var(--ink); }
   .modal-overlay { position: fixed; inset: 0; background: rgba(15,12,10,0.55); z-index: 200; display: flex; align-items: center; justify-content: center; }
-  .email-modal { background: #fff; border-radius: 10px; width: 620px; max-width: 92vw; border: 0.5px solid #e4dfd8; overflow: hidden; display: flex; flex-direction: column; max-height: 80vh; }
-  .em-header { padding: 16px 20px; border-bottom: 0.5px solid #f0ece6; display: flex; align-items: center; justify-content: space-between; background: #fdfdfc; flex-shrink: 0; }
-  .em-title { font-size: 13px; font-weight: 500; color: #1a1a1a; }
-  .em-close { background: none; border: none; cursor: pointer; color: #b0a898; font-size: 20px; line-height: 1; transition: color 0.15s; }
+  .email-modal { background: var(--paper); border-radius: 10px; width: 620px; max-width: 92vw; border: 0.5px solid var(--line-2); overflow: hidden; display: flex; flex-direction: column; max-height: 80vh; }
+  .em-header { padding: 16px 20px; border-bottom: 0.5px solid var(--line-faint); display: flex; align-items: center; justify-content: space-between; background: var(--surface-6); flex-shrink: 0; }
+  .em-title { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .em-close { background: none; border: none; cursor: pointer; color: var(--faint); font-size: 20px; line-height: 1; transition: color 0.15s; }
   .em-close:hover { color: #5a534a; }
-  .em-field { display: flex; align-items: center; border-bottom: 0.5px solid #f5f2ee; flex-shrink: 0; }
-  .em-field-lbl { font-size: 10px; color: #b0a898; font-weight: 500; padding: 9px 14px; min-width: 56px; letter-spacing: 0.5px; flex-shrink: 0; text-transform: uppercase; }
-  .em-field-input { flex: 1; border: none; padding: 9px 10px 9px 0; font-size: 13px; color: #1a1a1a; font-family: inherit; outline: none; background: transparent; font-weight: 300; }
+  .em-field { display: flex; align-items: center; border-bottom: 0.5px solid var(--surface); flex-shrink: 0; }
+  .em-field-lbl { font-size: 10px; color: var(--faint); font-weight: 500; padding: 9px 14px; min-width: 56px; letter-spacing: 0.5px; flex-shrink: 0; text-transform: uppercase; }
+  .em-field-input { flex: 1; border: none; padding: 9px 10px 9px 0; font-size: 13px; color: var(--ink); font-family: inherit; outline: none; background: transparent; font-weight: 300; }
   .em-body-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-  .em-body-ta { width: 100%; border: none; padding: 16px 20px; font-size: 13px; color: #1a1a1a; font-family: inherit; font-weight: 300; resize: none; outline: none; line-height: 1.75; min-height: 200px; background: #fff; flex: 1; }
-  .em-footer { padding: 12px 20px; border-top: 0.5px solid #f0ece6; display: flex; gap: 8px; align-items: center; background: #fdfdfc; flex-shrink: 0; }
+  .em-body-ta { width: 100%; border: none; padding: 16px 20px; font-size: 13px; color: var(--ink); font-family: inherit; font-weight: 300; resize: none; outline: none; line-height: 1.75; min-height: 200px; background: var(--paper); flex: 1; }
+  .em-footer { padding: 12px 20px; border-top: 0.5px solid var(--line-faint); display: flex; gap: 8px; align-items: center; background: var(--surface-6); flex-shrink: 0; }
 `
 
 // ── Job Details Accordion ──────────────────────────────────────────────────
@@ -315,8 +315,8 @@ function JobDetailsAccordion({
   return (
     <div
       style={{
-        background: '#fff',
-        border: '0.5px solid #e4dfd8',
+        background: 'var(--paper)',
+        border: '0.5px solid var(--line-2)',
         borderRadius: 8,
         overflow: 'hidden',
         fontFamily: 'DM Sans, sans-serif',
@@ -329,8 +329,8 @@ function JobDetailsAccordion({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '13px 16px',
-          background: open ? '#faf9f7' : '#fff',
-          borderBottom: open ? '0.5px solid #e4dfd8' : 'none',
+          background: open ? 'var(--surface-3)' : 'var(--paper)',
+          borderBottom: open ? '0.5px solid var(--line-2)' : 'none',
           transition: 'background 0.15s',
           gap: 12,
         }}
@@ -346,7 +346,7 @@ function JobDetailsAccordion({
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
-            color: '#9e998f',
+            color: 'var(--subtle)',
             fontWeight: 500,
             fontFamily: 'inherit',
           }}
@@ -361,9 +361,9 @@ function JobDetailsAccordion({
               onClick={() => setEditing(true)}
               style={{
                 fontSize: 11,
-                color: '#7a6a58',
+                color: 'var(--brown-500)',
                 background: 'transparent',
-                border: '1px solid #d4cfc8',
+                border: '1px solid var(--line-strong-3)',
                 borderRadius: 20,
                 padding: '3px 12px',
                 cursor: 'pointer',
@@ -382,9 +382,9 @@ function JobDetailsAccordion({
                 disabled={saving}
                 style={{
                   fontSize: 11,
-                  color: '#fff',
-                  background: '#2a6b50',
-                  border: '1px solid #2a6b50',
+                  color: 'var(--paper)',
+                  background: 'var(--teal)',
+                  border: '1px solid var(--teal)',
                   borderRadius: 20,
                   padding: '3px 14px',
                   cursor: saving ? 'not-allowed' : 'pointer',
@@ -401,9 +401,9 @@ function JobDetailsAccordion({
                 disabled={saving}
                 style={{
                   fontSize: 11,
-                  color: '#9a9088',
+                  color: 'var(--subtle-3)',
                   background: 'transparent',
-                  border: '1px solid #e8e3dc',
+                  border: '1px solid var(--line-5)',
                   borderRadius: 20,
                   padding: '3px 12px',
                   cursor: 'pointer',
@@ -429,7 +429,7 @@ function JobDetailsAccordion({
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
-                color: '#c8b89a',
+                color: 'var(--tan)',
                 fontSize: 11,
                 fontFamily: 'inherit',
               }}
@@ -459,7 +459,7 @@ function JobDetailsAccordion({
             gridTemplateColumns: '1fr 1fr',
             gap: '0 40px',
             padding: '16px 20px 20px',
-            background: editing ? '#fdfcfb' : '#fff',
+            background: editing ? 'var(--surface-7)' : 'var(--paper)',
             transition: 'background 0.2s',
           }}
         >
@@ -608,7 +608,7 @@ function JobDetailsAccordion({
                 placeholder="Enter claim description…"
               />
             ) : (
-              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.65, margin: 0 }}>
                 {saved.claim_description || '—'}
               </p>
             )}
@@ -623,7 +623,7 @@ function JobDetailsAccordion({
                 placeholder="Enter special instructions…"
               />
             ) : (
-              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.65, margin: 0 }}>
                 {saved.special_instructions || '—'}
               </p>
             )}
@@ -673,7 +673,7 @@ function JobDetailsAccordion({
                 const extras = (additional || []).filter(c => c.slot !== 'insured' && (c.name || c.phone || c.email))
                 if (extras.length === 0) {
                   return (
-                    <p style={{ fontSize: 12, color: '#9e998f', lineHeight: 1.65, margin: 0 }}>
+                    <p style={{ fontSize: 12, color: 'var(--subtle)', lineHeight: 1.65, margin: 0 }}>
                       No additional contacts.
                     </p>
                   )
@@ -681,7 +681,7 @@ function JobDetailsAccordion({
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {extras.map((c, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65 }}>
+                      <div key={i} style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.65 }}>
                         <strong>{c.type ? c.type.replace('_', ' ') : 'Contact'}</strong>
                         {c.name ? ` — ${c.name}` : ''}
                         {c.phone ? ` · ${c.phone}` : ''}
@@ -705,7 +705,7 @@ function JobDetailsAccordion({
                 placeholder="Enter notes…"
               />
             ) : (
-              <p style={{ fontSize: 12, color: '#3a3530', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.65, margin: 0 }}>
                 {saved.notes || '—'}
               </p>
             )}
@@ -820,8 +820,8 @@ function AutomationOverridesAccordion({
   return (
     <div
       style={{
-        background: '#fff',
-        border: '0.5px solid #e4dfd8',
+        background: 'var(--paper)',
+        border: '0.5px solid var(--line-2)',
         borderRadius: 8,
         overflow: 'hidden',
         fontFamily: 'DM Sans, sans-serif',
@@ -833,8 +833,8 @@ function AutomationOverridesAccordion({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '13px 16px',
-          background: open ? '#faf9f7' : '#fff',
-          borderBottom: open ? '0.5px solid #e4dfd8' : 'none',
+          background: open ? 'var(--surface-3)' : 'var(--paper)',
+          borderBottom: open ? '0.5px solid var(--line-2)' : 'none',
           transition: 'background 0.15s',
           gap: 12,
         }}
@@ -849,7 +849,7 @@ function AutomationOverridesAccordion({
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
-            color: '#9e998f',
+            color: 'var(--subtle)',
             fontWeight: 500,
             fontFamily: 'inherit',
           }}
@@ -863,9 +863,9 @@ function AutomationOverridesAccordion({
               onClick={() => setEditing(true)}
               style={{
                 fontSize: 11,
-                color: '#7a6a58',
+                color: 'var(--brown-500)',
                 background: 'transparent',
-                border: '1px solid #d4cfc8',
+                border: '1px solid var(--line-strong-3)',
                 borderRadius: 20,
                 padding: '3px 12px',
                 cursor: 'pointer',
@@ -884,9 +884,9 @@ function AutomationOverridesAccordion({
                 disabled={saving}
                 style={{
                   fontSize: 11,
-                  color: '#fff',
-                  background: '#2a6b50',
-                  border: '1px solid #2a6b50',
+                  color: 'var(--paper)',
+                  background: 'var(--teal)',
+                  border: '1px solid var(--teal)',
                   borderRadius: 20,
                   padding: '3px 14px',
                   cursor: saving ? 'not-allowed' : 'pointer',
@@ -903,9 +903,9 @@ function AutomationOverridesAccordion({
                 disabled={saving}
                 style={{
                   fontSize: 11,
-                  color: '#9a9088',
+                  color: 'var(--subtle-3)',
                   background: 'transparent',
-                  border: '1px solid #e8e3dc',
+                  border: '1px solid var(--line-5)',
                   borderRadius: 20,
                   padding: '3px 12px',
                   cursor: 'pointer',
@@ -930,7 +930,7 @@ function AutomationOverridesAccordion({
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
-                color: '#c8b89a',
+                color: 'var(--tan)',
                 fontSize: 11,
                 fontFamily: 'inherit',
               }}
@@ -956,7 +956,7 @@ function AutomationOverridesAccordion({
         <div
           style={{
             padding: '16px 20px 20px',
-            background: editing ? '#fdfcfb' : '#fff',
+            background: editing ? 'var(--surface-7)' : 'var(--paper)',
             transition: 'background 0.2s',
           }}
         >
@@ -982,7 +982,7 @@ function AutomationOverridesAccordion({
               </span>
             )}
           </div>
-          <p style={{ fontSize: 11, color: '#9a9088', marginTop: 6 }}>
+          <p style={{ fontSize: 11, color: 'var(--subtle-3)', marginTop: 6 }}>
             Overrides the time mode for all automations on this job. Use Urgent for CAT events. Leave blank for standard behaviour.
           </p>
 
@@ -1060,7 +1060,7 @@ function AutomationOverridesAccordion({
               </div>
             </>
           )}
-          <p style={{ fontSize: 11, color: '#9a9088', marginTop: 6 }}>
+          <p style={{ fontSize: 11, color: 'var(--subtle-3)', marginTop: 6 }}>
             For night-shift workers or contacts with non-standard hours. Example: set 2pm–10pm for a night-shift worker. Overrides global waking hours for this job's insured contact only.
           </p>
 
@@ -1068,12 +1068,12 @@ function AutomationOverridesAccordion({
           {trades.length > 0 && (
             <>
               <div style={subLabel({ marginTop: 20 })}>Trade-Specific Contact Windows</div>
-              <p style={{ fontSize: 11, color: '#9a9088', marginBottom: 10 }}>
+              <p style={{ fontSize: 11, color: 'var(--subtle-3)', marginBottom: 10 }}>
                 Override contact hours for a specific trade on this job only. Gary's global send window covers most cases — use this only for trades with confirmed non-standard availability.
               </p>
               {trades.map(trade => (
-                <div key={trade.id} style={{ marginBottom: 16, padding: 12, background: '#faf9f7', borderRadius: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', marginBottom: 8 }}>
+                <div key={trade.id} style={{ marginBottom: 16, padding: 12, background: 'var(--surface-3)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)', marginBottom: 8 }}>
                     {trade.business_name} ({trade.primary_trade})
                   </div>
                   <div className="ov-detail-row">
@@ -1258,17 +1258,17 @@ function ActionCardsSection({ jobId, tenantId, job }: { jobId: string; tenantId:
     <>
       {/* Section header */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 14 }}>
-        <span style={{ fontSize: 26, fontWeight: 700, color: '#1a1a1a', letterSpacing: -0.5, lineHeight: 1 }}>
+        <span style={{ fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: -0.5, lineHeight: 1 }}>
           To do
         </span>
         {pendingCount > 0 && (
           <span
             style={{
               fontSize: 11,
-              color: '#c8b89a',
+              color: 'var(--tan)',
               fontWeight: 600,
               background: '#faf5ee',
-              border: '0.5px solid #e8ddd0',
+              border: '0.5px solid var(--line-tan-5)',
               padding: '2px 9px',
               borderRadius: 20,
             }}
@@ -1629,8 +1629,8 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
   return (
     <div
       style={{
-        background: '#fff',
-        border: '0.5px solid #e4dfd8',
+        background: 'var(--paper)',
+        border: '0.5px solid var(--line-2)',
         borderRadius: 8,
         overflow: 'hidden',
         fontFamily: 'DM Sans, sans-serif',
@@ -1643,7 +1643,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 16px',
-          borderBottom: '0.5px solid #e4dfd8',
+          borderBottom: '0.5px solid var(--line-2)',
         }}
       >
         <span
@@ -1651,7 +1651,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
             fontSize: 11,
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
-            color: '#9e998f',
+            color: 'var(--subtle)',
             fontWeight: 500,
           }}
         >
@@ -1664,7 +1664,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#9e998f',
+              color: 'var(--subtle)',
               fontSize: 16,
               lineHeight: 1,
               padding: '0 4px',
@@ -1673,7 +1673,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
           >
             ‹
           </button>
-          <span style={{ fontSize: 12, color: '#3a3530', fontWeight: 500, minWidth: 115, textAlign: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--body)', fontWeight: 500, minWidth: 115, textAlign: 'center' }}>
             {MONTH_NAMES[month]} {year}
           </span>
           <button
@@ -1682,7 +1682,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#9e998f',
+              color: 'var(--subtle)',
               fontSize: 16,
               lineHeight: 1,
               padding: '0 4px',
@@ -1704,7 +1704,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
               style={{
                 textAlign: 'center',
                 fontSize: 10,
-                color: '#b0a898',
+                color: 'var(--faint)',
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
@@ -1736,8 +1736,8 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
                     justifyContent: 'center',
                     borderRadius: '50%',
                     fontSize: 12,
-                    color: todayDay ? '#fff' : '#3a3530',
-                    background: todayDay ? '#1a1a1a' : 'transparent',
+                    color: todayDay ? 'var(--paper)' : 'var(--body)',
+                    background: todayDay ? 'var(--ink)' : 'transparent',
                     fontWeight: todayDay ? 600 : 400,
                   }}
                 >
@@ -1761,13 +1761,13 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
 
         {/* Upcoming events */}
         {upcomingEvents.length > 0 && (
-          <div style={{ marginTop: 14, borderTop: '0.5px solid #f0ece6', paddingTop: 12 }}>
+          <div style={{ marginTop: 14, borderTop: '0.5px solid var(--line-faint)', paddingTop: 12 }}>
             <div
               style={{
                 fontSize: 10,
                 textTransform: 'uppercase',
                 letterSpacing: '0.07em',
-                color: '#9e998f',
+                color: 'var(--subtle)',
                 fontWeight: 500,
                 marginBottom: 8,
               }}
@@ -1782,17 +1782,17 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
                   alignItems: 'center',
                   gap: 8,
                   padding: '5px 0',
-                  borderBottom: i < upcomingEvents.length - 1 ? '0.5px solid #f5f2ee' : 'none',
+                  borderBottom: i < upcomingEvents.length - 1 ? '0.5px solid var(--surface)' : 'none',
                 }}
               >
                 <div
                   style={{ width: 6, height: 6, borderRadius: '50%', background: e.color, flexShrink: 0 }}
                 />
-                <span style={{ fontSize: 12, color: '#3a3530' }}>{e.label}</span>
+                <span style={{ fontSize: 12, color: 'var(--body)' }}>{e.label}</span>
                 <span
                   style={{
                     fontSize: 11,
-                    color: '#9e998f',
+                    color: 'var(--subtle)',
                     marginLeft: 'auto',
                     fontFamily: 'DM Mono, monospace',
                   }}
@@ -1806,7 +1806,7 @@ function CalendarCard({ jobId, tenantId }: { jobId: string; tenantId: string }) 
 
         {upcomingEvents.length === 0 && events.length === 0 && (
           <div
-            style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#b0a898', padding: '8px 0' }}
+            style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: 'var(--faint)', padding: '8px 0' }}
           >
             No scheduled events
           </div>

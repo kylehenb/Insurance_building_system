@@ -101,9 +101,9 @@ function NumericCell({
         width: '100%',
         fontFamily: 'DM Mono, monospace',
         fontSize: 12,
-        color: '#3a3530',
-        background: disabled ? '#f5f2ee' : '#ffffff',
-        border: '1px solid #d8d0c8',
+        color: 'var(--body)',
+        background: disabled ? 'var(--surface)' : 'var(--paper)',
+        border: '1px solid var(--line-strong-2)',
         borderRadius: 4,
         outline: 'none',
         textAlign: 'right',
@@ -430,8 +430,8 @@ function ItemTypeMenu({
         top: '100%',
         right: 0,
         zIndex: 300,
-        background: '#ffffff',
-        border: '1px solid #e0dbd4',
+        background: 'var(--paper)',
+        border: '1px solid var(--line)',
         borderRadius: 6,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
         minWidth: 180,
@@ -469,12 +469,12 @@ function ItemTypeMenu({
                 onUpdate(item.id, { is_reference: false })
                 onClose()
               }}
-              style={{ ...menuItemStyle(true), color: '#b45309' }}
+              style={{ ...menuItemStyle(true), color: 'var(--warning)' }}
             >
               ✓ Price reference — remove
             </button>
           )}
-          <div style={{ height: 1, background: '#f0ece6', margin: '3px 0' }} />
+          <div style={{ height: 1, background: 'var(--line-faint)', margin: '3px 0' }} />
         </>
       )}
 
@@ -485,7 +485,7 @@ function ItemTypeMenu({
           fontWeight: 500,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: '#b0a89e',
+          color: 'var(--faint-2)',
           fontFamily: 'DM Sans, sans-serif',
           padding: '4px 12px 2px',
         }}
@@ -626,7 +626,7 @@ export function LineItemRow({
   return (
     <div
       style={{
-        borderBottom: '1px solid #f0ece6',
+        borderBottom: '1px solid var(--line-faint)',
         borderLeft: `3px solid ${leftBorderColor}`,
         opacity: isDragging ? 0.4 : 1,
         transition: 'opacity 0.15s',
@@ -645,7 +645,7 @@ export function LineItemRow({
         <div
           style={{ ...col, justifyContent: 'center', padding: '6px 2px' }}
         >
-          <span style={{ fontSize: 11, color: '#9e998f', fontFamily: 'DM Mono, monospace' }}>{itemIndex}</span>
+          <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Mono, monospace' }}>{itemIndex}</span>
         </div>
 
         {/* Description */}
@@ -656,8 +656,8 @@ export function LineItemRow({
         >
           <div
             style={{
-              background: isLocked ? '#f5f2ee' : '#ffffff',
-              border: '1px solid #d8d0c8',
+              background: isLocked ? 'var(--surface)' : 'var(--paper)',
+              border: '1px solid var(--line-strong-2)',
               borderRadius: 4,
               width: '100%',
               padding: '2px 5px',
@@ -776,13 +776,13 @@ export function LineItemRow({
           style={{ ...col, justifyContent: 'flex-end', cursor: 'help' }}
           title="Labour hours per unit — used for scheduling"
         >
-          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: '#9e998f' }}>
+          <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--subtle)' }}>
             {formatEstHours(estHours)}
           </span>
         </div>
 
         {/* Line Total */}
-        <div style={{ ...col, justifyContent: 'flex-end', borderRight: isAdmin ? '1px solid #f0ece6' : 'none' }}>
+        <div style={{ ...col, justifyContent: 'flex-end', borderRight: isAdmin ? '1px solid var(--line-faint)' : 'none' }}>
           {typeInfo && (
             <span
               style={{
@@ -804,7 +804,7 @@ export function LineItemRow({
               fontFamily: 'DM Mono, monospace',
               fontSize: 12,
               fontWeight: 500,
-              color: hasLineTotal ? '#3a3530' : '#c0bab3',
+              color: hasLineTotal ? 'var(--body)' : 'var(--faint-4)',
             }}
           >
             {hasLineTotal ? fmt(item.line_total!) : '—'}
@@ -875,7 +875,7 @@ export function LineItemRow({
                     letterSpacing: '0.05em',
                     transition: 'color 0.1s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#3a3530')}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--body)')}
                   onMouseLeave={e => (e.currentTarget.style.color = menuIconColor)}
                 >
                   •••
@@ -898,7 +898,7 @@ export function LineItemRow({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#b0a89e',
+                  color: 'var(--faint-2)',
                   fontSize: 16,
                   lineHeight: 1,
                   padding: '2px 3px',
@@ -906,8 +906,8 @@ export function LineItemRow({
                   fontFamily: 'monospace',
                   transition: 'color 0.1s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#c5221f')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#b0a89e')}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--faint-2)')}
               >
                 ×
               </button>
