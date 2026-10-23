@@ -70,7 +70,7 @@ trade_type_sequence: id, tenant_id, trade_type, typical_sequence_order, typical_
 
 job_schedule_blueprints: id, tenant_id, job_id, status, draft_data, confirmed_by, confirmed_at, notes, created_at
 
-users: id, tenant_id, name, role, phone, address, is_emergency_contact, makesafe_available, can_send_to_insurer, can_edit_settings, can_approve_invoices, can_manage_scope_library, can_view_financials, created_at
+users: id, tenant_id, name, role, phone, address, is_emergency_contact, makesafe_available, created_at (what each user may do is set in Settings → Users & Permissions, not on this table)
 
 tenants: id, name, slug, job_prefix, job_sequence, plan, contact_email, contact_phone, address, logo_storage_path, created_at
 `

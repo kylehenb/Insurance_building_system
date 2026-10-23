@@ -13,17 +13,10 @@ export type TenantUpdate = Database["public"]["Tables"]["tenants"]["Update"];
 // User role types
 export type UserRole = "admin" | "inspector" | "office";
 
-// User with all permission flags (including effective permissions)
-export interface User extends UserRow {
-  // Effective permissions (computed from role defaults if null)
-  effectivePermissions: {
-    can_send_to_insurer: boolean;
-    can_edit_settings: boolean;
-    can_approve_invoices: boolean;
-    can_manage_scope_library: boolean;
-    can_view_financials: boolean;
-  };
-}
+// A signed-in user's profile. What they may do comes from lib/permissions
+// (loadUserPermissions), not from this row — the old can_* columns on users
+// are no longer read.
+export type User = UserRow;
 
 // Full user session response
 export interface UserSession {
@@ -37,62 +30,7 @@ export interface UserSession {
   tenant_id: string | null;
 }
 
-// Role default permissions lookup
-export const ROLE_DEFAULTS: Record<
-  UserRole,
-  {
-    can_send_to_insurer: boolean;
-    can_edit_settings: boolean;
-    can_approve_invoices: boolean;
-    can_manage_scope_library: boolean;
-    can_view_financials: boolean;
-  }
-> = {
-  admin: {
-    can_send_to_insurer: true,
-    can_edit_settings: true,
-    can_approve_invoices: true,
-    can_manage_scope_library: true,
-    can_view_financials: true,
-  },
-  office: {
-    can_send_to_insurer: true,
-    can_edit_settings: false,
-    can_approve_invoices: true,
-    can_manage_scope_library: false,
-    can_view_financials: true,
-  },
-  inspector: {
-    can_send_to_insurer: false,
-    can_edit_settings: false,
-    can_approve_invoices: false,
-    can_manage_scope_library: false,
-    can_view_financials: false,
-  },
-};
-
-// Helper to compute effective permissions from user row
-export function computeEffectivePermissions(userRow: UserRow): User["effectivePermissions"] {
-  const defaults = ROLE_DEFAULTS[userRow.role as UserRole] ?? ROLE_DEFAULTS.inspector;
-
-  return {
-    can_send_to_insurer:
-      userRow.can_send_to_insurer ?? defaults.can_send_to_insurer,
-    can_edit_settings:
-      userRow.can_edit_settings ?? defaults.can_edit_settings,
-    can_approve_invoices:
-      userRow.can_approve_invoices ?? defaults.can_approve_invoices,
-    can_manage_scope_library:
-      userRow.can_manage_scope_library ?? defaults.can_manage_scope_library,
-    can_view_financials:
-      userRow.can_view_financials ?? defaults.can_view_financials,
-  };
-}
-
-// Helper to convert UserRow to User with effective permissions
+// The profile row as the session's user
 export function toUser(userRow: UserRow): User {
-  return {
-    ...userRow,
-    effectivePermissions: computeEffectivePermissions(userRow),
-  };
+  return userRow;
 }

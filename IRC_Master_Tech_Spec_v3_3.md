@@ -2844,7 +2844,7 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 
 **Tenant from the session, never the request:** `/api/insurer-orders/lodge` requires a signed-in user and only lodges that user's tenant's orders; `/api/jobs/[jobId]/stage` takes the tenant from the session and ignores any `tenantId` in the body (fixed 23 Oct 2026).
 
-**User permissions:** see §6 "Permissions". The older `can_*` columns on `users` (`lib/types/user.ts`) are superseded and only read by the AI assistant; to be retired.
+**User permissions:** see §6 "Permissions". The older `can_*` columns on `users` are no longer read anywhere (the sidebar's "teach the AI" uses settings.edit; the brain teach/approve routes check it); the columns are left in the table and can be dropped.
 
 **Claude voice connector:** the `Authorization` header key is the only credential — whoever has a personal key acts as its owner (revoke it in Settings → Voice connector); the legacy shared key acts as `MCP_USER_ID`. See §10b.
 

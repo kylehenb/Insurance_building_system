@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/server'
 import type { TeachSavePayload } from '@/types/brain'
 import type { Database } from '@/lib/supabase/database.types'
@@ -27,14 +29,19 @@ function formatContent(payload: TeachSavePayload): string {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const payload = await req.json() as TeachSavePayload
-  const { structured, tenantId, saveMode = 'new', sourceRefId } = payload
+  const { structured, saveMode = 'new', sourceRefId } = payload
+  const tenantId = me.tenantId
 
-  if (!structured || !tenantId) {
+  if (!structured) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 

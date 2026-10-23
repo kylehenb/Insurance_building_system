@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/supabase/get-user'
 import { DashboardShell } from '@/components/layout/dashboard-shell'
+import { loadUserPermissions } from '@/lib/permissions/resolve'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const userSession = await getUser()
@@ -8,6 +9,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!userSession.user) redirect('/auth/new-user')
 
   const { user } = userSession
+  // Teaching the AI changes what it tells everyone — the same permission as company settings
+  const { levels } = await loadUserPermissions(user.tenant_id, user.id)
 
   const initials = user.name
     .split(' ')
@@ -31,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userId: user.id,
         tenantId: user.tenant_id,
         role: user.role,
-        canTeach: user.role === 'admin' || user.can_edit_settings === true,
+        canTeach: levels['settings.edit'] === 'allowed',
       }}
     >
       {children}

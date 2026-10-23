@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/server'
 import type { BrainEntryCategory, BrainEntryPersona } from '@/types/brain'
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const me = await sessionUser()
   if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
