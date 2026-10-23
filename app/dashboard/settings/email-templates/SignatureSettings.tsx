@@ -54,6 +54,8 @@ export function SignatureSettings({ supabase, tenant, onSaved }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const height = Math.max(1, Math.round(width * aspect))
+  const logoUrl = tenantAssetUrl(imagePath)
+  const logoImage = useMemo(() => (logoUrl ? { url: logoUrl, width, height } : null), [logoUrl, width, height])
   const fields = {
     email_signature: html.replace(/<p><\/p>/g, '').trim() ? html : null,
     email_signature_image_path: imagePath,
@@ -139,7 +141,11 @@ export function SignatureSettings({ supabase, tenant, onSaved }: Props) {
         </p>
 
         <label className={labelCls}>Signature text</label>
-        <RichTextEditor value={html} onChange={setHtml} minHeight={130} compact />
+        <RichTextEditor value={html} onChange={setHtml} minHeight={130} compact logo={logoImage} />
+        <p className="text-xs text-subtle mt-1.5 leading-relaxed">
+          The logo goes at the bottom unless you place it: click the line where you want it and press <strong>Place logo here</strong>.
+          You can also drag it, or select it and press Delete.
+        </p>
 
         <div className="mt-5">
           <label className={labelCls}>Logo or image</label>

@@ -1,4 +1,4 @@
-import { richToText, toRichHtml, type EmailSignature } from './rich-text'
+import { richToText, SIGNATURE_LOGO_TOKEN, toRichHtml, type EmailSignature } from './rich-text'
 
 // The tenant's email signature (Settings → Email Templates → Signature),
 // added to every templated email. Client-safe.
@@ -26,7 +26,10 @@ export function tenantAssetUrl(path: string | null | undefined): string | null {
 
 export function emailSignatureFor(tenant: SignatureTenant): EmailSignature | null {
   const html = tenant.email_signature?.trim() ? toRichHtml(tenant.email_signature) : ''
-  const text = html ? richToText(html) : ''
+  // The plain-text version leaves out the logo's line
+  const text = html
+    ? richToText(html).split('\n').filter(line => line.trim() !== SIGNATURE_LOGO_TOKEN).join('\n').replace(/^\n+|\n+$/g, '')
+    : ''
   const url = tenantAssetUrl(tenant.email_signature_image_path)
   const width = tenant.email_signature_image_width
   const height = tenant.email_signature_image_height

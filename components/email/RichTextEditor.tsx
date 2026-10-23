@@ -6,9 +6,10 @@ import StarterKit from '@tiptap/starter-kit'
 import { Color, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import TextAlign from '@tiptap/extension-text-align'
 import {
-  AlignCenter, AlignLeft, Bold, Italic, Link2, Link2Off, List, ListOrdered, Palette, RemoveFormatting, Strikethrough, Underline,
+  AlignCenter, AlignLeft, Bold, ImageIcon, Italic, Link2, Link2Off, List, ListOrdered, Palette, RemoveFormatting, Strikethrough, Underline,
 } from 'lucide-react'
-import { RICH_TEXT_COLORS, RICH_TEXT_SIZES, toRichHtml } from '@/lib/email/rich-text'
+import { RICH_TEXT_COLORS, RICH_TEXT_SIZES, SIGNATURE_LOGO_TOKEN, toRichHtml } from '@/lib/email/rich-text'
+import { createSignatureLogoNode, LOGO_ELEMENT_ATTR, paintLogo, type SignatureLogoImage } from './SignatureLogoNode'
 
 // Rich text editor for email templates, Customise send and the signature.
 // Offers only formats that render in every mail app (see lib/email/rich-text.ts),
@@ -30,16 +31,32 @@ interface Props {
   minHeight?: number
   /** Leave out headings and lists (the signature) */
   compact?: boolean
+  /** The signature's logo, placeable in the text (stored as a {logo} line).
+   *  null = no image yet; leave out where there's no logo. */
+  logo?: SignatureLogoImage | null
 }
 
+const LOGO_LINE = `<p>${SIGNATURE_LOGO_TOKEN}</p>`
+const LOGO_ELEMENT_RE = new RegExp(`<div ${LOGO_ELEMENT_ATTR}(?:="")?></div>`, 'g')
+
+// Stored form ↔ editor: the {logo} line is the logo block in the editor
+const toEditorHtml = (value: string, withLogo: boolean) =>
+  withLogo ? toRichHtml(value).split(LOGO_LINE).join(`<div ${LOGO_ELEMENT_ATTR}></div>`) : toRichHtml(value)
+const fromEditorHtml = (html: string) => toRichHtml(html.replace(LOGO_ELEMENT_RE, LOGO_LINE))
+
 export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function RichTextEditor(
-  { value, onChange, onFocus, disabled = false, minHeight = 260, compact = false },
+  { value, onChange, onFocus, disabled = false, minHeight = 260, compact = false, logo },
   ref,
 ) {
+  const withLogo = logo !== undefined
+  const logoRef = useRef<SignatureLogoImage | null>(logo ?? null)
+  // Created once; the block reads the current logo when it draws (not during render)
+  // eslint-disable-next-line react-hooks/refs
+  const [logoNode] = useState(() => createSignatureLogoNode(() => logoRef.current))
   const lastEmitted = useRef<string | null>(null)
   const onChangeRef = useRef(onChange)
   const onFocusRef = useRef(onFocus)
-  useEffect(() => { onChangeRef.current = onChange; onFocusRef.current = onFocus })
+  useEffect(() => { onChangeRef.current = onChange; onFocusRef.current = onFocus; logoRef.current = logo ?? null })
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -60,8 +77,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       Color,
       FontSize,
       TextAlign.configure({ types: compact ? ['paragraph'] : ['heading', 'paragraph'], alignments: ['left', 'center'] }),
+      ...(withLogo ? [logoNode] : []),
     ],
-    content: toRichHtml(value),
+    content: toEditorHtml(value, withLogo),
     editorProps: {
       attributes: { class: 'rich-email-content', spellcheck: 'true' },
       // Pasted text takes this email's look; structure (bold, lists, links) stays
@@ -70,7 +88,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         .replace(/\s(style|class)='[^']*'/gi, ''),
     },
     onUpdate: ({ editor: e }) => {
-      const html = toRichHtml(e.getHTML())
+      const html = fromEditorHtml(e.getHTML())
       lastEmitted.current = html
       onChangeRef.current(html)
     },
@@ -83,8 +101,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     const next = toRichHtml(value)
     if (next === lastEmitted.current) return
     lastEmitted.current = next
-    editor.commands.setContent(next, { emitUpdate: false })
-  }, [editor, value])
+    editor.commands.setContent(toEditorHtml(next, withLogo), { emitUpdate: false })
+  }, [editor, value, withLogo])
+
+  // A new or resized logo: redraw the block(s) in place
+  useEffect(() => {
+    if (!editor || !withLogo) return
+    editor.view.dom.querySelectorAll<HTMLElement>(`[${LOGO_ELEMENT_ATTR}]`).forEach(el => paintLogo(el, logo ?? null))
+  }, [editor, withLogo, logo?.url, logo?.width, logo?.height]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { editor?.setEditable(!disabled) }, [editor, disabled])
 
@@ -95,7 +119,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   return (
     <div className={`border border-line-3 rounded-md bg-surface-5 focus-within:border-gold ${disabled ? 'opacity-60' : ''}`}>
-      {editor && <Toolbar editor={editor} compact={compact} disabled={disabled} />}
+      {editor && <Toolbar editor={editor} compact={compact} disabled={disabled} logo={withLogo} />}
       <EditorContent
         editor={editor}
         style={{ minHeight }}
@@ -112,7 +136,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   )
 })
 
-function Toolbar({ editor, compact, disabled }: { editor: Editor; compact: boolean; disabled: boolean }) {
+function Toolbar({ editor, compact, disabled, logo }: { editor: Editor; compact: boolean; disabled: boolean; logo: boolean }) {
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -147,6 +171,19 @@ function Toolbar({ editor, compact, disabled }: { editor: Editor; compact: boole
     } else {
       chain().extendMarkRange('link').setLink({ href: normalised }).run()
     }
+  }
+
+  // One logo: placing it again moves it to the cursor
+  const insertLogo = () => {
+    chain()
+      .command(({ tr }) => {
+        const positions: number[] = []
+        tr.doc.descendants((node, pos) => { if (node.type.name === 'signatureLogo') positions.push(pos) })
+        for (const pos of positions.reverse()) tr.delete(pos, pos + 1)
+        return true
+      })
+      .insertContent({ type: 'signatureLogo' })
+      .run()
   }
 
   const btn = (active: boolean) =>
@@ -229,6 +266,11 @@ function Toolbar({ editor, compact, disabled }: { editor: Editor; compact: boole
       <button type="button" title="Add or change a link" disabled={disabled} className={btn(state.link)} onClick={setLink}><Link2 size={14} /></button>
       {state.link && (
         <button type="button" title="Remove link" disabled={disabled} className={btn(false)} onClick={() => chain().extendMarkRange('link').unsetLink().run()}><Link2Off size={14} /></button>
+      )}
+{logo && (
+        <button type="button" title="Put the logo where the cursor is" disabled={disabled} className={`${btn(false)} gap-1 text-xs`} onClick={insertLogo}>
+          <ImageIcon size={14} /> Place logo here
+        </button>
       )}
       <button type="button" title="Clear formatting" disabled={disabled} className={btn(false)} onClick={() => chain().unsetAllMarks().clearNodes().unsetTextAlign().run()}><RemoveFormatting size={14} /></button>
     </div>

@@ -92,6 +92,21 @@ describe('rich text: sending', () => {
     expect(html).toContain('Thanks, Kyle Bindon<br>Insurance Repair Co</p>')
   })
 
+  it('puts the logo on its {logo} line, between the signature lines', () => {
+    const sig = { ...SIGNATURE, html: '<p>Kyle Bindon</p><p>{logo}</p><p>0431 132 077</p>' }
+    const { html } = compose('<p>{signature}</p>', sig)
+    expect(html.indexOf('Kyle Bindon')).toBeLessThan(html.indexOf('<img'))
+    expect(html.indexOf('<img')).toBeLessThan(html.indexOf('0431 132 077'))
+    expect(html.match(/<img/g)).toHaveLength(1)
+    expect(html).not.toContain('{logo}')
+  })
+
+  it('leaves out the {logo} line when there is no image', () => {
+    const { html } = compose('<p>{signature}</p>', { ...SIGNATURE, html: '<p>Kyle</p><p>{logo}</p>', image: null })
+    expect(html).not.toContain('{logo}')
+    expect(html).not.toContain('<img')
+  })
+
   it('adds the signature at the end when the template has no {signature}', () => {
     const { html, text } = compose('Thanks,', SIGNATURE)
     expect(html.indexOf('Thanks,')).toBeLessThan(html.indexOf('Kyle Bindon'))
@@ -102,5 +117,17 @@ describe('rich text: sending', () => {
     const { html, text } = compose('Kind regards,\n{signature}')
     expect(text).toBe('Kind regards,\nInsurance Repair Co')
     expect(html).toContain('>Insurance Repair Co</p>')
+  })
+})
+
+describe('signature from tenant settings', () => {
+  it('leaves the logo line out of the plain-text version', async () => {
+    const { emailSignatureFor } = await import('../signature')
+    const sig = emailSignatureFor({
+      name: 'IRC', trading_name: 'Insurance Repair Co',
+      email_signature: '<p>Kyle Bindon</p><p>{logo}</p><p>0431 132 077</p>',
+      email_signature_image_path: null, email_signature_image_width: null, email_signature_image_height: null,
+    })
+    expect(sig?.text).toBe('Kyle Bindon\n0431 132 077')
   })
 })

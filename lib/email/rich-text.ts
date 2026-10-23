@@ -22,7 +22,8 @@ export interface EmailSignatureImage {
 }
 
 export interface EmailSignature {
-  /** Stored rich HTML (name, title, phone…) */
+  /** Stored rich HTML (name, title, phone…). A {logo} line places the image;
+   *  without one it goes at the end. */
   html: string
   /** Plain-text version of html */
   text: string
@@ -37,6 +38,8 @@ const LINK_COLOR = '#1a4f8b'
 const TOKEN_RE = /\{(\w+)\}/g
 const URL_RE = /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]']/g
 const SIGNATURE_TOKEN = '{signature}'
+/** A line of the signature that is exactly this is where the logo goes */
+export const SIGNATURE_LOGO_TOKEN = '{logo}'
 
 /** Colours offered in the editor (all readable on white). */
 export const RICH_TEXT_COLORS: { label: string; value: string }[] = [
@@ -137,17 +140,30 @@ export function composeEmailBody(body: string, options: ComposeEmailOptions): { 
   return { html, text }
 }
 
-/** The signature as email HTML: its text, then the logo image. */
+/** The signature as email HTML: its text, with the logo on its {logo} line (or at the end). */
 export function signatureHtml(signature: EmailSignature, fontSize: number): string {
   const size = Math.max(13, fontSize - 2)
-  const text = signature.html ? walk(signature.html, { email: { fontSize: size } }) : ''
   const img = signature.image
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0;"><tr><td>` +
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0;"><tr><td>` +
       `<img src="${escapeHtml(signature.image.url)}" width="${signature.image.width}" height="${signature.image.height}" alt="${escapeHtml(signature.image.alt)}" ` +
       `style="display:block;width:${signature.image.width}px;height:${signature.image.height}px;max-width:100%;border:0;outline:none;text-decoration:none;">` +
       `</td></tr></table>`
     : ''
-  return text + img
+  let placed = false
+  const text = signature.html
+    ? walk(signature.html, {
+        email: {
+          fontSize: size,
+          blockOverride: (_line, raw) => {
+            if (raw !== SIGNATURE_LOGO_TOKEN) return null
+            if (placed) return ''
+            placed = true
+            return img
+          },
+        },
+      })
+    : ''
+  return placed ? text : text + img
 }
 
 // ── The walker ─────────────────────────────────────────────────────────────
