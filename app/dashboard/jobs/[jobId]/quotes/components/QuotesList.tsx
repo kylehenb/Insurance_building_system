@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
 import { TccModal } from './TccModal'
 import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
+import { pendingApprovalFrom } from '@/lib/approvals/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -426,6 +427,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         if (res.ok) {
           setCurrentJobStage(stage)
           load()
+        } else {
+          // Refused, or saved for an admin's approval — say so rather than doing nothing
+          const data = await res.json().catch(() => ({}))
+          const queued = pendingApprovalFrom(data)
+          window.alert(queued ? `Waiting for approval: ${queued.message.replace(/^Sent for approval:\s*/, '')}` : (data as { error?: string }).error ?? 'Could not change the job stage')
         }
       } catch (error) {
         console.error('Error updating job stage:', error)

@@ -13,6 +13,8 @@ import { JobContact } from '@/lib/types/contacts'
 import { LOSS_TYPES } from '@/lib/loss-types'
 import { applyContactDefaults } from '@/lib/contacts/defaults'
 import { useCurrentUser } from '@/components/layout/current-user'
+import { pendingApprovalFrom } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -280,6 +282,7 @@ function InsurerOrdersPageContent() {
   // Panel-level action state
   const [lodging, setLodging] = useState(false)
   const [lodgeError, setLodgeError] = useState<string | null>(null)
+  const [lodgePending, setLodgePending] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
@@ -594,7 +597,7 @@ function InsurerOrdersPageContent() {
   }
 
   async function handleLodge(order: InsurerOrder) {
-    setLodging(true); setLodgeError(null)
+    setLodging(true); setLodgeError(null); setLodgePending(null)
     try {
       const res = await fetch('/api/insurer-orders/lodge', {
         method: 'POST',
@@ -602,7 +605,12 @@ function InsurerOrdersPageContent() {
         body: JSON.stringify({ orderId: order.id }),
       })
       const json = await res.json()
-      if (!res.ok) { setLodgeError(json.error ?? 'Lodge failed'); setLodging(false); return }
+      if (!res.ok) {
+        const queued = pendingApprovalFrom(json)
+        if (queued) setLodgePending(queued.message)
+        else setLodgeError(json.error ?? 'Lodge failed')
+        setLodging(false); return
+      }
       const { jobNumber, jobId, acknowledgement } = json as { jobNumber: string; jobId: string; acknowledgement?: { sent: boolean; skipped?: string } }
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, job_id: jobId, status: 'lodged' } : o))
       setJobNumbers(prev => ({ ...prev, [jobId]: jobNumber }))
@@ -1305,6 +1313,7 @@ function InsurerOrdersPageContent() {
                                     )}
                                   </div>
 
+                                  {lodgePending && <ApprovalNotice message={lodgePending} style={{ marginTop: 8 }} />}
                                   {lodgeError && (
                                     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger-strong)' }}>{lodgeError}</div>
                                   )}

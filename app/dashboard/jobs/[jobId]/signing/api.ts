@@ -1,6 +1,7 @@
 import type { SendDialogDefaults, SendForSignatureResult } from '@/lib/signing/service'
 import type { SigningDocumentTypeKey, SigningEventSummary, SigningRequestSummary } from '@/lib/signing/types'
 import type { ExcessChoice } from '@/lib/excess/decision'
+import { responseError } from '@/lib/approvals/client'
 
 // Browser-side calls to the internal signing API (/api/signing/*). The UI
 // only ever talks to these routes, never to a signing provider.
@@ -13,7 +14,8 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `Request failed (${res.status})`)
+  // A queued action throws PendingApprovalError (lib/approvals/client) — show it as waiting, not failed
+  if (!res.ok) throw responseError(data, `Request failed (${res.status})`)
   return data as T
 }
 

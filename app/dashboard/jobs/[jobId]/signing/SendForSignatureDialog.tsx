@@ -8,6 +8,8 @@ import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { createAndSend, fetchJobSigning, type SendDialogDefaults } from './api'
 import { notifyExcessChanged } from '@/components/jobs/ExcessDecisionBadge'
 import { ExcessStep, excessChoiceFromForm, excessSummary, initialExcessForm, type ExcessFormState } from './ExcessStep'
+import { isPendingApproval } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // Choose the document, the quotes it covers and the signer, then send.
 // The document is generated from the job's approved quotes at send time.
@@ -86,6 +88,7 @@ function SendForm({
   const [excessForm, setExcessForm] = useState<ExcessFormState>(() => initialExcessForm(defaults.excess))
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   const total = useMemo(
     () => defaults.quotes.filter(q => quoteIds.includes(q.id)).reduce((s, q) => s + q.totalInclGst, 0),
@@ -122,7 +125,8 @@ function SendForm({
         + (result.stageMoved ? ' Job moved to Awaiting Signed Document.' : ''),
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sending failed')
+      if (isPendingApproval(err)) setPending(err.message)
+      else setError(err instanceof Error ? err.message : 'Sending failed')
       setSending(false)
     }
   }
@@ -226,6 +230,7 @@ function SendForm({
         {defaults.excess.applies && !excessReady && (
           <p className="text-[12px] text-warning">Choose what to do about the excess to continue.</p>
         )}
+        {pending && <ApprovalNotice message={pending} />}
         {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</div>}
       </div>
 

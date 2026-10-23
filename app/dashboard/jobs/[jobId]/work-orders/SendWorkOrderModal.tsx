@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { type WorkOrderWithDetails } from './types'
 import { RichTextEditor } from '@/components/email/RichTextEditor'
+import { isPendingApproval, responseError } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 export interface SendWorkOrderModalProps {
   workOrder: WorkOrderWithDetails
@@ -33,6 +35,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
   const [loadError, setLoadError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   const [to, setTo]           = useState('')
   const [cc, setCc]           = useState('')
@@ -66,6 +69,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
   async function send(mode: 'auto' | 'custom') {
     setSending(true)
     setSendError(null)
+    setPending(null)
     try {
       const res = await fetch(`/api/work-orders/${workOrder.id}/send`, {
         method: 'POST',
@@ -73,10 +77,11 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
         body: JSON.stringify(mode === 'auto' ? { mode } : { mode, to, cc, subject, body, includePhotos }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? 'Failed to send work order')
+      if (!res.ok) throw responseError(data, 'Failed to send work order')
       onSent()
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : String(err))
+      if (isPendingApproval(err)) setPending(err.message)
+      else setSendError(err instanceof Error ? err.message : String(err))
       setSending(false)
     }
   }
@@ -309,6 +314,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
             </div>
           )}
 
+          {pending && <ApprovalNotice message={pending} style={{ marginTop: 12 }} />}
           {sendError && (
             <p style={{ fontSize: 11, color: 'var(--danger-dark)', background: 'var(--danger-bg-3)', border: '1px solid var(--danger-soft)', borderRadius: 6, padding: '8px 10px', marginTop: 12, lineHeight: 1.5 }}>
               {sendError}

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
+import { pendingApprovalFrom } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type JobHit = {
@@ -94,6 +96,7 @@ export default function MobileOrderReview({
   const [sheet, setSheet] = useState<Sheet>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [linkSearch, setLinkSearch] = useState('')
   const [linkResults, setLinkResults] = useState<JobHit[]>([])
@@ -134,7 +137,7 @@ export default function MobileOrderReview({
   }
 
   async function handleLodge() {
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setPending(null)
     try {
       const res = await fetch('/api/insurer-orders/lodge', {
         method: 'POST',
@@ -142,7 +145,12 @@ export default function MobileOrderReview({
         body: JSON.stringify({ orderId: order.id }),
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error ?? 'Lodge failed'); setBusy(false); return }
+      if (!res.ok) {
+        const queued = pendingApprovalFrom(json)
+        if (queued) setPending(queued.message)
+        else setError(json.error ?? 'Lodge failed')
+        setBusy(false); return
+      }
       const { jobNumber: newJobNumber, jobId } = json as { jobNumber: string; jobId: string }
       setOrder(o => ({ ...o, job_id: jobId, status: 'lodged' }))
       setJobNumber(newJobNumber)
@@ -391,6 +399,7 @@ export default function MobileOrderReview({
               </>
             )}
 
+            {pending && <ApprovalNotice message={pending} style={{ marginTop: 12, fontSize: 14 }} />}
             {error && <div style={{ marginTop: 12, fontSize: 14, color: C.red }}>{error}</div>}
 
             <button style={{ ...bigBtn, background: 'transparent', color: C.muted, marginTop: 8 }} disabled={busy} onClick={closeSheet}>

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import type { Json } from '@/lib/supabase/database.types'
+import { pendingApprovalFrom } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,7 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   const replySubject = comm.subject
     ? comm.subject.toLowerCase().startsWith('re:') ? comm.subject : `Re: ${comm.subject}`
@@ -192,6 +195,7 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
     if (!body.trim()) return
     setSending(true)
     setError(null)
+    setPending(null)
     try {
       const res = await fetch('/api/communications/reply', {
         method: 'POST',
@@ -199,8 +203,10 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
         body: JSON.stringify({ commId: comm.id, body }),
       })
       if (!res.ok) {
-        const d = await res.json() as { error?: string }
-        setError(d.error ?? 'Send failed')
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        const queued = pendingApprovalFrom(d)
+        if (queued) setPending(queued.message)
+        else setError(d.error ?? 'Send failed')
         return
       }
       onSent()
@@ -277,6 +283,7 @@ function ReplyModal({ comm, onClose, onSent }: { comm: Comm; onClose: () => void
             Cancel
           </button>
           {error && <span style={{ fontSize: 11, color: '#c05a4a', marginLeft: 4 }}>{error}</span>}
+          {pending && <ApprovalNotice message={pending} style={{ marginLeft: 4, padding: '6px 10px' }} />}
         </div>
       </div>
     </div>

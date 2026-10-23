@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { Paperclip, X } from 'lucide-react'
 import type { DocumentRef } from '@/lib/documents/send/documents'
 import { RichTextEditor } from '@/components/email/RichTextEditor'
+import { isPendingApproval, responseError } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // Send a document (quote, report, invoice, TCC, photos) by email from the
 // job. Auto send emails the standard template as-is; Customise send opens the
@@ -66,7 +68,7 @@ async function post(body: Record<string, unknown>) {
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error ?? 'Something went wrong')
+  if (!res.ok) throw responseError(data, 'Something went wrong')
   return data
 }
 
@@ -76,6 +78,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy]       = useState<null | 'auto' | 'custom' | 'mark_sent'>(null)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   const [to, setTo]           = useState('')
   const [cc, setCc]           = useState('')
@@ -108,6 +111,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
   async function run(mode: 'auto' | 'custom' | 'mark_sent') {
     setBusy(mode)
     setSendError(null)
+    setPending(null)
     try {
       const refs = mode === 'custom' ? attachments.map(a => a.ref) : documents
       const result = await post(mode === 'custom'
@@ -115,7 +119,8 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
         : { mode, documents: refs })
       onDone({ emailed: mode !== 'mark_sent', statusChanges: result.statusChanges ?? [] })
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : String(err))
+      if (isPendingApproval(err)) setPending(err.message)
+      else setSendError(err instanceof Error ? err.message : String(err))
       setBusy(null)
     }
   }
@@ -385,6 +390,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
             </div>
           )}
 
+          {pending && <ApprovalNotice message={pending} style={{ marginTop: 12 }} />}
           {sendError && (
             <p style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, padding: '8px 10px', marginTop: 12, lineHeight: 1.5 }}>
               {sendError}

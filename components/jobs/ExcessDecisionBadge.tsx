@@ -10,6 +10,8 @@ import {
   type ExcessDecision,
 } from '@/lib/excess/decision'
 import { formatPerthDateTime } from '@/lib/signing/format'
+import { isPendingApproval, responseError } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // The job's excess at a glance (Overview → Excess, Invoices tab), with a way
 // to record "no excess" or why it isn't being collected without sending
@@ -53,7 +55,7 @@ export function useJobExcess(jobId: string) {
       body: JSON.stringify({ decision, note }),
     })
     const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((body as { error?: string }).error ?? 'Could not save')
+    if (!res.ok) throw responseError(body, 'Could not save')
     setCtx(body as ExcessContext)
     notifyExcessChanged(jobId)
   }, [jobId])
@@ -89,6 +91,7 @@ export function ExcessDecisionBadge({ jobId }: { jobId: string }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   if (!ctx || !ctx.applies) return null
   const status = statusOf(ctx)
@@ -106,11 +109,13 @@ export function ExcessDecisionBadge({ jobId }: { jobId: string }) {
     if (!choice) return
     setSaving(true)
     setError(null)
+    setPending(null)
     try {
       await record(choice, note.trim() || null)
       setOpen(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save')
+      if (isPendingApproval(err)) setPending(err.message)
+      else setError(err instanceof Error ? err.message : 'Could not save')
     } finally {
       setSaving(false)
     }
@@ -147,6 +152,7 @@ export function ExcessDecisionBadge({ jobId }: { jobId: string }) {
             maxLength={1000}
             onChange={e => setNote(e.target.value)}
           />
+          {pending && <ApprovalNotice message={pending} />}
           {error && <div className="text-red-700">{error}</div>}
           <div className="flex gap-2 pt-1">
             <button

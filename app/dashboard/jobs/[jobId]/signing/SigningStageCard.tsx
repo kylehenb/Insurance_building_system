@@ -7,6 +7,8 @@ import { SIGNER_CAPACITY_LABELS } from '@/lib/signing/types'
 import { excessInvoiceStatusLine } from '@/lib/excess/decision'
 import { documentUrl } from './api'
 import { useJobSigning } from './useJobSigning'
+import { isPendingApproval } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // Action card in the stage banner. When a document has been signed, the job
 // stage is NOT moved automatically: this card asks the office to confirm,
@@ -17,6 +19,7 @@ import { useJobSigning } from './useJobSigning'
 export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConfirmed?: () => void }) {
   const { requests, busyId, act } = useJobSigning(jobId)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
 
   const toConfirm = requests.find(r => r.status === 'signed' && !r.stageConfirmedAt)
   const outstanding = requests.find(r => r.status === 'sent' || r.status === 'viewed')
@@ -24,11 +27,13 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
   if (toConfirm) {
     const confirm = async () => {
       setError(null)
+      setPending(null)
       try {
         await act(toConfirm.id, 'confirm-stage')
         onConfirmed?.()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not confirm')
+        if (isPendingApproval(err)) setPending(err.message)
+        else setError(err instanceof Error ? err.message : 'Could not confirm')
       }
     }
     return (
@@ -45,6 +50,7 @@ export function SigningStageCard({ jobId, onConfirmed }: { jobId: string; onConf
             {excessInvoiceStatusLine(toConfirm.excessInvoice)}
           </div>
         )}
+        {pending && <ApprovalNotice message={pending} style={{ marginTop: 4 }} />}
         {error && <div className="mt-1 text-red-700">{error}</div>}
         <div className="mt-2 flex flex-wrap gap-2">
           <a

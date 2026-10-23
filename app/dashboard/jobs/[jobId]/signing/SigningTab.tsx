@@ -10,6 +10,8 @@ import { SendForSignatureDialog } from './SendForSignatureDialog'
 import { SigningAuditTrail } from './SigningAuditTrail'
 import { SigningStatusBadge } from './SigningStatusBadge'
 import { useJobSigning } from './useJobSigning'
+import { isPendingApproval } from '@/lib/approvals/client'
+import { ApprovalNotice } from '@/components/approvals/approval-notice'
 
 // Signatures tab on the job page: send documents for signature and follow
 // each request (sent → viewed → signed), with resend, revoke, downloads and
@@ -118,10 +120,16 @@ function RequestRow({
   )
 }
 
+/** A failed action's notice — or the waiting-for-approval one when it was queued */
+function failureNotice(err: unknown): { kind: 'error' | 'pending'; text: string } {
+  if (isPendingApproval(err)) return { kind: 'pending', text: err.message }
+  return { kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong' }
+}
+
 export function SigningTab({ jobId }: { jobId: string }) {
   const { requests, defaults, loading, error, busyId, reload, act } = useJobSigning(jobId)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error' | 'pending'; text: string } | null>(null)
 
   const run = async (request: SigningRequestSummary, action: 'send' | 'resend' | 'revoke') => {
     let body: Record<string, unknown> | undefined
@@ -135,7 +143,7 @@ export function SigningTab({ jobId }: { jobId: string }) {
       await act(request.id, action, body)
       setNotice({ kind: 'ok', text: action === 'revoke' ? 'Signing link revoked.' : `Emailed to ${request.signerEmail}.` })
     } catch (err) {
-      setNotice({ kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
+      setNotice(failureNotice(err))
     }
   }
 
@@ -154,7 +162,8 @@ export function SigningTab({ jobId }: { jobId: string }) {
         </button>
       </div>
 
-      {notice && (
+      {notice?.kind === 'pending' && <ApprovalNotice message={notice.text} style={{ marginBottom: 16 }} />}
+      {notice && notice.kind !== 'pending' && (
         <div className={`mb-4 rounded-md border px-3 py-2 text-[13px] ${notice.kind === 'ok' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
           {notice.text}
         </div>
@@ -180,7 +189,7 @@ export function SigningTab({ jobId }: { jobId: string }) {
                   await act(r.id, 'reminders', { enabled })
                   setNotice({ kind: 'ok', text: `Automatic reminders turned ${enabled ? 'on' : 'off'} for ${r.signerName}.` })
                 } catch (err) {
-                  setNotice({ kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
+                  setNotice(failureNotice(err))
                 }
               }}
             />
