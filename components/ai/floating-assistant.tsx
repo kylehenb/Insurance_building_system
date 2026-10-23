@@ -144,6 +144,8 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const { userId, canTeach: userCanTeach } = useCurrentUser()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // The full conversation (tool calls included) the server hands back each turn
+  const historyRef = useRef<unknown[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const teachTextareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPopoverRef = useRef<HTMLDivElement>(null)
@@ -606,6 +608,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       if (fileToSend && isBinaryFile) {
         const fd = new FormData()
         fd.append('messages', JSON.stringify(newMessages.map((m) => ({ role: m.role, content: m.content }))))
+        fd.append('history', JSON.stringify(historyRef.current))
         fd.append('pageContext', pathname || '')
         if (activeTab) fd.append('activeTab', activeTab)
         fd.append('tenantId', tenantId)
@@ -621,19 +624,15 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+            history: historyRef.current,
             pageContext: pathname, activeTab, tenantId,
             ...(fileAttachment ? { fileAttachment } : {}),
           }),
         })
       }
       const data = await res.json()
-      let text: string = data.text ?? 'Sorry, I encountered an error.'
-      text = text.replace(/\n?\n?\s*\{"name":\s*"[^"]+",\s*"parameters":\s*\{[^}]*\}\}\s*\n?/g, '')
-      text = text.replace(/\n?\n?\s*\[\]\s*\n?/g, '')
-      text = text.replace(/\n?\n?\s*Let me read[^\n]*\n?/g, '')
-      text = text.replace(/\n?\n?\s*Let me check[^\n]*\n?/g, '')
-      text = text.replace(/\n?\n?\s*Let me get[^\n]*\n?/g, '')
-      text = text.trim()
+      if (Array.isArray(data.history)) historyRef.current = data.history
+      const text: string = data.text ?? 'Sorry, I encountered an error.'
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
       window.dispatchEvent(new CustomEvent('ai-action-complete', { detail: { success: true } }))
     } catch {

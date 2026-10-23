@@ -1842,7 +1842,7 @@ Every user has a level for each action: **allowed**, **needs approval** or **not
     /ai/execute-action/route.ts  -- executes a confirmed action's playbook steps
     /ai/config-update/route.ts   -- writes to automation_config via AI chat instruction
     /ai/draft-blueprint/route.ts -- calls Claude to generate job_schedule_blueprints.draft_data
-    /ai/assistant/route.ts       -- AI assistant chat endpoint
+    /ai/assistant/route.ts       -- AI assistant chat endpoint (Claude + the voice connector's tools, §10b)
     /ai/activity/
       /summary/route.ts          -- GET: 24hr/7day metric aggregates for dashboard top strip
       /feed/route.ts             -- GET: paginated chronological feed of ai_audit + automation_audit
@@ -2602,6 +2602,13 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 - Tools: `lib/mcp/tools/*.ts`, registered in `lib/mcp/tools/index.ts`. Tests in `lib/mcp/__tests__/`
 - Setup: Settings → Voice connector → Make a key, then claude.ai → Settings → Connectors → Add custom connector: URL `https://<app>/api/mcp`, Authentication "No sign-in", request header `Authorization` = `Bearer <key>` (the page shows these). Rotate by making a new key, updating the header and revoking the old key. The shared-key env vars are optional; remove them once everyone uses a personal key
 
+### In-app assistant (same tools)
+The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assistant.ts`) are Claude (`AI_ASSISTANT_MODEL`, default `claude-sonnet-5-5`; `claude-haiku-5-5` is the cheaper option) with every tool in `MCP_TOOLS` plus one chat-only, read-only `read_records(table, filters?, columns?, limit?)` lookup (listed tables, always the session's tenant) for data the tools don't cover.
+- Acts as the signed-in user (`sessionUser()`, service client). Each call goes through `callTool(tool, args, ctx)` with `ctx.via = 'chat'` in `lib/mcp/server.ts` — the same permission check, approval queueing (`voice.tool` with `via: 'chat'`, requested via `app`) and who-did-what log (via `app`) as the connector
+- Manual tool loop, one tool at a time (sends), up to 15 model calls per message; the last one can't call tools. Effort `medium`, prompt caching on, server-side refusal fallback on Sonnet/Opus
+- The browser keeps the full conversation (tool calls and results included) and sends it back as `history` with each message; only a finished turn is returned, so it never ends on an unanswered tool call. The current page's context, the date/time (Perth) and any attached image/PDF/text file go in the new user message, not the system prompt, so the cached prefix stays the same
+- A new tool in `MCP_TOOLS` appears in the chat automatically; tool descriptions are shared, so keep them right for both
+
 ### Rules for tools
 - A tool only calls shared `lib/` functions — the same ones the app's buttons use. No business logic in the tool (e.g. "sent" is `woIsSent`, the amount is `workOrderAmountFor`)
 - Read tools return warnings for the things a person would want flagged (no email address, $0 amount, already sent)
@@ -2613,7 +2620,7 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | Tool | Type | Calls | Notes |
 |---|---|---|---|
 | `get_job_summary(job_number)` | read | `fetchJobContext` + `getJobStage`, pending `action_queue`, and the work order / document / signing / excess / email tools | Who and where, stage + next step + warning, what's waiting (pending action cards), work orders, documents, signing, excess, latest 3 emails, last 600 chars of notes. A section that fails says so; the rest still return |
-| `add_job_note(job_number, note)` | change | — | Appends `"<date> (voice): <note>"` to `jobs.notes` (the Overview tab's Notes field; the `job_notes` table has no UI yet) |
+| `add_job_note(job_number, note)` | change | — | Appends `"<date> (voice): <note>"` (`(assistant)` from the in-app chat) to `jobs.notes` (the Overview tab's Notes field; the `job_notes` table has no UI yet) |
 | `find_work_orders(job_number?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders. Without: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
 | `get_work_order_email(work_order_id)` | read | `buildWorkOrderEmailDraft` | Recipient, amount, warnings, attachments (WO PDF + photos PDF), standard subject/body from the tenant template (body as plain text, `{signature}` kept; a replacement body in `send_work_order` is plain text). Already sent → says it can't be sent again |
 | `send_work_order(work_order_id, to?, subject?, body?, include_photos?)` | send | `sendWorkOrderEmail` | Same send as Auto/Customise send: PDF + photos, communications row, Gary hand-off. Refuses an already-sent work order (409). One work order per call; several can be confirmed with one yes. Description requires a read-back first, and no retry on error |
@@ -2825,6 +2832,9 @@ GOOGLE_MAPS_API_KEY=               # Used for trade proximity calculation (Dista
 # Claude voice connector (§10b) — leave unset to keep the connector off
 MCP_CONNECTOR_SECRET=              # optional, legacy shared key (32+ chars) — personal keys replace it
 MCP_USER_ID=                       # optional, users.id the shared key acts as
+
+# In-app assistant (§10b) — uses ANTHROPIC_API_KEY
+AI_ASSISTANT_MODEL=                # optional, default claude-sonnet-5-5; claude-haiku-5-5 is cheaper
 
 # App
 NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead

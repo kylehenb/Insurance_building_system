@@ -85,6 +85,11 @@ describe('add_job_note', () => {
     expect(res.text).toMatch(/^Added to IRC1062's notes/)
     expect((await addJobNote.run({ job_number: 'IRC1062', note: ' ' }, ctx)).isError).toBe(true)
   })
+
+  it('marks a note from the in-app assistant as such', async () => {
+    await addJobNote.run({ job_number: 'IRC1062', note: 'Roofer booked' }, { ...ctx, via: 'chat' })
+    expect(db.jobs[0].notes).toMatch(/\(assistant\): Roofer booked$/)
+  })
 })
 
 describe('update_insurer_order', () => {

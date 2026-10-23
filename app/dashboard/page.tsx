@@ -142,6 +142,8 @@ export default function DashboardPage() {
 
   // AI Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  // The full conversation (tool calls included) the server hands back each turn
+  const aiHistoryRef = useRef<unknown[]>([])
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -420,9 +422,12 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+          history: aiHistoryRef.current,
+          pageContext: '/dashboard',
         }),
       })
       const data = await res.json()
+      if (Array.isArray(data.history)) aiHistoryRef.current = data.history
       const rawText: string = data.text ?? 'Sorry, I encountered an error.'
       const proposal = parseActionProposal(rawText)
       const displayText = proposal ? stripActionJson(rawText) : rawText
@@ -562,7 +567,7 @@ export default function DashboardPage() {
         .ai-avatar.user { background: #2e2820; color: var(--tan); border: 0.5px solid rgba(200,184,154,0.2); }
         .ai-avatar.assistant { background: var(--cream); color: var(--bronze); border: 0.5px solid var(--line-tan-5); font-size: 13px; }
         .ai-bubble-inner { display: flex; flex-direction: column; max-width: 100%; gap: 8px; }
-        .ai-bubble-text { padding: 10px 15px; border-radius: 10px; font-size: 13px; line-height: 1.65; font-weight: 400; }
+        .ai-bubble-text { padding: 10px 15px; border-radius: 10px; font-size: 13px; line-height: 1.65; font-weight: 400; white-space: pre-wrap; word-break: break-word; }
         .ai-bubble.user .ai-bubble-text { background: var(--ink); color: var(--line-tan-3); border-radius: 10px 10px 3px 10px; }
         .ai-bubble.assistant .ai-bubble-text { background: #f7f5f2; color: var(--ink-brown); border-radius: 10px 10px 10px 3px; border: 0.5px solid var(--line-5); }
         .ai-action-panel { background: var(--surface-9); border: 0.5px solid var(--line-tan-5); border-radius: 8px; padding: 14px 16px; }

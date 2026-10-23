@@ -1,265 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { LOSS_TYPES_PROMPT_LIST } from '@/lib/loss-types'
-import { getUser } from '@/lib/supabase/get-user'
-import type { PermissionKey } from '@/lib/permissions/catalogue'
-import { permissionLevel, refusalMessage } from '@/lib/permissions/resolve'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { runAssistantTurn } from '@/lib/ai/assistant'
 
+// The in-app assistant (floating chat and dashboard chat): Claude with the
+// voice connector's tools, acting as the signed-in user — lib/ai/assistant.ts.
+// The browser keeps the conversation (`history`) and sends it back each time.
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// A turn can run several tools, and sends can render PDFs
+export const maxDuration = 300
 
-// Tables that need the settings.edit permission to write to
-const SETTINGS_TABLES = new Set(['scope_library', 'trade_type_sequence', 'report_templates'])
-// Read-only here: people and companies change only through their own settings pages
-const READ_ONLY_TABLES = new Set(['tenants', 'users'])
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-/** What the user must be allowed to do for the assistant to write to a table (lib/permissions) */
-function writePermission(table: string): PermissionKey | null {
-  if (READ_ONLY_TABLES.has(table)) return null
-  return SETTINGS_TABLES.has(table) ? 'settings.edit' : 'jobs.edit'
+type MessageParam = Anthropic.Beta.BetaMessageParam
+type ContentBlockParam = Anthropic.Beta.BetaContentBlockParam
+
+/** A conversation sent back by the browser: user/assistant turns only */
+function validHistory(value: unknown): MessageParam[] | null {
+  if (value == null) return []
+  if (!Array.isArray(value)) return null
+  const ok = value.every(m => m && typeof m === 'object'
+    && (m.role === 'user' || m.role === 'assistant')
+    && (typeof m.content === 'string' || Array.isArray(m.content)))
+  return ok ? value as MessageParam[] : null
 }
 
-// All writable tables the AI is allowed to read from
-const READABLE_TABLES = new Set([
-  'jobs', 'quotes', 'scope_items', 'reports', 'inspections',
-  'clients', 'insurer_orders', 'trades', 'work_orders', 'work_order_visits',
-  'action_queue', 'communications', 'photos', 'safety_records',
-  'scope_library', 'report_templates', 'trade_type_sequence',
-  'job_schedule_blueprints', 'users', 'tenants', 'assistant_templates',
-])
-
-const SCHEMA_REFERENCE = `
-DATABASE SCHEMA REFERENCE — use this to know exactly which table and column names to use in tool calls.
-
-loss_type (on jobs, reports and insurer_orders) must be exactly one of: ${LOSS_TYPES_PROMPT_LIST} — or null.
-
-jobs: id, tenant_id, job_number, claim_number, client_id, insurer, adjuster, property_address, insured_name, insured_phone, insured_email, contacts (JSONB array of JobContact objects), adjuster_reference, order_sender_name, order_sender_email, date_of_loss, loss_type, claim_description, special_instructions, sum_insured, excess, assigned_to, status, kpi_contact_due, kpi_booking_due, kpi_visit_due, kpi_report_due, kpi_contacted_at, kpi_booked_at, kpi_visited_at, kpi_reported_at, notes, automation_overrides, created_at
-
-reports: id, tenant_id, job_id, inspection_id, quote_id, parent_report_id, report_ref, version, is_locked, report_type, status, attendance_date, attendance_time, person_met, property_address, insured_name, claim_number, loss_type, assessor_name, property_description, incident_description, cause_of_damage, how_damage_occurred, resulting_damage, conclusion, pre_existing_conditions, maintenance_notes, raw_report_notes, damage_template, damage_template_saved, type_specific_fields, doc_storage_path, pdf_storage_path, deleted_at, deleted_by, delete_reason, created_at
-
-quotes: id, tenant_id, job_id, inspection_id, report_id, parent_quote_id, quote_ref, quote_type, version, is_active_version, is_locked, status, approved_amount, approval_notes, raw_scope_notes, total_amount, markup_pct, gst_pct, doc_storage_path, pdf_storage_path, notes, created_at
-
-scope_items: id, tenant_id, quote_id, scope_library_id, room, room_length, room_width, room_height, trade, keyword, item_description, unit, qty, rate_labour, rate_materials, rate_total, line_total, split_type, approval_status, is_custom, library_writeback_approved, sort_order, created_at
-NOTE: scope_items links to quotes via quote_id, NOT job_id directly.
-
-inspections: id, tenant_id, job_id, quote_id, report_id, inspection_ref, scheduled_date, start_time, finish_time, inspector_id, status, insured_notified, scheduling_sms_sent_at, scheduling_sms_response, booking_confirmed_at, access_notes, calendar_event_id, field_draft, form_submitted_at, safety_confirmed_at, person_met, scope_status, report_status, photos_status, send_checklist, raw_report_notes, created_at
-
-clients: id, tenant_id, client_type, parent_id, name, trading_name, abn, submission_email, adjuster_submission_email, contact_phone, address, kpi_contact_hours, kpi_booking_hours, kpi_visit_days, kpi_report_days, send_booking_confirmation, notes, status, created_at
-
-insurer_orders: id, tenant_id, job_id, client_id, order_ref, status, claim_number, insurer, adjuster, wo_type, is_make_safe, property_address, insured_name, insured_phone, insured_email, contacts (JSONB array of JobContact objects), adjuster_reference, order_sender_name, order_sender_email, date_of_loss, loss_type, claim_description, special_instructions, sum_insured_building, excess_building, raw_email_link, parse_status, entry_method, notes, created_at
-
-trades: id, tenant_id, primary_trade, trade_code, business_name, entity_name, abn, primary_contact, address, lat, lng, contact_email, contact_mobile, contact_office, can_do_make_safe, makesafe_priority, can_do_reports, availability, priority_rank (star rating: 1=lowest priority, 5=highest priority), service_area (array of service area options, e.g., ["30kms radius"]), gary_opt_out, gary_contact_preference, gary_notes, status, status_note, notes, created_at
-
-work_orders: id, tenant_id, job_id, quote_id, trade_id, report_id, blueprint_id, work_type, status, sequence_order, is_concurrent, predecessor_work_order_id, estimated_hours, total_visits, current_visit, proximity_range, gary_state, scope_summary, trade_cost, charge_out_amount, agreed_amount, notes, created_at
-
-work_order_visits: id, tenant_id, work_order_id, job_id, visit_number, estimated_hours, scheduled_date, scheduled_end_date, confirmed_date, status, lag_days_after, lag_description, gary_triggered_at, gary_return_trigger_at, trade_confirmed_at, notes, created_at
-
-action_queue: id, tenant_id, job_id, rule_key, title, description, ai_draft, status, priority (number: 0=low 1=medium 2=high), snoozed_until, confirmed_by, confirmed_at, error_log, created_at
-
-communications: id, tenant_id, job_id, inspection_id, work_order_id, type, direction, contact_type, contact_name, contact_detail, subject, content, attachments, ai_extracted_notes, requires_action, action_queue_id, persona, parse_confidence, linked_to, created_by, created_at
-
-photos: id, tenant_id, job_id, inspection_id, storage_path, label, report_code, sequence_number, file_name, mime_type, size_bytes, uploaded_at
-
-safety_records: id, tenant_id, job_id, inspection_id, type, inspector_id, confirmed_at, date, status, signed_by, nearest_hospital, ppe_confirmed, hazards_noted, custom_notes, roof_access, structural_ok, asbestos_risk, lone_worker_checkin_active, lone_worker_checkin_interval_mins, signature_data, pdf_storage_path, created_at
-
-scope_library: id, tenant_id, insurer_specific, pair_id, split_type, trade, keyword, item_description, unit, labour_rate_per_hour, labour_per_unit, materials_per_unit, total_per_unit, estimated_hours, has_lag, lag_days, lag_description, updated_at
-
-report_templates: id, tenant_id, name, report_type, loss_types, use_count, last_used_at, created_at
-
-trade_type_sequence: id, tenant_id, trade_type, typical_sequence_order, typical_visit_count, notes, updated_at, created_at
-
-job_schedule_blueprints: id, tenant_id, job_id, status, draft_data, confirmed_by, confirmed_at, notes, created_at
-
-users: id, tenant_id, name, role, phone, address, is_emergency_contact, makesafe_available, created_at (what each user may do is set in Settings → Users & Permissions, not on this table)
-
-tenants: id, name, slug, job_prefix, job_sequence, plan, contact_email, contact_phone, address, logo_storage_path, created_at
-`
-
-const SYSTEM_PROMPT = `You are an AI assistant for Insurance Repair Co, a building insurance repair business. You only assist with tasks and questions related to running this business and using this system. If asked anything clearly outside this scope, politely decline and redirect the user back to IRC-related topics. Never return raw JSON, code blocks, or technical syntax. When performing or proposing actions: be extremely concise. Present proposed actions as a brief numbered list — one short line per action, no explanation unless critical. After execution, confirm in one sentence or a few words per completed step. No preamble, no summaries, no elaboration. When answering questions: be clear and direct, slightly more detailed than action responses, but still concise — no padding, no restating the question, no closing remarks.
-
-You have full read and write access to the entire IRC database. When answering questions about specific records, use the read_records tool to look up the current data rather than relying only on injected context. When the user asks you to update, create, or delete data, you can do so using the appropriate tools.
-
-The only restriction: modifying tenants, users, scope_library, trade_type_sequence, or report_templates requires the user to be an admin. If the current user is not an admin and requests changes to those tables, politely decline and tell them to contact their administrator.
-
-When the user asks you to take an action that requires a data change, always present the full action plan first as a numbered list in plain English before doing anything. At the end of every action proposal always say exactly: "Reply yes to confirm all, or tell me what you'd like to change."
-
-If the user confirms (e.g., "yes", "go ahead", "sure", "ok", etc.), execute all steps sequentially using the available tools. After each step completes, report back in plain English that it is done before moving to the next. If a step fails, report the failure clearly and stop — do not continue to subsequent steps.
-
-If the user replies with modifications (e.g., "yes but change step 2 to..."), regenerate the full updated action plan in plain English incorporating the requested changes. End the updated plan again with "Reply yes to confirm all, or tell me what you'd like to change." Loop until the user confirms or abandons.
-
-If the user declines or asks for clarification, respond accordingly.
-
-Never execute any data changes without receiving confirmation first. Never partially execute a plan.
-
-Key facts about IRC:
-- Sedgwick SLA: BAR reports within 7 calendar days, Make Safes attended within 24 hours
-- Job numbers prefixed with IRC (e.g. IRC1008)
-- Quote numbers use quote_ref field (e.g. Q1005-1)
-- The business handles building insurance repairs: storm damage, water damage, make safes
-- Reports have a property_description field for describing the property (roof type, wall construction, condition etc.)
-${SCHEMA_REFERENCE}`
-
-
-const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'read_records',
-      description: 'Read records from any table. Use this to look up current data before proposing changes, or to answer questions about specific records.',
-      parameters: {
-        type: 'object',
-        properties: {
-          table: { type: 'string', description: 'Table name (e.g. jobs, reports, quotes, scope_items, inspections, etc.)' },
-          filters: {
-            type: 'object',
-            description: 'Key-value pairs to filter by (e.g. {"job_id": "abc123", "status": "pending"}). All filters use equality matching.',
-          },
-          columns: { type: 'string', description: 'Comma-separated list of columns to return. Omit or use "*" for all columns.' },
-          limit: { type: 'number', description: 'Maximum number of rows to return. Defaults to 20.' },
-        },
-        required: ['table'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'insert_record',
-      description: 'Insert a new record into a table. Pass all field values as direct properties (e.g., {"table": "jobs", "claim_number": "ABC123", "insurer": "XYZ"}). tenant_id is automatically added.',
-      parameters: {
-        type: 'object',
-        properties: {
-          table: { type: 'string', description: 'Table name (e.g. jobs, insurer_orders, quotes, etc.)' },
-        },
-        required: ['table'],
-        additionalProperties: { type: 'string', description: 'Any additional fields for the record' },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'update_record',
-      description: 'Update one or more fields on an existing record identified by its id.',
-      parameters: {
-        type: 'object',
-        properties: {
-          table: { type: 'string', description: 'Table name' },
-          id: { type: 'string', description: 'The UUID of the record to update' },
-          fields: { type: 'object', description: 'Key-value pairs of fields to update' },
-        },
-        required: ['table', 'id', 'fields'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'delete_record',
-      description: 'Delete a record by its id from a table.',
-      parameters: {
-        type: 'object',
-        properties: {
-          table: { type: 'string', description: 'Table name' },
-          id: { type: 'string', description: 'The UUID of the record to delete' },
-        },
-        required: ['table', 'id'],
-      },
-    },
-  },
-]
-
-async function executeTool(
-  name: string,
-  input: Record<string, unknown>,
-  tenantId: string,
-  userId: string,
-): Promise<string> {
-  const table = input.table as string
-
-  if (!table || !READABLE_TABLES.has(table)) {
-    return `Error: table "${table}" is not accessible.`
+/** The new message: where the user is, any attached file, then what they typed */
+function userContent(text: string, context: string, file: { type: string; name: string; data: string; mediaType?: string } | null): ContentBlockParam[] {
+  const now = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Perth', dateStyle: 'full', timeStyle: 'short' })
+  const blocks: ContentBlockParam[] = [{ type: 'text', text: `[${now}. ${context}]` }]
+  if (file?.type === 'image') {
+    blocks.push({ type: 'image', source: { type: 'base64', media_type: file.mediaType as 'image/png', data: file.data } })
+  } else if (file?.type === 'document') {
+    blocks.push({ type: 'document', title: file.name, source: { type: 'base64', media_type: 'application/pdf', data: file.data } })
+  } else if (file?.type === 'text') {
+    blocks.push({ type: 'text', text: `Attached file ${file.name}:\n${file.data}` })
   }
-
-  // Writes need the same permissions as the app's buttons
-  if (name !== 'read_records') {
-    const needed = writePermission(table)
-    if (!needed) return `Permission denied: "${table}" can't be changed by the assistant.`
-    for (const action of name === 'delete_record' ? [needed, 'records.delete' as const] : [needed]) {
-      const level = await permissionLevel(tenantId, userId, action)
-      if (level !== 'allowed') return `Permission denied: ${refusalMessage(action, level)}`
-    }
-  }
-
-  // Service client — every query below is scoped to the signed-in user's tenant
-  const db = createServiceClient()
-
-  try {
-    if (name === 'read_records') {
-      const columns = (input.columns as string | undefined) ?? '*'
-      const limit = (input.limit as number | undefined) ?? 20
-      const filters = (input.filters as Record<string, unknown> | undefined) ?? {}
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let q = (db as any).from(table).select(columns).limit(limit)
-      for (const [col, val] of Object.entries(filters)) {
-        if (col !== 'tenant_id') q = q.eq(col, val)
-      }
-      // Always this tenant's rows (a tenant row is its own id)
-      q = table === 'tenants' ? q.eq('id', tenantId) : q.eq('tenant_id', tenantId)
-
-      const { data, error } = await q
-      if (error) return `Error reading ${table}: ${error.message}`
-      if (!data || (Array.isArray(data) && data.length === 0)) return `No records found in ${table} matching those filters.`
-      return JSON.stringify(data, null, 2)
-    }
-
-    if (name === 'update_record') {
-      const { error } = await (db as any)
-        .from(table)
-        .update(withoutTenant(input.fields))
-        .eq('id', input.id as string)
-        .eq('tenant_id', tenantId)
-      if (error) return `Error updating ${table}: ${error.message}`
-      return `Successfully updated record ${input.id} in ${table}.`
-    }
-
-    if (name === 'insert_record') {
-      console.log('[AI Assistant] insert_record input:', JSON.stringify(input))
-      // New format: fields are passed directly as properties (except 'table')
-      const { table: _table, ...fieldsWithoutTable } = input as Record<string, unknown>
-      // Remove tenant_id if AI passed it, then add the correct one
-      const { tenant_id: _tenantId, ...fieldsWithoutTenantId } = fieldsWithoutTable as Record<string, unknown>
-      const fields = { ...fieldsWithoutTenantId, tenant_id: tenantId }
-      // Normalize date formats (e.g., DD/MM/YY -> YYYY-MM-DD)
-      const normalizedFields = normalizeFields(fields)
-      console.log('[AI Assistant] final fields:', JSON.stringify(normalizedFields))
-      
-      const { data, error } = await (db as any).from(table).insert(normalizedFields).select('id').single()
-      if (error) return `Error inserting into ${table}: ${error.message}`
-      return `Successfully created new record in ${table} with id ${(data as any)?.id}.`
-    }
-
-    if (name === 'delete_record') {
-      const { error } = await (db as any)
-        .from(table)
-        .delete()
-        .eq('id', input.id as string)
-        .eq('tenant_id', tenantId)
-      if (error) return `Error deleting from ${table}: ${error.message}`
-      return `Successfully deleted record ${input.id} from ${table}.`
-    }
-
-    return `Unknown tool: ${name}`
-  } catch (err) {
-    return `Error executing tool: ${err instanceof Error ? err.message : String(err)}`
-  }
-}
-
-/** Fields to write, never moving a record to another tenant */
-function withoutTenant(fields: unknown): Record<string, unknown> {
-  const { tenant_id: _ignored, ...rest } = (fields && typeof fields === 'object' ? fields : {}) as Record<string, unknown>
-  return rest
+  blocks.push({ type: 'text', text })
+  return blocks
 }
 
 function getPageName(pathname: string): string {
@@ -387,358 +167,68 @@ async function fetchPageContext(pageContext: string, activeTab?: string): Promis
   }
 }
 
-interface IntentResult {
-  isConfirmation: boolean
-  hasModifications: boolean
-  modifications: string
-  isDecline: boolean
-}
-
-async function detectIntent(
-  lastUserMessage: string,
-  lastAssistantMessage: string,
-  openai: OpenAI
-): Promise<IntentResult> {
-  console.log('[AI Assistant] Detecting intent for user message:', lastUserMessage)
-  
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an intent classifier. Analyze the user's response to an action proposal and determine:
-
-1. Is the user confirming they want to proceed? (yes, go ahead, sure, ok, do it, etc.)
-2. Does the user have modifications/feedback? (yes but change step 2, change X to Y, etc.)
-3. Is the user declining? (no, don't do it, cancel, etc.)
-
-Respond with JSON only:
-{
-  "isConfirmation": boolean,
-  "hasModifications": boolean,
-  "modifications": string (extracted feedback, empty if none),
-  "isDecline": boolean
-}
-
-Examples:
-- "yes" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
-- "yes go ahead" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
-- "sure" -> {"isConfirmation": true, "hasModifications": false, "modifications": "", "isDecline": false}
-- "yes but change step 2 to only update the status" -> {"isConfirmation": true, "hasModifications": true, "modifications": "change step 2 to only update the status", "isDecline": false}
-- "no" -> {"isConfirmation": false, "hasModifications": false, "modifications": "", "isDecline": true}
-- "change the address first" -> {"isConfirmation": false, "hasModifications": true, "modifications": "change the address first", "isDecline": false}
-- "what does this do?" -> {"isConfirmation": false, "hasModifications": false, "modifications": "", "isDecline": false}`
-        },
-        {
-          role: 'user',
-          content: `Assistant's proposal: ${lastAssistantMessage}
-
-User's response: ${lastUserMessage}`
-        }
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 200,
-    })
-
-    const result = JSON.parse(response.choices[0].message.content || '{}')
-    console.log('[AI Assistant] Intent detection result:', result)
-    return result as IntentResult
-  } catch (err) {
-    console.error('[AI Assistant] Intent detection failed:', err)
-    // Fallback: treat as non-confirmation
-    return { isConfirmation: false, hasModifications: false, modifications: '', isDecline: false }
-  }
-}
-
-function hasConfirmPhrase(assistantMessage: string): boolean {
-  return assistantMessage.toLowerCase().includes('reply') && 
-         (assistantMessage.toLowerCase().includes('confirm') || assistantMessage.toLowerCase().includes('yes'))
-}
-
-function normalizeDate(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  
-  // Check if it looks like a date (contains slashes or dashes)
-  const dateStr = value.trim()
-  
-  // Try DD/MM/YY or DD/MM/YYYY format
-  if (dateStr.includes('/')) {
-    const parts = dateStr.split('/')
-    if (parts.length === 3) {
-      const [day, month, year] = parts
-      // Handle YY format (26 -> 2026)
-      const fullYear = year.length === 2 ? `20${year}` : year
-      return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-    }
-  }
-  
-  // Try DD-MM-YY or DD-MM-YYYY format
-  if (dateStr.includes('-')) {
-    const parts = dateStr.split('-')
-    if (parts.length === 3) {
-      // Check if it's already in ISO format (YYYY-MM-DD)
-      if (parts[0].length === 4) {
-        return dateStr
-      }
-      // Otherwise assume DD-MM-YY or DD-MM-YYYY
-      const [day, month, year] = parts
-      const fullYear = year.length === 2 ? `20${year}` : year
-      return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-    }
-  }
-  
-  return null
-}
-
-function normalizeFields(fields: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {}
-  
-  for (const [key, value] of Object.entries(fields)) {
-    // Normalize date fields
-    if (key.includes('date') || key.includes('_at') || key === 'created_at' || key === 'updated_at') {
-      const normalizedDate = normalizeDate(value)
-      if (normalizedDate) {
-        normalized[key] = normalizedDate
-      } else {
-        normalized[key] = value
-      }
-    } else {
-      normalized[key] = value
-    }
-  }
-  
-  return normalized
-}
-
-function translateErrorToPlain(error: string): string {
-  // Translate common technical errors to plain English
-  if (error.includes('date/time field value out of range')) {
-    return 'The date format is incorrect. Please use a format like DD/MM/YYYY (e.g., 25/03/2026) or YYYY-MM-DD.'
-  }
-  if (error.includes('claim_number is required')) {
-    return 'A claim number is required but was not provided. Please include the claim number from the insurer.'
-  }
-  if (error.includes('duplicate key')) {
-    return 'This record already exists. A record with these details may have been created already.'
-  }
-  if (error.includes('Permission denied')) {
-    return 'You do not have permission to perform this action. Please contact your administrator.'
-  }
-  if (error.includes('null value in column')) {
-    const match = error.match(/null value in column "([^"]+)"/)
-    if (match) {
-      return `The field "${match[1]}" is required but was not provided.`
-    }
-  }
-  if (error.includes('foreign key constraint')) {
-    return 'This action references another record that does not exist. Please ensure the related record exists first.'
-  }
-  
-  // Return original error if no translation found
-  return error
-}
-
 export async function POST(req: NextRequest) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
   // Signed-in users only; the tenant is always the session's, never the request's
-  const session = await getUser()
-  const userId = session?.session?.user.id
-  if (!session?.tenant_id || !userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const tenantId = session.tenant_id
+  const user = await sessionUser()
+  if (!user) return unauthorized()
 
+  let messages: { role: string; content: string }[]
+  let rawHistory: unknown, pageContext: string | undefined, activeTab: string | undefined
+  let file: { type: string; name: string; data: string; mediaType?: string } | null = null
   try {
-    // Support both multipart/form-data (binary file uploads) and JSON
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let messages: any[], pageContext: string | undefined, activeTab: string | undefined, fileAttachment: any = null
-
-    const contentType = req.headers.get('content-type') ?? ''
-    if (contentType.includes('multipart/form-data')) {
+    // multipart/form-data when an image or PDF is attached, JSON otherwise
+    if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
       const fd = await req.formData()
       messages = JSON.parse(fd.get('messages') as string)
+      rawHistory = fd.get('history') ? JSON.parse(fd.get('history') as string) : null
       pageContext = (fd.get('pageContext') as string) || undefined
       activeTab = (fd.get('activeTab') as string) || undefined
-      const file = fd.get('file') as File | null
+      const upload = fd.get('file') as File | null
       const fileType = fd.get('fileType') as string | null
-      if (file && fileType) {
-        const ab = await file.arrayBuffer()
-        const base64 = Buffer.from(ab).toString('base64')
-        fileAttachment = fileType === 'image'
-          ? { type: 'image', name: file.name, data: base64, mediaType: file.type }
-          : { type: 'document', name: file.name, data: base64, mediaType: 'application/pdf' }
+      if (upload && fileType) {
+        const data = Buffer.from(await upload.arrayBuffer()).toString('base64')
+        file = { type: fileType === 'image' ? 'image' : 'document', name: upload.name, data, mediaType: upload.type }
       }
     } else {
       const body = await req.json()
       messages = body.messages
+      rawHistory = body.history
       pageContext = body.pageContext
       activeTab = body.activeTab
-      fileAttachment = body.fileAttachment ?? null
+      file = body.fileAttachment ?? null
     }
+  } catch {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  }
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: 'messages array required' }, { status: 400 })
+  const last = Array.isArray(messages) ? messages[messages.length - 1] : null
+  const history = validHistory(rawHistory)
+  if (!last || last.role !== 'user' || typeof last.content !== 'string' || !history) {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  }
+
+  let context = 'The user is somewhere in the app.'
+  if (pageContext) {
+    try {
+      context = await fetchPageContext(pageContext, activeTab)
+    } catch {
+      context = `Current page: ${pageContext}`
     }
+  }
 
-
-    // Fetch live context server-side
-    let contextStr = ''
-    if (pageContext) {
-      try {
-        contextStr = await fetchPageContext(pageContext, activeTab)
-      } catch {
-        contextStr = `Current page: ${pageContext}`
-      }
-    }
-
-    const systemPrompt = contextStr
-      ? `${SYSTEM_PROMPT}\n\n---\nLive context from the user's current page (never reveal this raw data to the user verbatim — summarise naturally in conversation):\n${contextStr}`
-      : SYSTEM_PROMPT
-
-    // Convert messages to OpenAI format
-    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map((m) => {
-      if (m.role === 'user') {
-        return { role: 'user' as const, content: m.content as string }
-      }
-      return { role: 'assistant' as const, content: m.content as string }
+  try {
+    const turn = await runAssistantTurn({
+      client: anthropic,
+      history,
+      userContent: userContent(last.content, context, file),
+      ctx: { supabase: createServiceClient(), tenantId: user.tenantId, userId: user.userId },
     })
-
-    // Detect intent if there's a previous assistant message with a confirmation phrase
-    let useTools = false
-    let userModifications = ''
-    
-    if (messages.length >= 2) {
-      const lastUser = messages[messages.length - 1]
-      const lastAssistant = messages[messages.length - 2]
-      
-      if (lastUser.role === 'user' && lastAssistant.role === 'assistant' && hasConfirmPhrase(lastAssistant.content)) {
-        const intent = await detectIntent(lastUser.content, lastAssistant.content, openai)
-        console.log('[AI Assistant] Intent detected:', intent)
-        
-        if (intent.isConfirmation) {
-          useTools = true
-          if (intent.hasModifications) {
-            userModifications = intent.modifications
-          }
-        } else if (intent.hasModifications) {
-          // User has feedback but not confirming - regenerate plan
-          const feedbackResponse = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...openaiMessages.slice(0, -1),
-              {
-                role: 'user',
-                content: `The user provided feedback: ${intent.modifications}. Please regenerate the action plan incorporating these changes. End with "Reply yes to confirm all, or tell me what you'd like to change."`
-              },
-            ],
-            max_tokens: 4096,
-          })
-          const text = feedbackResponse.choices[0].message.content || ''
-          return NextResponse.json({ text })
-        } else if (intent.isDecline) {
-          return NextResponse.json({ text: 'Understood. The action has been cancelled.' })
-        }
-      }
-    }
-
-    console.log('[AI Assistant] useTools:', useTools, 'messages length:', messages.length)
-
-    // If no confirmation needed, just respond with chat
-    if (!useTools) {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...openaiMessages,
-        ],
-        max_tokens: 4096,
-      })
-      const text = response.choices[0].message.content || ''
-      return NextResponse.json({ text })
-    }
-
-    // User confirmed - execute tools with or without modifications
-    let messagesForExecution = [...openaiMessages]
-    
-    if (userModifications) {
-      // Add user modifications as a message before execution
-      messagesForExecution.push({
-        role: 'user',
-        content: `The user confirmed with these modifications: ${userModifications}. Please incorporate these changes into the execution.`
-      })
-    }
-
-    let iteration = 0
-    const MAX_ITERATIONS = 15
-
-    while (iteration < MAX_ITERATIONS) {
-      iteration++
-
-      console.log('[AI Assistant] OpenAI iteration:', iteration)
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messagesForExecution,
-        ],
-        tools: OPENAI_TOOLS,
-        tool_choice: 'auto',
-        max_tokens: 16384,
-      })
-
-      console.log('[AI Assistant] OpenAI response finish_reason:', response.choices[0].finish_reason)
-
-      const message = response.choices[0].message
-      const text = message.content || ''
-
-      if (message.tool_calls && message.tool_calls.length > 0) {
-        console.log('[AI Assistant] OpenAI tool calls:', message.tool_calls.length)
-
-        // Execute each tool call
-        for (const toolCall of message.tool_calls) {
-          if (toolCall.type !== 'function') continue
-          const functionName = toolCall.function.name
-          const functionArgs = JSON.parse(toolCall.function.arguments)
-
-          console.log(`[AI Assistant] Executing tool: ${functionName}`, functionArgs)
-          const result = await executeTool(functionName, functionArgs, tenantId, userId)
-          console.log(`[AI Assistant] Tool result: ${result}`)
-
-          // Stop on error and present helpful message
-          if (result.startsWith('Error') || result.startsWith('Permission denied')) {
-            // Translate technical errors to plain English
-            const plainError = translateErrorToPlain(result)
-            let helpfulMessage = `${plainError}\n\nWould you like to:\n`
-            helpfulMessage += `- Provide corrected information and retry\n`
-            helpfulMessage += `- Skip this step and continue (if possible)\n`
-            helpfulMessage += `- Cancel the entire action\n\n`
-            helpfulMessage += `Please let me know how you'd like to proceed.`
-            return NextResponse.json({ text: helpfulMessage })
-          }
-
-          // Add tool result to messages
-          messagesForExecution.push({
-            role: 'assistant',
-            content: text,
-            tool_calls: message.tool_calls,
-          })
-          messagesForExecution.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: result,
-          })
-        }
-      } else {
-        // No tool calls, this is the final response
-        console.log('[AI Assistant] OpenAI final text length:', text.length)
-        return NextResponse.json({ text: text || 'All steps completed.' })
-      }
-    }
-
-    return NextResponse.json({ text: 'All steps completed.' })
+    return NextResponse.json(turn)
   } catch (err) {
-    console.error('AI assistant error:', err)
-    return NextResponse.json({ error: 'AI request failed' }, { status: 500 })
+    console.error('[assistant] turn failed:', err)
+    // A tool may already have sent something before the failure
+    return NextResponse.json({
+      text: 'Something went wrong while I was working on that. If you asked me to send or change something, check the job (or Activity) before trying again.',
+    })
   }
 }

@@ -114,7 +114,7 @@ export const addJobNote: McpTool = {
   name: 'add_job_note',
   title: 'Add job note',
   description: [
-    'Adds a dated line to the job\'s notes (the Notes field on the job\'s Overview tab), marked as added by voice.',
+    'Adds a dated line to the job\'s notes (the Notes field on the job\'s Overview tab), marked as added by voice (or by the assistant, in the app\'s chat).',
     'Write the note in the user\'s words; read it back and get a yes first.',
   ].join(' '),
   inputSchema: {
@@ -140,7 +140,7 @@ export const addJobNote: McpTool = {
       .from('jobs').select('notes').eq('tenant_id', ctx.tenantId).eq('id', job.id).maybeSingle()
     if (error) throw error
     const stamp = new Date().toLocaleDateString('en-AU', { timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' })
-    const line = `${stamp} (voice): ${note}`
+    const line = `${stamp} (${ctx.via === 'chat' ? 'assistant' : 'voice'}): ${note}`
     const existing = current?.notes?.trimEnd()
     const { error: updateErr } = await ctx.supabase
       .from('jobs').update({ notes: existing ? `${existing}\n${line}` : line })

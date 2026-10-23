@@ -18,6 +18,8 @@ export interface McpContext {
   userId: string
   /** The personal key used (none for the shared key) */
   voiceKeyId?: string
+  /** Set when the in-app assistant is calling rather than the voice connector */
+  via?: 'chat'
 }
 
 export interface McpToolResult {
@@ -56,6 +58,52 @@ export const SERVER_INSTRUCTIONS = [
   'Always pass on the warnings a tool returns (no email address, $0 amount, already sent).',
   'Before anything that sends an email or changes a record, read back what will happen and wait for a clear yes.',
 ].join(' ')
+
+/**
+ * Runs one tool call as ctx.userId, with the same permission check as the
+ * app's buttons: not allowed → refused, needs approval → queued for an
+ * approver with the call to replay. Calls that changed or sent something go
+ * in the who-did-what log. Used by the voice connector and the in-app
+ * assistant (ctx.via 'chat').
+ */
+export async function callTool(tool: McpTool, args: Record<string, unknown>, ctx: McpContext): Promise<McpToolResult> {
+  const chat = ctx.via === 'chat'
+  let out: McpToolResult
+  let ran = false
+  let failed = false
+  try {
+    const level = tool.permission ? await permissionLevel(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase) : 'allowed'
+    if (level === 'blocked' && tool.permission) {
+      out = { text: refusalMessage(tool.permission, 'blocked'), isError: true }
+    } else if (level === 'approval' && tool.permission) {
+      const requested = await requestApproval({
+        tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission,
+        operation: 'voice.tool', payload: chat ? { tool: tool.name, args, via: 'chat' } : { tool: tool.name, args },
+        via: chat ? 'app' : 'voice', voiceKeyId: ctx.voiceKeyId, service: ctx.supabase,
+      })
+      out = {
+        text: `${requested.message} Nothing has been done yet — tell the user it's waiting for approval, and don't retry.`,
+        data: { pending_approval: true, approval_id: requested.id, summary: requested.summary },
+      }
+    } else {
+      out = await tool.run(args, ctx)
+      ran = true
+    }
+  } catch (err) {
+    console.error(`[${chat ? 'assistant' : 'mcp'}] ${tool.name} failed:`, err)
+    // Not "nothing changed": a send tool may have got part way. Check first.
+    out = { text: `${tool.title} hit an unexpected error. Check the app before trying again.`, isError: true }
+    failed = true
+  }
+  // Who-did-what log: what changed or was sent (not refusals or questions back)
+  if (tool.permission && ((ran && !out.isError) || failed)) {
+    await recordVoiceCall({
+      tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission, tool, args,
+      resultText: out.text, outcome: failed ? 'failed' : 'done', via: chat ? 'app' : 'voice', voiceKeyId: ctx.voiceKeyId, service: ctx.supabase,
+    })
+  }
+  return out
+}
 
 type JsonRpcId = string | number
 interface JsonRpcRequest { jsonrpc: '2.0'; id?: JsonRpcId | null; method: string; params?: Record<string, unknown> }
@@ -113,41 +161,7 @@ export async function handleMcpMessage(
       const tool = tools.find(t => t.name === params.name)
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${String(params.name)}`)
       const args = params.arguments && typeof params.arguments === 'object' ? params.arguments as Record<string, unknown> : {}
-      let out: McpToolResult
-      let ran = false
-      let failed = false
-      try {
-        // Same permission check as the app's buttons: not allowed → refused,
-        // needs approval → queued for an approver, with the call to replay
-        const level = tool.permission ? await permissionLevel(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase) : 'allowed'
-        if (level === 'blocked' && tool.permission) {
-          out = { text: refusalMessage(tool.permission, 'blocked'), isError: true }
-        } else if (level === 'approval' && tool.permission) {
-          const requested = await requestApproval({
-            tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission,
-            operation: 'voice.tool', payload: { tool: tool.name, args }, via: 'voice', voiceKeyId: ctx.voiceKeyId, service: ctx.supabase,
-          })
-          out = {
-            text: `${requested.message} Nothing has been done yet — tell the user it's waiting for approval, and don't retry.`,
-            data: { pending_approval: true, approval_id: requested.id, summary: requested.summary },
-          }
-        } else {
-          out = await tool.run(args, ctx)
-          ran = true
-        }
-      } catch (err) {
-        console.error(`[mcp] ${tool.name} failed:`, err)
-        // Not "nothing changed": a send tool may have got part way. Check first.
-        out = { text: `${tool.title} hit an unexpected error. Check the app before trying again.`, isError: true }
-        failed = true
-      }
-      // Who-did-what log: what changed or was sent (not refusals or questions back)
-      if (tool.permission && ((ran && !out.isError) || failed)) {
-        await recordVoiceCall({
-          tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission, tool, args,
-          resultText: out.text, outcome: failed ? 'failed' : 'done', voiceKeyId: ctx.voiceKeyId, service: ctx.supabase,
-        })
-      }
+      const out = await callTool(tool, args, ctx)
       return {
         jsonrpc: '2.0', id,
         result: {

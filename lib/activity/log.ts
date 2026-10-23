@@ -158,7 +158,8 @@ export async function listActivity(
 }
 
 /**
- * Records a voice tool call that changed or sent something. The summary is
+ * Records a voice tool call (or the in-app assistant's, via 'app') that
+ * changed or sent something. The summary is
  * what the tool told Claude it did; the job comes from the same lookups the
  * approval queue uses, or the job number it was given.
  */
@@ -170,6 +171,7 @@ export async function recordVoiceCall(params: {
   args: Record<string, unknown>
   resultText: string
   outcome: 'done' | 'failed'
+  via?: 'voice' | 'app'
   voiceKeyId?: string
   service: Service
 }): Promise<void> {
@@ -186,7 +188,7 @@ export async function recordVoiceCall(params: {
   }
   const firstLine = params.resultText.split('\n')[0].trim()
   await recordActivity({
-    tenantId, userId: params.userId, action: params.action, via: 'voice', outcome: params.outcome, jobId,
+    tenantId, userId: params.userId, action: params.action, via: params.via ?? 'voice', outcome: params.outcome, jobId,
     summary: `${params.tool.title}: ${firstLine}`, detail: params.resultText, voiceKeyId: params.voiceKeyId, service,
   })
 }

@@ -192,19 +192,19 @@ const invoiceGenerate: Operation<{ input: GenerateInvoiceInput }> = {
   },
 }
 
-/** A voice connector tool call, replayed as the requester once approved */
-const voiceTool: Operation<{ tool: string; args: Record<string, unknown> }> = {
+/** A voice connector (or in-app assistant, via 'chat') tool call, replayed as the requester once approved */
+const voiceTool: Operation<{ tool: string; args: Record<string, unknown>; via?: 'chat' }> = {
   async describe(p, ctx) {
     const { MCP_TOOLS } = await import('@/lib/mcp/tools')
     const tool = MCP_TOOLS.find(t => t.name === p.tool)
     const detail = await voiceDetail(p.tool, p.args, ctx)
-    return { summary: `${tool?.title ?? p.tool} (by voice): ${detail.text}`, jobId: detail.jobId }
+    return { summary: `${tool?.title ?? p.tool} (${p.via === 'chat' ? 'by the assistant' : 'by voice'}): ${detail.text}`, jobId: detail.jobId }
   },
   async run(p, ctx) {
     const { MCP_TOOLS } = await import('@/lib/mcp/tools')
     const tool = MCP_TOOLS.find(t => t.name === p.tool)
     if (!tool) throw new Error(`Unknown voice tool ${p.tool}`)
-    const out = await tool.run(p.args, { supabase: ctx.service, tenantId: ctx.tenantId, userId: ctx.requesterId ?? '' })
+    const out = await tool.run(p.args, { supabase: ctx.service, tenantId: ctx.tenantId, userId: ctx.requesterId ?? '', via: p.via })
     if (out.isError) throw new Error(out.text)
     return out.text
   },
