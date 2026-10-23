@@ -299,6 +299,7 @@ export const sendDocuments: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'send.documents',
 
   async run(args, ctx): Promise<McpToolResult> {
     const refs = parseDocuments(args)

@@ -1756,6 +1756,16 @@ CREATE INDEX idx_work_order_visits_sequence_order ON work_order_visits(sequence_
 
 ---
 
+### Permissions
+Every user has a level for each action: **allowed**, **needs approval** or **not allowed** (`lib/permissions/catalogue.ts`). Settings → Users & Permissions (`/dashboard/settings/users`, API `/api/settings/permissions`) shows and changes them.
+
+- Level = the user's own change (`user_permission_overrides`) → else the tenant's default for their role (`permission_defaults`) → else `BUILT_IN_DEFAULTS` in code. Both tables hold changes only; RLS lets users read their tenant's rows, all writes go through the API (service role) after a `users.manage` check
+- Roles: `admin` (always everything — can't be restricted, so the company can't be locked out; nobody can change their own role), `office`, `inspector`. Unknown roles get inspector defaults
+- Built-in defaults: office runs jobs and sends work orders and replies; anything to an insurer or homeowner (documents, signing) and invoices need approval; no deleting, settings or user management. Inspectors add notes and edit job details; replies need approval; everything else outward-facing or financial is off
+- Actions (`PERMISSION_ACTIONS`): jobs.notes, jobs.edit*, jobs.change_stage, orders.lodge, orders.manage, records.delete*, send.work_orders, send.documents, send.signing, send.replies, financials.view*, invoices.manage*, excess.decide, settings.edit*, users.manage. (* saved but not enforced yet — those edits go straight from the browser to Supabase and need RLS rules; shown as COMING in settings)
+- Enforced on the server: `permissionDenied()` (`lib/permissions/http.ts`) at the top of the work order send, document send, signing (create / send / resend / revoke / reminders; confirm-stage → jobs.change_stage), reply, lodge, job stage and excess routes; and `permission` on every voice connector tool that changes or sends something, checked in `lib/mcp/server.ts` (a test fails if one is missing). The voice connector acts as `MCP_USER_ID`, so it has that user's permissions
+- "Needs approval" refuses for now with "needs an admin's approval…". Planned: an approval queue (action cards an admin approves), per-person voice connector keys, and a who-did-what log
+
 ## 7. Application Structure
 
 ### Next.js App Router structure
@@ -2823,7 +2833,7 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 
 **Tenant from the session, never the request:** `/api/insurer-orders/lodge` requires a signed-in user and only lodges that user's tenant's orders; `/api/jobs/[jobId]/stage` takes the tenant from the session and ignores any `tenantId` in the body (fixed 23 Oct 2026).
 
-**User permissions:** `users.role` (`admin` / `office` / `inspector`) and the `can_*` flags (`lib/types/user.ts`, `computeEffectivePermissions`) exist but are only checked by the AI assistant — API routes and the voice connector don't enforce them yet.
+**User permissions:** see §6 "Permissions". The older `can_*` columns on `users` (`lib/types/user.ts`) are superseded and only read by the AI assistant; to be retired.
 
 **Claude voice connector:** the `Authorization` header key is the only credential — whoever has it can act as `MCP_USER_ID`. See §10b.
 

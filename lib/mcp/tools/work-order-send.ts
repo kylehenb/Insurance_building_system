@@ -124,6 +124,7 @@ export const sendWorkOrder: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'send.work_orders',
 
   async run(args, ctx): Promise<McpToolResult> {
     const wo = await loadWorkOrder(args, ctx)

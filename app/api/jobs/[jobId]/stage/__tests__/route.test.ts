@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const eqCalls: [string, unknown][] = []
 let sessionTenant: string | null = 't1'
+// Permissions are tested in lib/permissions; here the user is allowed
+vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null }))
 vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => (sessionTenant ? { tenant_id: sessionTenant } : null) }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({

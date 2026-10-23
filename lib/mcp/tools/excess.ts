@@ -100,6 +100,7 @@ export const setJobExcessDecision: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'excess.decide',
 
   async run(args, ctx): Promise<McpToolResult> {
     const decision = SETTABLE.find(d => d === args.decision)

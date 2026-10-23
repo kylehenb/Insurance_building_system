@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
 
 export async function PATCH(
   request: Request,
@@ -14,6 +15,8 @@ export async function PATCH(
     if (!tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await permissionDenied(tenantId, user.session?.user.id, 'jobs.change_stage')
+    if (denied) return denied
     const body = await request.json()
     const { stage } = body
 

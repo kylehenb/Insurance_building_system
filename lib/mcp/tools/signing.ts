@@ -168,6 +168,7 @@ export const sendForSignatureTool: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'send.signing',
 
   async run(args, ctx): Promise<McpToolResult> {
     const job = await jobFromArgs(args, ctx)
@@ -243,6 +244,7 @@ export const resendSigningRequestTool: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'send.signing',
 
   async run(args, ctx): Promise<McpToolResult> {
     const id = typeof args.request_id === 'string' ? args.request_id.trim() : ''

@@ -4,6 +4,7 @@ import { getSendDialogDefaults, listSigningRequestsForJob, sendForSignature } fr
 import { SIGNING_DOCUMENT_TYPES } from '@/lib/signing/documents/registry'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { parseExcessChoice } from '@/lib/excess/decision'
+import { permissionDenied } from '@/lib/permissions/http'
 
 // GET  → this job's signing requests, plus defaults for the send dialog
 // POST → generate the document, create the request and email the signer
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   if (!isUuid(jobId)) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   const actor = await signingActorFromSession()
   if (!actor) return unauthorized()
+  const denied = await permissionDenied(actor.tenantId, actor.userId, 'send.signing')
+  if (denied) return denied
 
   let body: Record<string, unknown>
   try {

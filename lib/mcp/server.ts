@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
+import type { PermissionKey } from '@/lib/permissions/catalogue'
+import { PermissionError, requirePermission } from '@/lib/permissions/resolve'
 
 // Minimal MCP server (Streamable HTTP, stateless, JSON responses) for the
 // Claude voice connector. Only what a tools-only server needs: initialize,
@@ -29,6 +31,8 @@ export interface McpTool {
   description: string
   inputSchema: Record<string, unknown>
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
+  /** What the connector's user must be allowed to do (lib/permissions). Required for any tool that changes or sends something. */
+  permission?: PermissionKey
   run(args: Record<string, unknown>, ctx: McpContext): Promise<McpToolResult>
 }
 
@@ -101,8 +105,13 @@ export async function handleMcpMessage(
       const args = params.arguments && typeof params.arguments === 'object' ? params.arguments as Record<string, unknown> : {}
       let out: McpToolResult
       try {
+        // Same permission check as the app's buttons — refused tools say why
+        if (tool.permission) await requirePermission(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase)
         out = await tool.run(args, ctx)
       } catch (err) {
+        if (err instanceof PermissionError) {
+          return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: err.message }], isError: true } }
+        }
         console.error(`[mcp] ${tool.name} failed:`, err)
         // Not "nothing changed": a send tool may have got part way. Check first.
         out = { text: `${tool.title} hit an unexpected error. Check the app before trying again.`, isError: true }

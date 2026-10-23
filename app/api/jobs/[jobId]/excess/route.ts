@@ -3,6 +3,7 @@ import { getUser } from '@/lib/supabase/get-user'
 import { createServiceClient } from '@/lib/supabase/server'
 import { EXCESS_WAIVER_REASONS, type ExcessDecision } from '@/lib/excess/decision'
 import { ExcessError, loadExcessContext, recordExcessDecision } from '@/lib/excess/server'
+import { permissionDenied } from '@/lib/permissions/http'
 
 // GET  → the job's excess: amount, the office's decision, excess invoices
 // POST → record a decision without sending anything
@@ -43,6 +44,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   if (!UUID_RE.test(jobId)) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   const a = await actor()
   if (!a) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const denied = await permissionDenied(a.tenantId, a.userId, 'excess.decide')
+  if (denied) return denied
 
   const body = await req.json().catch(() => ({})) as { decision?: unknown; note?: unknown }
   const decision = SETTABLE.find(d => d === body.decision)

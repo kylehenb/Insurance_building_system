@@ -127,6 +127,7 @@ export const addJobNote: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  permission: 'jobs.notes',
 
   async run(args, ctx: McpContext): Promise<McpToolResult> {
     const note = typeof args.note === 'string' ? args.note.trim().replace(/\s+/g, ' ') : ''

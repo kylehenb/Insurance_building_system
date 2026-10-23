@@ -33,6 +33,8 @@ const client = { from: query }
 const gmailSend = vi.fn(async (_req: unknown) => ({ data: { id: 'sent1' } }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => client, createClient: async () => client }))
 vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { send: gmailSend } } }) }))
+// Permissions are tested in lib/permissions; here the user is allowed
+vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null }))
 vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => ({ tenant_id: 't1' }) }))
 
 const { listJobEmails, getEmail, replyToEmailTool } = await import('../tools/emails')

@@ -29,6 +29,7 @@ export const recoverDroppedEmails: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'orders.manage',
 
   async run(args, ctx): Promise<McpToolResult> {
     const dryRun = args.dry_run === true

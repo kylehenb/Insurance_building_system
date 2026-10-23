@@ -9,6 +9,7 @@ import {
   type DocumentEmailContext,
   type DocumentEmailOverrides,
 } from '@/lib/documents/send/email'
+import { permissionDenied } from '@/lib/permissions/http'
 
 // Email quotes, reports, invoices, TCCs and photos from a job.
 // POST { documents: DocumentRef[], mode }
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
     const refs = parsed.documents.map(parseDocumentRef)
 
     if (mode === 'draft') return NextResponse.json(await buildDocumentEmailDraft(refs, ctx))
+    // Sending, or marking as sent, needs the send permission
+    const denied = await permissionDenied(ctx.tenantId, ctx.actorId, 'send.documents')
+    if (denied) return denied
     if (mode === 'mark_sent') return NextResponse.json({ ok: true, ...await markDocumentsSentWithoutEmail(refs, ctx) })
 
     let overrides: DocumentEmailOverrides = {}

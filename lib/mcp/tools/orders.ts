@@ -178,6 +178,7 @@ export const createOrderFromEmail: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'orders.manage',
 
   async run(args, ctx): Promise<McpToolResult> {
     const id = typeof args.message_id === 'string' ? args.message_id.trim() : ''
@@ -235,6 +236,7 @@ export const lodgeOrder: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'orders.lodge',
 
   async run(args, ctx): Promise<McpToolResult> {
     const id = typeof args.order_id === 'string' ? args.order_id.trim() : ''
@@ -312,6 +314,7 @@ export const updateInsurerOrder: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'orders.manage',
 
   async run(args, ctx): Promise<McpToolResult> {
     const order = await pendingOrder(ctx, args)
@@ -358,6 +361,7 @@ export const linkOrderToJob: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'orders.manage',
 
   async run(args, ctx): Promise<McpToolResult> {
     const order = await pendingOrder(ctx, args)

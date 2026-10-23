@@ -170,6 +170,7 @@ export const replyToEmailTool: McpTool = {
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  permission: 'send.replies',
 
   async run(args, ctx): Promise<McpToolResult> {
     const id = typeof args.email_id === 'string' ? args.email_id.trim() : ''

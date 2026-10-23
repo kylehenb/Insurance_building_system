@@ -8,6 +8,7 @@ import {
   type WorkOrderEmailOverrides,
 } from '@/lib/work-orders/work-order-email'
 import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
+import { permissionDenied } from '@/lib/permissions/http'
 
 // GET  → the pre-filled email (from the work_order template) for the send modal
 // POST → send to the trade and lock. Body { mode: 'auto' } sends the template
@@ -23,7 +24,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 async function context() {
   const user = await getUser()
   if (!user?.tenant_id) return null
-  return { supabase: await createClient(), tenantId: user.tenant_id }
+  return { supabase: await createClient(), tenantId: user.tenant_id, userId: user.session?.user.id ?? null }
 }
 
 function errorResponse(err: unknown, action: string) {
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
   const ctx = await context()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const denied = await permissionDenied(ctx.tenantId, ctx.userId, 'send.work_orders')
+  if (denied) return denied
 
   let overrides: WorkOrderEmailOverrides = {}
   try {

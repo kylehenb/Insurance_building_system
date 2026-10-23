@@ -109,9 +109,9 @@ export default async function SettingsPage() {
       icon: <Building2 className="w-4 h-4" />,
     },
     {
-      name: 'Users',
+      name: 'Users & Permissions',
       route: '/dashboard/settings/users',
-      description: 'Manage users, roles, and permission overrides',
+      description: 'Roles, and what each role and person can do — allowed, needs approval or not allowed',
       icon: <Users className="w-4 h-4" />,
     },
     {

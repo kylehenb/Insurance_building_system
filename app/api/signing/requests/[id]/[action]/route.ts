@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } from '@/lib/signing/http'
 import { confirmSigningStage, getSigningProvider, resendSigningRequest, setRemindersEnabled } from '@/lib/signing/service'
+import { permissionDenied } from '@/lib/permissions/http'
 
 // POST /api/signing/requests/[id]/send          send a draft
 // POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working; excess invoice re-attached)
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!ACTIONS.includes(action as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 })
   const actor = await signingActorFromSession()
   if (!actor) return unauthorized()
+  const denied = await permissionDenied(actor.tenantId, actor.userId, action === 'confirm-stage' ? 'jobs.change_stage' : 'send.signing')
+  if (denied) return denied
 
   const provider = getSigningProvider()
   try {

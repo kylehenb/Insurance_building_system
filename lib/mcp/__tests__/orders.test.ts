@@ -39,6 +39,8 @@ vi.mock('@/lib/email/order-parser', () => ({ parseInsurerOrder: (...a: unknown[]
 vi.mock('@/lib/email/order-writer', () => ({ writeInsurerOrder: (...a: unknown[]) => write(...a) }))
 vi.mock('@/lib/insurer-orders/lodge', () => ({ LodgeError, lodgeInsurerOrder: (...a: unknown[]) => lodge(...a) }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => ({ from: query }) }))
+// Permissions are tested in lib/permissions; here the user is allowed
+vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null }))
 let sessionTenant: string | null = 't1'
 vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => (sessionTenant ? { tenant_id: sessionTenant } : null) }))
 
