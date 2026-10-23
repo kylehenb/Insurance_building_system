@@ -63,11 +63,12 @@ export async function replyToEmail(
   const serviceClient = createServiceClient()
   const { data: tenant } = await serviceClient
     .from('tenants')
-    .select('contact_email')
+    .select('contact_email, name, trading_name')
     .eq('id', tenantId)
     .single()
 
-  const fromEmail = (tenant as { contact_email: string | null } | null)?.contact_email ?? FALLBACK_FROM
+  const sender = tenant as { contact_email: string | null; name: string | null; trading_name: string | null } | null
+  const fromEmail = sender?.contact_email ?? FALLBACK_FROM
 
   // Build Re: subject (avoid double-prefix)
   const originalSubject = source.subject ?? ''
@@ -82,6 +83,7 @@ export async function replyToEmail(
 
   const raw = buildEmailRaw({
     from: fromEmail,
+    fromName: sender?.trading_name || sender?.name,
     to: source.from_email,
     subject: replySubject,
     body,

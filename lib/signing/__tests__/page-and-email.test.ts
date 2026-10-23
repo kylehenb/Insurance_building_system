@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { buildEmailRaw } from '@/lib/email/build-raw'
+import { buildEmailRaw, formatFromHeader } from '@/lib/email/build-raw'
 import { BUILT_IN_TEMPLATES, REQUIRED_TOKENS, TEMPLATE_TOKENS, renderTemplate, signingTemplateVars } from '@/lib/email/templates'
-import { actionButtonHtml, BRANDED_EMAIL_FONT_SIZE, renderBrandedEmailHtml } from '../email/html'
-import { composeEmailBody, renderRichTemplate } from '@/lib/email/rich-text'
+import { actionButtonHtml, SIGNING_ACTION_LABEL } from '../email/html'
+import { renderRichTemplate } from '@/lib/email/rich-text'
+import { composeStandardEmail } from '@/lib/email/compose'
 import { unsignedFilename } from '../email/messages'
 import { renderSignerPage, SIGNER_PAGE_CSP, SIGNER_SCRIPT_HASH } from '../signer-page/render'
 import { SIGNER_SCRIPT } from '../signer-page/script'
@@ -222,17 +223,26 @@ describe('signing emails', () => {
     expect(vars.company_phone).toBe('0431 132 077')
   })
 
-  it('branded HTML turns the link line into a button and escapes text', () => {
+  it('signing emails are a plain email: the template, the button, the signature — no banner or footer', () => {
     const link = 'https://app.example/sign/abc'
-    const { html: bodyHtml, text } = composeEmailBody(
+    const tenant = { name: 'IRC', trading_name: 'Insurance Repair Co', email_signature: null, email_signature_image_path: null, email_signature_image_width: null, email_signature_image_height: null }
+    const { html, text } = composeStandardEmail(
       renderRichTemplate('Hi {signer_first_name},\n\n{signing_link}\n\nKind regards,\n{signature}', { signer_first_name: '<b>Jane</b>', signing_link: link }),
-      { fontSize: BRANDED_EMAIL_FONT_SIZE, signature: null, signatureFallback: 'Insurance Repair Co', action: { url: link, html: actionButtonHtml(link, 'Review and sign') } },
+      tenant,
+      { url: link, html: actionButtonHtml(link, SIGNING_ACTION_LABEL) },
     )
-    const html = renderBrandedEmailHtml({ bodyHtml, logoUrl: null, companyName: 'Insurance Repair Co', footerLines: ['x'] })
     expect(html).toContain('Review and sign</a>')
     expect(html).toContain('Hi &lt;b&gt;Jane&lt;/b&gt;,')
-    expect(html).toContain('font-size:18px')
+    expect(html).not.toMatch(/<img|You received this email|#f5f2ee/)
     expect(text).toBe(`Hi <b>Jane</b>,\n\n${link}\n\nKind regards,\nInsurance Repair Co`)
+  })
+
+  it('buildEmailRaw shows the company as the sender name', () => {
+    const raw = (fromName?: string) => Buffer.from(buildEmailRaw({ from: 'office@b.co', fromName, to: 'c@d.co', subject: 'S', body: 'x' }), 'base64url').toString()
+    expect(raw('Insurance Repair Co')).toContain('From: "Insurance Repair Co" <office@b.co>')
+    expect(raw()).toContain('From: office@b.co\r\n')
+    expect(formatFromHeader('a@b.co', 'Smith "Bros" Café')).toBe('=?UTF-8?B?' + Buffer.from('Smith "Bros" Café').toString('base64') + '?= <a@b.co>')
+    expect(formatFromHeader('a@b.co', 'Say "Hi"')).toBe('"Say \\"Hi\\"" <a@b.co>')
   })
 
   it('buildEmailRaw adds a Bcc header for the office copy', () => {

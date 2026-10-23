@@ -10,6 +10,8 @@ import { buildEmailRaw, type EmailAttachment } from '@/lib/email/build-raw'
 
 export interface OutgoingEmail {
   from: string
+  /** Sender name shown in the inbox (the tenant's trading name) */
+  fromName?: string | null
   to: string
   cc?: string
   bcc?: string
@@ -27,6 +29,7 @@ export interface SentEmail {
 export async function sendEmailViaGmail(service: SupabaseClient<Database>, email: OutgoingEmail): Promise<SentEmail> {
   const raw = buildEmailRaw({
     from: email.from,
+    fromName: email.fromName,
     to: email.to,
     cc: email.cc,
     bcc: email.bcc,

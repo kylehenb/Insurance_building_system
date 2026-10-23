@@ -162,6 +162,7 @@ export async function sendWorkOrderEmail(
   const fromEmail = tenant.contact_email ?? FALLBACK_FROM
   const raw = buildEmailRaw({
     from: fromEmail,
+    fromName: tenant.trading_name || tenant.name,
     to: to.join(', '),
     cc: cc.length ? cc.join(', ') : undefined,
     subject,

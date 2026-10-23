@@ -1,9 +1,8 @@
 import { escapeHtml } from './rich-text'
 
-// The HTML wrapper for emails to insurers, adjusters and trades: a plain,
-// left-aligned email like one written in Gmail, so it reads as a normal
-// message. (Homeowner signing emails use the branded wrapper in
-// lib/signing/email/html.ts.) Table layout and inline styles only.
+// The HTML wrapper for every templated email: a plain, left-aligned email
+// like one written in Gmail, so it reads as a normal message — only what's in
+// the template and the signature. Table layout and inline styles only.
 
 /** Normal text size for these emails, in px */
 export const STANDARD_EMAIL_FONT_SIZE = 15

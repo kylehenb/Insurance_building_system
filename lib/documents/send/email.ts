@@ -245,6 +245,7 @@ export async function sendDocumentEmail(
   try {
     sent = await sendEmailViaGmail(service, {
       from: fromEmail,
+      fromName: main.tenant.trading_name || main.tenant.name,
       to: to.join(', '),
       cc: cc.length ? cc.join(', ') : undefined,
       subject,

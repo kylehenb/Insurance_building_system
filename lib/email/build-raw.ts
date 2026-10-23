@@ -6,6 +6,9 @@ export interface EmailAttachment {
 
 export interface BuildRawEmailParams {
   from: string
+  /** Sender name shown in the recipient's inbox, e.g. "Insurance Repair Co".
+   *  Without it Gmail shows the mailbox account's own name. */
+  fromName?: string | null
   to: string
   cc?: string
   /** Blind copy: added as a Bcc header, which Gmail delivers and strips before sending */
@@ -41,6 +44,16 @@ function base64Lines(content: Buffer): string {
   return content.toString('base64').replace(/.{76}/g, '$&\r\n')
 }
 
+/** "Insurance Repair Co" <office@…>, or the bare address without a name. */
+export function formatFromHeader(email: string, name?: string | null): string {
+  const clean = name?.replace(/[\r\n]+/g, ' ').trim()
+  if (!clean) return email
+  const display = /^[\x20-\x7e]*$/.test(clean)
+    ? `"${clean.replace(/(["\\])/g, '\\$1')}"`
+    : encodeHeaderValue(clean)
+  return `${display} <${email}>`
+}
+
 /**
  * Builds a base64url-encoded RFC 2822 raw email string suitable for
  * passing to gmail.users.messages.send({ requestBody: { raw } }).
@@ -48,10 +61,10 @@ function base64Lines(content: Buffer): string {
  * bodies are multipart/alternative; otherwise plain text.
  */
 export function buildEmailRaw(params: BuildRawEmailParams): string {
-  const { from, to, cc, bcc, subject, body, inReplyTo, references, attachments = [], html } = params
+  const { from, fromName, to, cc, bcc, subject, body, inReplyTo, references, attachments = [], html } = params
 
   const headers: string[] = [
-    `From: ${from}`,
+    `From: ${formatFromHeader(from, fromName)}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),

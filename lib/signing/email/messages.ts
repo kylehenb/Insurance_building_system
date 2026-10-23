@@ -1,15 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import { renderTemplate, resolveEmailTemplate, signingTemplateVars } from '@/lib/email/templates'
-import { composeEmailBody, escapeHtml, renderRichTemplate, richToText } from '@/lib/email/rich-text'
-import { emailSignatureFor } from '@/lib/email/signature'
+import { escapeHtml, renderRichTemplate, richToText } from '@/lib/email/rich-text'
+import { composeStandardEmail } from '@/lib/email/compose'
 import { appBaseUrl, SIGNER_CONTACT } from '@/lib/signing/config'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
 import { filenamePart } from '@/lib/documents/document-assets'
 import { downloadSigningPdf } from '@/lib/signing/storage'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
 import type { SigningRequestRow } from '@/lib/signing/types'
-import { actionButtonHtml, BRANDED_EMAIL_FONT_SIZE, renderBrandedEmailHtml, signingEmailFooterLines, signingEmailLogoUrl } from './html'
+import { actionButtonHtml, SIGNING_ACTION_LABEL } from './html'
 import { sendEmailViaGmail, type SentEmail } from './gmail'
 import type { AccompanyingDocuments } from '@/lib/signing/provider'
 
@@ -125,22 +125,14 @@ export async function sendSigningRequestEmail(service: Service, params: {
   let rich = renderRichTemplate(template.body, vars)
   // The link is the whole point of this email: add it if a template lost it
   if (!richToText(rich).includes(signingLink)) rich += `<p></p><p>${escapeHtml(signingLink)}</p>`
-  const { html: bodyHtml, text: body } = composeEmailBody(rich, {
-    fontSize: BRANDED_EMAIL_FONT_SIZE,
-    signature: emailSignatureFor(tenant),
-    signatureFallback: companyName(tenant),
-    action: { url: signingLink, html: actionButtonHtml(signingLink, 'Review and sign') },
+  const { html, text: body } = composeStandardEmail(rich, tenant, {
+    url: signingLink,
+    html: actionButtonHtml(signingLink, SIGNING_ACTION_LABEL),
   })
   let subject = renderTemplate(template.subject, vars).trim() || `Please sign your ${documentName}`
   if (kind === 'reminder') subject = `Reminder: ${subject}`
 
   const from = senderFor(tenant)
-  const html = renderBrandedEmailHtml({
-    bodyHtml,
-    logoUrl: signingEmailLogoUrl(tenant),
-    companyName: companyName(tenant),
-    footerLines: signingEmailFooterLines(tenant),
-  })
 
   // The unsigned document goes too, as a backup for anyone who can't or won't
   // use the link (they can open it, print it, sign it by hand).
@@ -149,7 +141,7 @@ export async function sendSigningRequestEmail(service: Service, params: {
     { filename: unsignedFilename(request, job), mimeType: 'application/pdf', content: documentPdf },
     ...(excessInvoice ? [{ filename: excessInvoice.filename, mimeType: 'application/pdf', content: excessInvoice.pdf }] : []),
   ]
-  const sent = await sendEmailViaGmail(service, { from, to, subject, text: body, html, attachments })
+  const sent = await sendEmailViaGmail(service, { from, fromName: companyName(tenant), to, subject, text: body, html, attachments })
   await recordOutboundEmail(service, {
     request,
     sent,
@@ -201,20 +193,10 @@ export async function sendSignedCopyEmails(service: Service, params: {
         tenant,
         signedAt: request.signed_at ? formatPerthDateTime(request.signed_at) : '',
       })
-      const { html: bodyHtml, text: body } = composeEmailBody(renderRichTemplate(template.body, vars), {
-        fontSize: BRANDED_EMAIL_FONT_SIZE,
-        signature: emailSignatureFor(tenant),
-        signatureFallback: companyName(tenant),
-      })
+      const { html, text: body } = composeStandardEmail(renderRichTemplate(template.body, vars), tenant)
       const subject = renderTemplate(template.subject, vars).trim() || `Your signed ${documentName}`
-      const html = renderBrandedEmailHtml({
-        bodyHtml,
-        logoUrl: signingEmailLogoUrl(tenant),
-        companyName: companyName(tenant),
-        footerLines: signingEmailFooterLines(tenant),
-      })
       const bcc = to.toLowerCase() === officeAddress.toLowerCase() ? undefined : officeAddress
-      const sent = await sendEmailViaGmail(service, { from, to, bcc, subject, text: body, html, attachments: [attachment] })
+      const sent = await sendEmailViaGmail(service, { from, fromName: companyName(tenant), to, bcc, subject, text: body, html, attachments: [attachment] })
       await recordOutboundEmail(service, {
         request, sent, from, to, subject, text: body, source: 'signing_signed_copy', actorId: null, attachments: commAttachment,
       })
@@ -241,7 +223,7 @@ export async function sendSignedCopyEmails(service: Service, params: {
         '',
         `${appBaseUrl()}/dashboard/jobs/${job.id}`,
       ].join('\n')
-      await sendEmailViaGmail(service, { from, to: officeAddress, subject, text, attachments: [attachment] })
+      await sendEmailViaGmail(service, { from, fromName: companyName(tenant), to: officeAddress, subject, text, attachments: [attachment] })
       officeSent = true
     } catch (err) {
       console.error(`[signing] office copy failed for ${request.id}:`, err)
