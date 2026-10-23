@@ -131,3 +131,11 @@ describe('signature from tenant settings', () => {
     expect(sig?.text).toBe('Kyle Bindon\n0431 132 077')
   })
 })
+
+describe('email layout', () => {
+  it('fills the reader\'s window like a Gmail-written email (no width cap)', async () => {
+    const { renderStandardEmailHtml } = await import('../email-html')
+    const html = renderStandardEmailHtml({ bodyHtml: '<p>Hi</p>', title: 'IRC' })
+    expect(html).not.toMatch(/max-width|width:\s*\d+px/)
+  })
+})
