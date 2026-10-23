@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/supabase/get-user'
 import { getBrainContext } from '@/lib/brain/getBrainContext'
 import { formatBrainContext } from '@/lib/brain/formatBrainContext'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
@@ -10,6 +11,11 @@ import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  // Signed-in users only; the tenant is the session's, never the request's
+  const session = await getUser()
+  if (!session?.tenant_id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const tenantId = session.tenant_id
+
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
   })
@@ -19,12 +25,10 @@ export async function POST(req: NextRequest) {
     const {
       rawReportDump,
       reportType,
-      tenantId,
       reportId,
     } = body as {
       rawReportDump: string
       reportType: string
-      tenantId: string
       reportId?: string | null
     }
 
@@ -33,9 +37,6 @@ export async function POST(req: NextRequest) {
     }
     if (!reportType) {
       return NextResponse.json({ error: 'reportType is required' }, { status: 400 })
-    }
-    if (!tenantId) {
-      return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
     }
 
     const supabase = createServiceClient()

@@ -2,11 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { LOSS_TYPES_PROMPT_LIST } from '@/lib/loss-types'
+import { getUser } from '@/lib/supabase/get-user'
+import type { PermissionKey } from '@/lib/permissions/catalogue'
+import { permissionLevel, refusalMessage } from '@/lib/permissions/resolve'
 
 export const dynamic = 'force-dynamic'
 
-// Tables that require admin role to write to
-const SETTINGS_TABLES = new Set(['tenants', 'users', 'scope_library', 'trade_type_sequence', 'report_templates'])
+// Tables that need the settings.edit permission to write to
+const SETTINGS_TABLES = new Set(['scope_library', 'trade_type_sequence', 'report_templates'])
+// Read-only here: people and companies change only through their own settings pages
+const READ_ONLY_TABLES = new Set(['tenants', 'users'])
+
+/** What the user must be allowed to do for the assistant to write to a table (lib/permissions) */
+function writePermission(table: string): PermissionKey | null {
+  if (READ_ONLY_TABLES.has(table)) return null
+  return SETTINGS_TABLES.has(table) ? 'settings.edit' : 'jobs.edit'
+}
 
 // All writable tables the AI is allowed to read from
 const READABLE_TABLES = new Set([
@@ -162,20 +173,25 @@ async function executeTool(
   name: string,
   input: Record<string, unknown>,
   tenantId: string,
-  isAdmin: boolean,
+  userId: string,
 ): Promise<string> {
   const table = input.table as string
 
-  if (table && !READABLE_TABLES.has(table)) {
+  if (!table || !READABLE_TABLES.has(table)) {
     return `Error: table "${table}" is not accessible.`
   }
 
-  // Settings tables require admin for writes
-  if (name !== 'read_records' && table && SETTINGS_TABLES.has(table) && !isAdmin) {
-    return `Permission denied: modifying "${table}" requires admin access. Please contact your administrator.`
+  // Writes need the same permissions as the app's buttons
+  if (name !== 'read_records') {
+    const needed = writePermission(table)
+    if (!needed) return `Permission denied: "${table}" can't be changed by the assistant.`
+    for (const action of name === 'delete_record' ? [needed, 'records.delete' as const] : [needed]) {
+      const level = await permissionLevel(tenantId, userId, action)
+      if (level !== 'allowed') return `Permission denied: ${refusalMessage(action, level)}`
+    }
   }
 
-  // Use service client to bypass RLS — access control is handled above
+  // Service client — every query below is scoped to the signed-in user's tenant
   const db = createServiceClient()
 
   try {
@@ -187,12 +203,10 @@ async function executeTool(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (db as any).from(table).select(columns).limit(limit)
       for (const [col, val] of Object.entries(filters)) {
-        q = q.eq(col, val)
+        if (col !== 'tenant_id') q = q.eq(col, val)
       }
-      // Scope to tenant
-      if (!filters['tenant_id']) {
-        q = q.eq('tenant_id', tenantId)
-      }
+      // Always this tenant's rows (a tenant row is its own id)
+      q = table === 'tenants' ? q.eq('id', tenantId) : q.eq('tenant_id', tenantId)
 
       const { data, error } = await q
       if (error) return `Error reading ${table}: ${error.message}`
@@ -203,8 +217,9 @@ async function executeTool(
     if (name === 'update_record') {
       const { error } = await (db as any)
         .from(table)
-        .update(input.fields)
+        .update(withoutTenant(input.fields))
         .eq('id', input.id as string)
+        .eq('tenant_id', tenantId)
       if (error) return `Error updating ${table}: ${error.message}`
       return `Successfully updated record ${input.id} in ${table}.`
     }
@@ -239,6 +254,12 @@ async function executeTool(
   } catch (err) {
     return `Error executing tool: ${err instanceof Error ? err.message : String(err)}`
   }
+}
+
+/** Fields to write, never moving a record to another tenant */
+function withoutTenant(fields: unknown): Record<string, unknown> {
+  const { tenant_id: _ignored, ...rest } = (fields && typeof fields === 'object' ? fields : {}) as Record<string, unknown>
+  return rest
 }
 
 function getPageName(pathname: string): string {
@@ -520,11 +541,17 @@ function translateErrorToPlain(error: string): string {
 
 export async function POST(req: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  
+
+  // Signed-in users only; the tenant is always the session's, never the request's
+  const session = await getUser()
+  const userId = session?.session?.user.id
+  if (!session?.tenant_id || !userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const tenantId = session.tenant_id
+
   try {
     // Support both multipart/form-data (binary file uploads) and JSON
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let messages: any[], pageContext: string | undefined, activeTab: string | undefined, tenantId: string, fileAttachment: any = null
+    let messages: any[], pageContext: string | undefined, activeTab: string | undefined, fileAttachment: any = null
 
     const contentType = req.headers.get('content-type') ?? ''
     if (contentType.includes('multipart/form-data')) {
@@ -532,7 +559,6 @@ export async function POST(req: NextRequest) {
       messages = JSON.parse(fd.get('messages') as string)
       pageContext = (fd.get('pageContext') as string) || undefined
       activeTab = (fd.get('activeTab') as string) || undefined
-      tenantId = fd.get('tenantId') as string
       const file = fd.get('file') as File | null
       const fileType = fd.get('fileType') as string | null
       if (file && fileType) {
@@ -547,7 +573,6 @@ export async function POST(req: NextRequest) {
       messages = body.messages
       pageContext = body.pageContext
       activeTab = body.activeTab
-      tenantId = body.tenantId
       fileAttachment = body.fileAttachment ?? null
     }
 
@@ -555,22 +580,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 })
     }
 
-    // Get current user's role for settings-table access control
-    let isAdmin = false
-    try {
-      const authClient = await createClient()
-      const { data: { user } } = await authClient.auth.getUser()
-      if (user) {
-        const { data: userRow } = await authClient
-          .from('users')
-          .select('role, can_edit_settings')
-          .eq('id', user.id)
-          .single()
-        if (userRow) {
-          isAdmin = (userRow as any).role === 'admin' || (userRow as any).can_edit_settings === true
-        }
-      }
-    } catch { /* non-fatal */ }
 
     // Fetch live context server-side
     let contextStr = ''
@@ -693,7 +702,7 @@ export async function POST(req: NextRequest) {
           const functionArgs = JSON.parse(toolCall.function.arguments)
 
           console.log(`[AI Assistant] Executing tool: ${functionName}`, functionArgs)
-          const result = await executeTool(functionName, functionArgs, tenantId ?? '', isAdmin)
+          const result = await executeTool(functionName, functionArgs, tenantId, userId)
           console.log(`[AI Assistant] Tool result: ${result}`)
 
           // Stop on error and present helpful message
