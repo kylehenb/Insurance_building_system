@@ -7,7 +7,7 @@
 
 **E-signing update (Oct 2026):** In-house e-signing module built — see §10a. Homeowners sign the Scope of Works Authorisation (work of $7,500 or less) or the WA Building Contract (over $7,500) from an emailed link, with no account. New tables `signing_requests`, `signing_events`, `signing_rate_limits` (§4.32–4.34), private storage bucket `signed-documents` (§5), new PDF generators for the SOW and Building Contract (§10). No new paid service and no new environment variables.
 
-**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 2 (Oct 2026) added archive, bin, spam, read/unread, bulk actions and undo.
+**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 2 (Oct 2026) added archive, bin, spam, read/unread, bulk actions and undo; phase 3 added writing email (compose, reply, reply all, forward, Gmail drafts, attachments, undo send; table `mail_drafts`, bucket `mail-attachments`).
 
 ---
 
@@ -1764,11 +1764,11 @@ Every user has a level for each action: **allowed**, **needs approval** or **not
 - Level = the user's own change (`user_permission_overrides`) → else the tenant's default for their role (`permission_defaults`) → else `BUILT_IN_DEFAULTS` in code. Both tables hold changes only; RLS lets users read their tenant's rows, all writes go through the API (service role) after a `users.manage` check
 - Roles: `admin` (always everything — can't be restricted, so the company can't be locked out; nobody can change their own role), `office`, `inspector`. Unknown roles get inspector defaults
 - Built-in defaults: office runs jobs and sends work orders and replies; anything to an insurer or homeowner (documents, signing) and invoices need approval; no deleting, settings or user management. Inspectors add notes and edit job details; replies need approval; everything else outward-facing or financial is off
-- Actions (`PERMISSION_ACTIONS`): jobs.notes, jobs.edit*, jobs.change_stage, orders.lodge, orders.manage, records.delete*, mail.view, mail.organise, send.work_orders, send.documents, send.signing, send.replies, financials.view*, invoices.manage, excess.decide, settings.edit, users.manage. (* saved but not enforced yet — hiding amounts needs UI work as well as rules, since RLS can't hide single columns; shown as COMING in settings)
+- Actions (`PERMISSION_ACTIONS`): jobs.notes, jobs.edit*, jobs.change_stage, orders.lodge, orders.manage, records.delete*, mail.view, mail.send, mail.organise, send.work_orders, send.documents, send.signing, send.replies, financials.view*, invoices.manage, excess.decide, settings.edit, users.manage. (* saved but not enforced yet — hiding amounts needs UI work as well as rules, since RLS can't hide single columns; shown as COMING in settings)
 - **Database rules** (`supabase/migrations/20261101_permission_rls.sql`): edits that go straight from the browser to Supabase are checked by restrictive RLS policies `perm_<action>_<command>` using `public.user_can(action)` (→ `user_permission_level`, the same resolution as `lib/permissions/resolve.ts`; its built-in defaults must match `BUILT_IN_DEFAULTS` — a test checks). Only "allowed" passes ("needs approval" can't be queued from the browser). settings.edit: writes to settings tables (tenants, templates, prompts, rates, scope library, automation, accounting map) and all access to `accounting_credentials`; invoices.manage: writes to invoices, line items, deductions; jobs.edit: insert/update on jobs, quotes, reports, work orders, clients, trades, and scope items / visits; records.delete: deleting jobs, quotes, reports, invoices, work orders, insurer orders, emails, clients, trades. `users` has no browser writes at all. Service-role routes are unaffected and check permissions themselves (`permissionDenied`/`permissionGate`); routes that act for a permitted action write with the service client so a rule can't stop them part way
 - **Tenant from the session only**: API routes take the tenant from the signed-in session (`sessionUser()`, `lib/auth/session.ts`), never from the request — with the service client a request's tenantId would reach another company's data. `/api/ai/*` requires sign-in; the assistant's record tools are tenant-scoped and follow the user's permissions
 - Enforced on the server: `permissionGate()` (`lib/permissions/http.ts`) in the work order send, document send, signing (create / send / resend / revoke / reminders; confirm-stage → jobs.change_stage), reply, lodge, job stage and excess routes (`permissionDenied()` where there's nothing to queue, e.g. users.manage); and `permission` on every voice connector tool that changes or sends something, checked in `lib/mcp/server.ts` (a test fails if one is missing; tools that check for themselves set `checksOwnPermission`). The voice connector acts as the owner of the personal key used (or `MCP_USER_ID` for the old shared key), so it has that person's permissions
-- **Approval queue** (`lib/approvals`, table `approval_requests`): at "needs approval" the action is saved instead of done — the operation to run (`lib/approvals/operations.ts`: `work_order.send`, `documents.send`, `signing.create`, `signing.action`, `reply.send`, `order.lodge`, `job.stage`, `excess.decide`, `invoice.generate`, `voice.tool`), its payload, a plain-English summary and the job. Each operation calls the same shared function as the button; a voice call is saved as `voice.tool` and replayed through the tool. The route answers 403 with `pendingApproval: true` and "Sent for approval: …" (so no screen mistakes it for done); the voice tool tells Claude it's waiting. An identical pending request isn't saved twice
+- **Approval queue** (`lib/approvals`, table `approval_requests`): at "needs approval" the action is saved instead of done — the operation to run (`lib/approvals/operations.ts`: `work_order.send`, `documents.send`, `signing.create`, `signing.action`, `reply.send`, `order.lodge`, `job.stage`, `excess.decide`, `invoice.generate`, `mail.send`, `voice.tool`), its payload, a plain-English summary and the job. Each operation calls the same shared function as the button; a voice call is saved as `voice.tool` and replayed through the tool. The route answers 403 with `pendingApproval: true` and "Sent for approval: …" (so no screen mistakes it for done); the voice tool tells Claude it's waiting. An identical pending request isn't saved twice
 - Deciding: dashboard "Waiting for approval" panel (`components/approvals/approvals-panel.tsx`), `GET /api/approvals`, `POST /api/approvals/[id]` `{ decision: approve|reject|cancel, note? }`, voice tools `list_approvals` / `decide_approval`. Approve/reject: anyone allowed to do that action, not the requester. Cancel: the requester. The row is claimed with a guarded `status = 'pending'` update so it runs once; approving runs it as the requester (e.g. `created_by`, excess `decided_by`) and stores what happened in `result`, or `failed` + the error
 - **Personal voice keys** (`lib/voice-keys/keys.ts`, table `voice_keys`, Settings → Voice connector, API `/api/settings/voice-keys`): each person makes their own key (`irc_vk_` + 48 hex) for the connector; only its SHA-256 and last 4 characters are stored, the key is shown once. Up to 5 active keys per person. Owners revoke their own; people allowed to manage users see and revoke everyone's. A revoked key, or one whose owner has left the tenant, is refused at once
 - **Activity log** (`lib/activity/log.ts`, table `activity_log`, Settings → Activity, API `/api/activity`, voice tool `list_activity`): who did what, how (`app` / `voice` / `approval`), on which job and the outcome (`done`, `failed`, `requested`, `rejected`, `cancelled`). Written by: the gated routes after the action succeeds (`recordOperation`, described by the same `OPERATIONS[…].describe` as approval requests); `lib/mcp/server.ts` for every permissioned voice tool call that ran (not refusals or questions back), with the key used; and `lib/approvals/service.ts` for requests, rejections/cancellations, and approved actions (logged as the requester's, with `approved_by`). Recording never fails the action. People allowed to manage users see everyone's; others see their own
@@ -4138,7 +4138,7 @@ This section slots in as **Phase 7**, after Phase 6c (AI & Automation Dashboard)
 
 ## 23. Mail Client (Gmail)
 
-Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phases 1 (reading) and 2 (organising) are done.
+Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phases 1 (reading), 2 (organising) and 3 (writing) are done.
 
 ### 23.1 Model — Gmail is the source of truth
 
@@ -4194,11 +4194,33 @@ Laid out like Gmail with no split: folders on the left, a full-width one-line li
 
 Emails render in a sandboxed iframe with no scripts (`lib/mail/html.ts`). A Content-Security-Policy blocks remote images, stylesheets and fonts until "Show images" (or "Always show from" a sender, remembered in the browser). `cid:` images point at the attachment route.
 
-### 23.6 Next phases
+### 23.6 Writing email (`lib/mail/compose.ts`, `components/mail/Composer.tsx`)
 
-1. Compose — new, reply, reply all, forward; drafts autosaved to Gmail; attachments uploaded via storage (Vercel body limit); undo send.
-2. Scheduled send — draft in Gmail plus a `scheduled_emails` row; the cron sends it. Gmail's own scheduled sends can't be read through the API, so schedule from IRC.
-3. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
+Every email being written is a real Gmail draft — it shows in the Gmail app's Drafts, and closing the page loses nothing. The composer saves 2 seconds after the last change (`POST /api/mail/drafts`, which creates or updates the Gmail draft). Send saves, then waits 10 seconds with "Sending… Undo" on screen (Undo reopens the draft), then sends the draft (`POST /api/mail/drafts/[id]/send` → `drafts.send`). If the page is closed in those seconds the email stays in Drafts unsent (the browser warns).
+
+What's sent: the text as typed (rich text, the same editor and formats as the templates), the company signature from Settings → Email Templates (a Signature tick box; on by default), and for a reply or forward the quoted email underneath, marked up as Gmail does (`gmail_quote`, so Gmail folds it). From is the mailbox with the company's trading name. Replies carry In-Reply-To/References and the thread id, so they thread in Gmail and in the recipient's mail app. Rules in `lib/mail/compose-rules.ts`: reply goes to the sender (or Reply-To); replying to our own email goes to its recipients again; reply all adds the other To and Cc, without our address or duplicates; Re:/Fwd: added once. Forward includes the original's attachments.
+
+`mail_drafts` keeps what the app needs to reopen its own draft: the text as typed (the Gmail copy has the signature and quote added), what it quotes, its attachments and threading headers, and the draft message id it saved. A draft written or changed in the Gmail app (no row, or a different message id) opens as it is: its text above the quote is editable, the quote is kept as it was, its attachments are copied into storage, and no second signature is added.
+
+Attachments upload straight from the browser to the private `mail-attachments` bucket (`POST /api/mail/uploads` gives a signed upload URL; paths start with the tenant id and are checked when used) and are removed once the email is sent or discarded. 25 MB total, Gmail's limit. Big emails are uploaded to Gmail as media rather than JSON.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/mail/compose?mode=&message=` | A new email, reply, reply all or forward, ready to edit |
+| `POST /api/mail/drafts` | Save (create or update) the Gmail draft |
+| `GET /api/mail/drafts/[id]` / `DELETE` | Reopen a draft to edit / discard it |
+| `POST /api/mail/drafts/[id]/send` | Send it (permission gate) |
+| `POST /api/mail/uploads` | Signed upload URL for an attachment |
+| `GET /api/mail/contacts?q=` | To/Cc/Bcc suggestions: trades, insurers and adjusters, and addresses from filed emails |
+
+Permission `mail.send` (allowed / needs approval / not allowed; office allowed, inspectors not). At "needs approval" drafts can still be written; Send queues approval operation `mail.send` (the draft waits in Gmail until approved, then the approver's approval sends it). Sends are logged in the activity log. The sent copy is filed on its job by the Gmail webhook like any mail sent from Gmail (`lib/communications/record-sent.ts`). Migration `20261104_mail_compose.sql` (table, bucket, permission default).
+
+Page: Compose button (and `c`) opens a floating composer bottom right; in a conversation, Reply / Reply all / Forward (and `r` / `a` / `f`) open it inline under the last message. A draft in a conversation opens in the composer when clicked; a draft on its own in Drafts opens straight into the composer. Ctrl/⌘+Enter sends; Esc saves and closes a floating composer.
+
+### 23.7 Next phases
+
+1. Scheduled send — draft in Gmail plus a `scheduled_emails` row; the cron sends it. Gmail's own scheduled sends can't be read through the API, so schedule from IRC.
+2. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
 
 ---
 

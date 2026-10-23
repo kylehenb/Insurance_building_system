@@ -14,13 +14,17 @@ import type { UserLabel } from '@/lib/mail/labels'
 import type { MailAddress } from '@/lib/mail/summary'
 import { attachmentUrl, type MailMessage } from '@/lib/mail/message'
 import { MessageBody } from '@/components/mail/MessageBody'
+import { Composer, type ComposerHandle } from '@/components/mail/Composer'
+import type { ComposeMode, ComposeStart } from '@/lib/mail/compose-rules'
 
 // The mail client: the office Gmail mailbox, laid out like Gmail with no
 // reading pane — a full-width list, and a conversation opens full width.
 // Gmail is the source of truth: the list reads the mirror kept by
 // lib/mail/sync.ts, conversations open straight from Gmail, and actions
 // (archive, bin, spam, read state) are made in Gmail. The page updates
-// straight away and puts things back if Gmail refuses.
+// straight away and puts things back if Gmail refuses. Writing email
+// (components/mail/Composer.tsx) saves Gmail drafts; Send waits a few seconds
+// so it can be undone, then sends the draft.
 
 type MailboxInfo = { email: string; synced_at: string | null; sync_error: string | null; backfilling: boolean }
 
@@ -36,6 +40,7 @@ type Toast = { message: string; undo?: () => void; error?: boolean }
 
 const POLL_MS = 20_000
 const TOAST_MS = 8_000
+const UNDO_SEND_MS = 10_000
 const EMPTY_COUNTS: FolderCounts = { inbox: 0, promotions: 0, social: 0, drafts: 0, spam: 0 }
 
 function listDate(iso: string | null): string {
@@ -138,12 +143,16 @@ function Mail() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<Toast | null>(null)
+  const [detailVersion, setDetailVersion] = useState(0)
+  const [composer, setComposer] = useState<{ key: string; initial: ComposeStart } | null>(null)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const gPressed = useRef(false)
   const requestSeq = useRef(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const composerRef = useRef<ComposerHandle>(null)
+  const pendingSends = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   const activeTab = folder === 'inbox' && !query ? tab : null
 
@@ -256,24 +265,103 @@ function Mail() {
         if (cancelled) return
         setDetail(d)
         // Gmail opens the latest message and any unread ones; earlier ones fold away
+        const sent = d.messages.filter(m => !m.labelIds.includes('DRAFT'))
         const open = new Set<string>()
-        d.messages.forEach((m, i) => {
-          if (i === d.messages.length - 1 || m.labelIds.includes('UNREAD')) open.add(m.id)
+        sent.forEach((m, i) => {
+          if (i === sent.length - 1 || m.labelIds.includes('UNREAD')) open.add(m.id)
         })
         setExpanded(open)
       })
       .catch(err => { if (!cancelled) setDetailError(err.message) })
       .finally(() => { if (!cancelled) setDetailLoading(false) })
     return () => { cancelled = true }
-  }, [openId])
+  }, [openId, detailVersion])
 
   // ── Toast ──
 
-  function showToast(t: Toast) {
+  function showToast(t: Toast, ms = TOAST_MS) {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(t)
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+    toastTimer.current = setTimeout(() => setToast(null), ms)
   }
+
+  // ── Writing ──
+
+  async function fetchJson<T>(url: string): Promise<T> {
+    const res = await fetch(url)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error ?? 'Something went wrong')
+    return body as T
+  }
+
+  /** Opens the composer — one at a time; what's in an open one is saved first */
+  async function startComposer(load: () => Promise<ComposeStart>) {
+    if (composer) {
+      try {
+        await composerRef.current?.flush()
+      } catch {
+        return // its error is showing; don't lose it
+      }
+    }
+    try {
+      const initial = await load()
+      setComposer({ key: crypto.randomUUID(), initial })
+    } catch (err) {
+      showToast({ message: err instanceof Error ? err.message : 'Could not open the email', error: true })
+    }
+  }
+
+  function compose(mode: ComposeMode, messageId?: string) {
+    startComposer(() => fetchJson(`/api/mail/compose?mode=${mode}${messageId ? `&message=${messageId}` : ''}`))
+  }
+
+  function editDraft(draftId: string) {
+    startComposer(() => fetchJson(`/api/mail/drafts/${draftId}`))
+  }
+
+  /** Send, after a few seconds in which it can be undone (the draft stays in Gmail until then) */
+  function sendLater(draftId: string) {
+    setComposer(null)
+    const timer = setTimeout(() => sendNow(draftId), UNDO_SEND_MS)
+    pendingSends.current.set(draftId, timer)
+    showToast({
+      message: 'Sending…',
+      undo: () => {
+        clearTimeout(timer)
+        pendingSends.current.delete(draftId)
+        setToast(null)
+        editDraft(draftId)
+      },
+    }, UNDO_SEND_MS)
+  }
+
+  async function sendNow(draftId: string) {
+    pendingSends.current.delete(draftId)
+    const res = await fetch(`/api/mail/drafts/${draftId}/send`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
+    if (res.ok) {
+      showToast({ message: 'Message sent.' })
+    } else if (body.pendingApproval) {
+      showToast({ message: body.error ?? 'Sent for approval.' })
+    } else {
+      showToast({ message: body.error ?? 'Could not send the email', error: true })
+      editDraft(draftId)
+    }
+    refresh()
+    setDetailVersion(v => v + 1)
+  }
+
+  // An email waiting out its undo seconds would stay a draft if the page closed
+  useEffect(() => {
+    function onUnload(e: BeforeUnloadEvent) {
+      if (pendingSends.current.size > 0) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', onUnload)
+    return () => window.removeEventListener('beforeunload', onUnload)
+  }, [])
+
+  /** The message a reply or forward from the keyboard answers: the latest one sent */
+  const lastMessageId = () => detail?.messages.filter(m => !m.labelIds.includes('DRAFT')).at(-1)?.id
 
   // ── Actions ──
 
@@ -287,7 +375,7 @@ function Mail() {
       body: JSON.stringify({ threadIds: ids, action, auto }),
     })
     const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(body.error ?? 'Gmail did not accept the change')
+    if (!res.ok || !Array.isArray(body.done)) throw new Error(body.error ?? 'Gmail did not accept the change')
     return body as { done: string[]; failed: string[] }
   }
 
@@ -361,10 +449,22 @@ function Mail() {
     setSearchInput('')
   }
 
-  function openThread(index: number) {
+  async function openThread(index: number) {
     const t = threads[index]
     if (!t) return
     setFocused(index)
+    // A draft on its own opens to be written, as in Gmail
+    if (t.label_ids.includes('DRAFT') && t.message_count === 1 && t.participants.every(p => p.me)) {
+      try {
+        const d = await fetchJson<ThreadDetail>(`/api/mail/threads/${t.id}`)
+        if (d.messages.every(m => m.labelIds.includes('DRAFT')) && d.drafts[0]) {
+          editDraft(d.drafts[0].draftId)
+          return
+        }
+      } catch {
+        // Open it as a conversation instead
+      }
+    }
     setOpenId(t.id)
     // Opening marks it read, as in Gmail
     if (t.unread) performAction([t.id], 'read', { auto: true })
@@ -432,6 +532,17 @@ function Mail() {
         case '!': act(folder === 'spam' ? 'not_spam' : 'spam'); break
         case 'I': act('read'); break
         case 'U': act('unread'); break
+        case 'c':
+          e.preventDefault()
+          compose('new')
+          break
+        case 'r':
+        case 'a':
+        case 'f': {
+          const id = openId ? lastMessageId() : undefined
+          if (id) { e.preventDefault(); compose(e.key === 'r' ? 'reply' : e.key === 'a' ? 'reply_all' : 'forward', id) }
+          break
+        }
         case 'z':
           if (toast?.undo) { e.preventDefault(); toast.undo() }
           break
@@ -463,6 +574,10 @@ function Mail() {
       <nav className="mail-folders">
         <div className="mail-title">Mail</div>
         {mailbox && <div className="mail-account" title={mailbox.email}>{mailbox.email}</div>}
+        <button className="mail-compose" onClick={() => compose('new')} title="Compose (c)">
+          <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M10.5 2.5l3 3L6 13H3v-3z" /></svg>
+          Compose
+        </button>
         {FOLDERS.map(f => {
           const n = countFor(f.key)
           return (
@@ -515,6 +630,20 @@ function Mail() {
                   <ThreadView
                     detail={detail}
                     labels={labels}
+                    onCompose={(mode, messageId) => compose(mode, messageId)}
+                    onEditDraft={editDraft}
+                    replying={!!composer && composer.initial.threadId === detail.id && composer.initial.mode !== 'new'}
+                    composer={composer && composer.initial.threadId === detail.id && composer.initial.mode !== 'new' && (
+                      <Composer
+                        key={composer.key}
+                        ref={composerRef}
+                        initial={composer.initial}
+                        variant="inline"
+                        onClose={() => { setComposer(null); setDetailVersion(v => v + 1) }}
+                        onDiscarded={() => { setComposer(null); setDetailVersion(v => v + 1) }}
+                        onSend={sendLater}
+                      />
+                    )}
                     expanded={expanded}
                     onToggle={id => setExpanded(prev => {
                       const next = new Set(prev)
@@ -606,6 +735,18 @@ function Mail() {
         </div>
       </main>
 
+      {composer && !(openId && composer.initial.threadId === openId && composer.initial.mode !== 'new') && (
+        <Composer
+          key={composer.key}
+          ref={composerRef}
+          initial={composer.initial}
+          variant="floating"
+          onClose={id => { setComposer(null); if (id) showToast({ message: 'Draft saved.' }); refresh() }}
+          onDiscarded={() => { setComposer(null); showToast({ message: 'Draft discarded.' }); refresh() }}
+          onSend={sendLater}
+        />
+      )}
+
       {toast && (
         <div className={`mail-toast${toast.error ? ' is-error' : ''}`} role="status">
           <span>{toast.message}</span>
@@ -684,12 +825,17 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
   )
 }
 
-function ThreadView({ detail, labels, expanded, onToggle }: {
+function ThreadView({ detail, labels, expanded, onToggle, onCompose, onEditDraft, replying, composer }: {
   detail: ThreadDetail
   labels: Record<string, UserLabel>
   expanded: Set<string>
   onToggle: (id: string) => void
+  onCompose: (mode: ComposeMode, messageId: string) => void
+  onEditDraft: (draftId: string) => void
+  replying: boolean
+  composer: React.ReactNode
 }) {
+  const last = detail.messages.filter(m => !m.labelIds.includes('DRAFT')).at(-1)
   return (
     <div className="mail-thread">
       <div className="mail-thread-head">
@@ -707,9 +853,28 @@ function ThreadView({ detail, labels, expanded, onToggle }: {
         </div>
       </div>
 
-      {detail.messages.map(m => (
-        <MessageView key={m.id} message={m} open={expanded.has(m.id)} onToggle={() => onToggle(m.id)} />
-      ))}
+      {detail.messages.map(m => {
+        const draft = detail.drafts.find(d => d.messageId === m.id)
+        // The draft being edited shows as the composer below instead
+        if (draft && replying) return null
+        return (
+          <MessageView
+            key={m.id}
+            message={m}
+            open={expanded.has(m.id)}
+            onToggle={() => (draft ? onEditDraft(draft.draftId) : onToggle(m.id))}
+          />
+        )
+      })}
+
+      {composer}
+      {!replying && last && (
+        <div className="mail-reply-btns">
+          <button onClick={() => onCompose('reply', last.id)} title="Reply (r)">↩ Reply</button>
+          {last.to.length + last.cc.length > 1 && <button onClick={() => onCompose('reply_all', last.id)} title="Reply all (a)">↩↩ Reply all</button>}
+          <button onClick={() => onCompose('forward', last.id)} title="Forward (f)">↪ Forward</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -727,7 +892,9 @@ function MessageView({ message: m, open, onToggle }: { message: MailMessage; ope
             <strong>{m.from?.name || m.from?.email || '(unknown sender)'}</strong>
             {m.from?.name && <span className="mail-msg-email">&lt;{m.from.email}&gt;</span>}
           </div>
-          {open ? (
+          {isDraft ? (
+            <div className="mail-msg-snippet">{m.snippet || '(empty draft)'} · <span className="mail-edit">Edit</span></div>
+          ) : open ? (
             <div className="mail-msg-to">
               to {addressText(m.to) || '(no recipients)'}
               {m.cc.length > 0 && <> · cc {addressText(m.cc)}</>}
@@ -739,7 +906,7 @@ function MessageView({ message: m, open, onToggle }: { message: MailMessage; ope
         <span className="mail-msg-date">{fullDate(m.date)}</span>
       </header>
 
-      {open && (
+      {open && !isDraft && (
         <div className="mail-msg-body">
           <MessageBody html={m.html} text={m.text} sender={m.from?.email ?? ''} />
           {files.length > 0 && (
@@ -880,6 +1047,12 @@ const MAIL_CSS = `
   .mail-file-size { color: var(--subtle); flex-shrink: 0; }
   .mail-file-dl { color: var(--grey-600); flex-shrink: 0; }
 
+  .mail-compose { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; margin: 0 0 14px 12px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--cream); border: none; border-radius: 16px; padding: 14px 22px 14px 18px; cursor: pointer; box-shadow: 0 1px 3px rgba(60,50,40,.15); }
+  .mail-compose:hover { box-shadow: 0 2px 8px rgba(60,50,40,.22); }
+  .mail-reply-btns { display: flex; gap: 10px; margin: 18px 0 8px; }
+  .mail-reply-btns button { font: inherit; font-size: 14px; color: var(--body); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 18px; padding: 8px 20px; cursor: pointer; }
+  .mail-reply-btns button:hover { background: var(--surface-2); }
+  .mail-edit { color: var(--info); }
   .mail-toast { position: fixed; left: 24px; bottom: 24px; z-index: 50; display: flex; align-items: center; gap: 16px; background: var(--ink); color: var(--cream); font-size: 14px; padding: 12px 14px 12px 20px; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
   .mail-toast.is-error { background: var(--danger-dark); }
   .mail-toast button { font: inherit; font-size: 14px; font-weight: 600; color: var(--gold); background: none; border: none; cursor: pointer; padding: 0; }

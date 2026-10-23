@@ -16,6 +16,8 @@ import { lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { setJobStage } from '@/lib/jobs/set-stage'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import { generateInvoice, type GenerateInvoiceInput } from '@/lib/invoices/generate'
+import { describeDraft, sendDraft } from '@/lib/mail/compose'
+import { getMailbox } from '@/lib/mail/sync'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -208,6 +210,18 @@ const voiceTool: Operation<{ tool: string; args: Record<string, unknown> }> = {
   },
 }
 
+// An email written on the Mail page; it waits in Gmail's drafts until approved
+const mailSend: Operation<{ draftId: string }> = {
+  async describe(p) {
+    const { to, subject } = await describeDraft(p.draftId)
+    return { summary: `Send the email "${clip(subject, 80)}" to ${clip(to, 120)} from the office mailbox`, jobId: null }
+  },
+  async run(p, ctx) {
+    await sendDraft(await getMailbox(ctx.tenantId), p.draftId)
+    return 'Email sent.'
+  },
+}
+
 /** A readable description of a voice tool call, from the same lookups as the app's operations */
 async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: OperationContext): Promise<{ text: string; jobId: string | null }> {
   const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
@@ -252,6 +266,7 @@ export const OPERATIONS = {
   'job.stage': jobStage,
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
+  'mail.send': mailSend,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -273,4 +288,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'job.stage': 'jobs.change_stage',
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
+  'mail.send': 'mail.send',
 }

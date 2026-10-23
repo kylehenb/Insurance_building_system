@@ -65,7 +65,8 @@ export function buildEmailRaw(params: BuildRawEmailParams): string {
 
   const headers: string[] = [
     `From: ${formatFromHeader(from, fromName)}`,
-    `To: ${to}`,
+    // A draft can be saved before it has recipients
+    ...(to ? [`To: ${to}`] : []),
     ...(cc ? [`Cc: ${cc}`] : []),
     ...(bcc ? [`Bcc: ${bcc}`] : []),
     `Subject: ${encodeHeaderValue(subject)}`,

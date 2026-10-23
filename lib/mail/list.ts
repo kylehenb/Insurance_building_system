@@ -4,6 +4,7 @@ import { findThreadJobId } from '@/lib/communications/thread-link'
 import { folderLabel, HIDDEN_LABELS, TAB_LABELS, tabLabel, type FolderKey, type TabKey } from './folders'
 import { parseMessage, resolveCidImages, type MailMessage } from './message'
 import { fetchThreads, mailDb, storeThread, type Mailbox } from './sync'
+import { draftsInThread } from './compose'
 import type { MailAddress, Participant } from './summary'
 
 // Reading the mailbox for the mail page: folder lists come from the mirror,
@@ -39,6 +40,8 @@ export type ThreadDetail = {
   label_ids: string[]
   messages: MailMessage[]
   job: JobChip | null
+  /** Gmail drafts in the conversation, by the draft message's id */
+  drafts: { draftId: string; messageId: string }[]
 }
 
 const LIST_COLUMNS =
@@ -233,6 +236,8 @@ export async function getThreadDetail(mailbox: Mailbox, threadId: string, db = m
     job = (data as JobChip | null) ?? null
   }
 
+  const drafts = labels.has('DRAFT') ? await draftsInThread(threadId) : []
+
   const firstSent = messages.find(m => !m.labelIds.includes('DRAFT')) ?? messages[0]
   return {
     id: threadId,
@@ -240,5 +245,6 @@ export async function getThreadDetail(mailbox: Mailbox, threadId: string, db = m
     label_ids: [...labels].sort(),
     messages,
     job,
+    drafts,
   }
 }
