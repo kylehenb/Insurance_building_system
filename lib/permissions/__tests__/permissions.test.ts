@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Permissions: how a user's level is worked out, what gets refused (by the
@@ -57,8 +57,14 @@ beforeEach(() => {
 })
 
 describe('working out a level', () => {
-  it('has the same built-in defaults in the database rules (supabase/migrations/20261101_permission_rls.sql)', () => {
-    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261101_permission_rls.sql'), 'utf8')
+  it('has the same built-in defaults in the database rules (the newest migration defining user_permission_level)', () => {
+    const dir = join(process.cwd(), 'supabase/migrations')
+    const latest = readdirSync(dir)
+      .filter(f => /^\d{8}_.*\.sql$/.test(f))
+      .sort()
+      .filter(f => readFileSync(join(dir, f), 'utf8').includes('FUNCTION public.user_permission_level'))
+      .pop()!
+    const sql = readFileSync(join(dir, latest), 'utf8')
     const rows = [...sql.matchAll(/\('(office|inspector)', '([a-z_.]+)', '(allowed|approval|blocked)'\)/g)]
     const fromSql = Object.fromEntries(rows.map(([, role, action, level]) => [`${role}:${action}`, level]))
     const expected = Object.fromEntries((['office', 'inspector'] as const).flatMap(role => PERMISSION_ACTIONS.map(a => [`${role}:${a.key}`, BUILT_IN_DEFAULTS[role][a.key]])))

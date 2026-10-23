@@ -20,9 +20,12 @@
  *
  * 4. Call POST /api/gmail/setup once to register the Gmail watch and seed historyId.
  *
- * The watch covers INBOX and SENT. Inbound mail is routed to the order pipeline
- * or linked to a job; mail sent directly from Gmail is recorded as an outbound
- * communication so replies to it inherit the job through the thread.
+ * The watch covers every label. New INBOX and SENT messages are processed here:
+ * inbound mail is routed to the order pipeline or linked to a job; mail sent
+ * directly from Gmail is recorded as an outbound communication so replies to it
+ * inherit the job through the thread. Every change (including archive, spam,
+ * bin, read state and drafts) then updates the mail client's mirror
+ * (lib/mail/sync.ts).
  */
 
 import { NextRequest, NextResponse, after } from 'next/server'
@@ -38,6 +41,7 @@ import { sendOrderNotification } from '@/lib/email/order-notifier'
 import { threadExists } from '@/lib/communications/thread-link'
 import { recordSentMessage } from '@/lib/communications/record-sent'
 import { insertLinkedCommunication, uploadAttachments, type StoredAttachment } from '@/lib/communications/inbound-email'
+import { getMailboxByEmail, syncMailbox } from '@/lib/mail/sync'
 
 export const maxDuration = 300
 
@@ -214,9 +218,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch (err) {
       console.error('[email-inbound] unhandled processing error:', err)
     }
+    // Then bring the mail client's copy of the mailbox up to date
+    try {
+      await syncMailMirror(body)
+    } catch (err) {
+      console.error('[email-inbound] mailbox sync error:', err)
+    }
   })
 
   return NextResponse.json({ ok: true })
+}
+
+async function syncMailMirror(body: PubSubBody): Promise<void> {
+  const { emailAddress } = JSON.parse(Buffer.from(body.message.data, 'base64').toString('utf-8')) as { emailAddress: string }
+  // The mirror starts once the mail page or the mailbox-sync cron has created the mailbox
+  const mailbox = await getMailboxByEmail(emailAddress)
+  if (mailbox) await syncMailbox(mailbox, { budgetMs: 60_000 })
 }
 
 async function processWebhook(body: PubSubBody): Promise<void> {

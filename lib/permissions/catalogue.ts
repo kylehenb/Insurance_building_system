@@ -25,7 +25,7 @@ export const LEVEL_LABELS: Record<PermissionLevel, string> = {
 
 export interface PermissionAction {
   key: string
-  group: 'Jobs' | 'Sending' | 'Money' | 'Admin'
+  group: 'Jobs' | 'Email' | 'Sending' | 'Money' | 'Admin'
   label: string
   description: string
   /** Approval makes no sense for some actions (reading, admin) — they're allowed or not */
@@ -49,6 +49,8 @@ export const PERMISSION_ACTIONS = [
   { key: 'orders.lodge', group: 'Jobs', label: 'Lodge insurer orders', description: 'Create jobs from insurer orders', levels: ALL, enforced: true },
   { key: 'orders.manage', group: 'Jobs', label: 'Fix and file orders and emails', description: 'Correct or link insurer orders, create orders from emails, file emails on jobs', levels: ALL, enforced: true },
   { key: 'records.delete', group: 'Jobs', label: 'Delete records', description: 'Delete jobs, quotes, reports, work orders and other records', levels: ON_OFF, enforced: true },
+  // Email
+  { key: 'mail.view', group: 'Email', label: 'Read the office mailbox', description: 'Open the Mail page: every folder of the shared office inbox, not just emails filed on jobs', levels: ON_OFF, enforced: true },
   // Sending — anything that leaves the company
   { key: 'send.work_orders', group: 'Sending', label: 'Send work orders to trades', description: 'Email work orders to trades and hand them to Gary', levels: ALL, enforced: true },
   { key: 'send.documents', group: 'Sending', label: 'Send quotes, reports and invoices', description: 'Email documents to insurers or homeowners (or mark them as sent)', levels: ALL, enforced: true },
@@ -87,6 +89,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'orders.lodge': 'allowed',
     'orders.manage': 'allowed',
     'records.delete': 'blocked',
+    'mail.view': 'allowed',
     'send.work_orders': 'allowed',
     'send.documents': 'approval',
     'send.signing': 'approval',
@@ -104,6 +107,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'orders.lodge': 'blocked',
     'orders.manage': 'blocked',
     'records.delete': 'blocked',
+    'mail.view': 'blocked',
     'send.work_orders': 'blocked',
     'send.documents': 'blocked',
     'send.signing': 'blocked',

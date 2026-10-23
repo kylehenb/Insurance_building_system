@@ -14,8 +14,9 @@ export async function startGmailWatch(): Promise<WatchResult> {
     userId: 'me',
     requestBody: {
       topicName: PUBSUB_TOPIC,
-      // SENT lets the webhook record mail sent directly from Gmail (see email-inbound)
-      labelIds: ['INBOX', 'SENT'],
+      // No label filter: the mail client mirrors every folder (lib/mail/sync.ts),
+      // so archive, spam, bin, drafts and read state all need to notify.
+      // The webhook still only processes new INBOX and SENT messages itself.
     },
   })
 

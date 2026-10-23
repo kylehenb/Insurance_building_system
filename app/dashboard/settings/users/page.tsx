@@ -33,7 +33,7 @@ async function fetchPermissions(): Promise<Loaded> {
   return res.ok ? { data: json as PermissionsData } : { error: json.error ?? 'Could not load users' }
 }
 
-const GROUPS = ['Jobs', 'Sending', 'Money', 'Admin'] as const
+const GROUPS = ['Jobs', 'Email', 'Sending', 'Money', 'Admin'] as const
 
 const LEVEL_STYLE: Record<PermissionLevel, string> = {
   allowed: 'text-[#2d6a4f]',
