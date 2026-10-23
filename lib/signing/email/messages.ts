@@ -3,6 +3,8 @@ import type { Database, Json } from '@/lib/supabase/database.types'
 import { renderTemplate, resolveEmailTemplate, signingTemplateVars } from '@/lib/email/templates'
 import { appBaseUrl, SIGNER_CONTACT } from '@/lib/signing/config'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
+import { filenamePart } from '@/lib/documents/document-assets'
+import { downloadSigningPdf } from '@/lib/signing/storage'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
 import type { SigningRequestRow } from '@/lib/signing/types'
 import { renderBrandedEmailHtml } from './html'
@@ -10,8 +12,9 @@ import { sendEmailViaGmail, type SentEmail } from './gmail'
 import type { AccompanyingDocuments } from '@/lib/signing/provider'
 
 // The emails the signing module sends:
-//   1. Signature request (template 'signing_request') — link to sign; or
-//      'signing_request_excess' when an excess invoice goes with it (PDF attached)
+//   1. Signature request (template 'signing_request') — link to sign, with the
+//      unsigned document attached as a backup for anyone who won't use the link;
+//      'signing_request_excess' when an excess invoice goes with it (also attached)
 //   2. Signed copy to the signer (template 'signing_completed') — PDF attached,
 //      office BCC'd (office gets its own copy only if the signer can't be emailed)
 // Both templates are editable in Settings → Email Templates.
@@ -86,6 +89,16 @@ async function recordOutboundEmail(service: Service, params: {
   if (error) console.error(`[signing] communications insert (${params.source}) failed for ${params.request.id}:`, error)
 }
 
+/** "Scope of Works Authorisation - J1234 - 12 Smith St Perth.pdf" */
+export function unsignedFilename(request: SigningRequestRow, job: { job_number: string; property_address: string | null }): string {
+  const parts = [
+    signingDocumentLabel(request.document_type),
+    filenamePart(job.job_number),
+    filenamePart(job.property_address).slice(0, 70),
+  ].filter(Boolean)
+  return `${parts.join(' - ')}.pdf`
+}
+
 export type RequestEmailKind = 'initial' | 'resend' | 'reminder'
 
 /**
@@ -138,9 +151,13 @@ export async function sendSigningRequestEmail(service: Service, params: {
     footerLines: footerLines(tenant),
   })
 
-  const attachments = excessInvoice
-    ? [{ filename: excessInvoice.filename, mimeType: 'application/pdf', content: excessInvoice.pdf }]
-    : undefined
+  // The unsigned document goes too, as a backup for anyone who can't or won't
+  // use the link (they can open it, print it, sign it by hand).
+  const documentPdf = await downloadSigningPdf(service, request.source_pdf_path)
+  const attachments = [
+    { filename: unsignedFilename(request, job), mimeType: 'application/pdf', content: documentPdf },
+    ...(excessInvoice ? [{ filename: excessInvoice.filename, mimeType: 'application/pdf', content: excessInvoice.pdf }] : []),
+  ]
   const sent = await sendEmailViaGmail(service, { from, to, subject, text: body, html, attachments })
   await recordOutboundEmail(service, {
     request,
@@ -151,9 +168,7 @@ export async function sendSigningRequestEmail(service: Service, params: {
     text: body.split(signingLink).join(LINK_PLACEHOLDER),
     source: kind === 'reminder' ? 'signing_reminder' : 'signing_request',
     actorId: params.actorId,
-    attachments: excessInvoice
-      ? [{ filename: excessInvoice.filename, storage_path: null, mime_type: 'application/pdf', size_bytes: excessInvoice.pdf.length }]
-      : undefined,
+    attachments: attachments.map(a => ({ filename: a.filename, storage_path: null, mime_type: 'application/pdf', size_bytes: a.content.length })),
   })
   return sent
 }

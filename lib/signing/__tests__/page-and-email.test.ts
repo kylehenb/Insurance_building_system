@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { buildEmailRaw } from '@/lib/email/build-raw'
 import { BUILT_IN_TEMPLATES, REQUIRED_TOKENS, TEMPLATE_TOKENS, renderTemplate, signingTemplateVars } from '@/lib/email/templates'
 import { renderBrandedEmailHtml } from '../email/html'
+import { unsignedFilename } from '../email/messages'
 import { renderSignerPage, SIGNER_PAGE_CSP, SIGNER_SCRIPT_HASH } from '../signer-page/render'
 import { SIGNER_SCRIPT } from '../signer-page/script'
 import type { SignerView } from '../in-house/signer'
@@ -196,6 +197,14 @@ describe('signing emails', () => {
     expect(body).toContain('$500.00')
     expect(body).toContain('IRC1001-EX')
     expect(body).not.toMatch(/\{\w+\}/)
+  })
+
+  it('names the attached unsigned document after its type, job and address', () => {
+    const request = { document_type: 'building_contract' } as Parameters<typeof unsignedFilename>[0]
+    expect(unsignedFilename(request, { job_number: 'J1234', property_address: '1 Example St, Perth' }))
+      .toMatch(/^Building Contract - J1234 - 1 Example St.*\.pdf$/)
+    expect(unsignedFilename({ ...request, document_type: 'scope_of_works' }, { job_number: 'J1234', property_address: null }))
+      .toBe('Scope of Works Authorisation - J1234.pdf')
   })
 
   it('subject includes the property address', () => {

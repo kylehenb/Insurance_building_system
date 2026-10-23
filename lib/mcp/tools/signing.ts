@@ -141,7 +141,7 @@ export const sendForSignatureTool: McpTool = {
   name: 'send_for_signature',
   title: 'Send for signature',
   description: [
-    'Emails the homeowner a link to sign the Scope of Works Authorisation or Building Contract for approved quotes, exactly like Send for Signature in the app.',
+    'Emails the homeowner a link to sign the Scope of Works Authorisation or Building Contract for approved quotes (with a PDF copy of the document attached as a backup), exactly like Send for Signature in the app.',
     'Leave out quote_ids, document_type and the signer to use the suggestions from get_signing.',
     'Insurance jobs need an excess choice — ask the user using the options get_signing lists, then pass excess as one of:',
     '{"kind":"new_invoice","amountIncGst":500} (creates and attaches an excess invoice), {"kind":"attach_existing","invoiceId":"…"},',
@@ -233,7 +233,7 @@ export const resendSigningRequestTool: McpTool = {
   name: 'resend_signing_request',
   title: 'Resend signing link',
   description: [
-    'Emails the signer a fresh link for an existing signing request (the previous link stops working), with the excess invoice attached again if one went originally — like Resend in the app.',
+    'Emails the signer a fresh link for an existing signing request (the previous link stops working), with the document PDF attached and the excess invoice attached again if one went originally — like Resend in the app.',
     'Use the request_id from get_signing. Read back the document and signer and get a clear yes first.',
   ].join(' '),
   inputSchema: {
