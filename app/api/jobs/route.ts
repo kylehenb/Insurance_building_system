@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { Database } from '@/lib/supabase/database.types'
 import { normaliseLossType } from '@/lib/loss-types'
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   try {
     const userSession = await getUser()
     if (!userSession?.tenant_id) {

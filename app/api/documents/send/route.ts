@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { DocumentSendError, parseDocumentRef } from '@/lib/documents/send/documents'
 import {
   buildDocumentEmailDraft,
@@ -25,7 +25,9 @@ export const maxDuration = 120
 async function context(): Promise<DocumentEmailContext | null> {
   const user = await getUser()
   if (!user?.tenant_id) return null
-  return { supabase: await createClient(), tenantId: user.tenant_id, actorId: user.session?.user.id ?? null }
+  // Service client: the permission is checked here, and every query filters tenant_id.
+  // (The user's own session could be stopped part way by database rules.)
+  return { supabase: createServiceClient(), tenantId: user.tenant_id, actorId: user.session?.user.id ?? null }
 }
 
 export async function POST(req: NextRequest) {

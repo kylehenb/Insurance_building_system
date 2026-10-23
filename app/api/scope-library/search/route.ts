@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 function formatRefDate(isoStr: string | null): string | null {
@@ -11,10 +12,9 @@ function formatRefDate(isoStr: string | null): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const tenantId = searchParams.get('tenantId')
-
-  if (!tenantId) return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -31,21 +31,7 @@ export async function GET(req: NextRequest) {
   if (libError) return NextResponse.json({ error: libError.message }, { status: 500 })
 
   const libraryResults = (libData ?? []).map(item => ({
-    result_type: 'library' as const,
-    id: item.id,
-    item_description: item.item_description,
-    unit: item.unit,
-    rate_labour: item.labour_per_unit,
-    rate_materials: item.materials_per_unit,
-    rate_total: item.total_per_unit,
-    trade: item.trade,
-    keyword: item.keyword,
-    insurer_specific: item.insurer_specific,
-    trade_rate_total: item.trade_rate_total,
-    estimated_hours: item.estimated_hours,
-    quote_ref: null,
-    job_number: null,
-    reference_date: null,
+    result_type: 'library' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.labour_per_unit, rate_materials: item.materials_per_unit, rate_total: item.total_per_unit, trade: item.trade, keyword: item.keyword, insurer_specific: item.insurer_specific, trade_rate_total: item.trade_rate_total, estimated_hours: item.estimated_hours, quote_ref: null, job_number: null, reference_date: null,
   }))
 
   // ── Reference items from scope_items ─────────────────────────────────────
@@ -101,21 +87,7 @@ export async function GET(req: NextRequest) {
     const quote = quoteMap.get(item.quote_id ?? '')
     const jobNumber = quote ? (jobMap.get(quote.job_id) ?? null) : null
     return {
-      result_type: 'reference' as const,
-      id: item.id,
-      item_description: item.item_description,
-      unit: item.unit,
-      rate_labour: item.rate_labour,
-      rate_materials: item.rate_materials,
-      rate_total: item.rate_total,
-      trade: item.trade,
-      keyword: null,
-      insurer_specific: null,
-      trade_rate_total: null,
-      estimated_hours: null,
-      quote_ref: quote?.quote_ref ?? null,
-      job_number: jobNumber,
-      reference_date: formatRefDate(item.created_at),
+      result_type: 'reference' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.rate_labour, rate_materials: item.rate_materials, rate_total: item.rate_total, trade: item.trade, keyword: null, insurer_specific: null, trade_rate_total: null, estimated_hours: null, quote_ref: quote?.quote_ref ?? null, job_number: jobNumber, reference_date: formatRefDate(item.created_at),
     }
   })
 

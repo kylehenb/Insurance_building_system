@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import {
   buildWorkOrderEmailDraft,
   sendWorkOrderEmail,
@@ -25,7 +25,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 async function context() {
   const user = await getUser()
   if (!user?.tenant_id) return null
-  return { supabase: await createClient(), tenantId: user.tenant_id, userId: user.session?.user.id ?? null }
+  // Service client: the permission is checked here, and every query filters tenant_id.
+  // (The user's own session could be stopped part way by database rules.)
+  return { supabase: createServiceClient(), tenantId: user.tenant_id, userId: user.session?.user.id ?? null }
 }
 
 function errorResponse(err: unknown, action: string) {

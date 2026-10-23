@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { jobId } = await params
-  const tenantId = req.nextUrl.searchParams.get('tenantId')
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -23,8 +23,7 @@ export async function GET(
       .select('*')
       .eq('job_id', jobId)
       .eq('tenant_id', tenantId)
-      .order('sequence_order', { ascending: true, nullsFirst: false }),
-    supabase
+      .order('sequence_order', { ascending: true, nullsFirst: false }), supabase
       .from('work_order_visits')
       .select('*')
       .eq('job_id', jobId)
@@ -42,13 +41,12 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const { jobId } = await params
-  const body = await req.json().catch(() => ({}))
-  const { tenantId } = body as { tenantId?: string }
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -131,8 +129,7 @@ export async function POST(
   tradeSequence?.forEach(ts => {
     if (ts.trade_type) {
       sequenceMap.set(ts.trade_type.toLowerCase(), {
-        order: ts.typical_sequence_order || 999,
-        visits: ts.typical_visit_count || 1,
+        order: ts.typical_sequence_order || 999, visits: ts.typical_visit_count || 1,
       })
     }
   })
@@ -209,19 +206,7 @@ export async function POST(
     const { data: workOrder, error: woError } = await supabase
       .from('work_orders')
       .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        quote_id: quote.id,
-        trade_id: trade?.id ?? null,
-        trade_name: tradeName,
-        work_type: 'repair',
-        scope_summary: `${items.length} items`,
-        estimated_hours: totalHours,
-        total_visits: totalVisits,
-        current_visit: 1,
-        sequence_order: sequenceOrder,
-        status: 'pending',
-        gary_state: 'not_started',
+        tenant_id: tenantId, job_id: jobId, quote_id: quote.id, trade_id: trade?.id ?? null, trade_name: tradeName, work_type: 'repair', scope_summary: `${items.length} items`, estimated_hours: totalHours, total_visits: totalVisits, current_visit: 1, sequence_order: sequenceOrder, status: 'pending', gary_state: 'not_started',
       })
       .select('*')
       .single()
@@ -239,12 +224,7 @@ export async function POST(
       const { error: visitError } = await supabase
         .from('work_order_visits')
         .insert({
-          tenant_id: tenantId,
-          work_order_id: workOrder.id,
-          job_id: jobId,
-          visit_number: visitNum,
-          estimated_hours: visitHours,
-          status: 'unscheduled',
+          tenant_id: tenantId, work_order_id: workOrder.id, job_id: jobId, visit_number: visitNum, estimated_hours: visitHours, status: 'unscheduled',
         })
 
       if (visitError) {
@@ -257,10 +237,7 @@ export async function POST(
 
   const tradesInQuote = [...itemsByTrade.keys()]
   return NextResponse.json({
-    success: true,
-    workOrdersCreated,
-    tradesInQuote,
-    message: workOrdersCreated.length > 0
+    success: true, workOrdersCreated, tradesInQuote, message: workOrdersCreated.length > 0
       ? `Created ${workOrdersCreated.length} work order${workOrdersCreated.length === 1 ? '' : 's'} from quote`
       : `No new work orders created — all ${tradesInQuote.length} trade${tradesInQuote.length === 1 ? '' : 's'} in the quote already have work orders`,
   })

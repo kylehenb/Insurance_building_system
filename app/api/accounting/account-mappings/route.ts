@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
@@ -69,6 +71,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const cookieSupabase = await createClient()
   const tenantId = await getAuthenticatedTenantId(cookieSupabase)
 

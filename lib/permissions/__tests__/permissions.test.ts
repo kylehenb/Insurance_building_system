@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Permissions: how a user's level is worked out, what gets refused (by the
 // app's routes and the voice connector alike), and the settings API's guards
@@ -55,6 +57,14 @@ beforeEach(() => {
 })
 
 describe('working out a level', () => {
+  it('has the same built-in defaults in the database rules (supabase/migrations/20261101_permission_rls.sql)', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261101_permission_rls.sql'), 'utf8')
+    const rows = [...sql.matchAll(/\('(office|inspector)', '([a-z_.]+)', '(allowed|approval|blocked)'\)/g)]
+    const fromSql = Object.fromEntries(rows.map(([, role, action, level]) => [`${role}:${action}`, level]))
+    const expected = Object.fromEntries((['office', 'inspector'] as const).flatMap(role => PERMISSION_ACTIONS.map(a => [`${role}:${a.key}`, BUILT_IN_DEFAULTS[role][a.key]])))
+    expect(fromSql).toEqual(expected)
+  })
+
   it('has a built-in default for every action and role, valid for that action', () => {
     for (const role of ['admin', 'office', 'inspector'] as const) {
       for (const a of PERMISSION_ACTIONS) expect((a.levels as readonly string[]).includes(BUILT_IN_DEFAULTS[role][a.key])).toBe(true)

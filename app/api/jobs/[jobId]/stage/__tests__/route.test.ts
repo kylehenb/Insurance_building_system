@@ -8,18 +8,17 @@ let sessionTenant: string | null = 't1'
 // Permissions are tested in lib/permissions; here the user is allowed
 vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null, permissionGate: async () => null }))
 vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => (sessionTenant ? { tenant_id: sessionTenant } : null) }))
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: async () => ({
-    from: () => {
-      const b = {
-        update: () => b,
-        eq: (c: string, v: unknown) => { eqCalls.push([c, v]); return b },
-        then: (res: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(res),
-      }
-      return b
-    },
-  }),
-}))
+const client = {
+  from: () => {
+    const b = {
+      update: () => b,
+      eq: (c: string, v: unknown) => { eqCalls.push([c, v]); return b },
+      then: (res: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(res),
+    }
+    return b
+  },
+}
+vi.mock('@/lib/supabase/server', () => ({ createClient: async () => client, createServiceClient: () => client }))
 
 const { PATCH } = await import('../route')
 const patch = (body: unknown) =>

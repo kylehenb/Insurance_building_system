@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/server'
 import type { BrainEntryCategory, BrainEntryPersona } from '@/types/brain'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,9 +19,10 @@ export async function POST(req: NextRequest) {
     tenantId: string
   }
 
-  const { text, persona, category, tenantId } = body
+  const { text, persona, category } = body
+  const tenantId = me.tenantId
 
-  if (!text?.trim() || !tenantId) {
+  if (!text?.trim()) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -38,17 +42,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('brain_entries')
     .insert({
-      tenant_id: tenantId,
-      title: text.slice(0, 120).trim(),
-      content: text.trim(),
-      category: resolvedCategory,
-      persona: resolvedPersona,
-      source_type: 'manual',
-      status: 'draft',
-      confidence: 'medium',
-      prompt_keys: [],
-      tags: [],
-      created_by: user.id,
+      tenant_id: tenantId, title: text.slice(0, 120).trim(), content: text.trim(), category: resolvedCategory, persona: resolvedPersona, source_type: 'manual', status: 'draft', confidence: 'medium', prompt_keys: [], tags: [], created_by: user.id,
     })
     .select('id')
     .single()

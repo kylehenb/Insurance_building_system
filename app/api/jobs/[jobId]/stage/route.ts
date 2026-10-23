@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { NextResponse } from 'next/server'
 import { permissionGate } from '@/lib/permissions/http'
@@ -31,7 +31,7 @@ export async function PATCH(
     if (gated) return gated
 
     try {
-      await setJobStage(await createClient(), tenantId, jobId, stage)
+      await setJobStage(createServiceClient(), tenantId, jobId, stage)
     } catch (err) {
       if (err instanceof SetStageError) return NextResponse.json({ error: err.message }, { status: 500 })
       throw err

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 interface Params {
@@ -37,12 +39,10 @@ async function recalcInvoiceTotals(supabase: ReturnType<typeof import('@/lib/sup
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { invoiceId } = await params
-  const tenantId = req.nextUrl.searchParams.get('tenantId')
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -59,6 +59,10 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'invoices.manage')
+  if (denied) return denied
   const { invoiceId } = await params
   const body = await req.json() as {
     tenantId: string
@@ -69,9 +73,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     library_item_id?: string
   }
 
-  const { tenantId, description, quantity, unit_price, unit, library_item_id } = body
+  const { description, quantity, unit_price, unit, library_item_id } = body
+  const tenantId = me.tenantId
 
-  if (!tenantId || !description) {
+  if (!description) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -88,15 +93,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: lineItem, error } = await supabase
     .from('invoice_line_items')
     .insert({
-      tenant_id: tenantId,
-      invoice_id: invoiceId,
-      description,
-      quantity: quantity ?? 1,
-      unit_price: unit_price ?? 0,
-      line_total: lineTotal,
-      unit: unit ?? null,
-      library_item_id: library_item_id ?? null,
-      sort_order: (count ?? 0),
+      tenant_id: tenantId, invoice_id: invoiceId, description, quantity: quantity ?? 1, unit_price: unit_price ?? 0, line_total: lineTotal, unit: unit ?? null, library_item_id: library_item_id ?? null, sort_order: (count ?? 0),
     })
     .select('*')
     .single()

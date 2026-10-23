@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getUser } from '@/lib/supabase/get-user'
 
@@ -25,6 +27,10 @@ function getRawClient() {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const userSession = await getUser()
   if (!userSession || !userSession.tenant_id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -58,6 +64,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const userSession = await getUser()
   if (!userSession || !userSession.tenant_id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -87,6 +97,10 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const userSession = await getUser()
   if (!userSession || !userSession.tenant_id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

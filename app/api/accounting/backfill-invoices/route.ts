@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
@@ -23,6 +25,10 @@ function sleep(ms: number) {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'invoices.manage')
+  if (denied) return denied
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {

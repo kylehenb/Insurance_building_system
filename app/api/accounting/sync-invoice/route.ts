@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
@@ -12,6 +14,10 @@ interface UserRow {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'invoices.manage')
+  if (denied) return denied
   // Cookie-based auth
   const cookieSupabase = await createClient()
   const { data: { user }, error: userError } = await cookieSupabase.auth.getUser()

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { StructuredTeachOutput } from '@/types/brain'
@@ -42,6 +43,8 @@ Rules:
 Return ONLY the JSON object. No other text.`
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -52,16 +55,16 @@ export async function POST(req: NextRequest) {
     tenantId: string
   }
 
-  const { dictation, trigger, tenantId } = body
+  const { dictation, trigger } = body
+  const tenantId = me.tenantId
 
-  if (!dictation?.trim() || !tenantId) {
+  if (!dictation?.trim()) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
   const model = genAI.getGenerativeModel({
-    model: GEMINI_FLASH_MODEL,
-    systemInstruction: STRUCTURE_SYSTEM_PROMPT,
+    model: GEMINI_FLASH_MODEL, systemInstruction: STRUCTURE_SYSTEM_PROMPT,
   })
 
   const userContent = `Dictation:\n${dictation.trim()}\n\nTrigger condition:\n${trigger?.trim() || '(not specified)'}`
@@ -69,8 +72,7 @@ export async function POST(req: NextRequest) {
   let structured: StructuredTeachOutput
   try {
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: userContent }] }],
-      generationConfig: { maxOutputTokens: 1024 },
+      contents: [{ role: 'user', parts: [{ text: userContent }] }], generationConfig: { maxOutputTokens: 1024 },
     })
 
     const raw = result.response.text()
@@ -89,19 +91,13 @@ export async function POST(req: NextRequest) {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (supabaseUrl && serviceKey) {
       await fetch(`${supabaseUrl}/rest/v1/ai_audit`, {
-        method: 'POST',
-        headers: {
+        method: 'POST', headers: {
           'Content-Type': 'application/json',
           'apikey': serviceKey,
           'Authorization': `Bearer ${serviceKey}`,
           'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          category: 'brain_teach',
-          prompt_key: 'brain_structure',
-          model: GEMINI_FLASH_MODEL,
-          created_by: user.id,
+        }, body: JSON.stringify({
+          tenant_id: tenantId, category: 'brain_teach', prompt_key: 'brain_structure', model: GEMINI_FLASH_MODEL, created_by: user.id,
         }),
       })
     }

@@ -1,4 +1,6 @@
 import { randomBytes } from 'crypto'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
@@ -8,6 +10,10 @@ interface UserRow {
 }
 
 export async function GET(): Promise<NextResponse> {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const cookieSupabase = await createClient()
 
   const { data: { user }, error: userError } = await cookieSupabase.auth.getUser()

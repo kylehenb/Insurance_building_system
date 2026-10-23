@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateInvoiceRef } from '@/lib/invoices/ref'
 
 export async function GET(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { searchParams } = new URL(req.url)
   const jobId = searchParams.get('jobId')
-  const tenantId = searchParams.get('tenantId')
+  const tenantId = me.tenantId
 
-  if (!jobId || !tenantId) {
-    return NextResponse.json({ error: 'Missing jobId or tenantId' }, { status: 400 })
+  if (!jobId) {
+    return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
@@ -39,10 +43,7 @@ export async function GET(req: NextRequest) {
         .order('sort_order', { ascending: true })
 
       return {
-        ...invoice,
-        line_items: items ?? [],
-        item_count: items?.length ?? 0,
-        deductions: deductions ?? [],
+        ...invoice, line_items: items ?? [], item_count: items?.length ?? 0, deductions: deductions ?? [],
       }
     })
   )
@@ -51,8 +52,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'invoices.manage')
+  if (denied) return denied
   const body = await req.json()
-  const { jobId, tenantId, invoiceType, direction = 'outbound', lineItems, templateCode } = body as {
+  const { jobId, invoiceType, direction = 'outbound', lineItems, templateCode } = body as {
     jobId: string
     tenantId: string
     invoiceType: string
@@ -60,8 +65,9 @@ export async function POST(req: NextRequest) {
     lineItems?: Array<{ description: string; quantity: number; unit_price: number }>
     templateCode?: string // e.g., 'bar', 'single_storey_roof', etc.
   }
+  const tenantId = me.tenantId
 
-  if (!jobId || !tenantId || !invoiceType) {
+  if (!jobId || !invoiceType) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -139,9 +145,7 @@ export async function POST(req: NextRequest) {
 
     // Build line item from template
     processedLineItems = [{
-      description,
-      quantity: 1,
-      unit_price: price,
+      description, quantity: 1, unit_price: price,
     }]
   }
 
@@ -171,15 +175,7 @@ export async function POST(req: NextRequest) {
   const { data: invoice, error } = await supabase
     .from('invoices')
     .insert({
-      tenant_id: tenantId,
-      job_id: jobId,
-      invoice_ref: invoiceRef,
-      invoice_type: invoiceType,
-      direction,
-      amount_ex_gst: amountExGst,
-      gst,
-      amount_inc_gst: amountIncGst,
-      status: 'draft',
+      tenant_id: tenantId, job_id: jobId, invoice_ref: invoiceRef, invoice_type: invoiceType, direction, amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, status: 'draft',
     })
     .select('*')
     .single()
@@ -189,13 +185,7 @@ export async function POST(req: NextRequest) {
   // Insert line items if provided
   if (processedLineItems && processedLineItems.length > 0) {
     const lineItemsToInsert = processedLineItems.map((item, index) => ({
-      tenant_id: tenantId,
-      invoice_id: invoice.id,
-      description: item.description,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      line_total: item.quantity * item.unit_price,
-      sort_order: index,
+      tenant_id: tenantId, invoice_id: invoice.id, description: item.description, quantity: item.quantity, unit_price: item.unit_price, line_total: item.quantity * item.unit_price, sort_order: index,
     }))
 
     const { error: itemsError } = await supabase
@@ -218,8 +208,6 @@ export async function POST(req: NextRequest) {
     .order('sort_order', { ascending: true })
 
   return NextResponse.json({
-    ...invoice,
-    line_items: items ?? [],
-    item_count: items?.length ?? 0,
+    ...invoice, line_items: items ?? [], item_count: items?.length ?? 0,
   }, { status: 201 })
 }

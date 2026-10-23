@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { quoteId } = await params
-  const { searchParams } = new URL(req.url)
-  const tenantId = searchParams.get('tenantId')
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
-  }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -30,9 +29,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const { quoteId } = await params
   const body = await req.json()
-  const { tenantId, room, qty, rate_labour, rate_materials, ...rest } = body as {
+  const { tenantId: _clientTenantId, room, qty, rate_labour, rate_materials, ...rest } = body as {
     tenantId: string
     room: string | null
     qty: number | null
@@ -40,6 +43,7 @@ export async function POST(
     rate_materials: number | null
     [key: string]: unknown
   }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -68,18 +72,9 @@ export async function POST(
   const { data, error } = await supabase
     .from('scope_items')
     .insert({
-      tenant_id: tenantId,
-      quote_id: quoteId,
-      room: room ?? null,
-      sort_order: sortOrder,
-      qty,
-      rate_labour: rateLabour,
-      rate_materials: rateMaterials,
-      rate_total: ratesReady
+      tenant_id: tenantId, quote_id: quoteId, room: room ?? null, sort_order: sortOrder, qty, rate_labour: rateLabour, rate_materials: rateMaterials, rate_total: ratesReady
         ? (rateLabour ?? 0) + (rateMaterials ?? 0)
-        : null,
-      line_total: lineTotal,
-      is_custom: (rest.is_custom as boolean | undefined) ?? true,
+        : null, line_total: lineTotal, is_custom: (rest.is_custom as boolean | undefined) ?? true,
       ...(rest as object),
     })
     .select('*')

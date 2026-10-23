@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createClient } from '@/lib/supabase/server'
 import type { SimilarityMatch } from '@/types/brain'
 
@@ -29,6 +30,8 @@ function wordOverlap(aWords: Set<string>, bWords: Set<string>): number {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -40,11 +43,8 @@ export async function POST(req: NextRequest) {
     tenantId: string
   }
 
-  const { title, trigger_condition, tags, tenantId } = body
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
+  const { title, trigger_condition, tags } = body
+  const tenantId = me.tenantId
 
   // Build the new entry's word set from title + tags (not trigger — too many common words)
   const newText = [title, ...(tags ?? [])].join(' ')
@@ -71,10 +71,7 @@ export async function POST(req: NextRequest) {
     const overlap = wordOverlap(newWords, entryWords)
     if (overlap >= 2) {
       matches.push({
-        id: entry.id as string,
-        title: entry.title as string,
-        category: entry.category as string,
-        similarity: overlap >= 3 ? 'high' : 'medium',
+        id: entry.id as string, title: entry.title as string, category: entry.category as string, similarity: overlap >= 3 ? 'high' : 'medium',
       })
     }
   }
@@ -87,10 +84,7 @@ export async function POST(req: NextRequest) {
       const alreadyMatched = matches.some((m) => m.title === playbook.name)
       if (!alreadyMatched) {
         matches.push({
-          id: playbook.id as string,
-          title: playbook.name as string,
-          category: 'workflow',
-          similarity: overlap >= 3 ? 'high' : 'medium',
+          id: playbook.id as string, title: playbook.name as string, category: 'workflow', similarity: overlap >= 3 ? 'high' : 'medium',
         })
       }
     }

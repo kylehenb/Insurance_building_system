@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -8,12 +10,17 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string; itemId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   let body: Record<string, unknown> | undefined
   try {
     const { quoteId, itemId } = await params
     body = await req.json()
     console.error('Request body:', JSON.stringify(body, null, 2))
-    const { tenantId, ...rawUpdates } = body as Record<string, unknown>
+    const { tenantId: _clientTenantId, ...rawUpdates } = body as Record<string, unknown>
+    const tenantId = me.tenantId
 
     const supabase = createServiceClient()
 
@@ -93,8 +100,12 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string; itemId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const { quoteId, itemId } = await params
-  const { tenantId } = (await req.json()) as { tenantId: string }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 

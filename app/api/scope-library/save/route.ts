@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   try {
     const body = await req.json()
-    const { tenantId, item } = body
+    const { item } = body
+    const tenantId = me.tenantId
 
-    if (!tenantId || !item) {
-      return NextResponse.json({ error: 'Missing tenantId or item' }, { status: 400 })
+    if (!item) {
+      return NextResponse.json({ error: 'Missing item' }, { status: 400 })
     }
 
     const supabase = createServiceClient()
@@ -41,20 +48,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from('scope_library')
       .insert({
-        tenant_id: tenantId,
-        trade: item.trade || null,
-        keyword: item.keyword || null,
-        item_description: item.item_description || null,
-        unit: item.unit || null,
-        labour_rate_per_hour: labourRatePerHour,
-        labour_per_unit: labourPerUnit,
-        materials_per_unit: materialsPerUnit,
-        total_per_unit: totalPerUnit,
-        estimated_hours: estimatedHours,
-        estimated_hours_overridden: false,
-        insurer_specific: null,
-        approval_status: 'pending',
-        updated_at: new Date().toISOString(),
+        tenant_id: tenantId, trade: item.trade || null, keyword: item.keyword || null, item_description: item.item_description || null, unit: item.unit || null, labour_rate_per_hour: labourRatePerHour, labour_per_unit: labourPerUnit, materials_per_unit: materialsPerUnit, total_per_unit: totalPerUnit, estimated_hours: estimatedHours, estimated_hours_overridden: false, insurer_specific: null, approval_status: 'pending', updated_at: new Date().toISOString(),
       } as any)
       .select('id')
       .single()

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const tenantId = req.nextUrl.searchParams.get('tenantId')
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const tenantId = me.tenantId
   const invoiceType = req.nextUrl.searchParams.get('type')
-
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
 
   const supabase = createServiceClient()
 
@@ -30,6 +30,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const body = await req.json() as {
     tenantId: string
     invoice_type: string
@@ -40,10 +44,11 @@ export async function POST(req: NextRequest) {
     sort_order?: number
   }
 
-  const { tenantId, invoice_type, description, default_quantity, default_unit_price, unit, sort_order } = body
+  const { invoice_type, description, default_quantity, default_unit_price, unit, sort_order } = body
+  const tenantId = me.tenantId
 
-  if (!tenantId || !invoice_type || !description) {
-    return NextResponse.json({ error: 'Missing required fields: tenantId, invoice_type, description' }, { status: 400 })
+  if (!invoice_type || !description) {
+    return NextResponse.json({ error: 'Missing required fields: invoice_type, description' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
@@ -51,14 +56,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('invoice_line_item_library')
     .insert({
-      tenant_id: tenantId,
-      invoice_type,
-      description,
-      default_quantity: default_quantity ?? 1,
-      default_unit_price: default_unit_price ?? null,
-      unit: unit ?? null,
-      sort_order: sort_order ?? 0,
-      is_active: true,
+      tenant_id: tenantId, invoice_type, description, default_quantity: default_quantity ?? 1, default_unit_price: default_unit_price ?? null, unit: unit ?? null, sort_order: sort_order ?? 0, is_active: true,
     })
     .select('*')
     .single()

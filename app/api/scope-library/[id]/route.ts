@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { ScopeLibraryItem, PricingTiers } from '@/lib/types/scope-library'
@@ -12,6 +14,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const session = await getUser()
   if (!session || !session.tenant_id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -138,6 +144,10 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'settings.edit')
+  if (denied) return denied
   const session = await getUser()
   if (!session || !session.tenant_id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

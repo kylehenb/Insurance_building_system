@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { searchParams } = new URL(req.url)
   const jobId = searchParams.get('jobId')
-  const tenantId = searchParams.get('tenantId')
+  const tenantId = me.tenantId
 
-  if (!jobId || !tenantId) {
-    return NextResponse.json({ error: 'Missing jobId or tenantId' }, { status: 400 })
+  if (!jobId) {
+    return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
@@ -47,10 +51,7 @@ export async function GET(req: NextRequest) {
       const calculatedTotal = calculatedSubtotal + calculatedMarkup + calculatedGst
 
       return {
-        ...quote,
-        item_count: itemCount,
-        room_summary: roomSummary,
-        total_amount: calculatedTotal,
+        ...quote, item_count: itemCount, room_summary: roomSummary, total_amount: calculatedTotal,
       }
     })
   )
@@ -59,14 +60,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const body = await req.json()
-  const { jobId, tenantId, quoteType = 'additional_works' } = body as {
+  const { jobId, quoteType = 'additional_works' } = body as {
     jobId: string
     tenantId: string
     quoteType?: string
   }
+  const tenantId = me.tenantId
 
-  if (!jobId || !tenantId) {
+  if (!jobId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -109,15 +115,7 @@ export async function POST(req: NextRequest) {
   const { data: quote, error } = await supabase
     .from('quotes')
     .insert({
-      tenant_id: tenantId,
-      job_id: jobId,
-      quote_ref: quoteRef,
-      quote_type: quoteType,
-      status: 'draft',
-      is_active_version: true,
-      is_locked: false,
-      markup_pct: markupPct,
-      gst_pct: 0.10,
+      tenant_id: tenantId, job_id: jobId, quote_ref: quoteRef, quote_type: quoteType, status: 'draft', is_active_version: true, is_locked: false, markup_pct: markupPct, gst_pct: 0.10,
     })
     .select('*')
     .single()

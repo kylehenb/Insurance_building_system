@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
@@ -105,18 +107,7 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
     const { data: workOrder, error: woError } = await supabase
       .from('work_orders')
       .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        quote_id: quoteId,
-        trade_id: tradeId,
-        trade_name: tradeName,
-        work_type: 'repair',
-        status: 'pending',
-        estimated_hours: totalHours,
-        total_visits: totalVisits,
-        current_visit: 1,
-        gary_state: 'not_started',
-        scope_summary: `${items.length} items`,
+        tenant_id: tenantId, job_id: jobId, quote_id: quoteId, trade_id: tradeId, trade_name: tradeName, work_type: 'repair', status: 'pending', estimated_hours: totalHours, total_visits: totalVisits, current_visit: 1, gary_state: 'not_started', scope_summary: `${items.length} items`,
       })
       .select('id')
       .single()
@@ -132,12 +123,7 @@ async function createUnplacedWorkOrdersFromQuote(quoteId: string, jobId: string,
       await supabase
         .from('work_order_visits')
         .insert({
-          tenant_id: tenantId,
-          work_order_id: workOrder.id,
-          job_id: jobId,
-          visit_number: visitNum,
-          estimated_hours: visitHours,
-          status: 'unscheduled',
+          tenant_id: tenantId, work_order_id: workOrder.id, job_id: jobId, visit_number: visitNum, estimated_hours: visitHours, status: 'unscheduled',
         })
     }
 
@@ -151,10 +137,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const { quoteId } = await params
-  const tenantId = req.nextUrl.searchParams.get('tenantId')
-
-  if (!tenantId) return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 
@@ -181,9 +167,14 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const { quoteId } = await params
   const body = await req.json()
-  const { tenantId, ...updates } = body as Record<string, unknown>
+  const { tenantId: _clientTenantId, ...updates } = body as Record<string, unknown>
+  const tenantId = me.tenantId
 
   const allowed: (keyof QuoteUpdate)[] = [
     'markup_pct',
@@ -262,8 +253,12 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'records.delete')
+  if (denied) return denied
   const { quoteId } = await params
-  const { tenantId } = (await req.json()) as { tenantId: string }
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 

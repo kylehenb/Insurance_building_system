@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import {
-  generateExcessInvoice,
-  generateBalanceInvoice,
+  generateExcessInvoice, generateBalanceInvoice,
 } from '@/lib/invoices/generators'
 import { generateInvoiceRef } from '@/lib/invoices/ref'
 import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
@@ -10,6 +11,10 @@ import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
 const DEFAULT_GST_PCT = 0.1
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'invoices.manage')
+  if (denied) return denied
   const body = await req.json() as {
     type: string
     jobId: string
@@ -19,10 +24,11 @@ export async function POST(req: NextRequest) {
     lineItems?: Array<{ description: string; quantity: number; unitPrice: number; unit?: string; libraryItemId?: string }>
   }
 
-  const { type, jobId, tenantId } = body
+  const { type, jobId } = body
+  const tenantId = me.tenantId
 
-  if (!type || !jobId || !tenantId) {
-    return NextResponse.json({ error: 'Missing required fields: type, jobId, tenantId' }, { status: 400 })
+  if (!type || !jobId) {
+    return NextResponse.json({ error: 'Missing required fields: type, jobId' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
@@ -71,9 +77,7 @@ export async function POST(req: NextRequest) {
 
     // Map invoice types to template codes
     const templateCodeMap: Record<string, string> = {
-      assessment: 'bar',
-      make_safe: 'make_safe',
-      roof: 'single_storey_roof', // Will be adjusted based on property type
+      assessment: 'bar', make_safe: 'make_safe', roof: 'single_storey_roof', // Will be adjusted based on property type
       leak_detection: 'leak_detection',
     }
     const templateCode = templateCodeMap[type]
@@ -141,25 +145,10 @@ export async function POST(req: NextRequest) {
 
     generated = {
       invoiceData: {
-        tenant_id: tenantId,
-        job_id: jobId,
-        report_id: reportId,
-        invoice_type: type,
-        direction: 'outbound',
-        gst_treatment: 'exclusive',
-        amount_ex_gst: amountExGst,
-        gst,
-        amount_inc_gst: amountIncGst,
-        status: 'draft',
+        tenant_id: tenantId, job_id: jobId, report_id: reportId, invoice_type: type, direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, status: 'draft',
         ...(makeSafeMarkupPct != null ? { markup_pct: makeSafeMarkupPct } : {}),
-      },
-      lineItems: [{
-        tenant_id: tenantId,
-        description,
-        quantity: 1,
-        unit_price: lineItemTotal,
-        line_total: lineItemTotal,
-        sort_order: 0,
+      }, lineItems: [{
+        tenant_id: tenantId, description, quantity: 1, unit_price: lineItemTotal, line_total: lineItemTotal, sort_order: 0,
       }],
     }
 
@@ -173,12 +162,7 @@ export async function POST(req: NextRequest) {
     }
 
     generated = generateExcessInvoice({
-      tenantId,
-      jobId,
-      claimNumber: job.claim_number,
-      insuredName: job.insured_name,
-      excessAmountIncGst,
-      gstPct: DEFAULT_GST_PCT,
+      tenantId, jobId, claimNumber: job.claim_number, insuredName: job.insured_name, excessAmountIncGst, gstPct: DEFAULT_GST_PCT,
     })
 
   } else if (type === 'balance') {
@@ -219,15 +203,7 @@ export async function POST(req: NextRequest) {
     if (scopeItems.length > 0) {
       // Build line items from scope items — each item is listed explicitly
       const lineItems = scopeItems.map((item, index) => ({
-        tenant_id: tenantId,
-        description: item.item_description ?? 'Scope Item',
-        quantity: item.qty ?? 1,
-        unit_price: item.rate_total ?? 0,
-        line_total: item.line_total ?? 0,
-        unit: item.unit ?? null,
-        quote_id: quote?.id ?? null,
-        quote_ref: quote?.quote_ref ?? null,
-        sort_order: item.sort_order ?? index,
+        tenant_id: tenantId, description: item.item_description ?? 'Scope Item', quantity: item.qty ?? 1, unit_price: item.rate_total ?? 0, line_total: item.line_total ?? 0, unit: item.unit ?? null, quote_id: quote?.id ?? null, quote_ref: quote?.quote_ref ?? null, sort_order: item.sort_order ?? index,
       }))
 
       const subtotal = Math.round(
@@ -239,18 +215,8 @@ export async function POST(req: NextRequest) {
 
       generated = {
         invoiceData: {
-          tenant_id: tenantId,
-          job_id: jobId,
-          invoice_type: 'repair',
-          direction: 'outbound',
-          gst_treatment: 'exclusive',
-          amount_ex_gst: amountExGst,
-          gst,
-          amount_inc_gst: amountIncGst,
-          markup_pct: markupPct,
-          status: 'draft',
-        },
-        lineItems,
+          tenant_id: tenantId, job_id: jobId, invoice_type: 'repair', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, markup_pct: markupPct, status: 'draft',
+        }, lineItems,
       }
     } else {
       // Fallback when no scope items: compute balance from approved amount minus prior invoices
@@ -275,17 +241,11 @@ export async function POST(req: NextRequest) {
         .neq('status', 'voided')
 
       const previouslyInvoicedAmountIncGst = (priorInvoices ?? []).reduce(
-        (sum, inv) => sum + (inv.amount_inc_gst ?? 0),
-        0
+        (sum, inv) => sum + (inv.amount_inc_gst ?? 0), 0
       )
 
       generated = generateBalanceInvoice({
-        tenantId,
-        jobId,
-        claimNumber: job.claim_number,
-        approvedQuoteAmountIncGst,
-        previouslyInvoicedAmountIncGst,
-        gstPct,
+        tenantId, jobId, claimNumber: job.claim_number, approvedQuoteAmountIncGst, previouslyInvoicedAmountIncGst, gstPct,
       })
     }
 
@@ -331,15 +291,7 @@ export async function POST(req: NextRequest) {
 
       for (const item of items ?? []) {
         allLineItems.push({
-          tenant_id: tenantId,
-          description: item.item_description ?? 'Scope Item',
-          quantity: item.qty ?? 1,
-          unit_price: item.rate_total ?? 0,
-          line_total: item.line_total ?? 0,
-          unit: item.unit ?? null,
-          quote_id: quote.id,
-          quote_ref: quote.quote_ref ?? null,
-          sort_order: (item.sort_order ?? 0) + sortOffset,
+          tenant_id: tenantId, description: item.item_description ?? 'Scope Item', quantity: item.qty ?? 1, unit_price: item.rate_total ?? 0, line_total: item.line_total ?? 0, unit: item.unit ?? null, quote_id: quote.id, quote_ref: quote.quote_ref ?? null, sort_order: (item.sort_order ?? 0) + sortOffset,
         })
       }
       sortOffset += 1000
@@ -367,19 +319,8 @@ export async function POST(req: NextRequest) {
 
     generated = {
       invoiceData: {
-        tenant_id: tenantId,
-        job_id: jobId,
-        invoice_type: 'quoted_amounts',
-        direction: 'outbound',
-        gst_treatment: 'exclusive',
-        amount_ex_gst: amountExGst,
-        gst,
-        amount_inc_gst: amountIncGst,
-        markup_pct: markupPct,
-        status: 'draft',
-      },
-      lineItems: allLineItems,
-      deductions: excessDeductionIncGst > 0
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'quoted_amounts', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, markup_pct: markupPct, status: 'draft',
+      }, lineItems: allLineItems, deductions: excessDeductionIncGst > 0
         ? [{ description: 'Policy Excess Payment Received', amount_inc_gst: excessDeductionIncGst }]
         : [],
     }
@@ -428,13 +369,7 @@ export async function POST(req: NextRequest) {
     }
 
     const variationsLineItems = allAddedItems.map((item, index) => ({
-      tenant_id: tenantId,
-      description: item.item_description,
-      quantity: item.qty,
-      unit_price: item.rate_labour + item.rate_materials,
-      line_total: item.line_total,
-      unit: null as string | null,
-      sort_order: index,
+      tenant_id: tenantId, description: item.item_description, quantity: item.qty, unit_price: item.rate_labour + item.rate_materials, line_total: item.line_total, unit: null as string | null, sort_order: index,
     }))
 
     const varSubtotal = Math.round(variationsLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
@@ -444,18 +379,8 @@ export async function POST(req: NextRequest) {
 
     generated = {
       invoiceData: {
-        tenant_id: tenantId,
-        job_id: jobId,
-        invoice_type: 'variations',
-        direction: 'outbound',
-        gst_treatment: 'exclusive',
-        amount_ex_gst: varAmountExGst,
-        gst: varGst,
-        amount_inc_gst: varAmountIncGst,
-        markup_pct: variationsMarkupPct,
-        status: 'draft',
-      },
-      lineItems: variationsLineItems,
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'variations', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: varAmountExGst, gst: varGst, amount_inc_gst: varAmountIncGst, markup_pct: variationsMarkupPct, status: 'draft',
+      }, lineItems: variationsLineItems,
     }
 
   } else if (type === 'custom') {
@@ -472,18 +397,8 @@ export async function POST(req: NextRequest) {
 
     generated = {
       invoiceData: {
-        tenant_id: tenantId,
-        job_id: jobId,
-        invoice_type: 'custom',
-        direction: 'outbound',
-        gst_treatment: 'exclusive',
-        amount_ex_gst: 0,
-        gst: 0,
-        amount_inc_gst: 0,
-        markup_pct: customMarkupPct,
-        status: 'draft',
-      },
-      lineItems: [],
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'custom', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: 0, gst: 0, amount_inc_gst: 0, markup_pct: customMarkupPct, status: 'draft',
+      }, lineItems: [],
     }
 
   } else {
@@ -507,8 +422,7 @@ export async function POST(req: NextRequest) {
   // Write line items
   if (generated.lineItems.length > 0) {
     const lineItemsToInsert = generated.lineItems.map(li => ({
-      ...li,
-      invoice_id: invoice.id,
+      ...li, invoice_id: invoice.id,
     }))
 
     const { error: itemsError } = await supabase
@@ -524,11 +438,7 @@ export async function POST(req: NextRequest) {
   // Write deductions (e.g. policy excess already paid, deducted post-GST)
   if (generated.deductions && generated.deductions.length > 0) {
     const deductionsToInsert = generated.deductions.map((d, index) => ({
-      tenant_id: tenantId,
-      invoice_id: invoice.id,
-      description: d.description,
-      amount_inc_gst: d.amount_inc_gst,
-      sort_order: index,
+      tenant_id: tenantId, invoice_id: invoice.id, description: d.description, amount_inc_gst: d.amount_inc_gst, sort_order: index,
     }))
 
     const { error: deductionsError } = await supabase

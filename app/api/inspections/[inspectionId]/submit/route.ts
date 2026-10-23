@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { indexReports } from '@/lib/reports/similar-reports'
 
@@ -6,13 +7,11 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ inspectionId: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   try {
     const { inspectionId } = await params
-    const { tenantId } = await req.json()
-
-    if (!tenantId) {
-      return NextResponse.json({ error: 'tenantId required' }, { status: 400 })
-    }
+    const tenantId = me.tenantId
 
     const supabase = createServiceClient()
 
@@ -127,11 +126,7 @@ export async function POST(
     // 3. Sending via Gmail compose window with proper routing
 
     return NextResponse.json({
-      success: true,
-      message: 'Inspection package submitted successfully',
-      inspectionId,
-      reportId: coreReport.id,
-      quoteId: coreQuote.id,
+      success: true, message: 'Inspection package submitted successfully', inspectionId, reportId: coreReport.id, quoteId: coreQuote.id,
     })
   } catch (err) {
     console.error('[inspection submit] unexpected error:', err)

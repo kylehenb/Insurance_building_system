@@ -44,11 +44,11 @@ const ON_OFF: PermissionLevel[] = ['allowed', 'blocked']
 export const PERMISSION_ACTIONS = [
   // Jobs
   { key: 'jobs.notes', group: 'Jobs', label: 'Add job notes', description: 'Add notes to a job (by voice for now)', levels: ON_OFF, enforced: true },
-  { key: 'jobs.edit', group: 'Jobs', label: 'Edit job details', description: 'Change job details, contacts, quotes and reports in the app', levels: ON_OFF, enforced: false },
+  { key: 'jobs.edit', group: 'Jobs', label: 'Edit job details', description: 'Change job details, contacts, quotes and reports in the app', levels: ON_OFF, enforced: true },
   { key: 'jobs.change_stage', group: 'Jobs', label: 'Change a job\'s stage', description: 'Move a job to a different stage by hand', levels: ALL, enforced: true },
   { key: 'orders.lodge', group: 'Jobs', label: 'Lodge insurer orders', description: 'Create jobs from insurer orders', levels: ALL, enforced: true },
   { key: 'orders.manage', group: 'Jobs', label: 'Fix and file orders and emails', description: 'Correct or link insurer orders, create orders from emails, file emails on jobs', levels: ALL, enforced: true },
-  { key: 'records.delete', group: 'Jobs', label: 'Delete records', description: 'Delete jobs, quotes, reports, work orders and other records', levels: ON_OFF, enforced: false },
+  { key: 'records.delete', group: 'Jobs', label: 'Delete records', description: 'Delete jobs, quotes, reports, work orders and other records', levels: ON_OFF, enforced: true },
   // Sending — anything that leaves the company
   { key: 'send.work_orders', group: 'Sending', label: 'Send work orders to trades', description: 'Email work orders to trades and hand them to Gary', levels: ALL, enforced: true },
   { key: 'send.documents', group: 'Sending', label: 'Send quotes, reports and invoices', description: 'Email documents to insurers or homeowners (or mark them as sent)', levels: ALL, enforced: true },
@@ -56,10 +56,10 @@ export const PERMISSION_ACTIONS = [
   { key: 'send.replies', group: 'Sending', label: 'Reply to emails', description: 'Reply to emails on a job', levels: ALL, enforced: true },
   // Money
   { key: 'financials.view', group: 'Money', label: 'See amounts and margins', description: 'See quote, invoice and work order amounts, margins and the accounts', levels: ON_OFF, enforced: false },
-  { key: 'invoices.manage', group: 'Money', label: 'Create and sync invoices', description: 'Raise invoices and push them to the accounting system', levels: ALL, enforced: false },
+  { key: 'invoices.manage', group: 'Money', label: 'Create and sync invoices', description: 'Raise and edit invoices and push them to the accounting system. Needs approval means an admin does it — browser edits can\'t be queued', levels: ALL, enforced: true },
   { key: 'excess.decide', group: 'Money', label: 'Decide the excess', description: 'Record whether an excess is collected, waived or not applicable', levels: ALL, enforced: true },
   // Admin
-  { key: 'settings.edit', group: 'Admin', label: 'Change company settings', description: 'Templates, automation, rates, integrations and company details', levels: ON_OFF, enforced: false },
+  { key: 'settings.edit', group: 'Admin', label: 'Change company settings', description: 'Templates, automation, rates, integrations and company details', levels: ON_OFF, enforced: true },
   { key: 'users.manage', group: 'Admin', label: 'Manage users and permissions', description: 'Change roles and these permissions', levels: ON_OFF, enforced: true },
 ] as const satisfies readonly PermissionAction[]
 

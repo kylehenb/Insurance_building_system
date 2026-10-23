@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export interface NoteTemplate {
@@ -11,10 +12,9 @@ export interface NoteTemplate {
 }
 
 export async function GET(req: NextRequest) {
-  const tenantId = req.nextUrl.searchParams.get('tenantId')
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenantId' }, { status: 400 })
-  }
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const tenantId = me.tenantId
 
   const supabase = createServiceClient()
 

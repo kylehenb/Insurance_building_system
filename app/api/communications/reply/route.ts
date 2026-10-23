@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/get-user'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { ReplyError, replyToEmail } from '@/lib/communications/reply'
 import { permissionGate } from '@/lib/permissions/http'
 import { recordOperation } from '@/lib/activity/log'
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
   if (gated) return gated
 
   try {
-    // RLS-scoped client, plus the explicit tenant filter in replyToEmail
-    await replyToEmail(await createClient(), tenantId, commId, body)
+    // Service client after the permission check; replyToEmail filters tenant_id
+    await replyToEmail(createServiceClient(), tenantId, commId, body)
   } catch (err) {
     if (err instanceof ReplyError) return NextResponse.json({ error: err.message }, { status: err.status })
     throw err

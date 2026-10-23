@@ -2,29 +2,32 @@
 // Handles: PATCH (lock/unlock/reinstate), DELETE (soft delete), POST (duplicate)
 
 import { NextRequest, NextResponse, after } from 'next/server'
+import { permissionDenied } from '@/lib/permissions/http'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { indexReports } from '@/lib/reports/similar-reports'
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
-  BAR: 'BAR',
-  storm_wind: 'SW',
-  make_safe: 'MS',
-  roof: 'RR',
-  specialist: 'SPR',
-  LDR: 'LDR',
+  BAR: 'BAR', storm_wind: 'SW', make_safe: 'MS', roof: 'RR', specialist: 'SPR', LDR: 'LDR',
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const supabase = createServiceClient()
   const { id: reportId } = await params
   const body = await req.json()
-  const { action, userId, tenantId } = body
+  const { action } = body
+  const tenantId = me.tenantId
+  const userId = me.userId
 
-  if (!action || !userId || !tenantId) {
+  if (!action) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -79,21 +82,21 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'records.delete')
+  if (denied) return denied
   const supabase = createServiceClient()
   const { id: reportId } = await params
   const body = await req.json()
-  const { userId, tenantId, reason } = body
-
-  if (!userId || !tenantId) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
+  const { reason } = body
+  const tenantId = me.tenantId
+  const userId = me.userId
 
   const { error } = await supabase
     .from('reports')
     .update({
-      deleted_at: new Date().toISOString(),
-      deleted_by: userId,
-      delete_reason: reason ?? null,
+      deleted_at: new Date().toISOString(), deleted_by: userId, delete_reason: reason ?? null,
     })
     .eq('id', reportId)
     .eq('tenant_id', tenantId)
@@ -106,14 +109,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
   const supabase = createServiceClient()
   const { id: reportId } = await params
-  const body = await req.json()
-  const { userId, tenantId } = body
-
-  if (!userId || !tenantId) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
+  const tenantId = me.tenantId
+  const userId = me.userId
 
   const { data: source, error: fetchError } = await supabase
     .from('reports')
@@ -141,15 +144,7 @@ export async function POST(
   const { data: newReport, error: insertError } = await supabase
     .from('reports')
     .insert({
-      ...rest,
-      report_ref: newRef,
-      parent_report_id: source.id,
-      version: 1,
-      is_locked: false,
-      status: 'draft',
-      deleted_at: null,
-      deleted_by: null,
-      delete_reason: null,
+      ...rest, report_ref: newRef, parent_report_id: source.id, version: 1, is_locked: false, status: 'draft', deleted_at: null, deleted_by: null, delete_reason: null,
     })
     .select()
     .single()
