@@ -6,6 +6,9 @@ import { extractMessageParts, getFullMessage } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { LodgeError, lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
+import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
+import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
+import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 
 // Insurer orders by voice: the orders waiting to be lodged, finding an order
 // email the auto job lodger missed and turning it into an order, and lodging
@@ -255,6 +258,122 @@ export const lodgeOrder: McpTool = {
         }
       }
       return { text: err.message, data: { status: err.status }, isError: true }
+    }
+  },
+}
+
+/** Order fields that can be corrected by voice — as editable on the Insurer Orders page */
+const EDITABLE_FIELDS = {
+  claim_number: 'Claim number',
+  insurer: 'Insurer',
+  property_address: 'Property address',
+  insured_name: 'Insured name',
+  insured_phone: 'Insured phone',
+  insured_email: 'Insured email',
+  wo_type: 'Work type',
+  excess_building: 'Excess (building)',
+  special_instructions: 'Special instructions',
+} as const
+type EditableField = keyof typeof EDITABLE_FIELDS
+/** The Insurer Orders page's work type options */
+const WO_TYPES = ['BAR', 'make_safe', 'roof_report', 'specialist', 'variation', 'quote_only']
+
+async function pendingOrder(ctx: McpContext, args: Record<string, unknown>): Promise<OrderSummaryRow | McpToolResult> {
+  const id = typeof args.order_id === 'string' ? args.order_id.trim() : ''
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { text: 'Order not found — use list_insurer_orders for its id.', isError: true }
+  const { data, error } = await ctx.supabase
+    .from('insurer_orders').select(ORDER_COLUMNS).eq('tenant_id', ctx.tenantId).eq('id', id).maybeSingle()
+  if (error) throw error
+  if (!data) return { text: 'Order not found — use list_insurer_orders for its id.', isError: true }
+  const order = data as OrderSummaryRow
+  if (order.job_id) return { text: 'That order is already lodged, so it can\'t be changed here.', isError: true }
+  return order
+}
+
+const isOrderResult = (v: OrderSummaryRow | McpToolResult): v is McpToolResult => 'text' in v
+
+export const updateInsurerOrder: McpTool = {
+  name: 'update_insurer_order',
+  title: 'Correct insurer order',
+  description: [
+    'Corrects details on an order waiting to be lodged — e.g. adds a missing claim number so it can be lodged —',
+    `as on the Insurer Orders page. Fields: ${Object.keys(EDITABLE_FIELDS).join(', ')}. work type is one of ${WO_TYPES.join(', ')}.`,
+    'Read back the change and get a yes first. Lodged orders can\'t be changed here.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      order_id: { type: 'string', description: 'order_id from list_insurer_orders.' },
+      ...Object.fromEntries(Object.keys(EDITABLE_FIELDS).map(k => [k, k === 'excess_building'
+        ? { type: 'number', description: 'Excess amount in dollars.' }
+        : k === 'wo_type' ? { type: 'string', enum: WO_TYPES } : { type: 'string' }])),
+    },
+    required: ['order_id'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const order = await pendingOrder(ctx, args)
+    if (isOrderResult(order)) return order
+
+    const update: Partial<Record<EditableField, string | number | null>> = {}
+    for (const field of Object.keys(EDITABLE_FIELDS) as EditableField[]) {
+      if (!(field in args)) continue
+      const v = args[field]
+      if (field === 'excess_building') {
+        const n = typeof v === 'number' ? v : Number(v)
+        if (!Number.isFinite(n) || n < 0 || n > 100_000) return { text: 'The excess must be a dollar amount.', isError: true }
+        update[field] = Math.round(n * 100) / 100
+      } else if (typeof v === 'string') {
+        const s = field === 'claim_number' ? v.replace(/\s+/g, '').toUpperCase() : v.trim()
+        if (field === 'wo_type' && !WO_TYPES.includes(s)) return { text: `Work type must be one of ${WO_TYPES.join(', ')}.`, isError: true }
+        update[field] = s || null
+      }
+    }
+    if (!Object.keys(update).length) return { text: 'What should be changed on the order?', isError: true }
+
+    const { error } = await ctx.supabase
+      .from('insurer_orders').update(update as never).eq('tenant_id', ctx.tenantId).eq('id', order.id)
+    if (error) throw error
+    const changed = Object.entries(update).map(([k, v]) => `${EDITABLE_FIELDS[k as EditableField]}: ${v ?? 'cleared'}`).join(', ')
+    return orderResult(ctx, order.id, `Updated (${changed}).`)
+  },
+}
+
+export const linkOrderToJob: McpTool = {
+  name: 'link_order_to_job',
+  title: 'Link order to existing job',
+  description: [
+    'Attaches an order waiting to be lodged to a job that already exists instead of lodging a new one (e.g. a second instruction for the same claim, or when lodge_order reports the address already has a job) —',
+    'like "Link to job" on the Insurer Orders page. Its email thread moves to the job too. Read back the order and the job and get a yes first.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      order_id: { type: 'string', description: 'order_id from list_insurer_orders.' },
+      job_number: { type: 'string', description: 'The existing job, e.g. IRC1035.' },
+    },
+    required: ['order_id', 'job_number'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const order = await pendingOrder(ctx, args)
+    if (isOrderResult(order)) return order
+    const job = await jobFromArgs(args, ctx)
+    if (isToolResult(job)) return job
+
+    const { error } = await ctx.supabase
+      .from('insurer_orders').update({ job_id: job.id, status: 'lodged' }).eq('tenant_id', ctx.tenantId).eq('id', order.id)
+    if (error) throw error
+    // As the Lodge button does when it links to an existing job
+    await linkOrderThreadsToJob(ctx.supabase, ctx.tenantId, order.id, job.id)
+    await recomputeAndSaveStage(job.id)
+    return {
+      text: `Linked the order (${order.claim_number ? `claim ${order.claim_number}` : 'no claim number'}) to ${job.job_number}.`,
+      data: { order_id: order.id, job_number: job.job_number },
     }
   },
 }

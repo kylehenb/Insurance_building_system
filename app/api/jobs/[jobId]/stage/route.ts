@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/supabase/get-user'
 import { NextResponse } from 'next/server'
 
 export async function PATCH(
@@ -7,10 +8,16 @@ export async function PATCH(
 ) {
   try {
     const { jobId } = await params
+    // The tenant comes from the signed-in session, never the request body
+    const user = await getUser()
+    const tenantId = user?.tenant_id
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
-    const { tenantId, stage } = body
+    const { stage } = body
 
-    if (!tenantId || !stage) {
+    if (!stage) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

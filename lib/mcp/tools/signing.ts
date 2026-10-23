@@ -38,7 +38,7 @@ function errorResult(err: unknown): McpToolResult {
 }
 
 /** "Building Contract to Jane Smith (jane@…): sent 10 Oct, viewed 11 Oct, expires 24 Oct." */
-function describeRequest(r: SigningRequestSummary): string {
+export function describeRequest(r: SigningRequestSummary): string {
   const who = `${r.signerName}${r.signerEmail ? ` (${r.signerEmail})` : ''}`
   const steps: string[] = []
   if (r.status === 'signed' && r.signedAt) steps.push(`signed ${spokenDate(r.signedAt)}`)

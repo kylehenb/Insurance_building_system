@@ -39,6 +39,8 @@ vi.mock('@/lib/email/order-parser', () => ({ parseInsurerOrder: (...a: unknown[]
 vi.mock('@/lib/email/order-writer', () => ({ writeInsurerOrder: (...a: unknown[]) => write(...a) }))
 vi.mock('@/lib/insurer-orders/lodge', () => ({ LodgeError, lodgeInsurerOrder: (...a: unknown[]) => lodge(...a) }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => ({ from: query }) }))
+let sessionTenant: string | null = 't1'
+vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => (sessionTenant ? { tenant_id: sessionTenant } : null) }))
 
 const { listInsurerOrders, findOrderEmails, createOrderFromEmail, lodgeOrder } = await import('../tools/orders')
 const { POST: lodgeRoute } = await import('@/app/api/insurer-orders/lodge/route')
@@ -137,7 +139,7 @@ describe('Lodge button route', () => {
 
   it('answers as before: the job, the address warning with its fields, and errors', async () => {
     expect(await (await post({ orderId: ORDER_ID })).json()).toEqual({ jobNumber: 'IRC1080', jobId: 'j80' })
-    expect(lodge).toHaveBeenCalledWith(expect.anything(), ORDER_ID)
+    expect(lodge).toHaveBeenCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1' })
 
     lodge.mockRejectedValueOnce(new LodgeError('Address already exists in system', 409, { warning: true, matchingJobs: [], message: 'Found 1…' }))
     const warn = await post({ orderId: ORDER_ID })
@@ -150,5 +152,13 @@ describe('Lodge button route', () => {
     const boom = await post({ orderId: ORDER_ID })
     expect(boom.status).toBe(500)
     expect(await boom.json()).toEqual({ error: 'Internal server error' })
+  })
+
+  it('refuses without a signed-in user', async () => {
+    sessionTenant = null
+    const res = await post({ orderId: ORDER_ID })
+    sessionTenant = 't1'
+    expect(res.status).toBe(401)
+    expect(lodge).not.toHaveBeenCalled()
   })
 })

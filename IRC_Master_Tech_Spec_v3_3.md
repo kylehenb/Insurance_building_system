@@ -2592,6 +2592,8 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 ### Tools
 | Tool | Type | Calls | Notes |
 |---|---|---|---|
+| `get_job_summary(job_number)` | read | `fetchJobContext` + `getJobStage`, pending `action_queue`, and the work order / document / signing / excess / email tools | Who and where, stage + next step + warning, what's waiting (pending action cards), work orders, documents, signing, excess, latest 3 emails, last 600 chars of notes. A section that fails says so; the rest still return |
+| `add_job_note(job_number, note)` | change | — | Appends `"<date> (voice): <note>"` to `jobs.notes` (the Overview tab's Notes field; the `job_notes` table has no UI yet) |
 | `find_work_orders(job_number?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders. Without: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
 | `get_work_order_email(work_order_id)` | read | `buildWorkOrderEmailDraft` | Recipient, amount, warnings, attachments (WO PDF + photos PDF), standard subject/body from the tenant template. Already sent → says it can't be sent again |
 | `send_work_order(work_order_id, to?, subject?, body?, include_photos?)` | send | `sendWorkOrderEmail` | Same send as Auto/Customise send: PDF + photos, communications row, Gary hand-off. Refuses an already-sent work order (409). One work order per call; several can be confirmed with one yes. Description requires a read-back first, and no retry on error |
@@ -2607,6 +2609,8 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `find_order_emails(query)` | read | Gmail `messages.list` | Inbox search (last 90 days, excluding our domain) by claim number, name, address or Gmail syntax; says whether each email is already an order, or its thread is on a job |
 | `create_order_from_email(message_id)` | change | `parseInsurerOrder`, `writeInsurerOrder` | For an order email the auto lodger missed: runs the lodger's reader and writer with `isNewOrder` forced true (the reader's reasoning is kept on `ai_audit`). Returns the existing order if the email or claim number already has one. No new-order notification (the user asked for it) |
 | `lodge_order(order_id)` | change | `lodgeInsurerOrder` | Same as the Lodge button, scoped to the tenant. Links to an existing job with the same claim; the same-address-different-claim warning creates nothing and lists the matching jobs |
+| `update_insurer_order(order_id, claim_number?, insurer?, property_address?, insured_*?, wo_type?, excess_building?, special_instructions?)` | change | — | Corrects an unlodged order as the Insurer Orders page does (claim number upper-cased, spaces removed; `wo_type` from the page's options). Lodged orders refused |
+| `link_order_to_job(order_id, job_number)` | change | `linkOrderThreadsToJob`, `recomputeAndSaveStage` | The page's "Link to job" (`job_id`, status `lodged`), plus moving the order's email thread and recomputing the stage as lodging does |
 | `list_job_emails(job_number?, limit?)` | read | — | A job's latest emails (both directions) with the new text up to the quoted earlier message; without a job, incoming emails not on a job (last 14 days) |
 | `get_email(email_id)` | read | — | One email in full (6,000 chars), with attachments |
 | `reply_to_email(email_id, body, send_anyway?)` | send | `replyToEmail` | Same as the Reply box (`lib/communications/reply.ts`): same thread, Re: subject, In-Reply-To, office From, `manual_reply` comms row. Incoming emails only; the same text on the same conversation within 10 minutes is refused unless `send_anyway: true` |
@@ -2616,7 +2620,7 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `recover_dropped_emails(dry_run?, cursor?, batch_size?)` | change | `listDroppedEmails`, `recoverDroppedEmail` (`lib/communications/recover-dropped.ts`) | One-off clean-up of emails dropped before 23 Oct 2026: reads `ai_audit` rejections (`email_order_parser`), finds each in Gmail by sender + exact subject within 3 days before / 1 day after, takes the closest whose Message-ID isn't on the comms log, saves it via `insertLinkedCommunication` with attachments. Batches of 10 (max 20, 80 s budget) with a `created_at` cursor; idempotent. Reports emails not in Gmail and saved emails with no job (possible missed orders) |
 
 ### Planned
-1. Inspection confirm/reschedule, job stage, accounting sync, editing an insurer order (e.g. adding a missing claim number), linking an order to an existing job
+1. Inspections (parked — booking flow to be reworked first), job stage override, accounting re-sync, Word/Excel attachments
 2. Needs logic moved out of the route into `lib/` first: invoice generation, inspection proposals, AI report generation
 
 ---
@@ -2814,6 +2818,10 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 **Supabase service role key:** Never exposed to the browser. Used only in Next.js API routes (server-side). The anon key is safe to expose — RLS enforces all access control.
 
 **Signed URLs:** See Section 5 for signed URL architecture. Never store signed URLs in the database — they are ephemeral.
+
+**Tenant from the session, never the request:** `/api/insurer-orders/lodge` requires a signed-in user and only lodges that user's tenant's orders; `/api/jobs/[jobId]/stage` takes the tenant from the session and ignores any `tenantId` in the body (fixed 23 Oct 2026).
+
+**User permissions:** `users.role` (`admin` / `office` / `inspector`) and the `can_*` flags (`lib/types/user.ts`, `computeEffectivePermissions`) exist but are only checked by the AI assistant — API routes and the voice connector don't enforce them yet.
 
 **Claude voice connector:** the `Authorization` header key is the only credential — whoever has it can act as `MCP_USER_ID`. See §10b.
 

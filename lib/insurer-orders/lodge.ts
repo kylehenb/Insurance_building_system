@@ -46,8 +46,8 @@ export class LodgeError extends Error {
 }
 
 /**
- * Lodges an order. tenantId, when given, must own the order (the voice
- * connector passes it; the Lodge button relies on the signed-in session).
+ * Lodges an order. tenantId, when given, must own the order — both the Lodge
+ * button (the signed-in user's tenant) and the voice connector pass it.
  */
 export async function lodgeInsurerOrder(
   supabase: SupabaseClient<Database>,
