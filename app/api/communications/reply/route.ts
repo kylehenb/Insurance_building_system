@@ -3,6 +3,7 @@ import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { ReplyError, replyToEmail } from '@/lib/communications/reply'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // Reply box on the comms log (see lib/communications/reply.ts).
 export async function POST(req: NextRequest) {
@@ -38,5 +39,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof ReplyError) return NextResponse.json({ error: err.message }, { status: err.status })
     throw err
   }
+  await recordOperation({ tenantId, userId: userSession.session?.user.id, action: 'send.replies', operation: 'reply.send', payload: { commId, body } })
   return NextResponse.json({ ok: true })
 }

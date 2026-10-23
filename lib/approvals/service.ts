@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { permissionAction, type PermissionKey } from '@/lib/permissions/catalogue'
 import { loadUserPermissions } from '@/lib/permissions/resolve'
 import { OPERATIONS, type OperationKey, type OperationPayload } from '@/lib/approvals/operations'
+import { recordActivity } from '@/lib/activity/log'
 
 // The approval queue. A user whose level for an action is "needs approval"
 // gets a request here instead of the action (requestApproval). Someone allowed
@@ -40,6 +41,8 @@ export async function requestApproval<K extends OperationKey>(params: {
   operation: K
   payload: OperationPayload<K>
   via?: 'app' | 'voice'
+  /** The personal voice key used, for the activity log */
+  voiceKeyId?: string
   service?: Service
 }): Promise<ApprovalRequested> {
   const service = params.service ?? createServiceClient()
@@ -77,6 +80,10 @@ export async function requestApproval<K extends OperationKey>(params: {
     requested_via: params.via ?? 'app',
   }).select('id').single()
   if (error || !data) throw new Error(`Could not save the approval request: ${error?.message ?? 'no row'}`)
+  await recordActivity({
+    tenantId: params.tenantId, userId: params.userId, action: params.action, summary, jobId,
+    via: params.via ?? 'app', outcome: 'requested', voiceKeyId: params.voiceKeyId, approvalId: data.id, service,
+  })
 
   return { id: data.id, summary, existing: false, message: `Sent for approval: ${summary}. It will happen once an admin approves it.` }
 }
@@ -185,7 +192,13 @@ export async function decideApproval(params: {
     .select('id')
   if (claimErr) throw claimErr
   if (!claimed?.length) throw new ApprovalError('Someone else has just decided this request.', 409)
-  if (params.decision !== 'approve') return { status, result: null, summary: row.summary }
+  if (params.decision !== 'approve') {
+    await recordActivity({
+      tenantId: params.tenantId, userId: params.userId, action: 'approval.decide', summary: row.summary, jobId: row.job_id,
+      via: 'app', outcome: status === 'rejected' ? 'rejected' : 'cancelled', detail: params.note?.trim() || null, approvalId: row.id, service,
+    })
+    return { status, result: null, summary: row.summary }
+  }
 
   // Run it, as the person who asked
   const operation = OPERATIONS[row.operation as OperationKey]
@@ -204,5 +217,10 @@ export async function decideApproval(params: {
     }
   }
   await service.from('approval_requests').update({ status: finalStatus, result }).eq('id', row.id)
+  // Logged as the requester's action, run on approval
+  await recordActivity({
+    tenantId: params.tenantId, userId: row.requested_by, action: row.action, summary: row.summary, jobId: row.job_id,
+    via: 'approval', outcome: finalStatus === 'failed' ? 'failed' : 'done', detail: result, approvalId: row.id, approvedBy: params.userId, service,
+  })
   return { status: finalStatus, result, summary: row.summary }
 }

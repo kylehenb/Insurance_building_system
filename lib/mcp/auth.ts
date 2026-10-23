@@ -1,12 +1,16 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { McpContext } from '@/lib/mcp/server'
+import { VOICE_KEY_PREFIX, findVoiceKey } from '@/lib/voice-keys/keys'
 
 // The voice connector is added in claude.ai with "No sign-in" and a request
-// header carrying the key: Authorization: Bearer <MCP_CONNECTOR_SECRET>.
-// A header (unlike a secret in the URL) stays out of request logs. Whoever
-// has the key can act as MCP_USER_ID, so treat it like a password: rotate it
-// by changing the env var and the header value in claude.ai.
+// header carrying a key: Authorization: Bearer <key>. A header (unlike a
+// secret in the URL) stays out of request logs.
+//
+// Personal keys (irc_vk_…, Settings → Voice connector) act as the person who
+// made them, with their permissions; revoking one stops it at once. The older
+// shared key, MCP_CONNECTOR_SECRET acting as MCP_USER_ID, still works until
+// those env vars are removed.
 
 /** Shorter secrets are refused so a placeholder can't switch the connector on. */
 const MIN_SECRET_LENGTH = 32
@@ -28,16 +32,27 @@ export function keyFromAuthorization(header: string | null): string {
  * reason is logged, never the key.
  */
 export async function mcpContextFor(authorization: string | null): Promise<McpContext | null> {
-  // Trimmed: a value pasted into Vercel can pick up a trailing newline
-  const expected = (process.env.MCP_CONNECTOR_SECRET ?? '').trim()
-  const userId = (process.env.MCP_USER_ID ?? '').trim()
-  if (expected.length < MIN_SECRET_LENGTH || !userId) {
-    console.error('[mcp] connector not configured: MCP_CONNECTOR_SECRET (32+ chars) and MCP_USER_ID are required')
-    return null
-  }
   const key = keyFromAuthorization(authorization)
   if (!key) {
     console.warn('[mcp] request without an Authorization header')
+    return null
+  }
+  const supabase = createServiceClient()
+
+  if (key.startsWith(VOICE_KEY_PREFIX)) {
+    const found = await findVoiceKey(key, supabase)
+    if (!found) {
+      console.warn('[mcp] unknown or revoked personal key')
+      return null
+    }
+    return { supabase, tenantId: found.tenantId, userId: found.userId, voiceKeyId: found.id }
+  }
+
+  // The shared key. Trimmed: a value pasted into Vercel can pick up a trailing newline
+  const expected = (process.env.MCP_CONNECTOR_SECRET ?? '').trim()
+  const userId = (process.env.MCP_USER_ID ?? '').trim()
+  if (expected.length < MIN_SECRET_LENGTH || !userId) {
+    console.warn('[mcp] not a personal key, and no shared key is configured (MCP_CONNECTOR_SECRET 32+ chars and MCP_USER_ID)')
     return null
   }
   if (!secretMatches(key, expected)) {
@@ -45,7 +60,6 @@ export async function mcpContextFor(authorization: string | null): Promise<McpCo
     return null
   }
 
-  const supabase = createServiceClient()
   const { data: user, error } = await supabase
     .from('users').select('tenant_id').eq('id', userId).maybeSingle()
   if (error || !user?.tenant_id) {

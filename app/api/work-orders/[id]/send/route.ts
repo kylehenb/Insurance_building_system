@@ -9,6 +9,7 @@ import {
 } from '@/lib/work-orders/work-order-email'
 import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // GET  → the pre-filled email (from the work_order template) for the send modal
 // POST → send to the trade and lock. Body { mode: 'auto' } sends the template
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const result = await sendWorkOrderEmail(id, ctx, overrides)
+    await recordOperation({ tenantId: ctx.tenantId, userId: ctx.userId, action: 'send.work_orders', operation: 'work_order.send', payload: { workOrderId: id, overrides } })
     return NextResponse.json({ ok: true, ...result })
   } catch (err) {
     return errorResponse(err, 'send work order')

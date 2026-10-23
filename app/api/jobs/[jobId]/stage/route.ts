@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { NextResponse } from 'next/server'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 import { SetStageError, setJobStage } from '@/lib/jobs/set-stage'
 
 export async function PATCH(
@@ -36,6 +37,7 @@ export async function PATCH(
       throw err
     }
 
+    await recordOperation({ tenantId, userId: user.session?.user.id, action: 'jobs.change_stage', operation: 'job.stage', payload: { jobId, stage } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in stage PATCH endpoint:', error)

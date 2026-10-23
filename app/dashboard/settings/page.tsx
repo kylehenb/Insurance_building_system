@@ -15,6 +15,8 @@ import {
   Inbox,
   FileText,
   Link2,
+  Mic,
+  History,
 } from 'lucide-react'
 
 interface SettingsCard {
@@ -113,6 +115,18 @@ export default async function SettingsPage() {
       route: '/dashboard/settings/users',
       description: 'Roles, and what each role and person can do — allowed, needs approval or not allowed',
       icon: <Users className="w-4 h-4" />,
+    },
+    {
+      name: 'Voice connector',
+      route: '/dashboard/settings/voice',
+      description: 'Your own key for using IRC Master from Claude — acts as you, with your permissions',
+      icon: <Mic className="w-4 h-4" />,
+    },
+    {
+      name: 'Activity',
+      route: '/dashboard/settings/activity',
+      description: 'Who sent, lodged, changed or approved what — in the app, by voice, or on approval',
+      icon: <History className="w-4 h-4" />,
     },
     {
       name: 'Scope Library',

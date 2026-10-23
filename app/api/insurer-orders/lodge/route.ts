@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { LodgeError, lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // Lodge button: creates the job for an insurer order (see lib/insurer-orders/lodge.ts).
 // Only the signed-in user's own tenant's orders can be lodged.
@@ -18,7 +19,9 @@ export async function POST(req: NextRequest) {
     }
     const gated = await permissionGate(user.tenant_id, user.session?.user.id, 'orders.lodge', { operation: 'order.lodge', payload: { orderId } })
     if (gated) return gated
-    return NextResponse.json(await lodgeInsurerOrder(createServiceClient(), orderId, { tenantId: user.tenant_id }))
+    const result = await lodgeInsurerOrder(createServiceClient(), orderId, { tenantId: user.tenant_id })
+    await recordOperation({ tenantId: user.tenant_id, userId: user.session?.user.id, action: 'orders.lodge', operation: 'order.lodge', payload: { orderId } })
+    return NextResponse.json(result)
   } catch (err) {
     if (err instanceof LodgeError) {
       return NextResponse.json({ error: err.message, ...err.details }, { status: err.status })

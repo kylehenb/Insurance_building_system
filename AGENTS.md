@@ -19,4 +19,5 @@ Every user has a level per action — allowed, needs approval, not allowed — f
 
 - A new user-facing action that changes or sends something gets a permission: add it to `PERMISSION_ACTIONS` and `BUILT_IN_DEFAULTS` in `lib/permissions/catalogue.ts`, or reuse a fitting one.
 - Check it on the server: `permissionGate(...)` in the API route (queues it when the user needs approval — add an operation in `lib/approvals/operations.ts` that calls the same shared function), or `permissionDenied(...)` when there's nothing sensible to queue, and `permission:` on any voice connector tool (checked centrally in `lib/mcp/server.ts`). Never rely on hiding a button.
+- Record it in the who-did-what log once it has happened: `recordOperation(...)` (`lib/activity/log.ts`) after success in the route. Voice tools and approvals are logged centrally.
 - Edits saved straight from the browser to Supabase can't be checked this way — mark their action `enforced: false` until database rules cover them.

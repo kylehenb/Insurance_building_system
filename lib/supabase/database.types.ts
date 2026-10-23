@@ -163,6 +163,54 @@ export type Database = {
           },
         ]
       }
+      activity_log: {
+        Row: {
+          action: string
+          approval_id: string | null
+          approved_by: string | null
+          created_at: string
+          detail: string | null
+          id: string
+          job_id: string | null
+          outcome: string
+          summary: string
+          tenant_id: string
+          user_id: string | null
+          via: string
+          voice_key_id: string | null
+        }
+        Insert: {
+          action: string
+          approval_id?: string | null
+          approved_by?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          job_id?: string | null
+          outcome?: string
+          summary: string
+          tenant_id: string
+          user_id?: string | null
+          via?: string
+          voice_key_id?: string | null
+        }
+        Update: {
+          action?: string
+          approval_id?: string | null
+          approved_by?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          job_id?: string | null
+          outcome?: string
+          summary?: string
+          tenant_id?: string
+          user_id?: string | null
+          via?: string
+          voice_key_id?: string | null
+        }
+        Relationships: []
+      }
       approval_requests: {
         Row: {
           action: string
@@ -4320,6 +4368,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      voice_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_hint: string
+          label: string
+          last_used_at: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_hint: string
+          label: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_hint?: string
+          label?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       work_order_visits: {
         Row: {

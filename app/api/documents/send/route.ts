@@ -10,6 +10,7 @@ import {
   type DocumentEmailOverrides,
 } from '@/lib/documents/send/email'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // Email quotes, reports, invoices, TCCs and photos from a job.
 // POST { documents: DocumentRef[], mode }
@@ -58,8 +59,9 @@ export async function POST(req: NextRequest) {
     })
     if (gated) return gated
 
-    if (mode === 'mark_sent') return NextResponse.json({ ok: true, ...await markDocumentsSentWithoutEmail(refs, ctx) })
-    return NextResponse.json({ ok: true, ...await sendDocumentEmail(refs, ctx, overrides) })
+    const result = mode === 'mark_sent' ? await markDocumentsSentWithoutEmail(refs, ctx) : await sendDocumentEmail(refs, ctx, overrides)
+    await recordOperation({ tenantId: ctx.tenantId, userId: ctx.actorId, action: 'send.documents', operation: 'documents.send', payload: { refs, mode, overrides } })
+    return NextResponse.json({ ok: true, ...result })
   } catch (err) {
     if (err instanceof DocumentSendError) return NextResponse.json({ error: err.message }, { status: err.status })
     console.error(`[documents/send] ${String(mode)} failed:`, err)

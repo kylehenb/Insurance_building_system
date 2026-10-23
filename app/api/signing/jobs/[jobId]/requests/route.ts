@@ -5,6 +5,7 @@ import { SIGNING_DOCUMENT_TYPES } from '@/lib/signing/documents/registry'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { parseExcessChoice } from '@/lib/excess/decision'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // GET  → this job's signing requests, plus defaults for the send dialog
 // POST → generate the document, create the request and email the signer
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
 
   try {
     const result = await sendForSignature(actor, input, options)
+    await recordOperation({ tenantId: actor.tenantId, userId: actor.userId, action: 'send.signing', operation: 'signing.create', payload: { input, options } })
     return NextResponse.json(result)
   } catch (err) {
     return signingErrorResponse(err, 'send for signature')

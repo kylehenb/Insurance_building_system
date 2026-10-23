@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } from '@/lib/signing/http'
 import { isSigningAction, runSigningAction, type SigningActionBody } from '@/lib/signing/actions'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // POST /api/signing/requests/[id]/send          send a draft
 // POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working; excess invoice re-attached)
@@ -19,12 +20,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const actor = await signingActorFromSession()
   if (!actor) return unauthorized()
   const body = await req.json().catch(() => ({})) as SigningActionBody
-  const gated = await permissionGate(actor.tenantId, actor.userId, action === 'confirm-stage' ? 'jobs.change_stage' : 'send.signing', {
-    operation: 'signing.action', payload: { requestId: id, action, body: { reason: body.reason, enabled: body.enabled } },
-  })
+  const permission = action === 'confirm-stage' ? 'jobs.change_stage' : 'send.signing'
+  const approval = { operation: 'signing.action', payload: { requestId: id, action, body: { reason: body.reason, enabled: body.enabled } } } as const
+  const gated = await permissionGate(actor.tenantId, actor.userId, permission, approval)
   if (gated) return gated
   try {
-    return NextResponse.json(await runSigningAction(actor, id, action, body))
+    const result = await runSigningAction(actor, id, action, body)
+    await recordOperation({ tenantId: actor.tenantId, userId: actor.userId, action: permission, ...approval })
+    return NextResponse.json(result)
   } catch (err) {
     return signingErrorResponse(err, action.replace('-', ' '))
   }

@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { EXCESS_WAIVER_REASONS, type ExcessDecision } from '@/lib/excess/decision'
 import { ExcessError, loadExcessContext, recordExcessDecision } from '@/lib/excess/server'
 import { permissionGate } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
 
 // GET  → the job's excess: amount, the office's decision, excess invoices
 // POST → record a decision without sending anything
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
     const gated = await permissionGate(a.tenantId, a.userId, 'excess.decide', { operation: 'excess.decide', payload: { jobId, decision, note } })
     if (gated) return gated
     await recordExcessDecision(service, { tenantId: a.tenantId, jobId, userId: a.userId, decision, note })
+    await recordOperation({ tenantId: a.tenantId, userId: a.userId, action: 'excess.decide', operation: 'excess.decide', payload: { jobId, decision, note }, service })
     return NextResponse.json(await loadExcessContext(service, a.tenantId, jobId))
   } catch (err) {
     return errorResponse(err, 'save excess decision')

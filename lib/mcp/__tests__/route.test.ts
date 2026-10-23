@@ -92,6 +92,7 @@ describe('mcp route', () => {
       'recover_dropped_emails',
       'list_approvals',
       'decide_approval',
+      'list_activity',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })
