@@ -13,6 +13,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/gmail/scheduled-send",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/accounting/poll-payments",
       "schedule": "0 22 * * *"
     },

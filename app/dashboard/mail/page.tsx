@@ -16,6 +16,8 @@ import { attachmentUrl, type MailMessage } from '@/lib/mail/message'
 import { MessageBody } from '@/components/mail/MessageBody'
 import { Composer, type ComposerHandle } from '@/components/mail/Composer'
 import type { ComposeMode, ComposeStart } from '@/lib/mail/compose-rules'
+import type { ScheduledEmail } from '@/lib/mail/scheduled'
+import { spokenSendAt } from '@/lib/mail/schedule-rules'
 
 // The mail client: the office Gmail mailbox, laid out like Gmail with no
 // reading pane — a full-width list, and a conversation opens full width.
@@ -33,6 +35,8 @@ type ListResponse = {
   cursor: string | null
   counts: FolderCounts
   labels: Record<string, UserLabel>
+  /** Gmail thread id → scheduled send time */
+  scheduled: Record<string, string>
   mailbox: MailboxInfo
 }
 
@@ -145,6 +149,10 @@ function Mail() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [detailVersion, setDetailVersion] = useState(0)
   const [composer, setComposer] = useState<{ key: string; initial: ComposeStart } | null>(null)
+  const [scheduledMap, setScheduledMap] = useState<Record<string, string>>({})
+  // The Scheduled folder isn't a Gmail label, so it's its own view
+  const [showScheduled, setShowScheduled] = useState(searchParams.get('folder') === 'scheduled')
+  const [scheduledList, setScheduledList] = useState<ScheduledEmail[] | null>(null)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -159,13 +167,14 @@ function Mail() {
   // Keep the address bar shareable: /dashboard/mail?folder=sent&thread=…
   useEffect(() => {
     const params = new URLSearchParams()
-    if (folder !== 'inbox') params.set('folder', folder)
+    if (showScheduled) params.set('folder', 'scheduled')
+    else if (folder !== 'inbox') params.set('folder', folder)
     if (folder === 'inbox' && tab !== 'primary') params.set('tab', tab)
     if (query) params.set('q', query)
     if (openId) params.set('thread', openId)
     const qs = params.toString()
     window.history.replaceState(null, '', qs ? `/dashboard/mail?${qs}` : '/dashboard/mail')
-  }, [folder, tab, query, openId])
+  }, [folder, tab, query, openId, showScheduled])
 
   const fetchPage = useCallback(async (pageCursor: string | null): Promise<ListResponse> => {
     const params = new URLSearchParams({ folder })
@@ -193,6 +202,7 @@ function Mail() {
         setCursor(page.cursor)
         setCounts(page.counts)
         setLabels(page.labels)
+        setScheduledMap(page.scheduled ?? {})
         setMailbox(page.mailbox)
       })
       .catch(err => { if (seq === requestSeq.current) setListError(err.message) })
@@ -215,6 +225,7 @@ function Mail() {
       setChecked(prev => new Set([...prev].filter(id => page.threads.some(t => t.id === id))))
       setCounts(page.counts)
       setLabels(page.labels)
+      setScheduledMap(page.scheduled ?? {})
       setMailbox(page.mailbox)
     } catch {
       // Polling — the next one will try again
@@ -351,6 +362,54 @@ function Mail() {
     setDetailVersion(v => v + 1)
   }
 
+  const loadScheduled = useCallback(async () => {
+    try {
+      setScheduledList(await fetchJson<ScheduledEmail[]>('/api/mail/scheduled'))
+    } catch (err) {
+      showToast({ message: err instanceof Error ? err.message : 'Could not load scheduled emails', error: true })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showScheduled) loadScheduled()
+  }, [showScheduled, loadScheduled])
+
+  /** Schedule send — the email waits as a draft; Undo takes it off the schedule and reopens it */
+  async function scheduleLater(draftId: string, sendAt: string) {
+    setComposer(null)
+    const res = await fetch('/api/mail/scheduled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draftId, sendAt }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (res.ok) {
+      const row = body as ScheduledEmail
+      showToast({ message: `Send scheduled for ${spokenSendAt(row.send_at)}.`, undo: () => { setToast(null); unschedule(row, true) } })
+    } else if (body.pendingApproval) {
+      showToast({ message: body.error ?? 'Sent for approval.' })
+    } else {
+      showToast({ message: body.error ?? 'Could not schedule the email', error: true })
+      editDraft(draftId)
+    }
+    refresh()
+    if (showScheduled) loadScheduled()
+  }
+
+  /** Takes an email off the schedule (it stays a draft); edit = reopen it in the composer */
+  async function unschedule(row: ScheduledEmail, edit: boolean) {
+    const res = await fetch(`/api/mail/scheduled/${row.id}`, { method: 'DELETE' })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      showToast({ message: body.error ?? 'Could not cancel the scheduled send', error: true })
+    } else {
+      if (edit) editDraft(row.gmail_draft_id)
+      else showToast({ message: 'Scheduled send cancelled — it\'s back in Drafts.' })
+    }
+    refresh()
+    if (showScheduled) loadScheduled()
+  }
+
   // An email waiting out its undo seconds would stay a draft if the page closed
   useEffect(() => {
     function onUnload(e: BeforeUnloadEvent) {
@@ -443,6 +502,7 @@ function Mail() {
   // ── Navigation ──
 
   function switchFolder(key: FolderKey) {
+    setShowScheduled(false)
     setFolder(key)
     setOpenId(null)
     setQuery('')
@@ -581,14 +641,24 @@ function Mail() {
         {FOLDERS.map(f => {
           const n = countFor(f.key)
           return (
-            <button
-              key={f.key}
-              className={`mail-folder${folder === f.key ? ' active' : ''}${n > 0 && f.key !== 'drafts' ? ' has-unread' : ''}`}
-              onClick={() => switchFolder(f.key)}
-            >
-              <span>{f.label}</span>
-              {n > 0 && <span className="mail-count">{n}</span>}
-            </button>
+            <span key={f.key} style={{ display: 'contents' }}>
+              <button
+                className={`mail-folder${folder === f.key && !showScheduled ? ' active' : ''}${n > 0 && f.key !== 'drafts' ? ' has-unread' : ''}`}
+                onClick={() => switchFolder(f.key)}
+              >
+                <span>{f.label}</span>
+                {n > 0 && <span className="mail-count">{n}</span>}
+              </button>
+              {f.key === 'drafts' && (
+                <button
+                  className={`mail-folder${showScheduled ? ' active' : ''}`}
+                  onClick={() => { setShowScheduled(true); setOpenId(null); setQuery(''); setSearchInput('') }}
+                >
+                  <span>Scheduled</span>
+                  {Object.keys(scheduledMap).length > 0 && <span className="mail-count">{Object.keys(scheduledMap).length}</span>}
+                </button>
+              )}
+            </span>
           )
         })}
         <div className="mail-hint">
@@ -615,7 +685,14 @@ function Mail() {
         </form>
 
         <div className="mail-card">
-          {openId ? (
+          {showScheduled && !openId ? (
+            <ScheduledView
+              rows={scheduledList}
+              onEdit={row => unschedule(row, true)}
+              onCancel={row => unschedule(row, false)}
+              onRefresh={loadScheduled}
+            />
+          ) : openId ? (
             <>
               <div className="mail-toolbar">
                 <IconButton icon="back" title="Back to list (u)" onClick={() => setOpenId(null)} />
@@ -642,6 +719,7 @@ function Mail() {
                         onClose={() => { setComposer(null); setDetailVersion(v => v + 1) }}
                         onDiscarded={() => { setComposer(null); setDetailVersion(v => v + 1) }}
                         onSend={sendLater}
+                        onSchedule={scheduleLater}
                       />
                     )}
                     expanded={expanded}
@@ -722,6 +800,7 @@ function Mail() {
                     onCheck={() => toggleChecked(t.id)}
                     onOpen={() => openThread(i)}
                     onAction={a => performAction([t.id], a)}
+                    scheduledAt={scheduledMap[t.id] ?? null}
                   />
                 ))}
                 {cursor && !loading && (
@@ -744,6 +823,7 @@ function Mail() {
           onClose={id => { setComposer(null); if (id) showToast({ message: 'Draft saved.' }); refresh() }}
           onDiscarded={() => { setComposer(null); showToast({ message: 'Draft discarded.' }); refresh() }}
           onSend={sendLater}
+          onSchedule={scheduleLater}
         />
       )}
 
@@ -783,7 +863,7 @@ function LabelChips({ labelIds, labels, hide }: { labelIds: string[]; labels: Re
   )
 }
 
-function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck, onOpen, onAction }: {
+function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck, onOpen, onAction, scheduledAt }: {
   index: number
   thread: ThreadListItem
   folder: FolderKey
@@ -793,6 +873,7 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
   onCheck: () => void
   onOpen: () => void
   onAction: (a: MailAction) => void
+  scheduledAt: string | null
 }) {
   const isDraft = t.label_ids.includes('DRAFT')
   const hover = actionsFor([t.label_ids], folder).filter(a => a !== 'spam' && a !== 'not_spam')
@@ -811,6 +892,7 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
         {isDraft && folder !== 'drafts' && <span className="mail-draft">Draft</span>}
       </span>
       <span className="mail-content">
+        {scheduledAt && <span className="mail-chip sched" title="Scheduled to send">Scheduled {spokenSendAt(scheduledAt)}</span>}
         {t.job && <span className="mail-chip job">{t.job.job_number}</span>}
         <LabelChips labelIds={t.label_ids} labels={labels} />
         <span className="mail-subject">{t.subject || '(no subject)'}</span>
@@ -822,6 +904,43 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
         {hover.map(a => <IconButton key={a} icon={a} title={ACTION_TITLE[a]} onClick={() => onAction(a)} small />)}
       </span>
     </div>
+  )
+}
+
+function ScheduledView({ rows, onEdit, onCancel, onRefresh }: {
+  rows: ScheduledEmail[] | null
+  onEdit: (row: ScheduledEmail) => void
+  onCancel: (row: ScheduledEmail) => void
+  onRefresh: () => void
+}) {
+  return (
+    <>
+      <div className="mail-toolbar">
+        <IconButton icon="refresh" title="Refresh" onClick={onRefresh} />
+        <span className="mail-toolbar-note">Emails waiting to send (Perth time). Opening one to change it takes it off the schedule.</span>
+      </div>
+      <div className="mail-list">
+        {rows === null && <div className="mail-empty">Loading…</div>}
+        {rows?.length === 0 && <div className="mail-empty">Nothing scheduled. Use the arrow next to Send to schedule an email.</div>}
+        {rows?.map(r => (
+          <div key={r.id} className="mail-row sched-row" onClick={() => r.status !== 'sending' && onEdit(r)}>
+            <span />
+            <span className="mail-from">To: {r.recipients || '(no recipients)'}</span>
+            <span className="mail-content">
+              {r.status === 'failed'
+                ? <span className="mail-chip warn" title={r.error ?? ''}>Not sent</span>
+                : <span className="mail-chip sched">{r.status === 'sending' ? 'Sending now' : spokenSendAt(r.send_at)}</span>}
+              <span className="mail-subject">{r.subject || '(no subject)'}</span>
+              {r.status === 'failed' && r.error && <span className="mail-snippet"> - {r.error}</span>}
+            </span>
+            <span />
+            <span className="mail-date">{r.status === 'scheduled' && (
+              <button className="mail-sched-cancel" onClick={e => { e.stopPropagation(); onCancel(r) }}>Cancel send</button>
+            )}</span>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -1022,6 +1141,11 @@ const MAIL_CSS = `
   .mail-chip { display: inline-block; vertical-align: 1px; font-size: 12px; line-height: 18px; color: var(--grey-600); background: var(--surface-2); border: 0.5px solid var(--line); border-radius: 4px; padding: 0 6px; margin-right: 6px; font-weight: 400; text-decoration: none; }
   .mail-chip.job { color: var(--teal); background: var(--success-bg-2); border-color: #cfe5d8; font-weight: 600; }
   .mail-chip.job.link:hover { background: var(--success-bg); }
+  .mail-chip.sched { color: var(--warning-dark); background: var(--warning-bg); border-color: var(--warning-soft); }
+  .sched-row { grid-template-columns: 12px minmax(160px, 260px) 1fr 0 110px; background: var(--paper); }
+  .mail-row.sched-row:hover .mail-date { visibility: visible; }
+  .mail-sched-cancel { font: inherit; font-size: 12px; color: var(--danger-dark); background: none; border: none; cursor: pointer; padding: 0; }
+  .mail-sched-cancel:hover { text-decoration: underline; }
   .mail-chip.warn { color: var(--danger-dark); background: var(--danger-bg); border-color: var(--danger-soft); }
   .mail-draft { font-size: 13px; color: var(--danger); margin-left: 6px; font-weight: 400; }
   .mail-more { display: block; width: 100%; font: inherit; font-size: 13px; color: var(--grey-600); background: none; border: none; padding: 14px; cursor: pointer; }

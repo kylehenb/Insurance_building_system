@@ -341,6 +341,7 @@ export async function discardDraft(mailbox: Mailbox, draftId: string, db = mailD
     if (!isNotFound(err)) throw err
   }
   await db.from('mail_drafts').delete().eq('mailbox_id', mailbox.id).eq('gmail_draft_id', draftId)
+  await unschedule(mailbox, draftId, db)
   await removeUploads(row, db)
   if (threadId) await fetchThreads(mailbox, [threadId], db)
 }
@@ -358,20 +359,30 @@ export async function sendDraft(mailbox: Mailbox, draftId: string, db = mailDb()
     throw err
   }
   await db.from('mail_drafts').delete().eq('mailbox_id', mailbox.id).eq('gmail_draft_id', draftId)
+  await unschedule(mailbox, draftId, db)
   await removeUploads(row, db)
   if (sent.threadId) await fetchThreads(mailbox, [sent.threadId], db)
   return { messageId: sent.id ?? null, threadId: sent.threadId ?? null }
 }
 
 /** "Re: Roof leak" to jane@insurer.com — for approvals and the activity log */
-export async function describeDraft(draftId: string): Promise<{ to: string; subject: string }> {
+export async function describeDraft(draftId: string): Promise<{ to: string; subject: string; exists: boolean }> {
   try {
     const draft = (await getGmailClient().users.drafts.get({ userId: 'me', id: draftId, format: 'metadata' })).data
     const p = draft.message?.payload
-    return { to: [header(p, 'To'), header(p, 'Cc')].filter(Boolean).join(', ') || 'no recipients', subject: header(p, 'Subject') || '(no subject)' }
+    return { to: [header(p, 'To'), header(p, 'Cc')].filter(Boolean).join(', ') || 'no recipients', subject: header(p, 'Subject') || '(no subject)', exists: true }
   } catch {
-    return { to: 'unknown recipients', subject: 'a draft that no longer exists' }
+    return { to: 'unknown recipients', subject: 'a draft that no longer exists', exists: false }
   }
+}
+
+/** Takes a draft off the schedule (sent by hand or discarded) — not one the scheduler is sending */
+async function unschedule(mailbox: Mailbox, draftId: string, db = mailDb()) {
+  await db.from('scheduled_emails')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('mailbox_id', mailbox.id)
+    .eq('gmail_draft_id', draftId)
+    .in('status', ['scheduled', 'failed'])
 }
 
 /** Gmail drafts in a conversation, oldest first */

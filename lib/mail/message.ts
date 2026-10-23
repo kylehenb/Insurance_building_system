@@ -126,3 +126,22 @@ export function resolveCidImages(html: string, messageId: string, attachments: M
     return whole
   })
 }
+
+/** A message as plain text: its text part, or its HTML with the tags taken out */
+export function messageText(m: Pick<MailMessage, 'text' | 'html'>): string {
+  if (m.text.trim()) return m.text.replace(/\r\n/g, '\n').trim()
+  return m.html
+    .replace(/<(style|script|head)\b[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|li|h\d|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n\s*\n+/g, '\n\n')
+    .trim()
+}

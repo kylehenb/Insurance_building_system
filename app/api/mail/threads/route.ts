@@ -4,6 +4,7 @@ import { isFolderKey, isTabKey } from '@/lib/mail/folders'
 import { userLabels } from '@/lib/mail/labels'
 import { folderCounts, listFolder, searchFolder } from '@/lib/mail/list'
 import { getMailbox, syncMailbox } from '@/lib/mail/sync'
+import { scheduledThreads } from '@/lib/mail/scheduled'
 
 export const maxDuration = 60
 
@@ -32,11 +33,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const mailbox = await getMailbox(access.tenantId)
 
-    const [page, counts, labels] = await Promise.all([
+    const [page, counts, labels, scheduled] = await Promise.all([
       q ? searchFolder(mailbox, folder, tab, q, cursor) : listFolder(mailbox, folder, tab, cursor),
       folderCounts(mailbox),
       // Chips are a nicety — the list still loads if Gmail's label list doesn't
       userLabels().catch(() => ({})),
+      scheduledThreads(mailbox),
     ])
 
     const stale = !mailbox.synced_at || Date.now() - new Date(mailbox.synced_at).getTime() > FRESH_MS
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ...page,
       counts,
       labels,
+      scheduled,
       mailbox: {
         email: mailbox.email_address,
         synced_at: mailbox.synced_at,

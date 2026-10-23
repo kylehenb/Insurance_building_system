@@ -7,7 +7,7 @@
 
 **E-signing update (Oct 2026):** In-house e-signing module built — see §10a. Homeowners sign the Scope of Works Authorisation (work of $7,500 or less) or the WA Building Contract (over $7,500) from an emailed link, with no account. New tables `signing_requests`, `signing_events`, `signing_rate_limits` (§4.32–4.34), private storage bucket `signed-documents` (§5), new PDF generators for the SOW and Building Contract (§10). No new paid service and no new environment variables.
 
-**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 2 (Oct 2026) added archive, bin, spam, read/unread, bulk actions and undo; phase 3 added writing email (compose, reply, reply all, forward, Gmail drafts, attachments, undo send; table `mail_drafts`, bucket `mail-attachments`).
+**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 2 (Oct 2026) added archive, bin, spam, read/unread, bulk actions and undo; phase 3 added writing email (compose, reply, reply all, forward, Gmail drafts, attachments, undo send; table `mail_drafts`, bucket `mail-attachments`); phase 4 added scheduled send (table `scheduled_emails`) and the mailbox voice tools.
 
 ---
 
@@ -1768,7 +1768,7 @@ Every user has a level for each action: **allowed**, **needs approval** or **not
 - **Database rules** (`supabase/migrations/20261101_permission_rls.sql`): edits that go straight from the browser to Supabase are checked by restrictive RLS policies `perm_<action>_<command>` using `public.user_can(action)` (→ `user_permission_level`, the same resolution as `lib/permissions/resolve.ts`; its built-in defaults must match `BUILT_IN_DEFAULTS` — a test checks). Only "allowed" passes ("needs approval" can't be queued from the browser). settings.edit: writes to settings tables (tenants, templates, prompts, rates, scope library, automation, accounting map) and all access to `accounting_credentials`; invoices.manage: writes to invoices, line items, deductions; jobs.edit: insert/update on jobs, quotes, reports, work orders, clients, trades, and scope items / visits; records.delete: deleting jobs, quotes, reports, invoices, work orders, insurer orders, emails, clients, trades. `users` has no browser writes at all. Service-role routes are unaffected and check permissions themselves (`permissionDenied`/`permissionGate`); routes that act for a permitted action write with the service client so a rule can't stop them part way
 - **Tenant from the session only**: API routes take the tenant from the signed-in session (`sessionUser()`, `lib/auth/session.ts`), never from the request — with the service client a request's tenantId would reach another company's data. `/api/ai/*` requires sign-in; the assistant's record tools are tenant-scoped and follow the user's permissions
 - Enforced on the server: `permissionGate()` (`lib/permissions/http.ts`) in the work order send, document send, signing (create / send / resend / revoke / reminders; confirm-stage → jobs.change_stage), reply, lodge, job stage and excess routes (`permissionDenied()` where there's nothing to queue, e.g. users.manage); and `permission` on every voice connector tool that changes or sends something, checked in `lib/mcp/server.ts` (a test fails if one is missing; tools that check for themselves set `checksOwnPermission`). The voice connector acts as the owner of the personal key used (or `MCP_USER_ID` for the old shared key), so it has that person's permissions
-- **Approval queue** (`lib/approvals`, table `approval_requests`): at "needs approval" the action is saved instead of done — the operation to run (`lib/approvals/operations.ts`: `work_order.send`, `documents.send`, `signing.create`, `signing.action`, `reply.send`, `order.lodge`, `job.stage`, `excess.decide`, `invoice.generate`, `mail.send`, `voice.tool`), its payload, a plain-English summary and the job. Each operation calls the same shared function as the button; a voice call is saved as `voice.tool` and replayed through the tool. The route answers 403 with `pendingApproval: true` and "Sent for approval: …" (so no screen mistakes it for done); the voice tool tells Claude it's waiting. An identical pending request isn't saved twice
+- **Approval queue** (`lib/approvals`, table `approval_requests`): at "needs approval" the action is saved instead of done — the operation to run (`lib/approvals/operations.ts`: `work_order.send`, `documents.send`, `signing.create`, `signing.action`, `reply.send`, `order.lodge`, `job.stage`, `excess.decide`, `invoice.generate`, `mail.send`, `mail.schedule`, `voice.tool`), its payload, a plain-English summary and the job. Each operation calls the same shared function as the button; a voice call is saved as `voice.tool` and replayed through the tool. The route answers 403 with `pendingApproval: true` and "Sent for approval: …" (so no screen mistakes it for done); the voice tool tells Claude it's waiting. An identical pending request isn't saved twice
 - Deciding: dashboard "Waiting for approval" panel (`components/approvals/approvals-panel.tsx`), `GET /api/approvals`, `POST /api/approvals/[id]` `{ decision: approve|reject|cancel, note? }`, voice tools `list_approvals` / `decide_approval`. Approve/reject: anyone allowed to do that action, not the requester. Cancel: the requester. The row is claimed with a guarded `status = 'pending'` update so it runs once; approving runs it as the requester (e.g. `created_by`, excess `decided_by`) and stores what happened in `result`, or `failed` + the error
 - **Personal voice keys** (`lib/voice-keys/keys.ts`, table `voice_keys`, Settings → Voice connector, API `/api/settings/voice-keys`): each person makes their own key (`irc_vk_` + 48 hex) for the connector; only its SHA-256 and last 4 characters are stored, the key is shown once. Up to 5 active keys per person. Owners revoke their own; people allowed to manage users see and revoke everyone's. A revoked key, or one whose owner has left the tenant, is refused at once
 - **Activity log** (`lib/activity/log.ts`, table `activity_log`, Settings → Activity, API `/api/activity`, voice tool `list_activity`): who did what, how (`app` / `voice` / `approval`), on which job and the outcome (`done`, `failed`, `requested`, `rejected`, `cancelled`). Written by: the gated routes after the action succeeds (`recordOperation`, described by the same `OPERATIONS[…].describe` as approval requests); `lib/mcp/server.ts` for every permissioned voice tool call that ran (not refusals or questions back), with the key used; and `lib/approvals/service.ts` for requests, rejections/cancellations, and approved actions (logged as the requester's, with `approved_by`). Recording never fails the action. People allowed to manage users see everyone's; others see their own
@@ -2634,6 +2634,10 @@ Lets the owner run the system from the Claude app (iOS voice, web, desktop) as a
 | `list_job_emails(job_number?, limit?)` | read | — | A job's latest emails (both directions) with the new text up to the quoted earlier message; without a job, incoming emails not on a job (last 14 days) |
 | `get_email(email_id)` | read | — | One email in full (6,000 chars), with attachments |
 | `reply_to_email(email_id, body, send_anyway?)` | send | `replyToEmail` | Same as the Reply box (`lib/communications/reply.ts`): same thread, Re: subject, In-Reply-To, office From, `manual_reply` comms row. Incoming emails only; the same text on the same conversation within 10 minutes is refused unless `send_anyway: true` |
+| `list_mailbox(folder?, unread_only?, search?, limit?)` | read (`mail.view`) | `listFolder`, `searchFolder` (`lib/mail/list.ts`) | The Mail page's list: inbox Primary tab by default, or sent / drafts / all / spam / trash; Gmail search syntax reaches all mail. Who, subject, latest text, unread, attachments, job |
+| `read_conversation(conversation_id)` | read (`mail.view`) | `getThreadDetail` | Each message's sender, recipients, date, attachments and text (4,000 chars each), drafts marked, with message_ids for `send_email`. Doesn't mark it read |
+| `organise_emails(conversation_ids[], action)` | change (`mail.organise`) | `applyThreadAction` (`lib/mail/actions.ts`) | archive, trash (Bin, recoverable 30 days), spam, not_spam, inbox, read, unread — as the page's buttons, in Gmail too |
+| `send_email(mode?, message_id? \| conversation_id?, to?, cc?, bcc?, subject?, body, send_at?, draft_only?, send_anyway?)` | send (`mail.send`) | `startCompose`, `saveDraft`, `sendDraft`, `scheduleDraft` (`lib/mail/compose.ts`, `scheduled.ts`) | New email, reply, reply all or forward exactly as the Mail page writes it (recipients, Re:/Fwd:, quote, threading, signature); body is plain text. `send_at` (Perth) schedules it; `draft_only` saves to Drafts. The same text to the same person within 10 minutes (from the sent copies filed by the webhook) is refused unless `send_anyway: true` |
 | `read_email_attachment(email_id? \| message_id?, attachment?)` | read | `readAttachment` (`lib/attachments/read.ts`) | PDFs (typed or scanned) and images are read by Gemini Flash (`GEMINI_FLASH_MODEL`, inline data) into "Summary:" + "Contents:" text; text/HTML/CSV decoded locally; Word/Excel not yet. Stored copy (`job-files`) first, else Gmail (`rfc822msgid:` lookup). Several attachments and none named → returns the list to ask. PDF/image ≤ 14 MB (Gemini's 20 MB inline limit after base64), text cut at 30k chars |
 | `save_email(message_id, job_number?)` | change | `uploadAttachments`, `insertLinkedCommunication` (`lib/communications/inbound-email.ts`), `linkThreadToJob` | Saves an inbox email the app never recorded, with attachments, matched to its job as the webhook does (or to `job_number`). Already saved → says where (moves it if `job_number` given). Not for our own emails |
 | `link_email_to_job(email_id, job_number)` | change | `linkThreadToJob` | The unlinked inbox's "Link to job": sets the email's job, clears match candidates, links the rest of the thread |
@@ -4138,7 +4142,7 @@ This section slots in as **Phase 7**, after Phase 6c (AI & Automation Dashboard)
 
 ## 23. Mail Client (Gmail)
 
-Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phases 1 (reading), 2 (organising) and 3 (writing) are done.
+Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phases 1 (reading), 2 (organising), 3 (writing) and 4 (scheduled send, voice) are done.
 
 ### 23.1 Model — Gmail is the source of truth
 
@@ -4217,10 +4221,29 @@ Permission `mail.send` (allowed / needs approval / not allowed; office allowed, 
 
 Page: Compose button (and `c`) opens a floating composer bottom right; in a conversation, Reply / Reply all / Forward (and `r` / `a` / `f`) open it inline under the last message. A draft in a conversation opens in the composer when clicked; a draft on its own in Drafts opens straight into the composer. Ctrl/⌘+Enter sends; Esc saves and closes a floating composer.
 
-### 23.7 Next phases
+### 23.7 Scheduled send (`lib/mail/scheduled.ts`)
 
-1. Scheduled send — draft in Gmail plus a `scheduled_emails` row; the cron sends it. Gmail's own scheduled sends can't be read through the API, so schedule from IRC.
-2. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
+A scheduled email is a Gmail draft plus a `scheduled_emails` row (send_at, status scheduled → sending → sent | failed, or cancelled). The arrow next to Send offers Gmail's picks — tomorrow morning (8:00 am), tomorrow afternoon (1:00 pm), Monday morning — or any date and time, all Perth time (`lib/mail/schedule-rules.ts`; Perth has no daylight saving). Until it's sent the email is an ordinary draft, in the Gmail app's Drafts too (Gmail's own Scheduled folder can't be used through the API, and Gmail-app scheduled sends don't show in IRC).
+
+The cron `/api/gmail/scheduled-send` (every minute, CRON_SECRET) claims each due row (status scheduled → sending, so overlapping runs can't both send it) and sends the draft with the same `sendDraft` as the Send button; failures are kept with their reason. A row left in "sending" for 10 minutes (an interrupted run) is marked failed with "check Sent" rather than sent again. Sends and failures are logged in the activity log as the person who scheduled it.
+
+Page: a Scheduled folder under Drafts (send time, recipients, subject; failed ones with the reason; Cancel send puts it back in Drafts; opening one takes it off the schedule and opens it in the composer, as Gmail does); scheduled drafts show a "Scheduled <time>" chip in lists. Scheduling shows "Send scheduled for …" with Undo. Sending a scheduled draft by hand, or discarding it, takes it off the schedule.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/mail/scheduled` | The Scheduled list |
+| `POST /api/mail/scheduled` | `{ draftId, sendAt }` (ISO, or Perth wall clock) — permission gate on `mail.send`; at needs approval it queues `mail.schedule`, which schedules once approved (or sends now if the time has passed) |
+| `DELETE /api/mail/scheduled/[id]` | Take it off the schedule |
+
+Migration `20261105_scheduled_emails.sql`.
+
+### 23.8 Voice
+
+`list_mailbox`, `read_conversation`, `organise_emails` and `send_email` (§10b) use the same `lib/mail` functions as the page: the list and Gmail search, the conversation fetch, `applyThreadAction`, and `startCompose` → `saveDraft` → `sendDraft` / `scheduleDraft`.
+
+### 23.9 Next phases
+
+1. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
 
 ---
 

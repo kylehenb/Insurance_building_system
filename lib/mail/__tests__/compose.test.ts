@@ -86,3 +86,28 @@ describe('drafts without recipients', () => {
     expect(raw).not.toMatch(/^To:/m)
   })
 })
+
+describe('scheduled send times (Perth)', async () => {
+  const { parseSendAt, schedulePresets, spokenSendAt, isoToPerthLocal } = await import('../schedule-rules')
+
+  it('reads Perth wall-clock times and ISO times', () => {
+    expect(parseSendAt('2026-10-26T08:00')).toBe('2026-10-26T00:00:00.000Z')
+    expect(parseSendAt('2026-10-26 08:00')).toBe('2026-10-26T00:00:00.000Z')
+    expect(parseSendAt('2026-10-26T08:00:00+10:00')).toBe('2026-10-25T22:00:00.000Z')
+    expect(parseSendAt('next tuesday')).toBeNull()
+    expect(isoToPerthLocal('2026-10-26T00:00:00.000Z')).toBe('2026-10-26T08:00')
+    expect(spokenSendAt('2026-10-26T05:30:00.000Z')).toBe('Mon 26 Oct, 1:30 pm')
+  })
+
+  it('offers tomorrow morning and afternoon, and Monday morning', () => {
+    // Friday 23 Oct 2026, 9pm Perth
+    const presets = schedulePresets(new Date('2026-10-23T13:00:00.000Z'))
+    expect(presets.map(p => [p.label, spokenSendAt(p.at)])).toEqual([
+      ['Tomorrow morning', 'Sat 24 Oct, 8:00 am'],
+      ['Tomorrow afternoon', 'Sat 24 Oct, 1:00 pm'],
+      ['Monday morning', 'Mon 26 Oct, 8:00 am'],
+    ])
+    // Sunday: tomorrow is Monday, so no separate Monday option
+    expect(schedulePresets(new Date('2026-10-25T02:00:00.000Z')).map(p => p.label)).toEqual(['Tomorrow morning', 'Tomorrow afternoon'])
+  })
+})
