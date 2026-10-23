@@ -603,9 +603,10 @@ function InsurerOrdersPageContent() {
       })
       const json = await res.json()
       if (!res.ok) { setLodgeError(json.error ?? 'Lodge failed'); setLodging(false); return }
-      const { jobNumber, jobId } = json as { jobNumber: string; jobId: string }
+      const { jobNumber, jobId, acknowledgement } = json as { jobNumber: string; jobId: string; acknowledgement?: { sent: boolean; skipped?: string } }
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, job_id: jobId, status: 'lodged' } : o))
       setJobNumbers(prev => ({ ...prev, [jobId]: jobNumber }))
+      if (acknowledgement && !acknowledgement.sent) setLodgeError(`Lodged as ${jobNumber}, but the acknowledgement email wasn't sent: ${acknowledgement.skipped}`)
     } catch { setLodgeError('Network error — please try again') }
     setLodging(false)
   }

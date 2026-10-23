@@ -10,6 +10,8 @@ export type EmailSendType =
   | 'signing_request'
   | 'signing_request_excess'
   | 'signing_completed'
+  // Automatic reply to the insurer/adjuster when their order is lodged
+  | 'order_acknowledgement'
   // Documents sent from the job (lib/documents/send)
   | 'quote'
   | 'report'
@@ -105,6 +107,24 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Signed: {signed_at}',
       '',
       'If you have any questions, call us on {company_phone} or reply to this email.',
+      '',
+      'Kind regards,',
+      '{signature}',
+    ].join('\n'),
+  },
+  order_acknowledgement: {
+    name: 'Order acknowledgement — default',
+    subject: 'Re: {order_subject}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Thank you for your instruction. We have received and lodged the order for {property_address}.',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'We will contact the insured to arrange an inspection and let you know once the appointment is booked.',
       '',
       'Kind regards,',
       '{signature}',
@@ -306,6 +326,10 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
     SIGNATURE_TOKEN,
   ],
+  order_acknowledgement: [
+    { key: 'order_subject',    label: 'Order email subject', example: 'New BAR instruction – CLM-558213' },
+    ...INSURER_DOCUMENT_TOKENS,
+  ],
   quote: [
     { key: 'quote_ref',        label: 'Quote number',     example: 'Q-IRC1042-1' },
     { key: 'quote_total',      label: 'Quote total (inc GST)', example: '$8,250.00' },
@@ -353,6 +377,11 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
     sendType: 'signing_completed',
     label: 'Signed copy',
     description: 'Sent to the homeowner straight after they sign, with the signed PDF attached.',
+  },
+  {
+    sendType: 'order_acknowledgement',
+    label: 'Order acknowledgement',
+    description: 'Sent automatically to whoever sent the order when it is lodged as a new job, as a reply in the same email thread. Keep the subject as "Re: {order_subject}" so it stays in that thread.',
   },
   {
     sendType: 'quote',

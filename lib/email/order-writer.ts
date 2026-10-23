@@ -211,6 +211,7 @@ export async function writeInsurerOrder(
     from_email: message.fromEmail,
     to_email: message.to,
     body_text: message.bodyText,
+    gmail_message_id: message.gmailMessageId || null,
     source: 'auto_parsed',
   }
 

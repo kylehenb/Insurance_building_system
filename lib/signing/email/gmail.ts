@@ -19,6 +19,10 @@ export interface OutgoingEmail {
   text: string
   html?: string
   attachments?: EmailAttachment[]
+  /** Reply threading: the RFC 822 Message-ID being replied to, and the Gmail
+   *  thread to add the sent message to (the subject must match to join it) */
+  inReplyTo?: string
+  threadId?: string | null
 }
 
 export interface SentEmail {
@@ -37,8 +41,13 @@ export async function sendEmailViaGmail(service: SupabaseClient<Database>, email
     body: email.text,
     html: email.html,
     attachments: email.attachments,
+    inReplyTo: email.inReplyTo,
+    references: email.inReplyTo,
   })
-  const res = await getGmailClient().users.messages.send({ userId: 'me', requestBody: { raw } })
+  const res = await getGmailClient().users.messages.send({
+    userId: 'me',
+    requestBody: { raw, ...(email.threadId ? { threadId: email.threadId } : {}) },
+  })
   const gmailId = res.data.id ?? null
 
   if (gmailId) {
