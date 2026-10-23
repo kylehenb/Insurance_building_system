@@ -4,7 +4,7 @@ import { getSendDialogDefaults, listSigningRequestsForJob, sendForSignature } fr
 import { SIGNING_DOCUMENT_TYPES } from '@/lib/signing/documents/registry'
 import type { SigningDocumentTypeKey } from '@/lib/signing/types'
 import { parseExcessChoice } from '@/lib/excess/decision'
-import { permissionDenied } from '@/lib/permissions/http'
+import { permissionGate } from '@/lib/permissions/http'
 
 // GET  → this job's signing requests, plus defaults for the send dialog
 // POST → generate the document, create the request and email the signer
@@ -36,9 +36,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   if (!isUuid(jobId)) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   const actor = await signingActorFromSession()
   if (!actor) return unauthorized()
-  const denied = await permissionDenied(actor.tenantId, actor.userId, 'send.signing')
-  if (denied) return denied
-
   let body: Record<string, unknown>
   try {
     body = await req.json()
@@ -56,19 +53,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ job
   const excess = body.excess == null ? null : parseExcessChoice(body.excess)
   if (body.excess != null && !excess) return NextResponse.json({ error: 'The excess choice is not valid' }, { status: 400 })
   const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  const input = {
+    jobId,
+    documentType: documentType as SigningDocumentTypeKey,
+    quoteIds,
+    signer: { name: str(signer.name), email: str(signer.email), phone: str(signer.phone) || null },
+    remindersEnabled: body.remindersEnabled !== false,
+  }
+  const options = { moveJobToAwaitingStage: body.moveJobToAwaitingStage === true, excess }
+
+  const gated = await permissionGate(actor.tenantId, actor.userId, 'send.signing', { operation: 'signing.create', payload: { input, options } })
+  if (gated) return gated
 
   try {
-    const result = await sendForSignature(
-      actor,
-      {
-        jobId,
-        documentType: documentType as SigningDocumentTypeKey,
-        quoteIds,
-        signer: { name: str(signer.name), email: str(signer.email), phone: str(signer.phone) || null },
-        remindersEnabled: body.remindersEnabled !== false,
-      },
-      { moveJobToAwaitingStage: body.moveJobToAwaitingStage === true, excess },
-    )
+    const result = await sendForSignature(actor, input, options)
     return NextResponse.json(result)
   } catch (err) {
     return signingErrorResponse(err, 'send for signature')

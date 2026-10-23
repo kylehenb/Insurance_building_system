@@ -8,7 +8,7 @@ import {
   type WorkOrderEmailOverrides,
 } from '@/lib/work-orders/work-order-email'
 import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
-import { permissionDenied } from '@/lib/permissions/http'
+import { permissionGate } from '@/lib/permissions/http'
 
 // GET  → the pre-filled email (from the work_order template) for the send modal
 // POST → send to the trade and lock. Body { mode: 'auto' } sends the template
@@ -53,9 +53,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!UUID_RE.test(id)) return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
   const ctx = await context()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const denied = await permissionDenied(ctx.tenantId, ctx.userId, 'send.work_orders')
-  if (denied) return denied
-
   let overrides: WorkOrderEmailOverrides = {}
   try {
     const parsed = await req.json() as Record<string, unknown>
@@ -71,6 +68,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
+
+  const gated = await permissionGate(ctx.tenantId, ctx.userId, 'send.work_orders', {
+    operation: 'work_order.send', payload: { workOrderId: id, overrides },
+  })
+  if (gated) return gated
 
   try {
     const result = await sendWorkOrderEmail(id, ctx, overrides)

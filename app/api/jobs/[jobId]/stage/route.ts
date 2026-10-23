@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import { NextResponse } from 'next/server'
-import { permissionDenied } from '@/lib/permissions/http'
+import { permissionGate } from '@/lib/permissions/http'
+import { SetStageError, setJobStage } from '@/lib/jobs/set-stage'
 
 export async function PATCH(
   request: Request,
@@ -15,8 +16,6 @@ export async function PATCH(
     if (!tenantId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const denied = await permissionDenied(tenantId, user.session?.user.id, 'jobs.change_stage')
-    if (denied) return denied
     const body = await request.json()
     const { stage } = body
 
@@ -27,38 +26,14 @@ export async function PATCH(
       )
     }
 
-    const supabase = await createClient()
+    const gated = await permissionGate(tenantId, user.session?.user.id, 'jobs.change_stage', { operation: 'job.stage', payload: { jobId, stage } })
+    if (gated) return gated
 
-    // Build the update payload — always update current_stage, and also set
-    // the business-logic timestamp fields that recomputeAndSaveStage derives
-    // the stage from. Without these, any subsequent quote status change would
-    // trigger a recompute that overwrites current_stage back to the previous stage.
-    const now = new Date().toISOString()
-    const patch: Record<string, unknown> = {
-      current_stage: stage,
-      current_stage_updated_at: now,
-    }
-
-    if (stage === 'awaiting_signed_document') {
-      // "Send for Signature" — mark signoff as sent so recompute returns this stage
-      patch.homeowner_signoff_sent_at = now
-    } else if (stage === 'signed_build_schedule') {
-      // "Receive sign off" — mark signoff received so recompute returns this stage
-      patch.homeowner_signoff_received_at = now
-    }
-
-    const { error } = await supabase
-      .from('jobs')
-      .update(patch as any)
-      .eq('id', jobId)
-      .eq('tenant_id', tenantId)
-
-    if (error) {
-      console.error('Error updating job stage:', error)
-      return NextResponse.json(
-        { error: 'Failed to update job stage' },
-        { status: 500 }
-      )
+    try {
+      await setJobStage(await createClient(), tenantId, jobId, stage)
+    } catch (err) {
+      if (err instanceof SetStageError) return NextResponse.json({ error: err.message }, { status: 500 })
+      throw err
     }
 
     return NextResponse.json({ success: true })

@@ -109,7 +109,7 @@ describe('refusing', () => {
   })
 
   it('has a permission on every voice tool that changes or sends something', () => {
-    const unguarded = MCP_TOOLS.filter(t => !t.annotations.readOnlyHint && !t.permission).map(t => t.name)
+    const unguarded = MCP_TOOLS.filter(t => !t.annotations.readOnlyHint && !t.permission && !t.checksOwnPermission).map(t => t.name)
     expect(unguarded).toEqual([])
   })
 })

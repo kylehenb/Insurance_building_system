@@ -18,5 +18,5 @@ The app is exposed to Claude (iOS voice etc.) as an MCP connector. Details and t
 Every user has a level per action — allowed, needs approval, not allowed — from their role's defaults (Settings → Users & Permissions) and their own changes. Details: tech spec §6 "Permissions".
 
 - A new user-facing action that changes or sends something gets a permission: add it to `PERMISSION_ACTIONS` and `BUILT_IN_DEFAULTS` in `lib/permissions/catalogue.ts`, or reuse a fitting one.
-- Check it on the server: `permissionDenied(...)` at the top of the API route, and `permission:` on any voice connector tool (checked centrally in `lib/mcp/server.ts`). Never rely on hiding a button.
+- Check it on the server: `permissionGate(...)` in the API route (queues it when the user needs approval — add an operation in `lib/approvals/operations.ts` that calls the same shared function), or `permissionDenied(...)` when there's nothing sensible to queue, and `permission:` on any voice connector tool (checked centrally in `lib/mcp/server.ts`). Never rely on hiding a button.
 - Edits saved straight from the browser to Supabase can't be checked this way — mark their action `enforced: false` until database rules cover them.

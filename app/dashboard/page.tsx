@@ -7,6 +7,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import type { JobCandidate } from '@/lib/communications/match-job'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import { useCurrentUser } from '@/components/layout/current-user'
+import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -852,6 +853,8 @@ export default function DashboardPage() {
             <div className="ai-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
           </div>
         </div>
+
+        <ApprovalsPanel />
 
         {/* ── TWO COL: flagged + weather ── */}
         <div className="two-col">

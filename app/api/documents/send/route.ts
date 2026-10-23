@@ -9,7 +9,7 @@ import {
   type DocumentEmailContext,
   type DocumentEmailOverrides,
 } from '@/lib/documents/send/email'
-import { permissionDenied } from '@/lib/permissions/http'
+import { permissionGate } from '@/lib/permissions/http'
 
 // Email quotes, reports, invoices, TCCs and photos from a job.
 // POST { documents: DocumentRef[], mode }
@@ -44,18 +44,21 @@ export async function POST(req: NextRequest) {
     const refs = parsed.documents.map(parseDocumentRef)
 
     if (mode === 'draft') return NextResponse.json(await buildDocumentEmailDraft(refs, ctx))
-    // Sending, or marking as sent, needs the send permission
-    const denied = await permissionDenied(ctx.tenantId, ctx.actorId, 'send.documents')
-    if (denied) return denied
-    if (mode === 'mark_sent') return NextResponse.json({ ok: true, ...await markDocumentsSentWithoutEmail(refs, ctx) })
-
     let overrides: DocumentEmailOverrides = {}
     if (mode === 'custom') {
       const str = (k: string) => (typeof parsed[k] === 'string' ? parsed[k] as string : undefined)
       overrides = { to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body') }
-    } else if (mode !== 'auto') {
+    } else if (mode !== 'auto' && mode !== 'mark_sent') {
       return NextResponse.json({ error: "mode must be 'draft', 'auto', 'custom' or 'mark_sent'" }, { status: 400 })
     }
+
+    // Sending, or marking as sent, needs the send permission (or approval)
+    const gated = await permissionGate(ctx.tenantId, ctx.actorId, 'send.documents', {
+      operation: 'documents.send', payload: { refs, mode, overrides },
+    })
+    if (gated) return gated
+
+    if (mode === 'mark_sent') return NextResponse.json({ ok: true, ...await markDocumentsSentWithoutEmail(refs, ctx) })
     return NextResponse.json({ ok: true, ...await sendDocumentEmail(refs, ctx, overrides) })
   } catch (err) {
     if (err instanceof DocumentSendError) return NextResponse.json({ error: err.message }, { status: err.status })

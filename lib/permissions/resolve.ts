@@ -58,14 +58,22 @@ export async function loadUserPermissions(tenantId: string, userId: string, serv
 export function refusalMessage(action: PermissionKey, level: PermissionLevel): string {
   const label = permissionAction(action)?.label.toLowerCase() ?? action
   if (level === 'approval') {
-    return `Your account needs an admin's approval to ${label}, and approvals aren't set up yet — ask an admin to do it.`
+    return `Your account needs an admin's approval to ${label}, and this can't be sent for approval from here — ask an admin to do it.`
   }
   return `Your account isn't allowed to ${label}. Ask an admin if you need to.`
 }
 
+/** The user's level for one action (no user → not allowed) */
+export async function permissionLevel(tenantId: string, userId: string | null, action: PermissionKey, service?: Service): Promise<PermissionLevel> {
+  if (!userId) return 'blocked'
+  const { levels } = await loadUserPermissions(tenantId, userId, service)
+  return levels[action]
+}
+
 /**
  * Throws PermissionError unless the user is allowed to do the action
- * outright. ("Needs approval" refuses for now — the approval queue comes next.)
+ * outright. Callers that can queue the action for approval use
+ * permissionLevel (or permissionGate in lib/permissions/http.ts) instead.
  */
 export async function requirePermission(tenantId: string, userId: string | null, action: PermissionKey, service?: Service): Promise<void> {
   if (!userId) throw new PermissionError(refusalMessage(action, 'blocked'), 'blocked', action)

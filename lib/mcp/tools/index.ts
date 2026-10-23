@@ -10,6 +10,7 @@ import { readEmailAttachment } from '@/lib/mcp/tools/attachments'
 import { linkEmailToJob, saveEmail } from '@/lib/mcp/tools/inbox'
 import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
 import { addJobNote, getJobSummary } from '@/lib/mcp/tools/jobs'
+import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -40,4 +41,6 @@ export const MCP_TOOLS: McpTool[] = [
   saveEmail,
   linkEmailToJob,
   recoverDroppedEmails,
+  listApprovalsTool,
+  decideApprovalTool,
 ]

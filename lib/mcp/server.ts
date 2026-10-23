@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import type { PermissionKey } from '@/lib/permissions/catalogue'
-import { PermissionError, requirePermission } from '@/lib/permissions/resolve'
+import { permissionLevel, refusalMessage } from '@/lib/permissions/resolve'
+import { requestApproval } from '@/lib/approvals/service'
 
 // Minimal MCP server (Streamable HTTP, stateless, JSON responses) for the
 // Claude voice connector. Only what a tools-only server needs: initialize,
@@ -31,8 +32,14 @@ export interface McpTool {
   description: string
   inputSchema: Record<string, unknown>
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
-  /** What the connector's user must be allowed to do (lib/permissions). Required for any tool that changes or sends something. */
+  /**
+   * What the connector's user must be allowed to do (lib/permissions).
+   * Required for any tool that changes or sends something. At "needs
+   * approval" the call is queued for approval instead of run.
+   */
   permission?: PermissionKey
+  /** The tool checks the caller's permission itself (e.g. deciding approvals) */
+  checksOwnPermission?: true
   run(args: Record<string, unknown>, ctx: McpContext): Promise<McpToolResult>
 }
 
@@ -105,13 +112,24 @@ export async function handleMcpMessage(
       const args = params.arguments && typeof params.arguments === 'object' ? params.arguments as Record<string, unknown> : {}
       let out: McpToolResult
       try {
-        // Same permission check as the app's buttons — refused tools say why
-        if (tool.permission) await requirePermission(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase)
-        out = await tool.run(args, ctx)
-      } catch (err) {
-        if (err instanceof PermissionError) {
-          return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: err.message }], isError: true } }
+        // Same permission check as the app's buttons: not allowed → refused,
+        // needs approval → queued for an approver, with the call to replay
+        const level = tool.permission ? await permissionLevel(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase) : 'allowed'
+        if (level === 'blocked' && tool.permission) {
+          out = { text: refusalMessage(tool.permission, 'blocked'), isError: true }
+        } else if (level === 'approval' && tool.permission) {
+          const requested = await requestApproval({
+            tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission,
+            operation: 'voice.tool', payload: { tool: tool.name, args }, via: 'voice', service: ctx.supabase,
+          })
+          out = {
+            text: `${requested.message} Nothing has been done yet — tell the user it's waiting for approval, and don't retry.`,
+            data: { pending_approval: true, approval_id: requested.id, summary: requested.summary },
+          }
+        } else {
+          out = await tool.run(args, ctx)
         }
+      } catch (err) {
         console.error(`[mcp] ${tool.name} failed:`, err)
         // Not "nothing changed": a send tool may have got part way. Check first.
         out = { text: `${tool.title} hit an unexpected error. Check the app before trying again.`, isError: true }

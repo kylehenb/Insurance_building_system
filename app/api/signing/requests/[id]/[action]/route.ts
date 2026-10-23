@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isUuid, signingActorFromSession, signingErrorResponse, unauthorized } from '@/lib/signing/http'
-import { confirmSigningStage, getSigningProvider, resendSigningRequest, setRemindersEnabled } from '@/lib/signing/service'
-import { permissionDenied } from '@/lib/permissions/http'
+import { isSigningAction, runSigningAction, type SigningActionBody } from '@/lib/signing/actions'
+import { permissionGate } from '@/lib/permissions/http'
 
 // POST /api/signing/requests/[id]/send          send a draft
 // POST /api/signing/requests/[id]/resend        email a fresh link (old link stops working; excess invoice re-attached)
@@ -12,38 +12,19 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const ACTIONS = ['send', 'resend', 'revoke', 'confirm-stage', 'reminders'] as const
-type Action = (typeof ACTIONS)[number]
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; action: string }> }) {
   const { id, action } = await params
   if (!isUuid(id)) return NextResponse.json({ error: 'Signing request not found' }, { status: 404 })
-  if (!ACTIONS.includes(action as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 })
+  if (!isSigningAction(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 })
   const actor = await signingActorFromSession()
   if (!actor) return unauthorized()
-  const denied = await permissionDenied(actor.tenantId, actor.userId, action === 'confirm-stage' ? 'jobs.change_stage' : 'send.signing')
-  if (denied) return denied
-
-  const provider = getSigningProvider()
+  const body = await req.json().catch(() => ({})) as SigningActionBody
+  const gated = await permissionGate(actor.tenantId, actor.userId, action === 'confirm-stage' ? 'jobs.change_stage' : 'send.signing', {
+    operation: 'signing.action', payload: { requestId: id, action, body: { reason: body.reason, enabled: body.enabled } },
+  })
+  if (gated) return gated
   try {
-    switch (action as Action) {
-      case 'send':
-        return NextResponse.json({ request: await provider.send(actor, id) })
-      case 'resend':
-        return NextResponse.json({ request: await resendSigningRequest(actor, id) })
-      case 'revoke': {
-        const body = await req.json().catch(() => ({})) as { reason?: unknown }
-        const reason = typeof body.reason === 'string' ? body.reason : null
-        return NextResponse.json({ request: await provider.revoke(actor, id, reason) })
-      }
-      case 'confirm-stage':
-        return NextResponse.json(await confirmSigningStage(actor, id))
-      case 'reminders': {
-        const body = await req.json().catch(() => ({})) as { enabled?: unknown }
-        if (typeof body.enabled !== 'boolean') return NextResponse.json({ error: 'enabled must be true or false' }, { status: 400 })
-        return NextResponse.json({ request: await setRemindersEnabled(actor, id, body.enabled) })
-      }
-    }
+    return NextResponse.json(await runSigningAction(actor, id, action, body))
   } catch (err) {
     return signingErrorResponse(err, action.replace('-', ' '))
   }
