@@ -9,6 +9,7 @@ import {
   type ComposeStart, type ComposeState, type DraftAttachment,
 } from '@/lib/mail/compose-rules'
 import type { MailAddress } from '@/lib/mail/summary'
+import { isoToPerthLocal, MIN_SCHEDULE_LEAD_MS, perthLocalToIso, schedulePresets, spokenSendAt } from '@/lib/mail/schedule-rules'
 
 // Writing an email — new, reply, reply all or forward. What's written is
 // saved as a Gmail draft a couple of seconds after each change (so it's in
@@ -26,6 +27,8 @@ interface Props {
   onClose(draftId: string | null): void
   onDiscarded(): void
   onSend(draftId: string): void
+  /** Send later: sendAt is an ISO time */
+  onSchedule(draftId: string, sendAt: string): void
 }
 
 const SAVE_AFTER_MS = 2000
@@ -41,7 +44,7 @@ function formatSize(bytes: number): string {
 
 const TITLES = { new: 'New message', reply: 'Reply', reply_all: 'Reply all', forward: 'Forward' } as const
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ initial, variant, onClose, onDiscarded, onSend }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ initial, variant, onClose, onDiscarded, onSend, onSchedule }, ref) {
   const [state, setState] = useState<ComposeState>(initial)
   const [showCc, setShowCc] = useState(!!(initial.cc || initial.bcc))
   const [showQuote, setShowQuote] = useState(false)
@@ -50,6 +53,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState<Uploading[]>([])
   const [busy, setBusy] = useState(false)
+  const [scheduleMenu, setScheduleMenu] = useState<'closed' | 'presets' | 'pick'>('closed')
+  const [pickAt, setPickAt] = useState('')
 
   const stateRef = useRef(state)
   const dirty = useRef(false)
@@ -168,24 +173,39 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
     }
   }
 
-  async function send() {
+  /** Saves it as it is now, ready to send; null (with the reason showing) if it isn't ready */
+  async function readyToSend(): Promise<string | null> {
     const fields = [state.to, state.cc, state.bcc].map(readAddressInput)
     const invalid = fields.flatMap(f => f.invalid)
-    if (invalid.length) { setError(`Not a valid address: ${invalid.join(', ')}`); return }
-    if (fields.every(f => f.addresses.length === 0)) { setError('Add at least one recipient'); return }
-    if (uploading.some(u => !u.error)) { setError('Wait for the attachments to finish uploading'); return }
+    if (invalid.length) { setError(`Not a valid address: ${invalid.join(', ')}`); return null }
+    if (fields.every(f => f.addresses.length === 0)) { setError('Add at least one recipient'); return null }
+    if (uploading.some(u => !u.error)) { setError('Wait for the attachments to finish uploading'); return null }
     setBusy(true)
     setError(null)
     try {
       // Sending sends the saved draft, so it must be saved as it is now
       dirty.current = true
-      const id = await flush()
-      if (id) onSend(id)
+      return await flush()
     } catch {
-      // save() has shown the error
+      return null // save() has shown the error
     } finally {
       setBusy(false)
     }
+  }
+
+  async function send() {
+    const id = await readyToSend()
+    if (id) onSend(id)
+  }
+
+  async function schedule(sendAt: string | null) {
+    if (!sendAt || new Date(sendAt).getTime() < Date.now() + MIN_SCHEDULE_LEAD_MS) {
+      setError('Choose a time at least a minute from now')
+      return
+    }
+    setScheduleMenu('closed')
+    const id = await readyToSend()
+    if (id) onSchedule(id, sendAt)
   }
 
   async function close() {
@@ -281,7 +301,34 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
           {error && <div className="cmp-error">{error}</div>}
 
           <div className="cmp-foot">
-            <button className="cmp-send" onClick={send} disabled={busy} title="Send (Ctrl+Enter)">Send</button>
+            <span className="cmp-send-group">
+              <button className="cmp-send" onClick={send} disabled={busy} title="Send (Ctrl+Enter)">Send</button>
+              <button className="cmp-send-more" disabled={busy} title="Schedule send" aria-label="Schedule send"
+                onClick={() => setScheduleMenu(m => (m === 'closed' ? 'presets' : 'closed'))}>▾</button>
+              {scheduleMenu !== 'closed' && (
+                <div className="cmp-sched">
+                  <div className="cmp-sched-title">Schedule send <span>(Perth time)</span></div>
+                  {scheduleMenu === 'presets' ? (
+                    <>
+                      {schedulePresets().map(p => (
+                        <button key={p.label} onClick={() => schedule(p.at)}>
+                          <span>{p.label}</span><span className="cmp-sched-when">{spokenSendAt(p.at)}</span>
+                        </button>
+                      ))}
+                      <button onClick={() => { setPickAt(isoToPerthLocal(schedulePresets()[0].at)); setScheduleMenu('pick') }}>Pick date &amp; time</button>
+                    </>
+                  ) : (
+                    <div className="cmp-sched-pick">
+                      <input type="datetime-local" value={pickAt} onChange={e => setPickAt(e.target.value)} />
+                      <div>
+                        <button className="cmp-link" onClick={() => setScheduleMenu('presets')}>Back</button>
+                        <button className="cmp-send" onClick={() => schedule(perthLocalToIso(pickAt))}>Schedule send</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </span>
             <button className="cmp-icon" title="Attach files" onClick={() => fileRef.current?.click()}>📎</button>
             <input ref={fileRef} type="file" multiple hidden onChange={e => { if (e.target.files) attach(e.target.files); e.target.value = '' }} />
             <label className="cmp-sig" title="Add the company email signature (Settings → Email Templates)">
@@ -397,6 +444,19 @@ const COMPOSER_CSS = `
   .cmp-send { font: inherit; font-size: 14px; font-weight: 600; color: var(--cream); background: var(--ink); border: none; border-radius: 18px; padding: 8px 22px; cursor: pointer; }
   .cmp-send:hover { background: var(--ink-hover); }
   .cmp-send:disabled { opacity: .6; cursor: default; }
+  .cmp-send-group { position: relative; display: inline-flex; }
+  .cmp-send-group > .cmp-send { border-radius: 18px 0 0 18px; padding-right: 16px; }
+  .cmp-send-more { font-size: 11px; color: var(--cream); background: var(--ink); border: none; border-left: 1px solid rgba(255,255,255,.25); border-radius: 0 18px 18px 0; padding: 0 12px; cursor: pointer; }
+  .cmp-send-more:hover { background: var(--ink-hover); }
+  .cmp-sched { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; min-width: 280px; background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 6px 0; }
+  .cmp-sched-title { font-size: 12px; font-weight: 600; color: var(--ink); padding: 6px 14px 8px; }
+  .cmp-sched-title span { font-weight: 400; color: var(--subtle); }
+  .cmp-sched > button { display: flex; justify-content: space-between; gap: 16px; width: 100%; font: inherit; font-size: 13px; text-align: left; background: none; border: none; padding: 8px 14px; cursor: pointer; color: var(--ink); }
+  .cmp-sched > button:hover { background: var(--surface-2); }
+  .cmp-sched-when { color: var(--subtle); }
+  .cmp-sched-pick { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 8px; }
+  .cmp-sched-pick input { font: inherit; font-size: 13px; padding: 6px 8px; border: 0.5px solid var(--line-strong); border-radius: 6px; }
+  .cmp-sched-pick div { display: flex; justify-content: space-between; align-items: center; }
   .cmp-icon { font-size: 15px; background: none; border: none; cursor: pointer; padding: 4px; border-radius: 50%; opacity: .75; }
   .cmp-icon:hover { opacity: 1; background: var(--surface-2); }
   .cmp-icon:last-child { margin-left: auto; }

@@ -17,6 +17,8 @@ import { setJobStage } from '@/lib/jobs/set-stage'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import { generateInvoice, type GenerateInvoiceInput } from '@/lib/invoices/generate'
 import { describeDraft, sendDraft } from '@/lib/mail/compose'
+import { scheduleDraft } from '@/lib/mail/scheduled'
+import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { getMailbox } from '@/lib/mail/sync'
 
 // What an approval request does once approved. Each operation calls the same
@@ -222,6 +224,24 @@ const mailSend: Operation<{ draftId: string }> = {
   },
 }
 
+// Scheduling is sending later — approved, it goes on the schedule (or out at the next minute if the time has passed)
+const mailSchedule: Operation<{ draftId: string; sendAt: string }> = {
+  async describe(p) {
+    const { to, subject } = await describeDraft(p.draftId)
+    return { summary: `Send the email "${clip(subject, 80)}" to ${clip(to, 120)} from the office mailbox at ${spokenSendAt(p.sendAt)}`, jobId: null }
+  },
+  async run(p, ctx) {
+    const mailbox = await getMailbox(ctx.tenantId)
+    const late = new Date(p.sendAt).getTime() < Date.now() + 90_000
+    if (late) {
+      await sendDraft(mailbox, p.draftId)
+      return 'The scheduled time had passed, so the email was sent now.'
+    }
+    await scheduleDraft(mailbox, ctx.requesterId, p.draftId, p.sendAt)
+    return `Email scheduled for ${spokenSendAt(p.sendAt)}.`
+  },
+}
+
 /** A readable description of a voice tool call, from the same lookups as the app's operations */
 async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: OperationContext): Promise<{ text: string; jobId: string | null }> {
   const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
@@ -267,6 +287,7 @@ export const OPERATIONS = {
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
   'mail.send': mailSend,
+  'mail.schedule': mailSchedule,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -289,4 +310,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
   'mail.send': 'mail.send',
+  'mail.schedule': 'mail.send',
 }
