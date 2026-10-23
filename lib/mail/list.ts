@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getGmailClient } from '@/lib/gmail/client'
 import { findThreadJobId } from '@/lib/communications/thread-link'
-import { folderLabel, HIDDEN_LABELS, type FolderKey } from './folders'
+import { folderLabel, HIDDEN_LABELS, TAB_LABELS, tabLabel, type FolderKey, type TabKey } from './folders'
 import { parseMessage, resolveCidImages, type MailMessage } from './message'
 import { fetchThreads, mailDb, storeThread, type Mailbox } from './sync'
 import type { MailAddress, Participant } from './summary'
@@ -31,7 +31,7 @@ export type ThreadPage = {
   cursor: string | null
 }
 
-export type FolderCounts = { inbox: number; drafts: number; spam: number }
+export type FolderCounts = { inbox: number; promotions: number; social: number; drafts: number; spam: number }
 
 export type ThreadDetail = {
   id: string
@@ -97,8 +97,22 @@ async function withJobs(mailbox: Mailbox, rows: Row[], db: SupabaseClient): Prom
   }))
 }
 
+/** The mirror's version of inFolder (lib/mail/folders.ts) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function whereInFolder<Q extends { contains: any; not: any }>(query: Q, folder: FolderKey, tab: TabKey | null): Q {
+  const label = folderLabel(folder)
+  let q = query
+  if (label !== 'SPAM' && label !== 'TRASH') q = q.not('label_ids', 'ov', `{${HIDDEN_LABELS.join(',')}}`)
+  if (label) q = q.contains('label_ids', [label])
+  if (folder === 'inbox' && tab) {
+    const t = tabLabel(tab)
+    q = t ? q.contains('label_ids', [t]) : q.not('label_ids', 'ov', `{${TAB_LABELS.join(',')}}`)
+  }
+  return q
+}
+
 /** A folder from the mirror, newest first. cursor is the last row's last_message_at. */
-export async function listFolder(mailbox: Mailbox, folder: FolderKey, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
+export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
   let query = db
     .from('mail_threads')
     .select(LIST_COLUMNS)
@@ -107,10 +121,7 @@ export async function listFolder(mailbox: Mailbox, folder: FolderKey, cursor: st
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(PAGE_SIZE)
 
-  const label = folderLabel(folder)
-  query = label
-    ? query.contains('label_ids', [label])
-    : query.not('label_ids', 'ov', `{${HIDDEN_LABELS.join(',')}}`)
+  query = whereInFolder(query, folder, tab)
   if (cursor) query = query.lt('last_message_at', cursor)
 
   const { data, error } = await query
@@ -127,12 +138,14 @@ export async function listFolder(mailbox: Mailbox, folder: FolderKey, cursor: st
  * Results not yet in the mirror — older mail — are fetched on the way.
  * cursor is Gmail's page token.
  */
-export async function searchFolder(mailbox: Mailbox, folder: FolderKey, q: string, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
+export async function searchFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, q: string, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
   const label = folderLabel(folder)
+  const tabL = folder === 'inbox' && tab ? tabLabel(tab) : null
+  const primary = folder === 'inbox' && tab === 'primary'
   const res = await getGmailClient().users.threads.list({
     userId: 'me',
-    q,
-    labelIds: label ? [label] : undefined,
+    q: primary ? `${q} -category:promotions -category:social` : q,
+    labelIds: [label, tabL].filter((l): l is string => !!l),
     includeSpamTrash: label !== null && HIDDEN_LABELS.includes(label),
     maxResults: PAGE_SIZE,
     pageToken: cursor ?? undefined,
@@ -163,24 +176,27 @@ export async function searchFolder(mailbox: Mailbox, folder: FolderKey, q: strin
   }
 }
 
+/** Unread counts for the folder list, as Gmail shows them (the inbox counts its Primary tab) */
 export async function folderCounts(mailbox: Mailbox, db = mailDb()): Promise<FolderCounts> {
-  const count = async (label: string, unreadOnly: boolean) => {
+  const count = async (folder: FolderKey, tab: TabKey | null, unreadOnly: boolean) => {
     let q = db
       .from('mail_threads')
       .select('id', { count: 'exact', head: true })
       .eq('mailbox_id', mailbox.id)
       .not('synced_at', 'is', null)
-      .contains('label_ids', [label])
+    q = whereInFolder(q, folder, tab)
     if (unreadOnly) q = q.eq('unread', true)
     const { count } = await q
     return count ?? 0
   }
-  const [inbox, drafts, spam] = await Promise.all([
-    count('INBOX', true),
-    count('DRAFT', false),
-    count('SPAM', true),
+  const [inbox, promotions, social, drafts, spam] = await Promise.all([
+    count('inbox', 'primary', true),
+    count('inbox', 'promotions', true),
+    count('inbox', 'social', true),
+    count('drafts', null, false),
+    count('spam', null, true),
   ])
-  return { inbox, drafts, spam }
+  return { inbox, promotions, social, drafts, spam }
 }
 
 /** An opened conversation, fetched from Gmail. Also refreshes its row in the mirror. Null if it's gone. */

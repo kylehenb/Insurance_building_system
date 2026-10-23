@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { mailAccess } from '@/lib/mail/access'
-import { isFolderKey } from '@/lib/mail/folders'
+import { isFolderKey, isTabKey } from '@/lib/mail/folders'
+import { userLabels } from '@/lib/mail/labels'
 import { folderCounts, listFolder, searchFolder } from '@/lib/mail/list'
 import { getMailbox, syncMailbox } from '@/lib/mail/sync'
 
@@ -9,8 +10,9 @@ export const maxDuration = 60
 // A sync newer than this is fresh enough; older and opening the page kicks one off
 const FRESH_MS = 30_000
 
-// GET /api/mail/threads?folder=inbox&q=&cursor=
+// GET /api/mail/threads?folder=inbox&tab=primary&q=&cursor=
 //   folder  inbox | sent | drafts | all | spam | trash (default inbox)
+//   tab     primary | promotions | social — inbox only
 //   q       Gmail search syntax; searches Gmail instead of the mirror
 //   cursor  from the previous page
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -22,15 +24,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!isFolderKey(folder)) {
     return NextResponse.json({ error: 'Unknown folder' }, { status: 400 })
   }
+  const tabParam = params.get('tab')
+  const tab = folder === 'inbox' ? (isTabKey(tabParam) ? tabParam : 'primary') : null
   const q = params.get('q')?.trim() || null
   const cursor = params.get('cursor') || null
 
   try {
     const mailbox = await getMailbox(access.tenantId)
 
-    const [page, counts] = await Promise.all([
-      q ? searchFolder(mailbox, folder, q, cursor) : listFolder(mailbox, folder, cursor),
+    const [page, counts, labels] = await Promise.all([
+      q ? searchFolder(mailbox, folder, tab, q, cursor) : listFolder(mailbox, folder, tab, cursor),
       folderCounts(mailbox),
+      // Chips are a nicety — the list still loads if Gmail's label list doesn't
+      userLabels().catch(() => ({})),
     ])
 
     const stale = !mailbox.synced_at || Date.now() - new Date(mailbox.synced_at).getTime() > FRESH_MS
@@ -43,6 +49,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       ...page,
       counts,
+      labels,
       mailbox: {
         email: mailbox.email_address,
         synced_at: mailbox.synced_at,

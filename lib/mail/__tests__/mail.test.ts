@@ -3,6 +3,7 @@ import type { gmail_v1 } from 'googleapis'
 import { decodeEntities, historyThreadIds, parseAddresses, summariseThread } from '../summary'
 import { parseMessage, resolveCidImages } from '../message'
 import { cleanEmailHtml, emailDocument, hasRemoteImages, textToHtml } from '../html'
+import { applyAction, inFolder, undoAction, type MailAction } from '../folders'
 
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64url')
 
@@ -205,5 +206,51 @@ describe('email html', () => {
 
   it('escapes plain text and links URLs', () => {
     expect(textToHtml('<b> see https://example.com/a?b=1.')).toContain('&lt;b&gt; see <a href="https://example.com/a?b=1">https://example.com/a?b=1</a>.')
+  })
+})
+
+describe('folders and actions', () => {
+  it('puts conversations in folders and inbox tabs the way Gmail does', () => {
+    expect(inFolder('inbox', ['INBOX', 'UNREAD'], 'primary')).toBe(true)
+    expect(inFolder('inbox', ['INBOX', 'CATEGORY_PROMOTIONS'], 'primary')).toBe(false)
+    expect(inFolder('inbox', ['INBOX', 'CATEGORY_PROMOTIONS'], 'promotions')).toBe(true)
+    expect(inFolder('inbox', ['INBOX', 'CATEGORY_UPDATES'], 'primary')).toBe(true)
+    // Binned or spam conversations leave every other folder
+    expect(inFolder('inbox', ['INBOX', 'TRASH'])).toBe(false)
+    expect(inFolder('all', ['SENT', 'SPAM'])).toBe(false)
+    expect(inFolder('trash', ['INBOX', 'TRASH'])).toBe(true)
+    expect(inFolder('all', ['SENT'])).toBe(true)
+  })
+
+  it('applies actions to labels', () => {
+    expect(applyAction(['INBOX', 'UNREAD'], 'archive')).toEqual(['UNREAD'])
+    expect(applyAction(['INBOX'], 'spam')).toEqual(['SPAM'])
+    expect(applyAction(['SPAM'], 'not_spam')).toEqual(['INBOX'])
+    expect(applyAction(['TRASH', 'SENT'], 'inbox')).toEqual(['INBOX', 'SENT'])
+    expect(applyAction(['INBOX', 'UNREAD'], 'read')).toEqual(['INBOX'])
+    expect(applyAction(['INBOX'], 'trash')).toEqual(['INBOX', 'TRASH'])
+  })
+
+  it('undoes each action back to where the conversation was', () => {
+    const cases: [MailAction, string[]][] = [
+      ['archive', ['INBOX', 'UNREAD']],
+      ['trash', ['INBOX']],
+      ['trash', ['SENT']],
+      ['spam', ['INBOX']],
+      ['not_spam', ['SPAM']],
+      ['inbox', ['TRASH']],
+      ['inbox', ['SENT']],
+      ['read', ['INBOX', 'UNREAD']],
+      ['unread', ['INBOX']],
+    ]
+    for (const [action, before] of cases) {
+      const after = applyAction(before, action)
+      const restored = applyAction(after, undoAction(action, before))
+      // Gmail's trash keeps the other labels, so compare where it shows rather than the exact set
+      for (const folder of ['inbox', 'sent', 'all', 'spam', 'trash'] as const) {
+        expect(inFolder(folder, restored), `${action} on ${before} in ${folder}`).toBe(inFolder(folder, before))
+      }
+      expect(restored.includes('UNREAD')).toBe(before.includes('UNREAD'))
+    }
   })
 })

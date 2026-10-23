@@ -51,6 +51,7 @@ export const PERMISSION_ACTIONS = [
   { key: 'records.delete', group: 'Jobs', label: 'Delete records', description: 'Delete jobs, quotes, reports, work orders and other records', levels: ON_OFF, enforced: true },
   // Email
   { key: 'mail.view', group: 'Email', label: 'Read the office mailbox', description: 'Open the Mail page: every folder of the shared office inbox, not just emails filed on jobs', levels: ON_OFF, enforced: true },
+  { key: 'mail.organise', group: 'Email', label: 'Organise the office mailbox', description: 'Archive, bin, mark as spam and mark read or unread on the Mail page — changes the mailbox in Gmail too', levels: ON_OFF, enforced: true },
   // Sending — anything that leaves the company
   { key: 'send.work_orders', group: 'Sending', label: 'Send work orders to trades', description: 'Email work orders to trades and hand them to Gary', levels: ALL, enforced: true },
   { key: 'send.documents', group: 'Sending', label: 'Send quotes, reports and invoices', description: 'Email documents to insurers or homeowners (or mark them as sent)', levels: ALL, enforced: true },
@@ -90,6 +91,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'orders.manage': 'allowed',
     'records.delete': 'blocked',
     'mail.view': 'allowed',
+    'mail.organise': 'allowed',
     'send.work_orders': 'allowed',
     'send.documents': 'approval',
     'send.signing': 'approval',
@@ -108,6 +110,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'orders.manage': 'blocked',
     'records.delete': 'blocked',
     'mail.view': 'blocked',
+    'mail.organise': 'blocked',
     'send.work_orders': 'blocked',
     'send.documents': 'blocked',
     'send.signing': 'blocked',

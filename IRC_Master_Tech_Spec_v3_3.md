@@ -7,7 +7,7 @@
 
 **E-signing update (Oct 2026):** In-house e-signing module built — see §10a. Homeowners sign the Scope of Works Authorisation (work of $7,500 or less) or the WA Building Contract (over $7,500) from an emailed link, with no account. New tables `signing_requests`, `signing_events`, `signing_rate_limits` (§4.32–4.34), private storage bucket `signed-documents` (§5), new PDF generators for the SOW and Building Contract (§10). No new paid service and no new environment variables.
 
-**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 1 is read-only.
+**Mail client update (Oct 2026):** The office Gmail mailbox can be read in the app at /dashboard/mail — see §23. Gmail stays the source of truth; new tables `mailboxes` and `mail_threads` hold a disposable copy of the conversation list. Phase 2 (Oct 2026) added archive, bin, spam, read/unread, bulk actions and undo.
 
 ---
 
@@ -1764,7 +1764,7 @@ Every user has a level for each action: **allowed**, **needs approval** or **not
 - Level = the user's own change (`user_permission_overrides`) → else the tenant's default for their role (`permission_defaults`) → else `BUILT_IN_DEFAULTS` in code. Both tables hold changes only; RLS lets users read their tenant's rows, all writes go through the API (service role) after a `users.manage` check
 - Roles: `admin` (always everything — can't be restricted, so the company can't be locked out; nobody can change their own role), `office`, `inspector`. Unknown roles get inspector defaults
 - Built-in defaults: office runs jobs and sends work orders and replies; anything to an insurer or homeowner (documents, signing) and invoices need approval; no deleting, settings or user management. Inspectors add notes and edit job details; replies need approval; everything else outward-facing or financial is off
-- Actions (`PERMISSION_ACTIONS`): jobs.notes, jobs.edit*, jobs.change_stage, orders.lodge, orders.manage, records.delete*, mail.view, send.work_orders, send.documents, send.signing, send.replies, financials.view*, invoices.manage, excess.decide, settings.edit, users.manage. (* saved but not enforced yet — hiding amounts needs UI work as well as rules, since RLS can't hide single columns; shown as COMING in settings)
+- Actions (`PERMISSION_ACTIONS`): jobs.notes, jobs.edit*, jobs.change_stage, orders.lodge, orders.manage, records.delete*, mail.view, mail.organise, send.work_orders, send.documents, send.signing, send.replies, financials.view*, invoices.manage, excess.decide, settings.edit, users.manage. (* saved but not enforced yet — hiding amounts needs UI work as well as rules, since RLS can't hide single columns; shown as COMING in settings)
 - **Database rules** (`supabase/migrations/20261101_permission_rls.sql`): edits that go straight from the browser to Supabase are checked by restrictive RLS policies `perm_<action>_<command>` using `public.user_can(action)` (→ `user_permission_level`, the same resolution as `lib/permissions/resolve.ts`; its built-in defaults must match `BUILT_IN_DEFAULTS` — a test checks). Only "allowed" passes ("needs approval" can't be queued from the browser). settings.edit: writes to settings tables (tenants, templates, prompts, rates, scope library, automation, accounting map) and all access to `accounting_credentials`; invoices.manage: writes to invoices, line items, deductions; jobs.edit: insert/update on jobs, quotes, reports, work orders, clients, trades, and scope items / visits; records.delete: deleting jobs, quotes, reports, invoices, work orders, insurer orders, emails, clients, trades. `users` has no browser writes at all. Service-role routes are unaffected and check permissions themselves (`permissionDenied`/`permissionGate`); routes that act for a permitted action write with the service client so a rule can't stop them part way
 - **Tenant from the session only**: API routes take the tenant from the signed-in session (`sessionUser()`, `lib/auth/session.ts`), never from the request — with the service client a request's tenantId would reach another company's data. `/api/ai/*` requires sign-in; the assistant's record tools are tenant-scoped and follow the user's permissions
 - Enforced on the server: `permissionGate()` (`lib/permissions/http.ts`) in the work order send, document send, signing (create / send / resend / revoke / reminders; confirm-stage → jobs.change_stage), reply, lodge, job stage and excess routes (`permissionDenied()` where there's nothing to queue, e.g. users.manage); and `permission` on every voice connector tool that changes or sends something, checked in `lib/mcp/server.ts` (a test fails if one is missing; tools that check for themselves set `checksOwnPermission`). The voice connector acts as the owner of the personal key used (or `MCP_USER_ID` for the old shared key), so it has that person's permissions
@@ -4138,7 +4138,7 @@ This section slots in as **Phase 7**, after Phase 6c (AI & Automation Dashboard)
 
 ## 23. Mail Client (Gmail)
 
-Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phase 1 (reading) is done.
+Goal: run the office mailbox from IRC Master instead of the Gmail app, with job context alongside every conversation. Built in phases; phases 1 (reading) and 2 (organising) are done.
 
 ### 23.1 Model — Gmail is the source of truth
 
@@ -4165,28 +4165,40 @@ Triggers:
 
 | Route | Purpose |
 |---|---|
-| `GET /api/mail/threads?folder=&q=&cursor=` | Folder list from the mirror (or Gmail search when `q` is set — Gmail search syntax), unread counts, mailbox status |
+| `GET /api/mail/threads?folder=&tab=&q=&cursor=` | Folder list from the mirror (or Gmail search when `q` is set — Gmail search syntax), unread counts, the mailbox's Gmail labels (name and colour, `lib/mail/labels.ts`, cached 5 min), mailbox status |
 | `GET /api/mail/threads/[threadId]` | One conversation fetched from Gmail (`full`), parsed by `lib/mail/message.ts`; also refreshes its mirror row |
 | `GET /api/mail/attachments?m=&a=&n=&t=` | Attachment bytes from Gmail. Images, PDFs and plain text open in the browser; everything else downloads |
+| `POST /api/mail/threads/actions` | `{ threadIds, action, auto? }` — up to 100 conversations. Needs `mail.organise` too |
 
-Folders (`lib/mail/folders.ts`): Inbox `INBOX`, Sent `SENT`, Drafts `DRAFT`, All mail (anything not Spam/Bin), Spam `SPAM`, Bin `TRASH`. A thread is in a folder if any of its messages has the label, as in Gmail. Job chips come from `communications.thread_id` → `job_id`.
+Folders (`lib/mail/folders.ts`): Inbox `INBOX`, Sent `SENT`, Drafts `DRAFT`, All mail (anything not Spam/Bin), Spam `SPAM`, Bin `TRASH`. A thread is in a folder if any of its messages has the label, as in Gmail; Spam and Bin threads are left out of every other folder. The inbox has Gmail's tabs: Primary (anything not Promotions or Social — Updates and Forums aren't turned on for office@), Promotions `CATEGORY_PROMOTIONS`, Social `CATEGORY_SOCIAL`; its unread count is Primary's. Job chips come from `communications.thread_id` → `job_id`.
 
 All `/api/mail` routes require `mail.view` (admin and office on, inspectors off by default).
 
-### 23.4 Page (`/dashboard/mail`)
+### 23.4 Actions (`lib/mail/actions.ts`)
 
-Three panels: folders, conversation list, reading pane. Refreshes every 20 seconds while visible. Gmail keyboard shortcuts: `j`/`k`, `o`/Enter, `/`, Esc/`u`, `g` then `i`/`s`/`d`/`a`/`!`/`t`. Conversations open the latest and unread messages, earlier ones folded.
+| Action | In Gmail |
+|---|---|
+| archive | remove INBOX |
+| inbox (Move to Inbox) | untrash if binned, remove SPAM, add INBOX |
+| trash / untrash | `threads.trash` / `threads.untrash` |
+| spam / not_spam | add SPAM, remove INBOX / remove SPAM, add INBOX |
+| read / unread | remove / add UNREAD |
+
+Each is made in Gmail (`threads.modify`, 8 at a time), then those threads are re-fetched into the mirror. The label rules (`applyAction`, `inFolder`, `undoAction` in `lib/mail/folders.ts`) are shared with the page, which updates the list straight away and puts it back if Gmail refuses. Undo runs the reverse action for each conversation based on its labels before (e.g. undoing a delete of an inbox conversation moves it back to the inbox).
+
+Permission `mail.organise` (Email group; admin and office on, inspectors off). Logged in the activity log as one entry per request ("3 email conversations archived"). Opening an unread conversation marks it read (`auto: true`), which isn't logged, and is silently skipped for people without `mail.organise`. Migration `20261103_mail_organise_permission.sql` adds it to `user_permission_level`. Delete forever and empty Bin aren't offered — Gmail deletes binned mail after 30 days.
+
+### 23.5 Page (`/dashboard/mail`)
+
+Laid out like Gmail with no split: folders on the left, a full-width one-line list (tick box, sender, job chip and Gmail label chips, subject - snippet, attachment, date; archive / delete / read buttons on hover), inbox tabs, and the conversation opening full width with its action bar. Refreshes every 20 seconds while visible. Gmail keyboard shortcuts: `j`/`k` (next/previous, also inside a conversation), `x` tick, `o`/Enter open, `e` archive, `#` delete, `!` spam, Shift+`I`/`U` read/unread, `z` undo, `/` search, Esc/`u` back, `g` then `i`/`s`/`d`/`a`/`!`/`t`. Action keys apply to the open conversation, else the ticked ones, else the highlighted row. Conversations open the latest and unread messages, earlier ones folded.
 
 Emails render in a sandboxed iframe with no scripts (`lib/mail/html.ts`). A Content-Security-Policy blocks remote images, stylesheets and fonts until "Show images" (or "Always show from" a sender, remembered in the browser). `cid:` images point at the attachment route.
 
-Phase 1 is read-only: opening a conversation doesn't mark it read in Gmail.
+### 23.6 Next phases
 
-### 23.5 Next phases
-
-1. Actions — archive, bin, spam/not spam, read/unread (from Gmail's UNREAD label), bulk select, undo. Each gets a permission.
-2. Compose — new, reply, reply all, forward; drafts autosaved to Gmail; attachments uploaded via storage (Vercel body limit); undo send.
-3. Scheduled send — draft in Gmail plus a `scheduled_emails` row; the cron sends it. Gmail's own scheduled sends can't be read through the API, so schedule from IRC.
-4. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
+1. Compose — new, reply, reply all, forward; drafts autosaved to Gmail; attachments uploaded via storage (Vercel body limit); undo send.
+2. Scheduled send — draft in Gmail plus a `scheduled_emails` row; the cron sends it. Gmail's own scheduled sends can't be read through the API, so schedule from IRC.
+3. IRC features — Jobs / Unlinked / Admin split inbox replacing the dashboard triage list, job side panel, job-aware compose, create order from email, snooze, voice tools.
 
 ---
 
