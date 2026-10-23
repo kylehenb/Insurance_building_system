@@ -1,0 +1,492 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/supabase/database.types'
+import {
+  generateExcessInvoice, generateBalanceInvoice,
+} from '@/lib/invoices/generators'
+import { generateInvoiceRef } from '@/lib/invoices/ref'
+import { syncInvoiceToAccounting } from '@/lib/accounting/sync'
+
+// Creates a draft invoice of a given type for a job: works out its lines and
+// amounts (from the client's report pricing, approved quotes, work order
+// variations or the excess), writes the invoice, lines and deductions, and
+// syncs it to accounting if it was created as sent. Used by the invoice
+// buttons (app/api/invoices/generate). The caller checks invoices.manage.
+
+const DEFAULT_GST_PCT = 0.1
+
+export const INVOICE_TYPES = ['assessment', 'make_safe', 'roof', 'leak_detection', 'excess', 'balance', 'quoted_amounts', 'variations', 'custom'] as const
+export type InvoiceType = typeof INVOICE_TYPES[number]
+
+export class InvoiceGenerateError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'InvoiceGenerateError'
+  }
+}
+
+export interface GenerateInvoiceInput {
+  type: string
+  jobId: string
+  /** Report-based types (assessment, make_safe, roof, leak_detection) */
+  reportId?: string
+  /** Excess invoices; defaults to the job's excess */
+  excessAmountIncGst?: number
+}
+
+type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+
+export interface GeneratedInvoice {
+  invoice: Row<'invoices'>
+  lineItems: Row<'invoice_line_items'>[]
+  deductions: Row<'invoice_deductions'>[]
+}
+
+export async function generateInvoice(
+  supabase: SupabaseClient<Database>,
+  tenantId: string,
+  input: GenerateInvoiceInput,
+): Promise<GeneratedInvoice> {
+  const { type, jobId } = input
+  if (!type || !jobId) throw new InvoiceGenerateError('Missing required fields: type, jobId', 400)
+
+  // Fetch job details needed by all types
+  const { data: jobData, error: jobError } = await supabase
+    .from('jobs')
+    .select('job_number, claim_number, insured_name, excess, tenant_id, client_id, property_address, insurer')
+    .eq('id', jobId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (jobError || !jobData) {
+    throw new InvoiceGenerateError('Job not found', 404)
+  }
+
+  // Resolve client_id from insurer name if not set (handles jobs lodged before this was wired up)
+  const job = { ...jobData }
+  if (!job.client_id && job.insurer) {
+    const { data: resolvedClient } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .eq('name', job.insurer)
+      .maybeSingle()
+
+    if (resolvedClient) {
+      job.client_id = resolvedClient.id
+      await supabase.from('jobs').update({ client_id: resolvedClient.id }).eq('id', jobId).eq('tenant_id', tenantId)
+    }
+  }
+
+  let generated: {
+    invoiceData: any
+    lineItems: any[]
+    deductions?: Array<{ description: string; amount_inc_gst: number }>
+  }
+
+  // Report-based invoices use template system with client config pricing
+  if (['assessment', 'make_safe', 'roof', 'leak_detection'].includes(type)) {
+    const reportId = input.reportId
+    if (!reportId) {
+      throw new InvoiceGenerateError('reportId required for this invoice type', 400)
+    }
+
+    // Map invoice types to template codes
+    const templateCodeMap: Record<string, string> = {
+      assessment: 'bar', make_safe: 'make_safe', roof: 'single_storey_roof', // Will be adjusted based on property type
+      leak_detection: 'leak_detection',
+    }
+    const templateCode = templateCodeMap[type]
+
+    // Fetch template
+    const { data: template, error: templateError } = await supabase
+      .from('invoice_templates')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('template_code', templateCode)
+      .eq('is_active', true)
+      .single()
+
+    if (templateError || !template) {
+      throw new InvoiceGenerateError('Template not found', 404)
+    }
+
+    // Fetch client pricing
+    if (!job.client_id) {
+      throw new InvoiceGenerateError('Job has no client assigned', 400)
+    }
+
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', job.client_id)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (clientError || !client) {
+      throw new InvoiceGenerateError('Client not found', 404)
+    }
+
+    // Determine price based on template code
+    let price = 0
+    if (type === 'assessment') {
+      price = (client as any).bar_amount || 0
+    } else if (type === 'make_safe') {
+      price = (client as any).make_safe_amount || 0
+    } else if (type === 'roof') {
+      // For roof reports, check property type to use correct pricing
+      // Default to single_storey, will need property_type from job in future
+      price = (client as any).single_storey_roof_report_amount || (client as any).double_storey_roof_report_amount || 0
+    } else if (type === 'leak_detection') {
+      price = (client as any).leak_detection_report_amount || 0
+    }
+
+    // Replace placeholders in description
+    let description = template.description
+    description = description.replace(/{property_address}/g, job.property_address || 'N/A')
+    description = description.replace(/{claim_number}/g, job.claim_number || 'N/A')
+    description = description.replace(/{job_number}/g, job.job_number || 'N/A')
+    description = description.replace(/{insured_name}/g, job.insured_name || 'N/A')
+
+    // For make_safe, apply builder's margin from client settings
+    const makeSafeMarkupPct = type === 'make_safe'
+      ? ((client as any).builders_margin_pct ?? 0) / 100
+      : null
+
+    const lineItemTotal = price
+    const markup = makeSafeMarkupPct != null ? Math.round(lineItemTotal * makeSafeMarkupPct * 100) / 100 : 0
+    const amountExGst = Math.round((lineItemTotal + markup) * 100) / 100
+    const gst = Math.round(amountExGst * DEFAULT_GST_PCT * 100) / 100
+    const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId, job_id: jobId, report_id: reportId, invoice_type: type, direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, status: 'draft',
+        ...(makeSafeMarkupPct != null ? { markup_pct: makeSafeMarkupPct } : {}),
+      }, lineItems: [{
+        tenant_id: tenantId, description, quantity: 1, unit_price: lineItemTotal, line_total: lineItemTotal, sort_order: 0,
+      }],
+    }
+
+  } else if (type === 'excess') {
+    let excessAmountIncGst = input.excessAmountIncGst
+    if (!excessAmountIncGst) {
+      if (!job.excess) {
+        throw new InvoiceGenerateError('No excess amount on job and none provided', 400)
+      }
+      excessAmountIncGst = job.excess
+    }
+
+    generated = generateExcessInvoice({
+      tenantId, jobId, claimNumber: job.claim_number, insuredName: job.insured_name, excessAmountIncGst, gstPct: DEFAULT_GST_PCT,
+    })
+
+  } else if (type === 'balance') {
+    // Fetch approved quote
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('id, approved_amount, gst_pct, markup_pct, quote_ref')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const gstPct = quote?.gst_pct ?? DEFAULT_GST_PCT
+    const markupPct = quote?.markup_pct ?? 0
+
+    // Fetch scope items from the approved quote
+    let scopeItems: Array<{
+      item_description: string | null
+      qty: number | null
+      rate_total: number | null
+      line_total: number | null
+      unit: string | null
+      sort_order: number | null
+    }> = []
+
+    if (quote?.id) {
+      const { data: items } = await supabase
+        .from('scope_items')
+        .select('item_description, qty, rate_total, line_total, unit, sort_order')
+        .eq('quote_id', quote.id)
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+      scopeItems = items ?? []
+    }
+
+    if (scopeItems.length > 0) {
+      // Build line items from scope items — each item is listed explicitly
+      const lineItems = scopeItems.map((item, index) => ({
+        tenant_id: tenantId, description: item.item_description ?? 'Scope Item', quantity: item.qty ?? 1, unit_price: item.rate_total ?? 0, line_total: item.line_total ?? 0, unit: item.unit ?? null, quote_id: quote?.id ?? null, quote_ref: quote?.quote_ref ?? null, sort_order: item.sort_order ?? index,
+      }))
+
+      const subtotal = Math.round(
+        lineItems.reduce((sum, li) => sum + (li.line_total ?? 0), 0) * 100
+      ) / 100
+      const amountExGst = Math.round(subtotal * (1 + markupPct) * 100) / 100
+      const gst = Math.round(amountExGst * gstPct * 100) / 100
+      const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
+
+      generated = {
+        invoiceData: {
+          tenant_id: tenantId, job_id: jobId, invoice_type: 'repair', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, markup_pct: markupPct, status: 'draft',
+        }, lineItems,
+      }
+    } else {
+      // Fallback when no scope items: compute balance from approved amount minus prior invoices
+      let approvedQuoteAmountIncGst = quote?.approved_amount ?? 0
+
+      if (!approvedQuoteAmountIncGst && quote?.id) {
+        const { data: fallbackItems } = await supabase
+          .from('scope_items')
+          .select('line_total')
+          .eq('quote_id', quote.id)
+          .eq('tenant_id', tenantId)
+        const subtotal = (fallbackItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
+        approvedQuoteAmountIncGst = Math.round(subtotal * (1 + markupPct) * (1 + gstPct) * 100) / 100
+      }
+
+      const { data: priorInvoices } = await supabase
+        .from('invoices')
+        .select('amount_inc_gst')
+        .eq('job_id', jobId)
+        .eq('tenant_id', tenantId)
+        .eq('direction', 'outbound')
+        .neq('status', 'voided')
+
+      const previouslyInvoicedAmountIncGst = (priorInvoices ?? []).reduce(
+        (sum, inv) => sum + (inv.amount_inc_gst ?? 0), 0
+      )
+
+      generated = generateBalanceInvoice({
+        tenantId, jobId, claimNumber: job.claim_number, approvedQuoteAmountIncGst, previouslyInvoicedAmountIncGst, gstPct,
+      })
+    }
+
+  } else if (type === 'quoted_amounts') {
+    // Fetch all approved/partially-approved quotes, ordered oldest first
+    const { data: approvedQuotes } = await supabase
+      .from('quotes')
+      .select('id, approved_amount, gst_pct, markup_pct, quote_ref')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .in('status', ['approved', 'partially_approved'])
+      .order('created_at', { ascending: true })
+
+    if (!approvedQuotes || approvedQuotes.length === 0) {
+      throw new InvoiceGenerateError('No approved quotes for this job', 400)
+    }
+
+    const primaryQuote = approvedQuotes[0]
+    const gstPct = primaryQuote.gst_pct ?? DEFAULT_GST_PCT
+    const markupPct = primaryQuote.markup_pct ?? 0
+
+    // Collect scope items from all approved quotes
+    const allLineItems: Array<{
+      tenant_id: string
+      description: string
+      quantity: number
+      unit_price: number
+      line_total: number
+      unit: string | null
+      quote_id: string | null
+      quote_ref: string | null
+      sort_order: number
+    }> = []
+
+    let sortOffset = 0
+    for (const quote of approvedQuotes) {
+      const { data: items } = await supabase
+        .from('scope_items')
+        .select('item_description, qty, rate_total, line_total, unit, sort_order')
+        .eq('quote_id', quote.id)
+        .eq('tenant_id', tenantId)
+        .order('sort_order', { ascending: true })
+
+      for (const item of items ?? []) {
+        allLineItems.push({
+          tenant_id: tenantId, description: item.item_description ?? 'Scope Item', quantity: item.qty ?? 1, unit_price: item.rate_total ?? 0, line_total: item.line_total ?? 0, unit: item.unit ?? null, quote_id: quote.id, quote_ref: quote.quote_ref ?? null, sort_order: (item.sort_order ?? 0) + sortOffset,
+        })
+      }
+      sortOffset += 1000
+    }
+
+    // Fetch excess invoices — the deduction is applied post-GST, not as a line item
+    const { data: excessInvoices } = await supabase
+      .from('invoices')
+      .select('amount_inc_gst')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+      .eq('invoice_type', 'excess')
+      .neq('status', 'voided')
+
+    const excessDeductionIncGst = excessInvoices && excessInvoices.length > 0
+      ? Math.round(excessInvoices.reduce((sum, inv) => sum + (inv.amount_inc_gst ?? 0), 0) * 100) / 100
+      : 0
+
+    const subtotal = Math.round(allLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+    const amountExGst = Math.round(subtotal * (1 + markupPct) * 100) / 100
+    const gst = Math.round(amountExGst * gstPct * 100) / 100
+    const grossIncGst = Math.round((amountExGst + gst) * 100) / 100
+    // Excess is subtracted after GST — amount_inc_gst is the net amount the insurer pays
+    const amountIncGst = Math.round((grossIncGst - excessDeductionIncGst) * 100) / 100
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'quoted_amounts', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: amountExGst, gst, amount_inc_gst: amountIncGst, markup_pct: markupPct, status: 'draft',
+      }, lineItems: allLineItems, deductions: excessDeductionIncGst > 0
+        ? [{ description: 'Policy Excess Payment Received', amount_inc_gst: excessDeductionIncGst }]
+        : [],
+    }
+
+  } else if (type === 'variations') {
+    // Collect added_items from all work orders
+    const { data: workOrders } = await supabase
+      .from('work_orders')
+      .select('id, notes')
+      .eq('job_id', jobId)
+      .eq('tenant_id', tenantId)
+
+    interface WOAddedItem {
+      id: string
+      item_description: string
+      qty: number
+      rate_labour: number
+      rate_materials: number
+      line_total: number
+    }
+
+    const allAddedItems: WOAddedItem[] = []
+    for (const wo of workOrders ?? []) {
+      if (!wo.notes) continue
+      try {
+        const parsed = JSON.parse(wo.notes) as Record<string, unknown>
+        if (Array.isArray(parsed.added_items)) {
+          allAddedItems.push(...(parsed.added_items as WOAddedItem[]))
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (allAddedItems.length === 0) {
+      throw new InvoiceGenerateError('No additional items or variations in work orders', 400)
+    }
+
+    let variationsMarkupPct = 0
+    if (job.client_id) {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('builders_margin_pct')
+        .eq('id', job.client_id)
+        .eq('tenant_id', tenantId)
+        .single()
+      variationsMarkupPct = ((client as any)?.builders_margin_pct ?? 0) / 100
+    }
+
+    const variationsLineItems = allAddedItems.map((item, index) => ({
+      tenant_id: tenantId, description: item.item_description, quantity: item.qty, unit_price: item.rate_labour + item.rate_materials, line_total: item.line_total, unit: null as string | null, sort_order: index,
+    }))
+
+    const varSubtotal = Math.round(variationsLineItems.reduce((sum, li) => sum + li.line_total, 0) * 100) / 100
+    const varAmountExGst = Math.round(varSubtotal * (1 + variationsMarkupPct) * 100) / 100
+    const varGst = Math.round(varAmountExGst * DEFAULT_GST_PCT * 100) / 100
+    const varAmountIncGst = Math.round((varAmountExGst + varGst) * 100) / 100
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'variations', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: varAmountExGst, gst: varGst, amount_inc_gst: varAmountIncGst, markup_pct: variationsMarkupPct, status: 'draft',
+      }, lineItems: variationsLineItems,
+    }
+
+  } else if (type === 'custom') {
+    let customMarkupPct = 0
+    if (job.client_id) {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('builders_margin_pct')
+        .eq('id', job.client_id)
+        .eq('tenant_id', tenantId)
+        .single()
+      customMarkupPct = ((client as any)?.builders_margin_pct ?? 0) / 100
+    }
+
+    generated = {
+      invoiceData: {
+        tenant_id: tenantId, job_id: jobId, invoice_type: 'custom', direction: 'outbound', gst_treatment: 'exclusive', amount_ex_gst: 0, gst: 0, amount_inc_gst: 0, markup_pct: customMarkupPct, status: 'draft',
+      }, lineItems: [],
+    }
+
+  } else {
+    throw new InvoiceGenerateError(`Unknown invoice type: ${type}`, 400)
+  }
+
+  // Generate invoice ref
+  const invoiceRef = await generateInvoiceRef(supabase, tenantId, jobId, job.job_number ?? jobId)
+
+  // Write invoice to DB
+  const { data: invoice, error: insertError } = await supabase
+    .from('invoices')
+    .insert({ ...generated.invoiceData, invoice_ref: invoiceRef })
+    .select('*')
+    .single()
+
+  if (insertError || !invoice) {
+    throw new InvoiceGenerateError(insertError?.message ?? 'Failed to create invoice', 500)
+  }
+
+  // Write line items
+  if (generated.lineItems.length > 0) {
+    const lineItemsToInsert = generated.lineItems.map(li => ({
+      ...li, invoice_id: invoice.id,
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('invoice_line_items')
+      .insert(lineItemsToInsert)
+
+    if (itemsError) {
+      await supabase.from('invoices').delete().eq('id', invoice.id)
+      throw new InvoiceGenerateError(itemsError.message, 500)
+    }
+  }
+
+  // Write deductions (e.g. policy excess already paid, deducted post-GST)
+  if (generated.deductions && generated.deductions.length > 0) {
+    const deductionsToInsert = generated.deductions.map((d, index) => ({
+      tenant_id: tenantId, invoice_id: invoice.id, description: d.description, amount_inc_gst: d.amount_inc_gst, sort_order: index,
+    }))
+
+    const { error: deductionsError } = await supabase
+      .from('invoice_deductions')
+      .insert(deductionsToInsert)
+
+    if (deductionsError) {
+      await supabase.from('invoices').delete().eq('id', invoice.id)
+      throw new InvoiceGenerateError(deductionsError.message, 500)
+    }
+  }
+
+  const { data: lineItems } = await supabase
+    .from('invoice_line_items')
+    .select('*')
+    .eq('invoice_id', invoice.id)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
+  const { data: deductions } = await supabase
+    .from('invoice_deductions')
+    .select('*')
+    .eq('invoice_id', invoice.id)
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+
+  if (invoice.status === 'sent') {
+    console.log(`[invoice-sync] Auto-triggering sync for invoice ${invoice.id} on generation with status 'sent'`)
+    void syncInvoiceToAccounting(supabase, tenantId, invoice.id).catch((err: unknown) => {
+      console.error(`[invoice-sync] Unexpected sync error for invoice ${invoice.id}:`, err)
+    })
+  }
+
+  return { invoice, lineItems: lineItems ?? [], deductions: deductions ?? [] }
+}

@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { JobContext } from './InvoicesTab'
 import { InvoiceEditor } from './InvoiceEditor'
 import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
+import { pendingApprovalFrom } from '@/lib/approvals/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -187,8 +188,9 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
         body: JSON.stringify({ type, jobId, tenantId, ...extra }),
       })
       if (!res.ok) {
-        const err = await res.json() as { error?: string }
-        alert(err.error ?? 'Failed to create invoice')
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        const queued = pendingApprovalFrom(err)
+        alert(queued ? `Waiting for approval: ${queued.message.replace(/^Sent for approval:\s*/, '')}` : err.error ?? 'Failed to create invoice')
         return
       }
       const { invoice: newInvoice } = await res.json() as { invoice: { id: string } }

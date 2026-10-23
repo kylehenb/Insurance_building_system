@@ -15,6 +15,7 @@ import { replyToEmail } from '@/lib/communications/reply'
 import { lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { setJobStage } from '@/lib/jobs/set-stage'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
+import { generateInvoice, type GenerateInvoiceInput } from '@/lib/invoices/generate'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -172,6 +173,23 @@ const excessDecide: Operation<{ jobId: string; decision: ExcessDecision; note: s
   },
 }
 
+const INVOICE_TYPE_LABELS: Record<string, string> = {
+  assessment: 'assessment report', make_safe: 'make safe', roof: 'roof report', leak_detection: 'leak detection report',
+  excess: 'excess', balance: 'balance', quoted_amounts: 'quoted amounts', variations: 'variations', custom: 'custom',
+}
+
+const invoiceGenerate: Operation<{ input: GenerateInvoiceInput }> = {
+  async describe(p, ctx) {
+    const what = INVOICE_TYPE_LABELS[p.input.type] ?? p.input.type
+    const amount = p.input.type === 'excess' && p.input.excessAmountIncGst ? ` for $${p.input.excessAmountIncGst}` : ''
+    return { summary: `Create a ${what} invoice${amount} on ${await jobNumber(ctx, p.input.jobId)}`, jobId: p.input.jobId }
+  },
+  async run(p, ctx) {
+    const { invoice } = await generateInvoice(ctx.service, ctx.tenantId, p.input)
+    return `Created draft invoice ${invoice.invoice_ref ?? ''} for $${invoice.amount_inc_gst ?? 0}.`.replace('  ', ' ')
+  },
+}
+
 /** A voice connector tool call, replayed as the requester once approved */
 const voiceTool: Operation<{ tool: string; args: Record<string, unknown> }> = {
   async describe(p, ctx) {
@@ -233,6 +251,7 @@ export const OPERATIONS = {
   'order.lodge': orderLodge,
   'job.stage': jobStage,
   'excess.decide': excessDecide,
+  'invoice.generate': invoiceGenerate,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -253,4 +272,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'order.lodge': 'orders.lodge',
   'job.stage': 'jobs.change_stage',
   'excess.decide': 'excess.decide',
+  'invoice.generate': 'invoices.manage',
 }
