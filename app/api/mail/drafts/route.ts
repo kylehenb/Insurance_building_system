@@ -38,6 +38,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     body: str(body.body, 2_000_000),
     includeSignature: body.includeSignature !== false,
     attachments: Array.isArray(body.attachments) ? body.attachments.slice(0, 50) as ComposeState['attachments'] : [],
+    jobId: typeof body.jobId === 'string' && /^[0-9a-f-]{36}$/i.test(body.jobId) ? body.jobId : null,
   }
 
   try {

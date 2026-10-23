@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
-import type { JobCandidate } from '@/lib/communications/match-job'
+import Link from 'next/link'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import { useCurrentUser } from '@/components/layout/current-user'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
@@ -56,25 +56,6 @@ interface ChatMessage {
   content: string
   actionProposal?: { steps: { n: number; description: string }[] } | null
   confirmed?: boolean
-}
-
-interface UnlinkedComm {
-  id: string
-  subject: string | null
-  content: string | null
-  from_email: string | null
-  contact_name: string | null
-  created_at: string | null
-  match_candidates: JobCandidate[] | null
-  source: string | null
-}
-
-interface JobSearchHit {
-  id: string
-  job_number: string
-  insured_name: string | null
-  property_address: string | null
-  claim_number: string | null
 }
 
 // ── WMO weather codes ────────────────────────────────────────────────────────
@@ -171,16 +152,8 @@ export default function DashboardPage() {
   const [stepEdits, setStepEdits] = useState<Record<string, string>>({})
   const [savedSteps, setSavedSteps] = useState<Record<string, boolean>>({})
 
-  // Unlinked inbox
-  const [unlinkedComms, setUnlinkedComms] = useState<UnlinkedComm[]>([])
-  // Notifications / compliance / newsletters filtered out of the unlinked inbox
-  const [adminComms, setAdminComms] = useState<UnlinkedComm[]>([])
-  const [showAdminComms, setShowAdminComms] = useState(false)
-  const [linkingId, setLinkingId] = useState<string | null>(null)
-  const [linkSearch, setLinkSearch] = useState('')
-  const [linkResults, setLinkResults] = useState<JobSearchHit[]>([])
-  const [linkSaving, setLinkSaving] = useState<string | null>(null)
-  const linkSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Emails to file (Mail page)
+  const [toFile, setToFile] = useState(0)
 
   // Auth
   const { tenantId, userId } = useCurrentUser()
@@ -222,7 +195,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     fetchFlaggedJobs()
     fetchActionCards()
-    fetchUnlinkedComms()
+    fetchToFile()
   }, [userId, tenantId])
 
   // Auto-refresh when AI actions complete
@@ -230,7 +203,7 @@ export default function DashboardPage() {
     if (!userId || !tenantId) return
     fetchFlaggedJobs()
     fetchActionCards()
-    fetchUnlinkedComms()
+    fetchToFile()
   }, [userId, tenantId])
 
   async function fetchFlaggedJobs() {
@@ -304,96 +277,13 @@ export default function DashboardPage() {
     setActionCards(cards)
   }
 
-  async function fetchUnlinkedComms() {
-    if (!tenantId) return
-    // Insurer-order emails are excluded — they're handled in the orders queue
-    // and linked to their job when the order is lodged.
-    const base = () => supabase
-      .from('communications')
-      .select('id, subject, content, from_email, contact_name, created_at, match_candidates, source')
-      .is('job_id', null)
-      .is('insurer_order_id', null)
-      .eq('type', 'email')
-      .eq('direction', 'inbound')
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    const [{ data }, { data: adminData }] = await Promise.all([
-      base().or('source.is.null,source.neq.admin'),
-      base().eq('source', 'admin'),
-    ])
-
-    const toComm = (row: NonNullable<typeof data>[number]): UnlinkedComm => ({
-      id: row.id,
-      subject: row.subject,
-      content: row.content,
-      from_email: row.from_email,
-      contact_name: row.contact_name,
-      created_at: row.created_at,
-      match_candidates: row.match_candidates as JobCandidate[] | null,
-      source: row.source,
-    })
-
-    if (data) setUnlinkedComms(data.map(toComm))
-    if (adminData) setAdminComms(adminData.map(toComm))
-  }
-
-  // ── Unlinked inbox ───────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!linkSearch.trim() || !tenantId) { setLinkResults([]); return }
-    if (linkSearchTimer.current) clearTimeout(linkSearchTimer.current)
-    const term = linkSearch.trim()
-    linkSearchTimer.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, job_number, insured_name, property_address, claim_number')
-        .eq('tenant_id', tenantId)
-        .or(`job_number.ilike.%${term}%,claim_number.ilike.%${term}%,insured_name.ilike.%${term}%,property_address.ilike.%${term}%`)
-        .limit(5)
-      setLinkResults((data as JobSearchHit[]) ?? [])
-    }, 300)
-    return () => { if (linkSearchTimer.current) clearTimeout(linkSearchTimer.current) }
-  }, [linkSearch, tenantId])
-
-  async function linkCommToJob(commId: string, jobId: string) {
-    setLinkSaving(commId)
+  /** Emails not on a job yet — counted by the Mail page (it isn't shown to people without the mailbox) */
+  async function fetchToFile() {
     try {
-      await fetch(`/api/communications/${commId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: jobId }),
-      })
-      setUnlinkedComms(prev => prev.filter(c => c.id !== commId))
-      setAdminComms(prev => prev.filter(c => c.id !== commId))
-      setLinkingId(null)
-      setLinkSearch('')
-      setLinkResults([])
-      // Linking one email links the rest of its thread — refresh to drop those too
-      fetchUnlinkedComms()
-    } finally {
-      setLinkSaving(null)
-    }
-  }
-
-  // File an unlinked email (and its thread) as admin, or move it back to the inbox
-  async function setCommCategory(commId: string, category: 'admin' | 'unlinked') {
-    setLinkSaving(commId)
-    try {
-      const res = await fetch(`/api/communications/${commId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: category }),
-      })
-      if (!res.ok) return
-      if (linkingId === commId) {
-        setLinkingId(null)
-        setLinkSearch('')
-        setLinkResults([])
-      }
-      await fetchUnlinkedComms()
-    } finally {
-      setLinkSaving(null)
+      const res = await fetch('/api/mail/counts')
+      if (res.ok) setToFile(((await res.json()) as { toFile?: number }).toFile ?? 0)
+    } catch {
+      // The card just doesn't show
     }
   }
 
@@ -692,46 +582,13 @@ export default function DashboardPage() {
         .snooze-undo { cursor: pointer; color: var(--tan); border-bottom: 0.5px solid var(--tan); background: none; border-left: none; border-right: none; border-top: none; font-family: inherit; font-size: 11px; padding: 0; }
 
         /* Unlinked inbox */
-        .ui-wrap { border: 0.5px solid var(--line-2); border-radius: 8px; overflow: hidden; background: var(--paper); margin-bottom: 28px; }
-        .ui-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 0.5px solid var(--line-faint); background: var(--surface-6); }
-        .ui-hdr-left { display: flex; align-items: center; gap: 8px; }
-        .ui-badge { font-size: 10px; font-weight: 700; background: #fdf5e8; color: #8a6020; border: 0.5px solid #e8c884; padding: 1px 7px; border-radius: 20px; }
-        .ui-empty { padding: 28px; text-align: center; font-size: 13px; color: var(--faint); font-weight: 300; }
-        .ui-row { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; padding: 11px 14px; border-bottom: 0.5px solid var(--surface); }
-        .ui-row:last-child { border-bottom: none; }
-        .ui-row:hover { background: var(--surface-3); }
-        .ui-row.is-admin { background: #f3f5f8; box-shadow: inset 3px 0 0 #8fa0b8; }
-        .ui-row.is-admin:hover { background: #ecf0f5; }
-        .ui-row.is-admin .ui-subject, .ui-row.is-admin .ui-preview { color: #7d8794; }
-        .ui-admin-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #4f6178; background: #e2e8f0; border: 0.5px solid #c3cddb; padding: 1px 6px; border-radius: 20px; margin-left: 6px; vertical-align: 1px; font-family: inherit; }
-        .ui-admin-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid #c3cddb; background: transparent; color: #5b6b80; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; transition: border-color 0.15s; flex-shrink: 0; }
-        .ui-admin-btn:hover { border-color: #8fa0b8; color: #3f4f63; }
-        .ui-admin-btn:disabled, .ui-link-btn:disabled { opacity: 0.5; cursor: default; }
-        .ui-from { font-size: 11px; color: var(--tan); font-weight: 500; margin-bottom: 2px; font-family: 'DM Mono', monospace; }
-        .ui-subject { font-size: 13px; color: var(--ink); font-weight: 500; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
-        .ui-preview { font-size: 12px; color: #7a7167; font-weight: 300; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 580px; }
-        .ui-age { font-size: 10px; color: var(--faint-5); font-weight: 300; margin-top: 3px; }
-        .ui-link-btn { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid var(--line-strong-3); background: transparent; color: var(--brown-500); cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; transition: border-color 0.15s; flex-shrink: 0; }
-        .ui-link-btn:hover { border-color: var(--tan); color: #5a4a38; }
-        .ui-link-panel { padding: 10px 14px 14px; background: var(--surface-7); border-top: 0.5px solid var(--line-faint); }
-        .ui-suggestion-lbl { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tan); font-weight: 700; margin-bottom: 6px; }
-        .ui-suggestion-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: var(--paper); border: 0.5px solid var(--line-tan-5); border-radius: 5px; margin-bottom: 5px; cursor: pointer; text-align: left; font-family: inherit; transition: border-color 0.15s; }
-        .ui-suggestion-btn:hover { border-color: var(--tan); background: var(--surface-9); }
-        .ui-sug-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--tan); font-weight: 600; flex-shrink: 0; }
-        .ui-sug-name { font-size: 12px; color: var(--body); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ui-sug-why { font-size: 10px; color: var(--faint); flex-shrink: 0; }
-        .ui-search-wrap { position: relative; margin-top: 8px; }
-        .ui-search { width: 100%; border: 0.5px solid var(--line-2); border-radius: 5px; padding: '7px 10px'; font-size: 13px; font-family: inherit; color: var(--ink); background: var(--paper); outline: none; box-sizing: border-box; }
-        .ui-search:focus { border-color: var(--tan); }
-        .ui-results { border: 0.5px solid var(--line-2); border-radius: 5px; overflow: hidden; margin-top: 4px; }
-        .ui-result-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: none; border: none; border-bottom: 0.5px solid var(--line-faint); cursor: pointer; text-align: left; font-family: inherit; }
-        .ui-result-row:last-child { border-bottom: none; }
-        .ui-result-row:hover { background: var(--surface-3); }
-        .ui-result-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--tan); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-        .ui-result-name { font-size: 13px; color: var(--body); }
-        .ui-result-addr { font-size: 11px; color: var(--faint); margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
-        .ui-cancel-btn { background: none; border: none; cursor: pointer; color: var(--faint); font-size: 20px; line-height: 1; padding: 0; margin-left: 6px; }
-        .ui-cancel-btn:hover { color: #5a534a; }
+        .ui-card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 28px; background: var(--paper); border: 0.5px solid var(--line-2); border-left: 3px solid var(--warning-bright); border-radius: 8px; text-decoration: none; color: var(--body); }
+        .ui-card:hover { background: var(--surface-3); }
+        .ui-card-n { font-size: 26px; font-weight: 700; color: var(--warning-dark); min-width: 32px; text-align: center; }
+        .ui-card-text { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+        .ui-card-text strong { font-size: 14px; color: var(--ink); }
+        .ui-card-text span { color: var(--subtle); font-size: 12px; }
+        .ui-card-go { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--ink); }
 
         /* Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(15,12,10,0.55); z-index: 200; display: flex; align-items: center; justify-content: center; }
@@ -976,147 +833,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── UNLINKED INBOX ── */}
-        {(unlinkedComms.length > 0 || adminComms.length > 0) && (
-          <div className="ui-wrap">
-            <div className="ui-hdr">
-              <div className="ui-hdr-left">
-                <span className="sec-label" style={{ margin: 0 }}>Unlinked inbox</span>
-                <span className="ui-badge">{unlinkedComms.length} unlinked</span>
-                {adminComms.length > 0 && (
-                  <button
-                    className="ui-link-btn"
-                    style={{ marginLeft: 6 }}
-                    onClick={() => setShowAdminComms(v => !v)}
-                  >
-                    {showAdminComms ? 'Hide' : 'Show'} {adminComms.length} admin / notification
-                  </button>
-                )}
-              </div>
-              <span style={{ fontSize: 12, color: 'var(--faint)', fontWeight: 300 }}>
-                Emails with no matching job — link manually or auto-suggestions shown below
-              </span>
-            </div>
-
-            {(showAdminComms ? [...unlinkedComms, ...adminComms] : unlinkedComms).map(comm => {
-              const isOpen = linkingId === comm.id
-              const isSaving = linkSaving === comm.id
-              const candidates = Array.isArray(comm.match_candidates) ? comm.match_candidates : []
-              const isAdmin = comm.source === 'admin'
-
-              return (
-                <div key={comm.id}>
-                  <div className={`ui-row${isAdmin ? ' is-admin' : ''}`}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="ui-from">
-                        {comm.from_email ?? comm.contact_name ?? 'Unknown sender'}
-                        {isAdmin && <span className="ui-admin-tag">Admin</span>}
-                      </div>
-                      <div className="ui-subject">{comm.subject ?? '(no subject)'}</div>
-                      <div className="ui-preview">{comm.content ?? ''}</div>
-                      <div className="ui-age">{timeAgo(comm.created_at ?? '')}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <button
-                        className="ui-admin-btn"
-                        disabled={isSaving}
-                        title={isAdmin ? 'Move back to the unlinked inbox' : 'Not job related — file as admin (applies to the whole thread)'}
-                        onClick={() => setCommCategory(comm.id, isAdmin ? 'unlinked' : 'admin')}
-                      >
-                        {isAdmin ? 'Not admin' : 'Mark admin'}
-                      </button>
-                      <button
-                        className="ui-link-btn"
-                        onClick={() => {
-                          if (isOpen) {
-                            setLinkingId(null)
-                            setLinkSearch('')
-                            setLinkResults([])
-                          } else {
-                            setLinkingId(comm.id)
-                            setLinkSearch('')
-                            setLinkResults([])
-                          }
-                        }}
-                      >
-                        {isOpen ? 'Cancel' : 'Link to job'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {isOpen && (
-                    <div className="ui-link-panel">
-                      {candidates.length > 0 && (
-                        <div style={{ marginBottom: 10 }}>
-                          <div className="ui-suggestion-lbl">AI suggestions</div>
-                          {candidates.map(c => (
-                            <button
-                              key={c.job_id}
-                              className="ui-suggestion-btn"
-                              disabled={isSaving}
-                              onClick={() => linkCommToJob(comm.id, c.job_id)}
-                            >
-                              <span className="ui-sug-num">{c.job_number}</span>
-                              <span className="ui-sug-name">
-                                {c.insured_name ?? c.property_address ?? c.job_number}
-                              </span>
-                              <span className="ui-sug-why">
-                                matched on {c.matched_on.join(', ')}
-                              </span>
-                              {c.confidence === 'high' && (
-                                <span style={{ fontSize: 10, color: 'var(--teal)', fontWeight: 700, marginLeft: 4 }}>
-                                  High
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                          <div style={{ fontSize: 10, color: 'var(--faint)', marginBottom: 8 }}>
-                            Or search manually:
-                          </div>
-                        </div>
-                      )}
-
-                      {candidates.length === 0 && (
-                        <div className="ui-suggestion-lbl" style={{ marginBottom: 8 }}>
-                          Search by job number, claim number, address or insured name
-                        </div>
-                      )}
-
-                      <input
-                        className="ui-search"
-                        style={{ width: '100%', border: '0.5px solid var(--line-2)', borderRadius: 5, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', color: 'var(--ink)', background: 'var(--paper)', outline: 'none', boxSizing: 'border-box' }}
-                        placeholder="e.g. IRC1008, CLM-12345, Smith St…"
-                        value={linkSearch}
-                        onChange={e => setLinkSearch(e.target.value)}
-                        autoFocus
-                      />
-
-                      {linkResults.length > 0 && (
-                        <div className="ui-results" style={{ marginTop: 4 }}>
-                          {linkResults.map(job => (
-                            <button
-                              key={job.id}
-                              className="ui-result-row"
-                              disabled={isSaving}
-                              onClick={() => linkCommToJob(comm.id, job.id)}
-                            >
-                              <span className="ui-result-num">{job.job_number}</span>
-                              <span className="ui-result-name">{job.insured_name ?? '—'}</span>
-                              <span className="ui-result-addr">{job.property_address ?? ''}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {isSaving && (
-                        <div style={{ fontSize: 12, color: 'var(--tan)', marginTop: 8 }}>Linking…</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+        {/* ── EMAILS TO FILE ── (filed on the Mail page) */}
+        {toFile > 0 && (
+          <Link href="/dashboard/mail?filing=to_file" className="ui-card">
+            <span className="ui-card-n">{toFile}</span>
+            <span className="ui-card-text">
+              <strong>email{toFile === 1 ? '' : 's'} to file</strong>
+              <span>Not on a job yet — file them from the Mail page</span>
+            </span>
+            <span className="ui-card-go">Open Mail →</span>
+          </Link>
         )}
 
         {/* ── TO DO ── */}

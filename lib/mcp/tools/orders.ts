@@ -2,11 +2,9 @@ import type { Database } from '@/lib/supabase/database.types'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { money, spokenDate } from '@/lib/mcp/tools/work-orders'
 import { getGmailClient } from '@/lib/gmail/client'
-import { extractMessageParts, getFullMessage } from '@/lib/gmail/messages'
-import { parseInsurerOrder } from '@/lib/email/order-parser'
-import { writeInsurerOrder } from '@/lib/email/order-writer'
 import { LodgeError, lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
+import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } from '@/lib/insurer-orders/from-email'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 
@@ -187,25 +185,14 @@ export const createOrderFromEmail: McpTool = {
     const existing = await emailStatus(ctx, id, null)
     if (existing.orderId) return orderResult(ctx, existing.orderId, 'That email is already an order:')
 
-    let orderId: string | null
+    let orderId: string
     try {
-      const msg = await extractMessageParts(await getFullMessage(id))
-      if (msg.fromEmail.toLowerCase().endsWith(`@${OWN_DOMAIN}`)) {
-        return { text: 'That email is one of ours, not an insurer\'s order.', isError: true }
-      }
-      const parsed = await parseInsurerOrder(msg, null, ctx.tenantId)
-      // The user says it's an order, so it's written even if the reader thought
-      // otherwise; its reasoning is kept on the audit record.
-      orderId = await writeInsurerOrder(
-        { ...parsed, isNewOrder: true, isNewOrderReasoning: `Created on request by voice. Reader said: ${parsed.isNewOrderReasoning ?? 'no reason'}` },
-        msg,
-        ctx.tenantId,
-      )
+      orderId = await createOrderFromEmailFn(ctx.tenantId, id, 'by voice')
     } catch (err) {
+      if (err instanceof OrderFromEmailError) return { text: err.message, isError: true }
       console.error('[mcp] create_order_from_email failed:', err)
       return { text: `Couldn't read that email into an order: ${err instanceof Error ? err.message : String(err)}. It can be entered by hand on the Insurer Orders page.`, isError: true }
     }
-    if (!orderId) return { text: 'The order could not be created. Enter it on the Insurer Orders page.', isError: true }
     return orderResult(ctx, orderId, 'Created the order:')
   },
 }

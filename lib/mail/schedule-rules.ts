@@ -58,3 +58,22 @@ export function schedulePresets(now = new Date()): { label: string; at: string }
   if (toMonday !== 1) presets.push({ label: 'Monday morning', at: at(day(toMonday), '08:00') })
   return presets
 }
+
+/** Gmail's snooze picks: later today (6 pm, until 5 pm), tomorrow, this weekend (Saturday), next week (Monday), all 8 am Perth */
+export function snoozePresets(now = new Date()): { label: string; at: string }[] {
+  const perthNow = new Date(now.getTime() + PERTH_OFFSET_MS)
+  const day = (offset: number) => {
+    const d = new Date(perthNow)
+    d.setUTCDate(d.getUTCDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+  const at = (date: string, time: string) => perthLocalToIso(`${date}T${time}`)!
+  const weekday = perthNow.getUTCDay()
+  const presets: { label: string; at: string }[] = []
+  if (perthNow.getUTCHours() < 17) presets.push({ label: 'Later today', at: at(day(0), '18:00') })
+  presets.push({ label: 'Tomorrow', at: at(day(1), '08:00') })
+  // This weekend: the coming Saturday (not offered on the weekend itself)
+  if (weekday >= 1 && weekday <= 5) presets.push({ label: 'This weekend', at: at(day(6 - weekday), '08:00') })
+  presets.push({ label: 'Next week', at: at(day(((8 - weekday) % 7) || 7), '08:00') })
+  return presets
+}

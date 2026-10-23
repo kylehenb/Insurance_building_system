@@ -1,8 +1,7 @@
-import { randomUUID } from 'node:crypto'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { extractMessageParts, getFullMessage } from '@/lib/gmail/messages'
-import { insertLinkedCommunication, uploadAttachments } from '@/lib/communications/inbound-email'
+import { recordInboxMessage } from '@/lib/communications/inbound-email'
 import { linkThreadToJob } from '@/lib/communications/thread-link'
 
 // Filing emails on jobs by voice: saving an inbox email the app never
@@ -82,9 +81,7 @@ export const saveEmail: McpTool = {
       }
     }
 
-    const emailId = randomUUID()
-    const stored = msg.attachments.length ? await uploadAttachments(msg.attachments, ctx.tenantId, emailId, ctx.supabase, messageId) : []
-    const link = await insertLinkedCommunication(ctx.supabase, ctx.tenantId, emailId, msg, stored)
+    const { emailId, stored, link } = await recordInboxMessage(ctx.supabase, ctx.tenantId, messageId, msg)
     if (!link) return { text: 'The email could not be saved. Try again, or check the app.', isError: true }
 
     let jobId = link.job_id

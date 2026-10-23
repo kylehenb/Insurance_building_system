@@ -34,7 +34,15 @@ const linkThread = vi.fn(async (..._a: unknown[]) => 2)
 vi.mock('@/lib/attachments/read', async (orig) => ({ ...(await orig<object>()), readAttachment: (f: never) => read(f) }))
 vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { list: gmailList } } }) }))
 vi.mock('@/lib/gmail/messages', () => ({ getFullMessage: async (id: string) => ({ id }), extractMessageParts: (m: { id: string }) => extract(m.id) }))
-vi.mock('@/lib/communications/inbound-email', () => ({ insertLinkedCommunication: (...a: unknown[]) => insertLinked(...a), uploadAttachments: (...a: unknown[]) => upload(...a) }))
+vi.mock('@/lib/communications/inbound-email', () => ({
+  // recordInboxMessage's own steps, on the mocks above
+  recordInboxMessage: async (db: unknown, tenantId: string, messageId: string, msg: { attachments?: unknown[] }) => {
+    const emailId = 'new-email-id'
+    const stored = msg.attachments?.length ? await upload(msg.attachments, tenantId, emailId, db, messageId) : []
+    const link = await insertLinked(db, tenantId, emailId, msg, stored)
+    return { emailId, link, msg, stored }
+  },
+}))
 vi.mock('@/lib/communications/thread-link', () => ({ linkThreadToJob: (...a: unknown[]) => linkThread(...a) }))
 
 const { readEmailAttachment } = await import('../tools/attachments')

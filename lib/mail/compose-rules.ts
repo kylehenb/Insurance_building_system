@@ -35,6 +35,8 @@ export type ComposeState = {
   body: string
   includeSignature: boolean
   attachments: DraftAttachment[]
+  /** The job it's about: its contacts and documents are offered, and the sent email is filed on it */
+  jobId: string | null
 }
 
 /** A ComposeState plus what the page shows but doesn't edit */
@@ -47,7 +49,7 @@ export function emptyCompose(): ComposeState {
   return {
     draftId: null, threadId: null, mode: 'new', quoteMessageId: null, rawQuote: null,
     inReplyTo: null, references: null, to: '', cc: '', bcc: '', subject: '', body: '',
-    includeSignature: true, attachments: [],
+    includeSignature: true, attachments: [], jobId: null,
   }
 }
 

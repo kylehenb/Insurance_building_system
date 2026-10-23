@@ -2,6 +2,7 @@ import { createClient as createRawClient, type SupabaseClient } from '@supabase/
 import type { gmail_v1 } from 'googleapis'
 import { getGmailClient } from '@/lib/gmail/client'
 import { historyThreadIds, summariseThread } from './summary'
+import { refreshFiling } from './filing'
 
 // Keeps the mail_threads mirror in step with Gmail (see the migration
 // 20261102_mailbox_mirror.sql for the model). Gmail is the source of truth:
@@ -167,6 +168,12 @@ export async function fetchThreads(mailbox: Mailbox, threadIds: string[], db = m
   }
 
   await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, threadIds.length) }, worker))
+  // Where each stands in IRC (on a job, to file, admin)
+  try {
+    await refreshFiling(db, mailbox.tenant_id, threadIds)
+  } catch (err) {
+    console.error('[mail-sync] could not refresh filing:', err)
+  }
   return fetched
 }
 

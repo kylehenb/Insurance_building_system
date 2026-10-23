@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { refreshThreadFiling } from '@/lib/mail/filing'
 
 // Gmail thread ↔ job linking.
 //
@@ -99,6 +100,7 @@ export async function linkThreadToJob(
     console.error(`[thread-link] failed to link thread ${threadId} to job ${jobId}:`, error)
     return 0
   }
+  await refreshThreadFiling(tenantId, threadId)
   return data?.length ?? 0
 }
 
@@ -126,6 +128,7 @@ export async function setThreadCategory(
     console.error(`[thread-link] failed to set thread ${threadId} to ${category}:`, error)
     return 0
   }
+  await refreshThreadFiling(tenantId, threadId)
   return data?.length ?? 0
 }
 

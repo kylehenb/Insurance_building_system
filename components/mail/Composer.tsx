@@ -9,6 +9,8 @@ import {
   type ComposeStart, type ComposeState, type DraftAttachment,
 } from '@/lib/mail/compose-rules'
 import type { MailAddress } from '@/lib/mail/summary'
+import type { JobPanel } from '@/lib/mail/job-context'
+import type { DocumentRef } from '@/lib/documents/send/documents'
 import { isoToPerthLocal, MIN_SCHEDULE_LEAD_MS, perthLocalToIso, schedulePresets, spokenSendAt } from '@/lib/mail/schedule-rules'
 
 // Writing an email — new, reply, reply all or forward. What's written is
@@ -55,6 +57,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const [busy, setBusy] = useState(false)
   const [scheduleMenu, setScheduleMenu] = useState<'closed' | 'presets' | 'pick'>('closed')
   const [pickAt, setPickAt] = useState('')
+  const [job, setJob] = useState<JobPanel | null>(null)
 
   const stateRef = useRef(state)
   const dirty = useRef(false)
@@ -64,6 +67,45 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { stateRef.current = state }, [state])
+
+  // Writing about a job: its contacts and documents are a click away
+  useEffect(() => {
+    if (!state.jobId) return
+    let cancelled = false
+    fetch(`/api/mail/jobs/${state.jobId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled) setJob(d) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [state.jobId])
+
+  function addRecipient(field: 'to' | 'cc', address: string) {
+    const current = stateRef.current[field]
+    const { addresses } = readAddressInput(current)
+    const email = readAddressInput(address).addresses[0]?.email.toLowerCase()
+    if (email && addresses.some(a => a.email.toLowerCase() === email)) return
+    const trimmed = current.trim().replace(/,$/, '')
+    change({ [field]: trimmed ? `${trimmed}, ${address}` : address } as Partial<ComposeState>)
+    if (field === 'cc') setShowCc(true)
+  }
+
+  async function attachDocument(ref: DocumentRef, title: string) {
+    const id = crypto.randomUUID()
+    setUploading(u => [...u, { id, filename: title }])
+    try {
+      const res = await fetch('/api/mail/job-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: stateRef.current.jobId, ref }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? 'Could not make the PDF')
+      change({ attachments: [...stateRef.current.attachments, body.attachment as DraftAttachment] })
+      setUploading(u => u.filter(x => x.id !== id))
+    } catch (err) {
+      setUploading(u => u.map(x => (x.id === id ? { ...x, error: err instanceof Error ? err.message : 'Failed' } : x)))
+    }
+  }
 
   const save = useCallback(async (): Promise<string | null> => {
     // One save at a time; changes made meanwhile are picked up by the next
@@ -270,6 +312,27 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
             <input className="cmp-subject" placeholder="Subject" value={state.subject} onChange={e => change({ subject: e.target.value })} />
           </div>
 
+          {state.jobId && job && (
+            <div className="cmp-job">
+              <span className="cmp-job-chip" title="Sent copies are filed on this job">{job.job_number}</span>
+              {job.contacts.map(c => (
+                <button key={c.email} className="cmp-job-add" title={`Add ${c.email} (Shift: Cc)`}
+                  onClick={e => addRecipient(e.shiftKey ? 'cc' : 'to', c.name ? `${c.name} <${c.email}>` : c.email)}>
+                  + {c.label}
+                </button>
+              ))}
+              {job.documents.length > 0 && (
+                <select className="cmp-job-docs" value="" onChange={e => {
+                  const d = job.documents[Number(e.target.value)]
+                  if (d) attachDocument(d.ref, `${d.title}.pdf`)
+                }}>
+                  <option value="">Attach a job document…</option>
+                  {job.documents.map((d, i) => <option key={i} value={i}>{d.title}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+
           <div className="cmp-editor">
             <RichTextEditor ref={editorRef} value={state.body} onChange={body => change({ body })} minHeight={variant === 'floating' ? 220 : 160} />
           </div>
@@ -430,6 +493,11 @@ const COMPOSER_CSS = `
   .cmp-suggest button span { font-size: 12px; color: var(--subtle); }
   .cmp-suggest button.on, .cmp-suggest button:hover { background: var(--surface-2); }
   .cmp-editor { padding: 10px 14px 4px; }
+  .cmp-job { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 0.5px solid var(--line-faint); background: var(--surface-3); }
+  .cmp-job-chip { font-size: 12px; font-weight: 700; color: var(--teal); background: var(--success-bg-2); border: 0.5px solid #cfe5d8; border-radius: 10px; padding: 1px 8px; }
+  .cmp-job-add { font: inherit; font-size: 12px; color: var(--body); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 1px 8px; cursor: pointer; }
+  .cmp-job-add:hover { border-color: var(--gold); }
+  .cmp-job-docs { font: inherit; font-size: 12px; border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 1px 6px; background: var(--paper); margin-left: auto; }
   .cmp-quote { padding: 0 14px; }
   .cmp-dots { font-size: 10px; letter-spacing: 1px; color: var(--grey-600); background: var(--surface-2); border: 0.5px solid var(--line); border-radius: 6px; padding: 0 6px; cursor: pointer; }
   .cmp-quote-body { margin-top: 8px; opacity: .85; }

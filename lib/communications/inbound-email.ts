@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ExtractedMessage, MessageAttachment } from '@/lib/gmail/messages'
+import { randomUUID } from 'node:crypto'
+import { extractMessageParts, getFullMessage, type ExtractedMessage, type MessageAttachment } from '@/lib/gmail/messages'
 import { resolveCommunicationLink, type CommunicationLink } from '@/lib/communications/resolve-link'
 import { linkThreadToJob } from '@/lib/communications/thread-link'
 
@@ -143,4 +144,23 @@ export async function insertLinkedCommunication(
     await linkThreadToJob(db, tenantId, msg.threadId, link.job_id)
   }
   return link
+}
+
+/**
+ * Records an inbox email the app never saved (by its Gmail message id), with
+ * its attachments, matched to its job as the webhook would. Used by the
+ * voice connector's save_email and the Mail page's filing.
+ */
+export async function recordInboxMessage(
+  db: SupabaseClient,
+  tenantId: string,
+  messageId: string,
+  /** Already fetched and extracted */
+  extracted?: ExtractedMessage,
+): Promise<{ emailId: string; link: CommunicationLink | null; msg: ExtractedMessage; stored: StoredAttachment[] }> {
+  const msg = extracted ?? await extractMessageParts(await getFullMessage(messageId))
+  const emailId = randomUUID()
+  const stored = msg.attachments.length ? await uploadAttachments(msg.attachments, tenantId, emailId, db, messageId) : []
+  const link = await insertLinkedCommunication(db, tenantId, emailId, msg, stored)
+  return { emailId, link, msg, stored }
 }

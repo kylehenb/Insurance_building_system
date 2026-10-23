@@ -4,7 +4,7 @@ import { isComposeMode } from '@/lib/mail/compose-rules'
 import { startCompose } from '@/lib/mail/compose'
 import { getMailbox } from '@/lib/mail/sync'
 
-// GET /api/mail/compose?mode=reply|reply_all|forward|new&message=<gmail message id>
+// GET /api/mail/compose?mode=reply|reply_all|forward|new&message=<gmail message id>&job=<job id>
 // A new email, reply or forward, ready to edit (recipients, subject, quote).
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const access = await composeAccess()
@@ -12,6 +12,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const mode = req.nextUrl.searchParams.get('mode') ?? 'new'
   const messageId = req.nextUrl.searchParams.get('message')
+  const jobParam = req.nextUrl.searchParams.get('job')
+  const jobId = jobParam && /^[0-9a-f-]{36}$/i.test(jobParam) ? jobParam : null
   if (!isComposeMode(mode)) return NextResponse.json({ error: 'Unknown mode' }, { status: 400 })
   if (mode !== 'new' && !/^[0-9a-f]+$/i.test(messageId ?? '')) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 })
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const mailbox = await getMailbox(access.tenantId)
-    return NextResponse.json(await startCompose(mailbox, mode, messageId))
+    return NextResponse.json(await startCompose(mailbox, mode, messageId, jobId))
   } catch (err) {
     return composeErrorResponse(err, 'start the email')
   }

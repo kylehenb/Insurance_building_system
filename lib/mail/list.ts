@@ -5,6 +5,8 @@ import { folderLabel, HIDDEN_LABELS, TAB_LABELS, tabLabel, type FolderKey, type 
 import { parseMessage, resolveCidImages, type MailMessage } from './message'
 import { fetchThreads, mailDb, storeThread, type Mailbox } from './sync'
 import { draftsInThread } from './compose'
+import { refreshFiling, type Filing } from './filing'
+import { orderForEmail } from '@/lib/insurer-orders/from-email'
 import type { MailAddress, Participant } from './summary'
 
 // Reading the mailbox for the mail page: folder lists come from the mirror,
@@ -24,6 +26,8 @@ export type ThreadListItem = {
   unread: boolean
   has_attachments: boolean
   job: JobChip | null
+  /** On a job, to file, admin — or null if the app never recorded it */
+  filing: Filing | null
 }
 
 export type ThreadPage = {
@@ -32,7 +36,7 @@ export type ThreadPage = {
   cursor: string | null
 }
 
-export type FolderCounts = { inbox: number; promotions: number; social: number; drafts: number; spam: number }
+export type FolderCounts = { inbox: number; promotions: number; social: number; drafts: number; spam: number; toFile: number }
 
 export type ThreadDetail = {
   id: string
@@ -42,49 +46,28 @@ export type ThreadDetail = {
   job: JobChip | null
   /** Gmail drafts in the conversation, by the draft message's id */
   drafts: { draftId: string; messageId: string }[]
+  filing: Filing | null
+  /** Jobs the matcher suggested for an email not on a job yet */
+  candidates: JobCandidate[]
+  /** The insurer order the conversation became, if any */
+  orderId: string | null
 }
 
-const LIST_COLUMNS =
-  'gmail_thread_id, subject, snippet, participants, recipients, last_message_at, message_count, label_ids, unread, has_attachments'
+export type JobCandidate = { job_id: string; job_number: string; insured_name: string | null; property_address: string | null; matched_on: string[]; confidence: string }
 
-type Row = Omit<ThreadListItem, 'id' | 'job'> & { gmail_thread_id: string }
+const LIST_COLUMNS =
+  'gmail_thread_id, subject, snippet, participants, recipients, last_message_at, message_count, label_ids, unread, has_attachments, filing, job_id'
+
+type Row = Omit<ThreadListItem, 'id' | 'job'> & { gmail_thread_id: string; job_id: string | null }
 
 const PAGE_SIZE = 50
 
-/** Job chips for a set of Gmail threads, from the emails filed on jobs */
-export async function jobsForThreads(tenantId: string, threadIds: string[], db: SupabaseClient = mailDb()): Promise<Map<string, JobChip>> {
-  const chips = new Map<string, JobChip>()
-  if (threadIds.length === 0) return chips
-
-  const { data: comms } = await db
-    .from('communications')
-    .select('thread_id, job_id, created_at')
-    .eq('tenant_id', tenantId)
-    .in('thread_id', threadIds)
-    .not('job_id', 'is', null)
-    .order('created_at', { ascending: false })
-  const jobByThread = new Map<string, string>()
-  // Newest link wins, matching findThreadJobId
-  for (const c of (comms as { thread_id: string; job_id: string }[] | null) ?? []) {
-    if (!jobByThread.has(c.thread_id)) jobByThread.set(c.thread_id, c.job_id)
-  }
-  if (jobByThread.size === 0) return chips
-
-  const { data: jobs } = await db
-    .from('jobs')
-    .select('id, job_number, insured_name')
-    .eq('tenant_id', tenantId)
-    .in('id', [...new Set(jobByThread.values())])
-  const byId = new Map(((jobs as JobChip[] | null) ?? []).map(j => [j.id, j]))
-  for (const [threadId, jobId] of jobByThread) {
-    const job = byId.get(jobId)
-    if (job) chips.set(threadId, job)
-  }
-  return chips
-}
-
 async function withJobs(mailbox: Mailbox, rows: Row[], db: SupabaseClient): Promise<ThreadListItem[]> {
-  const chips = await jobsForThreads(mailbox.tenant_id, rows.map(r => r.gmail_thread_id), db)
+  const jobIds = [...new Set(rows.map(r => r.job_id).filter((id): id is string => !!id))]
+  const { data: jobs } = jobIds.length
+    ? await db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', mailbox.tenant_id).in('id', jobIds)
+    : { data: [] }
+  const byId = new Map(((jobs as JobChip[] | null) ?? []).map(j => [j.id, j]))
   return rows.map(r => ({
     id: r.gmail_thread_id,
     subject: r.subject,
@@ -96,15 +79,17 @@ async function withJobs(mailbox: Mailbox, rows: Row[], db: SupabaseClient): Prom
     label_ids: r.label_ids,
     unread: r.unread,
     has_attachments: r.has_attachments,
-    job: chips.get(r.gmail_thread_id) ?? null,
+    job: r.job_id ? byId.get(r.job_id) ?? null : null,
+    filing: r.filing,
   }))
 }
 
 /** The mirror's version of inFolder (lib/mail/folders.ts) */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function whereInFolder<Q extends { contains: any; not: any }>(query: Q, folder: FolderKey, tab: TabKey | null): Q {
+function whereInFolder<Q extends { contains: any; not: any; eq: any }>(query: Q, folder: FolderKey, tab: TabKey | null, filing: Filing | null = null): Q {
   const label = folderLabel(folder)
   let q = query
+  if (filing) q = q.eq('filing', filing)
   if (label !== 'SPAM' && label !== 'TRASH') q = q.not('label_ids', 'ov', `{${HIDDEN_LABELS.join(',')}}`)
   if (label) q = q.contains('label_ids', [label])
   if (folder === 'inbox' && tab) {
@@ -115,7 +100,7 @@ function whereInFolder<Q extends { contains: any; not: any }>(query: Q, folder: 
 }
 
 /** A folder from the mirror, newest first. cursor is the last row's last_message_at. */
-export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
+export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, cursor: string | null, db = mailDb(), filing: Filing | null = null): Promise<ThreadPage> {
   let query = db
     .from('mail_threads')
     .select(LIST_COLUMNS)
@@ -124,7 +109,7 @@ export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKe
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(PAGE_SIZE)
 
-  query = whereInFolder(query, folder, tab)
+  query = whereInFolder(query, folder, tab, filing)
   if (cursor) query = query.lt('last_message_at', cursor)
 
   const { data, error } = await query
@@ -141,7 +126,7 @@ export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKe
  * Results not yet in the mirror — older mail — are fetched on the way.
  * cursor is Gmail's page token.
  */
-export async function searchFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, q: string, cursor: string | null, db = mailDb()): Promise<ThreadPage> {
+export async function searchFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKey | null, q: string, cursor: string | null, db = mailDb(), filing: Filing | null = null): Promise<ThreadPage> {
   const label = folderLabel(folder)
   const tabL = folder === 'inbox' && tab ? tabLabel(tab) : null
   const primary = folder === 'inbox' && tab === 'primary'
@@ -172,7 +157,8 @@ export async function searchFolder(mailbox: Mailbox, folder: FolderKey, tab: Tab
   }
 
   const byId = new Map(rows.map(r => [r.gmail_thread_id, r]))
-  const ordered = ids.map(id => byId.get(id)).filter((r): r is Row & { stale: boolean } => !!r && r.subject !== null)
+  const ordered = ids.map(id => byId.get(id))
+    .filter((r): r is Row & { stale: boolean } => !!r && r.subject !== null && (!filing || r.filing === filing))
   return {
     threads: await withJobs(mailbox, ordered, db),
     cursor: res.data.nextPageToken ?? null,
@@ -192,14 +178,18 @@ export async function folderCounts(mailbox: Mailbox, db = mailDb()): Promise<Fol
     const { count } = await q
     return count ?? 0
   }
-  const [inbox, promotions, social, drafts, spam] = await Promise.all([
+  const toFileQuery = whereInFolder(
+    db.from('mail_threads').select('id', { count: 'exact', head: true }).eq('mailbox_id', mailbox.id).not('synced_at', 'is', null),
+    'inbox', null, 'to_file')
+  const [inbox, promotions, social, drafts, spam, toFile] = await Promise.all([
     count('inbox', 'primary', true),
     count('inbox', 'promotions', true),
     count('inbox', 'social', true),
     count('drafts', null, false),
     count('spam', null, true),
+    toFileQuery.then(r => r.count ?? 0),
   ])
-  return { inbox, promotions, social, drafts, spam }
+  return { inbox, promotions, social, drafts, spam, toFile }
 }
 
 /** An opened conversation, fetched from Gmail. Also refreshes its row in the mirror. Null if it's gone. */
@@ -238,6 +228,15 @@ export async function getThreadDetail(mailbox: Mailbox, threadId: string, db = m
 
   const drafts = labels.has('DRAFT') ? await draftsInThread(threadId) : []
 
+  await refreshFiling(db, mailbox.tenant_id, [threadId])
+  const [{ data: mirror }, { data: suggested }, orderId] = await Promise.all([
+    db.from('mail_threads').select('filing').eq('mailbox_id', mailbox.id).eq('gmail_thread_id', threadId).maybeSingle(),
+    db.from('communications').select('match_candidates').eq('tenant_id', mailbox.tenant_id).eq('thread_id', threadId)
+      .is('job_id', null).not('match_candidates', 'is', null).order('created_at', { ascending: false }).limit(1),
+    orderForEmail(db, mailbox.tenant_id, messages.find(m => !m.labelIds.includes('SENT'))?.id ?? threadId, threadId),
+  ])
+  const candidates = ((suggested as { match_candidates: JobCandidate[] | null }[] | null)?.[0]?.match_candidates ?? [])
+
   const firstSent = messages.find(m => !m.labelIds.includes('DRAFT')) ?? messages[0]
   return {
     id: threadId,
@@ -246,5 +245,8 @@ export async function getThreadDetail(mailbox: Mailbox, threadId: string, db = m
     messages,
     job,
     drafts,
+    filing: (mirror as { filing: Filing | null } | null)?.filing ?? null,
+    candidates: Array.isArray(candidates) ? candidates : [],
+    orderId,
   }
 }

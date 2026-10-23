@@ -15,6 +15,7 @@ import { textToHtml } from './html'
 import { parseMessage, type MailMessage } from './message'
 import { header } from './summary'
 import { fetchThreads, mailDb, type Mailbox } from './sync'
+import { findThreadJobId, linkThreadToJob } from '@/lib/communications/thread-link'
 
 // Writing email from the office mailbox. Every email being written is a
 // Gmail draft: saving updates the draft, sending sends the draft (so Undo
@@ -43,6 +44,7 @@ type DraftRow = {
   in_reply_to: string | null
   references_header: string | null
   attachments: DraftAttachment[]
+  job_id: string | null
 }
 
 const SIGNATURE_COLUMNS = 'name, trading_name, email_signature, email_signature_image_path, email_signature_image_width, email_signature_image_height'
@@ -80,13 +82,30 @@ function threadingHeaders(message: gmail_v1.Schema$Message): { inReplyTo: string
   return { inReplyTo: id, references: [earlier, id].filter(Boolean).join(' ') }
 }
 
-/** A new reply, reply all or forward of a message, ready to edit */
-export async function startCompose(mailbox: Mailbox, mode: ComposeMode, messageId: string | null): Promise<ComposeStart> {
-  if (mode === 'new' || !messageId) return { ...emptyCompose(), quoteHtml: '' }
+/**
+ * A new email, reply, reply all or forward of a message, ready to edit. A new
+ * email about a job (jobId) gets the job number and address as its subject;
+ * a reply is about the job its conversation is filed on.
+ */
+export async function startCompose(mailbox: Mailbox, mode: ComposeMode, messageId: string | null, jobId: string | null = null, db = mailDb()): Promise<ComposeStart> {
+  if (mode === 'new' || !messageId) {
+    const state: ComposeState = { ...emptyCompose(), mode: 'new' }
+    if (jobId) {
+      const { data: job } = await db.from('jobs').select('id, job_number, property_address').eq('tenant_id', mailbox.tenant_id).eq('id', jobId).maybeSingle()
+      if (!job) throw new ComposeError('Job not found', 404)
+      const j = job as { id: string; job_number: string; property_address: string | null }
+      state.jobId = j.id
+      state.subject = [j.job_number, j.property_address].filter(Boolean).join(' - ')
+    }
+    return { ...state, quoteHtml: '' }
+  }
 
   const original = await getMessage(messageId)
   const m = parseMessage(original)
-  const state: ComposeState = { ...emptyCompose(), mode, threadId: m.threadId || null, quoteMessageId: m.id }
+  const state: ComposeState = {
+    ...emptyCompose(), mode, threadId: m.threadId || null, quoteMessageId: m.id,
+    jobId: jobId ?? await findThreadJobId(db, mailbox.tenant_id, m.threadId || null),
+  }
 
   if (mode === 'forward') {
     state.subject = forwardSubject(m.subject)
@@ -235,6 +254,7 @@ export async function saveDraft(
     in_reply_to: state.inReplyTo,
     references_header: state.references,
     attachments: state.attachments,
+    job_id: state.jobId,
     created_by: userId,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'mailbox_id,gmail_draft_id' })
@@ -287,6 +307,7 @@ export async function openDraft(mailbox: Mailbox, tenantId: string, draftId: str
       body: row.body,
       includeSignature: row.include_signature,
       attachments: row.attachments ?? [],
+      jobId: row.job_id,
     }
     let shown = row.raw_quote ?? ''
     if (!shown && row.quote_message_id && state.mode !== 'new') {
@@ -319,6 +340,7 @@ export async function openDraft(mailbox: Mailbox, tenantId: string, draftId: str
     // It already has whatever signature it was written with
     includeSignature: false,
     attachments,
+    jobId: await findThreadJobId(db, tenantId, message.threadId ?? null),
     quoteHtml: quote ?? '',
   }
 }
@@ -361,8 +383,37 @@ export async function sendDraft(mailbox: Mailbox, draftId: string, db = mailDb()
   await db.from('mail_drafts').delete().eq('mailbox_id', mailbox.id).eq('gmail_draft_id', draftId)
   await unschedule(mailbox, draftId, db)
   await removeUploads(row, db)
+  if (row?.job_id && sent.id) await fileSentOnJob(mailbox, row, sent.id, sent.threadId ?? null, db)
   if (sent.threadId) await fetchThreads(mailbox, [sent.threadId], db)
   return { messageId: sent.id ?? null, threadId: sent.threadId ?? null }
+}
+
+/**
+ * Files an email written about a job on that job, and its conversation with
+ * it. Recorded as the Reply box records its replies (source manual_reply), so
+ * the Gmail webhook doesn't record the sent copy a second time.
+ */
+async function fileSentOnJob(mailbox: Mailbox, row: DraftRow, messageId: string, threadId: string | null, db = mailDb()) {
+  try {
+    const sent = (await getGmailClient().users.messages.get({ userId: 'me', id: messageId, format: 'metadata', metadataHeaders: ['To', 'Subject'] })).data
+    const { error } = await db.from('communications').insert({
+      tenant_id: mailbox.tenant_id,
+      job_id: row.job_id,
+      type: 'email',
+      direction: 'outbound',
+      subject: header(sent.payload, 'Subject'),
+      content: plainText(row.body),
+      from_email: mailbox.email_address,
+      to_email: header(sent.payload, 'To'),
+      thread_id: threadId,
+      source: 'manual_reply',
+    })
+    if (error) throw error
+    if (threadId) await linkThreadToJob(db, mailbox.tenant_id, threadId, row.job_id!)
+  } catch (err) {
+    // Sent either way; the webhook will still record it
+    console.error('[mail] could not file the sent email on its job:', err)
+  }
 }
 
 /** "Re: Roof leak" to jane@insurer.com — for approvals and the activity log */

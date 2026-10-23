@@ -38,6 +38,7 @@ vi.mock('@/lib/mail/compose', async () => {
   }
 })
 vi.mock('@/lib/mail/scheduled', () => ({ scheduleDraft: spy('scheduleDraft', (_m, _u, _d, at) => ({ send_at: at })) }))
+vi.mock('@/lib/mail/snooze', () => ({ snoozeThreads: spy('snoozeThreads', (_m, _u, ids) => ({ done: ids, failed: [] })) }))
 
 let sentRows: { content: string; to_email: string }[] = []
 const supabase = {
@@ -61,7 +62,7 @@ beforeEach(() => {
 describe('list_mailbox', () => {
   it('lists the inbox Primary tab from the mirror', async () => {
     const out = await listMailbox.run({}, ctx)
-    expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null])
+    expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, null])
     expect(out.text).toContain('(unread)')
     expect(out.text).toContain('from Jane: "Roof leak" — Can you quote? [2 messages] [attachments] [IRC1001]')
   })
@@ -129,5 +130,19 @@ describe('send_email', () => {
     expect(calls.saveDraft).toBeUndefined()
     await sendEmailTool.run({ ...args, send_anyway: true }, ctx)
     expect(calls.sendDraft).toHaveLength(1)
+  })
+})
+
+describe('phase 5 by voice', () => {
+  it('lists what needs filing', async () => {
+    await listMailbox.run({ filing: 'to_file' }, ctx)
+    expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, 'to_file'])
+  })
+
+  it('snoozes until a Perth time', async () => {
+    const out = await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze', snooze_until: '2099-10-26T08:00' }, ctx)
+    expect(calls.snoozeThreads[0].slice(1)).toEqual(['u1', ['abc1'], '2099-10-26T00:00:00.000Z'])
+    expect(out.text).toBe('1 conversation snoozed until Mon 26 Oct, 8:00 am.')
+    expect((await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze' }, ctx)).isError).toBe(true)
   })
 })
