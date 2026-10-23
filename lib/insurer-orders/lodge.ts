@@ -4,13 +4,15 @@ import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
 import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 import { notifyJobApproved } from '@/lib/email/notify-job-approved'
+import { sendOrderAcknowledgement, type OrderAcknowledgementResult } from '@/lib/email/order-acknowledgement'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 import { normaliseLossType } from '@/lib/loss-types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 
 // Lodging an insurer order: creates the job (next job number, KPI due dates,
 // client), the inspection/report/quote/invoice its work order type needs, links
-// the order's email thread and notifies the office — or links the order to the
+// the order's email thread, notifies the office and replies to the order's
+// sender acknowledging it (template 'order_acknowledgement') — or links the order to the
 // job that already has its claim number. Used by the Lodge button
 // (app/api/insurer-orders/lodge) and the voice connector.
 
@@ -31,6 +33,8 @@ export interface LodgeResult {
   /** The claim number already had a job; the order was linked to it */
   linkedToExisting?: boolean
   message?: string
+  /** The acknowledgement reply to the order's sender (new jobs only) */
+  acknowledgement?: OrderAcknowledgementResult
 }
 
 export class LodgeError extends Error {
@@ -473,6 +477,9 @@ export async function lodgeInsurerOrder(
     inspectionId,
   })
 
+  const acknowledgement = await sendOrderAcknowledgement(supabase, { tenantId, orderId, jobId })
+  if (!acknowledgement.sent) console.warn('[lodge] acknowledgement not sent:', acknowledgement.skipped)
+
   console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
-  return { jobNumber, jobId }
+  return { jobNumber, jobId, acknowledgement }
 }

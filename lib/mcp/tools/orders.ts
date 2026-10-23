@@ -225,9 +225,9 @@ export const lodgeOrder: McpTool = {
   title: 'Lodge order',
   description: [
     'Lodges an insurer order as a job, exactly like the Lodge button: creates the job with the next job number and KPI due dates,',
-    'plus the inspection, report, quote and invoice its work type needs, and notifies the office.',
+    'plus the inspection, report, quote and invoice its work type needs, notifies the office, and emails the order\'s sender an acknowledgement (Settings → Email Templates → Order acknowledgement).',
     'If a job already has the claim number, the order is linked to that job instead. If another job has the same address with a different claim, nothing is created and the matching jobs are listed.',
-    'Read back the claim number, insured and address and get a clear yes first.',
+    'Read back the claim number, insured and address, say the sender will be emailed an acknowledgement, and get a clear yes first. Pass on it if the acknowledgement wasn\'t sent.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -243,11 +243,18 @@ export const lodgeOrder: McpTool = {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { text: 'Order not found — use list_insurer_orders for its id.', isError: true }
     try {
       const result = await lodgeInsurerOrder(ctx.supabase, id, { tenantId: ctx.tenantId })
+      const ack = result.acknowledgement
+      const ackText = !ack ? '' : ack.sent
+        ? ` Acknowledgement emailed to ${ack.to}.`
+        : ` The acknowledgement wasn't sent: ${ack.skipped}.`
       return {
         text: result.linkedToExisting
           ? `That claim already has job ${result.jobNumber}, so the order was linked to it.`
-          : `Lodged as job ${result.jobNumber}.`,
-        data: { job_number: result.jobNumber, job_id: result.jobId, linked_to_existing: !!result.linkedToExisting },
+          : `Lodged as job ${result.jobNumber}.${ackText}`,
+        data: {
+          job_number: result.jobNumber, job_id: result.jobId, linked_to_existing: !!result.linkedToExisting,
+          ...(ack ? { acknowledgement_sent: ack.sent, acknowledgement_to: ack.to ?? null, acknowledgement_skipped: ack.skipped ?? null } : {}),
+        },
       }
     } catch (err) {
       if (!(err instanceof LodgeError)) throw err

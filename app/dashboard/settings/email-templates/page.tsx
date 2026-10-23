@@ -188,6 +188,10 @@ export default function EmailTemplatesSettingsPage() {
 
     const load = async () => {
       if (selection.sendType in DOCUMENT_ATTACHMENTS) return loadDocument()
+      if (selection.sendType === 'order_acknowledgement') {
+        const doc = await loadDocument()
+        return doc && { ...doc, vars: { ...doc.vars, order_subject: examples.order_subject } }
+      }
       if (selection.sendType !== 'work_order') return loadSigning()
       let jobIds: string[] | null = null
       if (selection.clientId) {

@@ -134,6 +134,14 @@ describe('lodge_order', () => {
     const res = await lodgeOrder.run({ order_id: ORDER_ID }, ctx)
     expect(res).toMatchObject({ isError: true, text: expect.stringContaining('job IRC1050 (claim CHCCLM1)') })
   })
+  it('says whether the acknowledgement went to the order’s sender', async () => {
+    lodge.mockResolvedValueOnce({ jobNumber: 'IRC1080', jobId: 'j80', acknowledgement: { sent: true, to: 'claims@castle.com.au' } })
+    expect((await lodgeOrder.run({ order_id: ORDER_ID }, ctx)).text).toBe('Lodged as job IRC1080. Acknowledgement emailed to claims@castle.com.au.')
+    lodge.mockResolvedValueOnce({ jobNumber: 'IRC1080', jobId: 'j80', acknowledgement: { sent: false, skipped: 'The order has no sender email address' } })
+    const res = await lodgeOrder.run({ order_id: ORDER_ID }, ctx)
+    expect(res.text).toBe("Lodged as job IRC1080. The acknowledgement wasn't sent: The order has no sender email address.")
+    expect(res.data).toMatchObject({ acknowledgement_sent: false })
+  })
 })
 
 describe('Lodge button route', () => {
