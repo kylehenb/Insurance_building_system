@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { type WorkOrderWithDetails } from './types'
+import { RichTextEditor } from '@/components/email/RichTextEditor'
 
 export interface SendWorkOrderModalProps {
   workOrder: WorkOrderWithDetails
@@ -260,12 +261,12 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
               </div>
               <div>
                 <label style={fieldLabel}>Message</label>
-                <textarea
-                  style={{ ...input, minHeight: 220, resize: 'vertical', lineHeight: 1.5 }}
-                  value={body}
-                  onChange={e => setBody(e.target.value)}
-                  disabled={sending}
-                />
+                <RichTextEditor value={body} onChange={setBody} disabled={sending} minHeight={220} />
+                {body.includes('{signature}') && (
+                  <div style={{ fontSize: 10, color: 'var(--body-soft)', marginTop: 4 }}>
+                    {'{signature}'} is replaced by your email signature when sent.
+                  </div>
+                )}
               </div>
               <div>
                 <label style={fieldLabel}>{draft.photos ? 'Attachments' : 'Attachment'}</label>

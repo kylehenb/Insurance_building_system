@@ -1,6 +1,8 @@
 import type { Database, Json } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { documentTemplateVars, renderTemplate, resolveEmailTemplate } from '@/lib/email/templates'
+import { renderRichTemplate, richToText } from '@/lib/email/rich-text'
+import { composeStandardEmail } from '@/lib/email/compose'
 import { resolveInsurerEmailRecipients } from '@/lib/contacts/email-routing'
 import { sendEmailViaGmail } from '@/lib/signing/email/gmail'
 import type { PrintDataContext } from '@/lib/documents/print-data'
@@ -45,7 +47,10 @@ export interface DocumentEmailDraft {
   to: string
   cc: string
   subject: string
+  /** Rich text (the editor's HTML). {signature} is filled in when sent. */
   body: string
+  /** Plain-text version of body (for the voice connector) */
+  bodyText: string
   attachments: DocumentEmailAttachment[]
   /** Who the template addresses by default */
   audience: 'insurer' | 'insured'
@@ -61,6 +66,7 @@ export interface DocumentEmailOverrides {
   to?: string
   cc?: string
   subject?: string
+  /** Rich text from Customise send, or plain text from the voice connector */
   body?: string
 }
 
@@ -143,11 +149,13 @@ async function buildDraft(docs: PreparedDocument[], ctx: PrintDataContext): Prom
       : 'No insurer email found (order sender or client submission email). Use Customise send to enter one.')
   }
 
+  const body = renderRichTemplate(template.body, vars)
   return {
     to: to.join(', '),
     cc: cc.join(', '),
     subject: renderTemplate(template.subject, vars),
-    body: renderTemplate(template.body, vars),
+    body,
+    bodyText: richToText(body),
     attachments: docs.map(d => ({ ref: d.ref, filename: d.filename, title: d.title })),
     audience: main.audience,
     templateName: template.name,
@@ -209,7 +217,7 @@ export async function sendDocumentEmail(
   const to = parseAddressList(overrides.to ?? draft.to)
   const cc = parseAddressList(overrides.cc ?? draft.cc).filter(e => !to.includes(e))
   const subject = (overrides.subject ?? draft.subject).trim()
-  const body = overrides.body ?? draft.body
+  const { html, text: body } = composeStandardEmail(overrides.body ?? draft.body, main.tenant)
   if (to.length === 0) throw new DocumentSendError('Add a recipient — use Customise send to enter an email address', 422)
   if (!subject) throw new DocumentSendError('Subject is required', 400)
 
@@ -241,6 +249,7 @@ export async function sendDocumentEmail(
       cc: cc.length ? cc.join(', ') : undefined,
       subject,
       text: body,
+      html,
       attachments: files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })),
     })
   } catch (err) {

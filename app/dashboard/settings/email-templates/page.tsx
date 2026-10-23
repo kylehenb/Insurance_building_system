@@ -16,6 +16,10 @@ import {
   workOrderTemplateVars,
   type EmailSendType,
 } from '@/lib/email/templates'
+import { toRichHtml } from '@/lib/email/rich-text'
+import { renderTemplatePreviewHtml } from '@/lib/email/preview'
+import { RichTextEditor, type RichTextEditorHandle } from '@/components/email/RichTextEditor'
+import { SignatureSettings } from './SignatureSettings'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +27,7 @@ const supabase = createBrowserClient<Database>(
 )
 
 type TemplateRow = Database['public']['Tables']['email_templates']['Row']
+type Tenant = Database['public']['Tables']['tenants']['Row']
 type ClientOption = { id: string; name: string }
 
 // Documents emailed from a job (lib/documents/send) and the attachment each sends
@@ -52,11 +57,12 @@ function findRow(rows: TemplateRow[], sel: Selection): TemplateRow | null {
 }
 
 // The text a version starts from: its saved row, else (for a client version)
-// the standard version, else the built-in default.
+// the standard version, else the built-in default. The body as rich text
+// (templates saved before rich text are plain text).
 function baselineFrom(rows: TemplateRow[], sel: Selection) {
   const builtIn = BUILT_IN_TEMPLATES[sel.sendType]
   const row = findRow(rows, sel) ?? (sel.clientId ? findRow(rows, { ...sel, clientId: null }) : null)
-  return { subject: row?.subject_template ?? builtIn.subject, body: row?.body_template ?? builtIn.body }
+  return { subject: row?.subject_template ?? builtIn.subject, body: toRichHtml(row?.body_template ?? builtIn.body) }
 }
 
 // One template per email type, plus optional per-client versions. The send
@@ -65,6 +71,8 @@ function baselineFrom(rows: TemplateRow[], sel: Selection) {
 export default function EmailTemplatesSettingsPage() {
   const router = useRouter()
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [tenant, setTenant] = useState<Tenant | null>(null)
+  const [editingSignature, setEditingSignature] = useState(false)
   const [rows, setRows] = useState<TemplateRow[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,7 +89,7 @@ export default function EmailTemplatesSettingsPage() {
   const [preview, setPreview] = useState<Preview | null>(null)
 
   const subjectRef = useRef<HTMLInputElement>(null)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<RichTextEditorHandle>(null)
   const lastFocused = useRef<'subject' | 'body'>('body')
 
   useEffect(() => {
@@ -93,10 +101,12 @@ export default function EmailTemplatesSettingsPage() {
       if (!profile) { setError('Could not load your account.'); setLoading(false); return }
       setTenantId(profile.tenant_id)
 
-      const [templatesRes, clientsRes] = await Promise.all([
+      const [templatesRes, clientsRes, tenantRes] = await Promise.all([
         supabase.from('email_templates').select('*').eq('tenant_id', profile.tenant_id),
         supabase.from('clients').select('id, name, trading_name').eq('tenant_id', profile.tenant_id).order('name'),
+        supabase.from('tenants').select('*').eq('id', profile.tenant_id).maybeSingle(),
       ])
+      setTenant(tenantRes.data ?? null)
       if (templatesRes.error) {
         console.error('Error loading email templates:', templatesRes.error)
         setError('Failed to load email templates. Please refresh.')
@@ -225,9 +235,17 @@ export default function EmailTemplatesSettingsPage() {
   const addableClients = clients.filter(c => !versionClientIds.includes(c.id))
 
   const select = (next: Selection) => {
+    if (editingSignature) { setEditingSignature(false); openVersion(next); return }
     if (next.sendType === selection.sendType && next.clientId === selection.clientId) return
     if (hasChanges && !confirm('Discard your unsaved changes to this template?')) return
     openVersion(next)
+  }
+
+  const openSignature = () => {
+    if (editingSignature) return
+    if (hasChanges && !confirm('Discard your unsaved changes to this template?')) return
+    openVersion(selection)
+    setEditingSignature(true)
   }
 
   const addClientVersion = (clientId: string) => {
@@ -239,14 +257,11 @@ export default function EmailTemplatesSettingsPage() {
 
   const insertToken = (key: string) => {
     const token = `{${key}}`
-    const isSubject = lastFocused.current === 'subject'
-    const el = isSubject ? subjectRef.current : bodyRef.current
-    const value = isSubject ? subject : body
-    const start = el?.selectionStart ?? value.length
-    const end = el?.selectionEnd ?? value.length
-    const next = value.slice(0, start) + token + value.slice(end)
-    if (isSubject) setSubject(next)
-    else setBody(next)
+    if (lastFocused.current === 'body') { bodyRef.current?.insertText(token); return }
+    const el = subjectRef.current
+    const start = el?.selectionStart ?? subject.length
+    const end = el?.selectionEnd ?? subject.length
+    setSubject(subject.slice(0, start) + token + subject.slice(end))
     requestAnimationFrame(() => {
       el?.focus()
       el?.setSelectionRange(start + token.length, start + token.length)
@@ -337,8 +352,11 @@ export default function EmailTemplatesSettingsPage() {
 
   const usingBuiltIn = !currentRow && selection.clientId === null
   const isUnsavedClientVersion = !currentRow && selection.clientId !== null
-  const rendered = preview
-    ? { subject: renderTemplate(subject, preview.vars), body: renderTemplate(body, preview.vars) }
+  const rendered = preview && tenant
+    ? {
+        subject: renderTemplate(subject, preview.vars),
+        html: renderTemplatePreviewHtml({ sendType: selection.sendType, body, vars: preview.vars, tenant }),
+      }
     : null
   const labelCls = 'block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2'
   const versionBtn = (active: boolean) =>
@@ -357,8 +375,18 @@ export default function EmailTemplatesSettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
           {/* ── Email types and versions ─────────────────────────────────── */}
           <aside className="space-y-4">
+            <button
+              onClick={openSignature}
+              className={`w-full text-left bg-white border rounded-lg p-3 ${editingSignature ? 'border-gold' : 'border-line-3'}`}
+            >
+              <div className="font-semibold text-sm text-ink px-1">Signature</div>
+              <div className="text-xs text-subtle mt-0.5 leading-snug px-1">
+                Your name, details and logo, added to every email below.{' '}
+                {tenant && !tenant.email_signature && !tenant.email_signature_image_path ? 'Not set up yet.' : ''}
+              </div>
+            </button>
             {EMAIL_SEND_TYPES.map(type => {
-              const active = type.sendType === selection.sendType
+              const active = !editingSignature && type.sendType === selection.sendType
               return (
                 <div key={type.sendType} className="bg-white border border-line-3 rounded-lg p-3">
                   <button
@@ -401,6 +429,9 @@ export default function EmailTemplatesSettingsPage() {
           </aside>
 
           {/* ── Editor and preview ───────────────────────────────────────── */}
+          {editingSignature && tenant ? (
+            <SignatureSettings supabase={supabase} tenant={tenant} onSaved={setTenant} />
+          ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 min-w-0">
             <section className="bg-white border border-line-3 rounded-lg p-5 min-w-0">
               <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -428,12 +459,12 @@ export default function EmailTemplatesSettingsPage() {
 
               <div className="mb-3">
                 <label className={labelCls}>Message</label>
-                <textarea
+                <RichTextEditor
                   ref={bodyRef}
                   value={body}
-                  onChange={e => setBody(e.target.value)}
+                  onChange={setBody}
                   onFocus={() => { lastFocused.current = 'body' }}
-                  className="w-full min-h-[300px] p-3 border border-line-3 rounded-md bg-surface-5 text-sm text-ink leading-relaxed focus:outline-none focus:border-gold resize-y"
+                  minHeight={300}
                 />
               </div>
 
@@ -500,15 +531,15 @@ export default function EmailTemplatesSettingsPage() {
                     <div className="text-[11px] text-subtle">Subject</div>
                     <div className="text-sm font-medium text-ink break-words">{rendered.subject || '—'}</div>
                   </div>
-                  <div className="px-4 py-4 text-sm text-ink whitespace-pre-wrap break-words leading-relaxed">{rendered.body}</div>
+                  <iframe title="Email preview" srcDoc={rendered.html} sandbox="" className="block w-full h-[640px] bg-white" />
                   {selection.sendType === 'work_order' && (
                     <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Work order PDF and the job's photos PDF attached</div>
                   )}
                   {selection.sendType === 'signing_request' && (
-                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle">Sent with Insurance Repair Co branding. The {'{signing_link}'} line shows as a large “Review and sign” button. No attachment.</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> The document PDF ({'{document_name}'}) attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
                   )}
                   {selection.sendType === 'signing_request_excess' && (
-                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> Excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
+                    <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> The document PDF and the excess invoice PDF attached · the {'{signing_link}'} line shows as a large “Review and sign” button</div>
                   )}
                   {DOCUMENT_ATTACHMENTS[selection.sendType] && (
                     <div className="px-4 py-2 border-t border-line-3 text-xs text-subtle flex items-center gap-1.5"><Paperclip className="w-3 h-3" /> {DOCUMENT_ATTACHMENTS[selection.sendType]}</div>
@@ -522,6 +553,7 @@ export default function EmailTemplatesSettingsPage() {
               )}
             </section>
           </div>
+          )}
         </div>
       </div>
     </div>

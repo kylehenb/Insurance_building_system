@@ -107,8 +107,8 @@ describe('buildDocumentEmailDraft', () => {
     expect(draft.to).toBe('claims.officer@insurer.example')
     expect(draft.cc).toBe('reports@adjuster.example, claims@insurer.example')
     expect(draft.subject).toBe('Quote Q-IRC1234-1 - Claim CLM-555 <A&B> - Alex Example - 1 Example Street, Sampleton WA 6000')
-    expect(draft.body).toMatch(/^Hi Casey,/)
-    expect(draft.body).not.toMatch(/\{\w+\}/)
+    expect(draft.bodyText).toMatch(/^Hi Casey,/)
+    expect(draft.bodyText.replace('{signature}', '')).not.toMatch(/\{\w+\}/)
     expect(draft.attachments).toEqual([{ ref: quoteRef, filename: 'Quote - Q-IRC1234-1 - 1 Example Street, Sampleton WA 6000.pdf', title: 'Quote Q-IRC1234-1' }])
     expect(draft.usingBuiltInTemplate).toBe(true)
     expect(renderPdf).not.toHaveBeenCalled()
@@ -119,7 +119,7 @@ describe('buildDocumentEmailDraft', () => {
     const draft = await buildDocumentEmailDraft([quoteRef], ctx)
     expect(draft.to).toBe('reports@adjuster.example')
     expect(draft.cc).toBe('claims@insurer.example')
-    expect(draft.body).toMatch(/^Hi team,/)
+    expect(draft.bodyText).toMatch(/^Hi team,/)
   })
 
   it('sends an excess invoice to the insured with the excess template', async () => {
@@ -128,16 +128,16 @@ describe('buildDocumentEmailDraft', () => {
     expect(draft.audience).toBe('insured')
     expect(draft.to).toBe('alex@example.com')
     expect(draft.cc).toBe('')
-    expect(draft.body).toContain('Hi Alex,')
-    expect(draft.body).toContain('excess of $500.00')
-    expect(draft.body).toContain('due on receipt')
+    expect(draft.bodyText).toContain('Hi Alex,')
+    expect(draft.bodyText).toContain('excess of $500.00')
+    expect(draft.bodyText).toContain('due on receipt')
   })
 
   it('uses a client-specific template over the built-in one', async () => {
     db.email_templates = [{ id: 'tpl-1', tenant_id: fx.TENANT_ID, send_type: 'report', client_id: CLIENT_ID, name: 'Insurer X reports', subject_template: 'Report for {claim_number}', body_template: 'See attached {report_name}.', is_default: true }]
     const draft = await buildDocumentEmailDraft([{ kind: 'report', id: fx.printReport().id }], ctx)
     expect(draft.subject).toBe('Report for CLM-555 <A&B>')
-    expect(draft.body).toBe('See attached Building Assessment Report.')
+    expect(draft.bodyText).toBe('See attached Building Assessment Report.')
     expect(draft.templateName).toBe('Insurer X reports')
   })
 
@@ -185,6 +185,15 @@ describe('sendDocumentEmail', () => {
     await sendDocumentEmail([quoteRef], ctx, { to: 'a@x.com; b@x.com', cc: 'a@x.com, c@x.com', subject: ' Custom ', body: 'Hello' })
     const email = gmailSend.mock.calls[0][1] as Record<string, unknown>
     expect(email).toMatchObject({ to: 'a@x.com, b@x.com', cc: 'c@x.com', subject: 'Custom', text: 'Hello' })
+  })
+
+  it('sends the formatted message as HTML alongside the plain text', async () => {
+    await sendDocumentEmail([quoteRef], ctx, { body: '<p>Hi <strong>Casey</strong>,</p><p></p><p>Kind regards,</p><p>{signature}</p>' })
+    const email = gmailSend.mock.calls[0][1] as { text: string; html: string }
+    expect(email.html).toContain('<strong>Casey</strong>')
+    expect(email.html).toMatch(/^<!DOCTYPE html>/)
+    expect(email.text).toMatch(/^Hi Casey,\n\nKind regards,\n\S/)
+    expect(email.text).not.toContain('{signature}')
   })
 
   it('never moves a quote backwards (approved stays approved)', async () => {

@@ -1,13 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import { renderTemplate, resolveEmailTemplate, signingTemplateVars } from '@/lib/email/templates'
+import { composeEmailBody, escapeHtml, renderRichTemplate, richToText } from '@/lib/email/rich-text'
+import { emailSignatureFor } from '@/lib/email/signature'
 import { appBaseUrl, SIGNER_CONTACT } from '@/lib/signing/config'
 import { signingDocumentLabel } from '@/lib/signing/documents/catalog'
 import { filenamePart } from '@/lib/documents/document-assets'
 import { downloadSigningPdf } from '@/lib/signing/storage'
 import { formatPerthDateTime, formatSigningDate } from '@/lib/signing/format'
 import type { SigningRequestRow } from '@/lib/signing/types'
-import { renderBrandedEmailHtml } from './html'
+import { actionButtonHtml, BRANDED_EMAIL_FONT_SIZE, renderBrandedEmailHtml, signingEmailFooterLines, signingEmailLogoUrl } from './html'
 import { sendEmailViaGmail, type SentEmail } from './gmail'
 import type { AccompanyingDocuments } from '@/lib/signing/provider'
 
@@ -39,21 +41,6 @@ function senderFor(tenant: Tenant): string {
 
 function companyName(tenant: Tenant): string {
   return tenant.trading_name || tenant.name
-}
-
-function logoUrlFor(tenant: Tenant): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (tenant.logo_storage_path && base) {
-    return `${base}/storage/v1/object/public/tenant-assets/${tenant.logo_storage_path.split('/').map(encodeURIComponent).join('/')}`
-  }
-  return `${appBaseUrl()}/logo-alt.png`
-}
-
-function footerLines(tenant: Tenant): string[] {
-  return [
-    `${companyName(tenant)} · ${tenant.contact_phone ? tenant.contact_phone.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3') : SIGNER_CONTACT.phone} · ${senderFor(tenant)}`,
-    'You received this email because Insurance Repair Co is carrying out insurance repairs at your property.',
-  ]
 }
 
 async function recordOutboundEmail(service: Service, params: {
@@ -135,20 +122,24 @@ export async function sendSigningRequestEmail(service: Service, params: {
     } : {}),
   })
 
-  let body = renderTemplate(template.body, vars)
+  let rich = renderRichTemplate(template.body, vars)
   // The link is the whole point of this email: add it if a template lost it
-  if (!body.includes(signingLink)) body = `${body.trimEnd()}\n\n${signingLink}\n`
+  if (!richToText(rich).includes(signingLink)) rich += `<p></p><p>${escapeHtml(signingLink)}</p>`
+  const { html: bodyHtml, text: body } = composeEmailBody(rich, {
+    fontSize: BRANDED_EMAIL_FONT_SIZE,
+    signature: emailSignatureFor(tenant),
+    signatureFallback: companyName(tenant),
+    action: { url: signingLink, html: actionButtonHtml(signingLink, 'Review and sign') },
+  })
   let subject = renderTemplate(template.subject, vars).trim() || `Please sign your ${documentName}`
   if (kind === 'reminder') subject = `Reminder: ${subject}`
 
   const from = senderFor(tenant)
   const html = renderBrandedEmailHtml({
-    text: body,
-    actionUrl: signingLink,
-    actionLabel: `Review and sign`,
-    logoUrl: logoUrlFor(tenant),
+    bodyHtml,
+    logoUrl: signingEmailLogoUrl(tenant),
     companyName: companyName(tenant),
-    footerLines: footerLines(tenant),
+    footerLines: signingEmailFooterLines(tenant),
   })
 
   // The unsigned document goes too, as a backup for anyone who can't or won't
@@ -210,13 +201,17 @@ export async function sendSignedCopyEmails(service: Service, params: {
         tenant,
         signedAt: request.signed_at ? formatPerthDateTime(request.signed_at) : '',
       })
-      const body = renderTemplate(template.body, vars)
+      const { html: bodyHtml, text: body } = composeEmailBody(renderRichTemplate(template.body, vars), {
+        fontSize: BRANDED_EMAIL_FONT_SIZE,
+        signature: emailSignatureFor(tenant),
+        signatureFallback: companyName(tenant),
+      })
       const subject = renderTemplate(template.subject, vars).trim() || `Your signed ${documentName}`
       const html = renderBrandedEmailHtml({
-        text: body,
-        logoUrl: logoUrlFor(tenant),
+        bodyHtml,
+        logoUrl: signingEmailLogoUrl(tenant),
         companyName: companyName(tenant),
-        footerLines: footerLines(tenant),
+        footerLines: signingEmailFooterLines(tenant),
       })
       const bcc = to.toLowerCase() === officeAddress.toLowerCase() ? undefined : officeAddress
       const sent = await sendEmailViaGmail(service, { from, to, bcc, subject, text: body, html, attachments: [attachment] })

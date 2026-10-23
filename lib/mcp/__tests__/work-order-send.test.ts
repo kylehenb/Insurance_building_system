@@ -39,7 +39,7 @@ beforeEach(() => {
   summaries.clear()
   summaries.set(ID, { ...unsent })
   buildDraft.mockResolvedValue({
-    to: '', cc: '', subject: 'Work Order WO-1 - 123 Test Street (IRC1001)', body: 'Hi Sparky,\n\nPlease find attached…',
+    to: '', cc: '', subject: 'Work Order WO-1 - 123 Test Street (IRC1001)', body: '<p>Hi <strong>Sparky</strong>,</p><p></p><p>Please find attached…</p>', bodyText: 'Hi Sparky,\n\nPlease find attached…',
     attachmentName: 'WO-1 - Sparky Ltd - 123 Test Street.pdf',
     photos: { count: 4, attachmentName: 'Photos - IRC1001.pdf', jobId: 'j1' },
     tradeName: 'Sparky Ltd', templateName: 'Work order — default', usingBuiltInTemplate: true,
@@ -58,7 +58,8 @@ describe('get_work_order_email', () => {
     expect(res.text).toContain('To: no email address on file. Amount: $0.')
     expect(res.text).toContain('Warnings: Sparky Ltd has no email address')
     expect(res.text).toContain('and 4 photos as Photos - IRC1001.pdf')
-    expect(res.data).toMatchObject({ subject: 'Work Order WO-1 - 123 Test Street (IRC1001)', attachments: ['WO-1 - Sparky Ltd - 123 Test Street.pdf', 'Photos - IRC1001.pdf'] })
+    expect(res.text).toContain('Body:\nHi Sparky,\n\nPlease find attached…')
+    expect(res.data).toMatchObject({ body: 'Hi Sparky,\n\nPlease find attached…', subject: 'Work Order WO-1 - 123 Test Street (IRC1001)', attachments: ['WO-1 - Sparky Ltd - 123 Test Street.pdf', 'Photos - IRC1001.pdf'] })
   })
 
   it('says an already-sent work order can’t be sent again', async () => {

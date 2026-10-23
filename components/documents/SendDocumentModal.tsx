@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Paperclip, X } from 'lucide-react'
 import type { DocumentRef } from '@/lib/documents/send/documents'
+import { RichTextEditor } from '@/components/email/RichTextEditor'
 
 // Send a document (quote, report, invoice, TCC, photos) by email from the
 // job. Auto send emails the standard template as-is; Customise send opens the
@@ -327,12 +328,12 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
               </div>
               <div>
                 <label style={fieldLabel}>Message</label>
-                <textarea
-                  style={{ ...input, minHeight: 200, resize: 'vertical', lineHeight: 1.5 }}
-                  value={body}
-                  onChange={e => setBody(e.target.value)}
-                  disabled={sending}
-                />
+                <RichTextEditor value={body} onChange={setBody} disabled={sending} minHeight={200} />
+                {body.includes('{signature}') && (
+                  <div style={{ fontSize: 10, color: 'var(--body-soft)', marginTop: 4 }}>
+                    {'{signature}'} is replaced by your email signature when sent.
+                  </div>
+                )}
               </div>
               <div>
                 <label style={fieldLabel}>Attachments</label>

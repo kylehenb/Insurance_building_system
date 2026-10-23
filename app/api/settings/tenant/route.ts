@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { Database } from '@/lib/supabase/database.types'
+import { toRichHtml } from '@/lib/email/rich-text'
 
 // -----------------------------------------------------------------
 // Types
@@ -79,6 +80,10 @@ interface TenantPatchBody {
   invoice_payment_terms?: number | null
   excess_payment_terms?: number | null
   service_area_config?: ServiceAreaConfig | null
+  email_signature?: string | null
+  email_signature_image_path?: string | null
+  email_signature_image_width?: number | null
+  email_signature_image_height?: number | null
 }
 
 // -----------------------------------------------------------------
@@ -159,12 +164,33 @@ export async function PATCH(req: NextRequest) {
       'invoice_payment_terms',
       'excess_payment_terms',
       'service_area_config',
+      'email_signature',
+      'email_signature_image_path',
+      'email_signature_image_width',
+      'email_signature_image_height',
     ]
 
     for (const field of allowedFields) {
       if (Object.prototype.hasOwnProperty.call(body, field)) {
         updatePayload[field] = body[field]
       }
+    }
+
+    // Email signature: stored cleaned; the image must be this tenant's own file
+    if (typeof updatePayload.email_signature === 'string') {
+      updatePayload.email_signature = updatePayload.email_signature.trim() ? toRichHtml(updatePayload.email_signature) : null
+    }
+    const imagePath = updatePayload.email_signature_image_path
+    if (imagePath !== undefined && imagePath !== null && (typeof imagePath !== 'string' || !imagePath.startsWith(`tenants/${tenantId}/`))) {
+      return NextResponse.json({ error: 'Invalid signature image' }, { status: 400 })
+    }
+    for (const field of ['email_signature_image_width', 'email_signature_image_height'] as const) {
+      const value = updatePayload[field]
+      if (value === undefined || value === null) continue
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 2000) {
+        return NextResponse.json({ error: 'Invalid signature image size' }, { status: 400 })
+      }
+      updatePayload[field] = Math.round(value)
     }
 
     if (Object.keys(updatePayload).length === 0) {

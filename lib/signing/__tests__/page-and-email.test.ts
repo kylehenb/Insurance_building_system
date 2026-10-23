@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { buildEmailRaw } from '@/lib/email/build-raw'
 import { BUILT_IN_TEMPLATES, REQUIRED_TOKENS, TEMPLATE_TOKENS, renderTemplate, signingTemplateVars } from '@/lib/email/templates'
-import { renderBrandedEmailHtml } from '../email/html'
+import { actionButtonHtml, BRANDED_EMAIL_FONT_SIZE, renderBrandedEmailHtml } from '../email/html'
+import { composeEmailBody, renderRichTemplate } from '@/lib/email/rich-text'
 import { unsignedFilename } from '../email/messages'
 import { renderSignerPage, SIGNER_PAGE_CSP, SIGNER_SCRIPT_HASH } from '../signer-page/render'
 import { SIGNER_SCRIPT } from '../signer-page/script'
@@ -196,7 +197,7 @@ describe('signing emails', () => {
     expect(body).toContain('https://app/sign/x')
     expect(body).toContain('$500.00')
     expect(body).toContain('IRC1001-EX')
-    expect(body).not.toMatch(/\{\w+\}/)
+    expect(body.replace('{signature}', '')).not.toMatch(/\{\w+\}/)
   })
 
   it('names the attached unsigned document after its type, job and address', () => {
@@ -221,17 +222,17 @@ describe('signing emails', () => {
     expect(vars.company_phone).toBe('0431 132 077')
   })
 
-  it('branded HTML turns the link paragraph into a button and escapes text', () => {
-    const html = renderBrandedEmailHtml({
-      text: 'Hi <b>Jane</b>,\n\nhttps://app.example/sign/abc\n\nThanks',
-      actionUrl: 'https://app.example/sign/abc',
-      actionLabel: 'Review and sign',
-      logoUrl: null,
-      companyName: 'Insurance Repair Co',
-      footerLines: ['x'],
-    })
+  it('branded HTML turns the link line into a button and escapes text', () => {
+    const link = 'https://app.example/sign/abc'
+    const { html: bodyHtml, text } = composeEmailBody(
+      renderRichTemplate('Hi {signer_first_name},\n\n{signing_link}\n\nKind regards,\n{signature}', { signer_first_name: '<b>Jane</b>', signing_link: link }),
+      { fontSize: BRANDED_EMAIL_FONT_SIZE, signature: null, signatureFallback: 'Insurance Repair Co', action: { url: link, html: actionButtonHtml(link, 'Review and sign') } },
+    )
+    const html = renderBrandedEmailHtml({ bodyHtml, logoUrl: null, companyName: 'Insurance Repair Co', footerLines: ['x'] })
     expect(html).toContain('Review and sign</a>')
     expect(html).toContain('Hi &lt;b&gt;Jane&lt;/b&gt;,')
+    expect(html).toContain('font-size:18px')
+    expect(text).toBe(`Hi <b>Jane</b>,\n\n${link}\n\nKind regards,\nInsurance Repair Co`)
   })
 
   it('buildEmailRaw adds a Bcc header for the office copy', () => {

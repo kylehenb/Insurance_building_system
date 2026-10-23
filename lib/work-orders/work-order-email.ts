@@ -2,6 +2,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw } from '@/lib/email/build-raw'
 import { renderTemplate, resolveEmailTemplate, workOrderTemplateVars } from '@/lib/email/templates'
+import { renderRichTemplate, richToText } from '@/lib/email/rich-text'
+import { composeStandardEmail } from '@/lib/email/compose'
 import { woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import { buildWorkOrderPdf, tradeLabelFor, type WorkOrderPdfContext } from '@/lib/work-orders/work-order-pdf'
 import { buildPhotosPdf, photosPdfFilename } from '@/lib/documents/print-document-pdfs'
@@ -28,7 +30,10 @@ export interface WorkOrderEmailDraft {
   to: string
   cc: string
   subject: string
+  /** Rich text (the editor's HTML). {signature} is filled in when sent. */
   body: string
+  /** Plain-text version of body (for the voice connector) */
+  bodyText: string
   attachmentName: string
   /** The job's photos PDF attached by default; null when the job has no photos */
   photos: { count: number; attachmentName: string; jobId: string } | null
@@ -42,6 +47,7 @@ export interface WorkOrderEmailOverrides {
   to?: string
   cc?: string
   subject?: string
+  /** Rich text from Customise send, or plain text from the voice connector */
   body?: string
   /** Attach the job's photos PDF (default true) */
   includePhotos?: boolean
@@ -93,11 +99,13 @@ export async function buildWorkOrderEmailDraft(
     .from('photos').select('id', { count: 'exact', head: true })
     .eq('job_id', job.id).eq('tenant_id', ctx.tenantId)
 
+  const body = renderRichTemplate(template.body, vars)
   return {
     to: trade?.contact_email?.trim() ?? '',
     cc: '',
     subject: renderTemplate(template.subject, vars),
-    body: renderTemplate(template.body, vars),
+    body,
+    bodyText: richToText(body),
     attachmentName: `${filename}.pdf`,
     photos: photoCount
       ? { count: photoCount, attachmentName: photosPdfFilename({ job }), jobId: job.id }
@@ -126,7 +134,7 @@ export async function sendWorkOrderEmail(
   const to = parseAddressList(overrides.to ?? draft.to)
   const cc = parseAddressList(overrides.cc ?? draft.cc)
   const subject = (overrides.subject ?? draft.subject).trim()
-  const body = overrides.body ?? draft.body
+  const { html, text: body } = composeStandardEmail(overrides.body ?? draft.body, tenant)
   if (to.length === 0) {
     throw new WorkOrderEmailError('The trade has no email address — add one to the trade or use Customise send', 422)
   }
@@ -158,6 +166,7 @@ export async function sendWorkOrderEmail(
     cc: cc.length ? cc.join(', ') : undefined,
     subject,
     body,
+    html,
     attachments: files.map(f => ({ filename: f.filename, mimeType: 'application/pdf', content: f.pdf })),
   })
 

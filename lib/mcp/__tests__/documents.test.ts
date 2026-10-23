@@ -68,7 +68,7 @@ beforeEach(() => {
   db.photos = [{ id: 'p1', tenant_id: 't1', job_id: 'j1' }, { id: 'p2', tenant_id: 't1', job_id: 'j1' }]
   db.communications = [email(minutesAgo(3 * 24 * 60), 'claims@insurer.example', ['BAR-IRC1001-5.pdf'])]
   buildDraft.mockResolvedValue({
-    to: 'claims@insurer.example', cc: 'adjuster@example.com', subject: 'IRC1001 report and quote', body: 'Hi team,\n\nPlease find attached…',
+    to: 'claims@insurer.example', cc: 'adjuster@example.com', subject: 'IRC1001 report and quote', body: '<p>Hi team,</p><p></p><p>Please find <em>attached</em>…</p>', bodyText: 'Hi team,\n\nPlease find attached…',
     attachments: [
       { ref: REPORT, title: 'Building Assessment Report BAR-IRC1001-5', filename: 'BAR-IRC1001-5.pdf' },
       { ref: QUOTE, title: 'Quote Q-IRC1001-7', filename: 'Q-IRC1001-7.pdf' },
@@ -104,6 +104,8 @@ describe('get_document_email', () => {
     expect(res.text).toContain('Attachments: Building Assessment Report BAR-IRC1001-5, Quote Q-IRC1001-7.')
     expect(res.text).toMatch(/Building Assessment Report BAR-IRC1001-5 was already emailed on .* to claims@insurer\.example\./)
     expect(res.text).toContain('Could also attach: Excess invoice INV-IRC1001-1.')
+    expect(res.text).toContain('Body:\nHi team,\n\nPlease find attached…')
+    expect(res.data).toMatchObject({ body: 'Hi team,\n\nPlease find attached…' })
   })
 
   it('refuses a malformed document list', async () => {

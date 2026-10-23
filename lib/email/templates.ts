@@ -47,7 +47,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'The attached PDF sets out the scope of works and the agreed amount. Please reply to this email to confirm you accept the work order and let us know your earliest availability.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   signing_request: {
@@ -67,7 +67,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'The link works until {expiry_date}. If you have any questions, call us on {company_phone} or reply to this email.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   signing_request_excess: {
@@ -91,7 +91,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'The signing link works until {expiry_date}. If you have any questions, call us on {company_phone} or reply to this email.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   signing_completed: {
@@ -107,7 +107,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'If you have any questions, call us on {company_phone} or reply to this email.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   quote: {
@@ -125,7 +125,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Please let us know if you have any questions or need anything further to approve the works.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   report: {
@@ -143,7 +143,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Please let us know if you have any questions.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   invoice: {
@@ -161,7 +161,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Payment details are on the invoice. Please send remittance to {accounts_email}.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   excess_invoice: {
@@ -177,7 +177,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'If you have any questions, call us on {company_phone} or reply to this email.',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   tcc: {
@@ -193,7 +193,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Our ref: {job_number}',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
   photos: {
@@ -209,7 +209,7 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Our ref: {job_number}',
       '',
       'Kind regards,',
-      '{company_name}',
+      '{signature}',
     ].join('\n'),
   },
 }
@@ -220,6 +220,9 @@ export interface TemplateToken {
   /** Shown in the preview when there's no real record to fill it from */
   example: string
 }
+
+/** Every template can place the email signature (Settings → Email Templates → Signature). */
+const SIGNATURE_TOKEN: TemplateToken = { key: 'signature', label: 'Your signature', example: 'Insurance Repair Co' }
 
 // Placeholders shared by every document sent to the insurer/adjuster.
 const INSURER_DOCUMENT_TOKENS: TemplateToken[] = [
@@ -232,6 +235,7 @@ const INSURER_DOCUMENT_TOKENS: TemplateToken[] = [
   { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
   { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
   { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+  SIGNATURE_TOKEN,
 ]
 
 const INVOICE_TOKENS: TemplateToken[] = [
@@ -253,6 +257,7 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'insured_name',     label: 'Insured name',     example: 'Jane Citizen' },
     { key: 'property_address', label: 'Property address', example: '12 Example St, Perth WA 6000' },
     { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
+    SIGNATURE_TOKEN,
   ],
   signing_request: [
     { key: 'signing_link',     label: 'Signing link',     example: 'https://app.example.com/sign/…' },
@@ -267,6 +272,7 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
     { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+    SIGNATURE_TOKEN,
   ],
   signing_request_excess: [
     { key: 'signing_link',     label: 'Signing link',     example: 'https://app.example.com/sign/…' },
@@ -284,6 +290,7 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
     { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+    SIGNATURE_TOKEN,
   ],
   signing_completed: [
     { key: 'signed_at',        label: 'Signed date/time', example: '21 Oct 2026, 2:05 pm' },
@@ -297,6 +304,7 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
     { key: 'company_name',     label: 'Your company',     example: 'Insurance Repair Co' },
     { key: 'company_phone',    label: 'Your phone',       example: '0431 132 077' },
     { key: 'company_email',    label: 'Your email',       example: 'office@insurancerepairco.com.au' },
+    SIGNATURE_TOKEN,
   ],
   quote: [
     { key: 'quote_ref',        label: 'Quote number',     example: 'Q-IRC1042-1' },

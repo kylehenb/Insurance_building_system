@@ -3808,6 +3808,10 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string | null
+          email_signature: string | null
+          email_signature_image_height: number | null
+          email_signature_image_path: string | null
+          email_signature_image_width: number | null
           excess_payment_terms: number | null
           id: string
           invoice_payment_terms: number | null
@@ -3833,6 +3837,10 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          email_signature?: string | null
+          email_signature_image_height?: number | null
+          email_signature_image_path?: string | null
+          email_signature_image_width?: number | null
           excess_payment_terms?: number | null
           id?: string
           invoice_payment_terms?: number | null
@@ -3858,6 +3866,10 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          email_signature?: string | null
+          email_signature_image_height?: number | null
+          email_signature_image_path?: string | null
+          email_signature_image_width?: number | null
           excess_payment_terms?: number | null
           id?: string
           invoice_payment_terms?: number | null
