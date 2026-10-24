@@ -52,6 +52,7 @@ export const PERMISSION_ACTIONS = [
   // Email
   { key: 'mail.view', group: 'Email', label: 'Read the office mailbox', description: 'Open the Mail page: every folder of the shared office inbox, not just emails filed on jobs', levels: ON_OFF, enforced: true },
   { key: 'mail.send', group: 'Email', label: 'Send email from the office mailbox', description: 'Write, reply to and forward emails on the Mail page. Needs approval means drafts can be written and an admin approves each send', levels: ALL, enforced: true },
+  { key: 'actions.review', group: 'Email', label: 'Review action cards', description: 'Confirm, skip or snooze the AI\'s suggested next steps for incoming email. Each step still needs its own permission (sending, filing…)', levels: ON_OFF, enforced: true },
   { key: 'mail.organise', group: 'Email', label: 'Organise the office mailbox', description: 'Archive, bin, mark as spam and mark read or unread on the Mail page — changes the mailbox in Gmail too', levels: ON_OFF, enforced: true },
   // Sending — anything that leaves the company
   { key: 'send.work_orders', group: 'Sending', label: 'Send work orders to trades', description: 'Email work orders to trades and hand them to Gary', levels: ALL, enforced: true },
@@ -94,6 +95,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'mail.view': 'allowed',
     'mail.organise': 'allowed',
     'mail.send': 'allowed',
+    'actions.review': 'allowed',
     'send.work_orders': 'allowed',
     'send.documents': 'approval',
     'send.signing': 'approval',
@@ -114,6 +116,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'mail.view': 'blocked',
     'mail.organise': 'blocked',
     'mail.send': 'blocked',
+    'actions.review': 'blocked',
     'send.work_orders': 'blocked',
     'send.documents': 'blocked',
     'send.signing': 'blocked',

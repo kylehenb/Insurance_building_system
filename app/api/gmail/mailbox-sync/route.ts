@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMailbox, mailDb, syncMailbox } from '@/lib/mail/sync'
+import { onMailArrivals } from '@/lib/actions/cards'
 
 // Backstop for the mail client's mirror of the office mailbox (lib/mail/sync.ts).
 // The Gmail push webhook normally syncs within seconds; this catches anything
@@ -29,6 +30,8 @@ async function run(): Promise<NextResponse> {
 
   const mailbox = await getMailbox((syncState as { tenant_id: string }).tenant_id, db)
   const result = await syncMailbox(mailbox, { budgetMs: 240_000 }, db)
+  // Anything the webhook missed gets its action card (made by the scheduled-send cron)
+  await onMailArrivals(db, mailbox.tenant_id, result.arrivals)
   return NextResponse.json(result, { status: result.error ? 502 : 200 })
 }
 

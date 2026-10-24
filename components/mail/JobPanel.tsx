@@ -16,6 +16,8 @@ interface Props {
   onError(message: string): void
   /** New email about the job, optionally to someone */
   onEmail(jobId: string, to?: string): void
+  /** Shown above the job: the conversation's action card */
+  top?: React.ReactNode
 }
 
 async function postJson(url: string, body: unknown) {
@@ -25,7 +27,7 @@ async function postJson(url: string, body: unknown) {
   return data
 }
 
-export function JobPanel({ detail, onChanged, onError, onEmail }: Props) {
+export function JobPanel({ detail, onChanged, onError, onEmail, top }: Props) {
   const [job, setJob] = useState<JobPanelData | null>(null)
   const [loadingJob, setLoadingJob] = useState(false)
   const [moving, setMoving] = useState(false)
@@ -73,6 +75,7 @@ export function JobPanel({ detail, onChanged, onError, onEmail }: Props) {
 
   return (
     <aside className="jp">
+      {top}
       {jobId ? (
         <>
           <div className="jp-head">

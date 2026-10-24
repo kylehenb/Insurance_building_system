@@ -4,7 +4,8 @@ import { isFolderKey, isTabKey } from '@/lib/mail/folders'
 import { userLabels } from '@/lib/mail/labels'
 import { isFiling } from '@/lib/mail/filing'
 import { folderCounts, listFolder, searchFolder } from '@/lib/mail/list'
-import { getMailbox, syncMailbox } from '@/lib/mail/sync'
+import { getMailbox, mailDb, syncMailbox } from '@/lib/mail/sync'
+import { cardsForThreads, onMailArrivals } from '@/lib/actions/cards'
 import { scheduledThreads } from '@/lib/mail/scheduled'
 
 export const maxDuration = 60
@@ -45,10 +46,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       scheduledThreads(mailbox),
     ])
 
+    // Each conversation's live action card, for the chip on its row
+    const cards = await cardsForThreads(mailDb(), access.tenantId, page.threads.map(t => t.id)).catch(() => ({}))
+
     const stale = !mailbox.synced_at || Date.now() - new Date(mailbox.synced_at).getTime() > FRESH_MS
     if (stale) {
       after(async () => {
-        await syncMailbox(mailbox, { budgetMs: 45_000 })
+        const result = await syncMailbox(mailbox, { budgetMs: 45_000 })
+        await onMailArrivals(mailDb(), mailbox.tenant_id, result.arrivals)
       })
     }
 
@@ -57,6 +62,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       counts,
       labels,
       scheduled,
+      cards,
       mailbox: {
         email: mailbox.email_address,
         synced_at: mailbox.synced_at,

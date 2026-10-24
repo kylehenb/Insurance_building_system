@@ -41,7 +41,9 @@ import { sendOrderNotification } from '@/lib/email/order-notifier'
 import { threadExists } from '@/lib/communications/thread-link'
 import { recordSentMessage } from '@/lib/communications/record-sent'
 import { insertLinkedCommunication, uploadAttachments, type StoredAttachment } from '@/lib/communications/inbound-email'
-import { getMailboxByEmail, syncMailbox } from '@/lib/mail/sync'
+import { getMailboxByEmail, mailDb, syncMailbox } from '@/lib/mail/sync'
+import { onMailArrivals } from '@/lib/actions/cards'
+import { drainCardQueue } from '@/lib/actions/propose'
 
 export const maxDuration = 300
 
@@ -233,7 +235,10 @@ async function syncMailMirror(body: PubSubBody): Promise<void> {
   const { emailAddress } = JSON.parse(Buffer.from(body.message.data, 'base64').toString('utf-8')) as { emailAddress: string }
   // The mirror starts once the mail page or the mailbox-sync cron has created the mailbox
   const mailbox = await getMailboxByEmail(emailAddress)
-  if (mailbox) await syncMailbox(mailbox, { budgetMs: 60_000 })
+  if (!mailbox) return
+  const result = await syncMailbox(mailbox, { budgetMs: 60_000 })
+  // New mail gets its action card now, so it's ready when the email is opened
+  if (await onMailArrivals(mailDb(), mailbox.tenant_id, result.arrivals)) await drainCardQueue({ budgetMs: 90_000 })
 }
 
 async function processWebhook(body: PubSubBody): Promise<void> {

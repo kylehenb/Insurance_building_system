@@ -145,16 +145,6 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
       ),
     },
     {
-      label: 'Mail',
-      href: '/dashboard/mail',
-      icon: (
-        <svg className="nav-icon" viewBox="0 0 16 16" strokeWidth="1.6" stroke="currentColor" fill="none">
-          <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
-          <path d="M2.5 4.5L8 9l5.5-4.5" />
-        </svg>
-      ),
-    },
-    {
       label: 'Calendar',
       href: '/dashboard/calendar',
       badge: unscheduledInspectionsCount > 0 ? unscheduledInspectionsCount : null,

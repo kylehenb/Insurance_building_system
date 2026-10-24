@@ -94,6 +94,7 @@ describe('mcp route', () => {
       'read_conversation',
       'organise_emails',
       'send_email',
+      'file_conversation',
       'list_approvals',
       'decide_approval',
       'list_activity',

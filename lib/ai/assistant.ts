@@ -11,8 +11,8 @@ import { MCP_TOOLS } from '@/lib/mcp/tools'
 type MessageParam = Anthropic.Beta.BetaMessageParam
 type ContentBlockParam = Anthropic.Beta.BetaContentBlockParam
 
-/** Sonnet by default; set AI_ASSISTANT_MODEL=claude-haiku-5-5 for the cheaper, faster one */
-export const ASSISTANT_MODEL = process.env.AI_ASSISTANT_MODEL || 'claude-sonnet-5-5'
+/** Haiku by default; AI_ASSISTANT_MODEL overrides it (e.g. claude-sonnet-5-5 for harder questions) */
+export const ASSISTANT_MODEL = process.env.AI_ASSISTANT_MODEL || 'claude-haiku-5-5'
 
 /** Model calls per user message before the assistant has to answer */
 const MAX_STEPS = 15

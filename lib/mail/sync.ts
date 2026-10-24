@@ -1,7 +1,7 @@
 import { createClient as createRawClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { gmail_v1 } from 'googleapis'
 import { getGmailClient } from '@/lib/gmail/client'
-import { historyThreadIds, summariseThread } from './summary'
+import { historyArrivals, historyThreadIds, summariseThread, type Arrivals } from './summary'
 import { refreshFiling } from './filing'
 
 // Keeps the mail_threads mirror in step with Gmail (see the migration
@@ -30,6 +30,8 @@ export type Mailbox = {
 export type SyncResult = {
   changed: number
   fetched: number
+  /** New mail in the inbox and our own sends, from Gmail's history (not the backfill) — action cards react to these */
+  arrivals?: Arrivals
   remaining: number
   error?: string
 }
@@ -196,7 +198,7 @@ async function listThreadIds(gmail: gmail_v1.Gmail, opts: { labelIds?: string[];
 }
 
 /** Thread ids changed since the cursor, and the cursor to store next. Null when the cursor has expired. */
-async function readHistory(gmail: gmail_v1.Gmail, startHistoryId: string): Promise<{ threadIds: string[]; historyId: string } | null> {
+async function readHistory(gmail: gmail_v1.Gmail, startHistoryId: string): Promise<{ threadIds: string[]; historyId: string; arrivals: Arrivals } | null> {
   const history: gmail_v1.Schema$History[] = []
   let historyId = startHistoryId
   let pageToken: string | undefined
@@ -212,7 +214,7 @@ async function readHistory(gmail: gmail_v1.Gmail, startHistoryId: string): Promi
     if (isNotFound(err)) return null
     throw err
   }
-  return { threadIds: historyThreadIds(history), historyId }
+  return { threadIds: historyThreadIds(history), historyId, arrivals: historyArrivals(history) }
 }
 
 const laterHistoryId = (a: string | null, b: string) => (a && BigInt(a) > BigInt(b) ? a : b)
@@ -226,6 +228,7 @@ export async function syncMailbox(mailbox: Mailbox, { budgetMs = 60_000 } = {}, 
   const gmail = getGmailClient()
   let changed = 0
   let fetched = 0
+  let arrivals: Arrivals | undefined
 
   try {
     let historyId = mailbox.history_id
@@ -237,6 +240,7 @@ export async function syncMailbox(mailbox: Mailbox, { budgetMs = 60_000 } = {}, 
         await queueThreads(mailbox, changes.threadIds, Date.now(), db)
         changed = changes.threadIds.length
         historyId = changes.historyId
+        arrivals = changes.arrivals
       } else {
         historyId = null
         backfilledAt = null
@@ -295,7 +299,7 @@ export async function syncMailbox(mailbox: Mailbox, { budgetMs = 60_000 } = {}, 
       .eq('stale', true)
 
     await db.from('mailboxes').update({ synced_at: new Date().toISOString(), sync_error: null }).eq('id', mailbox.id)
-    return { changed, fetched, remaining: count ?? 0 }
+    return { changed, fetched, remaining: count ?? 0, arrivals }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[mail-sync] sync failed:', err)

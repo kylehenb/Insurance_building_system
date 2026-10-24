@@ -12,6 +12,8 @@ import { isComposeMode, readAddressInput, type ComposeState } from '@/lib/mail/c
 import { scheduleDraft } from '@/lib/mail/scheduled'
 import { parseSendAt, spokenSendAt } from '@/lib/mail/schedule-rules'
 import { messageText } from '@/lib/mail/message'
+import { FileThreadError, fileThread } from '@/lib/mail/file-thread'
+import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 
 // The office mailbox by voice — the Mail page's own functions (lib/mail):
 // what's in a folder or a search, reading a conversation, archive / bin /
@@ -300,6 +302,50 @@ export const sendEmailTool: McpTool = {
     } catch (err) {
       if (err instanceof ComposeError) return { text: err.message, isError: true }
       throw err
+    }
+  },
+}
+
+export const fileConversation: McpTool = {
+  name: 'file_conversation',
+  title: 'File conversation',
+  description: [
+    'Files a conversation from list_mailbox on a job (moving it from any other job), or as admin (not job related), or back to "to file" — the Mail page\'s job panel.',
+    'Give job_number, or filing: admin / to_file. Confirm the conversation and job with the user first.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation_id: { type: 'string', description: 'conversation_id from list_mailbox.' },
+      job_number: { type: 'string', description: 'Job number, e.g. IRC1001.' },
+      filing: { type: 'string', enum: ['admin', 'to_file'] },
+    },
+    required: ['conversation_id'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'orders.manage',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const id = str(args.conversation_id)
+    if (!THREAD_ID_RE.test(id)) return { text: 'Conversation not found — use list_mailbox for its id.', isError: true }
+    const filing = args.filing === 'admin' || args.filing === 'to_file' ? args.filing : null
+    let job: { id: string; job_number: string } | null = null
+    if (str(args.job_number)) {
+      const found = await jobFromArgs(args, ctx)
+      if (isToolResult(found)) return found
+      job = found
+    }
+    if (!job && !filing) return { text: 'Which job (job_number), or filing admin / to_file?', isError: true }
+    try {
+      await fileThread(await getMailbox(ctx.tenantId), id, job ? { jobId: job.id } : { filing: filing! })
+    } catch (err) {
+      if (err instanceof FileThreadError) return { text: err.message, isError: true }
+      throw err
+    }
+    return {
+      text: job ? `Filed on ${job.job_number}.` : filing === 'admin' ? 'Filed as admin.' : 'Moved back to To file.',
+      data: { conversation_id: id, job_number: job?.job_number ?? null, filing: job ? 'job' : filing },
     }
   },
 }

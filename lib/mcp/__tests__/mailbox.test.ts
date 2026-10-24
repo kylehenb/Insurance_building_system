@@ -39,6 +39,18 @@ vi.mock('@/lib/mail/compose', async () => {
 })
 vi.mock('@/lib/mail/scheduled', () => ({ scheduleDraft: spy('scheduleDraft', (_m, _u, _d, at) => ({ send_at: at })) }))
 vi.mock('@/lib/mail/snooze', () => ({ snoozeThreads: spy('snoozeThreads', (_m, _u, ids) => ({ done: ids, failed: [] })) }))
+vi.mock('@/lib/mail/file-thread', () => {
+  class FileThreadError extends Error {}
+  return {
+    FileThreadError,
+    fileThread: spy('fileThread', (_m, id) => { if (id === 'dead1') throw new FileThreadError('That conversation is no longer in Gmail'); return {} }),
+  }
+})
+vi.mock('@/lib/mcp/tools/excess', () => ({
+  isToolResult: (v: unknown) => !!v && typeof v === 'object' && 'text' in v,
+  jobFromArgs: async (args: { job_number?: string }) =>
+    args.job_number === 'IRC1001' ? { id: 'j1', job_number: 'IRC1001' } : { text: `No job ${args.job_number} found.`, isError: true },
+}))
 
 let sentRows: { content: string; to_email: string }[] = []
 const supabase = {
@@ -52,7 +64,7 @@ const supabase = {
 }
 const ctx = { supabase: supabase as never, tenantId: 't1', userId: 'u1' }
 
-const { listMailbox, readConversation, organiseEmails, sendEmailTool } = await import('../tools/mailbox')
+const { listMailbox, readConversation, organiseEmails, sendEmailTool, fileConversation } = await import('../tools/mailbox')
 
 beforeEach(() => {
   for (const k of Object.keys(calls)) delete calls[k]
@@ -144,5 +156,23 @@ describe('phase 5 by voice', () => {
     expect(calls.snoozeThreads[0].slice(1)).toEqual(['u1', ['abc1'], '2099-10-26T00:00:00.000Z'])
     expect(out.text).toBe('1 conversation snoozed until Mon 26 Oct, 8:00 am.')
     expect((await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze' }, ctx)).isError).toBe(true)
+  })
+})
+
+describe('file_conversation', () => {
+  it('files on a job, as admin, or back to To file', async () => {
+    expect((await fileConversation.run({ conversation_id: 'abc1', job_number: 'IRC1001' }, ctx)).text).toBe('Filed on IRC1001.')
+    expect(calls.fileThread[0].slice(1)).toEqual(['abc1', { jobId: 'j1' }])
+    expect((await fileConversation.run({ conversation_id: 'abc1', filing: 'admin' }, ctx)).text).toBe('Filed as admin.')
+    expect(calls.fileThread[1].slice(1)).toEqual(['abc1', { filing: 'admin' }])
+    expect((await fileConversation.run({ conversation_id: 'abc1', filing: 'to_file' }, ctx)).text).toBe('Moved back to To file.')
+  })
+
+  it('refuses a missing job, no choice, a bad id, or what Gmail no longer has', async () => {
+    expect(await fileConversation.run({ conversation_id: 'abc1', job_number: 'IRC9' }, ctx)).toMatchObject({ isError: true, text: 'No job IRC9 found.' })
+    expect((await fileConversation.run({ conversation_id: 'abc1' }, ctx)).isError).toBe(true)
+    expect((await fileConversation.run({ conversation_id: 'not an id', filing: 'admin' }, ctx)).isError).toBe(true)
+    expect(await fileConversation.run({ conversation_id: 'dead1', filing: 'admin' }, ctx)).toMatchObject({ isError: true, text: 'That conversation is no longer in Gmail' })
+    expect(calls.fileThread).toHaveLength(1)
   })
 })
