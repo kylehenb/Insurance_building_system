@@ -147,6 +147,14 @@ describe('update_quote', () => {
     expect(res.text).toContain('Created 1 work order: Plasterer.')
   })
 
+  it('records the approved amount on a full approval from the items, margin and GST', async () => {
+    const res = await updateQuoteTool.run({ quote_id: 'q1', status: 'approved' }, ctx)
+    // $300 of items + 20% margin + 10% GST
+    expect(db.quotes[0]).toMatchObject({ status: 'approved', is_locked: true, approved_amount: 396 })
+    expect(res.text).toContain('Approved amount $396.')
+    expect(db.work_orders.map(w => w.trade_name).sort()).toEqual(['Electrician', 'Plasterer'])
+  })
+
   it('records the reason on a rejection', async () => {
     await updateQuoteTool.run({ quote_id: 'q1', status: 'rejected', reason: 'Claim denied by insurer' }, ctx)
     expect(db.quotes[0]).toMatchObject({ status: 'rejected', is_locked: true, approval_notes: 'Claim denied by insurer' })

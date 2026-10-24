@@ -171,15 +171,20 @@ export async function updateQuote(
     if (APPROVED_QUOTE_STATUSES.includes(newStatus)) {
       await createUnplacedWorkOrdersFromQuote(supabase, data.id, data.job_id, data.tenant_id ?? tenantId)
 
-      // Auto-set approved_amount if not already set
+      // Auto-set approved_amount if not already set: the approved items (all
+      // but declined ones for a full approval) with margin and GST. The quote's
+      // stored total_amount is only used when one was saved — the editor never
+      // saves it, so it can't be relied on.
       if (!data.approved_amount) {
-        let approvedAmount: number | null = null
-        if (newStatus === 'approved') {
-          approvedAmount = data.total_amount
-        } else {
-          const { data: approvedItems } = await supabase
+        let approvedAmount: number | null = newStatus === 'approved' ? data.total_amount : null
+        if (approvedAmount == null) {
+          let itemsQuery = supabase
             .from('scope_items').select('line_total')
-            .eq('quote_id', quoteId).eq('tenant_id', tenantId).eq('approval_status', 'approved')
+            .eq('quote_id', quoteId).eq('tenant_id', tenantId)
+          itemsQuery = newStatus === 'approved'
+            ? itemsQuery.or('approval_status.is.null,approval_status.neq.declined')
+            : itemsQuery.eq('approval_status', 'approved')
+          const { data: approvedItems } = await itemsQuery
           const subtotal = (approvedItems ?? []).reduce((sum, item) => sum + (item.line_total ?? 0), 0)
           approvedAmount = Math.round(subtotal * (1 + (data.markup_pct ?? 0)) * (1 + (data.gst_pct ?? DEFAULT_GST_PCT)) * 100) / 100
         }
