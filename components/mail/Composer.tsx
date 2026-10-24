@@ -9,7 +9,8 @@ import {
   type ComposeStart, type ComposeState, type DraftAttachment,
 } from '@/lib/mail/compose-rules'
 import type { MailAddress } from '@/lib/mail/summary'
-import type { JobPanel } from '@/lib/mail/job-context'
+import type { JobHit, JobPanel } from '@/lib/mail/job-context'
+import type { JobAttachables, JobFileSource } from '@/lib/mail/job-files'
 import type { DocumentRef } from '@/lib/documents/send/documents'
 import { isoToPerthLocal, MIN_SCHEDULE_LEAD_MS, perthLocalToIso, schedulePresets, spokenSendAt } from '@/lib/mail/schedule-rules'
 
@@ -58,6 +59,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const [scheduleMenu, setScheduleMenu] = useState<'closed' | 'presets' | 'pick'>('closed')
   const [pickAt, setPickAt] = useState('')
   const [job, setJob] = useState<JobPanel | null>(null)
+  const [linking, setLinking] = useState(false)
+  const [picker, setPicker] = useState(false)
+  const [signature, setSignature] = useState<string | null | undefined>(undefined)
 
   const stateRef = useRef(state)
   const dirty = useRef(false)
@@ -78,6 +82,29 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
       .catch(() => {})
     return () => { cancelled = true }
   }, [state.jobId])
+
+  // The company signature, shown under the text as it will be sent
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/mail/signature')
+      .then(r => (r.ok ? r.json() : { html: null }))
+      .then(d => { if (!cancelled) setSignature(d.html ?? null) })
+      .catch(() => { if (!cancelled) setSignature(null) })
+    return () => { cancelled = true }
+  }, [])
+
+  /** Files the email about a job: its contacts, documents, files and photos are offered, and the sent copy is filed on it */
+  function linkJob(hit: JobHit) {
+    const patch: Partial<ComposeState> = { jobId: hit.id }
+    if (!stateRef.current.subject.trim()) patch.subject = [hit.job_number, hit.property_address].filter(Boolean).join(' - ')
+    change(patch)
+    setLinking(false)
+  }
+
+  function unlinkJob() {
+    change({ jobId: null })
+    setPicker(false)
+  }
 
   function addRecipient(field: 'to' | 'cc', address: string) {
     const current = stateRef.current[field]
@@ -104,6 +131,29 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
       setUploading(u => u.filter(x => x.id !== id))
     } catch (err) {
       setUploading(u => u.map(x => (x.id === id ? { ...x, error: err instanceof Error ? err.message : 'Failed' } : x)))
+    }
+  }
+
+  async function attachJobFile(source: JobFileSource, id: string, filename: string, size: number | null) {
+    const upId = crypto.randomUUID()
+    const total = stateRef.current.attachments.reduce((n, a) => n + a.size, 0) + (size ?? 0)
+    if (total > MAX_EMAIL_BYTES) {
+      setUploading(u => [...u, { id: upId, filename, error: 'Over Gmail\'s 25 MB limit' }])
+      return
+    }
+    setUploading(u => [...u, { id: upId, filename }])
+    try {
+      const res = await fetch('/api/mail/job-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: stateRef.current.jobId, source, id }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? 'Could not attach the file')
+      change({ attachments: [...stateRef.current.attachments, body.attachment as DraftAttachment] })
+      setUploading(u => u.filter(x => x.id !== upId))
+    } catch (err) {
+      setUploading(u => u.map(x => (x.id === upId ? { ...x, error: err instanceof Error ? err.message : 'Failed' } : x)))
     }
   }
 
@@ -312,30 +362,48 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
             <input className="cmp-subject" placeholder="Subject" value={state.subject} onChange={e => change({ subject: e.target.value })} />
           </div>
 
-          {state.jobId && job && (
+          {state.jobId && job?.id === state.jobId ? (
             <div className="cmp-job">
-              <span className="cmp-job-chip" title="Sent copies are filed on this job">{job.job_number}</span>
+              <span className="cmp-job-chip" title="Sent copies are filed on this job">
+                {job.job_number}
+                <button title="Unlink this job" aria-label="Unlink this job" onClick={unlinkJob}>✕</button>
+              </span>
               {job.contacts.map(c => (
                 <button key={c.email} className="cmp-job-add" title={`Add ${c.email} (Shift: Cc)`}
                   onClick={e => addRecipient(e.shiftKey ? 'cc' : 'to', c.name ? `${c.name} <${c.email}>` : c.email)}>
                   + {c.label}
                 </button>
               ))}
-              {job.documents.length > 0 && (
-                <select className="cmp-job-docs" value="" onChange={e => {
-                  const d = job.documents[Number(e.target.value)]
-                  if (d) attachDocument(d.ref, `${d.title}.pdf`)
-                }}>
-                  <option value="">Attach a job document…</option>
-                  {job.documents.map((d, i) => <option key={i} value={i}>{d.title}</option>)}
-                </select>
-              )}
+              <button className={`cmp-job-attach${picker ? ' on' : ''}`} onClick={() => setPicker(p => !p)}>📁 Attach from job</button>
             </div>
+          ) : !state.jobId && (
+            <div className="cmp-job">
+              {linking
+                ? <JobSearch onPick={linkJob} onCancel={() => setLinking(false)} />
+                : <button className="cmp-job-add" title="File this email on a job and attach its documents, files and photos" onClick={() => setLinking(true)}>+ Link to a job</button>}
+            </div>
+          )}
+
+          {picker && state.jobId && job?.id === state.jobId && (
+            <JobFilesPicker
+              key={state.jobId}
+              jobId={state.jobId}
+              documents={job.documents}
+              onDocument={d => attachDocument(d.ref, `${d.title}.pdf`)}
+              onFile={(source, id, name, size) => attachJobFile(source, id, name, size)}
+              onClose={() => setPicker(false)}
+            />
           )}
 
           <div className="cmp-editor">
             <RichTextEditor ref={editorRef} value={state.body} onChange={body => change({ body })} minHeight={variant === 'floating' ? 220 : 160} />
           </div>
+
+          {state.includeSignature && signature !== undefined && (
+            signature
+              ? <div className="cmp-sig-preview" title="Added when sent — change it in Settings → Email Templates" dangerouslySetInnerHTML={{ __html: signature }} />
+              : <div className="cmp-sig-none">No signature set up yet — add one in <a href="/dashboard/settings/email-templates">Settings → Email Templates</a>.</div>
+          )}
 
           {initial.quoteHtml && (
             <div className="cmp-quote">
@@ -392,7 +460,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
                 </div>
               )}
             </span>
-            <button className="cmp-icon" title="Attach files" onClick={() => fileRef.current?.click()}>📎</button>
+            <button className="cmp-icon" title="Attach files from your computer" onClick={() => fileRef.current?.click()}>📎</button>
+            <button className="cmp-icon" title="Attach documents, files or photos from a job"
+              onClick={() => { if (state.jobId) setPicker(p => !p); else setLinking(true) }}>📁</button>
             <input ref={fileRef} type="file" multiple hidden onChange={e => { if (e.target.files) attach(e.target.files); e.target.value = '' }} />
             <label className="cmp-sig" title="Add the company email signature (Settings → Email Templates)">
               <input type="checkbox" checked={state.includeSignature} onChange={e => change({ includeSignature: e.target.checked })} /> Signature
@@ -407,6 +477,170 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
     </div>
   )
 })
+
+function JobSearch({ onPick, onCancel }: { onPick(hit: JobHit): void; onCancel(): void }) {
+  const [q, setQ] = useState('')
+  const [found, setFound] = useState<JobHit[]>([])
+  const [active, setActive] = useState(0)
+  const seq = useRef(0)
+
+  const term = q.trim()
+  const searching = term.length >= 2
+  const hits = searching ? found : []
+  useEffect(() => {
+    if (!searching) return
+    const n = ++seq.current
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/mail/jobs?q=${encodeURIComponent(term)}`)
+        if (!res.ok || n !== seq.current) return
+        setFound(await res.json())
+        setActive(0)
+      } catch {
+        // Try again on the next keystroke
+      }
+    }, 200)
+    return () => clearTimeout(t)
+  }, [term, searching])
+
+  return (
+    <div className="cmp-jobsearch">
+      <input
+        autoFocus
+        placeholder="Job number, claim, insured or address"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') { e.stopPropagation(); onCancel() }
+          if (hits.length === 0) return
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, hits.length - 1)) }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(a - 1, 0)) }
+          if (e.key === 'Enter') { e.preventDefault(); onPick(hits[active]) }
+        }}
+      />
+      <button className="cmp-link" onClick={onCancel}>Cancel</button>
+      {hits.length > 0 && (
+        <div className="cmp-suggest cmp-jobhits">
+          {hits.map((h, i) => (
+            <button key={h.id} className={i === active ? 'on' : ''} onMouseDown={e => { e.preventDefault(); onPick(h) }}>
+              <strong>{h.job_number}{h.insured_name ? ` · ${h.insured_name}` : ''}</strong>
+              <span>{[h.property_address, h.claim_number && `Claim ${h.claim_number}`].filter(Boolean).join(' · ')}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type JobDocument = JobPanel['documents'][number]
+
+function JobFilesPicker({ jobId, documents, onDocument, onFile, onClose }: {
+  jobId: string
+  documents: JobDocument[]
+  onDocument(d: JobDocument): void
+  onFile(source: JobFileSource, id: string, name: string, size: number | null): void
+  onClose(): void
+}) {
+  const [data, setData] = useState<JobAttachables | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [tab, setTab] = useState<'photos' | 'files' | 'documents'>('photos')
+  const [chosen, setChosen] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/mail/jobs/${jobId}/files`)
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then((d: JobAttachables) => {
+        if (cancelled) return
+        setData(d)
+        setTab(d.photos.length ? 'photos' : d.files.length ? 'files' : 'documents')
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [jobId])
+
+  function toggle(id: string) {
+    setChosen(c => {
+      const next = new Set(c)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function attachChosen() {
+    if (!data) return
+    for (const p of data.photos) if (chosen.has(p.id)) onFile('photo', p.id, p.name, p.size)
+    setChosen(new Set())
+    onClose()
+  }
+
+  const counts = { photos: data?.photos.length ?? 0, files: data?.files.length ?? 0, documents: documents.length }
+
+  return (
+    <div className="cmp-picker">
+      <div className="cmp-picker-tabs">
+        {(['photos', 'files', 'documents'] as const).map(t => (
+          <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+            {t === 'photos' ? 'Photos' : t === 'files' ? 'Files' : 'Documents'} <span>{counts[t]}</span>
+          </button>
+        ))}
+        <button className="cmp-picker-close" title="Close" onClick={onClose}>✕</button>
+      </div>
+
+      {failed && <div className="cmp-picker-empty">Couldn&apos;t load the job&apos;s files.</div>}
+      {!failed && !data && <div className="cmp-picker-empty">Loading…</div>}
+
+      {data && tab === 'photos' && (
+        data.photos.length === 0 ? <div className="cmp-picker-empty">No photos on this job yet.</div> : (
+          <>
+            <div className="cmp-photos">
+              {data.photos.map(p => (
+                <button key={p.id} className={`cmp-photo${chosen.has(p.id) ? ' on' : ''}`} title={p.label ?? p.name} onClick={() => toggle(p.id)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URLs, shown small */}
+                  {p.thumbUrl ? <img src={p.thumbUrl} alt={p.label ?? p.name} loading="lazy" /> : <span>{p.name}</span>}
+                  {chosen.has(p.id) && <i>✓</i>}
+                </button>
+              ))}
+            </div>
+            <div className="cmp-picker-foot">
+              <button className="cmp-link" onClick={() => setChosen(chosen.size === data.photos.length ? new Set() : new Set(data.photos.map(p => p.id)))}>
+                {chosen.size === data.photos.length ? 'Clear' : 'Select all'}
+              </button>
+              <button className="cmp-send" disabled={chosen.size === 0} onClick={attachChosen}>
+                Attach {chosen.size || ''} photo{chosen.size === 1 ? '' : 's'}
+              </button>
+            </div>
+          </>
+        )
+      )}
+
+      {data && tab === 'files' && (
+        data.files.length === 0 ? <div className="cmp-picker-empty">No files uploaded to this job yet.</div> : (
+          <div className="cmp-picker-list">
+            {data.files.map(f => (
+              <button key={f.id} onClick={() => onFile('file', f.id, f.name, f.size)}>
+                <span>📄 {f.name}{f.description ? <em> — {f.description}</em> : null}</span>
+                <span className="cmp-file-size">{formatSize(f.size)}</span>
+              </button>
+            ))}
+          </div>
+        )
+      )}
+
+      {data && tab === 'documents' && (
+        documents.length === 0 ? <div className="cmp-picker-empty">No quotes, reports or invoices on this job yet.</div> : (
+          <div className="cmp-picker-list">
+            {documents.map((d, i) => (
+              <button key={i} onClick={() => onDocument(d)}><span>📑 {d.title}</span><span className="cmp-file-size">PDF</span></button>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  )
+}
 
 function RecipientField({ label, value, onChange, autoFocus, extra }: {
   label: string
@@ -497,7 +731,35 @@ const COMPOSER_CSS = `
   .cmp-job-chip { font-size: 12px; font-weight: 700; color: var(--teal); background: var(--success-bg-2); border: 0.5px solid #cfe5d8; border-radius: 10px; padding: 1px 8px; }
   .cmp-job-add { font: inherit; font-size: 12px; color: var(--body); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 1px 8px; cursor: pointer; }
   .cmp-job-add:hover { border-color: var(--gold); }
-  .cmp-job-docs { font: inherit; font-size: 12px; border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 1px 6px; background: var(--paper); margin-left: auto; }
+  .cmp-job-chip button { background: none; border: none; color: var(--teal); font-size: 10px; cursor: pointer; padding: 0 0 0 5px; opacity: .7; }
+  .cmp-job-chip button:hover { opacity: 1; }
+  .cmp-job-attach { font: inherit; font-size: 12px; color: var(--body); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 1px 8px; cursor: pointer; margin-left: auto; }
+  .cmp-job-attach:hover, .cmp-job-attach.on { border-color: var(--gold); }
+  .cmp-jobsearch { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; }
+  .cmp-jobsearch input { flex: 1; min-width: 0; font: inherit; font-size: 13px; border: 0.5px solid var(--line-strong); border-radius: 6px; padding: 4px 8px; background: var(--paper); color: var(--ink); outline: none; }
+  .cmp-jobhits { left: 0; }
+  .cmp-picker { border-bottom: 0.5px solid var(--line-faint); background: var(--surface-3); padding: 0 14px 10px; }
+  .cmp-picker-tabs { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
+  .cmp-picker-tabs button { font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: none; border-radius: 10px; padding: 3px 10px; cursor: pointer; }
+  .cmp-picker-tabs button span { color: var(--subtle); }
+  .cmp-picker-tabs button.on { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line-strong); }
+  .cmp-picker-tabs .cmp-picker-close { margin-left: auto; font-size: 11px; }
+  .cmp-picker-empty { font-size: 13px; color: var(--subtle); padding: 10px 0; }
+  .cmp-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 240px; overflow-y: auto; }
+  .cmp-photo { position: relative; aspect-ratio: 1; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: var(--surface-2); cursor: pointer; font-size: 10px; color: var(--subtle); }
+  .cmp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cmp-photo.on { border-color: var(--gold); }
+  .cmp-photo i { position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 11px; color: var(--cream); background: var(--ink); border-radius: 50%; width: 18px; height: 18px; line-height: 18px; text-align: center; }
+  .cmp-picker-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; }
+  .cmp-picker-foot .cmp-send { font-size: 13px; padding: 6px 16px; }
+  .cmp-picker-list { display: flex; flex-direction: column; max-height: 240px; overflow-y: auto; }
+  .cmp-picker-list button { display: flex; justify-content: space-between; gap: 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink); background: none; border: none; border-radius: 6px; padding: 6px 8px; cursor: pointer; }
+  .cmp-picker-list button:hover { background: var(--paper); }
+  .cmp-picker-list em { color: var(--subtle); font-style: normal; }
+  .cmp-sig-preview { margin: 0 14px 4px; padding: 8px 0 0; border-top: 0.5px dashed var(--line); opacity: .85; }
+  .cmp-sig-preview img { max-width: 100%; height: auto; }
+  .cmp-sig-none { margin: 0 14px 4px; font-size: 12px; color: var(--subtle); }
+  .cmp-sig-none a { color: var(--grey-600); }
   .cmp-quote { padding: 0 14px; }
   .cmp-dots { font-size: 10px; letter-spacing: 1px; color: var(--grey-600); background: var(--surface-2); border: 0.5px solid var(--line); border-radius: 6px; padding: 0 6px; cursor: pointer; }
   .cmp-quote-body { margin-top: 8px; opacity: .85; }
