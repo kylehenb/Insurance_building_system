@@ -4,8 +4,12 @@ import type { Arrivals } from '@/lib/mail/summary'
 // Action cards (tech spec §19, §23.11): the AI's suggested next steps,
 // stored in action_queue. This file is the card lifecycle — queueing a card
 // when an email arrives, claiming queued cards for generation
-// (lib/actions/propose.ts), skip / snooze, and reading them for the page.
-// Confirming runs the steps (lib/actions/confirm.ts).
+// (lib/actions/propose.ts), stars and categories, skip, and reading them for
+// the page. Confirming runs the steps (lib/actions/confirm.ts).
+//
+// A live card is the email's star: it needs doing. Its category is the
+// star's symbol. A star the user set or changed (starred_by) keeps its
+// category and stays until they clear it.
 
 export type StepKind = 'email' | 'filing' | 'change'
 export type StepStatus = 'done' | 'failed' | 'waiting' | 'skipped'
@@ -22,7 +26,25 @@ export type CardStep = {
   ran_at?: string
 }
 
-export type CardStatus = 'queued' | 'generating' | 'pending' | 'running' | 'snoozed' | 'done' | 'skipped' | 'no_action' | 'failed'
+export type CardStatus = 'queued' | 'generating' | 'pending' | 'running' | 'done' | 'skipped' | 'no_action' | 'failed'
+
+export type CardCategory = 'invoice' | 'attend_submit' | 'other'
+
+/** The star symbols, in the order a click cycles through them */
+export const CATEGORIES: { key: CardCategory; label: string }[] = [
+  { key: 'invoice', label: 'Invoices to pay' },
+  { key: 'attend_submit', label: 'Attend and Submit' },
+  { key: 'other', label: 'Everything else' },
+]
+
+export const isCategory = (v: unknown): v is CardCategory => CATEGORIES.some(c => c.key === v)
+
+/** The next star after this one; null after the last (the star comes off) */
+export function nextCategory(current: CardCategory | null): CardCategory | null {
+  if (!current) return CATEGORIES[0].key
+  const i = CATEGORIES.findIndex(c => c.key === current)
+  return CATEGORIES[i + 1]?.key ?? null
+}
 
 export type ActionCard = {
   id: string
@@ -36,8 +58,10 @@ export type ActionCard = {
   reasoning: string | null
   steps: CardStep[]
   status: CardStatus
+  category: CardCategory
+  /** Set when the user starred or re-starred it themselves */
+  starred_by: string | null
   priority: number | null
-  snoozed_until: string | null
   outcome: string | null
   error_log: string | null
   attempts: number
@@ -46,9 +70,9 @@ export type ActionCard = {
 }
 
 /** Cards that can still change: one per conversation (see the unique index) */
-export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'snoozed', 'failed']
+export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'failed']
 
-export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, priority, snoozed_until, outcome, error_log, attempts, created_at, updated_at'
+export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at'
 
 /** Priority from the model's high / normal / low */
 export const PRIORITY = { high: 90, normal: 50, low: 20 } as const
@@ -73,7 +97,7 @@ export async function queueEmailCard(db: SupabaseClient, tenantId: string, threa
     // A new email on it: read it again, with the latest
     if (live.status === 'generating') return live.id
     await db.from('action_queue')
-      .update({ status: 'queued', trigger_ref: messageId ?? live.trigger_ref, attempts: 0, error_log: null, snoozed_until: null, updated_at: now() })
+      .update({ status: 'queued', trigger_ref: messageId ?? live.trigger_ref, attempts: 0, error_log: null, updated_at: now() })
       .eq('id', live.id)
     return live.id
   }
@@ -94,7 +118,9 @@ export async function queueEmailCard(db: SupabaseClient, tenantId: string, threa
 
 /**
  * What a mailbox sync saw: new incoming mail queues its conversation's
- * card; a send from us in a conversation means it's been dealt with.
+ * card; a send from us in a conversation means it's been dealt with —
+ * unless the user starred it themselves (an invoice to pay isn't paid by
+ * replying), which stays until they clear it.
  */
 export async function onMailArrivals(db: SupabaseClient, tenantId: string, arrivals: Arrivals | undefined): Promise<number> {
   if (!arrivals) return 0
@@ -111,20 +137,18 @@ export async function onMailArrivals(db: SupabaseClient, tenantId: string, arriv
     await db.from('action_queue')
       .update({ status: 'done', outcome: 'Replied from Mail', updated_at: now() })
       .eq('tenant_id', tenantId).eq('source', 'email').in('source_ref', [...replied])
-      .in('status', ['queued', 'pending', 'snoozed', 'failed'])
+      .is('starred_by', null).in('status', ['queued', 'pending', 'failed'])
   }
   return queued
 }
 
 /**
  * Takes up to `limit` queued cards for generation (status → generating, so
- * overlapping runs don't both make one). Also brings back snoozed cards that
- * are due, and re-queues generation that was cut off.
+ * overlapping runs don't both make one). Also re-queues generation that was
+ * cut off.
  */
 export async function claimQueued(db: SupabaseClient, limit: number): Promise<ActionCard[]> {
   const t = now()
-  await db.from('action_queue').update({ status: 'pending', snoozed_until: null, updated_at: t })
-    .eq('status', 'snoozed').lte('snoozed_until', t)
   await db.from('action_queue').update({ status: 'queued', updated_at: t })
     .eq('status', 'generating').lt('updated_at', new Date(Date.now() - STUCK_MS).toISOString()).lt('attempts', MAX_ATTEMPTS)
   await db.from('action_queue').update({ status: 'failed', error_log: 'Gave up reading this email after several tries', updated_at: t })
@@ -147,16 +171,22 @@ export async function getCard(db: SupabaseClient, tenantId: string, id: string):
   return (data as ActionCard | null) ?? null
 }
 
-export type CardView = 'pending' | 'snoozed' | 'done'
+export type CardView = 'pending' | 'done'
 
 const VIEW_STATUSES: Record<CardView, CardStatus[]> = {
   pending: ['queued', 'generating', 'pending', 'running', 'failed'],
-  snoozed: ['snoozed'],
   done: ['done', 'skipped', 'no_action'],
 }
 
-export async function listCards(db: SupabaseClient, tenantId: string, view: CardView, limit = 100): Promise<ActionCard[]> {
+export async function listCards(
+  db: SupabaseClient,
+  tenantId: string,
+  view: CardView,
+  { limit = 100, category = null, jobId = null }: { limit?: number; category?: CardCategory | null; jobId?: string | null } = {},
+): Promise<ActionCard[]> {
   let q = db.from('action_queue').select(CARD_COLUMNS).eq('tenant_id', tenantId).in('status', VIEW_STATUSES[view])
+  if (category) q = q.eq('category', category)
+  if (jobId) q = q.eq('job_id', jobId)
   q = view === 'pending'
     ? q.order('priority', { ascending: false }).order('updated_at', { ascending: false })
     : q.order('updated_at', { ascending: false })
@@ -172,16 +202,80 @@ export async function countPending(db: SupabaseClient, tenantId: string): Promis
   return count ?? 0
 }
 
-/** Gmail thread → its live card, for list chips and the conversation panel */
-export async function cardsForThreads(db: SupabaseClient, tenantId: string, threadIds: string[]): Promise<Record<string, { id: string; status: CardStatus; title: string }>> {
+export type RowStar = { id: string; status: CardStatus; title: string; category: CardCategory }
+
+/** Gmail thread → its live card (its star), for the list and the conversation */
+export async function cardsForThreads(db: SupabaseClient, tenantId: string, threadIds: string[]): Promise<Record<string, RowStar>> {
   if (!threadIds.length) return {}
-  const { data } = await db.from('action_queue').select('id, source_ref, status, title')
+  const { data } = await db.from('action_queue').select('id, source_ref, status, title, category')
     .eq('tenant_id', tenantId).eq('source', 'email').in('source_ref', threadIds).in('status', LIVE_STATUSES)
-  const out: Record<string, { id: string; status: CardStatus; title: string }> = {}
-  for (const r of (data as { id: string; source_ref: string; status: CardStatus; title: string }[] | null) ?? []) {
-    out[r.source_ref] = { id: r.id, status: r.status, title: r.title }
+  const out: Record<string, RowStar> = {}
+  for (const r of (data as (RowStar & { source_ref: string })[] | null) ?? []) {
+    out[r.source_ref] = { id: r.id, status: r.status, title: r.title, category: r.category }
   }
   return out
+}
+
+/** Starred conversations (live email cards), optionally one category — the Starred folder */
+export async function starredThreadIds(db: SupabaseClient, tenantId: string, category: CardCategory | null = null): Promise<string[]> {
+  let q = db.from('action_queue').select('source_ref')
+    .eq('tenant_id', tenantId).eq('source', 'email').in('status', LIVE_STATUSES)
+  if (category) q = q.eq('category', category)
+  const { data, error } = await q.limit(1000)
+  if (error) throw new Error(error.message)
+  return ((data as { source_ref: string | null }[] | null) ?? []).map(r => r.source_ref).filter((id): id is string => !!id)
+}
+
+/**
+ * Sets a conversation's star — the inbox's star button. A category stars it
+ * (a new card, which the AI then fills in with a summary and steps) or
+ * changes its symbol; null takes the star off (the card is done).
+ */
+export async function starThread(db: SupabaseClient, tenantId: string, threadId: string, category: CardCategory | null, userId: string): Promise<RowStar | null> {
+  const live = await liveCard(db, tenantId, threadId)
+  if (!category) {
+    if (live) {
+      await db.from('action_queue')
+        .update({ status: 'done', outcome: 'Star taken off', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
+        .eq('id', live.id)
+    }
+    return null
+  }
+  if (live) {
+    await db.from('action_queue').update({ category, starred_by: userId, starred_at: now(), updated_at: now() }).eq('id', live.id)
+    return { id: live.id, status: live.status, title: live.title, category }
+  }
+  const { data: thread } = await db.from('mail_threads').select('subject')
+    .eq('tenant_id', tenantId).eq('gmail_thread_id', threadId).maybeSingle()
+  const title = (thread as { subject: string | null } | null)?.subject || 'Starred email'
+  const { data, error } = await db.from('action_queue').insert({
+    tenant_id: tenantId,
+    source: 'email',
+    source_ref: threadId,
+    rule_key: 'email',
+    title,
+    status: 'queued',
+    category,
+    starred_by: userId,
+    starred_at: now(),
+    priority: PRIORITY.normal,
+  }).select('id').single()
+  if (error) {
+    // Starred twice at once, or a card was just queued: star that one
+    const again = await liveCard(db, tenantId, threadId)
+    if (!again) throw new Error(error.message)
+    return starThread(db, tenantId, threadId, category, userId)
+  }
+  return { id: (data as { id: string }).id, status: 'queued', title, category }
+}
+
+/** Changes a card's symbol from the card itself (it then keeps it, as a star the user set) */
+export async function setCardCategory(db: SupabaseClient, tenantId: string, id: string, category: CardCategory, userId: string): Promise<boolean> {
+  const { data } = await db.from('action_queue')
+    .update({ category, starred_by: userId, starred_at: now(), updated_at: now() })
+    .eq('tenant_id', tenantId).eq('id', id).in('status', LIVE_STATUSES)
+    .select('id').maybeSingle()
+  return !!data
 }
 
 /** The card for one conversation: the live one, else the newest */
@@ -197,15 +291,7 @@ export async function cardForThread(db: SupabaseClient, tenantId: string, thread
 export async function skipCard(db: SupabaseClient, tenantId: string, id: string, userId: string): Promise<boolean> {
   const { data } = await db.from('action_queue')
     .update({ status: 'skipped', outcome: 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
-    .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'snoozed', 'queued'])
-    .select('id').maybeSingle()
-  return !!data
-}
-
-export async function snoozeCard(db: SupabaseClient, tenantId: string, id: string, until: string): Promise<boolean> {
-  const { data } = await db.from('action_queue')
-    .update({ status: 'snoozed', snoozed_until: until, updated_at: now() })
-    .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed'])
+    .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
     .select('id').maybeSingle()
   return !!data
 }

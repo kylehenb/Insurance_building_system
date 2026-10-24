@@ -16,14 +16,14 @@ import { attachmentUrl, type MailMessage } from '@/lib/mail/message'
 import { MessageBody } from '@/components/mail/MessageBody'
 import { JobPanel } from '@/components/mail/JobPanel'
 import { FILINGS, isFiling, type Filing } from '@/lib/mail/filing'
-import type { Snooze } from '@/lib/mail/snooze'
 import { Composer, type ComposerHandle } from '@/components/mail/Composer'
 import type { ComposeMode, ComposeStart } from '@/lib/mail/compose-rules'
 import type { ScheduledEmail } from '@/lib/mail/scheduled'
-import { isoToPerthLocal, perthLocalToIso, snoozePresets, spokenSendAt } from '@/lib/mail/schedule-rules'
+import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { ActionsView, ConversationCard } from '@/components/actions/ActionsView'
 import { TodayView } from '@/components/dashboard/TodayView'
-import type { CardStatus } from '@/lib/actions/cards'
+import { CATEGORIES, isCategory, nextCategory, type CardCategory, type RowStar } from '@/lib/actions/cards'
+import { StarButton, StarIcon } from '@/components/actions/Star'
 
 // The mail client: the office Gmail mailbox, laid out like Gmail with no
 // reading pane — a full-width list, and a conversation opens full width.
@@ -43,26 +43,16 @@ type ListResponse = {
   labels: Record<string, UserLabel>
   /** Gmail thread id → scheduled send time */
   scheduled: Record<string, string>
-  /** Gmail thread id → its live action card */
-  cards: Record<string, RowCard>
+  /** Gmail thread id → its live action card: its star */
+  cards: Record<string, RowStar>
   mailbox: MailboxInfo
 }
 
-type RowCard = { id: string; status: CardStatus; title: string }
-
-/** The row chips after reading a page: its conversations as they now stand, the rest as they were */
-function withPageCards(prev: Record<string, RowCard>, page: ListResponse): Record<string, RowCard> {
+/** The stars after reading a page: its conversations as they now stand, the rest as they were */
+function withPageCards(prev: Record<string, RowStar>, page: ListResponse): Record<string, RowStar> {
   const next = { ...prev }
   for (const t of page.threads) delete next[t.id]
   return { ...next, ...(page.cards ?? {}) }
-}
-
-/** What a row's chip says about its card; none once it's dealt with */
-const CARD_CHIP: Partial<Record<CardStatus, string>> = {
-  queued: 'Reading…',
-  generating: 'Reading…',
-  pending: 'Action card',
-  failed: 'Card stopped',
 }
 
 type Toast = { message: string; undo?: () => void; error?: boolean }
@@ -148,8 +138,8 @@ export function MailApp() {
 }
 
 /** Views that aren't Gmail folders */
-type Special = 'actions' | 'today' | 'scheduled' | 'snoozed'
-const SPECIALS: Special[] = ['actions', 'today', 'scheduled', 'snoozed']
+type Special = 'actions' | 'today' | 'scheduled'
+const SPECIALS: Special[] = ['actions', 'today', 'scheduled']
 const isSpecial = (v: string | null): v is Special => SPECIALS.includes(v as Special)
 
 function Mail() {
@@ -183,7 +173,11 @@ function Mail() {
   const [detailVersion, setDetailVersion] = useState(0)
   const [composer, setComposer] = useState<{ key: string; initial: ComposeStart } | null>(null)
   const [scheduledMap, setScheduledMap] = useState<Record<string, string>>({})
-  const [rowCards, setRowCards] = useState<Record<string, RowCard>>({})
+  const [rowCards, setRowCards] = useState<Record<string, RowStar>>({})
+  // The Starred folder (conversations with a live action card), and which star
+  const [starred, setStarred] = useState(initialFolder === 'starred')
+  const initialStar = searchParams.get('star')
+  const [starFilter, setStarFilter] = useState<CardCategory | null>(isCategory(initialStar) ? initialStar : null)
   // Views that aren't Gmail labels. With nothing asked for, the dashboard
   // opens on the action cards.
   const [special, setSpecial] = useState<Special | null>(
@@ -191,9 +185,6 @@ function Mail() {
       : !initialFolder && !searchParams.get('thread') && !searchParams.get('q') && !searchParams.get('filing') ? 'actions' : null)
   const [cardCount, setCardCount] = useState(0)
   const [scheduledList, setScheduledList] = useState<ScheduledEmail[] | null>(null)
-  const [snoozedList, setSnoozedList] = useState<Snooze[] | null>(null)
-  // Conversations the snooze picker is open for
-  const [snoozeTargets, setSnoozeTargets] = useState<string[] | null>(null)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -203,33 +194,40 @@ function Mail() {
   const composerRef = useRef<ComposerHandle>(null)
   const pendingSends = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
-  const activeTab = folder === 'inbox' && !query ? tab : null
+  const activeTab = folder === 'inbox' && !query && !starred ? tab : null
 
   // Keep the address bar shareable: /dashboard?folder=sent&thread=…
   useEffect(() => {
     const params = new URLSearchParams()
     if (special && special !== 'actions') params.set('folder', special)
+    else if (!special && starred) params.set('folder', 'starred')
     else if (!special && folder === 'inbox' && !openId && !query && !filing) params.set('folder', 'inbox')
     else if (folder !== 'inbox') params.set('folder', folder)
-    if (folder === 'inbox' && tab !== 'primary') params.set('tab', tab)
-    if (filing) params.set('filing', filing)
+    if (starred && starFilter) params.set('star', starFilter)
+    if (!starred && folder === 'inbox' && tab !== 'primary') params.set('tab', tab)
+    if (!starred && filing) params.set('filing', filing)
     if (query) params.set('q', query)
     if (openId) params.set('thread', openId)
     const qs = params.toString()
     window.history.replaceState(null, '', qs ? `/dashboard?${qs}` : '/dashboard')
-  }, [folder, tab, query, openId, special, filing])
+  }, [folder, tab, query, openId, special, filing, starred, starFilter])
 
   const fetchPage = useCallback(async (pageCursor: string | null): Promise<ListResponse> => {
     const params = new URLSearchParams({ folder })
-    if (folder === 'inbox') params.set('tab', tab)
-    if (filing) params.set('filing', filing)
-    if (query) params.set('q', query)
-    if (pageCursor) params.set('cursor', pageCursor)
+    if (starred) {
+      params.set('starred', '1')
+      if (starFilter) params.set('star', starFilter)
+    } else {
+      if (folder === 'inbox') params.set('tab', tab)
+      if (filing) params.set('filing', filing)
+      if (query) params.set('q', query)
+      if (pageCursor) params.set('cursor', pageCursor)
+    }
     const res = await fetch(`/api/mail/threads?${params}`)
     const body = await res.json()
     if (!res.ok) throw new Error(body.error ?? 'Could not load mail')
     return body as ListResponse
-  }, [folder, tab, query, filing])
+  }, [folder, tab, query, filing, starred, starFilter])
 
   // First page whenever the folder, tab or search changes
   useEffect(() => {
@@ -463,52 +461,35 @@ function Mail() {
     if (special === 'scheduled') loadScheduled()
   }
 
-  const loadSnoozed = useCallback(async () => {
-    try {
-      setSnoozedList(await fetchJson<Snooze[]>('/api/mail/snooze'))
-    } catch (err) {
-      showToast({ message: err instanceof Error ? err.message : 'Could not load snoozed emails', error: true })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (special === 'snoozed') loadSnoozed()
-  }, [special, loadSnoozed])
-
-  /** Out of the inbox until then; Undo puts it straight back */
-  async function snooze(ids: string[], until: string) {
-    setSnoozeTargets(null)
+  /** Stars, re-stars (next symbol) or unstars conversations — the star button and s */
+  async function star(ids: string[], category: CardCategory | null) {
     if (!ids.length) return
-    const snapshot = threads
-    setThreads(prev => prev.filter(t => !ids.includes(t.id)))
-    setChecked(new Set())
-    if (openId && ids.includes(openId)) setOpenId(null)
-    const res = await fetch('/api/mail/snooze', {
+    const before = rowCards
+    setRowCards(prev => {
+      const next = { ...prev }
+      for (const id of ids) {
+        if (category) next[id] = { id: prev[id]?.id ?? '', status: prev[id]?.status ?? 'queued', title: prev[id]?.title ?? '', category }
+        else delete next[id]
+      }
+      return next
+    })
+    const results = await Promise.all(ids.map(threadId => fetch('/api/actions/star', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ threadIds: ids, until }),
-    })
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok || !Array.isArray(body.done)) {
-      setThreads(snapshot)
-      showToast({ message: body.error ?? 'Could not snooze', error: true })
+      body: JSON.stringify({ threadId, category }),
+    }).then(async r => ({ ok: r.ok, body: await r.json().catch(() => ({})) }))))
+    const failed = results.find(r => !r.ok)
+    if (failed) {
+      setRowCards(before)
+      showToast({ message: failed.body.error ?? 'Could not star the email', error: true })
       return
     }
-    const n = body.done.length
-    showToast({
-      message: `${n === 1 ? 'Conversation' : `${n} conversations`} snoozed until ${spokenSendAt(until)}.`,
-      // Back in the inbox; the snooze notices and stands down
-      undo: async () => { setToast(null); await postAction(body.done, 'inbox'); refresh(); showToast({ message: 'Action undone.' }) },
+    setRowCards(prev => {
+      const next = { ...prev }
+      results.forEach((r, i) => { if (r.body.star) next[ids[i]] = r.body.star })
+      return next
     })
-    refresh()
-  }
-
-  async function unsnoozeRow(row: Snooze) {
-    const res = await fetch(`/api/mail/snooze/${row.id}`, { method: 'DELETE' })
-    const body = await res.json().catch(() => ({}))
-    showToast(res.ok ? { message: 'Back in the inbox.' } : { message: body.error ?? 'Could not unsnooze', error: true })
-    loadSnoozed()
-    refresh()
+    if (openId && ids.includes(openId)) setDetailVersion(v => v + 1)
   }
 
   // An email waiting out its undo seconds would stay a draft if the page closed
@@ -604,6 +585,7 @@ function Mail() {
 
   function switchFolder(key: FolderKey) {
     setSpecial(null)
+    setStarred(false)
     setFiling(null)
     setFolder(key)
     setOpenId(null)
@@ -647,7 +629,7 @@ function Mail() {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       // Keys in the composer or a picker are theirs (React handles events on the
       // document too, so their stopPropagation doesn't keep them from here)
-      if (e.target instanceof Element && e.target.closest('.cmp, .mail-modal-bg')) return
+      if (e.target instanceof Element && e.target.closest('.cmp')) return
       if (isTyping(e.target)) {
         if (e.key === 'Escape') (e.target as HTMLElement).blur()
         return
@@ -703,9 +685,9 @@ function Mail() {
           e.preventDefault()
           compose('new')
           break
-        case 'b': {
+        case 's': {
           const t = targets()
-          if (t.length) { e.preventDefault(); setSnoozeTargets(t) }
+          if (t.length) { e.preventDefault(); star(t, nextCategory(rowCards[t[0]]?.category ?? null)) }
           break
         }
         case 'r':
@@ -733,6 +715,7 @@ function Mail() {
     e.preventDefault()
     setOpenId(null)
     setSpecial(null)
+    setStarred(false)
     setQuery(searchInput.trim())
   }
 
@@ -753,14 +736,14 @@ function Mail() {
         </button>
         <button
           className={`mail-folder${special === 'actions' ? ' active' : ''}${cardCount > 0 ? ' has-unread' : ''}`}
-          onClick={() => { setSpecial('actions'); setOpenId(null) }}
+          onClick={() => { setSpecial('actions'); setStarred(false); setOpenId(null) }}
         >
           <span>Action cards</span>
           {cardCount > 0 && <span className="mail-count">{cardCount}</span>}
         </button>
         <button
           className={`mail-folder${special === 'today' ? ' active' : ''}`}
-          onClick={() => { setSpecial('today'); setOpenId(null) }}
+          onClick={() => { setSpecial('today'); setStarred(false); setOpenId(null) }}
         >
           <span>Today</span>
         </button>
@@ -770,7 +753,7 @@ function Mail() {
           return (
             <span key={f.key} style={{ display: 'contents' }}>
               <button
-                className={`mail-folder${folder === f.key && !special ? ' active' : ''}${n > 0 && f.key !== 'drafts' ? ' has-unread' : ''}`}
+                className={`mail-folder${folder === f.key && !special && !starred ? ' active' : ''}${n > 0 && f.key !== 'drafts' ? ' has-unread' : ''}`}
                 onClick={() => switchFolder(f.key)}
               >
                 <span>{f.label}</span>
@@ -778,16 +761,16 @@ function Mail() {
               </button>
               {f.key === 'inbox' && (
                 <button
-                  className={`mail-folder${special === 'snoozed' ? ' active' : ''}`}
-                  onClick={() => { setSpecial('snoozed'); setOpenId(null); setQuery(''); setSearchInput('') }}
+                  className={`mail-folder${starred && !special ? ' active' : ''}`}
+                  onClick={() => { setSpecial(null); setStarred(true); setFolder('all'); setFiling(null); setOpenId(null); setQuery(''); setSearchInput('') }}
                 >
-                  <span>Snoozed</span>
+                  <span>Starred</span>
                 </button>
               )}
               {f.key === 'drafts' && (
                 <button
                   className={`mail-folder${special === 'scheduled' ? ' active' : ''}`}
-                  onClick={() => { setSpecial('scheduled'); setOpenId(null); setQuery(''); setSearchInput('') }}
+                  onClick={() => { setSpecial('scheduled'); setStarred(false); setOpenId(null); setQuery(''); setSearchInput('') }}
                 >
                   <span>Scheduled</span>
                   {Object.keys(scheduledMap).length > 0 && <span className="mail-count">{Object.keys(scheduledMap).length}</span>}
@@ -799,7 +782,7 @@ function Mail() {
         <div className="mail-hint">
           <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>o</kbd> open<br />
           <kbd>e</kbd> archive · <kbd>#</kbd> delete · <kbd>!</kbd> spam<br />
-          <kbd>⇧I</kbd>/<kbd>⇧U</kbd> read/unread · <kbd>b</kbd> snooze<br />
+          <kbd>⇧I</kbd>/<kbd>⇧U</kbd> read/unread · <kbd>s</kbd> star<br />
           <kbd>c</kbd> compose · <kbd>r</kbd>/<kbd>a</kbd>/<kbd>f</kbd> reply · <kbd>z</kbd> undo<br />
           <kbd>/</kbd> search · <kbd>g</kbd> <kbd>i</kbd> inbox
         </div>
@@ -829,8 +812,6 @@ function Mail() {
             />
           ) : special === 'today' && !openId ? (
             <div className="mail-today"><TodayView /></div>
-          ) : special === 'snoozed' && !openId ? (
-            <SnoozedView rows={snoozedList} onOpen={row => setOpenId(row.gmail_thread_id)} onUnsnooze={unsnoozeRow} onRefresh={loadSnoozed} />
           ) : special === 'scheduled' && !openId ? (
             <ScheduledView
               rows={scheduledList}
@@ -845,8 +826,10 @@ function Mail() {
                 {detail && detail.id === openId && actionsFor([detail.label_ids], folder).map(a => (
                   <IconButton key={a} icon={a} title={ACTION_TITLE[a]} onClick={() => performAction([openId], a)} />
                 ))}
-                {detail && detail.id === openId && detail.label_ids.includes('INBOX') && (
-                  <IconButton icon="snooze" title="Snooze (b)" onClick={() => setSnoozeTargets([openId])} />
+                {detail && detail.id === openId && (
+                  <span className="mail-toolbar-star">
+                    <StarButton category={rowCards[openId]?.category ?? null} onCycle={next => star([openId], next)} />
+                  </span>
                 )}
               </div>
               <div className="mail-thread-wrap">
@@ -909,14 +892,23 @@ function Mail() {
                     {actionsFor(checkedLabels, folder).map(a => (
                       <IconButton key={a} icon={a} title={ACTION_TITLE[a]} onClick={() => performAction([...checked], a)} />
                     ))}
-                    {folder === 'inbox' && <IconButton icon="snooze" title="Snooze (b)" onClick={() => setSnoozeTargets([...checked])} />}
+                    <IconButton icon="star" title="Star (s)" onClick={() => star([...checked], nextCategory(rowCards[[...checked][0]]?.category ?? null))} />
                     <span className="mail-toolbar-note">{checked.size} selected</span>
                   </>
                 ) : (
                   <IconButton icon="refresh" title="Refresh" onClick={() => refresh()} />
                 )}
                 {query && <span className="mail-toolbar-note">Search results in {folderMeta.label}</span>}
-                {(folder === 'inbox' || folder === 'all') && (
+                {starred ? (
+                  <div className="mail-filing" role="group" aria-label="Filter by star">
+                    <button className={!starFilter ? 'on' : ''} onClick={() => setStarFilter(null)}>All</button>
+                    {CATEGORIES.map(c => (
+                      <button key={c.key} className={starFilter === c.key ? 'on' : ''} onClick={() => setStarFilter(c.key)}>
+                        <StarIcon category={c.key} size={13} /> {c.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (folder === 'inbox' || folder === 'all') && (
                   <div className="mail-filing" role="group" aria-label="Filed in IRC">
                     <button className={!filing ? 'on' : ''} onClick={() => setFiling(null)}>All</button>
                     {FILINGS.map(f => (
@@ -929,7 +921,7 @@ function Mail() {
                 )}
               </div>
 
-              {folder === 'inbox' && !query && (
+              {folder === 'inbox' && !query && !starred && (
                 <div className="mail-tabs">
                   {TABS.map(t => {
                     const n = counts[t.key === 'primary' ? 'inbox' : t.key]
@@ -958,7 +950,7 @@ function Mail() {
                 {loading && <div className="mail-empty">Loading…</div>}
                 {!loading && listError && <div className="mail-empty is-error">{listError}</div>}
                 {!loading && !listError && threads.length === 0 && (
-                  <div className="mail-empty">{query ? 'No conversations match your search.' : `Nothing in ${folderMeta.label}.`}</div>
+                  <div className="mail-empty">{starred ? 'Nothing starred — use the star (or s) on an email to put it on your list.' : query ? 'No conversations match your search.' : `Nothing in ${folderMeta.label}.`}</div>
                 )}
                 {threads.map((t, i) => (
                   <ThreadRow
@@ -973,8 +965,8 @@ function Mail() {
                     onOpen={() => openThread(i)}
                     onAction={a => performAction([t.id], a)}
                     scheduledAt={scheduledMap[t.id] ?? null}
-                    card={rowCards[t.id] ?? null}
-                    onSnooze={() => setSnoozeTargets([t.id])}
+                    star={rowCards[t.id]?.category ?? null}
+                    onStar={next => star([t.id], next)}
                   />
                 ))}
                 {cursor && !loading && (
@@ -1001,7 +993,6 @@ function Mail() {
         />
       )}
 
-      {snoozeTargets && <SnoozePicker onPick={until => snooze(snoozeTargets, until)} onClose={() => setSnoozeTargets(null)} />}
 
       {toast && (
         <div className={`mail-toast${toast.error ? ' is-error' : ''}`} role="status">
@@ -1039,7 +1030,7 @@ function LabelChips({ labelIds, labels, hide }: { labelIds: string[]; labels: Re
   )
 }
 
-function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck, onOpen, onAction, scheduledAt, card, onSnooze }: {
+function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck, onOpen, onAction, scheduledAt, star, onStar }: {
   index: number
   thread: ThreadListItem
   folder: FolderKey
@@ -1050,8 +1041,8 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
   onOpen: () => void
   onAction: (a: MailAction) => void
   scheduledAt: string | null
-  card: RowCard | null
-  onSnooze: () => void
+  star: CardCategory | null
+  onStar: (next: CardCategory | null) => void
 }) {
   const isDraft = t.label_ids.includes('DRAFT')
   const hover = actionsFor([t.label_ids], folder).filter(a => a !== 'spam' && a !== 'not_spam')
@@ -1063,6 +1054,7 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
     >
       <span className="mail-row-check" onClick={e => e.stopPropagation()}>
         <input type="checkbox" className="mail-check" checked={checked} onChange={onCheck} />
+        <StarButton category={star} onCycle={onStar} size={17} />
       </span>
       <span className="mail-from">
         {senderLine(t, folder)}
@@ -1070,7 +1062,6 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
         {isDraft && folder !== 'drafts' && <span className="mail-draft">Draft</span>}
       </span>
       <span className="mail-content">
-        {card && CARD_CHIP[card.status] && <span className={`mail-chip card ${card.status}`} title={card.title}>{CARD_CHIP[card.status]}</span>}
         {scheduledAt && <span className="mail-chip sched" title="Scheduled to send">Scheduled {spokenSendAt(scheduledAt)}</span>}
         {t.job && <span className="mail-chip job">{t.job.job_number}</span>}
         {!t.job && t.filing === 'to_file' && (folder === 'inbox' || folder === 'all') && <span className="mail-chip tofile" title="Not on a job yet — open it to file it">To file</span>}
@@ -1082,7 +1073,6 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
       <span className="mail-date">{listDate(t.last_message_at)}</span>
       <span className="mail-row-actions" onClick={e => e.stopPropagation()}>
         {hover.map(a => <IconButton key={a} icon={a} title={ACTION_TITLE[a]} onClick={() => onAction(a)} small />)}
-        {t.label_ids.includes('INBOX') && <IconButton icon="snooze" title="Snooze (b)" onClick={onSnooze} small />}
       </span>
     </div>
   )
@@ -1122,68 +1112,6 @@ function ScheduledView({ rows, onEdit, onCancel, onRefresh }: {
         ))}
       </div>
     </>
-  )
-}
-
-function SnoozedView({ rows, onOpen, onUnsnooze, onRefresh }: {
-  rows: Snooze[] | null
-  onOpen: (row: Snooze) => void
-  onUnsnooze: (row: Snooze) => void
-  onRefresh: () => void
-}) {
-  return (
-    <>
-      <div className="mail-toolbar">
-        <IconButton icon="refresh" title="Refresh" onClick={onRefresh} />
-        <span className="mail-toolbar-note">Back in the inbox, unread, at the time shown (Perth) — or sooner if someone replies.</span>
-      </div>
-      <div className="mail-list">
-        {rows === null && <div className="mail-empty">Loading…</div>}
-        {rows?.length === 0 && <div className="mail-empty">Nothing snoozed. Use the clock (or b) on a conversation to snooze it.</div>}
-        {rows?.map(r => (
-          <div key={r.id} className="mail-row sched-row" onClick={() => onOpen(r)}>
-            <span />
-            <span className="mail-from">{r.subject || '(no subject)'}</span>
-            <span className="mail-content"><span className="mail-chip sched">Until {spokenSendAt(r.until)}</span></span>
-            <span />
-            <span className="mail-date">
-              <button className="mail-sched-cancel" onClick={e => { e.stopPropagation(); onUnsnooze(r) }}>Unsnooze</button>
-            </span>
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
-function SnoozePicker({ onPick, onClose }: { onPick: (until: string) => void; onClose: () => void }) {
-  const [presets] = useState(() => snoozePresets())
-  const [picking, setPicking] = useState(false)
-  const [at, setAt] = useState(() => isoToPerthLocal(presets[presets.length - 1].at))
-  return (
-    <div className="mail-modal-bg" onClick={onClose} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') onClose() }}>
-      <div className="mail-modal" onClick={e => e.stopPropagation()} role="dialog" aria-label="Snooze until">
-        <div className="mail-modal-title">Snooze until… <span>(Perth time)</span></div>
-        {!picking ? (
-          <>
-            {presets.map((p, i) => (
-              <button key={p.label} className="mail-modal-opt" onClick={() => onPick(p.at)} autoFocus={i === 0}>
-                <span>{p.label}</span><span className="mail-modal-when">{spokenSendAt(p.at)}</span>
-              </button>
-            ))}
-            <button className="mail-modal-opt" onClick={() => setPicking(true)}>Pick date &amp; time</button>
-          </>
-        ) : (
-          <div className="mail-modal-pick">
-            <input type="datetime-local" value={at} onChange={e => setAt(e.target.value)} autoFocus />
-            <div>
-              <button className="mail-sched-cancel" style={{ color: 'var(--grey-600)' }} onClick={() => setPicking(false)}>Back</button>
-              <button className="mail-modal-go" onClick={() => { const iso = perthLocalToIso(at); if (iso) onPick(iso) }}>Snooze</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
   )
 }
 
@@ -1290,7 +1218,7 @@ function MessageView({ message: m, open, onToggle }: { message: MailMessage; ope
   )
 }
 
-type IconName = MailAction | 'back' | 'refresh' | 'clip' | 'snooze'
+type IconName = MailAction | 'back' | 'refresh' | 'clip' | 'star'
 
 const ICON_PATHS: Record<IconName, React.ReactNode> = {
   back: <path d="M13 8H3m4-4L3 8l4 4" />,
@@ -1303,7 +1231,7 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   spam: <><path d="M5.5 2h5L14 5.5v5L10.5 14h-5L2 10.5v-5z" /><path d="M8 5v3.5M8 10.5v.5" /></>,
   read: <><path d="M2 6.5 8 3l6 3.5V13H2z" /><path d="m2 6.5 6 4 6-4" /></>,
   unread: <><rect x="2" y="3.5" width="12" height="9" rx="1" /><path d="m2.5 4.5 5.5 4.5 5.5-4.5" /></>,
-  snooze: <><circle cx="8" cy="8.5" r="5.5" /><path d="M8 5.5v3l2 1.5M3 2.5 1.5 4M13 2.5 14.5 4" /></>,
+  star: <path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z" strokeLinejoin="round" />,
   clip: <path d="M10.5 5 6 9.5a1.2 1.2 0 0 0 1.7 1.7l5-5a2.4 2.4 0 0 0-3.4-3.4l-5 5a3.6 3.6 0 0 0 5.1 5.1L13 9.3" />,
 }
 
@@ -1366,12 +1294,13 @@ const MAIL_CSS = `
   .mail-empty { padding: 48px 20px; text-align: center; font-size: 13px; color: var(--subtle); }
   .mail-empty.is-error { color: var(--danger); }
 
-  .mail-row { display: grid; grid-template-columns: 36px minmax(120px, 200px) 1fr 24px 76px; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 6px; border-bottom: 0.5px solid var(--line-faint); cursor: pointer; position: relative; background: var(--surface-3); font-size: 14px; }
+  .mail-row { display: grid; grid-template-columns: 62px minmax(120px, 200px) 1fr 24px 76px; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 6px; border-bottom: 0.5px solid var(--line-faint); cursor: pointer; position: relative; background: var(--surface-3); font-size: 14px; }
   .mail-row.unread { background: var(--paper); }
   .mail-row:hover { box-shadow: inset 1px 0 0 var(--line-strong), inset -1px 0 0 var(--line-strong), 0 1px 3px rgba(60,50,40,.12); z-index: 1; }
   .mail-row.focused::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gold); }
   .mail-row.checked { background: var(--cream); }
-  .mail-row-check { display: flex; align-items: center; height: 100%; }
+  .mail-row-check { display: flex; align-items: center; gap: 2px; height: 100%; }
+  .mail-toolbar-star { margin-left: 4px; display: inline-flex; }
   .mail-from { color: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mail-n { font-size: 12px; color: var(--subtle); margin-left: 5px; font-weight: 400; }
   .mail-content { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--body); }
@@ -1404,22 +1333,9 @@ const MAIL_CSS = `
   .mail-filing button:last-child { border-right: none; }
   .mail-filing button.on { background: var(--ink); color: var(--cream); }
   .mail-filing-n { font-size: 10px; font-weight: 700; background: var(--warning-bright); color: var(--paper); border-radius: 8px; padding: 0 5px; }
-  .mail-chip.card { color: var(--ink); background: var(--cream); border-color: var(--line-strong); font-weight: 600; }
-  .mail-chip.card.failed { color: var(--danger-dark); background: var(--danger-bg); border-color: var(--danger-soft); }
-  .mail-chip.card.queued, .mail-chip.card.generating { font-weight: 400; color: var(--subtle); }
   .mail-chip.tofile { color: var(--warning-dark); background: var(--warning-bg); border-color: var(--warning-soft); }
   .mail-row.is-admin .mail-from, .mail-row.is-admin .mail-subject { color: var(--subtle); }
-  .mail-modal-bg { position: fixed; inset: 0; z-index: 70; background: rgba(20,15,10,.25); display: flex; align-items: center; justify-content: center; }
-  .mail-modal { width: 320px; background: var(--paper); border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.25); padding: 8px 0; }
-  .mail-modal-title { font-size: 13px; font-weight: 600; color: var(--ink); padding: 8px 16px 10px; }
-  .mail-modal-title span { font-weight: 400; color: var(--subtle); }
-  .mail-modal-opt { display: flex; justify-content: space-between; gap: 12px; width: 100%; font: inherit; font-size: 14px; text-align: left; background: none; border: none; padding: 9px 16px; cursor: pointer; color: var(--ink); }
-  .mail-modal-opt:hover, .mail-modal-opt:focus { background: var(--surface-2); outline: none; }
-  .mail-modal-when { color: var(--subtle); font-size: 13px; }
-  .mail-modal-pick { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 10px; }
-  .mail-modal-pick input { font: inherit; font-size: 14px; padding: 6px 8px; border: 0.5px solid var(--line-strong); border-radius: 6px; }
-  .mail-modal-pick div { display: flex; justify-content: space-between; align-items: center; }
-  .mail-modal-go { font: inherit; font-size: 13px; font-weight: 600; color: var(--cream); background: var(--ink); border: none; border-radius: 16px; padding: 7px 16px; cursor: pointer; }
+
   .mail-thread { padding: 18px 28px 48px 64px; max-width: 1100px; }
   .mail-thread-head { margin-bottom: 18px; }
   .mail-thread-subject { font-size: 22px; font-weight: 400; color: var(--ink); margin: 0 0 8px; line-height: 1.3; word-wrap: break-word; }

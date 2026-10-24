@@ -25,7 +25,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // A fresh read even if it was made for this same email before
   const id = await queueEmailCard(db, access.tenantId, threadId, null)
   if (!id) return NextResponse.json({ error: 'Could not queue the card' }, { status: 502 })
-  await db.from('action_queue').update({ status: 'queued', attempts: 0 }).eq('id', id).in('status', ['pending', 'failed', 'snoozed', 'queued'])
+  await db.from('action_queue').update({ status: 'queued', attempts: 0 }).eq('id', id).in('status', ['pending', 'failed', 'queued'])
 
   // Take this one if it's still queued; otherwise another run is making it
   const queued = await getCard(db, access.tenantId, id)

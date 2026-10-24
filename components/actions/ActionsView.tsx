@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { CardView, CardWithContext } from '@/lib/actions/cards'
+import { CATEGORIES, type CardCategory, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
+import { StarIcon } from './Star'
 
 // The Action cards view on the dashboard: everything that needs the office,
 // most urgent first — the AI's suggestions for incoming email (and, later,
@@ -12,7 +13,6 @@ import { ActionCardView } from './ActionCardView'
 const POLL_MS = 15_000
 const VIEWS: { key: CardView; label: string }[] = [
   { key: 'pending', label: 'Needs action' },
-  { key: 'snoozed', label: 'Snoozed' },
   { key: 'done', label: 'Done' },
 ]
 
@@ -22,12 +22,13 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   onCount?(pending: number): void
 }) {
   const [view, setView] = useState<CardView>('pending')
+  const [category, setCategory] = useState<CardCategory | null>(null)
   const [cards, setCards] = useState<CardWithContext[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/actions?view=${view}`)
+      const res = await fetch(`/api/actions?view=${view}${category ? `&category=${category}` : ''}`)
       const body = await res.json()
       if (!res.ok) throw new Error(body.error ?? 'Could not load action cards')
       setCards(body.cards)
@@ -36,7 +37,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load action cards')
     }
-  }, [view, onCount])
+  }, [view, category, onCount])
 
   useEffect(() => {
     setCards(null)
@@ -50,8 +51,8 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
     if (card) {
       setCards(prev => {
         if (!prev) return prev
-        const stillHere = view === 'pending' ? ['queued', 'generating', 'pending', 'running', 'failed'].includes(card.status)
-          : view === 'snoozed' ? card.status === 'snoozed' : true
+        const stillHere = (view === 'pending' ? ['queued', 'generating', 'pending', 'running', 'failed'].includes(card.status) : true)
+          && (!category || card.category === category)
         return stillHere ? prev.map(c => (c.id === card.id ? card : c)) : prev.filter(c => c.id !== card.id)
       })
     }
@@ -66,14 +67,21 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
             <button key={v.key} role="tab" aria-selected={view === v.key} className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)}>{v.label}</button>
           ))}
         </div>
-        <span className="mail-toolbar-note">Suggested by AI from each email and its job file. Nothing is sent or changed until you confirm.</span>
+        <div className="av-stars" role="group" aria-label="Filter by star">
+          <button className={!category ? 'on' : ''} onClick={() => setCategory(null)}>All</button>
+          {CATEGORIES.map(c => (
+            <button key={c.key} className={category === c.key ? 'on' : ''} onClick={() => setCategory(c.key)}>
+              <StarIcon category={c.key} size={14} /> {c.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="av-list">
         {view === 'pending' && <ApprovalsPanel />}
         {cards === null && !error && <div className="mail-empty">Loading…</div>}
         {error && <div className="mail-empty is-error">{error}</div>}
         {cards?.length === 0 && (
-          <div className="mail-empty">{view === 'pending' ? 'All caught up — nothing needs you right now.' : view === 'snoozed' ? 'Nothing snoozed.' : 'Nothing done yet.'}</div>
+          <div className="mail-empty">{view === 'pending' ? (category ? 'Nothing starred here.' : 'All caught up — nothing needs you right now.') : 'Nothing done yet.'}</div>
         )}
         {cards?.map(card => (
           <ActionCardView key={`${card.id}:${card.updated_at}`} card={card} onChanged={changed} onOpenConversation={onOpenConversation} />
@@ -86,6 +94,10 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
         .av-tabs button { font: inherit; font-size: 12px; color: var(--grey-600); background: var(--paper); border: none; border-right: 0.5px solid var(--line-faint); padding: 5px 14px; cursor: pointer; }
         .av-tabs button:last-child { border-right: none; }
         .av-tabs button.on { background: var(--ink); color: var(--cream); }
+        .av-stars { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+        .av-stars button { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: 0.5px solid transparent; border-radius: 14px; padding: 4px 10px; cursor: pointer; }
+        .av-stars button:hover { background: var(--surface-2); }
+        .av-stars button.on { border-color: var(--line-strong); background: var(--surface-2); color: var(--ink); font-weight: 600; }
       `}</style>
     </div>
   )
@@ -148,6 +160,53 @@ export function ConversationCard({ threadId, onToast, onChanged, version }: {
         <button className="jp-button" disabled={asking} onClick={suggest}>{asking ? 'Reading the email and job…' : 'Suggest next steps'}</button>
       )}
       <style>{`.cc { padding-bottom: 12px; margin-bottom: 4px; }`}</style>
+    </div>
+  )
+}
+
+/** One job's action cards, on the job page */
+export function JobCards({ jobId }: { jobId: string }) {
+  const [cards, setCards] = useState<CardWithContext[] | null>(null)
+  const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null)
+  const [version, setVersion] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/actions?job=${jobId}`)
+      .then(r => (r.ok ? r.json() : { cards: [] }))
+      .then(body => { if (!cancelled) setCards(body.cards) })
+    return () => { cancelled = true }
+  }, [jobId, version])
+
+  return (
+    <div className="jc">
+      <div className="jc-head">
+        <span className="jc-title">To do</span>
+        {!!cards?.length && <span className="jc-n">{cards.length} on the list</span>}
+        {message && <span className={`jc-msg${message.error ? ' err' : ''}`}>{message.text}</span>}
+      </div>
+      {cards === null && <div className="jc-empty">Loading…</div>}
+      {cards?.length === 0 && <div className="jc-empty">Nothing to do on this job — all clear.</div>}
+      {cards?.map(card => (
+        <ActionCardView
+          key={`${card.id}:${card.updated_at}`}
+          card={card}
+          onChanged={(c, text, error) => {
+            setMessage({ text, error })
+            if (c) setCards(prev => prev?.map(x => (x.id === c.id ? c : x)) ?? null)
+            setVersion(v => v + 1)
+          }}
+          onOpenConversation={threadId => { window.location.href = `/dashboard?thread=${threadId}` }}
+        />
+      ))}
+      <style>{`
+        .jc-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+        .jc-title { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -0.5px; line-height: 1; }
+        .jc-n { font-size: 11px; color: var(--tan); font-weight: 600; background: #faf5ee; border: 0.5px solid var(--line-tan-5); padding: 2px 9px; border-radius: 20px; }
+        .jc-msg { font-size: 12px; color: var(--subtle); }
+        .jc-msg.err { color: var(--danger-dark); }
+        .jc-empty { padding: 32px; text-align: center; font-size: 13px; color: var(--faint); background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 8px; }
+      `}</style>
     </div>
   )
 }

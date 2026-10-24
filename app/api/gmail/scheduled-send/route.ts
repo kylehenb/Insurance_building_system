@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDueEmails } from '@/lib/mail/scheduled'
-import { wakeSnoozed } from '@/lib/mail/snooze'
 import { drainCardQueue } from '@/lib/actions/propose'
 
-// Sends scheduled emails that are due (lib/mail/scheduled.ts) and brings
-// snoozed conversations back to the inbox (lib/mail/snooze.ts), and makes
+// Sends scheduled emails that are due (lib/mail/scheduled.ts) and makes
 // queued action cards (lib/actions/propose.ts). Vercel cron, every minute.
 
 export const maxDuration = 300
@@ -16,8 +14,8 @@ function checkCronAuth(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const [sent, snoozes, cards] = await Promise.all([sendDueEmails(), wakeSnoozed(), drainCardQueue({ budgetMs: 200_000 })])
-  return NextResponse.json({ ...sent, ...snoozes, cards: cards.made })
+  const [sent, cards] = await Promise.all([sendDueEmails(), drainCardQueue({ budgetMs: 200_000 })])
+  return NextResponse.json({ ...sent, cards: cards.made })
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

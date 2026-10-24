@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Action cards: queued once per conversation as email arrives, made by the
-// model with write tools recorded (never run), and confirmed by running only
-// the chosen steps — as the user, through callTool.
+// model with write tools recorded (never run), starred and re-starred by the
+// user, and confirmed by running only the chosen steps — as the user, through
+// callTool.
 
 type Row = Record<string, unknown>
 const tables: Record<string, Row[]> = {}
 let nextId = 1
 
-const LIVE = ['queued', 'generating', 'pending', 'snoozed', 'failed']
+const LIVE = ['queued', 'generating', 'pending', 'failed']
 
 /** Just enough of supabase-js over in-memory rows */
 function table(name: string) {
@@ -42,6 +43,7 @@ function table(name: string) {
     update: (p: Row) => { patch = p; return b },
     eq: (c: string, v: unknown) => { preds.push(r => r[c] === v); return b },
     in: (c: string, v: unknown[]) => { preds.push(r => v.includes(r[c])); return b },
+    is: (c: string, v: unknown) => { preds.push(r => (r[c] ?? null) === v); return b },
     lt: (c: string, v: unknown) => { preds.push(r => String(r[c]) < String(v)); return b },
     lte: (c: string, v: unknown) => { preds.push(r => String(r[c]) <= String(v)); return b },
     gte: (c: string, v: unknown) => { preds.push(r => Number(r[c]) >= Number(v)); return b },
@@ -84,7 +86,7 @@ const callTool = vi.fn(async (t: { name: string; run(a: Row): unknown }, args: R
 })
 vi.mock('@/lib/mcp/server', () => ({ callTool: (t: never, a: never, c: never) => callTool(t, a, c) }))
 
-const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads } = await import('../cards')
+const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, nextCategory } = await import('../cards')
 const { generateCard, describeStep } = await import('../propose')
 const { confirmCard, CardError } = await import('../confirm')
 const { historyArrivals } = await import('@/lib/mail/summary')
@@ -152,19 +154,49 @@ describe('queueing', () => {
     expect(tables.action_queue.find(r => r.source_ref === 'th2')).toMatchObject({ status: 'done', outcome: 'Replied from Mail' })
   })
 
-  it('claims each queued card once, wakes snoozed ones, and gives up on stuck ones', async () => {
+  it('claims each queued card once, and gives up on stuck ones', async () => {
     const old = new Date(Date.now() - 60 * 60_000).toISOString()
     tables.action_queue = [
       { id: 'a', tenant_id: 't1', status: 'queued', attempts: 0, updated_at: old },
-      { id: 'b', tenant_id: 't1', status: 'snoozed', snoozed_until: old, attempts: 1, updated_at: old },
-      { id: 'c', tenant_id: 't1', status: 'generating', attempts: 3, updated_at: old },
+      { id: 'b', tenant_id: 't1', status: 'generating', attempts: 3, updated_at: old },
     ]
     const [first, second] = await Promise.all([claimQueued(db as never, 5), claimQueued(db as never, 5)])
     expect([...first, ...second].map(c => c.id)).toEqual(['a'])
-    expect(tables.action_queue.map(r => r.status)).toEqual(['generating', 'pending', 'failed'])
+    expect(tables.action_queue.map(r => r.status)).toEqual(['generating', 'failed'])
     expect(tables.action_queue[0].attempts).toBe(1)
     expect(await cardsForThreads(db as never, 't1', [])).toEqual({})
-    expect((await listCards(db as never, 't1', 'pending')).map(c => c.id).sort()).toEqual(['a', 'b', 'c'])
+    expect((await listCards(db as never, 't1', 'pending')).map(c => c.id).sort()).toEqual(['a', 'b'])
+  })
+})
+
+describe('stars', () => {
+  it('cycles Invoices to pay → Attend and Submit → Everything else → off', () => {
+    expect([nextCategory(null), nextCategory('invoice'), nextCategory('attend_submit'), nextCategory('other')])
+      .toEqual(['invoice', 'attend_submit', 'other', null])
+  })
+
+  it('stars an email as a new card for the AI to fill in, changes its symbol, and takes it off', async () => {
+    tables.mail_threads = [{ tenant_id: 't1', gmail_thread_id: 'th1', subject: 'Plumbing invoice #44' }]
+    expect(await starThread(db as never, 't1', 'th1', 'invoice', 'u1')).toMatchObject({ status: 'queued', title: 'Plumbing invoice #44', category: 'invoice' })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'queued', starred_by: 'u1', category: 'invoice' })
+    await starThread(db as never, 't1', 'th1', 'attend_submit', 'u1')
+    expect(tables.action_queue).toHaveLength(1)
+    expect(tables.action_queue[0].category).toBe('attend_submit')
+    expect(await starredThreadIds(db as never, 't1', 'attend_submit')).toEqual(['th1'])
+    expect(await starredThreadIds(db as never, 't1', 'invoice')).toEqual([])
+    expect(await starThread(db as never, 't1', 'th1', null, 'u1')).toBeNull()
+    expect(tables.action_queue[0]).toMatchObject({ status: 'done', outcome: 'Star taken off' })
+    expect(await starredThreadIds(db as never, 't1')).toEqual([])
+  })
+
+  it("keeps the user's own stars when we reply; the AI's close", async () => {
+    await queueEmailCard(db as never, 't1', 'th1', 'm1')
+    await queueEmailCard(db as never, 't1', 'th2', 'x1')
+    for (const r of tables.action_queue) r.status = 'pending'
+    expect(await setCardCategory(db as never, 't1', tables.action_queue[0].id as string, 'invoice', 'u1')).toBe(true)
+    await onMailArrivals(db as never, 't1', { received: [], sentThreadIds: ['th1', 'th2'] })
+    expect(tables.action_queue.map(r => r.status)).toEqual(['pending', 'done'])
+    expect(await setCardCategory(db as never, 't1', tables.action_queue[1].id as string, 'invoice', 'u1')).toBe(false)
   })
 })
 
@@ -182,13 +214,13 @@ describe('generateCard', () => {
         { name: 'send_email', input: { mode: 'reply', conversation_id: 'th1', to: 'casey@gmail.com', body: 'Hi Casey, Thursday works.' } },
         { name: 'add_job_note', input: { job_number: 'IRC1001', note: 'Access Thursday' } },
       ],
-      [{ name: 'finish_card', input: { needs_action: true, title: 'Reply to Casey', summary: 'Casey asks about Thursday.', priority: 'high' } }],
+      [{ name: 'finish_card', input: { needs_action: true, title: 'Reply to Casey', summary: 'Casey asks about Thursday.', priority: 'high', category: 'attend_submit' } }],
     ])
     const out = await generateCard(card, { client, db: db as never, tools: TOOLS as never })
     expect(TOOLS[0].run).toHaveBeenCalledOnce()
     expect(TOOLS[1].run).not.toHaveBeenCalled()
     expect(TOOLS[3].run).not.toHaveBeenCalled()
-    expect(out).toMatchObject({ status: 'pending', title: 'Reply to Casey', priority: 90, job_id: 'j1', error_log: null })
+    expect(out).toMatchObject({ status: 'pending', title: 'Reply to Casey', priority: 90, job_id: 'j1', error_log: null, category: 'attend_submit' })
     expect(out.steps!.map(s => [s.tool, s.summary, s.kind])).toEqual([
       ['send_email', 'Reply to casey@gmail.com', 'email'],
       ['add_job_note', 'add job note — IRC1001', 'change'],
@@ -204,6 +236,20 @@ describe('generateCard', () => {
     const card = await claimed()
     const { client } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Xero receipt', summary: 'A receipt.', priority: 'low' } }]])
     expect(await generateCard(card, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action', steps: [], priority: 20 })
+  })
+
+  it("keeps a star the user set: their symbol, and on the list even when there's nothing to do or we've replied", async () => {
+    tables.mail_threads = [{ tenant_id: 't1', gmail_thread_id: 'th1', subject: 'Invoice' }]
+    await starThread(db as never, 't1', 'th1', 'invoice', 'u1')
+    const card = (await claimQueued(db as never, 1))[0]
+    detail = thread({ messages: [{ id: 'm1', labelIds: ['INBOX'], from: { email: 'casey@gmail.com' } }, { id: 'm2', labelIds: ['SENT'], from: { email: 'office@insurancerepairco.com.au' } }] })
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Invoice from Bob', summary: 'An invoice.', priority: 'low', category: 'other' } }]])
+    const out = await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    expect(create).toHaveBeenCalledOnce()
+    expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toContain('starred this email themselves')
+    expect(out).toMatchObject({ status: 'pending', title: 'Invoice from Bob' })
+    expect(out.category).toBeUndefined()
+    expect(tables.action_queue[0]).toMatchObject({ status: 'pending', category: 'invoice' })
   })
 
   it("skips the model when we've already replied, or the conversation is in the Bin", async () => {
