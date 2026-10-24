@@ -23,10 +23,11 @@ const MAX_STEPS = 10
 const MAX_PROPOSED_STEPS = 5
 const OWN_DOMAIN = 'insurancerepairco.com.au'
 
-/** Tools a card never uses: approvals, the activity log, one-off clean-up, and older ways of replying and filing */
+/** Tools a card never uses: approvals, the activity log, one-off clean-up, older ways of replying and filing, and the cards themselves */
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'dismiss_action_card',
 ])
 
 const FINISH: Anthropic.Beta.BetaTool = {

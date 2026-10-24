@@ -16,6 +16,7 @@ import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
 import { addJobNote, getJobSummary } from '@/lib/mcp/tools/jobs'
 import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 import { listActivityTool } from '@/lib/mcp/tools/activity'
+import { confirmActionCard, dismissActionCard, listActionCards, readActionCard } from '@/lib/mcp/tools/action-cards'
 import { fileConversation, listMailbox, organiseEmails, readConversation, sendEmailTool } from '@/lib/mcp/tools/mailbox'
 
 // Every tool the voice connector offers. Add new tools here and to the
@@ -69,6 +70,10 @@ export const MCP_TOOLS: McpTool[] = [
   organiseEmails,
   sendEmailTool,
   fileConversation,
+  listActionCards,
+  readActionCard,
+  confirmActionCard,
+  dismissActionCard,
   listApprovalsTool,
   decideApprovalTool,
   listActivityTool,

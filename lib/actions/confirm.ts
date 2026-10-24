@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
-import { callTool, type McpTool } from '@/lib/mcp/server'
+import { callTool, type McpContext, type McpTool } from '@/lib/mcp/server'
 import { MCP_TOOLS } from '@/lib/mcp/tools'
 import { mailDb } from '@/lib/mail/sync'
 import { getCard, type ActionCard, type CardStep } from './cards'
@@ -32,7 +32,13 @@ export async function confirmCard(
   userId: string,
   cardId: string,
   choices: StepChoice[],
-  { db = mailDb(), tools = MCP_TOOLS }: { db?: SupabaseClient; tools?: McpTool[] } = {},
+  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId }: {
+    db?: SupabaseClient
+    tools?: McpTool[]
+    /** Who's confirming: the app (default) or the voice connector — the steps are logged as that */
+    via?: 'chat' | 'voice'
+    voiceKeyId?: string
+  } = {},
 ): Promise<ActionCard> {
   const card = await getCard(db, tenantId, cardId)
   if (!card) throw new CardError('Card not found', 404)
@@ -45,7 +51,7 @@ export async function confirmCard(
     .eq('id', card.id).in('status', ['pending', 'failed']).select('id').maybeSingle()
   if (!claimed) throw new CardError('Someone else is confirming this card', 409)
 
-  const ctx = { supabase: db as unknown as SupabaseClient<Database>, tenantId, userId, via: 'chat' as const }
+  const ctx: McpContext = { supabase: db as unknown as SupabaseClient<Database>, tenantId, userId, via: via === 'chat' ? 'chat' : undefined, voiceKeyId }
   const steps: CardStep[] = card.steps.map(s => ({ ...s }))
   let stopped = false
 
