@@ -13,18 +13,22 @@ import { scheduleDraft } from '@/lib/mail/scheduled'
 import { parseSendAt, spokenSendAt } from '@/lib/mail/schedule-rules'
 import { messageText } from '@/lib/mail/message'
 import { FileThreadError, fileThread } from '@/lib/mail/file-thread'
+import { attachJobFile, listJobAttachables } from '@/lib/mail/job-files'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 
 // The office mailbox by voice — the Mail page's own functions (lib/mail):
 // what's in a folder or a search, reading a conversation, archive / bin /
 // spam / read state, and writing, replying, forwarding or scheduling an email
-// (saved as a Gmail draft and sent, exactly as the page's Send does).
+// (saved as a Gmail draft and sent, exactly as the page's Send does), with a
+// job's photos and files attached as the composer's "Attach from job" does.
 
 const DEFAULT_LIST = 10
 const MAX_LIST = 25
 const MESSAGE_CHARS = 4000
 const DUPLICATE_WINDOW_MINUTES = 10
 const THREAD_ID_RE = /^[0-9a-f]+$/i
+const UUID_RE = /^[0-9a-f-]{36}$/i
+const MAX_JOB_ATTACHMENTS = 30
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
@@ -223,6 +227,8 @@ export const sendEmailTool: McpTool = {
     'Write the body as plain text in the user\'s words (a short greeting and sign-off are fine; don\'t add commitments they didn\'t make).',
     'send_at (Perth time, e.g. "2026-10-26T08:00") schedules it instead; draft_only saves it to Drafts to finish in the app.',
     'ONLY call this (unless draft_only) after reading back who it goes to, the subject, the whole text and when it will send, and the user has clearly said yes.',
+    'job_number files the email on that job (a new email\'s subject defaults to "job number - address"). attach_photos / attach_files attach that job\'s photos and uploaded files: get their ids from list_job_files, and say which ones (by label or count) in the read-back.',
+    'For quotes, reports and invoices use send_documents instead.',
     'The same text to the same person within 10 minutes is refused as a likely repeat unless send_anyway: true. If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
   inputSchema: {
@@ -239,6 +245,9 @@ export const sendEmailTool: McpTool = {
       send_at: { type: 'string', description: 'Schedule for this Perth date and time instead of sending now.' },
       draft_only: { type: 'boolean', description: 'Save to Drafts, don\'t send.' },
       send_anyway: { type: 'boolean', description: 'The user confirmed sending the same email again.' },
+      job_number: { type: 'string', description: 'The job it\'s about, e.g. IRC1001: the sent email is filed on it. Required with attach_photos / attach_files.' },
+      attach_photos: { type: 'array', items: { type: 'string' }, maxItems: MAX_JOB_ATTACHMENTS, description: 'photo_id values from list_job_files, or ["all"] for every photo on the job.' },
+      attach_files: { type: 'array', items: { type: 'string' }, maxItems: MAX_JOB_ATTACHMENTS, description: 'file_id values from list_job_files.' },
     },
     required: ['body'],
     additionalProperties: false,
@@ -266,8 +275,19 @@ export const sendEmailTool: McpTool = {
     }
     if (messageId && !THREAD_ID_RE.test(messageId)) return { text: 'Message not found — use read_conversation for its message_id.', isError: true }
 
+    const photoArgs = Array.isArray(args.attach_photos) ? args.attach_photos.map(str).filter(Boolean) : []
+    const fileArgs = Array.isArray(args.attach_files) ? args.attach_files.map(str).filter(Boolean) : []
+    let job: { id: string; job_number: string } | null = null
+    if (str(args.job_number)) {
+      const found = await jobFromArgs(args, ctx)
+      if (isToolResult(found)) return found
+      job = found
+    } else if (photoArgs.length || fileArgs.length) {
+      return { text: 'Which job are the photos or files from? Give job_number.', isError: true }
+    }
+
     try {
-      const start = await startCompose(mailbox, mode, messageId)
+      const start = await startCompose(mailbox, mode, messageId, job?.id ?? null)
       const state: ComposeState = {
         ...start,
         to: typeof args.to === 'string' ? args.to : start.to,
@@ -276,6 +296,20 @@ export const sendEmailTool: McpTool = {
         subject: str(args.subject) || start.subject,
         body: plainTextToRichHtml(body),
       }
+
+      // The job's photos and files, copied into the draft as the composer does
+      if (job && (photoArgs.length || fileArgs.length)) {
+        let photoIds = photoArgs
+        if (photoArgs.some(p => p.toLowerCase() === 'all')) {
+          photoIds = (await listJobAttachables(ctx.tenantId, job.id)).photos.map(p => p.id)
+          if (!photoIds.length) return { text: `There are no photos on ${job.job_number}.`, isError: true }
+        }
+        const wanted = [...photoIds.map(id => ['photo', id] as const), ...fileArgs.map(id => ['file', id] as const)]
+        if (wanted.length > MAX_JOB_ATTACHMENTS) return { text: `That's ${wanted.length} attachments — at most ${MAX_JOB_ATTACHMENTS} in one email.`, isError: true }
+        if (wanted.some(([, id]) => !UUID_RE.test(id))) return { text: 'Use the photo_id / file_id values from list_job_files.', isError: true }
+        for (const [source, id] of wanted) state.attachments = [...state.attachments, await attachJobFile(ctx.tenantId, job.id, source, id)]
+      }
+
       const recipients = [state.to, state.cc, state.bcc].flatMap(v => readAddressInput(v).addresses)
       const draftOnly = args.draft_only === true
       if (!draftOnly) {
@@ -291,14 +325,16 @@ export const sendEmailTool: McpTool = {
 
       const saved = await saveDraft(mailbox, ctx.tenantId, ctx.userId || null, state)
       const toText = recipients.map(r => r.email).join(', ') || 'no one yet'
-      const data = { draft_id: saved.draftId, conversation_id: saved.threadId, to: toText, subject: state.subject }
-      if (draftOnly) return { text: `Saved to Drafts: "${state.subject || '(no subject)'}" to ${toText}. Finish it on the Mail page.`, data }
+      const attached = state.attachments.length
+      const withFiles = attached ? ` with ${attached} attachment${attached === 1 ? '' : 's'}` : ''
+      const data = { draft_id: saved.draftId, conversation_id: saved.threadId, to: toText, subject: state.subject, job_number: job?.job_number ?? null, attachments: state.attachments.map(a => a.filename) }
+      if (draftOnly) return { text: `Saved to Drafts: "${state.subject || '(no subject)'}" to ${toText}${withFiles}. Finish it on the Mail page.`, data }
       if (sendAt) {
         const scheduled = await scheduleDraft(mailbox, ctx.userId || null, saved.draftId, sendAt)
-        return { text: `Scheduled "${state.subject}" to ${toText} for ${spokenSendAt(scheduled.send_at)}. It's in Drafts until then.`, data: { ...data, send_at: scheduled.send_at } }
+        return { text: `Scheduled "${state.subject}" to ${toText}${withFiles} for ${spokenSendAt(scheduled.send_at)}. It's in Drafts until then.`, data: { ...data, send_at: scheduled.send_at } }
       }
       await sendDraft(mailbox, saved.draftId)
-      return { text: `Sent "${state.subject}" to ${toText}.`, data }
+      return { text: `Sent "${state.subject}" to ${toText}${withFiles}.`, data }
     } catch (err) {
       if (err instanceof ComposeError) return { text: err.message, isError: true }
       throw err
@@ -346,6 +382,42 @@ export const fileConversation: McpTool = {
     return {
       text: job ? `Filed on ${job.job_number}.` : filing === 'admin' ? 'Filed as admin.' : 'Moved back to To file.',
       data: { conversation_id: id, job_number: job?.job_number ?? null, filing: job ? 'job' : filing },
+    }
+  },
+}
+
+export const listJobFiles: McpTool = {
+  name: 'list_job_files',
+  title: 'List job photos and files',
+  description: [
+    'Lists the photos (numbered, with their labels) and uploaded files on a job, with the photo_id / file_id values to pass to send_email\'s attach_photos / attach_files.',
+    'For quotes, reports and invoices use list_job_documents.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: { job_number: { type: 'string', description: 'Job number, e.g. IRC1001.' } },
+    required: ['job_number'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const job = await jobFromArgs(args, ctx)
+    if (isToolResult(job)) return job
+    const { files, photos } = await listJobAttachables(ctx.tenantId, job.id)
+    const photoLines = photos.map((p, i) => `${i + 1}. ${p.label || p.name}`)
+    const fileLines = files.map(f => `${f.name}${f.description ? ` — ${f.description}` : ''}`)
+    const text = [
+      photos.length ? `${photos.length} photo${photos.length === 1 ? '' : 's'} on ${job.job_number}: ${photoLines.join('; ')}.` : `No photos on ${job.job_number}.`,
+      files.length ? `${files.length} file${files.length === 1 ? '' : 's'}: ${fileLines.join('; ')}.` : 'No uploaded files.',
+    ].join(' ')
+    return {
+      text,
+      data: {
+        job_number: job.job_number,
+        photos: photos.map((p, i) => ({ photo_id: p.id, number: i + 1, label: p.label, filename: p.name, size_bytes: p.size })),
+        files: files.map(f => ({ file_id: f.id, name: f.name, description: f.description, size_bytes: f.size, added: f.createdAt })),
+      },
     }
   },
 }

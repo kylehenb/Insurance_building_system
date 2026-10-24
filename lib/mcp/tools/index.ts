@@ -17,7 +17,7 @@ import { addJobNote, getJobSummary } from '@/lib/mcp/tools/jobs'
 import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 import { listActivityTool } from '@/lib/mcp/tools/activity'
 import { confirmActionCard, dismissActionCard, listActionCards, readActionCard } from '@/lib/mcp/tools/action-cards'
-import { fileConversation, listMailbox, organiseEmails, readConversation, sendEmailTool } from '@/lib/mcp/tools/mailbox'
+import { fileConversation, listJobFiles, listMailbox, organiseEmails, readConversation, sendEmailTool } from '@/lib/mcp/tools/mailbox'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -68,6 +68,7 @@ export const MCP_TOOLS: McpTool[] = [
   listMailbox,
   readConversation,
   organiseEmails,
+  listJobFiles,
   sendEmailTool,
   fileConversation,
   listActionCards,
