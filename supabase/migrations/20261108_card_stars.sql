@@ -7,7 +7,7 @@
 -- they clear it (a reply doesn't close it, and "nothing to do" doesn't drop it).
 --
 -- Snooze is gone from mail and cards: snoozed cards go back to needing
--- action, and the (never used) mail_snoozes table is dropped.
+-- action. The mail_snoozes table (never used, now unread) is left in place.
 
 ALTER TABLE action_queue
   ADD COLUMN IF NOT EXISTS category   TEXT NOT NULL DEFAULT 'other'
@@ -21,5 +21,3 @@ DROP INDEX IF EXISTS idx_action_queue_live_source;
 CREATE UNIQUE INDEX idx_action_queue_live_source
   ON action_queue (tenant_id, source, source_ref)
   WHERE source_ref IS NOT NULL AND status IN ('queued', 'generating', 'pending', 'failed');
-
-DROP TABLE IF EXISTS mail_snoozes;
