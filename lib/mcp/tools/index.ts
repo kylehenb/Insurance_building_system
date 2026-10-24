@@ -1,6 +1,10 @@
 import type { McpTool } from '@/lib/mcp/server'
 import { findWorkOrders } from '@/lib/mcp/tools/work-orders'
 import { getWorkOrderEmail, sendWorkOrder } from '@/lib/mcp/tools/work-order-send'
+import { createWorkOrderTool, createWorkOrdersFromQuote, editWorkOrderItems, getWorkOrder, updateWorkOrderTool } from '@/lib/mcp/tools/work-order-edit'
+import { createQuoteTool, editQuoteItems, findLineItemsTool, getQuote, updateQuoteTool } from '@/lib/mcp/tools/quotes'
+import { createInvoiceTool, editInvoiceItems, getInvoice, updateInvoiceTool } from '@/lib/mcp/tools/invoices'
+import { createReportTool, getReport, updateReportTool } from '@/lib/mcp/tools/reports'
 import { getDocumentEmail, listJobDocumentsTool, sendDocuments } from '@/lib/mcp/tools/documents'
 import { getJobExcess, setJobExcessDecision } from '@/lib/mcp/tools/excess'
 import { getSigning, resendSigningRequestTool, sendForSignatureTool } from '@/lib/mcp/tools/signing'
@@ -20,11 +24,28 @@ export const MCP_TOOLS: McpTool[] = [
   getJobSummary,
   addJobNote,
   findWorkOrders,
+  getWorkOrder,
+  createWorkOrdersFromQuote,
+  createWorkOrderTool,
+  updateWorkOrderTool,
+  editWorkOrderItems,
   getWorkOrderEmail,
   sendWorkOrder,
   listJobDocumentsTool,
   getDocumentEmail,
   sendDocuments,
+  getQuote,
+  findLineItemsTool,
+  createQuoteTool,
+  updateQuoteTool,
+  editQuoteItems,
+  getInvoice,
+  createInvoiceTool,
+  updateInvoiceTool,
+  editInvoiceItems,
+  getReport,
+  createReportTool,
+  updateReportTool,
   getJobExcess,
   setJobExcessDecision,
   getSigning,

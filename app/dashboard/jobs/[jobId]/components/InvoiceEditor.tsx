@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { invoiceTotals } from '@/lib/invoices/totals'
 
 interface JobInfo {
   job_number: string
@@ -13,6 +14,7 @@ interface JobInfo {
 interface Invoice {
   id: string
   invoice_type: string
+  gst_treatment?: string | null
   amount_ex_gst: number
   gst: number
   amount_inc_gst: number
@@ -157,18 +159,15 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
 
   // ── Persist recalculated totals to DB ───────────────────────────────────────
 
+  const gstTreatment = invoice?.gst_treatment ?? null
   const persistTotals = useCallback(async (items: InvoiceLineItem[], currentMarkupPct: number, invType: string, deductionsTotal: number) => {
-    if (invType === 'excess') return
-
-    const sub = Math.round(items.filter(i => i.completed !== false).reduce((s, i) => s + i.line_total, 0) * 100) / 100
-    const markup = currentMarkupPct > 0 ? Math.round(sub * currentMarkupPct * 100) / 100 : 0
-    const ex = Math.round((sub + markup) * 100) / 100
-    const g = Math.round(ex * 0.10 * 100) / 100
-    const grossInc = Math.round((ex + g) * 100) / 100
-    // For quoted_amounts, deductions are subtracted post-GST to give the net insurer amount
-    const inc = invType === 'quoted_amounts'
-      ? Math.round((grossInc - deductionsTotal) * 100) / 100
-      : grossInc
+    const totals = invoiceTotals(
+      { invoice_type: invType, markup_pct: currentMarkupPct, gst_treatment: gstTreatment },
+      items,
+      [{ amount_inc_gst: deductionsTotal }],
+    )
+    if (!totals) return
+    const { amount_ex_gst: ex, gst: g, amount_inc_gst: inc } = totals
 
     await supabase
       .from('invoices')
@@ -177,7 +176,7 @@ export function InvoiceEditor({ jobId, invoiceId, tenantId, job, onInvoiceUpdate
       .eq('tenant_id', tenantId)
 
     setInvoice(prev => prev ? { ...prev, amount_ex_gst: ex, gst: g, amount_inc_gst: inc } : prev)
-  }, [invoiceId, tenantId])
+  }, [invoiceId, tenantId, gstTreatment])
 
   // ── Update builder's margin ─────────────────────────────────────────────────
 

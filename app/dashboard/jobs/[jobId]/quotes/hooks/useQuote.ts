@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isPreliminary, preliminaryRate } from '@/lib/quotes/preliminaries'
 
 export type ItemType = 'provisional_sum' | 'prime_cost' | 'cash_settlement' | null
 
@@ -267,9 +268,9 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
     prevItemsRef.current = items
 
     // Calculate subtotal excluding preliminary items to avoid circular dependency
-    const nonPrelimItems = items.filter(i => !i.preliminary_formula || i.room !== 'Preliminaries')
+    const nonPrelimItems = items.filter(i => !isPreliminary(i))
     const subtotal = nonPrelimItems.reduce((sum, i) => sum + (i.line_total ?? 0), 0)
-    const prelimItems = items.filter(i => i.preliminary_formula && i.room === 'Preliminaries')
+    const prelimItems = items.filter(isPreliminary)
 
     if (prelimItems.length === 0) return
 
@@ -279,30 +280,9 @@ export function useQuote({ quoteId, tenantId }: UseQuoteOptions) {
 
     // Calculate new amounts for each preliminary item based on its formula
     const updatedItems = items.map(item => {
-      if (!item.preliminary_formula || item.room !== 'Preliminaries') return item
-
-      let newRate = 0
-      switch (item.preliminary_formula) {
-        case 'hii':
-          newRate = Math.max(700, subtotal * 0.012)
-          break
-        case 'ctf':
-          newRate = subtotal * 0.002
-          break
-        case 'bsl':
-          newRate = subtotal <= 45000 ? 61.65 : subtotal * 0.00137
-          break
-        case 'council':
-          newRate = Math.max(110, subtotal * 0.0019)
-          break
-        case 'cdc':
-          newRate = Math.max(1050, subtotal * 0.00165)
-          break
-        default:
-          return item
-      }
-
-      newRate = Math.round(newRate * 100) / 100
+      if (!isPreliminary(item)) return item
+      const newRate = preliminaryRate(item.preliminary_formula!, subtotal)
+      if (newRate == null) return item
       const newLineTotal = item.qty ? item.qty * newRate : newRate
 
       return {

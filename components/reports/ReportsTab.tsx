@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Plus, FileText } from 'lucide-react'
 import { ReportAccordionItem } from './ReportAccordionItem'
-import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
+import { createReport, type NewReportType } from '@/lib/reports/edit'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Report {
@@ -42,7 +42,6 @@ interface Report {
   created_at: string
 }
 
-type NewReportType = 'BAR' | 'make_safe' | 'roof' | 'specialist' | 'LDR'
 
 interface ReportsTabProps {
   jobId: string
@@ -59,15 +58,6 @@ const REPORT_TYPE_OPTIONS: { value: NewReportType; label: string }[] = [
   { value: 'LDR', label: 'Leak Detection Report' },
 ]
 
-// Mapping of report types to reference prefixes
-const REPORT_TYPE_PREFIXES: Record<string, string> = {
-  BAR: 'BAR',
-  storm_wind: 'SW',
-  make_safe: 'MS',
-  roof: 'RR',
-  specialist: 'SPR',
-  LDR: 'LDR',
-}
 
 // — Component ——————————————————————————————————————————————————————
 export function ReportsTab({
@@ -116,68 +106,12 @@ export function ReportsTab({
     setShowNewReportMenu(false)
     setIsCreating(true)
 
-    const { data: jobRow } = await supabase
-      .from('jobs')
-      .select('job_number, property_details, property_address, claim_number')
-      .eq('id', jobId)
-      .single()
-
-    const jobNumber = jobRow?.job_number ?? 'UNKNOWN'
-    const existingCount = reports.length
-    const newIndex = String(existingCount + 1)
-    const prefix = REPORT_TYPE_PREFIXES[type] || 'RPT'
-    const newRef = `${prefix}-${jobNumber}-${newIndex}`
-
-    const { data: newReport, error } = await supabase
-      .from('reports')
-      .insert({
-        tenant_id: tenantId,
-        job_id: jobId,
-        report_ref: newRef,
-        report_type: type,
-        status: 'draft',
-        is_locked: false,
-        version: 1,
-        type_specific_fields: {},
-      })
-      .select()
-      .single()
-
-    if (!error && newReport) {
-      setReports(prev => [...prev, newReport as Report])
-
-      // Auto-create invoice for the report
-      // Extract property type from property_details if available
-      const propertyDetails = jobRow?.property_details as Record<string, unknown> | null
-      const storeys = propertyDetails?.storeys as string | null
-      let propertyType: string | null = null
-      if (storeys === '2' || storeys === 'double') {
-        propertyType = 'double_storey'
-      } else if (storeys === '1' || storeys === 'single') {
-        propertyType = 'single_storey'
-      }
-
-      try {
-        const invoiceResult = await createInvoiceForReport(supabase, {
-          tenantId,
-          jobId,
-          reportId: newReport.id,
-          inspectionId: null, // Manually created reports are not linked to inspections initially
-          reportType: type,
-          propertyType,
-          propertyAddress: jobRow?.property_address || null,
-          claimNumber: jobRow?.claim_number || null,
-          jobNumber,
-        })
-
-        if (invoiceResult) {
-          console.log('[ReportsTab] auto-created invoice:', invoiceResult.invoiceRef)
-        } else {
-          console.warn('[ReportsTab] failed to auto-create invoice for report')
-        }
-      } catch (invoiceError) {
-        console.error('[ReportsTab] error creating invoice:', invoiceError)
-      }
+    try {
+      const { report: newReport, invoiceRef } = await createReport(supabase, tenantId, { jobId, type })
+      setReports(prev => [...prev, newReport as unknown as Report])
+      if (invoiceRef) console.log('[ReportsTab] auto-created invoice:', invoiceRef)
+    } catch (err) {
+      console.error('[ReportsTab] error creating report:', err)
     }
 
     setIsCreating(false)

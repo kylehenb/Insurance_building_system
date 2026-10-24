@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { permissionDenied } from '@/lib/permissions/http'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { QuoteEditError, createQuote } from '@/lib/quotes/service'
 
 export async function GET(req: NextRequest) {
   const me = await sessionUser()
@@ -70,57 +71,16 @@ export async function POST(req: NextRequest) {
     tenantId: string
     quoteType?: string
   }
-  const tenantId = me.tenantId
 
   if (!jobId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
-
-  const { data: job, error: jobError } = await supabase
-    .from('jobs')
-    .select('job_number, client_id')
-    .eq('id', jobId)
-    .eq('tenant_id', tenantId)
-    .single()
-
-  if (jobError || !job) {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  try {
+    const quote = await createQuote(createServiceClient(), me.tenantId, { jobId, quoteType })
+    return NextResponse.json(quote, { status: 201 })
+  } catch (err) {
+    if (err instanceof QuoteEditError) return NextResponse.json({ error: err.message }, { status: err.status })
+    throw err
   }
-
-  let markupPct = 0.19
-  if (job.client_id) {
-    const { data: client } = await supabase
-      .from('clients')
-      .select('builders_margin_pct')
-      .eq('id', job.client_id)
-      .eq('tenant_id', tenantId)
-      .single()
-
-    if (client?.builders_margin_pct != null) {
-      markupPct = client.builders_margin_pct / 100
-    }
-  }
-
-  const { count } = await supabase
-    .from('quotes')
-    .select('*', { count: 'exact', head: true })
-    .eq('job_id', jobId)
-    .eq('tenant_id', tenantId)
-
-  const seq = String((count ?? 0) + 1)
-  const quoteRef = `Q-${job.job_number}-${seq}`
-
-  const { data: quote, error } = await supabase
-    .from('quotes')
-    .insert({
-      tenant_id: tenantId, job_id: jobId, quote_ref: quoteRef, quote_type: quoteType, status: 'draft', is_active_version: true, is_locked: false, markup_pct: markupPct, gst_pct: 0.10,
-    })
-    .select('*')
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  return NextResponse.json(quote, { status: 201 })
 }

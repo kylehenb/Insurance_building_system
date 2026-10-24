@@ -6,11 +6,8 @@ import { permissionDenied } from '@/lib/permissions/http'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { indexReports } from '@/lib/reports/similar-reports'
+import { REPORT_TYPE_PREFIXES, ReportEditError, setReportLocked } from '@/lib/reports/edit'
 
-// Mapping of report types to reference prefixes
-const REPORT_TYPE_PREFIXES: Record<string, string> = {
-  BAR: 'BAR', storm_wind: 'SW', make_safe: 'MS', roof: 'RR', specialist: 'SPR', LDR: 'LDR',
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -44,11 +41,12 @@ export async function PATCH(
 
   switch (action) {
     case 'lock': {
-      const { error } = await supabase
-        .from('reports')
-        .update({ is_locked: true })
-        .eq('id', reportId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      try {
+        await setReportLocked(supabase, tenantId, reportId, true)
+      } catch (err) {
+        if (err instanceof ReportEditError) return NextResponse.json({ error: err.message }, { status: err.status })
+        throw err
+      }
       // Fingerprint for the similar-report lookup (the index-embeddings cron retries failures)
       after(() => indexReports(supabase, [reportId]).catch(err =>
         console.error(`[reports ${reportId}] fingerprint failed:`, err)))
@@ -56,11 +54,12 @@ export async function PATCH(
     }
 
     case 'unlock': {
-      const { error } = await supabase
-        .from('reports')
-        .update({ is_locked: false })
-        .eq('id', reportId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      try {
+        await setReportLocked(supabase, tenantId, reportId, false)
+      } catch (err) {
+        if (err instanceof ReportEditError) return NextResponse.json({ error: err.message }, { status: err.status })
+        throw err
+      }
       return NextResponse.json({ success: true, is_locked: false })
     }
 
