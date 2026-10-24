@@ -178,6 +178,7 @@ function Mail() {
   const [starred, setStarred] = useState(initialFolder === 'starred')
   const initialStar = searchParams.get('star')
   const [starFilter, setStarFilter] = useState<CardCategory | null>(isCategory(initialStar) ? initialStar : null)
+  const [importing, setImporting] = useState(false)
   // Views that aren't Gmail labels. With nothing asked for, the dashboard
   // opens on the action cards.
   const [special, setSpecial] = useState<Special | null>(
@@ -459,6 +460,26 @@ function Mail() {
     }
     refresh()
     if (special === 'scheduled') loadScheduled()
+  }
+
+  /** The conversations starred in Gmail go on the list — once, when moving over */
+  async function importStars() {
+    setImporting(true)
+    try {
+      const res = await fetch('/api/actions/import-stars', { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? 'Could not read the stars from Gmail')
+      showToast({
+        message: body.added
+          ? `Brought over ${body.added} starred email${body.added === 1 ? '' : 's'} from Gmail — the AI is reading them now.`
+          : body.found ? 'Everything starred in Gmail is already here.' : 'Nothing is starred in Gmail.',
+      })
+      refresh()
+    } catch (err) {
+      showToast({ message: err instanceof Error ? err.message : 'Could not read the stars from Gmail', error: true })
+    } finally {
+      setImporting(false)
+    }
   }
 
   /** Stars, re-stars (next symbol) or unstars conversations — the star button and s */
@@ -899,6 +920,11 @@ function Mail() {
                   <IconButton icon="refresh" title="Refresh" onClick={() => refresh()} />
                 )}
                 {query && <span className="mail-toolbar-note">Search results in {folderMeta.label}</span>}
+                {starred && checked.size === 0 && (
+                  <button className="mail-text-btn" disabled={importing} onClick={importStars} title="Put the conversations starred in Gmail on this list (as Everything else)">
+                    {importing ? 'Bringing over Gmail stars…' : 'Bring over Gmail stars'}
+                  </button>
+                )}
                 {starred ? (
                   <div className="mail-filing" role="group" aria-label="Filter by star">
                     <button className={!starFilter ? 'on' : ''} onClick={() => setStarFilter(null)}>All</button>
@@ -1301,6 +1327,9 @@ const MAIL_CSS = `
   .mail-row.checked { background: var(--cream); }
   .mail-row-check { display: flex; align-items: center; gap: 2px; height: 100%; }
   .mail-toolbar-star { margin-left: 4px; display: inline-flex; }
+  .mail-text-btn { font: inherit; font-size: 12px; color: var(--info); background: none; border: none; padding: 4px 6px; margin-left: 4px; cursor: pointer; }
+  .mail-text-btn:hover { text-decoration: underline; }
+  .mail-text-btn:disabled { color: var(--subtle); cursor: default; text-decoration: none; }
   .mail-from { color: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mail-n { font-size: 12px; color: var(--subtle); margin-left: 5px; font-weight: 400; }
   .mail-content { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--body); }
