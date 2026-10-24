@@ -1,18 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
-import { cardForThread, getCard, listCards, skipCard, snoozeCard, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
+import { CATEGORIES, cardForThread, getCard, isCategory, listCards, skipCard, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
-import { parseSendAt, spokenSendAt } from '@/lib/mail/schedule-rules'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 
 // Action cards by voice (and in the assistant chat) — the Action cards view's
-// own functions (lib/actions): what needs doing, one card's steps and draft
-// email, Do the steps, Skip and Snooze. Each step still runs through
-// callTool as the user, with its own permission, approval and log entry.
+// own functions (lib/actions): what needs doing (the starred list, by star),
+// one card's steps and draft email, Do the steps, and Skip. Each step still
+// runs through callTool as the user, with its own permission, approval and
+// log entry.
 
 const DEFAULT_LIST = 10
 const MAX_LIST = 25
-const VIEWS: CardView[] = ['pending', 'snoozed', 'done']
+const VIEWS: CardView[] = ['pending', 'done']
+const categoryLabel = (key: string) => CATEGORIES.find(c => c.key === key)?.label ?? key
 const CARD_ID_RE = /^[0-9a-f-]{36}$/i
 /** Fields a step's changes may set — confirmCard keeps only the ones its tool allows */
 const CHANGE_FIELDS = ['to', 'cc', 'bcc', 'subject', 'body', 'send_at', 'note', 'job_number', 'filing'] as const
@@ -25,7 +26,6 @@ const STATE: Record<string, string> = {
   generating: 'still being read',
   running: 'steps running now',
   failed: 'stopped — a step failed',
-  snoozed: 'snoozed',
   done: 'done',
   skipped: 'skipped',
   no_action: 'nothing needed',
@@ -35,7 +35,7 @@ const priorityWord = (p: number | null) => ((p ?? 50) >= 90 ? 'urgent' : (p ?? 5
 
 function cardLine(c: CardWithContext, i: number): string {
   const about = [c.job?.job_number, c.conversation ? `${c.conversation.from ?? 'unknown'}: "${c.conversation.subject || '(no subject)'}"` : null].filter(Boolean).join(', ')
-  const flags = [priorityWord(c.priority), c.status !== 'pending' ? STATE[c.status] : null, c.status === 'snoozed' && c.snoozed_until ? `until ${spokenSendAt(c.snoozed_until)}` : null, c.outcome].filter(Boolean)
+  const flags = [categoryLabel(c.category), priorityWord(c.priority), c.status !== 'pending' ? STATE[c.status] : null, c.outcome].filter(Boolean)
   const steps = c.steps.length ? ` Steps: ${c.steps.map(s => s.summary).join('; ')}.` : ''
   return `${i + 1}. ${c.title}${about ? ` (${about})` : ''}${flags.length ? ` [${flags.join(', ')}]` : ''}.${steps}`
 }
@@ -44,6 +44,9 @@ const cardData = (c: CardWithContext) => ({
   card_id: c.id,
   title: c.title,
   status: c.status,
+  category: c.category,
+  category_label: categoryLabel(c.category),
+  starred_by_user: !!c.starred_by,
   priority: priorityWord(c.priority) ?? 'normal',
   job_number: c.job?.job_number ?? null,
   conversation_id: c.source === 'email' ? c.source_ref : null,
@@ -51,7 +54,6 @@ const cardData = (c: CardWithContext) => ({
   subject: c.conversation?.subject ?? null,
   summary: c.description,
   steps: c.steps.map(s => ({ step_id: s.id, summary: s.summary, kind: s.kind, status: s.status ?? 'to do' })),
-  snoozed_until: c.snoozed_until,
   outcome: c.outcome,
   error: c.error_log,
 })
@@ -73,13 +75,15 @@ export const listActionCards: McpTool = {
   name: 'list_action_cards',
   title: 'List action cards',
   description: [
-    'The action cards — what needs doing, most urgent first, as on the dashboard. The AI makes one for each incoming email from the email and its job file, with suggested steps (a reply, filing it on a job, a job note…) that only run when confirmed.',
-    'view: pending (default — needs action), snoozed or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, dismiss_action_card to skip or snooze.',
+    'The action cards — the to-do list of starred emails, most urgent first, as on the dashboard. The AI makes one for each incoming email that needs doing (from the email and its job file, with suggested steps — a reply, filing it on a job, a job note… — that only run when confirmed), and the user stars others themselves.',
+    'Each has a category (its star): Invoices to pay (invoice), Attend and Submit (attend_submit — sites to attend, reports or quotes to submit), Everything else (other). category filters to one.',
+    'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, skip_action_card when it\'s dealt with.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       view: { type: 'string', enum: VIEWS },
+      category: { type: 'string', enum: CATEGORIES.map(c => c.key), description: 'Only this star.' },
       limit: { type: 'number', description: `How many (default ${DEFAULT_LIST}, max ${MAX_LIST}).` },
     },
     additionalProperties: false,
@@ -90,15 +94,17 @@ export const listActionCards: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const view = VIEWS.includes(args.view as CardView) ? (args.view as CardView) : 'pending'
     const limit = Math.min(MAX_LIST, Math.max(1, Math.round(Number(args.limit) || DEFAULT_LIST)))
-    const all = await listCards(db(ctx), ctx.tenantId, view)
+    const category = isCategory(args.category) ? args.category : null
+    const all = await listCards(db(ctx), ctx.tenantId, view, { category })
     const cards = await withContext(db(ctx), ctx.tenantId, all.slice(0, limit))
+    const what = category ? `${categoryLabel(category)} card` : 'action card'
     if (!cards.length) {
-      return { text: view === 'pending' ? 'No action cards need you right now.' : `No ${view} action cards.`, data: { view, cards: [] } }
+      return { text: view === 'pending' ? `No ${what}s need you right now.` : `No done ${what}s.`, data: { view, category, cards: [] } }
     }
     const heading = view === 'pending'
-      ? `${all.length} action card${all.length === 1 ? '' : 's'} need${all.length === 1 ? 's' : ''} you${all.length > cards.length ? ` — the first ${cards.length}` : ''}:`
-      : `${view === 'snoozed' ? 'Snoozed' : 'Done'} action cards:`
-    return { text: [heading, ...cards.map(cardLine)].join('\n'), data: { view, total: all.length, cards: cards.map(cardData) } }
+      ? `${all.length} ${what}${all.length === 1 ? '' : 's'} need${all.length === 1 ? 's' : ''} you${all.length > cards.length ? ` — the first ${cards.length}` : ''}:`
+      : `Done ${what}s:`
+    return { text: [heading, ...cards.map(cardLine)].join('\n'), data: { view, category, total: all.length, cards: cards.map(cardData) } }
   },
 }
 
@@ -138,7 +144,7 @@ export const readActionCard: McpTool = {
     })
     return {
       text: [
-        `${card.title}${card.job ? ` — ${card.job.job_number}` : ''}${card.status !== 'pending' ? ` [${STATE[card.status]}]` : ''}.`,
+        `${card.title}${card.job ? ` — ${card.job.job_number}` : ''} [${categoryLabel(card.category)}${card.status !== 'pending' ? `, ${STATE[card.status]}` : ''}].`,
         card.conversation ? `From ${card.conversation.from ?? 'unknown'}, "${card.conversation.subject || '(no subject)'}"${card.conversation.last_message_at ? `, ${spokenDate(card.conversation.last_message_at)}` : ''}.` : '',
         card.description ?? '',
         card.reasoning ? `Why: ${card.reasoning}` : '',
@@ -186,7 +192,7 @@ export const confirmActionCard: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
-    if (!card.steps.length) return { text: 'This card has no steps to do — skip it with dismiss_action_card if it\'s dealt with.', isError: true }
+    if (!card.steps.length) return { text: 'This card has no steps to do — use skip_action_card once it\'s dealt with.', isError: true }
     const ids = Array.isArray(args.step_ids) && args.step_ids.length
       ? args.step_ids.map(str)
       : card.steps.filter(s => s.status !== 'done' && s.status !== 'skipped').map(s => s.id)
@@ -215,21 +221,17 @@ export const confirmActionCard: McpTool = {
   },
 }
 
-export const dismissActionCard: McpTool = {
-  name: 'dismiss_action_card',
-  title: 'Skip or snooze action card',
+export const skipActionCard: McpTool = {
+  name: 'skip_action_card',
+  title: 'Skip action card',
   description: [
-    'Skips an action card (nothing to do, or done another way — it moves to Done) or snoozes it until a time (Perth time, e.g. "tomorrow 8am"; it comes back to needs action then).',
+    'Takes a card off the to-do list (its star comes off): nothing to do, or done another way. It moves to Done.',
     'Confirm which card first.',
   ].join(' '),
   inputSchema: {
     type: 'object',
-    properties: {
-      card_id: { type: 'string', description: 'card_id from list_action_cards.' },
-      action: { type: 'string', enum: ['skip', 'snooze'] },
-      snooze_until: { type: 'string', description: 'For snooze: when it comes back, Perth time.' },
-    },
-    required: ['card_id', 'action'],
+    properties: { card_id: { type: 'string', description: 'card_id from list_action_cards.' } },
+    required: ['card_id'],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -238,14 +240,7 @@ export const dismissActionCard: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
-    if (args.action === 'skip') {
-      if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
-      return { text: `Skipped "${card.title}".`, data: { card_id: card.id, status: 'skipped' } }
-    }
-    if (args.action !== 'snooze') return { text: 'action must be skip or snooze.', isError: true }
-    const until = parseSendAt(str(args.snooze_until))
-    if (!until || new Date(until).getTime() <= Date.now()) return { text: 'Snooze until when? Give a time in the future, e.g. "tomorrow 8am".', isError: true }
-    if (!(await snoozeCard(db(ctx), ctx.tenantId, card.id, until))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be snoozed now.`, isError: true }
-    return { text: `Snoozed "${card.title}" until ${spokenSendAt(until)}.`, data: { card_id: card.id, status: 'snoozed', until } }
+    if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
+    return { text: `Skipped "${card.title}".`, data: { card_id: card.id, status: 'skipped' } }
   },
 }

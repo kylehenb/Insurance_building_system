@@ -102,7 +102,7 @@ describe('mcp route', () => {
       'list_action_cards',
       'read_action_card',
       'confirm_action_card',
-      'dismiss_action_card',
+      'skip_action_card',
       'list_approvals',
       'decide_approval',
       'list_activity',

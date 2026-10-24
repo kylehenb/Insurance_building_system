@@ -4,8 +4,7 @@ import { plainTextToRichHtml } from '@/lib/email/rich-text'
 import { getMailbox } from '@/lib/mail/sync'
 import { getThreadDetail, listFolder, searchFolder, type ThreadListItem } from '@/lib/mail/list'
 import { applyThreadAction, MAX_THREADS_PER_ACTION } from '@/lib/mail/actions'
-import { ACTION_DONE, FOLDERS, isFolderKey, isMailAction, type FolderKey, type MailAction } from '@/lib/mail/folders'
-import { snoozeThreads } from '@/lib/mail/snooze'
+import { ACTION_DONE, FOLDERS, isFolderKey, isMailAction, type FolderKey } from '@/lib/mail/folders'
 import { isFiling } from '@/lib/mail/filing'
 import { ComposeError, saveDraft, sendDraft, startCompose } from '@/lib/mail/compose'
 import { isComposeMode, readAddressInput, type ComposeState } from '@/lib/mail/compose-rules'
@@ -150,16 +149,14 @@ export const organiseEmails: McpTool = {
   name: 'organise_emails',
   title: 'Organise emails',
   description: [
-    'Archive, move to the Bin (recoverable for 30 days), report spam, move back to the inbox, mark read / unread, or snooze — conversations from list_mailbox, as the Mail page\'s buttons do (changes Gmail too).',
-    'actions: archive, trash, spam, not_spam, inbox, read, unread, snooze (needs snooze_until, Perth time: out of the inbox until then, back unread; a reply brings it back sooner).',
-    'For archive, trash, spam and snooze, ONLY call after saying which conversations (sender and subject) and getting a clear yes.',
+    'Archive, move to the Bin (recoverable for 30 days), report spam, move back to the inbox, or mark read / unread — conversations from list_mailbox, as the Mail page\'s buttons do (changes Gmail too).',
+    'For archive, trash and spam, ONLY call after saying which conversations (sender and subject) and getting a clear yes.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       conversation_ids: { type: 'array', items: { type: 'string' }, description: 'conversation_id values from list_mailbox.' },
-      action: { type: 'string', enum: ['archive', 'trash', 'spam', 'not_spam', 'inbox', 'read', 'unread', 'snooze'] },
-      snooze_until: { type: 'string', description: 'For snooze: Perth date and time, e.g. "2026-10-26T08:00".' },
+      action: { type: 'string', enum: ['archive', 'trash', 'spam', 'not_spam', 'inbox', 'read', 'unread'] },
     },
     required: ['conversation_ids', 'action'],
     additionalProperties: false,
@@ -169,7 +166,7 @@ export const organiseEmails: McpTool = {
 
   async run(args, ctx): Promise<McpToolResult> {
     const action = args.action
-    if (action !== 'snooze' && (!isMailAction(action) || action === 'untrash')) return { text: 'Unknown action.', isError: true }
+    if (!isMailAction(action) || action === 'untrash') return { text: 'Unknown action.', isError: true }
     const ids = Array.isArray(args.conversation_ids)
       ? [...new Set(args.conversation_ids.map(str).filter(id => THREAD_ID_RE.test(id)))]
       : []
@@ -177,22 +174,8 @@ export const organiseEmails: McpTool = {
     if (ids.length > MAX_THREADS_PER_ACTION) return { text: `At most ${MAX_THREADS_PER_ACTION} at a time.`, isError: true }
 
     const mailbox = await getMailbox(ctx.tenantId)
-    let done: string
-    let result: { done: string[]; failed: string[] }
-    if (action === 'snooze') {
-      const until = str(args.snooze_until) ? parseSendAt(str(args.snooze_until)) : null
-      if (!until) return { text: 'Until when? snooze_until must be a date and time, e.g. 2026-10-26T08:00.', isError: true }
-      try {
-        result = await snoozeThreads(mailbox, ctx.userId || null, ids, until)
-      } catch (err) {
-        if (err instanceof ComposeError) return { text: err.message, isError: true }
-        throw err
-      }
-      done = `snoozed until ${spokenSendAt(until)}`
-    } else {
-      result = await applyThreadAction(mailbox, ids, action as MailAction)
-      done = ACTION_DONE[action as MailAction]
-    }
+    const result = await applyThreadAction(mailbox, ids, action)
+    const done = ACTION_DONE[action]
     const n = result.done.length
     if (!n) return { text: 'Gmail didn\'t accept the change.', data: result, isError: true }
     return {

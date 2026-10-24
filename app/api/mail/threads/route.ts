@@ -3,9 +3,9 @@ import { mailAccess } from '@/lib/mail/access'
 import { isFolderKey, isTabKey } from '@/lib/mail/folders'
 import { userLabels } from '@/lib/mail/labels'
 import { isFiling } from '@/lib/mail/filing'
-import { folderCounts, listFolder, searchFolder } from '@/lib/mail/list'
+import { folderCounts, listFolder, listThreadsById, searchFolder } from '@/lib/mail/list'
 import { getMailbox, mailDb, syncMailbox } from '@/lib/mail/sync'
-import { cardsForThreads, onMailArrivals } from '@/lib/actions/cards'
+import { cardsForThreads, isCategory, onMailArrivals, starredThreadIds } from '@/lib/actions/cards'
 import { scheduledThreads } from '@/lib/mail/scheduled'
 
 export const maxDuration = 60
@@ -17,6 +17,8 @@ const FRESH_MS = 30_000
 //   folder  inbox | sent | drafts | all | spam | trash (default inbox)
 //   tab     primary | promotions | social — inbox only
 //   filing  job | to_file | admin — where it stands in IRC
+//   starred 1 — the Starred folder: conversations with a live action card
+//           (folder is ignored); star = invoice | attend_submit | other
 //   q       Gmail search syntax; searches Gmail instead of the mirror
 //   cursor  from the previous page
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -34,12 +36,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const filing = isFiling(filingParam) ? filingParam : null
   const q = params.get('q')?.trim() || null
   const cursor = params.get('cursor') || null
+  const starred = params.get('starred') === '1'
+  const star = params.get('star')
 
   try {
     const mailbox = await getMailbox(access.tenantId)
 
     const [page, counts, labels, scheduled] = await Promise.all([
-      q ? searchFolder(mailbox, folder, tab, q, cursor, undefined, filing) : listFolder(mailbox, folder, tab, cursor, undefined, filing),
+      starred
+        ? starredThreadIds(mailDb(), access.tenantId, isCategory(star) ? star : null).then(ids => listThreadsById(mailbox, ids))
+        : q ? searchFolder(mailbox, folder, tab, q, cursor, undefined, filing) : listFolder(mailbox, folder, tab, cursor, undefined, filing),
       folderCounts(mailbox),
       // Chips are a nicety — the list still loads if Gmail's label list doesn't
       userLabels().catch(() => ({})),

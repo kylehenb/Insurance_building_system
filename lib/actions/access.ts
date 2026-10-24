@@ -4,7 +4,7 @@ import { permissionDenied } from '@/lib/permissions/http'
 
 /**
  * For the /api/actions routes: seeing cards needs the mailbox (mail.view);
- * acting on them (confirm, skip, snooze, ask for one) needs actions.review.
+ * acting on them (confirm, skip, star, ask for one) needs actions.review.
  * Each confirmed step also needs its own permission (checked in callTool).
  */
 export async function cardAccess(act: boolean): Promise<SessionUser | NextResponse> {

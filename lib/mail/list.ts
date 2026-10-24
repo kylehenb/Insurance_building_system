@@ -121,6 +121,21 @@ export async function listFolder(mailbox: Mailbox, folder: FolderKey, tab: TabKe
   }
 }
 
+/** Given conversations from the mirror, newest first — the Starred folder (its ids come from the action cards) */
+export async function listThreadsById(mailbox: Mailbox, ids: string[], db = mailDb()): Promise<ThreadPage> {
+  if (!ids.length) return { threads: [], cursor: null }
+  const { data, error } = await db
+    .from('mail_threads')
+    .select(LIST_COLUMNS)
+    .eq('mailbox_id', mailbox.id)
+    .in('gmail_thread_id', ids)
+    .not('synced_at', 'is', null)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+  if (error) throw new Error(error.message)
+  const rows = ((data as Row[] | null) ?? []).filter(r => r.subject !== null)
+  return { threads: await withJobs(mailbox, rows, db), cursor: null }
+}
+
 /**
  * Gmail search (same syntax as the Gmail search box) within a folder.
  * Results not yet in the mirror — older mail — are fetched on the way.

@@ -361,8 +361,6 @@ export function TodayView() {
         .btn-confirm:hover { background: #235a42; }
         .btn-edit { background: transparent; color: var(--brown-500); border-color: var(--line-strong-3); }
         .btn-edit:hover { border-color: var(--bronze); color: var(--bronze); }
-        .btn-snooze { background: transparent; color: var(--subtle-3); border-color: var(--line-5); }
-        .btn-snooze:hover { color: #5a534a; border-color: var(--faint-5); }
         .btn-dismiss { background: transparent; border: none; color: var(--faint-5); font-size: 16px; padding: 3px 5px; cursor: pointer; line-height: 1; }
         .btn-dismiss:hover { color: var(--rust); }
         .step-row { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 0.5px solid var(--surface); }

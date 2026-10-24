@@ -38,7 +38,6 @@ vi.mock('@/lib/mail/compose', async () => {
   }
 })
 vi.mock('@/lib/mail/scheduled', () => ({ scheduleDraft: spy('scheduleDraft', (_m, _u, _d, at) => ({ send_at: at })) }))
-vi.mock('@/lib/mail/snooze', () => ({ snoozeThreads: spy('snoozeThreads', (_m, _u, ids) => ({ done: ids, failed: [] })) }))
 vi.mock('@/lib/mail/file-thread', () => {
   class FileThreadError extends Error {}
   return {
@@ -151,10 +150,7 @@ describe('phase 5 by voice', () => {
     expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, 'to_file'])
   })
 
-  it('snoozes until a Perth time', async () => {
-    const out = await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze', snooze_until: '2099-10-26T08:00' }, ctx)
-    expect(calls.snoozeThreads[0].slice(1)).toEqual(['u1', ['abc1'], '2099-10-26T00:00:00.000Z'])
-    expect(out.text).toBe('1 conversation snoozed until Mon 26 Oct, 8:00 am.')
+  it('has no snooze any more', async () => {
     expect((await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze' }, ctx)).isError).toBe(true)
   })
 })
