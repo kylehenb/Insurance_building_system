@@ -3,7 +3,8 @@ import type { Database } from '@/lib/supabase/database.types'
 import { callTool, type McpContext, type McpTool } from '@/lib/mcp/server'
 import { MCP_TOOLS } from '@/lib/mcp/tools'
 import { mailDb } from '@/lib/mail/sync'
-import { getCard, type ActionCard, type CardStep } from './cards'
+import { CardError, getCard, type ActionCard, type CardStep } from './cards'
+import { applyEdits, cleanEdits } from './step-fields'
 
 // Confirming an action card: the chosen steps run in order, each through
 // callTool as the signed-in user — their permissions apply ("needs approval"
@@ -11,19 +12,10 @@ import { getCard, type ActionCard, type CardStep } from './cards'
 // who-did-what log. Steps already done are never run twice; the first
 // failure stops the rest, which stay on the card to retry.
 
-export class CardError extends Error {
-  constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
-    super(message)
-    this.name = 'CardError'
-  }
-}
+export { CardError }
 
-/** What the user may change on a step before it runs */
-const EDITABLE: Record<string, string[]> = {
-  send_email: ['to', 'cc', 'bcc', 'subject', 'body', 'send_at'],
-  add_job_note: ['note'],
-  file_conversation: ['job_number', 'filing'],
-}
+/** Fields an email change rewrites — the composer's draft is then left aside */
+const EMAIL_TEXT = ['to', 'cc', 'bcc', 'subject', 'body']
 
 export type StepChoice = { id: string; args?: Record<string, unknown> }
 
@@ -32,8 +24,10 @@ export async function confirmCard(
   userId: string,
   cardId: string,
   choices: StepChoice[],
-  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId }: {
+  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId, only = false }: {
     db?: SupabaseClient
+    /** Run just these steps and leave the rest on the card (an email sent from its composer) */
+    only?: boolean
     tools?: McpTool[]
     /** Who's confirming: the app (default) or the voice connector — the steps are logged as that */
     via?: 'chat' | 'voice'
@@ -59,20 +53,27 @@ export async function confirmCard(
     if (step.status === 'done') continue
     const choice = chosen.get(step.id)
     if (!choice) {
-      if (!step.status || step.status === 'failed') step.status = 'skipped'
+      if (!only && (!step.status || step.status === 'failed')) step.status = 'skipped'
       continue
     }
     if (stopped) continue
-    // Only the fields a person would edit; everything else is as proposed
-    const edits = Object.fromEntries(Object.entries(choice.args ?? {}).filter(([k]) => (EDITABLE[step.tool] ?? []).includes(k)))
-    const args = { ...step.args, ...edits }
     const tool = tools.find(t => t.name === step.tool)
     if (!tool) {
       Object.assign(step, { status: 'failed', result: `The action "${step.tool}" isn't available any more` })
       stopped = true
       continue
     }
-    const out = await callTool(tool, args, ctx)
+    // Only the fields a person would edit; everything else is as proposed
+    const edits = cleanEdits(tool.inputSchema, choice.args)
+    const args = applyEdits(step.args, edits)
+    // An email edited in the composer sends its draft, as it is — unless
+    // this change rewrites the email itself
+    let runArgs = args
+    if (step.tool === 'send_email' && step.draft) {
+      if (EMAIL_TEXT.some(k => k in edits)) delete step.draft
+      else runArgs = { draft_id: step.draft.id, ...(args.send_at ? { send_at: args.send_at } : {}) }
+    }
+    const out = await callTool(tool, runArgs, ctx)
     step.args = args
     step.ran_at = new Date().toISOString()
     step.result = out.text
@@ -89,8 +90,11 @@ export async function confirmCard(
   const failed = steps.find(s => s.status === 'failed')
   const doneCount = steps.filter(s => s.status === 'done').length
   const waiting = steps.filter(s => s.status === 'waiting').length
+  const left = only && steps.some(s => !s.status)
   const update = failed
     ? { status: 'failed', error_log: `${failed.summary}: ${failed.result ?? 'failed'}` }
+    : left
+    ? { status: 'pending', error_log: null }
     : {
         status: 'done',
         error_log: null,

@@ -76,6 +76,14 @@ describe('read_action_card', () => {
     expect(out.text).toContain('Step 2: Add job note — Access Thursday.\nNote: Access Thursday')
   })
 
+  it('reads an email edited in the app as its draft says', async () => {
+    stored = card()
+    stored.steps[0] = { ...stored.steps[0], draft: { id: 'r-1', to: 'casey@gmail.com', cc: 'jo@insurer.com', bcc: '', subject: 'Re: Access', html: '<p>Hi Casey,</p><p>Friday instead.</p>' } } as never
+    const out = await readActionCard.run({ card_id: CARD_ID }, ctx)
+    expect(out.text).toContain('Edited in the app. To: casey@gmail.com, cc jo@insurer.com\nSubject: Re: Access\nBody:\nHi Casey,\nFriday instead.')
+    expect(out.text).not.toContain('Thursday works')
+  })
+
   it('finds a card by its conversation, and refuses unknown ones', async () => {
     expect((await readActionCard.run({ conversation_id: 'abc1' }, ctx)).isError).toBeUndefined()
     expect(await readActionCard.run({ conversation_id: 'zzz9' }, ctx)).toMatchObject({ isError: true, text: 'That conversation has no action card.' })

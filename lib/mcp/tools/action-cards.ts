@@ -3,6 +3,7 @@ import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, skipCard, starThread, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
+import { messageText } from '@/lib/mail/message'
 
 // Action cards by voice (and in the assistant chat) — the Action cards view's
 // own functions (lib/actions): what needs doing (the starred list, by star),
@@ -132,7 +133,11 @@ export const readActionCard: McpTool = {
     const stepLines = card.steps.map((s, i) => {
       const a = s.args
       const lines = [`Step ${i + 1}${s.status ? ` (${s.status})` : ''}: ${s.summary}.`]
-      if (s.tool === 'send_email') {
+      if (s.tool === 'send_email' && s.draft) {
+        // Edited in the app's composer: that draft is what will go
+        const d = s.draft
+        lines.push(`Edited in the app. To: ${d.to || 'no one yet'}${d.cc ? `, cc ${d.cc}` : ''}`, `Subject: ${d.subject || '(no subject)'}`, `Body:\n${messageText({ text: '', html: d.html })}`)
+      } else if (s.tool === 'send_email') {
         if (str(a.to)) lines.push(`To: ${str(a.to)}${str(a.cc) ? `, cc ${str(a.cc)}` : ''}`)
         if (str(a.subject)) lines.push(`Subject: ${str(a.subject)}`)
         if (str(a.body)) lines.push(`Body:\n${str(a.body)}`)
@@ -151,7 +156,7 @@ export const readActionCard: McpTool = {
         card.error_log ? `Stopped: ${card.error_log}` : '',
         ...(stepLines.length ? ['', ...stepLines] : ['No steps suggested.']),
       ].filter(Boolean).join('\n'),
-      data: { ...cardData(card), reasoning: card.reasoning, steps: card.steps.map(s => ({ step_id: s.id, tool: s.tool, summary: s.summary, args: s.args, status: s.status ?? 'to do', result: s.result ?? null })) },
+      data: { ...cardData(card), reasoning: card.reasoning, steps: card.steps.map(s => ({ step_id: s.id, tool: s.tool, summary: s.summary, args: s.args, edited_email: s.draft ? { to: s.draft.to, cc: s.draft.cc, subject: s.draft.subject } : null, status: s.status ?? 'to do', result: s.result ?? null })) },
     }
   },
 }

@@ -35,6 +35,9 @@ vi.mock('@/lib/mail/compose', async () => {
     startCompose: spy('startCompose', (_m, mode) => ({ ...emptyCompose(), mode, quoteHtml: '', ...(mode === 'new' ? {} : { to: 'Jane <jane@insurer.com>', subject: 'Re: Roof leak', threadId: 'abc1', quoteMessageId: 'aa1' }) })),
     saveDraft: spy('saveDraft', () => ({ draftId: 'd1', threadId: 'abc1', messageId: 'dm1' })),
     sendDraft: spy('sendDraft', () => ({ messageId: 's1', threadId: 'abc1' })),
+    describeDraft: spy('describeDraft', (id) => (id === 'gone1'
+      ? { to: 'unknown recipients', subject: 'a draft that no longer exists', exists: false }
+      : { to: 'jane@insurer.com', subject: 'Re: Roof leak', exists: true })),
   }
 })
 vi.mock('@/lib/mail/scheduled', () => ({ scheduleDraft: spy('scheduleDraft', (_m, _u, _d, at) => ({ send_at: at })) }))
@@ -168,6 +171,25 @@ describe('send_email', () => {
     expect(calls.saveDraft).toBeUndefined()
     await sendEmailTool.run({ ...args, send_anyway: true }, ctx)
     expect(calls.sendDraft).toHaveLength(1)
+  })
+})
+
+describe('send_email with a saved draft (an action card\'s email edited in the composer)', () => {
+  it('sends or schedules the draft as it is, without writing a new one', async () => {
+    const sent = await sendEmailTool.run({ draft_id: 'r-123' }, ctx)
+    expect(calls.sendDraft[0][1]).toBe('r-123')
+    expect(calls.saveDraft).toBeUndefined()
+    expect(sent.text).toBe('Sent "Re: Roof leak" to jane@insurer.com.')
+
+    const later = await sendEmailTool.run({ draft_id: 'r-123', send_at: '2099-10-26T08:00' }, ctx)
+    expect(calls.scheduleDraft[0][2]).toBe('r-123')
+    expect(later.text).toMatch(/^Scheduled "Re: Roof leak"/)
+  })
+
+  it('says so when the draft has gone', async () => {
+    const out = await sendEmailTool.run({ draft_id: 'gone1' }, ctx)
+    expect(out.isError).toBe(true)
+    expect(calls.sendDraft).toBeUndefined()
   })
 })
 

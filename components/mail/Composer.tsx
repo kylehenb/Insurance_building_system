@@ -32,6 +32,8 @@ interface Props {
   onSend(draftId: string): void
   /** Send later: sendAt is an ISO time */
   onSchedule(draftId: string, sendAt: string): void
+  /** Each time the draft is saved, with what it says (an action card keeps it) */
+  onSaved?(state: ComposeState): void
 }
 
 const SAVE_AFTER_MS = 2000
@@ -47,7 +49,7 @@ function formatSize(bytes: number): string {
 
 const TITLES = { new: 'New message', reply: 'Reply', reply_all: 'Reply all', forward: 'Forward' } as const
 
-export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ initial, variant, onClose, onDiscarded, onSend, onSchedule }, ref) {
+export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ initial, variant, onClose, onDiscarded, onSend, onSchedule, onSaved }, ref) {
   const [state, setState] = useState<ComposeState>(initial)
   const [showCc, setShowCc] = useState(!!(initial.cc || initial.bcc))
   const [showQuote, setShowQuote] = useState(false)
@@ -71,6 +73,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { stateRef.current = state }, [state])
+  const onSavedRef = useRef(onSaved)
+  useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
 
   // Writing about a job: its contacts and documents are a click away
   useEffect(() => {
@@ -177,6 +181,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
       const next = { ...stateRef.current, draftId: body.draftId as string, threadId: (body.threadId as string | null) ?? stateRef.current.threadId }
       stateRef.current = next
       setState(s => ({ ...s, draftId: next.draftId, threadId: next.threadId }))
+      onSavedRef.current?.(next)
       return next.draftId
     })()
     saving.current = run

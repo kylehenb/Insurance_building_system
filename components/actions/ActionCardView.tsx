@@ -1,14 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { CardCategory, CardStep, CardWithContext } from '@/lib/actions/cards'
+import type { CardCategory, CardWithContext } from '@/lib/actions/cards'
 import { StarButton } from './Star'
+import { EmailStep } from './EmailStep'
+import { OriginalEmail } from './OriginalEmail'
+import { StepPanel } from './StepPanel'
 
 // One action card: its star (category — click to change), what the email
-// says, the AI's suggested steps (each can be unticked, and emails edited),
-// and Do steps / Skip. Doing runs the ticked steps through the user's own
-// permissions (lib/actions/confirm.ts).
+// says (and the email itself, opened in place), the AI's suggested steps —
+// each can be unticked, opened to see exactly what it will do, and changed;
+// emails open in the Mail page's composer — and Do steps / Skip. Doing runs
+// the ticked steps through the user's own permissions (lib/actions/confirm.ts).
+// "Tell the AI what to change" re-suggests the steps with the office's
+// instructions.
 
 interface Props {
   card: CardWithContext
@@ -41,20 +47,46 @@ async function post(url: string, body?: unknown) {
   return data
 }
 
-const str = (v: unknown) => (typeof v === 'string' ? v : '')
+export function ActionCardView({ card: given, compact, onChanged, onOpenConversation }: Props) {
+  // Step changes saved on the card (a draft, an edited note) show straight
+  // away; the next refresh brings the same from the server
+  const [edited, setEdited] = useState<CardWithContext | null>(null)
+  useEffect(() => { setEdited(null) }, [given])
+  const card = edited ?? given
 
-export function ActionCardView({ card, compact, onChanged, onOpenConversation }: Props) {
   const open = card.status === 'pending' || card.status === 'failed'
   const live = open || card.status === 'queued' || card.status === 'generating'
   const [ticked, setTicked] = useState<Set<string>>(() => new Set(card.steps.filter(s => s.status !== 'done' && s.status !== 'skipped').map(s => s.id)))
-  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({})
-  const [editing, setEditing] = useState<string | null>(() => (card.steps.find(s => s.kind === 'email' && s.status !== 'done')?.id ?? null))
+  // Opened steps; the first email to send starts open
+  const [shown, setShown] = useState<Set<string>>(() => new Set(card.steps.filter(s => s.kind === 'email' && s.status !== 'done').slice(0, 1).map(s => s.id)))
+  const [composing, setComposing] = useState<string | null>(null)
+  const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [showWhy, setShowWhy] = useState(false)
+  const [showEmail, setShowEmail] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const flushers = useRef(new Map<string, () => Promise<void>>())
 
-  const field = (step: CardStep, key: string) => edits[step.id]?.[key] ?? str(step.args[key])
-  const setField = (step: CardStep, key: string, value: string) =>
-    setEdits(e => ({ ...e, [step.id]: { ...e[step.id], [key]: value } }))
+  const registerFlush = useCallback((stepId: string, flush: (() => Promise<void>) | null) => {
+    if (flush) flushers.current.set(stepId, flush)
+    else flushers.current.delete(stepId)
+  }, [])
+  const markDirty = useCallback((stepId: string, on: boolean) => setDirty(d => {
+    if (d.has(stepId) === on) return d
+    const n = new Set(d)
+    if (on) n.add(stepId)
+    else n.delete(stepId)
+    return n
+  }), [])
+  const dirtyHandlers = useRef(new Map<string, (on: boolean) => void>())
+  const onDirtyFor = (stepId: string) => {
+    let h = dirtyHandlers.current.get(stepId)
+    if (!h) dirtyHandlers.current.set(stepId, h = (on: boolean) => markDirty(stepId, on))
+    return h
+  }
+  const toggleShown = (id: string) => setShown(x => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const message = useCallback((text: string, error?: boolean) => onChanged(null, text, error), [onChanged])
 
   async function run(what: string, fn: () => Promise<void>) {
     setBusy(what)
@@ -68,7 +100,9 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
   }
 
   const confirm = () => run('confirm', async () => {
-    const steps = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').map(s => ({ id: s.id, args: edits[s.id] }))
+    // What's being written in a composer is saved first, so it's what goes
+    for (const flush of flushers.current.values()) await flush()
+    const steps = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').map(s => ({ id: s.id }))
     const { card: updated } = await post(`/api/actions/${card.id}/confirm`, { steps })
     const failed = (updated as CardWithContext).steps.find(s => s.status === 'failed')
     onChanged(updated, failed ? `Stopped: ${failed.summary} — ${failed.result ?? 'failed'}` : (updated as CardWithContext).outcome ?? 'Done.', !!failed)
@@ -82,9 +116,11 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
     await post(`/api/actions/${card.id}/category`, { category })
     onChanged({ ...card, category }, 'Star changed.')
   })
-  const retry = () => run('retry', async () => {
-    const { card: updated } = await post('/api/actions/suggest', { threadId: card.source_ref })
-    onChanged(updated, 'Suggestions updated.')
+  const retry = (instructions?: string) => run(instructions ? 'ask' : 'retry', async () => {
+    const { card: updated } = await post('/api/actions/suggest', { threadId: card.source_ref, ...(instructions ? { feedback: instructions } : {}) })
+    setAsking(false)
+    setFeedback('')
+    onChanged(updated, instructions ? 'Steps re-suggested with your instructions.' : 'Suggestions updated.')
   })
 
   const toDo = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').length
@@ -116,43 +152,56 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
       ) : (
         <>
           {card.description && <p className="ac-summary">{card.description}</p>}
-          {card.reasoning && (
-            <div className="ac-why">
-              <button onClick={() => setShowWhy(w => !w)}>{showWhy ? 'Hide why' : 'Why?'}</button>
-              {showWhy && <p>{card.reasoning}</p>}
-            </div>
-          )}
+          <div className="ac-why">
+            {card.reasoning && <button onClick={() => setShowWhy(w => !w)}>{showWhy ? 'Hide why' : 'Why?'}</button>}
+            {!compact && card.source === 'email' && card.source_ref && (
+              <button onClick={() => setShowEmail(e => !e)}>{showEmail ? 'Hide the email' : 'Show the email'}</button>
+            )}
+            {showWhy && card.reasoning && <p>{card.reasoning}</p>}
+          </div>
+          {showEmail && card.source_ref && <OriginalEmail threadId={card.source_ref} onOpenConversation={onOpenConversation} />}
 
           {card.steps.length > 0 && (
             <ol className="ac-steps">
               {card.steps.map(step => {
-                const done = step.status === 'done'
+                const done = step.status === 'done' || step.status === 'waiting'
+                const editable = open && !done
+                const isShown = shown.has(step.id) || composing === step.id
                 return (
                   <li key={step.id} className={`ac-step k-${step.kind}${step.status ? ` s-${step.status}` : ''}`}>
-                    <label className="ac-step-row">
-                      <input type="checkbox" disabled={!open || done} checked={done || ticked.has(step.id)}
-                        onChange={e => setTicked(t => { const n = new Set(t); if (e.target.checked) n.add(step.id); else n.delete(step.id); return n })} />
-                      <span className="ac-step-text">{step.summary}</span>
+                    <div className="ac-step-row">
+                      <label className="ac-step-tick">
+                        <input type="checkbox" disabled={!open || done} checked={done || ticked.has(step.id)}
+                          onChange={e => setTicked(t => { const n = new Set(t); if (e.target.checked) n.add(step.id); else n.delete(step.id); return n })} />
+                        <span className="ac-step-text">{step.summary}</span>
+                      </label>
+                      {step.draft && !done && <span className="ac-step-status">edited</span>}
                       {step.status && <span className="ac-step-status">{step.status === 'waiting' ? 'waiting for approval' : step.status}</span>}
-                      {step.kind === 'email' && open && !done && (
-                        <button type="button" className="ac-link" onClick={e => { e.preventDefault(); setEditing(x => (x === step.id ? null : step.id)) }}>
-                          {editing === step.id ? 'Hide' : 'Edit'}
+                      <span className="ac-step-btns">
+                        {step.kind === 'email' && editable && composing !== step.id && (
+                          <button type="button" className="ac-link" onClick={() => { setShown(x => new Set(x).add(step.id)); setComposing(step.id) }}>Edit</button>
+                        )}
+                        <button type="button" className="ac-link" onClick={() => { if (composing === step.id) setComposing(null); toggleShown(step.id) }}>
+                          {isShown ? 'Hide' : step.kind === 'email' || !editable ? 'View' : 'Edit'}
                         </button>
-                      )}
-                    </label>
-                    {step.kind === 'email' && editing === step.id && open && !done && (
-                      <div className="ac-email">
-                        {(step.args.mode === 'new' || step.args.mode === 'forward' || str(step.args.to)) && (
-                          <label>To <input value={field(step, 'to')} onChange={e => setField(step, 'to', e.target.value)} placeholder="Usual recipients" /></label>
-                        )}
-                        {(step.args.mode === 'new' || step.args.mode === 'forward' || str(step.args.subject)) && (
-                          <label>Subject <input value={field(step, 'subject')} onChange={e => setField(step, 'subject', e.target.value)} /></label>
-                        )}
-                        <textarea value={field(step, 'body')} onChange={e => setField(step, 'body', e.target.value)} rows={Math.min(14, Math.max(5, field(step, 'body').split('\n').length + 1))} />
-                        <div className="ac-email-note">The company signature and the email you&apos;re replying to are added when it&apos;s sent.</div>
-                      </div>
-                    )}
-                    {step.result && (step.status === 'failed' || step.status === 'waiting' || done) && <div className="ac-result">{step.result}</div>}
+                      </span>
+                    </div>
+                    {isShown && (step.kind === 'email' && step.tool === 'send_email' ? (
+                      <EmailStep
+                        card={card}
+                        step={step}
+                        editable={editable}
+                        composing={composing === step.id}
+                        onComposing={on => setComposing(on ? step.id : null)}
+                        onCard={setEdited}
+                        onRan={updated => onChanged(updated, updated.steps.find(s => s.id === step.id)?.result ?? 'Sent.')}
+                        onError={text => message(text, true)}
+                        registerFlush={registerFlush}
+                      />
+                    ) : (
+                      <StepPanel card={card} step={step} editable={editable} onCard={setEdited} onMessage={message} onDirty={onDirtyFor(step.id)} />
+                    ))}
+                    {step.result && (step.status === 'failed' || done) && <div className="ac-result">{step.result}</div>}
                   </li>
                 )
               })}
@@ -162,17 +211,46 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
           {card.status === 'failed' && card.error_log && <div className="ac-error">{card.error_log}</div>}
           {(card.status === 'done' || card.status === 'skipped' || card.status === 'no_action') && card.outcome && <div className="ac-outcome">{card.outcome}</div>}
 
+          {asking && (
+            <div className="ac-ask">
+              <textarea
+                autoFocus
+                value={feedback}
+                onChange={e => setFeedback(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && feedback.trim()) { e.preventDefault(); retry(feedback.trim()) } }}
+                rows={3}
+                placeholder="What should happen instead? e.g. Don't reply yet — add a note that we're waiting on the insurer's approval, and file it on IRC1042."
+              />
+              <div className="ac-ask-btns">
+                <button className="ac-btn primary" disabled={!!busy || !feedback.trim()} onClick={() => retry(feedback.trim())}>
+                  {busy === 'ask' ? 'Re-suggesting…' : 'Re-suggest with this'}
+                </button>
+                <button className="ac-btn" disabled={!!busy} onClick={() => setAsking(false)}>Cancel</button>
+                <span className="ac-ask-note">Replaces the steps below{card.steps.some(s => s.draft) ? ', and discards emails you\'ve edited' : ''}.</span>
+              </div>
+            </div>
+          )}
+
           <footer className="ac-foot">
             {open && card.steps.length > 0 && (
-              <button className="ac-btn primary" disabled={!!busy || toDo === 0} onClick={confirm}>
+              <button className="ac-btn primary" disabled={!!busy || toDo === 0 || dirty.size > 0} onClick={confirm}
+                title={dirty.size ? 'Save or undo your changes to the steps first' : undefined}>
                 {busy === 'confirm' ? 'Working…' : toDo === 1 ? 'Do this step' : `Do ${toDo} steps`}
               </button>
             )}
             {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
+            {dirty.size > 0 && <span className="ac-dirty">Save or undo your step changes first</span>}
             {card.source === 'email' && card.source_ref && card.status !== 'running' && (
-              <button className="ac-btn ghost" disabled={!!busy} onClick={retry} title="Read the email and job file again">
-                {busy === 'retry' ? 'Reading…' : card.status === 'failed' ? 'Try again' : 'Re-suggest'}
-              </button>
+              <span className="ac-foot-right">
+                {live && !asking && (
+                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => setAsking(true)} title="Say what you want done, and the AI redoes the steps">
+                    Tell the AI what to change
+                  </button>
+                )}
+                <button className="ac-btn ghost" disabled={!!busy} onClick={() => retry()} title="Read the email and job file again">
+                  {busy === 'retry' ? 'Reading…' : card.status === 'failed' ? 'Try again' : 'Re-suggest'}
+                </button>
+              </span>
             )}
           </footer>
         </>
@@ -202,29 +280,31 @@ const CARD_CSS = `
   .ac-spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: ac-spin .8s linear infinite; }
   @keyframes ac-spin { to { transform: rotate(360deg); } }
   .ac-summary { margin: 8px 0 0; line-height: 1.5; }
-  .ac-why button { font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: none; padding: 0; margin-top: 6px; cursor: pointer; text-decoration: underline; }
+  .ac-why button { font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: none; padding: 0; margin: 6px 14px 0 0; cursor: pointer; text-decoration: underline; }
   .ac-why p { margin: 4px 0 0; font-size: 12px; color: var(--subtle); line-height: 1.5; }
   .ac-steps { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .ac-step { border: 0.5px solid var(--line-faint); border-radius: 8px; padding: 7px 10px; background: var(--surface-3); }
   .ac-step.s-done { background: var(--success-bg-2); }
   .ac-step.s-failed { background: var(--danger-bg); }
-  .ac-step-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-  .ac-step-row input { accent-color: var(--ink); }
+  .ac-step-row { display: flex; align-items: center; gap: 8px; }
+  .ac-step-tick { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
+  .ac-step-tick input { accent-color: var(--ink); }
+  .ac-step-btns { display: flex; gap: 12px; flex-shrink: 0; }
   .ac-step-text { flex: 1; min-width: 0; color: var(--ink); }
   .ac-step-status { font-size: 11px; color: var(--subtle); }
   .ac-link { font: inherit; font-size: 12px; color: var(--info); background: none; border: none; padding: 0; cursor: pointer; }
-  .ac-email { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-  .ac-email label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--subtle); }
-  .ac-email input { flex: 1; font: inherit; font-size: 13px; padding: 5px 8px; border: 0.5px solid var(--line-strong); border-radius: 6px; background: var(--paper); }
-  .ac-email textarea { font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 0.5px solid var(--line-strong); border-radius: 6px; background: var(--paper); resize: vertical; }
-  .ac-email input:focus, .ac-email textarea:focus { outline: none; border-color: var(--gold); }
-  .ac-email-note { font-size: 11px; color: var(--faint); }
+  .ac-ask { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ac-ask textarea { font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 0.5px solid var(--line-strong); border-radius: 6px; background: var(--paper); resize: vertical; }
+  .ac-ask textarea:focus { outline: none; border-color: var(--gold); }
+  .ac-ask-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ac-ask-note, .ac-dirty { font-size: 11px; color: var(--faint); }
   .ac-result { font-size: 12px; color: var(--grey-600); margin-top: 4px; white-space: pre-wrap; }
   .ac-error { margin-top: 10px; font-size: 12px; color: var(--danger-dark); background: var(--danger-bg); border-radius: 6px; padding: 6px 10px; }
   .ac-outcome { margin-top: 10px; font-size: 12px; color: var(--subtle); }
   .ac-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
   .ac-btn { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 16px; padding: 6px 14px; cursor: pointer; }
   .ac-btn.primary { color: var(--cream); background: var(--ink); border-color: var(--ink); font-weight: 600; }
-  .ac-btn.ghost { border-color: transparent; color: var(--grey-600); margin-left: auto; }
+  .ac-btn.ghost { border-color: transparent; color: var(--grey-600); }
+  .ac-foot-right { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
   .ac-btn:disabled { opacity: .55; cursor: default; }
 `

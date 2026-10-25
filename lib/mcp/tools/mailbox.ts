@@ -6,7 +6,7 @@ import { getThreadDetail, listFolder, searchFolder, type ThreadListItem } from '
 import { applyThreadAction, MAX_THREADS_PER_ACTION } from '@/lib/mail/actions'
 import { ACTION_DONE, FOLDERS, isFolderKey, isMailAction, type FolderKey } from '@/lib/mail/folders'
 import { isFiling } from '@/lib/mail/filing'
-import { ComposeError, openDraft, saveDraft, sendDraft, startCompose } from '@/lib/mail/compose'
+import { ComposeError, describeDraft, openDraft, saveDraft, sendDraft, startCompose } from '@/lib/mail/compose'
 import { isComposeMode, readAddressInput, type ComposeState, type DraftAttachment } from '@/lib/mail/compose-rules'
 import { scheduleDraft } from '@/lib/mail/scheduled'
 import { parseSendAt, spokenSendAt } from '@/lib/mail/schedule-rules'
@@ -216,6 +216,26 @@ async function recentlySent(ctx: Parameters<McpTool['run']>[1], to: string, body
 
 const attachedBytes = (list: DraftAttachment[]) => list.reduce((n, a) => n + (a.size || 0), 0)
 
+/** A draft saved earlier (an action card's email edited in the composer), sent or scheduled as it is */
+async function sendSavedDraft(draftId: string, sendAt: string | null, ctx: Parameters<McpTool['run']>[1]): Promise<McpToolResult> {
+  if (!/^[A-Za-z0-9_-]+$/.test(draftId)) return { text: 'Draft not found.', isError: true }
+  const { to, subject, exists } = await describeDraft(draftId)
+  if (!exists) return { text: 'That draft no longer exists — it may have been sent or discarded in Gmail.', isError: true }
+  if (to === 'no recipients') return { text: 'Who should it go to? The draft has no recipient.', isError: true }
+  const mailbox = await getMailbox(ctx.tenantId)
+  try {
+    if (sendAt) {
+      const scheduled = await scheduleDraft(mailbox, ctx.userId || null, draftId, sendAt)
+      return { text: `Scheduled "${subject}" to ${to} for ${spokenSendAt(scheduled.send_at)}. It's in Drafts until then.`, data: { draft_id: draftId, to, subject, send_at: scheduled.send_at } }
+    }
+    await sendDraft(mailbox, draftId)
+    return { text: `Sent "${subject}" to ${to}.`, data: { draft_id: draftId, to, subject } }
+  } catch (err) {
+    if (err instanceof ComposeError) return { text: err.message, isError: true }
+    throw err
+  }
+}
+
 export const sendEmailTool: McpTool = {
   name: 'send_email',
   title: 'Send email',
@@ -226,6 +246,7 @@ export const sendEmailTool: McpTool = {
     'send_at (Perth time, e.g. "2026-10-26T08:00") schedules it instead. To leave it for the user to review and send, use save_draft instead.',
     'ONLY call this after reading back who it goes to, the subject, the whole text, the attachments and when it will send, and the user has clearly said yes.',
     'job_number files the email on that job (a new email\'s subject defaults to "job number - address"). attach_photos / attach_files / attach_documents attach that job\'s photos ("2", "45-47", a label), files, and quotes/reports/invoices as PDFs; photos are compressed if the total is over Gmail\'s 25 MB.',
+    'draft_id sends a draft saved earlier (e.g. an action card\'s email edited in the app) exactly as it is, or schedules it with send_at; leave out body then.',
     'To email quotes, reports and invoices to the insurer with the standard template (and mark them sent) use send_documents instead.',
     'The same text to the same person within 10 minutes is refused as a likely repeat unless send_anyway: true. If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
@@ -245,8 +266,9 @@ export const sendEmailTool: McpTool = {
       send_anyway: { type: 'boolean', description: 'The user confirmed sending the same email again.' },
       job_number: { type: 'string', description: 'The job it\'s about, e.g. IRC1001: the sent email is filed on it. Required with attachments.' },
       ...ATTACH_PROPERTIES,
+      draft_id: { type: 'string', description: 'Send this saved draft as it is (body, to and subject are the draft\'s).' },
     },
-    required: ['body'],
+    required: [],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
@@ -255,10 +277,11 @@ export const sendEmailTool: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const mode = args.mode === undefined ? 'new' : args.mode
     if (!isComposeMode(mode)) return { text: 'mode must be new, reply, reply_all or forward.', isError: true }
-    const body = str(args.body)
-    if (!body) return { text: 'What should the email say?', isError: true }
     const sendAt = str(args.send_at) ? parseSendAt(str(args.send_at)) : null
     if (str(args.send_at) && !sendAt) return { text: 'send_at must be a date and time, e.g. 2026-10-26T08:00.', isError: true }
+    if (str(args.draft_id)) return sendSavedDraft(str(args.draft_id), sendAt, ctx)
+    const body = str(args.body)
+    if (!body) return { text: 'What should the email say?', isError: true }
 
     const mailbox = await getMailbox(ctx.tenantId)
 

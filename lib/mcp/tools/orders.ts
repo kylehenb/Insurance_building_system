@@ -21,8 +21,8 @@ const EMAIL_SEARCH_DAYS = 90
 const MAX_EMAILS = 10
 const MAX_ORDERS = 20
 
-const ORDER_COLUMNS = 'id, created_at, status, parse_status, entry_method, claim_number, insurer, wo_type, property_address, insured_name, insured_phone, date_of_loss, loss_type, excess_building, job_id, raw_email_subject'
-type OrderSummaryRow = Pick<Order, 'id' | 'created_at' | 'status' | 'parse_status' | 'entry_method' | 'claim_number' | 'insurer' | 'wo_type' | 'property_address' | 'insured_name' | 'insured_phone' | 'date_of_loss' | 'loss_type' | 'excess_building' | 'job_id' | 'raw_email_subject'>
+const ORDER_COLUMNS = 'id, created_at, status, parse_status, entry_method, claim_number, insurer, wo_type, property_address, insured_name, insured_phone, insured_email, special_instructions, date_of_loss, loss_type, excess_building, job_id, raw_email_subject'
+type OrderSummaryRow = Pick<Order, 'id' | 'created_at' | 'status' | 'parse_status' | 'entry_method' | 'claim_number' | 'insurer' | 'wo_type' | 'property_address' | 'insured_name' | 'insured_phone' | 'insured_email' | 'special_instructions' | 'date_of_loss' | 'loss_type' | 'excess_building' | 'job_id' | 'raw_email_subject'>
 
 const WO_TYPE_LABELS: Record<string, string> = {
   BAR: 'assessment (BAR)', make_safe: 'make safe', roof_report: 'roof report', specialist: 'specialist report', quote_only: 'quote only',

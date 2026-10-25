@@ -62,6 +62,7 @@ How it works:
 - Notifications, newsletters, receipts, spam-like mail, thank-yous and FYIs need nothing: call finish_card with needs_action false (you may propose organise_emails archive if it's clutter).
 - Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
 - If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
+- If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
 - Always end by calling finish_card.
 
 Today is given in the first message. Times are Perth time (AWST).`
@@ -106,7 +107,13 @@ type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 
  */
 export async function generateCard(
   card: ActionCard,
-  opts: { client?: Pick<Anthropic, 'beta'>; db?: SupabaseClient; tools?: McpTool[] } = {},
+  opts: {
+    client?: Pick<Anthropic, 'beta'>
+    db?: SupabaseClient
+    tools?: McpTool[]
+    /** What the office asked for, having seen the card's earlier suggestion ("Tell the AI what to change") */
+    feedback?: string
+  } = {},
 ): Promise<Outcome> {
   const db = opts.db ?? mailDb()
   const save = async (o: Outcome) => {
@@ -123,8 +130,9 @@ export async function generateCard(
     }
     const sent = detail.messages.filter(m => !m.labelIds.includes('DRAFT'))
     const latest = sent.at(-1)
-    // A star the user set stays on their list even when we've answered
-    if (!card.starred_by && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
+    // A star the user set stays on their list even when we've answered, as
+    // does a card they've asked for changes to
+    if (!card.starred_by && !opts.feedback?.trim() && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
       return save({ status: 'done', title: detail.subject || '(no subject)', outcome: 'Already replied', job_id: detail.job?.id ?? null })
     }
 
@@ -142,9 +150,14 @@ export async function generateCard(
       ...tools.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Beta.BetaTool.InputSchema })),
       FINISH,
     ]
+    const feedback = opts.feedback?.trim()
+    const earlier = card.steps.length ? card.steps.map((s, i) => `${i + 1}. ${s.summary}`).join('\n') : '(no steps)'
+    const instructions = feedback
+      ? `\n\nTHE OFFICE'S INSTRUCTIONS\nThey looked at the earlier suggestion — "${card.title}":\n${earlier}\n…and asked for this instead:\n"${feedback}"`
+      : ''
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
       role: 'user',
-      content: `Today: ${today()}.\n\nconversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
+      content: `Today: ${today()}.\n\nconversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${instructions}`,
     }]
 
     const steps: CardStep[] = []

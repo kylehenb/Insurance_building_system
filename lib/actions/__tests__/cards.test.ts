@@ -61,15 +61,16 @@ const db = { from: table }
 // ── The conversation and tools the card reads ──
 
 let detail: Row | null
-const tool = (name: string, readOnly: boolean, run: (args: Row) => { text: string; data?: unknown; isError?: boolean }) => ({
-  name, title: name.replace(/_/g, ' '), description: name, inputSchema: { type: 'object' },
+const tool = (name: string, readOnly: boolean, run: (args: Row) => { text: string; data?: unknown; isError?: boolean }, props: string[] = []) => ({
+  name, title: name.replace(/_/g, ' '), description: name,
+  inputSchema: { type: 'object', properties: Object.fromEntries(props.map(p => [p, { type: 'string' }])) },
   annotations: { readOnlyHint: readOnly }, run: vi.fn(async (args: Row) => run(args)),
 })
 const TOOLS = [
   tool('list_job_emails', true, () => ({ text: 'Two earlier emails.' })),
-  tool('send_email', false, () => ({ text: 'Sent.' })),
-  tool('file_conversation', false, () => ({ text: 'Filed on IRC1001.' })),
-  tool('add_job_note', false, () => ({ text: 'Note added.' })),
+  tool('send_email', false, () => ({ text: 'Sent.' }), ['mode', 'conversation_id', 'to', 'cc', 'bcc', 'subject', 'body', 'send_at', 'draft_id']),
+  tool('file_conversation', false, () => ({ text: 'Filed on IRC1001.' }), ['conversation_id', 'job_number', 'filing']),
+  tool('add_job_note', false, () => ({ text: 'Note added.' }), ['job_number', 'note']),
   tool('list_approvals', true, () => ({ text: 'none' })),
 ]
 
@@ -232,6 +233,20 @@ describe('generateCard', () => {
     expect(first.messages[0].content).toMatch(/Casey: can you come Thursday\?[\s\S]*IRC1001 — Casey Smith/)
   })
 
+  it("follows the office's instructions over its own view, with the earlier suggestion for context", async () => {
+    tables.action_queue = [{ id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'generating', attempts: 1, title: 'Reply to Casey',
+      steps: [{ id: 's1', tool: 'send_email', args: {}, summary: 'Reply to casey@gmail.com', kind: 'email' }] }]
+    // Already answered: still remade, as asked
+    detail = thread({ messages: [{ id: 'm2', labelIds: ['SENT'], from: { name: 'IRC', email: 'office@insurancerepairco.com.au' } }] })
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Add a note', summary: 's', priority: 'normal', category: 'other' } }]])
+    const out = await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never, feedback: 'Don\'t reply — just note we\'re waiting on the insurer' })
+    expect(out.status).toBe('pending')
+    const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(first).toContain("THE OFFICE'S INSTRUCTIONS")
+    expect(first).toContain('1. Reply to casey@gmail.com')
+    expect(first).toContain('"Don\'t reply — just note we\'re waiting on the insurer"')
+  })
+
   it('marks notifications as no action', async () => {
     const card = await claimed()
     const { client } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Xero receipt', summary: 'A receipt.', priority: 'low' } }]])
@@ -305,6 +320,36 @@ describe('confirmCard', () => {
     expect(retry).toMatchObject({ status: 'done', outcome: '2 steps done' })
     await expect(confirmCard('t1', 'u9', 'k1', all, { db: db as never, tools: TOOLS as never })).rejects.toThrow(/done/)
     expect(TOOLS[1].run).toHaveBeenCalledOnce()
+  })
+
+  it('sends an email edited in the composer as its draft — unless a change rewrites it', async () => {
+    const draft = { id: 'r-1', to: 'casey@gmail.com', cc: '', bcc: '', subject: 'Re: Access', html: '<p>Edited</p>' }
+    pendingCard([{ ...step('s1', 'send_email', { mode: 'reply', conversation_id: 'th1', body: 'AI text' }), draft }])
+    await confirmCard('t1', 'u9', 'k1', [{ id: 's1', args: { send_at: '2099-10-26T00:00:00.000Z' } }], { db: db as never, tools: TOOLS as never })
+    expect(callTool.mock.calls[0][1]).toEqual({ draft_id: 'r-1', send_at: '2099-10-26T00:00:00.000Z' })
+
+    callTool.mockClear()
+    pendingCard([{ ...step('s1', 'send_email', { mode: 'reply', conversation_id: 'th1', body: 'AI text' }), draft }])
+    const card = await confirmCard('t1', 'u9', 'k1', [{ id: 's1', args: { body: 'Said by voice' } }], { db: db as never, tools: TOOLS as never })
+    expect(callTool.mock.calls[0][1]).toEqual({ mode: 'reply', conversation_id: 'th1', body: 'Said by voice' })
+    expect(card.steps[0].draft).toBeUndefined()
+  })
+
+  it('with only, runs just the chosen step and leaves the rest on the card', async () => {
+    pendingCard([
+      step('s1', 'file_conversation', { job_number: 'IRC1001' }),
+      step('s2', 'send_email', { mode: 'reply', body: 'x' }),
+    ])
+    const card = await confirmCard('t1', 'u9', 'k1', [{ id: 's2' }], { db: db as never, tools: TOOLS as never, only: true })
+    expect(card.status).toBe('pending')
+    expect(card.steps.map(s => s.status)).toEqual([undefined, 'done'])
+
+    // A sync seeing that reply doesn't close the card with the filing still to do
+    await onMailArrivals(db as never, 't1', { received: [], sentThreadIds: ['th1'] } as never)
+    expect(tables.action_queue[0].status).toBe('pending')
+
+    const rest = await confirmCard('t1', 'u9', 'k1', [{ id: 's1' }], { db: db as never, tools: TOOLS as never })
+    expect(rest).toMatchObject({ status: 'done', outcome: '2 steps done' })
   })
 
   it('counts steps sent for approval as waiting', async () => {

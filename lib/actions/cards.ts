@@ -11,8 +11,18 @@ import type { Arrivals } from '@/lib/mail/summary'
 // star's symbol. A star the user set or changed (starred_by) keeps its
 // category and stays until they clear it.
 
+export class CardError extends Error {
+  constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
+    super(message)
+    this.name = 'CardError'
+  }
+}
+
 export type StepKind = 'email' | 'filing' | 'change'
 export type StepStatus = 'done' | 'failed' | 'waiting' | 'skipped'
+
+/** An email step opened in the composer: its Gmail draft, and what it says now (for the card) */
+export type StepDraft = { id: string; to: string; cc: string; bcc: string; subject: string; html: string }
 
 export type CardStep = {
   id: string
@@ -24,6 +34,8 @@ export type CardStep = {
   status?: StepStatus
   result?: string
   ran_at?: string
+  /** An email step edited in the composer: sending sends this draft */
+  draft?: StepDraft
 }
 
 export type CardStatus = 'queued' | 'generating' | 'pending' | 'running' | 'done' | 'skipped' | 'no_action' | 'failed'
@@ -134,10 +146,17 @@ export async function onMailArrivals(db: SupabaseClient, tenantId: string, arriv
     if (await queueEmailCard(db, tenantId, threadId, messageId)) queued++
   }
   if (replied.size) {
-    await db.from('action_queue')
-      .update({ status: 'done', outcome: 'Replied from Mail', updated_at: now() })
+    // Not cards part-way through (a reply sent from the card, other steps still to do)
+    const { data } = await db.from('action_queue').select('id, steps')
       .eq('tenant_id', tenantId).eq('source', 'email').in('source_ref', [...replied])
       .is('starred_by', null).in('status', ['queued', 'pending', 'failed'])
+    const ids = ((data as Pick<ActionCard, 'id' | 'steps'>[] | null) ?? [])
+      .filter(c => !(c.steps ?? []).some(s => s.ran_at)).map(c => c.id)
+    if (ids.length) {
+      await db.from('action_queue')
+        .update({ status: 'done', outcome: 'Replied from Mail', updated_at: now() })
+        .in('id', ids)
+    }
   }
   return queued
 }
