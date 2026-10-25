@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = {}
 const updates: { table: string; patch: Row }[] = []
+let nextId = 0
 function query(table: string) {
   const preds: ((r: Row) => boolean)[] = []
   let patch: Row | null = null
@@ -22,6 +23,11 @@ function query(table: string) {
     order: () => b,
     limit: () => b,
     update: (p: Row) => { patch = p; return b },
+    insert: (r: Row) => {
+      const row = { id: `n${++nextId}`, created_at: '2026-10-25T03:00:00Z', ...r }
+      ;(db[table] ??= []).push(row)
+      return { select: () => ({ single: async () => ({ data: row, error: null }) }) }
+    },
     maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
     then: (res: (v: unknown) => unknown) => Promise.resolve({ data: run(), error: null }).then(res),
   }
@@ -59,6 +65,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
   updates.length = 0
+  db.users = [{ id: 'u1', tenant_id: 't1', name: 'Kyle' }]
+  db.communications = [{ id: 'c0', tenant_id: 't1', job_id: 'j62', type: 'note', content: 'Owner prefers mornings', contact_name: 'Kyle', source: 'app', created_at: '2026-10-20T03:00:00Z' }]
   db.jobs = [{ id: 'j62', tenant_id: 't1', job_number: 'IRC1062', property_address: '1 St', insured_name: 'Bruce Long', insured_phone: '0400 111 222', insurer: 'Castle', claim_number: 'CHCCLM010001697', notes: '1 Oct: Called Bruce' }]
   db.action_queue = [{ tenant_id: 't1', job_id: 'j62', status: 'pending', title: 'Chase quote approval', description: null, priority: 1 }]
   db.insurer_orders = [{ id: ORDER, tenant_id: 't1', status: 'pending', job_id: null, claim_number: null, wo_type: 'BAR', insured_name: 'Peter Laundy' }]
@@ -74,21 +82,28 @@ describe('get_job_summary', () => {
     expect(res.text).toContain('Documents:\n- Quote Q-IRC1062-1: sent, $8,450')
     expect(res.text).toContain('Excess:\nExcess $500 on file — Collecting excess.')
     expect(res.text).toContain('Latest emails:\n(couldn\'t load this part)')
-    expect(res.text).toContain('Notes:\n1 Oct: Called Bruce')
+    expect(res.text).toContain('Recent job notes:\n- ')
+    expect(res.text).toContain('Kyle: Owner prefers mornings')
+    expect(res.text).toContain('Overview notes:\n1 Oct: Called Bruce')
   })
 })
 
 describe('add_job_note', () => {
-  it('appends a dated voice line to the Overview notes', async () => {
+  it('adds a voice note to the job\'s Comms feed, leaving the Overview notes alone', async () => {
     const res = await addJobNote.run({ job_number: 'IRC1062', note: ' Homeowner away until  the 5th ' }, ctx)
-    expect(db.jobs[0].notes).toMatch(/^1 Oct: Called Bruce\n\d{1,2} \w{3} \d{4} \(voice\): Homeowner away until the 5th$/)
-    expect(res.text).toMatch(/^Added to IRC1062's notes/)
+    expect(db.communications.at(-1)).toMatchObject({
+      tenant_id: 't1', job_id: 'j62', type: 'note', content: 'Homeowner away until the 5th',
+      contact_name: 'Kyle (voice)', source: 'voice', created_by: 'u1',
+    })
+    expect(db.jobs[0].notes).toBe('1 Oct: Called Bruce')
+    expect(res.text).toBe('Added a note to IRC1062\'s comms: "Homeowner away until the 5th"')
     expect((await addJobNote.run({ job_number: 'IRC1062', note: ' ' }, ctx)).isError).toBe(true)
+    expect((await addJobNote.run({ job_number: 'IRC1062', note: 'x'.repeat(2001) }, ctx)).isError).toBe(true)
   })
 
   it('marks a note from the in-app assistant as such', async () => {
     await addJobNote.run({ job_number: 'IRC1062', note: 'Roofer booked' }, { ...ctx, via: 'chat' })
-    expect(db.jobs[0].notes).toMatch(/\(assistant\): Roofer booked$/)
+    expect(db.communications.at(-1)).toMatchObject({ content: 'Roofer booked', contact_name: 'Kyle (assistant)', source: 'assistant' })
   })
 })
 

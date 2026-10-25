@@ -8,6 +8,7 @@ import { fetchJobContext } from '@/lib/jobs/fetchJobContext'
 import { getJobStage } from '@/lib/jobs/getJobStage'
 import { loadExcessContext } from '@/lib/excess/server'
 import { listSigningRequestsForJob } from '@/lib/signing/service'
+import { JobNoteError, addJobNote as saveJobNote, listJobNotes } from '@/lib/communications/notes'
 
 // A job at a glance, and adding a note to it. The summary is assembled from
 // the app's own stage logic (getJobStage), the dashboard's pending actions,
@@ -15,8 +16,7 @@ import { listSigningRequestsForJob } from '@/lib/signing/service'
 // excess and email — so it says what those say.
 
 const NOTES_SHOWN_CHARS = 600
-const MAX_NOTE_CHARS = 2000
-const TIME_ZONE = 'Australia/Perth'
+const RECENT_NOTES = 5
 
 type Section = { title: string; text: string }
 
@@ -83,12 +83,18 @@ export const getJobSummary: McpTool = {
       }),
       section('Excess', async () => describeExcess(await loadExcessContext(ctx.supabase, ctx.tenantId, job.id))),
       section('Latest emails', async () => body((await listJobEmails.run({ ...jobArgs, limit: 3 }, ctx)).text) || 'None yet.'),
+      section('Recent job notes', async () => {
+        const notes = await listJobNotes(ctx.supabase, { tenantId: ctx.tenantId, jobId: job.id, limit: RECENT_NOTES })
+        return notes.length
+          ? notes.map(n => `- ${n.created_at ? `${spokenDate(n.created_at)}, ` : ''}${n.author ?? 'note'}: ${n.content}`).join('\n')
+          : null
+      }),
     ])).filter((s): s is Section => !!s)
 
     const notes = full?.notes?.trim()
     if (notes) {
       sections.push({
-        title: 'Notes',
+        title: 'Overview notes',
         text: notes.length > NOTES_SHOWN_CHARS ? `…${notes.slice(-NOTES_SHOWN_CHARS)}` : notes,
       })
     }
@@ -114,7 +120,7 @@ export const addJobNote: McpTool = {
   name: 'add_job_note',
   title: 'Add job note',
   description: [
-    'Adds a dated line to the job\'s notes (the Notes field on the job\'s Overview tab), marked as added by voice (or by the assistant, in the app\'s chat).',
+    'Adds a note to the job\'s Comms feed (the communications list on the job\'s Overview tab), dated and marked as added by voice (or by the assistant, in the app\'s chat).',
     'Write the note in the user\'s words; read it back and get a yes first.',
   ].join(' '),
   inputSchema: {
@@ -130,22 +136,17 @@ export const addJobNote: McpTool = {
   permission: 'jobs.notes',
 
   async run(args, ctx: McpContext): Promise<McpToolResult> {
-    const note = typeof args.note === 'string' ? args.note.trim().replace(/\s+/g, ' ') : ''
-    if (!note) return { text: 'What should the note say?', isError: true }
-    if (note.length > MAX_NOTE_CHARS) return { text: `That note is too long (${note.length} characters; ${MAX_NOTE_CHARS} max).`, isError: true }
     const job = await jobFromArgs(args, ctx)
     if (isToolResult(job)) return job
-
-    const { data: current, error } = await ctx.supabase
-      .from('jobs').select('notes').eq('tenant_id', ctx.tenantId).eq('id', job.id).maybeSingle()
-    if (error) throw error
-    const stamp = new Date().toLocaleDateString('en-AU', { timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' })
-    const line = `${stamp} (${ctx.via === 'chat' ? 'assistant' : 'voice'}): ${note}`
-    const existing = current?.notes?.trimEnd()
-    const { error: updateErr } = await ctx.supabase
-      .from('jobs').update({ notes: existing ? `${existing}\n${line}` : line })
-      .eq('tenant_id', ctx.tenantId).eq('id', job.id)
-    if (updateErr) throw updateErr
-    return { text: `Added to ${job.job_number}'s notes: "${line}"`, data: { job_number: job.job_number, note: line } }
+    try {
+      const note = await saveJobNote(ctx.supabase, {
+        tenantId: ctx.tenantId, userId: ctx.userId, jobId: job.id, note: args.note,
+        source: ctx.via === 'chat' ? 'assistant' : 'voice',
+      })
+      return { text: `Added a note to ${job.job_number}'s comms: "${note.content}"`, data: { job_number: job.job_number, note: note.content, id: note.id } }
+    } catch (err) {
+      if (err instanceof JobNoteError) return { text: err.message, isError: true }
+      throw err
+    }
   },
 }

@@ -307,6 +307,100 @@ function AiPopover({ onSelect, onClose }: { onSelect: (s: AiScope) => void; onCl
   )
 }
 
+// ── Add note ──────────────────────────────────────────────────────────────────
+
+function AddNoteBar({ jobId, onAdded }: { jobId: string; onAdded: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    if (!text.trim() || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/communications/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, note: text }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        setError(body.error ?? 'Couldn\'t save the note')
+        return
+      }
+      setText('')
+      setOpen(false)
+      onAdded()
+    } catch {
+      setError('Couldn\'t save the note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div style={{ padding: '8px 16px', borderBottom: '0.5px solid var(--line-tan)' }}>
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            fontSize: 12.5, fontWeight: 600, color: '#8a6d2e', background: 'none',
+            border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          📝 Add note
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '10px 16px', borderBottom: '0.5px solid var(--line-tan)', background: '#fdfaf2' }}>
+      <textarea
+        autoFocus
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save() }
+          if (e.key === 'Escape') { setOpen(false); setError(null) }
+        }}
+        placeholder="Add a note to this job…"
+        rows={3}
+        style={{
+          width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit',
+          fontSize: 13, padding: '8px 10px', border: '1px solid #e6d6a8', borderRadius: 8,
+          background: 'var(--paper)', color: 'var(--ink-warm)',
+        }}
+      />
+      {error && <div style={{ fontSize: 12, color: '#c05a4a', marginTop: 6 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+        <button
+          onClick={() => { setOpen(false); setError(null) }}
+          style={{
+            fontSize: 12, padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
+            border: '1px solid var(--line-tan)', background: 'var(--paper)', color: '#6b6455', fontFamily: 'inherit',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={save}
+          disabled={!text.trim() || saving}
+          style={{
+            fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 6,
+            cursor: !text.trim() || saving ? 'default' : 'pointer', opacity: !text.trim() || saving ? 0.6 : 1,
+            border: '1px solid #c9a961', background: '#f8f2e3', color: '#8a6d2e', fontFamily: 'inherit',
+          }}
+        >
+          {saving ? 'Saving…' : 'Save note'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── CommsFeed ─────────────────────────────────────────────────────────────────
 
 export function CommsFeed({ jobId }: { jobId: string }) {
@@ -471,6 +565,8 @@ export function CommsFeed({ jobId }: { jobId: string }) {
             )}
           </div>
         </div>
+
+        <AddNoteBar jobId={jobId} onAdded={refetch} />
 
         {/* Body */}
         {loading ? (

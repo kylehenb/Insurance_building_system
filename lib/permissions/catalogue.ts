@@ -43,7 +43,7 @@ const ON_OFF: PermissionLevel[] = ['allowed', 'blocked']
 
 export const PERMISSION_ACTIONS = [
   // Jobs
-  { key: 'jobs.notes', group: 'Jobs', label: 'Add job notes', description: 'Add notes to a job (by voice for now)', levels: ON_OFF, enforced: true },
+  { key: 'jobs.notes', group: 'Jobs', label: 'Add job notes', description: 'Add notes to a job’s Comms feed (in the app, by voice or through the assistant)', levels: ON_OFF, enforced: true },
   { key: 'jobs.edit', group: 'Jobs', label: 'Edit job details', description: 'Change job details, contacts, quotes and reports in the app', levels: ON_OFF, enforced: true },
   { key: 'jobs.change_stage', group: 'Jobs', label: 'Change a job\'s stage', description: 'Move a job to a different stage by hand', levels: ALL, enforced: true },
   { key: 'orders.lodge', group: 'Jobs', label: 'Lodge insurer orders', description: 'Create jobs from insurer orders', levels: ALL, enforced: true },
