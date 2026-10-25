@@ -112,6 +112,8 @@ export interface ComposeEmailOptions {
   signatureFallback: string
   /** A line that is exactly this URL is shown as `html` (a big button) */
   action?: { url: string; html: string }
+  /** The logo for a {logo} line in the body itself — a signature written into the email in the composer */
+  logo?: EmailSignatureImage | null
 }
 
 /**
@@ -131,24 +133,72 @@ export function composeEmailBody(body: string, options: ComposeEmailOptions): { 
       fontSize: options.fontSize,
       blockOverride: (lineText, rawText) => {
         if (signature && rawText === SIGNATURE_TOKEN) return signatureHtml(signature, options.fontSize)
+        if (rawText === SIGNATURE_LOGO_TOKEN) return options.logo ? logoHtml(options.logo) : ''
         if (options.action && lineText === options.action.url) return options.action.html
         return null
       },
     },
   })
-  const text = richToText(rich).split(SIGNATURE_TOKEN).join(signatureText)
+  const text = richToText(rich).split('\n').filter(line => line.trim() !== SIGNATURE_LOGO_TOKEN).join('\n')
+    .split(SIGNATURE_TOKEN).join(signatureText)
   return { html, text }
+}
+
+/** The signature's text is a little smaller than the email's */
+const signatureFontSize = (fontSize: number) => Math.max(13, fontSize - 2)
+
+/** The signature's logo as email HTML */
+function logoHtml(image: EmailSignatureImage): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0;"><tr><td>` +
+    `<img src="${escapeHtml(image.url)}" width="${image.width}" height="${image.height}" alt="${escapeHtml(image.alt)}" ` +
+    `style="display:block;width:${image.width}px;height:${image.height}px;max-width:100%;border:0;outline:none;text-decoration:none;">` +
+    `</td></tr></table>`
+}
+
+/**
+ * The signature as text to write into an email (the composer, as Gmail
+ * does): its lines at the signature's smaller size, the logo as a {logo}
+ * line (where it's placed, else at the end; none without an image) — which
+ * composeEmailBody's `logo` turns back into the image when it's sent.
+ */
+export function signatureForEditor(signature: EmailSignature, fontSize: number): string {
+  const size = `${signatureFontSize(fontSize)}px`
+  const logoLine = `<p>${SIGNATURE_LOGO_TOKEN}</p>`
+  let html = toRichHtml(signature.html)
+  if (!signature.image) html = html.split(logoLine).join('')
+  else if (!html.includes(logoLine)) html += logoLine
+  return html.replace(/<p([^>]*)>([\s\S]*?)<\/p>/g, (whole, attrs: string, inner: string) =>
+    !inner || inner === SIGNATURE_LOGO_TOKEN ? whole : `<p${attrs}><span style="font-size: ${size}">${inner}</span></p>`)
+}
+
+const BLOCK_RE = /<(p|h2|h3|ul|ol)\b[^>]*>[\s\S]*?<\/\1>/g
+const blockText = (html: string) => richToText(html).trim()
+
+/**
+ * The email with the signature (signatureForEditor) taken off the end of its
+ * text, and the blank lines before it — matched by its words, so a change of
+ * formatting still matches. Null when the end isn't the signature (it's been
+ * changed, or isn't there).
+ */
+export function withoutSignature(body: string, signatureText: string): string | null {
+  const html = toRichHtml(body)
+  const blocks = [...html.matchAll(BLOCK_RE)]
+  const sig = [...toRichHtml(signatureText).matchAll(BLOCK_RE)].map(m => blockText(m[0])).filter(Boolean)
+  let end = blocks.length
+  while (end > 0 && !blockText(blocks[end - 1][0])) end--
+  if (!sig.length || end < sig.length) return null
+  for (let i = 0; i < sig.length; i++) {
+    if (blockText(blocks[end - sig.length + i][0]) !== sig[i]) return null
+  }
+  let start = end - sig.length
+  while (start > 0 && !blockText(blocks[start - 1][0])) start--
+  return start === 0 ? '' : html.slice(0, blocks[start].index)
 }
 
 /** The signature as email HTML: its text, with the logo on its {logo} line (or at the end). */
 export function signatureHtml(signature: EmailSignature, fontSize: number): string {
-  const size = Math.max(13, fontSize - 2)
-  const img = signature.image
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0;"><tr><td>` +
-      `<img src="${escapeHtml(signature.image.url)}" width="${signature.image.width}" height="${signature.image.height}" alt="${escapeHtml(signature.image.alt)}" ` +
-      `style="display:block;width:${signature.image.width}px;height:${signature.image.height}px;max-width:100%;border:0;outline:none;text-decoration:none;">` +
-      `</td></tr></table>`
-    : ''
+  const size = signatureFontSize(fontSize)
+  const img = signature.image ? logoHtml(signature.image) : ''
   let placed = false
   const text = signature.html
     ? walk(signature.html, {

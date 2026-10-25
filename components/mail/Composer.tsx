@@ -3,6 +3,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/email/RichTextEditor'
+import type { SignatureLogoImage } from '@/components/email/SignatureLogoNode'
+import { toRichHtml, withoutSignature } from '@/lib/email/rich-text'
 import { MessageBody } from '@/components/mail/MessageBody'
 import {
   formatAddress, MAX_EMAIL_BYTES, readAddressInput,
@@ -63,7 +65,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   const [job, setJob] = useState<JobPanel | null>(null)
   const [linking, setLinking] = useState(false)
   const [picker, setPicker] = useState(false)
-  const [signature, setSignature] = useState<string | null | undefined>(undefined)
+  // The company signature as text for the email, and its logo; null when none is set up
+  const [signature, setSignature] = useState<{ text: string; logo: SignatureLogoImage | null } | null | undefined>(undefined)
+  /** The signature is in the text (written in when it opened, or with the checkbox) */
+  const [signed, setSigned] = useState(false)
 
   const stateRef = useRef(state)
   const dirty = useRef(false)
@@ -87,15 +92,55 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
     return () => { cancelled = true }
   }, [state.jobId])
 
-  // The company signature, shown under the text as it will be sent
+  // The company signature, written into the text as Gmail does: it can be
+  // changed or deleted there. An email that would have had it added when sent
+  // gets it in the text instead — without saving a draft just for that.
   useEffect(() => {
     let cancelled = false
     fetch('/api/mail/signature')
-      .then(r => (r.ok ? r.json() : { html: null }))
-      .then(d => { if (!cancelled) setSignature(d.html ?? null) })
+      .then(r => (r.ok ? r.json() : { editor: null }))
+      .then(d => {
+        if (cancelled) return
+        const sig = d.editor ? { text: d.editor as string, logo: (d.logo as SignatureLogoImage | null) ?? null } : null
+        setSignature(sig)
+        if (!sig) return
+        const current = stateRef.current
+        if (current.includeSignature) {
+          const next = { ...current, body: `${toRichHtml(current.body) || '<p></p>'}<p></p>${sig.text}`, includeSignature: false }
+          stateRef.current = next
+          setState(next)
+          setSigned(true)
+          // Writing starts above the signature, as in Gmail
+          if (document.activeElement?.closest('.cmp .ProseMirror')) setTimeout(() => editorRef.current?.focus('start'), 0)
+        } else {
+          setSigned(withoutSignature(current.body, sig.text) !== null)
+        }
+      })
       .catch(() => { if (!cancelled) setSignature(null) })
     return () => { cancelled = true }
   }, [])
+
+  /** The Signature checkbox: puts it at the end of the text, or takes it off if it's still as it was */
+  function toggleSignature(on: boolean) {
+    if (!signature) {
+      change({ includeSignature: on })
+      return
+    }
+    if (on) {
+      change({ body: `${toRichHtml(stateRef.current.body) || '<p></p>'}<p></p>${signature.text}`, includeSignature: false })
+      setSigned(true)
+      return
+    }
+    if (stateRef.current.includeSignature) change({ includeSignature: false })
+    const without = withoutSignature(stateRef.current.body, signature.text)
+    if (without === null) {
+      if (signed) setError('The signature has been changed in the text — delete it there.')
+      setSigned(false)
+      return
+    }
+    change({ body: without })
+    setSigned(false)
+  }
 
   /** Files the email about a job: its contacts, documents, files and photos are offered, and the sent copy is filed on it */
   function linkJob(hit: JobHit) {
@@ -401,13 +446,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
           )}
 
           <div className="cmp-editor">
-            <RichTextEditor ref={editorRef} value={state.body} onChange={body => change({ body })} minHeight={variant === 'floating' ? 220 : 160} />
+            <RichTextEditor ref={editorRef} value={state.body} onChange={body => change({ body })} minHeight={variant === 'floating' ? 220 : 160}
+              logo={signature?.logo ?? null} logoButton={false} />
           </div>
 
-          {state.includeSignature && signature !== undefined && (
-            signature
-              ? <div className="cmp-sig-preview" title="Added when sent — change it in Settings → Email Templates" dangerouslySetInnerHTML={{ __html: signature }} />
-              : <div className="cmp-sig-none">No signature set up yet — add one in <a href="/dashboard/settings/email-templates">Settings → Email Templates</a>.</div>
+          {signature === null && state.includeSignature && (
+            <div className="cmp-sig-none">No signature set up yet — add one in <a href="/dashboard/settings/email-templates">Settings → Email Templates</a>.</div>
           )}
 
           {initial.quoteHtml && (
@@ -469,8 +513,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
             <button className="cmp-icon" title="Attach documents, files or photos from a job"
               onClick={() => { if (state.jobId) setPicker(p => !p); else setLinking(true) }}>📁</button>
             <input ref={fileRef} type="file" multiple hidden onChange={e => { if (e.target.files) attach(e.target.files); e.target.value = '' }} />
-            <label className="cmp-sig" title="Add the company email signature (Settings → Email Templates)">
-              <input type="checkbox" checked={state.includeSignature} onChange={e => change({ includeSignature: e.target.checked })} /> Signature
+            <label className="cmp-sig" title="The company email signature (Settings → Email Templates), at the end of the text — change it there if you like">
+              <input type="checkbox" checked={signed || state.includeSignature} onChange={e => toggleSignature(e.target.checked)} /> Signature
             </label>
             <span className="cmp-status">{statusText}</span>
             {variant === 'inline' && <button className="cmp-link" onClick={close}>Close</button>}
@@ -761,8 +805,6 @@ const COMPOSER_CSS = `
   .cmp-picker-list button { display: flex; justify-content: space-between; gap: 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink); background: none; border: none; border-radius: 6px; padding: 6px 8px; cursor: pointer; }
   .cmp-picker-list button:hover { background: var(--paper); }
   .cmp-picker-list em { color: var(--subtle); font-style: normal; }
-  .cmp-sig-preview { margin: 0 14px 4px; padding: 8px 0 0; border-top: 0.5px dashed var(--line); opacity: .85; }
-  .cmp-sig-preview img { max-width: 100%; height: auto; }
   .cmp-sig-none { margin: 0 14px 4px; font-size: 12px; color: var(--subtle); }
   .cmp-sig-none a { color: var(--grey-600); }
   .cmp-quote { padding: 0 14px; }

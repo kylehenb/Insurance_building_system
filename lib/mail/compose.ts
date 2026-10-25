@@ -163,10 +163,14 @@ function addressHeader(value: string, label: string): string {
 export async function buildMime(mailbox: Mailbox, tenantId: string, state: ComposeState, db = mailDb()): Promise<string> {
   const tenant = await signatureTenant(tenantId, db)
   const companyName = tenant.trading_name || tenant.name
+  const signature = emailSignatureFor(tenant)
   const body = composeEmailBody(state.body, {
     fontSize: STANDARD_EMAIL_FONT_SIZE,
-    signature: state.includeSignature ? emailSignatureFor(tenant) : null,
+    // Added here for emails written without it in the text (the voice
+    // tools, older drafts); the composer writes it into the text instead
+    signature: state.includeSignature ? signature : null,
     signatureFallback: '',
+    logo: signature?.image ?? null,
   })
   const quote = await quoteFor(state)
 

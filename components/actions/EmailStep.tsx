@@ -6,6 +6,7 @@ import { MessageBody } from '@/components/mail/MessageBody'
 import type { CardStep, CardWithContext } from '@/lib/actions/cards'
 import type { ComposeStart, ComposeState } from '@/lib/mail/compose-rules'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
+import { SIGNATURE_LOGO_TOKEN } from '@/lib/email/rich-text'
 
 // An email step on an action card: the email as it will go — recipients,
 // subject, text and the company signature — and Edit, which opens it in the
@@ -15,13 +16,20 @@ import { spokenSendAt } from '@/lib/mail/schedule-rules'
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
-let signature: Promise<string | null> | null = null
-function companySignature(): Promise<string | null> {
+type Signature = { html: string | null; logo: { url: string; width: number; height: number } | null }
+let signature: Promise<Signature> | null = null
+function companySignature(): Promise<Signature> {
   signature ??= fetch('/api/mail/signature')
-    .then(r => (r.ok ? r.json() : { html: null }))
-    .then(d => (d.html as string | null) ?? null)
-    .catch(() => null)
+    .then(r => (r.ok ? r.json() : { html: null, logo: null }))
+    .then(d => ({ html: (d.html as string | null) ?? null, logo: d.logo ?? null }))
+    .catch(() => ({ html: null, logo: null }))
   return signature
+}
+
+/** An edited email's text: its signature's {logo} line as the logo */
+function withLogo(html: string, logo: Signature['logo']): string {
+  const img = logo ? `<img src="${logo.url}" width="${logo.width}" height="${logo.height}" alt="Logo" style="display:block;max-width:100%;margin:6px 0">` : ''
+  return html.split(`<p>${SIGNATURE_LOGO_TOKEN}</p>`).join(img)
 }
 
 async function post(url: string, body: unknown) {
@@ -49,7 +57,7 @@ interface Props {
 }
 
 export function EmailStep({ card, step, editable, composing, onComposing, onCard, onRan, onError, registerFlush }: Props) {
-  const [sig, setSig] = useState<string | null | undefined>(undefined)
+  const [sig, setSig] = useState<Signature | undefined>(undefined)
   const [start, setStart] = useState<ComposeStart | null>(null)
   const [busy, setBusy] = useState(false)
   const composerRef = useRef<ComposerHandle>(null)
@@ -170,9 +178,10 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
         {editable && <button type="button" className="ac-btn es-edit" onClick={() => onComposing(true)}>Edit</button>}
       </div>
       <div className="es-body">
-        {d ? <MessageBody html={d.html} text="" sender="" /> : <div className="es-text">{str(a.body)}</div>}
-        {sig && <div className="es-sig" title="Added when sent — change it in Settings → Email Templates" dangerouslySetInnerHTML={{ __html: sig }} />}
-        {sig === null && <div className="es-note">No company signature set up yet.</div>}
+        {d ? <MessageBody html={withLogo(d.html, sig?.logo ?? null)} text="" sender="" /> : <div className="es-text">{str(a.body)}</div>}
+        {/* An edited email has the signature in its text */}
+        {!d && sig?.html && <div className="es-sig" title="Added when sent — change it in Settings → Email Templates" dangerouslySetInnerHTML={{ __html: sig.html }} />}
+        {!d && sig && !sig.html && <div className="es-note">No company signature set up yet.</div>}
         {files > 0 && <div className="es-note">📎 {files} job photo{files === 1 ? '' : 's'} or file{files === 1 ? '' : 's'} attached</div>}
         {mode !== 'new' && <div className="es-note">The email it answers is quoted underneath.</div>}
       </div>

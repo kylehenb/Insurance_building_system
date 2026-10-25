@@ -19,7 +19,8 @@ import { createSignatureLogoNode, LOGO_ELEMENT_ATTR, paintLogo, type SignatureLo
 export interface RichTextEditorHandle {
   /** Inserts text (e.g. a {placeholder}) at the cursor */
   insertText(text: string): void
-  focus(): void
+  /** Puts the cursor in the text: where it was, or at the start / end */
+  focus(at?: 'start' | 'end'): void
 }
 
 interface Props {
@@ -34,6 +35,8 @@ interface Props {
   /** The signature's logo, placeable in the text (stored as a {logo} line).
    *  null = no image yet; leave out where there's no logo. */
   logo?: SignatureLogoImage | null
+  /** Offer "Place logo here" in the toolbar (the signature editor); the composer just shows the logo */
+  logoButton?: boolean
 }
 
 const LOGO_LINE = `<p>${SIGNATURE_LOGO_TOKEN}</p>`
@@ -45,7 +48,7 @@ const toEditorHtml = (value: string, withLogo: boolean) =>
 const fromEditorHtml = (html: string) => toRichHtml(html.replace(LOGO_ELEMENT_RE, LOGO_LINE))
 
 export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function RichTextEditor(
-  { value, onChange, onFocus, disabled = false, minHeight = 260, compact = false, logo },
+  { value, onChange, onFocus, disabled = false, minHeight = 260, compact = false, logo, logoButton = true },
   ref,
 ) {
   const withLogo = logo !== undefined
@@ -114,12 +117,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   useImperativeHandle(ref, () => ({
     insertText(text: string) { editor?.chain().focus().insertContent(text).run() },
-    focus() { editor?.commands.focus() },
+    focus(at?: 'start' | 'end') { editor?.commands.focus(at) },
   }), [editor])
 
   return (
     <div className={`border border-line-3 rounded-md bg-surface-5 focus-within:border-gold ${disabled ? 'opacity-60' : ''}`}>
-      {editor && <Toolbar editor={editor} compact={compact} disabled={disabled} logo={withLogo} />}
+      {editor && <Toolbar editor={editor} compact={compact} disabled={disabled} logo={withLogo && logoButton} />}
       <EditorContent
         editor={editor}
         style={{ minHeight }}

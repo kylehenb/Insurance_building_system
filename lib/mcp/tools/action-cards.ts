@@ -4,6 +4,7 @@ import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCa
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 import { messageText } from '@/lib/mail/message'
+import { SIGNATURE_LOGO_TOKEN } from '@/lib/email/rich-text'
 
 // Action cards by voice (and in the assistant chat) — the Action cards view's
 // own functions (lib/actions): what needs doing (the starred list, by star),
@@ -136,7 +137,7 @@ export const readActionCard: McpTool = {
       if (s.tool === 'send_email' && s.draft) {
         // Edited in the app's composer: that draft is what will go
         const d = s.draft
-        lines.push(`Edited in the app. To: ${d.to || 'no one yet'}${d.cc ? `, cc ${d.cc}` : ''}`, `Subject: ${d.subject || '(no subject)'}`, `Body:\n${messageText({ text: '', html: d.html })}`)
+        lines.push(`Edited in the app. To: ${d.to || 'no one yet'}${d.cc ? `, cc ${d.cc}` : ''}`, `Subject: ${d.subject || '(no subject)'}`, `Body:\n${messageText({ text: '', html: d.html }).split('\n').filter(l => l.trim() !== SIGNATURE_LOGO_TOKEN).join('\n')}`)
       } else if (s.tool === 'send_email') {
         if (str(a.to)) lines.push(`To: ${str(a.to)}${str(a.cc) ? `, cc ${str(a.cc)}` : ''}`)
         if (str(a.subject)) lines.push(`Subject: ${str(a.subject)}`)

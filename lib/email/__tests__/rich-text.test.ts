@@ -5,6 +5,8 @@ import {
   plainTextToRichHtml,
   renderRichTemplate,
   richToText,
+  signatureForEditor,
+  withoutSignature,
   toRichHtml,
   type EmailSignature,
 } from '../rich-text'
@@ -137,5 +139,32 @@ describe('email layout', () => {
     const { renderStandardEmailHtml } = await import('../email-html')
     const html = renderStandardEmailHtml({ bodyHtml: '<p>Hi</p>', title: 'IRC' })
     expect(html).not.toMatch(/max-width|width:\s*\d+px/)
+  })
+})
+
+describe('the signature written into an email (the composer)', () => {
+  const image = { url: 'https://x.test/logo.png', width: 120, height: 40, alt: 'IRC' }
+  const sig = { html: '<p><strong>Kyle</strong></p><p>{logo}</p><p>0400 000 000</p>', text: 'Kyle\n0400 000 000', image }
+
+  it('is the signature at its smaller size, with the logo line kept only when there is a logo', () => {
+    expect(signatureForEditor(sig, 15)).toBe('<p><span style="font-size: 13px"><strong>Kyle</strong></span></p><p>{logo}</p><p><span style="font-size: 13px">0400 000 000</span></p>')
+    expect(signatureForEditor({ ...sig, image: null }, 15)).not.toContain('{logo}')
+    expect(signatureForEditor({ ...sig, html: '<p>Kyle</p>' }, 15)).toBe('<p><span style="font-size: 13px">Kyle</span></p><p>{logo}</p>')
+  })
+
+  it('sends the logo line as the logo, and leaves it out of the plain text', () => {
+    const out = composeEmailBody(`<p>Hi Casey</p><p></p>${signatureForEditor(sig, 15)}`, { fontSize: 15, signature: null, signatureFallback: '', logo: image })
+    expect(out.html).toContain('<img src="https://x.test/logo.png" width="120" height="40" alt="IRC"')
+    expect(out.html).not.toContain('{logo}')
+    expect(out.text).toBe('Hi Casey\n\nKyle\n0400 000 000')
+  })
+
+  it('takes the signature off the end, by its words, unless it has been changed', () => {
+    const body = `<p>Hi Casey</p><p></p>${signatureForEditor(sig, 15)}`
+    expect(withoutSignature(body, signatureForEditor(sig, 15))).toBe('<p>Hi Casey</p>')
+    // Formatting changed in the editor: still the signature
+    expect(withoutSignature('<p>Hi</p><p></p><p><span style="color: #a8843f; font-size: 13px">Kyle</span></p><p>{logo}</p><p>0400 000 000</p><p></p>', signatureForEditor(sig, 15))).toBe('<p>Hi</p>')
+    expect(withoutSignature('<p>Hi</p><p>Kyle (on leave)</p><p>{logo}</p><p>0400 000 000</p>', signatureForEditor(sig, 15))).toBeNull()
+    expect(withoutSignature(signatureForEditor(sig, 15), signatureForEditor(sig, 15))).toBe('')
   })
 })
