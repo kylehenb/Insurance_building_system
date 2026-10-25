@@ -65,11 +65,12 @@ vi.mock('@/lib/mcp/tools/excess', () => ({
 }))
 
 let sentRows: { content: string; to_email: string }[] = []
+let starRows: { id: string; source_ref: string; status: string; title: string; category: string }[] = []
 const supabase = {
-  from: () => {
+  from: (name: string) => {
     const b: Record<string, unknown> = {
-      select: () => b, eq: () => b, gte: () => b,
-      then: (res: (v: unknown) => unknown) => Promise.resolve({ data: sentRows, error: null }).then(res),
+      select: () => b, eq: () => b, gte: () => b, in: () => b,
+      then: (res: (v: unknown) => unknown) => Promise.resolve({ data: name === 'action_queue' ? starRows : sentRows, error: null }).then(res),
     }
     return b
   },
@@ -81,6 +82,7 @@ const { listMailbox, readConversation, organiseEmails, sendEmailTool, fileConver
 beforeEach(() => {
   for (const k of Object.keys(calls)) delete calls[k]
   sentRows = []
+  starRows = []
 })
 
 describe('list_mailbox', () => {
@@ -89,6 +91,14 @@ describe('list_mailbox', () => {
     expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, null])
     expect(out.text).toContain('(unread)')
     expect(out.text).toContain('from Jane: "Roof leak" — Can you quote? [2 messages] [attachments] [IRC1001]')
+    expect(out.text).not.toContain('starred')
+  })
+
+  it('shows which are starred, and under which star', async () => {
+    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'invoice' }]
+    const out = await listMailbox.run({}, ctx)
+    expect(out.text).toContain('[IRC1001] [starred: Invoices to pay]')
+    expect((out.data!.conversations as { star: string }[])[0].star).toBe('invoice')
   })
 
   it('searches Gmail for a search or unread only', async () => {

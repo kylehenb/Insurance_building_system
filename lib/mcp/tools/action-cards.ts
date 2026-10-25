@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
-import { CATEGORIES, cardForThread, getCard, isCategory, listCards, skipCard, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
+import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, skipCard, starThread, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 
 // Action cards by voice (and in the assistant chat) — the Action cards view's
 // own functions (lib/actions): what needs doing (the starred list, by star),
-// one card's steps and draft email, Do the steps, and Skip. Each step still
+// one card's steps and draft email, Do the steps, Skip, and starring an email. Each step still
 // runs through callTool as the user, with its own permission, approval and
 // log entry.
 
@@ -242,5 +242,59 @@ export const skipActionCard: McpTool = {
     if (isResult(card)) return card
     if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
     return { text: `Skipped "${card.title}".`, data: { card_id: card.id, status: 'skipped' } }
+  },
+}
+
+const THREAD_ID_RE = /^[0-9a-f]+$/i
+const MAX_STAR = 25
+
+export const starEmail: McpTool = {
+  name: 'star_email',
+  title: 'Star email',
+  description: [
+    'Stars conversations from list_mailbox — puts them on the to-do list (the action cards) under a star — or changes their star, or takes it off, as the star button on the Mail page does.',
+    'star: invoice (Invoices to pay), attend_submit (Attend and Submit — a site to attend, or a report or quote to submit), other (Everything else), or none to take the star off (it comes off the list).',
+    'A star the user sets stays until they take it off, even after a reply. A newly starred email gets a card the AI fills in with a summary and suggested steps.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation_ids: { type: 'array', items: { type: 'string' }, description: 'conversation_id values from list_mailbox.' },
+      star: { type: 'string', enum: [...CATEGORIES.map(c => c.key), 'none'] },
+    },
+    required: ['conversation_ids', 'star'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  permission: 'actions.review',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const star = args.star === 'none' ? null : isCategory(args.star) ? args.star : undefined
+    if (star === undefined) return { text: 'Which star? invoice, attend_submit, other, or none to take it off.', isError: true }
+    const ids = Array.isArray(args.conversation_ids)
+      ? [...new Set(args.conversation_ids.map(str).filter(id => THREAD_ID_RE.test(id)))]
+      : []
+    if (!ids.length) return { text: 'Which conversations? Use list_mailbox for their ids.', isError: true }
+    if (ids.length > MAX_STAR) return { text: `At most ${MAX_STAR} at a time.`, isError: true }
+
+    const before = await cardsForThreads(db(ctx), ctx.tenantId, ids)
+    const results = []
+    for (const id of ids) {
+      if (!star && !before[id]) continue
+      const out = await starThread(db(ctx), ctx.tenantId, id, star, ctx.userId)
+      results.push({ conversation_id: id, title: out?.title ?? before[id]?.title ?? null, star: out?.category ?? null })
+    }
+    const n = results.length
+    const what = (k: number) => `${k} email${k === 1 ? '' : 's'}`
+    if (!star) {
+      return {
+        text: n ? `Took the star off ${what(n)}.` : 'None of those were starred.',
+        data: { unstarred: results.map(r => r.conversation_id) },
+      }
+    }
+    return {
+      text: `Starred ${what(n)} as ${categoryLabel(star)}${n === 1 && results[0].title ? ` ("${results[0].title}")` : ''}.`,
+      data: { star, starred: results },
+    }
   },
 }

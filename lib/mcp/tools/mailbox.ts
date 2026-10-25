@@ -14,6 +14,8 @@ import { messageText } from '@/lib/mail/message'
 import { FileThreadError, fileThread } from '@/lib/mail/file-thread'
 import { attachJobFile, listJobAttachables } from '@/lib/mail/job-files'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
+import { CATEGORIES, cardsForThreads, type RowStar } from '@/lib/actions/cards'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // The office mailbox by voice — the Mail page's own functions (lib/mail):
 // what's in a folder or a search, reading a conversation, archive / bin /
@@ -38,7 +40,9 @@ function who(t: ThreadListItem, folder: FolderKey): string {
   return `from ${t.participants.filter(p => !p.me).map(p => p.name || p.email).join(', ') || 'us'}`
 }
 
-const threadSummary = (t: ThreadListItem) => ({
+const starLabel = (s: RowStar | undefined) => (s ? CATEGORIES.find(c => c.key === s.category)?.label ?? null : null)
+
+const threadSummary = (t: ThreadListItem, star?: RowStar) => ({
   conversation_id: t.id,
   subject: t.subject,
   snippet: t.snippet,
@@ -50,6 +54,7 @@ const threadSummary = (t: ThreadListItem) => ({
   attachments: t.has_attachments,
   job_number: t.job?.job_number ?? null,
   filing: t.filing,
+  star: star?.category ?? null,
 })
 
 export const listMailbox: McpTool = {
@@ -59,7 +64,7 @@ export const listMailbox: McpTool = {
     'Conversations in the office Gmail mailbox, newest first — the Mail page\'s list: who, subject, the start of the latest message, unread, and the job it\'s filed on.',
     'folder: inbox (default; its Primary tab), sent, drafts, all, spam or trash (the Bin).',
     'search takes Gmail search syntax (from:castle, subject:quote, has:attachment, newer_than:2d) and reaches all mail, not just recent.',
-    'filing: to_file lists emails not on a job yet (the old unlinked inbox). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply.',
+    'filing: to_file lists emails not on a job yet (the old unlinked inbox). Each shows its star if starred (on the to-do list). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply, star_email to star it.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -85,15 +90,18 @@ export const listMailbox: McpTool = {
     const page = q ? await searchFolder(mailbox, folder, tab, q, null, undefined, filing) : await listFolder(mailbox, folder, tab, null, undefined, filing)
     const threads = page.threads.slice(0, limit)
     const label = FOLDERS.find(f => f.key === folder)!.label
+    // Each one's star (its action card), if it has one
+    const stars = await cardsForThreads(ctx.supabase as unknown as SupabaseClient, ctx.tenantId, threads.map(t => t.id))
     if (!threads.length) {
       return { text: q ? `Nothing in ${label} matches "${q}".` : `Nothing in ${label}.`, data: { folder, conversations: [] } }
     }
     const lines = threads.map(t =>
       `- ${t.unread ? '(unread) ' : ''}${t.last_message_at ? spokenDate(t.last_message_at) : ''}, ${who(t, folder)}: "${t.subject || '(no subject)'}" — ${t.snippet || '(no text)'}` +
-      `${t.message_count > 1 ? ` [${t.message_count} messages]` : ''}${t.has_attachments ? ' [attachments]' : ''}${t.job ? ` [${t.job.job_number}]` : t.filing === 'to_file' ? ' [not on a job]' : ''}`)
+      `${t.message_count > 1 ? ` [${t.message_count} messages]` : ''}${t.has_attachments ? ' [attachments]' : ''}${t.job ? ` [${t.job.job_number}]` : t.filing === 'to_file' ? ' [not on a job]' : ''}` +
+      `${stars[t.id] ? ` [starred: ${starLabel(stars[t.id])}]` : ''}`)
     return {
       text: [`${label}${q ? ` matching "${q}"` : ''}:`, ...lines].join('\n'),
-      data: { folder, conversations: threads.map(threadSummary) },
+      data: { folder, conversations: threads.map(t => threadSummary(t, stars[t.id])) },
     }
   },
 }

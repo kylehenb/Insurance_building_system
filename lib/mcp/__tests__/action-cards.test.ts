@@ -22,6 +22,8 @@ const card = (o: Record<string, unknown> = {}) => ({
 let stored: ReturnType<typeof card> | null
 const listCards = vi.fn(async () => (stored ? [stored] : []))
 const skipCard = vi.fn(async () => stored?.status === 'pending')
+let starredNow: string[] = []
+const starThread = vi.fn(async (_db: unknown, _t: string, id: string, category: string | null) => (category ? { id: 'k', status: 'queued', title: `Email ${id}`, category } : null))
 const confirmCard = vi.fn(async (_t: string, _u: string, _id: string, choices: { id: string; args?: Record<string, unknown> }[]) => ({
   ...stored!, status: 'done', outcome: `${choices.length} steps done`,
   steps: stored!.steps.map(s => (choices.some(c => c.id === s.id) ? { ...s, status: 'done', result: 'Done.' } : { ...s, status: 'skipped' })),
@@ -32,6 +34,8 @@ vi.mock('@/lib/actions/cards', () => ({
   cardForThread: async (_db: unknown, _t: string, id: string) => (stored && id === stored.source_ref ? stored : null),
   withContext: async (_db: unknown, _t: string, cards: unknown[]) => cards,
   skipCard: (...a: unknown[]) => (skipCard as (...x: unknown[]) => unknown)(...a),
+  starThread: (...a: unknown[]) => (starThread as (...x: unknown[]) => unknown)(...a),
+  cardsForThreads: async (_db: unknown, _t: string, ids: string[]) => Object.fromEntries(ids.filter(id => starredNow.includes(id)).map(id => [id, { id: 'k', status: 'pending', title: `Card ${id}`, category: 'other' }])),
   isCategory: (v: unknown) => ['invoice', 'attend_submit', 'other'].includes(v as string),
   CATEGORIES: [{ key: 'invoice', label: 'Invoices to pay' }, { key: 'attend_submit', label: 'Attend and Submit' }, { key: 'other', label: 'Everything else' }],
 }))
@@ -41,11 +45,12 @@ vi.mock('@/lib/actions/confirm', () => {
 })
 
 const ctx = { supabase: {} as never, tenantId: 't1', userId: 'u1', voiceKeyId: 'k9' }
-const { listActionCards, readActionCard, confirmActionCard, skipActionCard } = await import('../tools/action-cards')
+const { listActionCards, readActionCard, confirmActionCard, skipActionCard, starEmail } = await import('../tools/action-cards')
 
 beforeEach(() => {
   stored = card()
-  for (const f of [listCards, skipCard, confirmCard]) f.mockClear()
+  for (const f of [listCards, skipCard, confirmCard, starThread]) f.mockClear()
+  starredNow = []
 })
 
 describe('list_action_cards', () => {
@@ -107,5 +112,28 @@ describe('skip_action_card', () => {
     expect(skipCard).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, 'u1')
     stored = card({ status: 'done' })
     expect(await skipActionCard.run({ card_id: CARD_ID }, ctx)).toMatchObject({ isError: true, text: "That card is done — it can't be skipped now." })
+  })
+})
+
+describe('star_email', () => {
+  it('stars conversations under a star, as the user', async () => {
+    const out = await starEmail.run({ conversation_ids: ['abc1'], star: 'invoice' }, ctx)
+    expect(starThread.mock.calls[0].slice(1)).toEqual(['t1', 'abc1', 'invoice', 'u1'])
+    expect(out.text).toBe('Starred 1 email as Invoices to pay ("Email abc1").')
+  })
+
+  it('takes stars off only where there is one', async () => {
+    starredNow = ['abc1']
+    const out = await starEmail.run({ conversation_ids: ['abc1', 'def2'], star: 'none' }, ctx)
+    expect(starThread.mock.calls.map(c => c.slice(2, 4))).toEqual([['abc1', null]])
+    expect(out.text).toBe('Took the star off 1 email.')
+    starredNow = []
+    expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'none' }, ctx)).text).toBe('None of those were starred.')
+  })
+
+  it('refuses an unknown star or no conversations', async () => {
+    expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'gold' }, ctx)).isError).toBe(true)
+    expect((await starEmail.run({ conversation_ids: ['not an id'], star: 'other' }, ctx)).isError).toBe(true)
+    expect(starThread).not.toHaveBeenCalled()
   })
 })
