@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { CardCategory, CardWithContext } from '@/lib/actions/cards'
+import { cardThreadId, type CardCategory, type CardWithContext } from '@/lib/actions/cards'
+import { spokenDue } from '@/lib/actions/followups'
 import { StarButton } from './Star'
 import { EmailStep } from './EmailStep'
 import { OriginalEmail } from './OriginalEmail'
 import { StepPanel } from './StepPanel'
+import { RemindMe } from './RemindMe'
 
 // One action card: its star (category — click to change), what the email
 // says (and the email itself, opened in place), the AI's suggested steps —
@@ -14,7 +16,8 @@ import { StepPanel } from './StepPanel'
 // emails open in the Mail page's composer — and Do steps / Skip. Doing runs
 // the ticked steps through the user's own permissions (lib/actions/confirm.ts).
 // "Tell the AI what to change" re-suggests the steps with the office's
-// instructions.
+// instructions; Remind me sets a follow-up (lib/actions/followups.ts), and a
+// follow-up that's due is a card like any other, saying what it was for.
 
 interface Props {
   card: CardWithContext
@@ -40,6 +43,9 @@ function ago(iso: string | null): string {
   return `${Math.round(h / 24)} d ago`
 }
 
+/** "on 25 Oct" */
+const setOn = (iso: string) => `on ${new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', day: 'numeric', month: 'short' }).format(new Date(iso))}`
+
 async function post(url: string, body?: unknown) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
   const data = await res.json().catch(() => ({}))
@@ -64,6 +70,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const [showWhy, setShowWhy] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
   const [asking, setAsking] = useState(false)
+  const [reminding, setReminding] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const flushers = useRef(new Map<string, () => Promise<void>>())
@@ -117,14 +124,19 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     onChanged({ ...card, category }, 'Star changed.')
   })
   const retry = (instructions?: string) => run(instructions ? 'ask' : 'retry', async () => {
-    const { card: updated } = await post('/api/actions/suggest', { threadId: card.source_ref, ...(instructions ? { feedback: instructions } : {}) })
+    const which = card.source === 'followup' ? { cardId: card.id } : { threadId: card.source_ref }
+    const { card: updated } = await post('/api/actions/suggest', { ...which, ...(instructions ? { feedback: instructions } : {}) })
     setAsking(false)
     setFeedback('')
     onChanged(updated, instructions ? 'Steps re-suggested with your instructions.' : 'Suggestions updated.')
   })
 
   const toDo = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').length
-  const thinking = STATUS_NOTE[card.status]
+  const thinking = card.source === 'followup' && card.status === 'generating' ? 'Checking where the job is at…' : STATUS_NOTE[card.status]
+  const f = card.follow_up
+  const thread = cardThreadId(card)
+  // Email cards are remade from their conversation; a follow-up while it's on the list
+  const redoable = card.source === 'email' ? !!card.source_ref : card.source === 'followup' && live
 
   return (
     <article className={`ac${compact ? ' compact' : ''}${card.priority && card.priority >= 80 ? ' high' : ''} st-${card.status}`}>
@@ -136,7 +148,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             {thinking && card.title === 'Reading the email…' ? (card.conversation?.subject ?? 'New email') : card.title}
           </div>
           {!compact && card.conversation && (
-            <button className="ac-source" onClick={() => card.source_ref && onOpenConversation?.(card.source_ref)}>
+            <button className="ac-source" onClick={() => thread && onOpenConversation?.(thread)}>
               {card.conversation.from ? `${card.conversation.from}: ` : ''}{card.conversation.subject ?? '(no subject)'}
             </button>
           )}
@@ -151,15 +163,20 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
         <div className="ac-thinking"><span className="ac-spin" aria-hidden /> {thinking}</div>
       ) : (
         <>
+          {f && (
+            <div className="ac-followup">
+              ⏰ Follow-up you set {setOn(card.created_at)}{card.due_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.who ? `, with ${f.who}` : ''}: <b>{f.note}</b>
+            </div>
+          )}
           {card.description && <p className="ac-summary">{card.description}</p>}
           <div className="ac-why">
             {card.reasoning && <button onClick={() => setShowWhy(w => !w)}>{showWhy ? 'Hide why' : 'Why?'}</button>}
-            {!compact && card.source === 'email' && card.source_ref && (
+            {!compact && thread && (
               <button onClick={() => setShowEmail(e => !e)}>{showEmail ? 'Hide the email' : 'Show the email'}</button>
             )}
             {showWhy && card.reasoning && <p>{card.reasoning}</p>}
           </div>
-          {showEmail && card.source_ref && <OriginalEmail threadId={card.source_ref} onOpenConversation={onOpenConversation} />}
+          {showEmail && thread && <OriginalEmail threadId={thread} onOpenConversation={onOpenConversation} />}
 
           {card.steps.length > 0 && (
             <ol className="ac-steps">
@@ -231,6 +248,24 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             </div>
           )}
 
+          {reminding && (
+            <RemindMe
+              note={f ? f.note : `Follow up: ${card.title}`}
+              who={f ? f.who : card.conversation?.from ?? null}
+              jobId={card.job_id}
+              jobNumber={card.job?.job_number}
+              threadId={thread}
+              fromCardId={card.id}
+              canClear={open}
+              onDone={(text, cleared) => {
+                setReminding(false)
+                onChanged(cleared ? { ...card, status: 'done', outcome: text } : null, text)
+              }}
+              onError={text => message(text, true)}
+              onCancel={() => setReminding(false)}
+            />
+          )}
+
           <footer className="ac-foot">
             {open && card.steps.length > 0 && (
               <button className="ac-btn primary" disabled={!!busy || toDo === 0 || dirty.size > 0} onClick={confirm}
@@ -240,16 +275,23 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             )}
             {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
             {dirty.size > 0 && <span className="ac-dirty">Save or undo your step changes first</span>}
-            {card.source === 'email' && card.source_ref && card.status !== 'running' && (
+            {card.status !== 'running' && (
               <span className="ac-foot-right">
-                {live && !asking && (
+                {!reminding && (
+                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => setReminding(true)} title="Have this come back on a day, with the chase drafted">
+                    ⏰ Remind me
+                  </button>
+                )}
+                {live && !asking && redoable && (
                   <button className="ac-btn ghost" disabled={!!busy} onClick={() => setAsking(true)} title="Say what you want done, and the AI redoes the steps">
                     Tell the AI what to change
                   </button>
                 )}
-                <button className="ac-btn ghost" disabled={!!busy} onClick={() => retry()} title="Read the email and job file again">
-                  {busy === 'retry' ? 'Reading…' : card.status === 'failed' ? 'Try again' : 'Re-suggest'}
-                </button>
+                {redoable && (
+                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => retry()} title="Read the email and job file again">
+                    {busy === 'retry' ? 'Reading…' : card.status === 'failed' ? 'Try again' : 'Re-suggest'}
+                  </button>
+                )}
               </span>
             )}
           </footer>
@@ -279,6 +321,8 @@ const CARD_CSS = `
   .ac-thinking { display: flex; align-items: center; gap: 8px; color: var(--subtle); margin-top: 10px; }
   .ac-spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: ac-spin .8s linear infinite; }
   @keyframes ac-spin { to { transform: rotate(360deg); } }
+  .ac-followup { margin: 8px 0 0; font-size: 12px; color: var(--grey-600); background: var(--surface-3); border-radius: 6px; padding: 6px 10px; line-height: 1.5; }
+  .ac-followup b { color: var(--ink); font-weight: 600; }
   .ac-summary { margin: 8px 0 0; line-height: 1.5; }
   .ac-why button { font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: none; padding: 0; margin: 6px 14px 0 0; cursor: pointer; text-decoration: underline; }
   .ac-why p { margin: 4px 0 0; font-size: 12px; color: var(--subtle); line-height: 1.5; }

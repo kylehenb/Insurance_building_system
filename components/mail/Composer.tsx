@@ -483,7 +483,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ in
   )
 })
 
-function JobSearch({ onPick, onCancel }: { onPick(hit: JobHit): void; onCancel(): void }) {
+export function JobSearch({ onPick, onCancel }: { onPick(hit: JobHit): void; onCancel(): void }) {
   const [q, setQ] = useState('')
   const [found, setFound] = useState<JobHit[]>([])
   const [active, setActive] = useState(0)

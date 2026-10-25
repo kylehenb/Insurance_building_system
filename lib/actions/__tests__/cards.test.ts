@@ -247,6 +247,22 @@ describe('generateCard', () => {
     expect(first).toContain('"Don\'t reply — just note we\'re waiting on the insurer"')
   })
 
+  it('drafts a due follow-up from the job as it is now, and keeps it on the list even if nothing is needed', async () => {
+    tables.action_queue = [{ id: 'f1', tenant_id: 't1', source: 'followup', source_ref: null, job_id: 'j1', status: 'generating', attempts: 1,
+      title: 'Follow up with Ace Roofing: Chase the roof quote', steps: [], created_at: '2026-10-18T02:00:00Z',
+      follow_up: { note: 'Chase the roof quote', who: 'Ace Roofing', thread_id: 'abc1', from_card_id: null, created_by: 'u1' } }]
+    const { client, create } = model([
+      [{ name: 'send_email', input: { mode: 'reply', conversation_id: 'abc1', body: 'Hi, just following up on the roof quote.' } }],
+      [{ name: 'finish_card', input: { needs_action: false, title: 'Chase Ace Roofing for the quote', summary: 'No quote yet.', priority: 'normal', category: 'other' } }],
+    ])
+    const out = await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })
+    expect(out).toMatchObject({ status: 'pending', title: 'Chase Ace Roofing for the quote', job_id: 'j1' })
+    expect(out.steps!.map(s => s.tool)).toEqual(['send_email'])
+    const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(first).toMatch(/A FOLLOW-UP THE OFFICE SET \(on Sunday 18 October, for today\)\nWho: Ace Roofing\n"Chase the roof quote"\nJob: IRC1001/)
+    expect(first).toMatch(/THE CONVERSATION IT WAS SET FROM \(conversation_id: abc1\)[\s\S]*THE JOB FILE \(as it is now\)/)
+  })
+
   it('marks notifications as no action', async () => {
     const card = await claimed()
     const { client } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Xero receipt', summary: 'A receipt.', priority: 'low' } }]])
@@ -376,5 +392,7 @@ describe('describeStep', () => {
       .toBe('Forward to bob@trade.com: "Plans" (scheduled tomorrow 8am)')
     expect(describeStep(t('file_conversation'), { filing: 'admin' })).toEqual({ summary: 'File as admin', kind: 'filing' })
     expect(describeStep(t('send_work_order'), { job_number: 'IRC1001' })).toEqual({ summary: 'Send work order — IRC1001', kind: 'change' })
+    expect(describeStep(t('set_follow_up'), { when: '7', who: 'Ace Roofing', note: 'Chase the quote' }).summary).toBe('Remind me in 7 days to follow up with Ace Roofing: Chase the quote')
+    expect(describeStep(t('set_follow_up'), { when: '2026-11-02', note: 'Call Jo' }).summary).toBe('Remind me on 2026-11-02: Call Jo')
   })
 })

@@ -8,7 +8,7 @@ import { ComposeError, discardDraft, openDraft, startCompose } from '@/lib/mail/
 import { isComposeMode, type ComposeStart } from '@/lib/mail/compose-rules'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
-import { CardError, getCard, type ActionCard, type CardStep, type StepDraft } from './cards'
+import { CardError, cardThreadId, getCard, type ActionCard, type CardStep, type StepDraft } from './cards'
 import { describeStep } from './propose'
 import { applyEdits, cleanEdits, stepFields, type StepField } from './step-fields'
 
@@ -198,7 +198,7 @@ export async function stepCompose(tenantId: string, cardId: string, stepId: stri
   const mode = isComposeMode(a.mode) ? a.mode : 'new'
   let messageId = s('message_id') || null
   if (mode !== 'new' && !messageId) {
-    const threadId = s('conversation_id') || card!.source_ref
+    const threadId = s('conversation_id') || cardThreadId(card!)
     const detail = threadId ? await getThreadDetail(mailbox, threadId, db) : null
     messageId = detail?.messages.filter(m => !m.labelIds.includes('DRAFT')).at(-1)?.id ?? null
     if (!messageId) throw new CardError('The conversation this replies to no longer exists', 404)

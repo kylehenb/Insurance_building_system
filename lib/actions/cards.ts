@@ -38,7 +38,8 @@ export type CardStep = {
   draft?: StepDraft
 }
 
-export type CardStatus = 'queued' | 'generating' | 'pending' | 'running' | 'done' | 'skipped' | 'no_action' | 'failed'
+/** scheduled: a follow-up waiting for its date (due_at) */
+export type CardStatus = 'scheduled' | 'queued' | 'generating' | 'pending' | 'running' | 'done' | 'skipped' | 'no_action' | 'failed'
 
 export type CardCategory = 'invoice' | 'attend_submit' | 'other'
 
@@ -56,6 +57,17 @@ export function nextCategory(current: CardCategory | null): CardCategory | null 
   if (!current) return CATEGORIES[0].key
   const i = CATEGORIES.findIndex(c => c.key === current)
   return CATEGORIES[i + 1]?.key ?? null
+}
+
+/** What a follow-up is for, as the person set it (lib/actions/followups.ts) */
+export type FollowUp = {
+  note: string
+  /** Who to follow up with, in their words: "Ace Roofing", "the insured" */
+  who: string | null
+  /** The conversation it came from, if any */
+  thread_id: string | null
+  from_card_id: string | null
+  created_by: string | null
 }
 
 export type ActionCard = {
@@ -79,12 +91,15 @@ export type ActionCard = {
   attempts: number
   created_at: string
   updated_at: string
+  /** A follow-up: when it comes onto the list */
+  due_at: string | null
+  follow_up: FollowUp | null
 }
 
 /** Cards that can still change: one per conversation (see the unique index) */
 export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'failed']
 
-export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at'
+export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up'
 
 /** Priority from the model's high / normal / low */
 export const PRIORITY = { high: 90, normal: 50, low: 20 } as const
@@ -190,10 +205,12 @@ export async function getCard(db: SupabaseClient, tenantId: string, id: string):
   return (data as ActionCard | null) ?? null
 }
 
-export type CardView = 'pending' | 'done'
+/** upcoming: follow-ups waiting for their date */
+export type CardView = 'pending' | 'upcoming' | 'done'
 
 const VIEW_STATUSES: Record<CardView, CardStatus[]> = {
   pending: ['queued', 'generating', 'pending', 'running', 'failed'],
+  upcoming: ['scheduled'],
   done: ['done', 'skipped', 'no_action'],
 }
 
@@ -208,6 +225,8 @@ export async function listCards(
   if (jobId) q = q.eq('job_id', jobId)
   q = view === 'pending'
     ? q.order('priority', { ascending: false }).order('updated_at', { ascending: false })
+    : view === 'upcoming'
+    ? q.order('due_at', { ascending: true })
     : q.order('updated_at', { ascending: false })
   const { data, error } = await q.limit(limit)
   if (error) throw new Error(error.message)
@@ -315,6 +334,10 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
   return !!data
 }
 
+/** The conversation a card is about: an email card's own, or the one a follow-up was set from */
+export const cardThreadId = (c: Pick<ActionCard, 'source' | 'source_ref' | 'follow_up'>): string | null =>
+  c.source === 'email' ? c.source_ref : c.follow_up?.thread_id ?? null
+
 export type CardWithContext = ActionCard & {
   job: { id: string; job_number: string; insured_name: string | null } | null
   conversation: { subject: string | null; from: string | null; last_message_at: string | null; unread: boolean } | null
@@ -323,7 +346,7 @@ export type CardWithContext = ActionCard & {
 /** Adds the job chip and the conversation (subject, sender) each card is about */
 export async function withContext(db: SupabaseClient, tenantId: string, cards: ActionCard[]): Promise<CardWithContext[]> {
   const jobIds = [...new Set(cards.map(c => c.job_id).filter((id): id is string => !!id))]
-  const threadIds = [...new Set(cards.filter(c => c.source === 'email' && c.source_ref).map(c => c.source_ref!))]
+  const threadIds = [...new Set(cards.map(cardThreadId).filter((id): id is string => !!id))]
   const [{ data: jobs }, { data: threads }] = await Promise.all([
     jobIds.length ? db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', tenantId).in('id', jobIds) : Promise.resolve({ data: [] }),
     threadIds.length ? db.from('mail_threads').select('gmail_thread_id, subject, participants, last_message_at, unread').eq('tenant_id', tenantId).in('gmail_thread_id', threadIds) : Promise.resolve({ data: [] }),
@@ -332,7 +355,8 @@ export async function withContext(db: SupabaseClient, tenantId: string, cards: A
   const jobById = new Map(((jobs as CardWithContext['job'][] | null) ?? []).map(j => [j!.id, j]))
   const threadById = new Map(((threads as ThreadRow[] | null) ?? []).map(t => [t.gmail_thread_id, t]))
   return cards.map(c => {
-    const t = c.source_ref ? threadById.get(c.source_ref) : undefined
+    const thread = cardThreadId(c)
+    const t = thread ? threadById.get(thread) : undefined
     const sender = t?.participants.filter(p => !p.me).at(-1)
     return {
       ...c,

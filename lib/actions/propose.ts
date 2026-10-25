@@ -27,7 +27,7 @@ const OWN_DOMAIN = 'insurancerepairco.com.au'
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
-  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'star_email',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'star_email', 'change_follow_up',
 ])
 
 const FINISH: Anthropic.Beta.BetaTool = {
@@ -52,7 +52,7 @@ const FINISH: Anthropic.Beta.BetaTool = {
   },
 }
 
-export const CARD_SYSTEM_PROMPT = `You prepare action cards in IRC Master, the job system of Insurance Repair Co (building insurance repairs in Perth: storm and water damage, make safes, quotes, reports, trades). An email has just arrived in the office mailbox. Read it with the job file and propose what the office should do next, for a person to confirm.
+export const CARD_SYSTEM_PROMPT = `You prepare action cards in IRC Master, the job system of Insurance Repair Co (building insurance repairs in Perth: storm and water damage, make safes, quotes, reports, trades). An email has just arrived in the office mailbox (or a follow-up the office set is due). Read it with the job file and propose what the office should do next, for a person to confirm.
 
 How it works:
 - The conversation and the job file are below. Use the read tools to check anything else you need (other emails on the job, documents, work orders, signing, excess, orders). Don't guess facts.
@@ -63,6 +63,8 @@ How it works:
 - Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
 - If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
 - If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
+- A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
+- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after).
 - Always end by calling finish_card.
 
 Today is given in the first message. Times are Perth time (AWST).`
@@ -81,6 +83,12 @@ export function describeStep(tool: McpTool, args: Record<string, unknown>): { su
     }
     case 'file_conversation':
       return { summary: s('job_number') ? `File on ${s('job_number')}` : s('filing') === 'admin' ? 'File as admin' : 'Move to To file', kind: 'filing' }
+    case 'set_follow_up': {
+      const when = s('when')
+      const on = !when ? '' : /^\d+$/.test(when) ? ` in ${when} days` : /^\d+\s*[a-z]/i.test(when) ? ` in ${when}` : ` on ${when}`
+      const note = s('note')
+      return { summary: `Remind me${on}${s('who') ? ` to follow up with ${s('who')}` : ''}: ${note.length > 80 ? `${note.slice(0, 80)}…` : note}`, kind: 'change' }
+    }
     case 'organise_emails':
       return { summary: `${s('action').replace('_', ' ') || 'Organise'} the conversation`.replace(/^./, c => c.toUpperCase()), kind: 'filing' }
     default: {
@@ -121,29 +129,12 @@ export async function generateCard(
     return o
   }
   try {
-    if (card.source !== 'email' || !card.source_ref) return save({ status: 'failed', error_log: 'Only email cards are made here' })
-    const mailbox = await getMailbox(card.tenant_id, db)
-    const detail = await getThreadDetail(mailbox, card.source_ref, db)
-    if (!detail) return save({ status: 'no_action', title: 'Conversation deleted', outcome: 'The conversation no longer exists' })
-    if (detail.label_ids.some(l => l === 'SPAM' || l === 'TRASH')) {
-      return save({ status: 'no_action', title: detail.subject || '(no subject)', outcome: 'In Spam or the Bin', job_id: detail.job?.id ?? null })
-    }
-    const sent = detail.messages.filter(m => !m.labelIds.includes('DRAFT'))
-    const latest = sent.at(-1)
-    // A star the user set stays on their list even when we've answered, as
-    // does a card they've asked for changes to
-    if (!card.starred_by && !opts.feedback?.trim() && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
-      return save({ status: 'done', title: detail.subject || '(no subject)', outcome: 'Already replied', job_id: detail.job?.id ?? null })
-    }
-
     const tools = (opts.tools ?? MCP_TOOLS).filter(t => !LEFT_OUT.has(t.name))
     const ctx: McpContext = { supabase: db as unknown as SupabaseClient<Database>, tenantId: card.tenant_id, userId: await cardActor(db, card.tenant_id), via: 'chat' }
-
-    // The conversation and the job file, up front
-    const conversation = (await readConversation.run({ conversation_id: card.source_ref }, ctx)).text
-    const jobFile = detail.job
-      ? (await getJobSummary.run({ job_number: detail.job.job_number }, ctx)).text
-      : `This conversation is not on a job yet.${detail.candidates.length ? ` The matcher suggests: ${detail.candidates.map(c => `${c.job_number} (${c.insured_name ?? c.property_address ?? ''}, matched on ${c.matched_on.join(', ')}, ${c.confidence})`).join('; ')}.` : ''}${detail.orderId ? ' It has already become an insurer order.' : ''}`
+    const about = card.source === 'followup'
+      ? await followUpContext(card, db, ctx)
+      : await emailContext(card, db, ctx, !!card.starred_by || !!opts.feedback?.trim())
+    if (!('intro' in about)) return save(about)
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const toolDefs: Anthropic.Beta.BetaTool[] = [
@@ -157,7 +148,7 @@ export async function generateCard(
       : ''
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
       role: 'user',
-      content: `Today: ${today()}.\n\nconversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${instructions}`,
+      content: `Today: ${today()}.\n\n${about.intro}${instructions}`,
     }]
 
     const steps: CardStep[] = []
@@ -229,7 +220,7 @@ export async function generateCard(
 
     const f = finish ?? {}
     const str = (k: string) => (typeof f[k] === 'string' ? (f[k] as string).trim() : '')
-    let jobId = detail.job?.id ?? null
+    let jobId = about.jobId
     if (!jobId && str('job_number')) {
       const { data: job } = await db.from('jobs').select('id').eq('tenant_id', card.tenant_id).ilike('job_number', str('job_number')).maybeSingle()
       jobId = (job as { id: string } | null)?.id ?? null
@@ -240,14 +231,15 @@ export async function generateCard(
     // stays, with their symbol
     const { data: latestRow } = await db.from('action_queue').select('starred_by').eq('id', card.id).maybeSingle()
     const starred = !!(latestRow as { starred_by: string | null } | null)?.starred_by
-    const needsAction = starred || f.needs_action !== false || steps.length > 0
+    // A follow-up stays on the list: the office asked to be reminded
+    const needsAction = starred || card.source === 'followup' || f.needs_action !== false || steps.length > 0
     const category = isCategory(f.category) ? f.category : 'other'
 
     await db.from('action_queue').update({ model: CARD_MODEL, usage }).eq('id', card.id)
     return save({
       ...(starred ? {} : { category }),
       status: needsAction ? 'pending' : 'no_action',
-      title: str('title') || detail.subject || 'New email',
+      title: str('title') || about.title,
       description: str('summary') || lastText || null,
       reasoning: str('reasoning') || null,
       steps,
@@ -258,6 +250,60 @@ export async function generateCard(
   } catch (err) {
     console.error(`[action-cards] card ${card.id} failed:`, err)
     return save({ status: 'failed', error_log: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+type Context = { intro: string; jobId: string | null; title: string }
+
+/** An email card: the conversation and the job file, up front — or no need for the model at all */
+async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContext, keep: boolean): Promise<Context | Outcome> {
+  if (!card.source_ref) return { status: 'failed', error_log: 'No conversation on this card' }
+  const mailbox = await getMailbox(card.tenant_id, db)
+  const detail = await getThreadDetail(mailbox, card.source_ref, db)
+  if (!detail) return { status: 'no_action', title: 'Conversation deleted', outcome: 'The conversation no longer exists' }
+  if (detail.label_ids.some(l => l === 'SPAM' || l === 'TRASH')) {
+    return { status: 'no_action', title: detail.subject || '(no subject)', outcome: 'In Spam or the Bin', job_id: detail.job?.id ?? null }
+  }
+  const sent = detail.messages.filter(m => !m.labelIds.includes('DRAFT'))
+  const latest = sent.at(-1)
+  // A star the user set stays on their list even when we've answered, as
+  // does a card they've asked for changes to
+  if (!keep && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
+    return { status: 'done', title: detail.subject || '(no subject)', outcome: 'Already replied', job_id: detail.job?.id ?? null }
+  }
+  const conversation = (await readConversation.run({ conversation_id: card.source_ref }, ctx)).text
+  const jobFile = detail.job
+    ? (await getJobSummary.run({ job_number: detail.job.job_number }, ctx)).text
+    : `This conversation is not on a job yet.${detail.candidates.length ? ` The matcher suggests: ${detail.candidates.map(c => `${c.job_number} (${c.insured_name ?? c.property_address ?? ''}, matched on ${c.matched_on.join(', ')}, ${c.confidence})`).join('; ')}.` : ''}${detail.orderId ? ' It has already become an insurer order.' : ''}`
+  return {
+    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
+    jobId: detail.job?.id ?? null,
+    title: detail.subject || 'New email',
+  }
+}
+
+/** A follow-up now due: what the office asked to be reminded of, the job file as it is now, and the conversation it came from */
+async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpContext): Promise<Context | Outcome> {
+  const f = card.follow_up
+  if (!f) return { status: 'failed', error_log: 'This follow-up has nothing to say' }
+  const { data: job } = card.job_id
+    ? await db.from('jobs').select('job_number').eq('tenant_id', card.tenant_id).eq('id', card.job_id).maybeSingle()
+    : { data: null }
+  const jobNumber = (job as { job_number: string } | null)?.job_number
+  const jobFile = jobNumber ? (await getJobSummary.run({ job_number: jobNumber }, ctx)).text : 'This follow-up isn\'t on a job.'
+  let conversation = ''
+  if (f.thread_id) {
+    try {
+      conversation = `\n\nTHE CONVERSATION IT WAS SET FROM (conversation_id: ${f.thread_id})\n${(await readConversation.run({ conversation_id: f.thread_id }, ctx)).text}`
+    } catch {
+      conversation = '\n\nThe conversation it was set from can\'t be read any more.'
+    }
+  }
+  const set = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(card.created_at))
+  return {
+    intro: `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"${jobNumber ? `\nJob: ${jobNumber}` : ''}${conversation}\n\nTHE JOB FILE (as it is now)\n${jobFile}`,
+    jobId: card.job_id,
+    title: card.title,
   }
 }
 

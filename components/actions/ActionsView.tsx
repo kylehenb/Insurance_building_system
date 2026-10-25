@@ -5,6 +5,7 @@ import { CATEGORIES, type CardCategory, type CardView, type CardWithContext } fr
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
 import { StarIcon } from './Star'
+import { FollowUps } from './FollowUps'
 
 // The Action cards view on the dashboard: everything that needs the office,
 // most urgent first — the AI's suggestions for incoming email (and, later,
@@ -13,6 +14,7 @@ import { StarIcon } from './Star'
 const POLL_MS = 15_000
 const VIEWS: { key: CardView; label: string }[] = [
   { key: 'pending', label: 'Needs action' },
+  { key: 'upcoming', label: 'Follow-ups' },
   { key: 'done', label: 'Done' },
 ]
 
@@ -27,6 +29,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    if (view === 'upcoming') return
     try {
       const res = await fetch(`/api/actions?view=${view}${category ? `&category=${category}` : ''}`)
       const body = await res.json()
@@ -67,23 +70,24 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
             <button key={v.key} role="tab" aria-selected={view === v.key} className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)}>{v.label}</button>
           ))}
         </div>
-        <div className="av-stars" role="group" aria-label="Filter by star">
+        {view !== 'upcoming' && <div className="av-stars" role="group" aria-label="Filter by star">
           <button className={!category ? 'on' : ''} onClick={() => setCategory(null)}>All</button>
           {CATEGORIES.map(c => (
             <button key={c.key} className={category === c.key ? 'on' : ''} onClick={() => setCategory(c.key)}>
               <StarIcon category={c.key} size={14} /> {c.label}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className="av-list">
+        {view === 'upcoming' && <FollowUps onMessage={onToast} />}
         {view === 'pending' && <ApprovalsPanel />}
-        {cards === null && !error && <div className="mail-empty">Loading…</div>}
+        {view !== 'upcoming' && cards === null && !error && <div className="mail-empty">Loading…</div>}
         {error && <div className="mail-empty is-error">{error}</div>}
-        {cards?.length === 0 && (
+        {view !== 'upcoming' && cards?.length === 0 && (
           <div className="mail-empty">{view === 'pending' ? (category ? 'Nothing starred here.' : 'All caught up — nothing needs you right now.') : 'Nothing done yet.'}</div>
         )}
-        {cards?.map(card => (
+        {view !== 'upcoming' && cards?.map(card => (
           <ActionCardView key={`${card.id}:${card.updated_at}`} card={card} onChanged={changed} onOpenConversation={onOpenConversation} />
         ))}
       </div>
@@ -185,6 +189,7 @@ export function JobCards({ jobId }: { jobId: string }) {
         {!!cards?.length && <span className="jc-n">{cards.length} on the list</span>}
         {message && <span className={`jc-msg${message.error ? ' err' : ''}`}>{message.text}</span>}
       </div>
+      <FollowUps jobId={jobId} compact version={version} onMessage={(text, error) => setMessage({ text, error })} />
       {cards === null && <div className="jc-empty">Loading…</div>}
       {cards?.length === 0 && <div className="jc-empty">Nothing to do on this job — all clear.</div>}
       {cards?.map(card => (
