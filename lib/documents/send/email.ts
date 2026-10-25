@@ -5,6 +5,7 @@ import { renderRichTemplate, richToText } from '@/lib/email/rich-text'
 import { composeStandardEmail } from '@/lib/email/compose'
 import { resolveInsurerEmailRecipients } from '@/lib/contacts/email-routing'
 import { sendEmailViaGmail } from '@/lib/signing/email/gmail'
+import type { EmailAttachment } from '@/lib/email/build-raw'
 import type { PrintDataContext } from '@/lib/documents/print-data'
 import { reportDocumentName } from '@/lib/documents/print-document-pdfs'
 import { PrintDataError } from '@/lib/documents/print-data'
@@ -68,6 +69,8 @@ export interface DocumentEmailOverrides {
   subject?: string
   /** Rich text from Customise send, or plain text from the voice connector */
   body?: string
+  /** Other files to go with the documents (the voice connector's job photos and files) */
+  extraAttachments?: EmailAttachment[]
 }
 
 export interface DocumentSendResult {
@@ -231,7 +234,8 @@ export async function sendDocumentEmail(
       throw new DocumentSendError(`Could not create the PDF for ${doc.title}. Nothing was sent.`, 500)
     }
   }
-  const totalBytes = files.reduce((sum, f) => sum + f.pdf.length, 0)
+  const extras = overrides.extraAttachments ?? []
+  const totalBytes = files.reduce((sum, f) => sum + f.pdf.length, 0) + extras.reduce((sum, f) => sum + f.content.length, 0)
   if (totalBytes > MAX_ATTACHMENT_BYTES) {
     throw new DocumentSendError(
       `The attachments come to ${(totalBytes / 1024 / 1024).toFixed(1)} MB, more than email allows. Send fewer documents or photos at a time.`,
@@ -251,7 +255,7 @@ export async function sendDocumentEmail(
       subject,
       text: body,
       html,
-      attachments: files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })),
+      attachments: [...files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })), ...extras],
     })
   } catch (err) {
     console.error(`[document-send] Gmail send failed (${docs.map(d => d.title).join(', ')}):`, err)
@@ -261,11 +265,12 @@ export async function sendDocumentEmail(
   // Keep a copy of exactly what was sent on the comms record. Non-fatal from
   // here on: the email has gone.
   const communicationId = crypto.randomUUID()
-  const attachments = await Promise.all(files.map(async ({ doc, pdf }, i) => {
-    const storagePath = `tenants/${ctx.tenantId}/comms/${communicationId}/${Date.now()}-${i}-${storageName(doc.filename)}`
-    const { error } = await service.storage.from('job-files').upload(storagePath, pdf, { contentType: 'application/pdf' })
-    if (error) console.error(`[document-send] PDF copy upload failed for ${doc.ref.kind} ${doc.ref.id}:`, error)
-    return { filename: doc.filename, storage_path: error ? null : storagePath, mime_type: 'application/pdf', size_bytes: pdf.length }
+  const sentFiles = [...files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })), ...extras]
+  const attachments = await Promise.all(sentFiles.map(async (f, i) => {
+    const storagePath = `tenants/${ctx.tenantId}/comms/${communicationId}/${Date.now()}-${i}-${storageName(f.filename)}`
+    const { error } = await service.storage.from('job-files').upload(storagePath, f.content, { contentType: f.mimeType })
+    if (error) console.error(`[document-send] copy upload failed for ${f.filename}:`, error)
+    return { filename: f.filename, storage_path: error ? null : storagePath, mime_type: f.mimeType, size_bytes: f.content.length }
   }))
 
   const { error: commErr } = await service.from('communications').insert({

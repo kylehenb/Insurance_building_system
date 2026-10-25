@@ -29,6 +29,8 @@ export interface McpToolResult {
   data?: Record<string, unknown>
   /** True when the request couldn't be done — text says why */
   isError?: boolean
+  /** Images for Claude to look at (base64), sent as image content */
+  images?: { data: string; mimeType: string }[]
 }
 
 export interface McpTool {
@@ -45,6 +47,12 @@ export interface McpTool {
   permission?: PermissionKey
   /** The tool checks the caller's permission itself (e.g. deciding approvals) */
   checksOwnPermission?: true
+  /**
+   * Runs (not queued) at "needs approval": the tool only prepares something
+   * the user finishes themselves, e.g. a draft (as the Mail page lets them
+   * write drafts). "Not allowed" still refuses.
+   */
+  runsAtApproval?: true
   run(args: Record<string, unknown>, ctx: McpContext): Promise<McpToolResult>
 }
 
@@ -75,7 +83,7 @@ export async function callTool(tool: McpTool, args: Record<string, unknown>, ctx
     const level = tool.permission ? await permissionLevel(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase) : 'allowed'
     if (level === 'blocked' && tool.permission) {
       out = { text: refusalMessage(tool.permission, 'blocked'), isError: true }
-    } else if (level === 'approval' && tool.permission) {
+    } else if (level === 'approval' && tool.permission && !tool.runsAtApproval) {
       const requested = await requestApproval({
         tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission,
         operation: 'voice.tool', payload: chat ? { tool: tool.name, args, via: 'chat' } : { tool: tool.name, args },
@@ -169,6 +177,7 @@ export async function handleMcpMessage(
           // show the model the text, and the ids live in the data.
           content: [
             { type: 'text', text: out.text },
+            ...(out.images ?? []).map(img => ({ type: 'image', data: img.data, mimeType: img.mimeType })),
             ...(out.data ? [{ type: 'text', text: JSON.stringify(out.data) }] : []),
           ],
           ...(out.data ? { structuredContent: out.data } : {}),

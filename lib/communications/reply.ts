@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
-import { buildEmailRaw, ensureAngleBrackets } from '@/lib/email/build-raw'
+import { buildEmailRaw, ensureAngleBrackets, type EmailAttachment } from '@/lib/email/build-raw'
 
 // Replying to an email on the job's comms log: sends in the same Gmail thread
 // (Re: subject, In-Reply-To/References) to whoever sent it, and records the
@@ -35,13 +35,15 @@ export interface ReplyResult {
 /**
  * Sends body as a reply to the email commId. supabase reads the source email
  * (the signed-in user's client, or the service client for automations);
- * tenantId is always enforced.
+ * tenantId is always enforced. attachments go with it (the voice connector's
+ * job photos and files).
  */
 export async function replyToEmail(
   supabase: SupabaseClient<Database>,
   tenantId: string,
   commId: string,
   body: string,
+  attachments: EmailAttachment[] = [],
 ): Promise<ReplyResult> {
   const { data: comm, error: commErr } = await supabase
     .from('communications')
@@ -89,6 +91,7 @@ export async function replyToEmail(
     body,
     inReplyTo,
     references,
+    attachments: attachments.length ? attachments : undefined,
   })
 
   // Send via Gmail — threadId appends to the existing conversation
@@ -130,6 +133,7 @@ export async function replyToEmail(
     to_email: source.from_email,
     thread_id: source.thread_id,
     source: 'manual_reply',
+    ...(attachments.length ? { attachments: attachments.map(a => ({ filename: a.filename, mime_type: a.mimeType, size_bytes: a.content.length })) } : {}),
   })
 
   if (insertErr) {

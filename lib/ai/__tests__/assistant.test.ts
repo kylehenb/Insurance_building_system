@@ -121,6 +121,41 @@ describe('assistant turn', () => {
   })
 })
 
+describe('tools that return photos or only prepare a draft', () => {
+  const photo: McpTool = {
+    name: 'get_job_photo', title: 'View job photo', description: 'Photo', inputSchema: { type: 'object' },
+    annotations: { readOnlyHint: true },
+    run: vi.fn(async () => ({ text: 'IRC1055: photo 2 (Floor plan)', images: [{ data: 'AAAA', mimeType: 'image/jpeg' }] })),
+  }
+  const draft: McpTool = {
+    name: 'save_draft', title: 'Save draft', description: 'Draft', inputSchema: { type: 'object' },
+    annotations: {}, permission: 'mail.send', runsAtApproval: true,
+    run: vi.fn(async () => ({ text: 'Draft saved.' })),
+  }
+
+  it('shows Claude the photo, but keeps it out of the history sent back to the browser', async () => {
+    const { client, create } = fakeClient(reply('tool_use', toolUse('c1', 'get_job_photo')), reply('end_turn', text('4.2 by 3.6 metres.')))
+    const out = await runAssistantTurn({ client, history: [], userContent: [{ type: 'text', text: 'Size of the kitchen?' }], ctx, tools: [photo], model: 'claude-sonnet-5-5' })
+    const sent = create.mock.calls[1][0].messages[2].content[0]
+    expect(sent.content).toEqual([
+      { type: 'text', text: 'IRC1055: photo 2 (Floor plan)' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+    ])
+    expect(out.history[2].content).toEqual([{
+      type: 'tool_result', tool_use_id: 'c1', is_error: false,
+      content: [{ type: 'text', text: 'IRC1055: photo 2 (Floor plan)' }, { type: 'text', text: '(1 image shown here earlier — call the tool again to look again.)' }],
+    }])
+  })
+
+  it('runs a draft at "needs approval" instead of queueing it', async () => {
+    level.mockResolvedValueOnce('approval')
+    const { client } = fakeClient(reply('tool_use', toolUse('c1', 'save_draft')), reply('end_turn', text('Saved.')))
+    await runAssistantTurn({ client, history: [], userContent: [{ type: 'text', text: 'Draft it' }], ctx, tools: [draft], model: 'claude-sonnet-5-5' })
+    expect(draft.run).toHaveBeenCalled()
+    expect(requestApproval).not.toHaveBeenCalled()
+  })
+})
+
 describe('read_records', () => {
   function fakeDb(rows: Block[]) {
     const eqs: [string, unknown][] = []

@@ -1,12 +1,9 @@
-import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/supabase/database.types'
 import { composeAccess } from '@/lib/mail/access'
-import { ATTACHMENT_BUCKET } from '@/lib/mail/compose'
-import type { DraftAttachment } from '@/lib/mail/compose-rules'
-import { mailDb } from '@/lib/mail/sync'
-import { DocumentSendError, parseDocumentRef, prepareDocument } from '@/lib/documents/send/documents'
+import { ComposeError } from '@/lib/mail/compose'
+import { renderJobDocument } from '@/lib/mail/job-documents'
+import { storeDraftUpload } from '@/lib/mail/job-files'
+import { DocumentSendError, parseDocumentRef } from '@/lib/documents/send/documents'
 import { PrintDataError } from '@/lib/documents/print-data'
 
 export const maxDuration = 120
@@ -27,21 +24,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   try {
     const ref = parseDocumentRef(body.ref)
-    const db = mailDb()
-    const doc = await prepareDocument(ref, { supabase: db as unknown as SupabaseClient<Database>, tenantId: access.tenantId })
-    if (typeof body.jobId === 'string' && doc.job.id !== body.jobId) {
-      return NextResponse.json({ error: 'That document belongs to another job' }, { status: 400 })
-    }
-    const pdf = await doc.render()
-    const path = `${access.tenantId}/${randomUUID()}/${doc.filename.replace(/[/\\]/g, '_')}`
-    const { error } = await db.storage.from(ATTACHMENT_BUCKET).upload(path, pdf, { contentType: 'application/pdf' })
-    if (error) throw new Error(error.message)
-    const attachment: DraftAttachment = { kind: 'upload', path, filename: doc.filename, mimeType: 'application/pdf', size: pdf.length }
-    return NextResponse.json({ attachment, title: doc.title, warnings: doc.warnings ?? [] })
+    const doc = await renderJobDocument(access.tenantId, typeof body.jobId === 'string' ? body.jobId : null, ref)
+    const attachment = await storeDraftUpload(access.tenantId, doc)
+    return NextResponse.json({ attachment, title: doc.title, warnings: doc.warnings })
   } catch (err) {
     if (err instanceof DocumentSendError || err instanceof PrintDataError) {
       return NextResponse.json({ error: err.message }, { status: (err as { status?: number }).status ?? 400 })
     }
+    if (err instanceof ComposeError && err.status !== 502) return NextResponse.json({ error: err.message }, { status: err.status })
     console.error('[mail] job document attach failed:', err)
     return NextResponse.json({ error: 'Could not make the PDF' }, { status: 502 })
   }

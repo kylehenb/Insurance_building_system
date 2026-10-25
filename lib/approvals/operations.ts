@@ -245,6 +245,12 @@ const mailSchedule: Operation<{ draftId: string; sendAt: string }> = {
 /** A readable description of a voice tool call, from the same lookups as the app's operations */
 async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: OperationContext): Promise<{ text: string; jobId: string | null }> {
   const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
+  // The job photos and files a send carries (the approver should see them)
+  const listed = (k: string) => (Array.isArray(args[k]) ? (args[k] as unknown[]).map(v => (typeof v === 'string' ? v : JSON.stringify(v))) : [])
+  const extras = [
+    ...listed('attach_photos').map(p => `photo ${p}`), ...listed('attach_files'), ...(listed('attach_documents').length ? [`${listed('attach_documents').length} document PDF(s)`] : []),
+  ]
+  const withExtras = (summary: string) => (extras.length ? `${summary}, attaching ${clip(extras.join(', '), 120)}` : summary)
   try {
     if (tool === 'send_work_order' && str('work_order_id')) {
       const d = await workOrderSend.describe({ workOrderId: str('work_order_id')!, overrides: { to: str('to'), body: str('body') } }, ctx)
@@ -252,11 +258,11 @@ async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: Ope
     }
     if (tool === 'send_documents' && Array.isArray(args.documents)) {
       const d = await documentsSend.describe({ refs: args.documents as DocumentRef[], mode: 'custom', overrides: { to: str('to'), body: str('body') } }, ctx)
-      return { text: d.summary, jobId: d.jobId }
+      return { text: withExtras(d.summary), jobId: d.jobId }
     }
     if (tool === 'reply_to_email' && str('email_id')) {
       const d = await replySend.describe({ commId: str('email_id')!, body: str('body') ?? '' }, ctx)
-      return { text: d.summary, jobId: d.jobId }
+      return { text: withExtras(d.summary), jobId: d.jobId }
     }
     if (tool === 'lodge_order' && str('order_id')) {
       const d = await orderLodge.describe({ orderId: str('order_id')! }, ctx)

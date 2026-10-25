@@ -52,6 +52,7 @@ export function fakeSupabase(db: Record<string, Row[]>) {
       delete: () => { mode = 'delete'; return b },
       eq: (c: string, v: unknown) => { preds.push(r => r[c] === v); return b },
       neq: (c: string, v: unknown) => { preds.push(r => r[c] !== v); return b },
+      gte: (c: string, v: unknown) => { preds.push(r => String(r[c] ?? '') >= String(v)); return b },
       is: (c: string, v: unknown) => { preds.push(r => (r[c] ?? null) === v); return b },
       in: (c: string, vs: unknown[]) => { preds.push(r => vs.includes(r[c])); return b },
       ilike: (c: string, p: string) => { preds.push(r => likeToRegex(p).test(String(r[c] ?? ''))); return b },

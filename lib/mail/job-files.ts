@@ -55,8 +55,10 @@ export async function listJobAttachables(tenantId: string, jobId: string, db = m
   }
 }
 
-/** Copies one of the job's files or photos into the draft's uploads */
-export async function attachJobFile(tenantId: string, jobId: string, source: JobFileSource, id: string, db = mailDb()): Promise<DraftAttachment> {
+export interface JobFileContent { filename: string; mimeType: string; content: Buffer }
+
+/** One of the job's files or photos, read from storage */
+export async function readJobFile(tenantId: string, jobId: string, source: JobFileSource, id: string, db = mailDb()): Promise<JobFileContent> {
   let bucket: string, storagePath: string, filename: string, mimeType: string
   if (source === 'file') {
     const { data } = await db.from('job_files').select('file_name, mime_type, storage_path')
@@ -74,11 +76,20 @@ export async function attachJobFile(tenantId: string, jobId: string, source: Job
 
   const { data: blob, error } = await db.storage.from(bucket).download(storagePath)
   if (error || !blob) throw new ComposeError(`Couldn't read ${filename}`, 502)
-  const content = Buffer.from(await blob.arrayBuffer())
-  if (content.length > MAX_EMAIL_BYTES) throw new ComposeError(`${filename} is over Gmail's 25 MB limit`, 413)
+  return { filename, mimeType, content: Buffer.from(await blob.arrayBuffer()) }
+}
 
+/** Keeps a file with the draft's uploads */
+export async function storeDraftUpload(tenantId: string, file: JobFileContent, db = mailDb()): Promise<DraftAttachment> {
+  const { filename, mimeType, content } = file
+  if (content.length > MAX_EMAIL_BYTES) throw new ComposeError(`${filename} is over Gmail's 25 MB limit`, 413)
   const path = `${tenantId}/${randomUUID()}/${filename.replace(/[/\\]/g, '_')}`
   const { error: upErr } = await db.storage.from(ATTACHMENT_BUCKET).upload(path, content, { contentType: mimeType, upsert: false })
   if (upErr) throw new ComposeError(`Couldn't attach ${filename}`, 502)
   return { kind: 'upload', path, filename, mimeType, size: content.length }
+}
+
+/** Copies one of the job's files or photos into the draft's uploads */
+export async function attachJobFile(tenantId: string, jobId: string, source: JobFileSource, id: string, db = mailDb()): Promise<DraftAttachment> {
+  return storeDraftUpload(tenantId, await readJobFile(tenantId, jobId, source, id, db), db)
 }

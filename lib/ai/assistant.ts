@@ -135,6 +135,7 @@ async function runTool(block: Anthropic.Beta.BetaToolUseBlock, tools: McpTool[],
   const args = block.input && typeof block.input === 'object' ? block.input as Record<string, unknown> : {}
   let text: string
   let isError = false
+  let images: { data: string; mimeType: string }[] = []
   if (block.name === READ_RECORDS.name) {
     try {
       const out = await readRecords(args, ctx)
@@ -155,9 +156,18 @@ async function runTool(block: Anthropic.Beta.BetaToolUseBlock, tools: McpTool[],
       // The data carries the ids later calls need
       text = out.data ? `${out.text}\n${JSON.stringify(out.data)}` : out.text
       isError = !!out.isError
+      images = out.images ?? []
     }
   }
-  return { type: 'tool_result', tool_use_id: block.id, content: text, is_error: isError }
+  if (!images.length) return { type: 'tool_result', tool_use_id: block.id, content: text, is_error: isError }
+  // Photos the tool returned (get_job_photo), for Claude to look at
+  return {
+    type: 'tool_result', tool_use_id: block.id, is_error: isError,
+    content: [
+      { type: 'text', text },
+      ...images.map(img => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: img.mimeType as 'image/jpeg', data: img.data } })),
+    ],
+  }
 }
 
 /** Text the user sees from one response */
@@ -222,6 +232,27 @@ export async function runAssistantTurn(params: {
     let text = replyText(response.content)
     if (response.stop_reason === 'refusal') text = text || "Sorry, I can't help with that one."
     if (response.stop_reason === 'max_tokens') text = `${text}\n\n(That answer was cut short — ask me to continue.)`.trim()
-    return { text: text || 'Done.', history: messages }
+    return { text: text || 'Done.', history: withoutToolImages(messages) }
   }
+}
+
+/** The history sent back to the browser, minus photos tools returned (they'd make every later request heavy) */
+function withoutToolImages(messages: MessageParam[]): MessageParam[] {
+  return messages.map(m => {
+    if (m.role !== 'user' || !Array.isArray(m.content)) return m
+    let changed = false
+    const content = m.content.map(block => {
+      if (block.type !== 'tool_result' || !Array.isArray(block.content) || !block.content.some(c => c.type === 'image')) return block
+      changed = true
+      const n = block.content.filter(c => c.type === 'image').length
+      return {
+        ...block,
+        content: [
+          ...block.content.filter(c => c.type !== 'image'),
+          { type: 'text' as const, text: `(${n} image${n === 1 ? '' : 's'} shown here earlier — call the tool again to look again.)` },
+        ],
+      }
+    })
+    return changed ? { ...m, content } as MessageParam : m
+  })
 }

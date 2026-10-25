@@ -57,7 +57,11 @@ vi.mock('@/lib/mail/job-files', () => ({
     ],
     files: [{ id: FILE, name: 'Scope.pdf', description: 'From insurer', mimeType: 'application/pdf', size: 50, createdAt: '2026-10-01' }],
   })),
-  attachJobFile: spy('attachJobFile', (_t, _j, source, id) => ({ kind: 'upload', path: `t1/x/${id}`, filename: source === 'file' ? 'Scope.pdf' : `${id}.jpg`, mimeType: 'image/jpeg', size: 100 })),
+  readJobFile: spy('readJobFile', (_t, _j, source, id) => ({ filename: source === 'file' ? 'Scope.pdf' : `${id}.jpg`, mimeType: source === 'file' ? 'application/pdf' : 'image/jpeg', content: Buffer.from('x') })),
+  storeDraftUpload: spy('storeDraftUpload', (_t, f) => {
+    const file = f as { filename: string; mimeType: string; content: Buffer }
+    return { kind: 'upload', path: `t1/x/${file.filename}`, filename: file.filename, mimeType: file.mimeType, size: file.content.length }
+  }),
 }))
 vi.mock('@/lib/mcp/tools/excess', () => ({
   isToolResult: (v: unknown) => !!v && typeof v === 'object' && 'text' in v,
@@ -162,7 +166,7 @@ describe('send_email with a job\'s photos and files', () => {
   it('files it on the job and attaches the chosen photos and files', async () => {
     const out = await sendEmailTool.run({ to: 'bob@trade.com', subject: 'Photos', body: 'Hi Bob', job_number: 'IRC1001', attach_photos: [PHOTO], attach_files: [FILE] }, ctx)
     expect(calls.startCompose[0].slice(1)).toEqual(['new', null, 'j1'])
-    expect(calls.attachJobFile.map(c => c.slice(0, 4))).toEqual([['t1', 'j1', 'photo', PHOTO], ['t1', 'j1', 'file', FILE]])
+    expect(calls.readJobFile.map(c => c.slice(0, 4))).toEqual([['t1', 'j1', 'photo', PHOTO], ['t1', 'j1', 'file', FILE]])
     const state = calls.saveDraft[0][3] as { attachments: { filename: string }[] }
     expect(state.attachments.map(a => a.filename)).toEqual([`${PHOTO}.jpg`, 'Scope.pdf'])
     expect(out.text).toBe('Sent "Photos" to bob@trade.com with 2 attachments.')
@@ -170,14 +174,14 @@ describe('send_email with a job\'s photos and files', () => {
 
   it('attaches every photo for ["all"]', async () => {
     await sendEmailTool.run({ to: 'bob@trade.com', subject: 'Photos', body: 'Hi', job_number: 'IRC1001', attach_photos: ['all'] }, ctx)
-    expect(calls.attachJobFile.map(c => c[3])).toEqual([PHOTO, PHOTO2])
+    expect(calls.readJobFile.map(c => c[3])).toEqual([PHOTO, PHOTO2])
   })
 
-  it('needs the job, and real ids', async () => {
+  it('needs the job, and photos that are on it', async () => {
     expect((await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', attach_photos: [PHOTO] }, ctx)).text).toMatch(/Which job/)
     expect((await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', job_number: 'IRC9', attach_photos: [PHOTO] }, ctx)).text).toMatch(/No job IRC9/)
-    expect((await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', job_number: 'IRC1001', attach_photos: ['kitchen'] }, ctx)).text).toMatch(/list_job_files/)
-    expect(calls.attachJobFile).toBeUndefined()
+    expect((await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', job_number: 'IRC1001', attach_photos: ['bathroom'] }, ctx)).text).toMatch(/list_job_files/)
+    expect(calls.readJobFile).toBeUndefined()
     expect(calls.saveDraft).toBeUndefined()
   })
 })

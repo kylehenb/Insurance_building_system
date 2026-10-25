@@ -2,6 +2,7 @@ import type { McpTool, McpToolResult } from '@/lib/mcp/server'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { ReplyError, replyToEmail } from '@/lib/communications/reply'
+import { ATTACH_PROPERTIES, fitJobAttachments, hasAttachArgs, loadJobAttachments, skippedText, type JobAttachment } from '@/lib/mcp/tools/job-attachments'
 
 // Email by voice: what's come in on a job (or isn't on a job yet), reading
 // one in full, and replying in its thread with the Reply box's own function
@@ -156,6 +157,7 @@ export const replyToEmailTool: McpTool = {
     'Replies to an incoming email in the same conversation, to whoever sent it, from the office address — like the Reply box in the app — and records it on the job.',
     'Write the reply as plain text in the user\'s words (a short greeting and sign-off are fine; don\'t add commitments they didn\'t make).',
     'ONLY call this after reading back who it goes to and the full reply, and the user has clearly said yes.',
+    'attach_photos ("2", "45-47", a label) / attach_files / attach_documents attach the email\'s job\'s photos, files and quotes/reports/invoices (job_number if the email isn\'t on a job); say which in the read-back.',
     'The same reply on the same conversation within 10 minutes is refused as a likely repeat unless send_anyway: true.',
     'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
@@ -165,6 +167,8 @@ export const replyToEmailTool: McpTool = {
       email_id: { type: 'string', description: 'email_id of the incoming email, from list_job_emails.' },
       body: { type: 'string', description: 'The reply text.' },
       send_anyway: { type: 'boolean', description: 'The user confirmed sending the same reply again.' },
+      job_number: { type: 'string', description: 'Where the attachments come from, if the email isn\'t on a job.' },
+      ...ATTACH_PROPERTIES,
     },
     required: ['email_id', 'body'],
     additionalProperties: false,
@@ -202,9 +206,33 @@ export const replyToEmailTool: McpTool = {
       }
     }
 
+    let files: JobAttachment[] = []
+    if (hasAttachArgs(args)) {
+      let job: { id: string; job_number: string } | null = null
+      if (typeof args.job_number === 'string' && args.job_number.trim()) {
+        const found = await jobFromArgs(args, ctx)
+        if (isToolResult(found)) return found
+        job = found
+      } else if (e.job_id) {
+        const { data: onJob, error: jobErr } = await ctx.supabase.from('jobs').select('id, job_number').eq('tenant_id', ctx.tenantId).eq('id', e.job_id).maybeSingle()
+        if (jobErr) throw jobErr
+        job = onJob
+      }
+      if (!job) return { text: 'Which job are the attachments from? Give job_number.', isError: true }
+      const loaded = await loadJobAttachments(args, ctx, job)
+      if (isToolResult(loaded)) return loaded
+      const fit = await fitJobAttachments(loaded)
+      if (fit.skipped.length) return { text: `Not sent. ${skippedText(fit)} Send them in a second email.`, isError: true }
+      files = fit.kept
+    }
+
     try {
-      const result = await replyToEmail(ctx.supabase, ctx.tenantId, id, body)
-      return { text: `Replied to ${result.to}: "${result.subject}".`, data: { to: result.to, subject: result.subject } }
+      const result = await replyToEmail(ctx.supabase, ctx.tenantId, id, body, files)
+      const names = files.map(f => f.filename)
+      return {
+        text: `Replied to ${result.to}: "${result.subject}"${names.length ? `, attached ${names.join(', ')}` : ''}.`,
+        data: { to: result.to, subject: result.subject, attachments: names },
+      }
     } catch (err) {
       if (err instanceof ReplyError) return { text: err.message, data: { status: err.status }, isError: true }
       throw err
