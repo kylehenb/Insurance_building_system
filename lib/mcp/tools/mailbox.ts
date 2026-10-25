@@ -4,8 +4,7 @@ import { plainTextToRichHtml } from '@/lib/email/rich-text'
 import { getMailbox } from '@/lib/mail/sync'
 import { getThreadDetail, listFolder, searchFolder, type ThreadListItem } from '@/lib/mail/list'
 import { applyThreadAction, MAX_THREADS_PER_ACTION } from '@/lib/mail/actions'
-import { ACTION_DONE, FOLDERS, isFolderKey, isMailAction, type FolderKey, type MailAction } from '@/lib/mail/folders'
-import { snoozeThreads } from '@/lib/mail/snooze'
+import { ACTION_DONE, FOLDERS, isFolderKey, isMailAction, type FolderKey } from '@/lib/mail/folders'
 import { isFiling } from '@/lib/mail/filing'
 import { ComposeError, openDraft, saveDraft, sendDraft, startCompose } from '@/lib/mail/compose'
 import { isComposeMode, readAddressInput, type ComposeState, type DraftAttachment } from '@/lib/mail/compose-rules'
@@ -18,6 +17,8 @@ import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import {
   ATTACH_PROPERTIES, fitJobAttachments, hasAttachArgs, loadJobAttachments, skippedText, storeJobAttachments, type JobAttachment,
 } from '@/lib/mcp/tools/job-attachments'
+import { CATEGORIES, cardsForThreads, type RowStar } from '@/lib/actions/cards'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // The office mailbox by voice — the Mail page's own functions (lib/mail):
 // what's in a folder or a search, reading a conversation, archive / bin /
@@ -43,7 +44,9 @@ function who(t: ThreadListItem, folder: FolderKey): string {
   return `from ${t.participants.filter(p => !p.me).map(p => p.name || p.email).join(', ') || 'us'}`
 }
 
-const threadSummary = (t: ThreadListItem) => ({
+const starLabel = (s: RowStar | undefined) => (s ? CATEGORIES.find(c => c.key === s.category)?.label ?? null : null)
+
+const threadSummary = (t: ThreadListItem, star?: RowStar) => ({
   conversation_id: t.id,
   subject: t.subject,
   snippet: t.snippet,
@@ -55,6 +58,7 @@ const threadSummary = (t: ThreadListItem) => ({
   attachments: t.has_attachments,
   job_number: t.job?.job_number ?? null,
   filing: t.filing,
+  star: star?.category ?? null,
 })
 
 export const listMailbox: McpTool = {
@@ -64,7 +68,7 @@ export const listMailbox: McpTool = {
     'Conversations in the office Gmail mailbox, newest first — the Mail page\'s list: who, subject, the start of the latest message, unread, and the job it\'s filed on.',
     'folder: inbox (default; its Primary tab), sent, drafts, all, spam or trash (the Bin).',
     'search takes Gmail search syntax (from:castle, subject:quote, has:attachment, newer_than:2d) and reaches all mail, not just recent.',
-    'filing: to_file lists emails not on a job yet (the old unlinked inbox). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply.',
+    'filing: to_file lists emails not on a job yet (the old unlinked inbox). Each shows its star if starred (on the to-do list). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply, star_email to star it.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -90,15 +94,18 @@ export const listMailbox: McpTool = {
     const page = q ? await searchFolder(mailbox, folder, tab, q, null, undefined, filing) : await listFolder(mailbox, folder, tab, null, undefined, filing)
     const threads = page.threads.slice(0, limit)
     const label = FOLDERS.find(f => f.key === folder)!.label
+    // Each one's star (its action card), if it has one
+    const stars = await cardsForThreads(ctx.supabase as unknown as SupabaseClient, ctx.tenantId, threads.map(t => t.id))
     if (!threads.length) {
       return { text: q ? `Nothing in ${label} matches "${q}".` : `Nothing in ${label}.`, data: { folder, conversations: [] } }
     }
     const lines = threads.map(t =>
       `- ${t.unread ? '(unread) ' : ''}${t.last_message_at ? spokenDate(t.last_message_at) : ''}, ${who(t, folder)}: "${t.subject || '(no subject)'}" — ${t.snippet || '(no text)'}` +
-      `${t.message_count > 1 ? ` [${t.message_count} messages]` : ''}${t.has_attachments ? ' [attachments]' : ''}${t.job ? ` [${t.job.job_number}]` : t.filing === 'to_file' ? ' [not on a job]' : ''}`)
+      `${t.message_count > 1 ? ` [${t.message_count} messages]` : ''}${t.has_attachments ? ' [attachments]' : ''}${t.job ? ` [${t.job.job_number}]` : t.filing === 'to_file' ? ' [not on a job]' : ''}` +
+      `${stars[t.id] ? ` [starred: ${starLabel(stars[t.id])}]` : ''}`)
     return {
       text: [`${label}${q ? ` matching "${q}"` : ''}:`, ...lines].join('\n'),
-      data: { folder, conversations: threads.map(threadSummary) },
+      data: { folder, conversations: threads.map(t => threadSummary(t, stars[t.id])) },
     }
   },
 }
@@ -159,16 +166,14 @@ export const organiseEmails: McpTool = {
   name: 'organise_emails',
   title: 'Organise emails',
   description: [
-    'Archive, move to the Bin (recoverable for 30 days), report spam, move back to the inbox, mark read / unread, or snooze — conversations from list_mailbox, as the Mail page\'s buttons do (changes Gmail too).',
-    'actions: archive, trash, spam, not_spam, inbox, read, unread, snooze (needs snooze_until, Perth time: out of the inbox until then, back unread; a reply brings it back sooner).',
-    'For archive, trash, spam and snooze, ONLY call after saying which conversations (sender and subject) and getting a clear yes.',
+    'Archive, move to the Bin (recoverable for 30 days), report spam, move back to the inbox, or mark read / unread — conversations from list_mailbox, as the Mail page\'s buttons do (changes Gmail too).',
+    'For archive, trash and spam, ONLY call after saying which conversations (sender and subject) and getting a clear yes.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       conversation_ids: { type: 'array', items: { type: 'string' }, description: 'conversation_id values from list_mailbox.' },
-      action: { type: 'string', enum: ['archive', 'trash', 'spam', 'not_spam', 'inbox', 'read', 'unread', 'snooze'] },
-      snooze_until: { type: 'string', description: 'For snooze: Perth date and time, e.g. "2026-10-26T08:00".' },
+      action: { type: 'string', enum: ['archive', 'trash', 'spam', 'not_spam', 'inbox', 'read', 'unread'] },
     },
     required: ['conversation_ids', 'action'],
     additionalProperties: false,
@@ -178,7 +183,7 @@ export const organiseEmails: McpTool = {
 
   async run(args, ctx): Promise<McpToolResult> {
     const action = args.action
-    if (action !== 'snooze' && (!isMailAction(action) || action === 'untrash')) return { text: 'Unknown action.', isError: true }
+    if (!isMailAction(action) || action === 'untrash') return { text: 'Unknown action.', isError: true }
     const ids = Array.isArray(args.conversation_ids)
       ? [...new Set(args.conversation_ids.map(str).filter(id => THREAD_ID_RE.test(id)))]
       : []
@@ -186,22 +191,8 @@ export const organiseEmails: McpTool = {
     if (ids.length > MAX_THREADS_PER_ACTION) return { text: `At most ${MAX_THREADS_PER_ACTION} at a time.`, isError: true }
 
     const mailbox = await getMailbox(ctx.tenantId)
-    let done: string
-    let result: { done: string[]; failed: string[] }
-    if (action === 'snooze') {
-      const until = str(args.snooze_until) ? parseSendAt(str(args.snooze_until)) : null
-      if (!until) return { text: 'Until when? snooze_until must be a date and time, e.g. 2026-10-26T08:00.', isError: true }
-      try {
-        result = await snoozeThreads(mailbox, ctx.userId || null, ids, until)
-      } catch (err) {
-        if (err instanceof ComposeError) return { text: err.message, isError: true }
-        throw err
-      }
-      done = `snoozed until ${spokenSendAt(until)}`
-    } else {
-      result = await applyThreadAction(mailbox, ids, action as MailAction)
-      done = ACTION_DONE[action as MailAction]
-    }
+    const result = await applyThreadAction(mailbox, ids, action)
+    const done = ACTION_DONE[action]
     const n = result.done.length
     if (!n) return { text: 'Gmail didn\'t accept the change.', data: result, isError: true }
     return {

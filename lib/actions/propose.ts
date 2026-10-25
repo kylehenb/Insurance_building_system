@@ -8,7 +8,7 @@ import { getJobSummary } from '@/lib/mcp/tools/jobs'
 import { readConversation } from '@/lib/mcp/tools/mailbox'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
-import { claimQueued, PRIORITY, type ActionCard, type CardStep, type StepKind } from './cards'
+import { CATEGORIES, claimQueued, isCategory, PRIORITY, type ActionCard, type CardStep, type StepKind } from './cards'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
@@ -27,7 +27,7 @@ const OWN_DOMAIN = 'insurancerepairco.com.au'
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
-  'list_action_cards', 'read_action_card', 'confirm_action_card', 'dismiss_action_card',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'star_email',
 ])
 
 const FINISH: Anthropic.Beta.BetaTool = {
@@ -41,9 +41,14 @@ const FINISH: Anthropic.Beta.BetaTool = {
       summary: { type: 'string', description: 'Two or three plain sentences: what the email says and where the job stands.' },
       reasoning: { type: 'string', description: 'Why these steps, briefly — what in the job file or emails led to them.' },
       priority: { type: 'string', enum: ['high', 'normal', 'low'], description: 'high: urgent or a deadline (make safe, insurer chasing, SLA). low: can wait.' },
+      category: {
+        type: 'string',
+        enum: CATEGORIES.map(c => c.key),
+        description: 'invoice: a bill or invoice IRC has to pay (a trade, supplier or subcontractor invoice). attend_submit: a job to attend (inspection, make safe, site visit) or a report or quote to finish and submit after attending. other: everything else.',
+      },
       job_number: { type: 'string', description: 'The job this is about, if you worked it out and the conversation is not on it yet.' },
     },
-    required: ['needs_action', 'title', 'summary', 'priority'],
+    required: ['needs_action', 'title', 'summary', 'priority', 'category'],
   },
 }
 
@@ -55,6 +60,8 @@ How it works:
 - Replies: send_email with mode "reply" and the conversation_id. Write the body as plain text in the office's voice — friendly, short, Australian English, a greeting with the person's first name. No sign-off or signature: the company signature is added. Don't promise dates, amounts or anything the job file doesn't support; if something needs the office to decide, leave a clear [placeholder] for them.
 - If the conversation isn't on a job and you can tell which job it's about, propose file_conversation with that job_number first. If it's an insurer's new work order that hasn't become an order, propose create_order_from_email.
 - Notifications, newsletters, receipts, spam-like mail, thank-yous and FYIs need nothing: call finish_card with needs_action false (you may propose organise_emails archive if it's clutter).
+- Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
+- If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
 - Always end by calling finish_card.
 
 Today is given in the first message. Times are Perth time (AWST).`
@@ -91,7 +98,7 @@ async function cardActor(db: SupabaseClient, tenantId: string): Promise<string> 
 
 const today = () => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date())
 
-type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log'>>
+type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log' | 'category'>>
 
 /**
  * Makes one card (already claimed: status generating). Returns what was
@@ -116,7 +123,8 @@ export async function generateCard(
     }
     const sent = detail.messages.filter(m => !m.labelIds.includes('DRAFT'))
     const latest = sent.at(-1)
-    if (latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
+    // A star the user set stays on their list even when we've answered
+    if (!card.starred_by && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
       return save({ status: 'done', title: detail.subject || '(no subject)', outcome: 'Already replied', job_id: detail.job?.id ?? null })
     }
 
@@ -136,7 +144,7 @@ export async function generateCard(
     ]
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
       role: 'user',
-      content: `Today: ${today()}.\n\nconversation_id: ${card.source_ref}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
+      content: `Today: ${today()}.\n\nconversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
     }]
 
     const steps: CardStep[] = []
@@ -213,11 +221,18 @@ export async function generateCard(
       const { data: job } = await db.from('jobs').select('id').eq('tenant_id', card.tenant_id).ilike('job_number', str('job_number')).maybeSingle()
       jobId = (job as { id: string } | null)?.id ?? null
     }
-    const needsAction = f.needs_action !== false || steps.length > 0
     const priority = PRIORITY[(str('priority') || 'normal') as keyof typeof PRIORITY] ?? PRIORITY.normal
+
+    // Starred (or re-starred) by the user while it was being read? Then it
+    // stays, with their symbol
+    const { data: latestRow } = await db.from('action_queue').select('starred_by').eq('id', card.id).maybeSingle()
+    const starred = !!(latestRow as { starred_by: string | null } | null)?.starred_by
+    const needsAction = starred || f.needs_action !== false || steps.length > 0
+    const category = isCategory(f.category) ? f.category : 'other'
 
     await db.from('action_queue').update({ model: CARD_MODEL, usage }).eq('id', card.id)
     return save({
+      ...(starred ? {} : { category }),
       status: needsAction ? 'pending' : 'no_action',
       title: str('title') || detail.subject || 'New email',
       description: str('summary') || lastText || null,

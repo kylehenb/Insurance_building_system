@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { CardStep, CardWithContext } from '@/lib/actions/cards'
-import { snoozePresets, spokenSendAt } from '@/lib/mail/schedule-rules'
+import type { CardCategory, CardStep, CardWithContext } from '@/lib/actions/cards'
+import { StarButton } from './Star'
 
-// One action card: what the email says, the AI's suggested steps (each can be
-// unticked, and emails edited), and Confirm / Skip / Snooze. Confirm runs the
-// ticked steps through the user's own permissions (lib/actions/confirm.ts).
+// One action card: its star (category — click to change), what the email
+// says, the AI's suggested steps (each can be unticked, and emails edited),
+// and Do steps / Skip. Doing runs the ticked steps through the user's own
+// permissions (lib/actions/confirm.ts).
 
 interface Props {
   card: CardWithContext
@@ -44,11 +45,11 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
 export function ActionCardView({ card, compact, onChanged, onOpenConversation }: Props) {
   const open = card.status === 'pending' || card.status === 'failed'
+  const live = open || card.status === 'queued' || card.status === 'generating'
   const [ticked, setTicked] = useState<Set<string>>(() => new Set(card.steps.filter(s => s.status !== 'done' && s.status !== 'skipped').map(s => s.id)))
   const [edits, setEdits] = useState<Record<string, Record<string, string>>>({})
   const [editing, setEditing] = useState<string | null>(() => (card.steps.find(s => s.kind === 'email' && s.status !== 'done')?.id ?? null))
   const [showWhy, setShowWhy] = useState(false)
-  const [snoozing, setSnoozing] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
   const field = (step: CardStep, key: string) => edits[step.id]?.[key] ?? str(step.args[key])
@@ -76,10 +77,10 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
     await post(`/api/actions/${card.id}/skip`)
     onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, 'Card skipped.')
   })
-  const snooze = (until: string) => run('snooze', async () => {
-    setSnoozing(false)
-    await post(`/api/actions/${card.id}/snooze`, { until })
-    onChanged({ ...card, status: 'snoozed', snoozed_until: until }, `Card snoozed until ${spokenSendAt(until)}.`)
+  const recategorise = (category: CardCategory | null) => run('star', async () => {
+    if (!category) return
+    await post(`/api/actions/${card.id}/category`, { category })
+    onChanged({ ...card, category }, 'Star changed.')
   })
   const retry = () => run('retry', async () => {
     const { card: updated } = await post('/api/actions/suggest', { threadId: card.source_ref })
@@ -92,6 +93,7 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
   return (
     <article className={`ac${compact ? ' compact' : ''}${card.priority && card.priority >= 80 ? ' high' : ''} st-${card.status}`}>
       <header className="ac-head">
+        {live && !compact && <StarButton category={card.category} cycleOff={false} disabled={!!busy} onCycle={recategorise} />}
         <div className="ac-titles">
           <div className="ac-title">
             {card.priority && card.priority >= 80 ? <span className="ac-urgent" title="Urgent">●</span> : null}
@@ -159,7 +161,6 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
 
           {card.status === 'failed' && card.error_log && <div className="ac-error">{card.error_log}</div>}
           {(card.status === 'done' || card.status === 'skipped' || card.status === 'no_action') && card.outcome && <div className="ac-outcome">{card.outcome}</div>}
-          {card.status === 'snoozed' && card.snoozed_until && <div className="ac-outcome">Snoozed until {spokenSendAt(card.snoozed_until)}</div>}
 
           <footer className="ac-foot">
             {open && card.steps.length > 0 && (
@@ -168,16 +169,6 @@ export function ActionCardView({ card, compact, onChanged, onOpenConversation }:
               </button>
             )}
             {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
-            {open && (
-              <span className="ac-snooze">
-                <button className="ac-btn" disabled={!!busy} onClick={() => setSnoozing(s => !s)}>Snooze</button>
-                {snoozing && (
-                  <span className="ac-snooze-menu">
-                    {snoozePresets().map(p => <button key={p.label} onClick={() => snooze(p.at)}>{p.label} <em>{spokenSendAt(p.at)}</em></button>)}
-                  </span>
-                )}
-              </span>
-            )}
             {card.source === 'email' && card.source_ref && card.status !== 'running' && (
               <button className="ac-btn ghost" disabled={!!busy} onClick={retry} title="Read the email and job file again">
                 {busy === 'retry' ? 'Reading…' : card.status === 'failed' ? 'Try again' : 'Re-suggest'}
@@ -196,8 +187,9 @@ const CARD_CSS = `
   .ac.high { border-left: 3px solid var(--danger); }
   .ac.compact { padding: 12px; margin-bottom: 0; }
   .ac.st-done, .ac.st-skipped, .ac.st-no_action { opacity: .75; }
-  .ac-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-  .ac-titles { min-width: 0; }
+  .ac-head { display: flex; gap: 8px; align-items: flex-start; }
+  .ac-head > .star-btn { margin: -2px 0 0 -4px; }
+  .ac-titles { min-width: 0; flex: 1; }
   .ac-title { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.35; }
   .ac.compact .ac-title { font-size: 13px; }
   .ac-urgent { color: var(--danger); margin-right: 6px; font-size: 10px; vertical-align: 2px; }
@@ -235,9 +227,4 @@ const CARD_CSS = `
   .ac-btn.primary { color: var(--cream); background: var(--ink); border-color: var(--ink); font-weight: 600; }
   .ac-btn.ghost { border-color: transparent; color: var(--grey-600); margin-left: auto; }
   .ac-btn:disabled { opacity: .55; cursor: default; }
-  .ac-snooze { position: relative; }
-  .ac-snooze-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 5; display: flex; flex-direction: column; min-width: 230px; background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); padding: 4px 0; }
-  .ac-snooze-menu button { display: flex; justify-content: space-between; gap: 10px; font: inherit; font-size: 13px; background: none; border: none; padding: 7px 12px; cursor: pointer; text-align: left; }
-  .ac-snooze-menu button:hover { background: var(--surface-2); }
-  .ac-snooze-menu em { font-style: normal; color: var(--subtle); font-size: 12px; }
 `

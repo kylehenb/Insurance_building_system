@@ -16,7 +16,7 @@ import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
 import { addJobNote, getJobSummary } from '@/lib/mcp/tools/jobs'
 import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 import { listActivityTool } from '@/lib/mcp/tools/activity'
-import { confirmActionCard, dismissActionCard, listActionCards, readActionCard } from '@/lib/mcp/tools/action-cards'
+import { confirmActionCard, listActionCards, readActionCard, skipActionCard, starEmail } from '@/lib/mcp/tools/action-cards'
 import { fileConversation, listJobFiles, listMailbox, organiseEmails, readConversation, saveDraftTool, sendEmailTool } from '@/lib/mcp/tools/mailbox'
 import { getJobPhoto } from '@/lib/mcp/tools/job-attachments'
 
@@ -77,7 +77,8 @@ export const MCP_TOOLS: McpTool[] = [
   listActionCards,
   readActionCard,
   confirmActionCard,
-  dismissActionCard,
+  skipActionCard,
+  starEmail,
   listApprovalsTool,
   decideApprovalTool,
   listActivityTool,

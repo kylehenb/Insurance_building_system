@@ -38,7 +38,6 @@ vi.mock('@/lib/mail/compose', async () => {
   }
 })
 vi.mock('@/lib/mail/scheduled', () => ({ scheduleDraft: spy('scheduleDraft', (_m, _u, _d, at) => ({ send_at: at })) }))
-vi.mock('@/lib/mail/snooze', () => ({ snoozeThreads: spy('snoozeThreads', (_m, _u, ids) => ({ done: ids, failed: [] })) }))
 vi.mock('@/lib/mail/file-thread', () => {
   class FileThreadError extends Error {}
   return {
@@ -70,11 +69,12 @@ vi.mock('@/lib/mcp/tools/excess', () => ({
 }))
 
 let sentRows: { content: string; to_email: string }[] = []
+let starRows: { id: string; source_ref: string; status: string; title: string; category: string }[] = []
 const supabase = {
-  from: () => {
+  from: (name: string) => {
     const b: Record<string, unknown> = {
-      select: () => b, eq: () => b, gte: () => b,
-      then: (res: (v: unknown) => unknown) => Promise.resolve({ data: sentRows, error: null }).then(res),
+      select: () => b, eq: () => b, gte: () => b, in: () => b,
+      then: (res: (v: unknown) => unknown) => Promise.resolve({ data: name === 'action_queue' ? starRows : sentRows, error: null }).then(res),
     }
     return b
   },
@@ -86,6 +86,7 @@ const { listMailbox, readConversation, organiseEmails, sendEmailTool, fileConver
 beforeEach(() => {
   for (const k of Object.keys(calls)) delete calls[k]
   sentRows = []
+  starRows = []
 })
 
 describe('list_mailbox', () => {
@@ -94,6 +95,14 @@ describe('list_mailbox', () => {
     expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, null])
     expect(out.text).toContain('(unread)')
     expect(out.text).toContain('from Jane: "Roof leak" — Can you quote? [2 messages] [attachments] [IRC1001]')
+    expect(out.text).not.toContain('starred')
+  })
+
+  it('shows which are starred, and under which star', async () => {
+    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'invoice' }]
+    const out = await listMailbox.run({}, ctx)
+    expect(out.text).toContain('[IRC1001] [starred: Invoices to pay]')
+    expect((out.data!.conversations as { star: string }[])[0].star).toBe('invoice')
   })
 
   it('searches Gmail for a search or unread only', async () => {
@@ -202,10 +211,7 @@ describe('phase 5 by voice', () => {
     expect(calls.listFolder[0].slice(1)).toEqual(['inbox', 'primary', null, undefined, 'to_file'])
   })
 
-  it('snoozes until a Perth time', async () => {
-    const out = await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze', snooze_until: '2099-10-26T08:00' }, ctx)
-    expect(calls.snoozeThreads[0].slice(1)).toEqual(['u1', ['abc1'], '2099-10-26T00:00:00.000Z'])
-    expect(out.text).toBe('1 conversation snoozed until Mon 26 Oct, 8:00 am.')
+  it('has no snooze any more', async () => {
     expect((await organiseEmails.run({ conversation_ids: ['abc1'], action: 'snooze' }, ctx)).isError).toBe(true)
   })
 })
