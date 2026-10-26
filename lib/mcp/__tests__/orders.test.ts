@@ -123,8 +123,19 @@ describe('create_order_from_email', () => {
 describe('lodge_order', () => {
   it('lodges through the Lodge button’s function, scoped to the tenant', async () => {
     const res = await lodgeOrder.run({ order_id: ORDER_ID }, ctx)
-    expect(lodge).toHaveBeenCalledWith(ctx.supabase, ORDER_ID, { tenantId: 't1' })
+    expect(lodge).toHaveBeenCalledWith(ctx.supabase, ORDER_ID, { tenantId: 't1', userId: 'u1', skipAcknowledgement: false })
     expect(res.text).toBe('Lodged as job IRC1080.')
+  })
+
+  it('lodges without the acknowledgement when asked, and says so', async () => {
+    lodge.mockResolvedValueOnce({ jobNumber: 'IRC1080', jobId: 'j80', acknowledgement: { sent: false, skipped: 'Skipped on purpose when lodging' } })
+    const res = await lodgeOrder.run({ order_id: ORDER_ID, skip_acknowledgement: true }, ctx)
+    expect(lodge).toHaveBeenCalledWith(ctx.supabase, ORDER_ID, { tenantId: 't1', userId: 'u1', skipAcknowledgement: true })
+    expect(res.text).toBe('Lodged as job IRC1080. No acknowledgement was emailed, as asked; a note on the job says so.')
+    expect(res.data).toMatchObject({ acknowledgement_sent: false })
+    expect((lodgeOrder.inputSchema.properties as Record<string, unknown>).skip_acknowledgement).toEqual({
+      type: 'boolean', description: 'Lodge without emailing the sender an acknowledgement, e.g. when the office has already replied manually.',
+    })
   })
 
   it('reports a link to the existing job, and the same-address warning', async () => {
@@ -149,7 +160,7 @@ describe('Lodge button route', () => {
 
   it('answers as before: the job, the address warning with its fields, and errors', async () => {
     expect(await (await post({ orderId: ORDER_ID })).json()).toEqual({ jobNumber: 'IRC1080', jobId: 'j80' })
-    expect(lodge).toHaveBeenCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1' })
+    expect(lodge).toHaveBeenCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1', userId: null, skipAcknowledgement: false })
 
     lodge.mockRejectedValueOnce(new LodgeError('Address already exists in system', 409, { warning: true, matchingJobs: [], message: 'Found 1…' }))
     const warn = await post({ orderId: ORDER_ID })
@@ -162,6 +173,13 @@ describe('Lodge button route', () => {
     const boom = await post({ orderId: ORDER_ID })
     expect(boom.status).toBe(500)
     expect(await boom.json()).toEqual({ error: 'Internal server error' })
+  })
+
+  it('passes "Lodge without acknowledgement" through, and only a true flag', async () => {
+    await post({ orderId: ORDER_ID, skipAcknowledgement: true })
+    expect(lodge).toHaveBeenLastCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1', userId: null, skipAcknowledgement: true })
+    await post({ orderId: ORDER_ID, skipAcknowledgement: 'yes' })
+    expect(lodge).toHaveBeenLastCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1', userId: null, skipAcknowledgement: false })
   })
 
   it('refuses without a signed-in user', async () => {

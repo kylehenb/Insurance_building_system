@@ -14,7 +14,10 @@ import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 // the order's email thread, notifies the office and replies to the order's
 // sender acknowledging it (template 'order_acknowledgement') — or links the order to the
 // job that already has its claim number. Used by the Lodge button
-// (app/api/insurer-orders/lodge) and the voice connector.
+// (app/api/insurer-orders/lodge) and the voice connector. With
+// skipAcknowledgement (the office has already replied by hand) everything
+// happens the same except the acknowledgement, and a note on the job's Comms
+// feed says it was skipped on purpose.
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -49,14 +52,17 @@ export class LodgeError extends Error {
   }
 }
 
+export const ACKNOWLEDGEMENT_SKIPPED = 'Skipped on purpose when lodging'
+
 /**
  * Lodges an order. tenantId, when given, must own the order — both the Lodge
  * button (the signed-in user's tenant) and the voice connector pass it.
+ * userId is who lodged it, named on the skipped-acknowledgement note.
  */
 export async function lodgeInsurerOrder(
   supabase: SupabaseClient<Database>,
   orderId: string,
-  options: { tenantId?: string } = {},
+  options: { tenantId?: string; userId?: string | null; skipAcknowledgement?: boolean } = {},
 ): Promise<LodgeResult> {
   // Step 2: Fetch insurer_order
   console.log('[lodge] fetching order', orderId)
@@ -477,9 +483,44 @@ export async function lodgeInsurerOrder(
     inspectionId,
   })
 
-  const acknowledgement = await sendOrderAcknowledgement(supabase, { tenantId, orderId, jobId })
-  if (!acknowledgement.sent) console.warn('[lodge] acknowledgement not sent:', acknowledgement.skipped)
+  let acknowledgement: OrderAcknowledgementResult
+  if (options.skipAcknowledgement) {
+    acknowledgement = { sent: false, skipped: ACKNOWLEDGEMENT_SKIPPED }
+    await noteSkippedAcknowledgement(supabase, { tenantId, jobId, userId: options.userId ?? null, senderEmail: order.order_sender_email })
+  } else {
+    acknowledgement = await sendOrderAcknowledgement(supabase, { tenantId, orderId, jobId })
+    if (!acknowledgement.sent) console.warn('[lodge] acknowledgement not sent:', acknowledgement.skipped)
+  }
 
   console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
   return { jobNumber, jobId, acknowledgement }
+}
+
+// A note on the job's Comms feed, so the job's history shows the sender wasn't
+// sent an acknowledgement on purpose. Never fails the lodge.
+async function noteSkippedAcknowledgement(
+  supabase: SupabaseClient<Database>,
+  params: { tenantId: string; jobId: string; userId: string | null; senderEmail: string | null },
+): Promise<void> {
+  try {
+    let author: string | null = null
+    if (params.userId) {
+      const { data: user } = await supabase
+        .from('users').select('name').eq('tenant_id', params.tenantId).eq('id', params.userId).maybeSingle()
+      author = user?.name?.trim() || null
+    }
+    const to = params.senderEmail?.trim()
+    const { error } = await supabase.from('communications').insert({
+      tenant_id: params.tenantId,
+      job_id: params.jobId,
+      type: 'note',
+      content: `Order acknowledgement not emailed${to ? ` to ${to}` : ''}: skipped on purpose when the order was lodged.`,
+      contact_name: author ?? 'Note',
+      source: 'order_acknowledgement_skipped',
+      created_by: params.userId,
+    })
+    if (error) throw error
+  } catch (err) {
+    console.error(`[lodge] couldn't note the skipped acknowledgement on job ${params.jobId}:`, err)
+  }
 }

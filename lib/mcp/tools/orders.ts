@@ -214,11 +214,15 @@ export const lodgeOrder: McpTool = {
     'Lodges an insurer order as a job, exactly like the Lodge button: creates the job with the next job number and KPI due dates,',
     'plus the inspection, report, quote and invoice its work type needs, notifies the office, and emails the order\'s sender an acknowledgement (Settings → Email Templates → Order acknowledgement).',
     'If a job already has the claim number, the order is linked to that job instead. If another job has the same address with a different claim, nothing is created and the matching jobs are listed.',
-    'Read back the claim number, insured and address, say the sender will be emailed an acknowledgement, and get a clear yes first. Pass on it if the acknowledgement wasn\'t sent.',
+    'With skip_acknowledgement, everything else happens the same but no acknowledgement is emailed, and a note on the job says it was skipped on purpose.',
+    'Read back the claim number, insured and address, say whether the sender will be emailed an acknowledgement, and get a clear yes first. Pass on it if the acknowledgement wasn\'t sent.',
   ].join(' '),
   inputSchema: {
     type: 'object',
-    properties: { order_id: { type: 'string', description: 'order_id from list_insurer_orders or create_order_from_email.' } },
+    properties: {
+      order_id: { type: 'string', description: 'order_id from list_insurer_orders or create_order_from_email.' },
+      skip_acknowledgement: { type: 'boolean', description: 'Lodge without emailing the sender an acknowledgement, e.g. when the office has already replied manually.' },
+    },
     required: ['order_id'],
     additionalProperties: false,
   },
@@ -229,11 +233,14 @@ export const lodgeOrder: McpTool = {
     const id = typeof args.order_id === 'string' ? args.order_id.trim() : ''
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { text: 'Order not found — use list_insurer_orders for its id.', isError: true }
     try {
-      const result = await lodgeInsurerOrder(ctx.supabase, id, { tenantId: ctx.tenantId })
+      const skipAcknowledgement = args.skip_acknowledgement === true
+      const result = await lodgeInsurerOrder(ctx.supabase, id, { tenantId: ctx.tenantId, userId: ctx.userId || null, skipAcknowledgement })
       const ack = result.acknowledgement
       const ackText = !ack ? '' : ack.sent
         ? ` Acknowledgement emailed to ${ack.to}.`
-        : ` The acknowledgement wasn't sent: ${ack.skipped}.`
+        : skipAcknowledgement
+          ? ' No acknowledgement was emailed, as asked; a note on the job says so.'
+          : ` The acknowledgement wasn't sent: ${ack.skipped}.`
       return {
         text: result.linkedToExisting
           ? `That claim already has job ${result.jobNumber}, so the order was linked to it.`

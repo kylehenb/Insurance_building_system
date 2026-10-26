@@ -142,17 +142,18 @@ const replySend: Operation<{ commId: string; body: string }> = {
   },
 }
 
-const orderLodge: Operation<{ orderId: string }> = {
+const orderLodge: Operation<{ orderId: string; skipAcknowledgement?: boolean }> = {
   async describe(p, ctx) {
     const { data: o } = await ctx.service.from('insurer_orders').select('claim_number, property_address, insured_name, insurer').eq('tenant_id', ctx.tenantId).eq('id', p.orderId).maybeSingle()
     return {
-      summary: `Lodge the insurer order${o ? ` for ${[o.insurer, o.claim_number ? `claim ${o.claim_number}` : null, o.insured_name, o.property_address].filter(Boolean).join(', ')}` : ''} as a new job`,
+      summary: `Lodge the insurer order${o ? ` for ${[o.insurer, o.claim_number ? `claim ${o.claim_number}` : null, o.insured_name, o.property_address].filter(Boolean).join(', ')}` : ''} as a new job${p.skipAcknowledgement ? ', without emailing the sender an acknowledgement' : ''}`,
       jobId: null,
     }
   },
   async run(p, ctx) {
-    const result = await lodgeInsurerOrder(ctx.service, p.orderId, { tenantId: ctx.tenantId })
-    return result.linkedToExisting ? `Linked to existing job ${result.jobNumber}.` : `Lodged as ${result.jobNumber}.`
+    const result = await lodgeInsurerOrder(ctx.service, p.orderId, { tenantId: ctx.tenantId, userId: ctx.requesterId, skipAcknowledgement: p.skipAcknowledgement === true })
+    if (result.linkedToExisting) return `Linked to existing job ${result.jobNumber}.`
+    return p.skipAcknowledgement ? `Lodged as ${result.jobNumber}, without an acknowledgement.` : `Lodged as ${result.jobNumber}.`
   },
 }
 
@@ -265,7 +266,7 @@ async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: Ope
       return { text: withExtras(d.summary), jobId: d.jobId }
     }
     if (tool === 'lodge_order' && str('order_id')) {
-      const d = await orderLodge.describe({ orderId: str('order_id')! }, ctx)
+      const d = await orderLodge.describe({ orderId: str('order_id')!, skipAcknowledgement: args.skip_acknowledgement === true }, ctx)
       return { text: d.summary, jobId: null }
     }
     if (tool === 'resend_signing_request' && str('request_id')) {

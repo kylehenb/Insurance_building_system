@@ -16,7 +16,7 @@ type JobHit = {
   property_address: string | null
   claim_number: string | null
 }
-type Sheet = 'lodge' | 'reject' | 'link' | null
+type Sheet = 'lodge' | 'lodge_no_ack' | 'reject' | 'link' | null
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -136,13 +136,14 @@ export default function MobileOrderReview({
     setSheet(null)
   }
 
-  async function handleLodge() {
+  // skipAcknowledgement: "Lodge without acknowledgement" — the office has already replied to the sender
+  async function handleLodge(skipAcknowledgement = false) {
     setBusy(true); setError(null); setPending(null)
     try {
       const res = await fetch('/api/insurer-orders/lodge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
+        body: JSON.stringify(skipAcknowledgement ? { orderId: order.id, skipAcknowledgement: true } : { orderId: order.id }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -292,7 +293,7 @@ export default function MobileOrderReview({
         </div>
 
         {/* Spacer so content isn't hidden behind the action bar */}
-        {canAct && <div style={{ height: isLinked ? 90 : 220 }} />}
+        {canAct && <div style={{ height: isLinked ? 90 : 280 }} />}
       </main>
 
       {/* Sticky action bar */}
@@ -305,6 +306,7 @@ export default function MobileOrderReview({
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 560, margin: '0 auto' }}>
             {!isLinked && <button style={primaryBtn} onClick={() => openSheet('lodge')}>Lodge Order</button>}
+            {!isLinked && <button style={secondaryBtn} onClick={() => openSheet('lodge_no_ack')}>Lodge without acknowledgement</button>}
             {!isLinked && <button style={secondaryBtn} onClick={() => openSheet('link')}>Link to Existing Job</button>}
             <button style={dangerBtn} onClick={() => openSheet('reject')}>Reject</button>
           </div>
@@ -334,8 +336,23 @@ export default function MobileOrderReview({
                   A new job will be created for {order.insured_name || 'this insured'}
                   {order.property_address ? ` at ${order.property_address}` : ''}.
                 </p>
-                <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={handleLodge}>
+                <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={() => handleLodge()}>
                   {busy ? 'Lodging…' : 'Confirm Lodge'}
+                </button>
+              </>
+            )}
+
+            {sheet === 'lodge_no_ack' && (
+              <>
+                <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 6px' }}>Lodge without acknowledgement?</h3>
+                <p style={{ fontSize: 15, color: C.body, margin: '0 0 18px', lineHeight: 1.4 }}>
+                  A new job will be created for {order.insured_name || 'this insured'}
+                  {order.property_address ? ` at ${order.property_address}` : ''}, but{' '}
+                  {order.order_sender_email || 'the order’s sender'} won’t be emailed an acknowledgement.
+                  A note on the job will say it was skipped on purpose.
+                </p>
+                <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={() => handleLodge(true)}>
+                  {busy ? 'Lodging…' : 'Confirm — lodge without acknowledgement'}
                 </button>
               </>
             )}

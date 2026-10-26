@@ -284,6 +284,7 @@ function InsurerOrdersPageContent() {
   const [lodgeError, setLodgeError] = useState<string | null>(null)
   const [lodgePending, setLodgePending] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [skipAckOpen, setSkipAckOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkSearch, setLinkSearch] = useState('')
@@ -417,6 +418,7 @@ function InsurerOrdersPageContent() {
       setExpandedId(id)
       setLodging(false); setLodgeError(null)
       setRejectOpen(false); setRejectReason('')
+      setSkipAckOpen(false)
       setLinkOpen(false); setLinkSearch(''); setLinkResults([])
 
       // Initialize contacts and email fields for this order
@@ -596,13 +598,14 @@ function InsurerOrdersPageContent() {
     })
   }
 
-  async function handleLodge(order: InsurerOrder) {
-    setLodging(true); setLodgeError(null); setLodgePending(null)
+  // skipAcknowledgement: "Lodge without acknowledgement" — the office has already replied to the sender
+  async function handleLodge(order: InsurerOrder, skipAcknowledgement = false) {
+    setLodging(true); setLodgeError(null); setLodgePending(null); setSkipAckOpen(false)
     try {
       const res = await fetch('/api/insurer-orders/lodge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
+        body: JSON.stringify(skipAcknowledgement ? { orderId: order.id, skipAcknowledgement: true } : { orderId: order.id }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -614,7 +617,7 @@ function InsurerOrdersPageContent() {
       const { jobNumber, jobId, acknowledgement } = json as { jobNumber: string; jobId: string; acknowledgement?: { sent: boolean; skipped?: string } }
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, job_id: jobId, status: 'lodged' } : o))
       setJobNumbers(prev => ({ ...prev, [jobId]: jobNumber }))
-      if (acknowledgement && !acknowledgement.sent) setLodgeError(`Lodged as ${jobNumber}, but the acknowledgement email wasn't sent: ${acknowledgement.skipped}`)
+      if (acknowledgement && !acknowledgement.sent && !skipAcknowledgement) setLodgeError(`Lodged as ${jobNumber}, but the acknowledgement email wasn't sent: ${acknowledgement.skipped}`)
     } catch { setLodgeError('Network error — please try again') }
     setLodging(false)
   }
@@ -1307,6 +1310,14 @@ function InsurerOrdersPageContent() {
                                         >
                                           {lodging ? 'Lodging…' : 'Lodge Order'}
                                         </button>
+                                        <button
+                                          onClick={() => { setSkipAckOpen(v => !v); setRejectOpen(false) }}
+                                          disabled={lodging}
+                                          title="Lodge without emailing the sender an acknowledgement, e.g. when the office has already replied"
+                                          style={{ ...ghostBtn, opacity: lodging ? 0.5 : 1 }}
+                                        >
+                                          Lodge without acknowledgement
+                                        </button>
                                         <button onClick={() => setRejectOpen(v => !v)} disabled={lodging} style={{ ...ghostBtn, color: 'var(--danger-strong)', opacity: lodging ? 0.5 : 1 }}>Reject</button>
                                         <button onClick={() => setLinkOpen(v => !v)} disabled={lodging} style={{ ...ghostBtn, opacity: lodging ? 0.5 : 1 }}>Link to existing job</button>
                                       </>
@@ -1316,6 +1327,22 @@ function InsurerOrdersPageContent() {
                                   {lodgePending && <ApprovalNotice message={lodgePending} style={{ marginTop: 8 }} />}
                                   {lodgeError && (
                                     <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger-strong)' }}>{lodgeError}</div>
+                                  )}
+
+                                  {/* Lodge without acknowledgement — confirm */}
+                                  {skipAckOpen && !isLinked && order.status !== 'rejected' && (
+                                    <div style={{ marginTop: 12, padding: '14px 16px', background: 'var(--surface-7)', border: '0.5px solid var(--line-2)', borderRadius: 6 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--body)', marginBottom: 4 }}>Lodge without emailing an acknowledgement?</div>
+                                      <div style={{ fontSize: 12, color: 'var(--body)', marginBottom: 8 }}>
+                                        The job is created as normal, but {order.order_sender_email ? order.order_sender_email : 'the order’s sender'} won’t be emailed. A note on the job will say it was skipped on purpose.
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={() => handleLodge(order, true)} disabled={lodging} style={{ ...greenBtn, opacity: lodging ? 0.7 : 1 }}>
+                                          {lodging ? 'Lodging…' : 'Confirm — lodge without acknowledgement'}
+                                        </button>
+                                        <button onClick={() => setSkipAckOpen(false)} disabled={lodging} style={ghostBtn}>Cancel</button>
+                                      </div>
+                                    </div>
                                   )}
 
                                   {/* Reject inline form */}
