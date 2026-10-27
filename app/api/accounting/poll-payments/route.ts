@@ -67,6 +67,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .eq('tenant_id', tenant.id)
         .eq('accounting_sync_status', 'synced')
         .neq('status', 'paid')
+        // A voided invoice has a $0 balance in QuickBooks — that isn't a payment
+        .neq('status', 'voided')
 
       if (invoicesError || !invoicesData) {
         tenantSummary.error = `Failed to fetch invoices: ${invoicesError?.message}`

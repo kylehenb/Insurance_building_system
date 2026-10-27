@@ -87,7 +87,7 @@ const callTool = vi.fn(async (t: { name: string; run(a: Row): unknown }, args: R
 })
 vi.mock('@/lib/mcp/server', () => ({ callTool: (t: never, a: never, c: never) => callTool(t, a, c) }))
 
-const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, nextCategory } = await import('../cards')
+const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, nextCategory, updateCardText, markCardDone, reopenCard } = await import('../cards')
 const { generateCard, describeStep } = await import('../propose')
 const { confirmCard, CardError } = await import('../confirm')
 const { historyArrivals } = await import('@/lib/mail/summary')
@@ -394,5 +394,31 @@ describe('describeStep', () => {
     expect(describeStep(t('send_work_order'), { job_number: 'IRC1001' })).toEqual({ summary: 'Send work order — IRC1001', kind: 'change' })
     expect(describeStep(t('set_follow_up'), { when: '7', who: 'Ace Roofing', note: 'Chase the quote' }).summary).toBe('Remind me in 7 days to follow up with Ace Roofing: Chase the quote')
     expect(describeStep(t('set_follow_up'), { when: '2026-11-02', note: 'Call Jo' }).summary).toBe('Remind me on 2026-11-02: Call Jo')
+  })
+})
+
+describe('editing a card', () => {
+  const put = (o: Row) => { tables.action_queue = [{ id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', title: 'Old', steps: [], ...o }] }
+
+  it('retitles a card, but not while it\'s being written or run', async () => {
+    put({})
+    expect(await updateCardText(db as never, 't1', 'k1', { title: '  Chase the roofer  ', description: 'New summary' })).toMatchObject({ title: 'Chase the roofer', description: 'New summary' })
+    await expect(updateCardText(db as never, 't1', 'k1', { title: ' ' })).rejects.toThrow('needs a title')
+    put({ status: 'running' })
+    await expect(updateCardText(db as never, 't1', 'k1', { title: 'x' })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('marks a card done without running it, and puts a done card back on the list', async () => {
+    put({})
+    expect(await markCardDone(db as never, 't1', 'k1', 'u1')).toBe(true)
+    expect(tables.action_queue[0]).toMatchObject({ status: 'done', outcome: 'Marked done', confirmed_by: 'u1' })
+    expect(await reopenCard(db as never, 't1', 'k1')).toMatchObject({ status: 'pending', outcome: null })
+    await expect(reopenCard(db as never, 't1', 'k1')).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('won\'t reopen a card when its conversation has another one on the list', async () => {
+    put({ status: 'skipped' })
+    tables.action_queue.push({ id: 'k2', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', title: 'Newer', steps: [] })
+    await expect(reopenCard(db as never, 't1', 'k1')).rejects.toThrow('already has a card on the list')
   })
 })

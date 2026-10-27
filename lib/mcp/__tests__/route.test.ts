@@ -80,12 +80,12 @@ describe('mcp route', () => {
     expect(list.headers.get('cache-control')).toBe('no-store')
     const body = await list.json() as { result: { tools: { name: string }[] } }
     expect(body.result.tools.map(t => t.name)).toEqual([
-      'get_job_summary', 'add_job_note',
+      'find_job', 'get_job_summary', 'add_job_note',
       'find_work_orders', 'get_work_order', 'create_work_orders_from_quote', 'create_work_order', 'update_work_order', 'edit_work_order_items',
       'get_work_order_email', 'send_work_order',
       'list_job_documents', 'get_document_email', 'send_documents',
       'get_quote', 'find_line_items', 'create_quote', 'update_quote', 'edit_quote_items',
-      'get_invoice', 'create_invoice', 'update_invoice', 'edit_invoice_items',
+      'get_invoice', 'create_invoice', 'update_invoice', 'edit_invoice_items', 'void_invoice',
       'get_report', 'create_report', 'update_report',
       'get_job_excess', 'set_job_excess_decision',
       'get_signing', 'send_for_signature', 'resend_signing_request',
@@ -106,6 +106,7 @@ describe('mcp route', () => {
       'read_action_card',
       'confirm_action_card',
       'skip_action_card',
+      'update_action_card',
       'star_email',
       'set_follow_up',
       'list_follow_ups',
@@ -113,6 +114,7 @@ describe('mcp route', () => {
       'list_approvals',
       'decide_approval',
       'list_activity',
+      'find_contact',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })

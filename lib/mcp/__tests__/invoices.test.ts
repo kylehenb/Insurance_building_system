@@ -8,8 +8,10 @@ import { invoiceTotals } from '@/lib/invoices/totals'
 
 const sync = vi.fn(async (..._a: unknown[]) => undefined)
 vi.mock('@/lib/accounting/sync', () => ({ syncInvoiceToAccounting: (...a: unknown[]) => sync(...a) }))
+const voidInAccounting = vi.fn(async (_id: string) => undefined)
+vi.mock('@/lib/accounting/client', () => ({ getAccountingProvider: async () => ({ voidInvoice: (id: string) => voidInAccounting(id) }) }))
 
-const { getInvoice, createInvoiceTool, updateInvoiceTool, editInvoiceItems } = await import('../tools/invoices')
+const { getInvoice, createInvoiceTool, updateInvoiceTool, editInvoiceItems, voidInvoiceTool, normaliseInvoiceNumber } = await import('../tools/invoices')
 
 const db: Record<string, Row[]> = {}
 const ctx = { supabase: fakeSupabase(db) as never, tenantId: 't1', userId: 'u1' }
@@ -100,5 +102,76 @@ describe('create_invoice', () => {
     const res = await createInvoiceTool.run({ job_number: 'IRC1001', type: 'assessment' }, ctx)
     expect(res).toMatchObject({ isError: true })
     expect(res.text).toContain('Which report')
+  })
+})
+
+describe('void_invoice', () => {
+  // INV-IRC1001-2 is a $500 excess invoice, sent; a draft final invoice takes it off
+  const withFinal = (status = 'draft') => {
+    db.jobs[0].excess_decision = 'collect'
+    db.invoices.push({ id: 'q1', tenant_id: 't1', job_id: 'j1', invoice_ref: 'INV-IRC1001-4', invoice_type: 'quoted_amounts', direction: 'outbound', status, markup_pct: 0, gst_treatment: 'exclusive', amount_ex_gst: 1000, gst: 100, amount_inc_gst: 600 })
+    db.invoice_line_items.push({ id: 'ql', tenant_id: 't1', invoice_id: 'q1', description: 'Repairs', quantity: 1, unit_price: 1000, line_total: 1000, completed: true, sort_order: 0 })
+    db.invoice_deductions.push({ id: 'qd', tenant_id: 't1', invoice_id: 'q1', description: 'Policy Excess Payment Received', amount_inc_gst: 500 })
+  }
+
+  it('reads spoken invoice numbers', () => {
+    expect(normaliseInvoiceNumber('irc1053 2')).toBe('INV-IRC1053-2')
+    expect(normaliseInvoiceNumber('INV IRC1053-2')).toBe('INV-IRC1053-2')
+    expect(normaliseInvoiceNumber('inv-irc1053-2')).toBe('INV-IRC1053-2')
+  })
+
+  it('keeps the invoice, voided with who, when and why, and takes the excess off the draft final invoice', async () => {
+    withFinal()
+    const res = await voidInvoiceTool.run({ invoice_number: 'irc1001 2', reason: 'Castle confirmed no excess to be collected' }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(db.invoices.find(i => i.id === 'i2')).toMatchObject({ status: 'voided', voided_by: 'u1', void_reason: 'Castle confirmed no excess to be collected' })
+    expect(db.invoices.find(i => i.id === 'i2')!.voided_at).toBeTruthy()
+    // The deduction is gone and the final invoice is back to the full $1,100
+    expect(db.invoice_deductions).toHaveLength(0)
+    expect(db.invoices.find(i => i.id === 'q1')!.amount_inc_gst).toBe(1100)
+    expect(res.text).toContain('Voided INV-IRC1001-2 on IRC1001 (excess, $500): Castle confirmed no excess to be collected.')
+    expect(res.text).toContain('It never reached the accounting system.')
+    expect(res.text).toContain('INV-IRC1001-4 no longer takes the excess off — now $1,100 inc GST.')
+    expect(res.text).toContain('excess decision still says collecting')
+    expect(voidInAccounting).not.toHaveBeenCalled()
+    // Left out of the job's list from now on
+    expect((await getInvoice.run({ job_number: 'IRC1001' }, ctx)).text).not.toContain('INV-IRC1001-2')
+  })
+
+  it('voids it in the accounting system when it was synced, and says so when that fails', async () => {
+    Object.assign(db.invoices[1], { accounting_sync_status: 'synced', accounting_ref_id: 'qbo-77' })
+    const res = await voidInvoiceTool.run({ invoice_id: 'i2', reason: 'Raised twice' }, ctx)
+    expect(voidInAccounting).toHaveBeenCalledWith('qbo-77')
+    expect(db.invoices[1]).toMatchObject({ status: 'voided', accounting_sync_status: 'voided' })
+    expect(res.text).toContain('Voided in the accounting system too.')
+
+    db.invoices[0].accounting_sync_status = 'synced'
+    db.invoices[0].accounting_ref_id = 'qbo-78'
+    voidInAccounting.mockRejectedValueOnce(new Error('QBO down'))
+    const failed = await voidInvoiceTool.run({ invoice_id: 'i1', reason: 'Wrong job' }, ctx)
+    expect(db.invoices[0]).toMatchObject({ status: 'voided', accounting_sync_status: 'synced' })
+    expect(String(db.invoices[0].accounting_sync_error)).toContain('QBO down')
+    expect(failed.text).toContain('couldn\'t be voided in the accounting system — void it there by hand')
+  })
+
+  it('says a sent final invoice needs re-issuing rather than changing it', async () => {
+    withFinal('sent')
+    const res = await voidInvoiceTool.run({ invoice_id: 'i2', reason: 'No excess' }, ctx)
+    expect(db.invoice_deductions).toHaveLength(1)
+    expect(res.text).toContain('INV-IRC1001-4 was sent with the excess taken off — it needs re-issuing.')
+  })
+
+  it('needs a reason, and refuses paid, voided and unknown invoices', async () => {
+    expect((await voidInvoiceTool.run({ invoice_id: 'i1' }, ctx)).isError).toBe(true)
+    expect(db.invoices[0].status).toBe('draft')
+    db.invoices[1].paid_date = '2026-10-05'
+    expect((await voidInvoiceTool.run({ invoice_id: 'i2', reason: 'x' }, ctx)).text).toContain('has been paid')
+    expect((await voidInvoiceTool.run({ invoice_id: 'iv', reason: 'x' }, ctx)).text).toBe('INV-IRC1001-3 is already voided.')
+    expect((await voidInvoiceTool.run({ invoice_number: 'INV-IRC1001-9', reason: 'x' }, ctx))).toMatchObject({ isError: true, text: expect.stringContaining('No invoice INV-IRC1001-9') })
+  })
+
+  it('shows why a voided invoice was voided', async () => {
+    Object.assign(db.invoices[2], { void_reason: 'Duplicate', voided_at: '2026-10-20T02:00:00Z' })
+    expect((await getInvoice.run({ invoice_id: 'iv' }, ctx)).text).toContain('Voided on Tue, 20 Oct: Duplicate.')
   })
 })

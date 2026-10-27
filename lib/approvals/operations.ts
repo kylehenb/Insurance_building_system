@@ -16,6 +16,7 @@ import { lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { setJobStage } from '@/lib/jobs/set-stage'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import { generateInvoice, type GenerateInvoiceInput } from '@/lib/invoices/generate'
+import { voidInvoice } from '@/lib/invoices/void'
 import { describeDraft, sendDraft } from '@/lib/mail/compose'
 import { scheduleDraft } from '@/lib/mail/scheduled'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
@@ -195,6 +196,18 @@ const invoiceGenerate: Operation<{ input: GenerateInvoiceInput }> = {
   },
 }
 
+const invoiceVoid: Operation<{ invoiceId: string; reason?: string | null }> = {
+  async describe(p, ctx) {
+    const { data } = await ctx.service.from('invoices').select('invoice_ref, amount_inc_gst, job_id').eq('tenant_id', ctx.tenantId).eq('id', p.invoiceId).maybeSingle()
+    const reason = p.reason?.trim() ? ` — ${clip(p.reason.trim())}` : ''
+    return { summary: `Void invoice ${data?.invoice_ref ?? ''} ($${data?.amount_inc_gst ?? 0}) on ${await jobNumber(ctx, data?.job_id ?? null)}${reason}`.replace('  ', ' '), jobId: data?.job_id ?? null }
+  },
+  async run(p, ctx) {
+    const { invoice, warnings } = await voidInvoice(ctx.service, ctx.tenantId, p.invoiceId, { reason: p.reason, userId: ctx.requesterId })
+    return [`Voided ${invoice.invoice_ref ?? 'the invoice'}.`, ...warnings].join(' ')
+  },
+}
+
 /** A voice connector (or in-app assistant, via 'chat') tool call, replayed as the requester once approved */
 const voiceTool: Operation<{ tool: string; args: Record<string, unknown>; via?: 'chat' }> = {
   async describe(p, ctx) {
@@ -293,6 +306,7 @@ export const OPERATIONS = {
   'job.stage': jobStage,
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
+  'invoice.void': invoiceVoid,
   'mail.send': mailSend,
   'mail.schedule': mailSchedule,
   'voice.tool': voiceTool,
@@ -316,6 +330,7 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'job.stage': 'jobs.change_stage',
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
+  'invoice.void': 'invoices.manage',
   'mail.send': 'mail.send',
   'mail.schedule': 'mail.send',
 }

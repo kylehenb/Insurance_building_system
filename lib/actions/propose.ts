@@ -8,7 +8,7 @@ import { getJobSummary } from '@/lib/mcp/tools/jobs'
 import { readConversation } from '@/lib/mcp/tools/mailbox'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
-import { CATEGORIES, claimQueued, isCategory, PRIORITY, type ActionCard, type CardStep, type StepKind } from './cards'
+import { CATEGORIES, CardError, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
@@ -27,8 +27,11 @@ const OWN_DOMAIN = 'insurancerepairco.com.au'
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
-  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'star_email', 'change_follow_up',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'update_action_card', 'star_email', 'change_follow_up',
 ])
+
+/** A tool a card can carry as a step: an action (not a read), and not one cards leave out */
+export const isStepTool = (tool: McpTool) => !tool.annotations.readOnlyHint && !LEFT_OUT.has(tool.name)
 
 const FINISH: Anthropic.Beta.BetaTool = {
   name: 'finish_card',
@@ -319,4 +322,45 @@ export async function drainCardQueue({ budgetMs = 60_000, db = mailDb() }: { bud
     made++
   }
   return { made }
+}
+
+/**
+ * Makes (or remakes) a card now — "Suggest next steps", "Try again" and
+ * "Re-suggest" ("Tell the AI what to change": feedback, followed over the
+ * AI's own view). By card (any card, remade where it is) or by conversation
+ * (a fresh read even if it was made for this email before). Emails edited in
+ * the composer are replaced by the new suggestion. Returns the card as it is
+ * afterwards, or null if it couldn't be queued.
+ */
+export async function resuggestCard(
+  db: SupabaseClient,
+  tenantId: string,
+  target: { cardId: string } | { threadId: string },
+  feedback = '',
+): Promise<ActionCard | null> {
+  let id: string | null
+  if ('cardId' in target) {
+    const card = await getCard(db, tenantId, target.cardId)
+    if (!card) throw new CardError('Card not found', 404)
+    if (card.status === 'scheduled' || card.status === 'running') throw new CardError('That card can\'t be re-suggested now', 409)
+    id = card.id
+  } else {
+    id = await queueEmailCard(db, tenantId, target.threadId, null)
+  }
+  if (!id) return null
+  const before = await getCard(db, tenantId, id)
+  if (before) {
+    const { discardStepDrafts } = await import('./steps')
+    await discardStepDrafts(before, db)
+  }
+  await db.from('action_queue').update({ status: 'queued', attempts: 0 }).eq('id', id).in('status', ['pending', 'failed', 'queued'])
+
+  // Take this one if it's still queued; otherwise another run is making it
+  const queued = await getCard(db, tenantId, id)
+  if (queued?.status === 'queued') {
+    const { data: won } = await db.from('action_queue').update({ status: 'generating', attempts: 1, updated_at: new Date().toISOString() })
+      .eq('id', id).eq('status', 'queued').select('*').maybeSingle()
+    if (won) await generateCard(won as ActionCard, { db, feedback })
+  }
+  return getCard(db, tenantId, id)
 }

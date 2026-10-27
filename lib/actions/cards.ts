@@ -334,6 +334,61 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
   return !!data
 }
 
+const MAX_TITLE = 200
+/** Not while it's being written or its steps are running */
+const EDITABLE_TEXT: CardStatus[] = ['scheduled', 'queued', 'pending', 'failed', 'done', 'skipped', 'no_action']
+const MAX_SUMMARY = 4000
+
+/** A new title or summary for a card — what it says, not its steps. Not while its steps are running. */
+export async function updateCardText(
+  db: SupabaseClient, tenantId: string, id: string, { title, description }: { title?: string; description?: string | null },
+): Promise<ActionCard> {
+  const patch: Record<string, unknown> = {}
+  if (typeof title === 'string') {
+    if (!title.trim()) throw new CardError('A card needs a title')
+    patch.title = title.trim().slice(0, MAX_TITLE)
+  }
+  if (description !== undefined) patch.description = description?.trim().slice(0, MAX_SUMMARY) || null
+  if (!Object.keys(patch).length) throw new CardError('Nothing to change')
+  const { data } = await db.from('action_queue').update({ ...patch, updated_at: now() })
+    .eq('tenant_id', tenantId).eq('id', id).in('status', EDITABLE_TEXT)
+    .select(CARD_COLUMNS).maybeSingle()
+  if (!data) {
+    const card = await getCard(db, tenantId, id)
+    throw card ? new CardError(`This card is ${card.status} — try again in a moment`, 409) : new CardError('Card not found', 404)
+  }
+  return data as ActionCard
+}
+
+/** Marks a card done without running its steps: dealt with another way */
+export async function markCardDone(db: SupabaseClient, tenantId: string, id: string, userId: string): Promise<boolean> {
+  const { data } = await db.from('action_queue')
+    .update({ status: 'done', outcome: 'Marked done', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
+    .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
+    .select('id').maybeSingle()
+  return !!data
+}
+
+/**
+ * Puts a done, skipped or no-action card back on the to-do list. A
+ * conversation has one live card, so not if it already has another.
+ */
+export async function reopenCard(db: SupabaseClient, tenantId: string, id: string): Promise<ActionCard> {
+  const card = await getCard(db, tenantId, id)
+  if (!card) throw new CardError('Card not found', 404)
+  if (!['done', 'skipped', 'no_action'].includes(card.status)) throw new CardError(`This card is ${card.status} — it's already on the list or on its way`, 409)
+  if (card.source === 'email' && card.source_ref && await liveCard(db, tenantId, card.source_ref)) {
+    throw new CardError('That conversation already has a card on the list — edit that one instead', 409)
+  }
+  const { data, error } = await db.from('action_queue')
+    .update({ status: 'pending', outcome: null, error_log: null, updated_at: now() })
+    .eq('tenant_id', tenantId).eq('id', id).in('status', ['done', 'skipped', 'no_action'])
+    .select(CARD_COLUMNS).maybeSingle()
+  if (error) throw new CardError('That conversation already has a card on the list — edit that one instead', 409)
+  if (!data) throw new CardError('This card just changed — check it again', 409)
+  return data as ActionCard
+}
+
 /** The conversation a card is about: an email card's own, or the one a follow-up was set from */
 export const cardThreadId = (c: Pick<ActionCard, 'source' | 'source_ref' | 'follow_up'>): string | null =>
   c.source === 'email' ? c.source_ref : c.follow_up?.thread_id ?? null

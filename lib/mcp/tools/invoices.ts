@@ -14,12 +14,13 @@ import {
   type InvoiceLine,
   type InvoiceLineFields,
 } from '@/lib/invoices/edit'
+import { InvoiceVoidError, voidInvoice, voidRefusal } from '@/lib/invoices/void'
 
 // Invoices by voice: reading one with its lines, raising one (the invoice
 // buttons' generateInvoice), and changing its details and lines
 // (lib/invoices/edit.ts, the same totals rule as the invoice editor).
 // Sending — which marks it sent and pushes it to accounting — stays with
-// send_documents.
+// send_documents. Voiding is lib/invoices/void.ts, as the invoice page's Void.
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 const amount = (n: number | null | undefined) => money(round2(n ?? 0))
@@ -44,6 +45,8 @@ export interface InvoiceView {
   paid_date: string | null
   accounting_sync_status: string | null
   notes: string | null
+  voided_at: string | null
+  void_reason: string | null
   lines: { line_id: string; description: string; quantity: number; unit: string | null; unit_price: number; line_total: number; charged: boolean; quote_ref: string | null }[]
   deductions: { description: string | null; amount_inc_gst: number | null }[]
   warnings: string[]
@@ -90,6 +93,8 @@ function invoiceView(invoice: Invoice, lines: InvoiceLine[], deductions: Invoice
     paid_date: invoice.paid_date,
     accounting_sync_status: invoice.accounting_sync_status,
     notes: invoice.notes,
+    voided_at: invoice.voided_at,
+    void_reason: invoice.void_reason,
     lines: lines.map(l => ({
       line_id: l.id, description: l.description, quantity: l.quantity, unit: l.unit, unit_price: l.unit_price,
       line_total: l.line_total, charged: l.completed !== false, quote_ref: l.quote_ref,
@@ -112,6 +117,7 @@ function describe(v: InvoiceView): string {
       : ['No lines.']),
     ...v.deductions.map(d => `- Less ${d.description ?? 'deduction'}: ${amount(d.amount_inc_gst)} inc GST`),
     ...(v.notes?.trim() ? [`Notes: ${v.notes.trim()}`] : []),
+    ...(v.status === 'voided' ? [`Voided${v.voided_at ? ` on ${spokenDate(v.voided_at)}` : ''}${v.void_reason ? `: ${v.void_reason}` : ''}.`] : []),
     ...(v.warnings.length ? [`Warnings: ${v.warnings.join(' ')}`] : []),
   ].join('\n')
 }
@@ -125,25 +131,49 @@ function errorResult(err: unknown): McpToolResult {
   throw err
 }
 
+/** "inv irc1053 2" / "IRC1053-2" → "INV-IRC1053-2" */
+export function normaliseInvoiceNumber(value: string): string {
+  const v = value.trim().toUpperCase().replace(/\s+/g, '-').replace(/-+/g, '-')
+  const bare = v.replace(/^INV-?/, '')
+  const m = bare.match(/^([A-Z]+)-?(\d+)-?(\d+)$/)
+  return m ? `INV-${m[1]}${m[2]}-${m[3]}` : v
+}
+
+/** One of our invoices by its number, or a result saying why not. */
+async function invoiceByNumber(value: string, ctx: McpContext): Promise<Invoice | McpToolResult> {
+  const ref = normaliseInvoiceNumber(value)
+  const { data, error } = await ctx.supabase
+    .from('invoices').select('*').eq('tenant_id', ctx.tenantId).eq('direction', 'outbound').ilike('invoice_ref', ref.replace(/[\\%_]/g, m => `\\${m}`))
+  if (error) throw error
+  if (!data?.length) return { text: `No invoice ${ref} — use get_invoice with the job number to list them.`, data: { invoice_number: ref }, isError: true }
+  return data[0]
+}
+
 export const getInvoice: McpTool = {
   name: 'get_invoice',
   title: 'Get invoice',
   description: [
     'Reads an invoice: its type, status, date, lines (description, quantity, unit price, total, and whether each is charged), deductions, builder\'s margin, totals and accounting sync status, with warnings (voided, already sent, paid, $0).',
-    'Give invoice_id (from list_job_documents), or just job_number to list the job\'s invoices to us (not trades\' invoices) and pick one.',
+    'Give invoice_id (from list_job_documents) or invoice_number (e.g. INV-IRC1001-2), or just job_number to list the job\'s invoices to us (not trades\' invoices) and pick one.',
     'Each line has a line_id for edit_invoice_items.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       invoice_id: { type: 'string' },
-      job_number: { type: 'string', description: 'Job number, e.g. IRC1001 — lists its invoices when no invoice_id is given.' },
+      invoice_number: { type: 'string', description: 'The invoice number, e.g. INV-IRC1001-2.' },
+      job_number: { type: 'string', description: 'Job number, e.g. IRC1001 — lists its invoices when no invoice is given.' },
     },
     additionalProperties: false,
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
 
   async run(args, ctx): Promise<McpToolResult> {
+    if (!str(args.invoice_id) && str(args.invoice_number)) {
+      const found = await invoiceByNumber(str(args.invoice_number)!, ctx)
+      if (isToolResult(found)) return found
+      return getInvoice.run({ invoice_id: found.id }, ctx)
+    }
     const invoiceId = str(args.invoice_id)
     if (!invoiceId) {
       if (!str(args.job_number)) return { text: 'Which invoice, or which job?', isError: true }
@@ -390,6 +420,74 @@ export const editInvoiceItems: McpTool = {
       ].join(' '),
       data: { invoice: view, ...(problems.length ? { problems } : {}) },
       ...(problems.length && !done.length ? { isError: true } : {}),
+    }
+  },
+}
+
+const ACCOUNTING_WORDS: Record<string, string> = {
+  not_synced: 'It never reached the accounting system.',
+  voided: 'Voided in the accounting system too.',
+  failed: '',
+  manual: '',
+}
+
+export const voidInvoiceTool: McpTool = {
+  name: 'void_invoice',
+  title: 'Void invoice',
+  description: [
+    'Voids one of our invoices, as the invoice page\'s Void button does — e.g. an excess invoice the insurer says won\'t be collected, or one raised by mistake.',
+    'It isn\'t deleted: it stays on the job marked voided, with the reason, who and when. It then stops counting in the job\'s totals, the balance and the final (quoted amounts) invoice\'s excess deduction;',
+    'voiding an excess invoice takes it off the job\'s draft quoted-amounts invoices. If it was synced to the accounting system it\'s voided there too. Paid invoices can\'t be voided.',
+    'Give invoice_number (e.g. INV-IRC1053-2) or invoice_id, and the reason. Can\'t be undone: read back the invoice number, job, amount and reason and get a clear yes first.',
+    'Pass on every warning (sent invoices that need re-issuing, the job\'s excess decision, anything to void by hand in accounting).',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      invoice_number: { type: 'string', description: 'The invoice number, e.g. INV-IRC1053-2.' },
+      invoice_id: { type: 'string' },
+      reason: { type: 'string', description: 'Why, in the user\'s words, e.g. "Castle confirmed no excess to be collected".' },
+    },
+    required: ['reason'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  permission: 'invoices.manage',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const reason = str(args.reason)
+    if (!reason) return { text: 'Why is it being voided? The reason is kept on the invoice.', isError: true }
+    let invoice: Invoice | null
+    if (str(args.invoice_id)) {
+      invoice = (await loadInvoice(str(args.invoice_id)!, ctx))?.invoice ?? null
+      if (!invoice) return notFound()
+    } else if (str(args.invoice_number)) {
+      const found = await invoiceByNumber(str(args.invoice_number)!, ctx)
+      if (isToolResult(found)) return found
+      invoice = found
+    } else {
+      return { text: 'Which invoice? Give its number, e.g. INV-IRC1001-2.', isError: true }
+    }
+    if (invoice.direction !== 'outbound') return { text: invoiceLinesLockedReason(invoice) ?? 'That\'s a trade\'s invoice to us.', isError: true }
+    const refused = voidRefusal(invoice)
+    if (refused) return { text: refused, isError: true }
+
+    try {
+      const result = await voidInvoice(ctx.supabase, ctx.tenantId, invoice.id, { reason, userId: ctx.userId })
+      const loaded = await loadInvoice(invoice.id, ctx)
+      const view = loaded ? invoiceView(loaded.invoice, loaded.lines, loaded.deductions, loaded.jobNumber) : null
+      return {
+        text: [
+          `Voided ${invoice.invoice_ref ?? 'the invoice'}${view?.job_number ? ` on ${view.job_number}` : ''} (${TYPE_LABELS[invoice.invoice_type] ?? invoice.invoice_type}, ${amount(invoice.amount_inc_gst)}): ${reason}.`,
+          ACCOUNTING_WORDS[result.accounting],
+          ...result.adjusted.map(a => `${a.invoice_ref ?? 'The quoted-amounts invoice'} no longer takes the excess off — now ${amount(a.amount_inc_gst)} inc GST.`),
+          ...result.warnings,
+        ].filter(Boolean).join(' '),
+        data: { invoice: view, accounting: result.accounting, adjusted: result.adjusted, warnings: result.warnings },
+      }
+    } catch (err) {
+      if (err instanceof InvoiceVoidError) return { text: err.message, isError: true }
+      throw err
     }
   },
 }

@@ -37,19 +37,40 @@ vi.mock('@/lib/actions/cards', () => ({
   starThread: (...a: unknown[]) => (starThread as (...x: unknown[]) => unknown)(...a),
   cardsForThreads: async (_db: unknown, _t: string, ids: string[]) => Object.fromEntries(ids.filter(id => starredNow.includes(id)).map(id => [id, { id: 'k', status: 'pending', title: `Card ${id}`, category: 'other' }])),
   isCategory: (v: unknown) => ['invoice', 'attend_submit', 'other'].includes(v as string),
+  updateCardText: (...a: unknown[]) => (updateCardText as (...x: unknown[]) => unknown)(...a),
+  markCardDone: (...a: unknown[]) => (markCardDone as (...x: unknown[]) => unknown)(...a),
+  reopenCard: (...a: unknown[]) => (reopenCard as (...x: unknown[]) => unknown)(...a),
+  setCardCategory: async () => true,
   CATEGORIES: [{ key: 'invoice', label: 'Invoices to pay' }, { key: 'attend_submit', label: 'Attend and Submit' }, { key: 'other', label: 'Everything else' }],
 }))
+const updateCardText = vi.fn(async (_db: unknown, _t: string, _id: string, o: { title?: string }) => (stored = { ...stored!, ...(o.title ? { title: o.title } : {}) }))
+const markCardDone = vi.fn(async () => stored?.status === 'pending')
+const reopenCard = vi.fn(async () => (stored = { ...stored!, status: 'pending' }))
+const removeSteps = vi.fn(async (_t: string, _id: string, ids: string[]) => (stored = { ...stored!, steps: stored!.steps.filter(x => !ids.includes(x.id)) }))
+const saveStepEdits = vi.fn(async (_t: string, _id: string, stepId: string, edits: Record<string, unknown>) =>
+  (stored = { ...stored!, steps: stored!.steps.map(x => (x.id === stepId ? { ...x, args: { ...x.args, ...edits }, summary: `Add job note — ${edits.note}` } : x)) }))
+const addStep = vi.fn(async (_t: string, _id: string, tool: string, args: Record<string, unknown>) => {
+  if (tool === 'get_job_summary') throw new (await import('@/lib/actions/confirm')).CardError('"get_job_summary" can\'t be a step')
+  return (stored = { ...stored!, steps: [...stored!.steps, { id: 's3', tool, kind: 'change', summary: `Add job note — ${args.note}`, args }] })
+})
+const resuggestCard = vi.fn(async (_db: unknown, _t: string, _target: unknown, feedback: string) => (stored = { ...stored!, title: `Redone: ${feedback}`, steps: [] }))
+vi.mock('@/lib/actions/steps', () => ({
+  removeSteps: (...a: unknown[]) => (removeSteps as (...x: unknown[]) => unknown)(...a),
+  saveStepEdits: (...a: unknown[]) => (saveStepEdits as (...x: unknown[]) => unknown)(...a),
+  addStep: (...a: unknown[]) => (addStep as (...x: unknown[]) => unknown)(...a),
+}))
+vi.mock('@/lib/actions/propose', () => ({ resuggestCard: (...a: unknown[]) => (resuggestCard as (...x: unknown[]) => unknown)(...a) }))
 vi.mock('@/lib/actions/confirm', () => {
   class CardError extends Error {}
   return { CardError, confirmCard: (...a: unknown[]) => (confirmCard as (...x: unknown[]) => unknown)(...a) }
 })
 
 const ctx = { supabase: {} as never, tenantId: 't1', userId: 'u1', voiceKeyId: 'k9' }
-const { listActionCards, readActionCard, confirmActionCard, skipActionCard, starEmail } = await import('../tools/action-cards')
+const { listActionCards, readActionCard, confirmActionCard, skipActionCard, starEmail, updateActionCard } = await import('../tools/action-cards')
 
 beforeEach(() => {
   stored = card()
-  for (const f of [listCards, skipCard, confirmCard, starThread]) f.mockClear()
+  for (const f of [listCards, skipCard, confirmCard, starThread, updateCardText, markCardDone, reopenCard, removeSteps, saveStepEdits, addStep, resuggestCard]) f.mockClear()
   starredNow = []
 })
 
@@ -143,5 +164,47 @@ describe('star_email', () => {
     expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'gold' }, ctx)).isError).toBe(true)
     expect((await starEmail.run({ conversation_ids: ['not an id'], star: 'other' }, ctx)).isError).toBe(true)
     expect(starThread).not.toHaveBeenCalled()
+  })
+})
+
+describe('update_action_card', () => {
+  it('retitles a card and fixes its steps without doing them', async () => {
+    const out = await updateActionCard.run({
+      card_id: CARD_ID, title: 'Reply to Casey — Friday instead',
+      remove_steps: ['s1'], change_steps: [{ step_id: 's2', args: { note: 'Access Friday' } }],
+      add_steps: [{ tool: 'add_job_note', args: { job_number: 'IRC1001', note: 'Key under mat' } }],
+    }, ctx)
+    expect(out.isError).toBeFalsy()
+    expect(removeSteps).toHaveBeenCalledWith('t1', CARD_ID, ['s1'], { db: ctx.supabase })
+    expect(saveStepEdits).toHaveBeenCalledWith('t1', CARD_ID, 's2', { note: 'Access Friday' }, { db: ctx.supabase })
+    expect(addStep).toHaveBeenCalledWith('t1', CARD_ID, 'add_job_note', { job_number: 'IRC1001', note: 'Key under mat' }, { db: ctx.supabase })
+    expect(out.text).toContain('removed "Reply to casey@gmail.com", changed "Add job note — Access Friday", added "Add job note — Key under mat", retitled it "Reply to Casey — Friday instead"')
+    expect(out.text).toContain('Steps: Add job note — Access Friday; Add job note — Key under mat.')
+    expect(confirmCard).not.toHaveBeenCalled()
+  })
+
+  it('has the AI redo the card from what the user says', async () => {
+    const before = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = 'k'
+    const out = await updateActionCard.run({ card_id: CARD_ID, redo_with: 'they want a quote' }, ctx)
+    process.env.ANTHROPIC_API_KEY = before
+    expect(resuggestCard).toHaveBeenCalledWith(ctx.supabase, 't1', { cardId: CARD_ID }, 'they want a quote')
+    expect(out.text).toContain('had the AI redo it')
+    expect((await updateActionCard.run({ card_id: CARD_ID, redo_with: 'x', remove_steps: ['s1'] }, ctx)).isError).toBe(true)
+  })
+
+  it('marks a card done, or puts a done one back on the list', async () => {
+    expect((await updateActionCard.run({ card_id: CARD_ID, status: 'done' }, ctx)).text).toContain('marked it done')
+    expect(markCardDone).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, 'u1')
+    stored = card({ status: 'skipped' })
+    expect((await updateActionCard.run({ card_id: CARD_ID, status: 'pending' }, ctx)).text).toContain('put it back on the list')
+    expect(reopenCard).toHaveBeenCalled()
+  })
+
+  it('says what went wrong, and what was already done', async () => {
+    const out = await updateActionCard.run({ card_id: CARD_ID, remove_steps: ['s1'], add_steps: [{ tool: 'get_job_summary', args: {} }] }, ctx)
+    expect(out).toMatchObject({ isError: true })
+    expect(out.text).toBe('"get_job_summary" can\'t be a step. Before that: removed "Reply to casey@gmail.com".')
+    expect((await updateActionCard.run({ card_id: CARD_ID }, ctx)).isError).toBe(true)
   })
 })

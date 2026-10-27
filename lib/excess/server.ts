@@ -41,6 +41,7 @@ export async function loadExcessInvoices(service: Service, tenantId: string, job
     .eq('tenant_id', tenantId)
     .eq('job_id', jobId)
     .eq('invoice_type', 'excess')
+    .neq('status', 'voided')
     .order('created_at', { ascending: false })
   return data ?? []
 }

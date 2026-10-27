@@ -8,8 +8,9 @@ import { ComposeError, discardDraft, openDraft, startCompose } from '@/lib/mail/
 import { isComposeMode, type ComposeStart } from '@/lib/mail/compose-rules'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
+import { randomUUID } from 'crypto'
 import { CardError, cardThreadId, getCard, type ActionCard, type CardStep, type StepDraft } from './cards'
-import { describeStep } from './propose'
+import { describeStep, isStepTool } from './propose'
 import { applyEdits, cleanEdits, stepFields, type StepField } from './step-fields'
 
 // One action card step, opened on the card: its details as a form, a preview
@@ -148,6 +149,51 @@ export async function saveStepEdits(
     return { ...s, args, summary: describeStep(tool, s.draft ? { ...args, to: s.draft.to, subject: s.draft.subject } : args).summary }
   })
   return saveSteps(db, card!, steps)
+}
+
+/** Most steps a card can carry */
+export const MAX_CARD_STEPS = 10
+
+/** Card must still be to do for its step list to change */
+function assertListOpen(card: ActionCard | null): asserts card is ActionCard {
+  if (!card) throw new CardError('Card not found', 404)
+  if (card.status !== 'pending' && card.status !== 'failed') throw new CardError(`This card is ${card.status} — its steps can't change now`, 409)
+}
+
+/** Takes steps off a card (not ones already done or waiting for approval); their unsent email drafts are discarded */
+export async function removeSteps(
+  tenantId: string, cardId: string, stepIds: string[],
+  { db = mailDb() }: { db?: SupabaseClient } = {},
+): Promise<ActionCard> {
+  const card = await getCard(db, tenantId, cardId)
+  assertListOpen(card)
+  for (const id of stepIds) assertOpen(card, findStep(card, id))
+  const gone = card.steps.filter(s => stepIds.includes(s.id))
+  const saved = await saveSteps(db, card, card.steps.filter(s => !stepIds.includes(s.id)))
+  await discardStepDrafts({ ...card, steps: gone }, db)
+  return saved
+}
+
+/**
+ * Adds a step to the end of a card: a call to one of the action tools, as the
+ * AI proposes them. It's recorded, not run — Do steps runs it as the user.
+ */
+export async function addStep(
+  tenantId: string, cardId: string, toolName: string, args: Record<string, unknown>,
+  { db = mailDb(), tools = MCP_TOOLS }: { db?: SupabaseClient; tools?: McpTool[] } = {},
+): Promise<ActionCard> {
+  const card = await getCard(db, tenantId, cardId)
+  assertListOpen(card)
+  const tool = tools.find(t => t.name === toolName)
+  if (!tool || !isStepTool(tool)) throw new CardError(`"${toolName}" can't be a step — use one of the action tools (send_email, add_job_note, file_conversation…)`)
+  if (card.steps.length >= MAX_CARD_STEPS) throw new CardError(`A card has at most ${MAX_CARD_STEPS} steps`)
+  // The tool's own arguments only; a step about the conversation is about this card's
+  const known = (tool.inputSchema.properties ?? {}) as Record<string, unknown>
+  const cleaned = Object.fromEntries(Object.entries(args).filter(([k, v]) => k in known && v !== null && v !== undefined && v !== ''))
+  const thread = cardThreadId(card)
+  if ('conversation_id' in known && !cleaned.conversation_id && thread) cleaned.conversation_id = thread
+  const { summary, kind } = describeStep(tool, cleaned)
+  return saveSteps(db, card, [...card.steps, { id: randomUUID(), tool: tool.name, args: cleaned, summary, kind }])
 }
 
 const DRAFT_ID_RE = /^[A-Za-z0-9_-]+$/

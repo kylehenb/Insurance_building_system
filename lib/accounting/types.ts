@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type AccountingProvider = 'quickbooks' | 'xero'
 
-export type AccountingSyncStatus = 'pending' | 'synced' | 'failed' | 'not_applicable'
+/** voided: the invoice was voided in IRC and in the accounting system */
+export type AccountingSyncStatus = 'pending' | 'synced' | 'failed' | 'not_applicable' | 'voided'
 
 export type IrcCategory =
   | 'bar_report'
@@ -102,6 +103,9 @@ export interface AccountingProvider_Interface {
   pollPaymentStatus(
     accountingRefIds: string[]
   ): Promise<PaymentStatusResult[]>
+
+  /** Voids a customer invoice (by its accounting_ref_id) */
+  voidInvoice(accountingRefId: string): Promise<void>
 
   refreshAccessToken(): Promise<void>
 }

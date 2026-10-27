@@ -28,7 +28,10 @@ const TOOLS = [
 const callTool = vi.fn(async (t: { run(a: Row): unknown }, args: Row) => t.run(args))
 vi.mock('@/lib/mcp/server', () => ({ callTool: (t: never, a: never) => callTool(t, a) }))
 vi.mock('@/lib/mcp/tools', () => ({ MCP_TOOLS: TOOLS }))
-vi.mock('../propose', () => ({ describeStep: (t: { title: string }, a: Row) => ({ summary: `${t.title}${a.to ? ` to ${a.to}` : ''}${a.note ? ` — ${a.note}` : ''}`, kind: 'change' }) }))
+vi.mock('../propose', () => ({
+  describeStep: (t: { title: string }, a: Row) => ({ summary: `${t.title}${a.to ? ` to ${a.to}` : ''}${a.note ? ` — ${a.note}` : ''}`, kind: 'change' }),
+  isStepTool: (t: { annotations: { readOnlyHint?: boolean } }) => !t.annotations.readOnlyHint,
+}))
 vi.mock('@/lib/mail/sync', () => ({ getMailbox: async () => ({ id: 'mb1', tenant_id: 't1' }), mailDb: () => db }))
 vi.mock('@/lib/mail/list', () => ({ getThreadDetail: async () => ({ messages: [{ id: 'm1', labelIds: ['INBOX'] }, { id: 'm2', labelIds: ['DRAFT'] }] }) }))
 const discarded: string[] = []
@@ -47,7 +50,7 @@ vi.mock('@/lib/mail/compose', async () => {
 })
 vi.mock('@/lib/mcp/tools/job-attachments', () => ({ hasAttachArgs: () => false, loadJobAttachments: async () => [], fitJobAttachments: async () => ({ kept: [], skipped: [] }), storeJobAttachments: async () => [] }))
 
-const { stepDetail, saveStepEdits, saveStepDraft, stepCompose, updateStepRecord, discardStepDrafts } = await import('../steps')
+const { stepDetail, saveStepEdits, saveStepDraft, stepCompose, updateStepRecord, discardStepDrafts, addStep, removeSteps } = await import('../steps')
 const { stepFields, cleanEdits } = await import('../step-fields')
 
 const card = (steps: Row[], o: Row = {}) => {
@@ -151,5 +154,39 @@ describe('an email step in the composer', () => {
       { id: 's1', draft: { id: 'r-1' } }, { id: 's2', draft: { id: 'r-2' }, status: 'done' }, { id: 's3' },
     ] } as never, db as never)
     expect(discarded).toEqual(['r-1'])
+  })
+})
+
+describe('the step list', () => {
+  it('adds a step from an action tool, with only its own arguments and the card\'s conversation', async () => {
+    card([{ id: 's1', tool: 'add_job_note', args: { note: 'a' }, summary: 'x', kind: 'change' }])
+    const updated = await addStep('t1', 'k1', 'send_email', { mode: 'reply', body: 'Hi Casey', bogus: 1 }, opts)
+    expect(updated.steps).toHaveLength(2)
+    expect(updated.steps[1]).toMatchObject({ tool: 'send_email', args: { mode: 'reply', body: 'Hi Casey', conversation_id: 'th1' }, kind: 'change' })
+    expect(updated.steps[1].args).not.toHaveProperty('bogus')
+    expect(updated.steps[1].id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(TOOLS.find(t => t.name === 'send_email')!.run).not.toHaveBeenCalled()
+  })
+
+  it('refuses read tools, unknown tools and a closed card', async () => {
+    card([])
+    await expect(addStep('t1', 'k1', 'get_work_order_email', {}, opts)).rejects.toThrow('can\'t be a step')
+    await expect(addStep('t1', 'k1', 'nope', {}, opts)).rejects.toThrow('can\'t be a step')
+    card([], { status: 'done' })
+    await expect(addStep('t1', 'k1', 'add_job_note', { note: 'n' }, opts)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('removes steps not yet done, discarding their email drafts', async () => {
+    card([
+      { id: 's1', tool: 'send_email', args: {}, summary: 'Reply', kind: 'email', draft: { id: 'r-9', to: '', cc: '', bcc: '', subject: '', html: '' } },
+      { id: 's2', tool: 'add_job_note', args: {}, summary: 'Note', kind: 'change' },
+      { id: 's3', tool: 'add_job_note', args: {}, summary: 'Done note', kind: 'change', status: 'done' },
+    ])
+    discarded.length = 0
+    const updated = await removeSteps('t1', 'k1', ['s1'], opts)
+    expect(updated.steps.map((x: { id: string }) => x.id)).toEqual(['s2', 's3'])
+    expect(discarded).toEqual(['r-9'])
+    await expect(removeSteps('t1', 'k1', ['s3'], opts)).rejects.toMatchObject({ status: 409 })
+    await expect(removeSteps('t1', 'k1', ['zz'], opts)).rejects.toMatchObject({ status: 404 })
   })
 })

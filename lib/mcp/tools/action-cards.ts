@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
-import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, skipCard, starThread, withContext, type CardView, type CardWithContext } from '@/lib/actions/cards'
+import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
+import { addStep, removeSteps, saveStepEdits } from '@/lib/actions/steps'
+import { resuggestCard } from '@/lib/actions/propose'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 import { messageText } from '@/lib/mail/message'
@@ -8,7 +10,8 @@ import { SIGNATURE_LOGO_TOKEN } from '@/lib/email/rich-text'
 
 // Action cards by voice (and in the assistant chat) — the Action cards view's
 // own functions (lib/actions): what needs doing (the starred list, by star),
-// one card's steps and draft email, Do the steps, Skip, and starring an email. Each step still
+// one card's steps and draft email, Do the steps, Skip, editing a card
+// (its title, star, steps, or remade by the AI), and starring an email. Each step still
 // runs through callTool as the user, with its own permission, approval and
 // log entry.
 
@@ -79,7 +82,7 @@ export const listActionCards: McpTool = {
   description: [
     'The action cards — the to-do list of starred emails, most urgent first, as on the dashboard. The AI makes one for each incoming email that needs doing (from the email and its job file, with suggested steps — a reply, filing it on a job, a job note… — that only run when confirmed), and the user stars others themselves.',
     'Each has a category (its star): Invoices to pay (invoice), Attend and Submit (attend_submit — sites to attend, reports or quotes to submit), Everything else (other). category filters to one.',
-    'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, skip_action_card when it\'s dealt with.',
+    'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, update_action_card to fix its title or steps, skip_action_card when it\'s dealt with.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -248,6 +251,133 @@ export const skipActionCard: McpTool = {
     if (isResult(card)) return card
     if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
     return { text: `Skipped "${card.title}".`, data: { card_id: card.id, status: 'skipped' } }
+  },
+}
+
+const SET_STATUSES = ['pending', 'done', 'skipped'] as const
+const MAX_REDO = 2000
+
+export const updateActionCard: McpTool = {
+  name: 'update_action_card',
+  title: 'Edit action card',
+  description: [
+    'Changes an action card without doing its steps — when its title or steps are wrong or out of date. Any mix of:',
+    'title and summary (what the card says); category (its star: invoice, attend_submit, other);',
+    'remove_steps (step_ids from read_action_card — not ones already done); change_steps (a step\'s details saved on the card, e.g. an email\'s to, subject or body, a note\'s text; the step\'s other details stay);',
+    'add_steps (a step is a call to one of the action tools, as the card\'s AI proposes them — e.g. { tool: "add_job_note", args: { job_number, note } } or { tool: "send_email", args: { mode: "reply", body } }; recorded, not run);',
+    'redo_with (tell the AI what to change in your own words — it rewrites the card\'s title, summary and steps from the email and job file; takes up to a minute);',
+    'status: done (dealt with another way, steps not run), skipped (as skip_action_card), or pending (put a done or skipped card back on the list).',
+    'Nothing is sent or changed on the job — confirm_action_card does the steps. Read back the change and get a yes first; read_action_card shows the result.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      card_id: { type: 'string', description: 'card_id from list_action_cards.' },
+      title: { type: 'string' },
+      summary: { type: 'string', description: 'Replaces what the card says about the email.' },
+      category: { type: 'string', enum: CATEGORIES.map(c => c.key) },
+      remove_steps: { type: 'array', items: { type: 'string' }, description: 'step_ids to take off.' },
+      change_steps: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { step_id: { type: 'string' }, args: { type: 'object', description: 'The details to change, by the step tool\'s argument names; "" clears one.' } },
+          required: ['step_id', 'args'],
+          additionalProperties: false,
+        },
+      },
+      add_steps: {
+        type: 'array',
+        maxItems: 5,
+        items: {
+          type: 'object',
+          properties: { tool: { type: 'string', description: 'An action tool name, e.g. send_email, add_job_note, file_conversation, send_work_order.' }, args: { type: 'object' } },
+          required: ['tool', 'args'],
+          additionalProperties: false,
+        },
+      },
+      redo_with: { type: 'string', description: 'What the AI should do instead, e.g. "they want a quote, not a report — reply asking for access times".' },
+      status: { type: 'string', enum: [...SET_STATUSES] },
+    },
+    required: ['card_id'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  permission: 'actions.review',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const found = await findCard({ card_id: args.card_id }, ctx)
+    if (isResult(found)) return found
+    const opts = { db: db(ctx) }
+    const done: string[] = []
+    let card: ActionCard = found
+    const objs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : [])
+    const removes = Array.isArray(args.remove_steps) ? args.remove_steps.map(str).filter(Boolean) : []
+    const changes = objs(args.change_steps)
+    const adds = objs(args.add_steps)
+    const redo = str(args.redo_with).slice(0, MAX_REDO)
+    const status = SET_STATUSES.find(x => x === args.status)
+    const title = typeof args.title === 'string' ? args.title : undefined
+    const summary = typeof args.summary === 'string' ? args.summary : undefined
+    const category = isCategory(args.category) ? args.category : null
+    if (!title && summary === undefined && !category && !removes.length && !changes.length && !adds.length && !redo && !status) {
+      return { text: 'What should change on the card — its title, steps, star or status?', isError: true }
+    }
+    if (redo && (removes.length || changes.length || adds.length)) {
+      return { text: 'redo_with rewrites every step — give it on its own, or edit the steps instead.', isError: true }
+    }
+
+    try {
+      // Back on the list first, so its steps can then change
+      if (status === 'pending') {
+        card = await reopenCard(db(ctx), ctx.tenantId, card.id)
+        done.push('put it back on the list')
+      }
+      if (redo) {
+        if (!process.env.ANTHROPIC_API_KEY) return { text: 'The AI isn\'t set up (no API key), so it can\'t redo the card.', isError: true }
+        const remade = await resuggestCard(db(ctx), ctx.tenantId, { cardId: card.id }, redo)
+        if (!remade) return { text: 'The card couldn\'t be remade — try again in the app.', isError: true }
+        card = remade
+        done.push(remade.status === 'failed' ? `tried to redo it, but the AI stopped: ${remade.error_log ?? 'no reason given'}` : 'had the AI redo it')
+      }
+      if (removes.length) {
+        const names = removes.map(id => card.steps.find(s => s.id === id)?.summary).filter(Boolean)
+        card = await removeSteps(ctx.tenantId, card.id, removes, opts)
+        done.push(`removed ${names.length === 1 ? `"${names[0]}"` : `${removes.length} steps`}`)
+      }
+      for (const c of changes) {
+        const stepArgs = c.args && typeof c.args === 'object' && !Array.isArray(c.args) ? c.args as Record<string, unknown> : {}
+        card = await saveStepEdits(ctx.tenantId, card.id, str(c.step_id), stepArgs, opts)
+        done.push(`changed "${card.steps.find(s => s.id === str(c.step_id))?.summary ?? 'a step'}"`)
+      }
+      for (const a of adds) {
+        const stepArgs = a.args && typeof a.args === 'object' && !Array.isArray(a.args) ? a.args as Record<string, unknown> : {}
+        card = await addStep(ctx.tenantId, card.id, str(a.tool), stepArgs, opts)
+        done.push(`added "${card.steps.at(-1)?.summary}"`)
+      }
+      if (title || summary !== undefined) {
+        card = await updateCardText(db(ctx), ctx.tenantId, card.id, { title, description: summary })
+        done.push(title ? `retitled it "${card.title}"` : 'changed its summary')
+      }
+      if (category) {
+        if (!(await setCardCategory(db(ctx), ctx.tenantId, card.id, category, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — its star can't change now.`, isError: true }
+        done.push(`starred it ${categoryLabel(category)}`)
+      }
+      if (status === 'done' || status === 'skipped') {
+        const ok = status === 'done' ? await markCardDone(db(ctx), ctx.tenantId, card.id, ctx.userId) : await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId)
+        if (!ok) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be marked ${status} now.${done.length ? ` Already ${done.join(', ')}.` : ''}`, isError: true }
+        done.push(status === 'done' ? 'marked it done' : 'skipped it')
+      }
+    } catch (err) {
+      if (!(err instanceof CardError)) throw err
+      return { text: `${err.message}.${done.length ? ` Before that: ${done.join(', ')}.` : ''}`.replace('..', '.'), isError: true }
+    }
+
+    const after = (await withContext(db(ctx), ctx.tenantId, [(await getCard(db(ctx), ctx.tenantId, card.id)) ?? card]))[0]
+    return {
+      text: `"${found.title}": ${done.join(', ')}.\nNow: ${cardLine(after, 0).replace(/^1\. /, '')}`,
+      data: cardData(after),
+    }
   },
 }
 

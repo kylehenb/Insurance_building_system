@@ -24,6 +24,7 @@ vi.mock('@/lib/mail/sync', () => ({ getMailbox: async () => mailbox }))
 vi.mock('@/lib/mail/list', () => ({
   listFolder: spy('listFolder', () => ({ threads: [thread], cursor: null })),
   searchFolder: spy('searchFolder', () => ({ threads: [thread], cursor: null })),
+  listThreadsById: spy('listThreadsById', (_m, ids) => ({ threads: (ids as string[]).includes('abc1') ? [thread] : [], cursor: null })),
   getThreadDetail: spy('getThreadDetail', () => detail),
 }))
 vi.mock('@/lib/mail/actions', () => ({ MAX_THREADS_PER_ACTION: 100, applyThreadAction: spy('applyThreadAction', (_m, ids) => ({ done: ids, failed: [] })) }))
@@ -76,7 +77,7 @@ let starRows: { id: string; source_ref: string; status: string; title: string; c
 const supabase = {
   from: (name: string) => {
     const b: Record<string, unknown> = {
-      select: () => b, eq: () => b, gte: () => b, in: () => b,
+      select: () => b, eq: () => b, gte: () => b, in: () => b, limit: () => b,
       then: (res: (v: unknown) => unknown) => Promise.resolve({ data: name === 'action_queue' ? starRows : sentRows, error: null }).then(res),
     }
     return b
@@ -106,6 +107,18 @@ describe('list_mailbox', () => {
     const out = await listMailbox.run({}, ctx)
     expect(out.text).toContain('[IRC1001] [starred: Invoices to pay]')
     expect((out.data!.conversations as { star: string }[])[0].star).toBe('invoice')
+  })
+
+  it('lists the Starred folder — the starred emails on the to-do list', async () => {
+    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'invoice' }]
+    const out = await listMailbox.run({ starred: true, search: 'ignored' }, ctx)
+    expect(calls.listThreadsById[0][1]).toEqual(['abc1'])
+    expect(calls.searchFolder).toBeUndefined()
+    expect(out.text).toMatch(/^Starred:\n- \(unread\) .*\[IRC1001\] \[starred: Invoices to pay\]$/)
+    expect(out.data).toMatchObject({ folder: 'starred', conversations: [{ conversation_id: 'abc1', job_number: 'IRC1001', star: 'invoice' }] })
+
+    starRows = []
+    expect((await listMailbox.run({ star: 'attend_submit' }, ctx)).text).toBe('Nothing in Starred (Attend and Submit).')
   })
 
   it('searches Gmail for a search or unread only', async () => {

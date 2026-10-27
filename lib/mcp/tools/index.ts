@@ -3,7 +3,7 @@ import { findWorkOrders } from '@/lib/mcp/tools/work-orders'
 import { getWorkOrderEmail, sendWorkOrder } from '@/lib/mcp/tools/work-order-send'
 import { createWorkOrderTool, createWorkOrdersFromQuote, editWorkOrderItems, getWorkOrder, updateWorkOrderTool } from '@/lib/mcp/tools/work-order-edit'
 import { createQuoteTool, editQuoteItems, findLineItemsTool, getQuote, updateQuoteTool } from '@/lib/mcp/tools/quotes'
-import { createInvoiceTool, editInvoiceItems, getInvoice, updateInvoiceTool } from '@/lib/mcp/tools/invoices'
+import { createInvoiceTool, editInvoiceItems, getInvoice, updateInvoiceTool, voidInvoiceTool } from '@/lib/mcp/tools/invoices'
 import { createReportTool, getReport, updateReportTool } from '@/lib/mcp/tools/reports'
 import { getDocumentEmail, listJobDocumentsTool, sendDocuments } from '@/lib/mcp/tools/documents'
 import { getJobExcess, setJobExcessDecision } from '@/lib/mcp/tools/excess'
@@ -13,10 +13,11 @@ import { getEmail, listJobEmails, replyToEmailTool } from '@/lib/mcp/tools/email
 import { readEmailAttachment } from '@/lib/mcp/tools/attachments'
 import { linkEmailToJob, saveEmail } from '@/lib/mcp/tools/inbox'
 import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
-import { addJobNote, getJobSummary } from '@/lib/mcp/tools/jobs'
+import { addJobNote, findJob, getJobSummary } from '@/lib/mcp/tools/jobs'
+import { findContact } from '@/lib/mcp/tools/contacts'
 import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 import { listActivityTool } from '@/lib/mcp/tools/activity'
-import { confirmActionCard, listActionCards, readActionCard, skipActionCard, starEmail } from '@/lib/mcp/tools/action-cards'
+import { confirmActionCard, listActionCards, readActionCard, skipActionCard, starEmail, updateActionCard } from '@/lib/mcp/tools/action-cards'
 import { fileConversation, listJobFiles, listMailbox, organiseEmails, readConversation, saveDraftTool, sendEmailTool } from '@/lib/mcp/tools/mailbox'
 import { getJobPhoto } from '@/lib/mcp/tools/job-attachments'
 import { changeFollowUp, listFollowUps, setFollowUp } from '@/lib/mcp/tools/follow-ups'
@@ -24,6 +25,7 @@ import { changeFollowUp, listFollowUps, setFollowUp } from '@/lib/mcp/tools/foll
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
 export const MCP_TOOLS: McpTool[] = [
+  findJob,
   getJobSummary,
   addJobNote,
   findWorkOrders,
@@ -46,6 +48,7 @@ export const MCP_TOOLS: McpTool[] = [
   createInvoiceTool,
   updateInvoiceTool,
   editInvoiceItems,
+  voidInvoiceTool,
   getReport,
   createReportTool,
   updateReportTool,
@@ -79,6 +82,7 @@ export const MCP_TOOLS: McpTool[] = [
   readActionCard,
   confirmActionCard,
   skipActionCard,
+  updateActionCard,
   starEmail,
   setFollowUp,
   listFollowUps,
@@ -86,4 +90,5 @@ export const MCP_TOOLS: McpTool[] = [
   listApprovalsTool,
   decideApprovalTool,
   listActivityTool,
+  findContact,
 ]

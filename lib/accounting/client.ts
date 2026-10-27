@@ -7,7 +7,7 @@ import type {
   ChartOfAccountsItem,
   PaymentStatusResult,
 } from './types'
-import { createQboInvoice } from './providers/quickbooks/invoices'
+import { createQboInvoice, voidQboInvoice } from './providers/quickbooks/invoices'
 import { createQboBill } from './providers/quickbooks/bills'
 import { upsertQboContact } from './providers/quickbooks/contacts'
 import { getQboAccounts } from './providers/quickbooks/accounts'
@@ -65,6 +65,10 @@ class QuickBooksProvider implements AccountingProvider_Interface {
     accountingRefIds: string[]
   ): Promise<PaymentStatusResult[]> {
     return pollQboPayments(this.supabase, this.tenantId, accountingRefIds)
+  }
+
+  async voidInvoice(accountingRefId: string): Promise<void> {
+    return voidQboInvoice(this.supabase, this.tenantId, accountingRefId)
   }
 
   async refreshAccessToken(): Promise<void> {

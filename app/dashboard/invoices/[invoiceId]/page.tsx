@@ -15,6 +15,8 @@ const supabase = createBrowserClient(
 
 interface Invoice {
   id: string
+  void_reason?: string | null
+  voided_at?: string | null
   invoice_ref: string | null
   invoice_type: string
   direction: string
@@ -388,12 +390,16 @@ export default function InvoiceDetailPage() {
 
   const voidInvoice = useCallback(async () => {
     if (!tenantId || !invoice) return
-    if (!window.confirm(`Void invoice ${invoice.invoice_ref ?? invoice.id}? This cannot be undone.`)) return
-    await fetch(`/api/invoices/${invoice.id}`, {
+    const reason = window.prompt(`Void invoice ${invoice.invoice_ref ?? invoice.id}? It stays on the job, marked voided, and is voided in the accounting system too. This cannot be undone.\n\nWhy is it being voided?`)
+    if (reason === null) return
+    const res = await fetch(`/api/invoices/${invoice.id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId }),
+      body: JSON.stringify({ reason }),
     })
+    const out = await res.json().catch(() => ({})) as { error?: string; warnings?: string[] }
+    if (!res.ok) window.alert(out.error ?? 'The invoice could not be voided.')
+    else if (out.warnings?.length) window.alert(out.warnings.join('\n'))
     load()
   }, [tenantId, invoice, load])
 
@@ -542,7 +548,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {invoice.status === 'voided' && (
-          <div className="voided-banner">This invoice has been voided and is no longer active.</div>
+          <div className="voided-banner">This invoice has been voided{invoice.voided_at ? ` on ${new Date(invoice.voided_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Perth' })}` : ''} and is no longer active.{invoice.void_reason ? ` Reason: ${invoice.void_reason}` : ''}</div>
         )}
 
         {/* Body */}

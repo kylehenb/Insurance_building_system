@@ -9,8 +9,9 @@ import { getJobStage } from '@/lib/jobs/getJobStage'
 import { loadExcessContext } from '@/lib/excess/server'
 import { listSigningRequestsForJob } from '@/lib/signing/service'
 import { JobNoteError, addJobNote as saveJobNote, listJobNotes } from '@/lib/communications/notes'
+import { searchJobs, type JobMatch } from '@/lib/jobs/search'
 
-// A job at a glance, and adding a note to it. The summary is assembled from
+// Finding a job, a job at a glance, and adding a note to it. The summary is assembled from
 // the app's own stage logic (getJobStage), the dashboard's pending actions,
 // and the other connector tools' views of work orders, documents, signing,
 // excess and email — so it says what those say.
@@ -147,6 +148,45 @@ export const addJobNote: McpTool = {
     } catch (err) {
       if (err instanceof JobNoteError) return { text: err.message, isError: true }
       throw err
+    }
+  },
+}
+
+const MAX_FOUND = 8
+
+const jobLine = (j: JobMatch) =>
+  `- ${j.job_number}: ${j.property_address ?? 'no address'}` +
+  `${j.insured_name ? `, ${j.insured_name}` : ''}${j.client_name || j.insurer ? ` (${j.client_name ?? j.insurer}${j.claim_number ? `, claim ${j.claim_number}` : ''})` : j.claim_number ? ` (claim ${j.claim_number})` : ''}` +
+  `${j.stage ? ` — ${j.stage}` : ''}.`
+
+export const findJob: McpTool = {
+  name: 'find_job',
+  title: 'Find job',
+  description: [
+    'Finds a job from what the user remembers: part of the street name or suburb, the insured\'s or client\'s name, the insurer, the claim number or the job number — e.g. "Leighton Mundaring", "Castle Smith", "claim 0123456".',
+    'Every word has to match something on the job. Returns each match\'s job number, address, insured, client, claim number and stage.',
+    'Use it whenever the user names a job by address or person instead of its number, then use the job_number with the other tools. If several match, read them out and ask which.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: { query: { type: 'string', description: 'Words to match, e.g. "Leighton Rd Mundaring" or "Jones".' } },
+    required: ['query'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const query = typeof args.query === 'string' ? args.query.trim() : ''
+    if (!query) return { text: 'What should I look for — a street, suburb, name or claim number?', isError: true }
+    const { matches, total } = await searchJobs(ctx.supabase, ctx.tenantId, query, { limit: MAX_FOUND })
+    if (!matches.length) return { text: `No job matches "${query}". Try fewer words, or just the street or surname.`, data: { query, jobs: [] } }
+    const jobs = matches.map(({ id: _id, created_at: _c, ...j }) => j)
+    return {
+      text: [
+        matches.length === 1 ? `One job matches "${query}":` : `${total} jobs match "${query}"${total > matches.length ? ` — the best ${matches.length}` : ''}:`,
+        ...matches.map(jobLine),
+      ].join('\n'),
+      data: { query, total, jobs },
     }
   },
 }

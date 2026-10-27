@@ -44,6 +44,19 @@ export async function filingForThreads(db: SupabaseClient, tenantId: string, thr
     const byThread = new Map<string, CommRow[]>()
     for (const r of (data as CommRow[] | null) ?? []) byThread.set(r.thread_id, [...(byThread.get(r.thread_id) ?? []), r])
     for (const id of batch) out.set(id, filingOf(byThread.get(id) ?? []))
+
+    // An order email's thread is on the job once the order is lodged (as findThreadJobId has it)
+    const orderIds = [...new Set(batch.filter(id => !out.get(id)?.jobId)
+      .flatMap(id => (byThread.get(id) ?? []).map(r => r.insurer_order_id).filter((o): o is string => !!o)))]
+    if (orderIds.length) {
+      const { data: orders } = await db.from('insurer_orders').select('id, job_id').eq('tenant_id', tenantId).in('id', orderIds)
+      const jobOf = new Map(((orders as { id: string; job_id: string | null }[] | null) ?? []).filter(o => o.job_id).map(o => [o.id, o.job_id!]))
+      for (const id of batch) {
+        if (out.get(id)?.jobId) continue
+        const jobId = (byThread.get(id) ?? []).map(r => r.insurer_order_id && jobOf.get(r.insurer_order_id)).find(Boolean)
+        if (jobId) out.set(id, { filing: 'job', jobId })
+      }
+    }
   }
   return out
 }

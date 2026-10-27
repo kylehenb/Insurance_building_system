@@ -5,7 +5,7 @@ import { folderLabel, HIDDEN_LABELS, TAB_LABELS, tabLabel, type FolderKey, type 
 import { parseMessage, resolveCidImages, type MailMessage } from './message'
 import { fetchThreads, mailDb, storeThread, type Mailbox } from './sync'
 import { draftsInThread } from './compose'
-import { refreshFiling, type Filing } from './filing'
+import { filingForThreads, refreshFiling, type Filing } from './filing'
 import { orderForEmail } from '@/lib/insurer-orders/from-email'
 import type { MailAddress, Participant } from './summary'
 
@@ -63,6 +63,21 @@ type Row = Omit<ThreadListItem, 'id' | 'job'> & { gmail_thread_id: string; job_i
 const PAGE_SIZE = 50
 
 async function withJobs(mailbox: Mailbox, rows: Row[], db: SupabaseClient): Promise<ThreadListItem[]> {
+  // The mirror's job can lag the emails filed on a job (linked elsewhere): check
+  // the ones it has none for, and put it right
+  const unfiled = rows.filter(r => !r.job_id).map(r => r.gmail_thread_id)
+  if (unfiled.length) {
+    const live = await filingForThreads(db, mailbox.tenant_id, unfiled)
+    const found = rows.filter(r => !r.job_id && live.get(r.gmail_thread_id)?.jobId)
+    for (const r of found) {
+      r.job_id = live.get(r.gmail_thread_id)!.jobId
+      r.filing = 'job'
+    }
+    if (found.length) {
+      await Promise.all(found.map(r => db.from('mail_threads').update({ job_id: r.job_id, filing: 'job' })
+        .eq('mailbox_id', mailbox.id).eq('gmail_thread_id', r.gmail_thread_id)))
+    }
+  }
   const jobIds = [...new Set(rows.map(r => r.job_id).filter((id): id is string => !!id))]
   const { data: jobs } = jobIds.length
     ? await db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', mailbox.tenant_id).in('id', jobIds)

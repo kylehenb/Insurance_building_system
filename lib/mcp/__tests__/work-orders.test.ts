@@ -100,4 +100,35 @@ describe('find_work_orders', () => {
     expect(workOrders(res.data)[2].warnings).toEqual(['No trade is assigned yet.'])
     expect(res.text).toMatch(/^3 work orders not sent yet, across 2 jobs\./)
   })
+
+  it('finds a trade business\'s work orders across jobs, by kind of work and suburb', async () => {
+    db.jobs.push({ id: 'j3', tenant_id: 't1', job_number: 'IRC1053', property_address: '9 Leighton Rd, Mundaring WA 6073', insured_name: 'Brown' })
+    db.trades.push({ id: 'tf', tenant_id: 't1', business_name: 'True Fix Carpentry', entity_name: 'TF Pty Ltd', primary_trade: 'Carpenter', trade_specialties: ['Cabinets', 'Doors'], contact_email: 'jobs@truefix.com.au' })
+    db.work_orders.push(
+      { id: 'wtf1', tenant_id: 't1', job_id: 'j3', trade_id: 'tf', trade_name: 'Cabinetmaker', quote_id: null, agreed_amount: 4200, notes: null, gary_state: 'waiting_reply', status: 'engaged', created_at: '6' },
+      { id: 'wtf2', tenant_id: 't1', job_id: 'j2', trade_id: 'tf', trade_name: 'Carpenter', scope_summary: 'Rehang doors', quote_id: null, agreed_amount: 300, notes: null, gary_state: 'not_started', status: 'pending', created_at: '7' },
+    )
+    const res = await run({ business_name: 'true fix', trade: 'cabinets', suburb: 'Mundaring' })
+    expect(workOrders(res.data).map(w => [w.work_order_id, w.job_number, w.business_name])).toEqual([['wtf1', 'IRC1053', 'True Fix Carpentry']])
+    expect(res.text).toMatch(/^1 work order matching cabinets, by true fix, in Mundaring, across 1 job\.\nIRC1053, 9 Leighton Rd, Mundaring WA 6073:\n- Cabinetmaker \(True Fix Carpentry\), \$4,200, sent\./)
+
+    // Everything that business has, and only what's still to send
+    expect(workOrders((await run({ business_name: 'True Fix' })).data).map(w => w.work_order_id)).toEqual(['wtf1', 'wtf2'])
+    expect(workOrders((await run({ business_name: 'True Fix', sent: false })).data).map(w => w.work_order_id)).toEqual(['wtf2'])
+    // A trade's specialties and the scope count as the kind of work
+    expect(workOrders((await run({ trade: 'door' })).data).map(w => w.work_order_id)).toEqual(['wtf1', 'wtf2'])
+  })
+
+  it('filters by status and sent state, on a job too', async () => {
+    expect(workOrders((await run({ status: 'Engaged' })).data).map(w => w.work_order_id)).toEqual(['wo3'])
+    const onJob = await run({ job_number: 'IRC1001', trade: 'plaster', sent: false })
+    expect(workOrders(onJob.data).map(w => w.work_order_id)).toEqual(['wo1'])
+    expect(onJob.text).toMatch(/^IRC1001, 1 Test St: 1 work orders matching plaster, not sent, 1 not sent\./)
+  })
+
+  it('says when nothing matches', async () => {
+    expect((await run({ business_name: 'Nobody' })).text).toBe('No trade business called "Nobody" — try part of the name.')
+    expect((await run({ suburb: 'Broome' })).text).toBe('No job address has "Broome" in it.')
+    expect((await run({ trade: 'pool' })).text).toBe('No work orders match pool.')
+  })
 })

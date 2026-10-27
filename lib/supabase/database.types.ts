@@ -1733,6 +1733,9 @@ export type Database = {
           trade_invoice_date: string | null
           trade_invoice_number: string | null
           trade_pdf_storage_path: string | null
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
           work_order_id: string | null
         }
         Insert: {
@@ -1766,6 +1769,9 @@ export type Database = {
           trade_invoice_date?: string | null
           trade_invoice_number?: string | null
           trade_pdf_storage_path?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
           work_order_id?: string | null
         }
         Update: {
@@ -1799,6 +1805,9 @@ export type Database = {
           trade_invoice_date?: string | null
           trade_invoice_number?: string | null
           trade_pdf_storage_path?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
           work_order_id?: string | null
         }
         Relationships: [

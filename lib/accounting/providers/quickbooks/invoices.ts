@@ -106,3 +106,34 @@ export async function createQboInvoice(
   const data = (await res.json()) as QboInvoiceCreateResponse
   return data.Invoice.Id
 }
+
+interface QboInvoiceReadResponse {
+  Invoice: {
+    Id: string
+    SyncToken: string
+  }
+}
+
+/** Voids an invoice in QuickBooks (it stays there, at $0, marked Voided). */
+export async function voidQboInvoice(
+  supabase: SupabaseClient,
+  tenantId: string,
+  accountingRefId: string
+): Promise<void> {
+  // QBO needs the invoice's current SyncToken to change it
+  const read = await qboFetch(supabase, tenantId, `/invoice/${encodeURIComponent(accountingRefId)}`)
+  if (!read.ok) {
+    const tid = read.headers.get('intuit_tid') ?? 'unavailable'
+    throw new Error(`Failed to read QBO invoice ${accountingRefId}: ${read.status} ${await read.text()} [intuit_tid=${tid}]`)
+  }
+  const { Invoice } = (await read.json()) as QboInvoiceReadResponse
+
+  const res = await qboFetch(supabase, tenantId, '/invoice?operation=void', {
+    method: 'POST',
+    body: JSON.stringify({ Id: Invoice.Id, SyncToken: Invoice.SyncToken }),
+  })
+  if (!res.ok) {
+    const tid = res.headers.get('intuit_tid') ?? 'unavailable'
+    throw new Error(`Failed to void QBO invoice ${accountingRefId}: ${res.status} ${await res.text()} [intuit_tid=${tid}]`)
+  }
+}
