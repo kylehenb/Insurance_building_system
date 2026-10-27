@@ -23,13 +23,28 @@ interface PollSummary {
   error?: string
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get('authorization')
+function checkCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
+}
+
+// Vercel cron calls with GET
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  return runPoll()
+}
 
+// Keep POST for manual/test invocation
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!checkCronAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runPoll()
+}
+
+async function runPoll(): Promise<NextResponse> {
   const supabase = createServiceClient()
   // Use raw client for queries on columns added by migration
   const rawDb = createRawClient(
