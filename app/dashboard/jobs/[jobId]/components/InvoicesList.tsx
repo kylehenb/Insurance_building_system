@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useCallback, useEffect, useState, useRef } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import type { JobContext } from './InvoicesTab'
 import { InvoiceEditor } from './InvoiceEditor'
 import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
@@ -221,18 +220,26 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
     load()
   }, [tenantId, load])
 
-  // ── Delete handler (hard delete for draft invoices) ───────────────────────
+  // ── Void handler — the invoice stays, voided, and is voided in accounting too ──
 
-  const handleDelete = useCallback(async (invoiceId: string, invoiceRef: string | null) => {
-    if (!window.confirm(`Delete invoice ${invoiceRef ?? 'this invoice'}? This cannot be undone.`)) return
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    await supabase.from('invoices').delete().eq('id', invoiceId).eq('tenant_id', tenantId)
-    setInvoices(prev => prev.filter(i => i.id !== invoiceId))
+  const handleVoid = useCallback(async (invoiceId: string, invoiceRef: string | null) => {
+    const reason = window.prompt(`Void invoice ${invoiceRef ?? 'this invoice'}? It stays on the job, marked voided, and is voided in the accounting system too. This cannot be undone.\n\nWhy is it being voided?`)
+    if (reason === null) return
+    const res = await fetch(`/api/invoices/${invoiceId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    const out = await res.json().catch(() => ({})) as { error?: string; warnings?: string[] }
+    if (!res.ok) {
+      const queued = pendingApprovalFrom(out)
+      alert(queued ? `Waiting for approval: ${queued.message.replace(/^Sent for approval:\s*/, '')}` : out.error ?? 'The invoice could not be voided.')
+    } else if (out.warnings?.length) {
+      alert(out.warnings.join('\n'))
+    }
+    await load()
     onInvoiceUpdated?.()
-  }, [tenantId, onInvoiceUpdated])
+  }, [load, onInvoiceUpdated])
 
   if (loading) {
     return (
@@ -544,14 +551,14 @@ export function InvoicesList({ jobId, tenantId, ctx, onInvoiceUpdated }: Invoice
                         Email Invoice…
                       </button>
                     )}
-                    {invoice.status === 'draft' && (
+                    {(invoice.status === 'draft' || invoice.status === 'sent') && !invoice.paid_date && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(invoice.id, invoice.invoice_ref); setMenuDropdownId(null) }}
+                        onClick={(e) => { e.stopPropagation(); handleVoid(invoice.id, invoice.invoice_ref); setMenuDropdownId(null) }}
                         style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', borderTop: '1px solid var(--line)' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--danger-bg)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        Delete
+                        Void…
                       </button>
                     )}
                   </div>
