@@ -2408,6 +2408,17 @@ export type Database = {
       }
       photos: {
         Row: {
+          client_id: string | null
+          ai_status: string | null
+          ai_claimed_at: string | null
+          ai_seen: string | null
+          ai_kind: string | null
+          ai_label: string | null
+          ai_room: string | null
+          ai_confidence: number | null
+          ai_room_confidence: number | null
+          ai_model: string | null
+          ai_labelled_at: string | null
           crop_x: number
           crop_y: number
           crop_scale: number
@@ -2426,6 +2437,17 @@ export type Database = {
           uploaded_at: string | null
         }
         Insert: {
+          client_id?: string | null
+          ai_status?: string | null
+          ai_claimed_at?: string | null
+          ai_seen?: string | null
+          ai_kind?: string | null
+          ai_label?: string | null
+          ai_room?: string | null
+          ai_confidence?: number | null
+          ai_room_confidence?: number | null
+          ai_model?: string | null
+          ai_labelled_at?: string | null
           crop_x?: number
           crop_y?: number
           crop_scale?: number
@@ -2444,6 +2466,17 @@ export type Database = {
           uploaded_at?: string | null
         }
         Update: {
+          client_id?: string | null
+          ai_status?: string | null
+          ai_claimed_at?: string | null
+          ai_seen?: string | null
+          ai_kind?: string | null
+          ai_label?: string | null
+          ai_room?: string | null
+          ai_confidence?: number | null
+          ai_room_confidence?: number | null
+          ai_model?: string | null
+          ai_labelled_at?: string | null
           crop_x?: number
           crop_y?: number
           crop_scale?: number
@@ -4694,6 +4727,10 @@ export type Database = {
       }
     }
     Functions: {
+      claim_photos_for_labelling: {
+        Args: { p_inspection_id: string; p_limit: number; p_tenant_id: string }
+        Returns: Database['public']['Tables']['photos']['Row'][]
+      }
       generate_job_number: { Args: { p_tenant_id: string }; Returns: string }
       generate_work_order_ref: {
         Args: { p_job_id: string; p_tenant_id: string }

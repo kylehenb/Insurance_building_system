@@ -1,7 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AI_LABEL_BATCH_SIZE, applyAiLabels, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel } from '@/lib/photos/report-order'
+import { LOW_CONFIDENCE, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL } from '@/lib/photos/report-order'
+import { processPhotoForUpload } from './photo-convert'
+import { UploadBanner } from './UploadBanner'
+import { useFieldPhotos } from './useFieldPhotos'
 
 interface InitialData {
   inspectionId: string
@@ -36,8 +39,7 @@ interface PhotoEntry { id: string; file: File; previewUrl: string; label: string
 
 function uid() { return Math.random().toString(36).slice(2) }
 
-// Upload photos concurrently (a few at a time) instead of one-by-one — this is what made
-// submission take minutes: N photos each waiting on a full round trip in series.
+// Roof photos upload at submit, a few at a time. (Inspection photos upload as they're added — see useFieldPhotos.)
 async function uploadPhotoEntries(entries: { file: File; label: string; sequenceNumber: number; isRoofPhoto?: boolean }[], base: string, concurrency = 4) {
   let next = 0
   const worker = async () => {
@@ -52,73 +54,6 @@ async function uploadPhotoEntries(entries: { file: File; label: string; sequence
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker))
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-// Convert any image (including HEIC) to a compressed JPEG ≤ TARGET_BYTES.
-// Uses the canvas API — iOS Safari decodes HEIC natively, so no extra library needed.
-async function processPhotoForUpload(file: File): Promise<File> {
-  const TARGET_BYTES = 125 * 1024  // 125 KB ceiling
-  const MAX_DIM = 1600             // 1600px max on longest side
-
-  return new Promise(resolve => {
-    const img = new Image()
-    const objUrl = URL.createObjectURL(file)
-
-    img.onload = () => {
-      URL.revokeObjectURL(objUrl)
-
-      let w = img.naturalWidth
-      let h = img.naturalHeight
-
-      if (w > MAX_DIM || h > MAX_DIM) {
-        const scale = Math.min(MAX_DIM / w, MAX_DIM / h)
-        w = Math.round(w * scale)
-        h = Math.round(h * scale)
-      }
-
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-
-      // Adaptive quality — steps down until ≤ TARGET_BYTES or hits 0.55 floor
-      const compress = (quality: number) => {
-        canvas.toBlob(blob => {
-          if (!blob) { resolve(file); return }
-          if (blob.size > TARGET_BYTES && quality > 0.55) {
-            compress(Math.round((quality - 0.08) * 100) / 100)
-            return
-          }
-          const baseName = file.name.replace(/\.(heic|heif)$/i, '')
-          const jpegName = baseName.match(/\.(jpe?g)$/i) ? file.name : `${baseName}.jpg`
-          resolve(new File([blob], jpegName, { type: 'image/jpeg', lastModified: Date.now() }))
-        }, 'image/jpeg', quality)
-      }
-
-      compress(0.82)
-    }
-
-    img.onerror = () => {
-      // Browser can't decode (e.g. Chrome with HEIC and no native support).
-      // Fall through — the server will receive the raw file; upload will likely
-      // fail the bucket mime-type check, but the user will see an error rather
-      // than a silent hang. In practice this path is never hit on iOS Safari.
-      URL.revokeObjectURL(objUrl)
-      resolve(file)
-    }
-
-    img.src = objUrl
-  })
 }
 
 function formatDate(d: string | null) {
@@ -145,9 +80,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [raw_report_notes, setRawReportNotes] = useState('')
 
   // ─── Photos ───────────────────────────────────────────────────────────────
-  const [photos, setPhotos] = useState<PhotoEntry[]>([])
   const [aiLabeling, setAiLabeling] = useState(false)
-  const [aiLabelDone, setAiLabelDone] = useState(false)
+  const [uploadDoneShown, setUploadDoneShown] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
   // ─── Additional Reports ───────────────────────────────────────────────────
@@ -385,112 +319,44 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     armDraft()
   }
 
+  // Inspection photos: converted, saved on the phone and uploaded as they're added; labelled on the server
+  const fieldPhotos = useFieldPhotos({ base, inspectionId: initialData.inspectionId, active: !submitted })
+  const { photos, counts: photoCounts, busy: photosBusy } = fieldPhotos
+  // Report order on screen: View of Property, then mud maps, then the rest as taken
+  const shownPhotos = orderReportPhotos(photos)
+
+  // The green "all uploaded" bar shows when a round of uploads finishes, until dismissed
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (photosBusy) { wasBusy.current = true; setUploadDoneShown(false) }
+    else if (wasBusy.current) { wasBusy.current = false; setUploadDoneShown(true) }
+  }, [photosBusy])
+
+  // Leaving mid-upload: browsers that honour it warn first (iOS mostly doesn't — hence the bar)
+  useEffect(() => {
+    if (!photosBusy) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [photosBusy])
+
   const handlePhotos = (files: FileList | null) => {
-    if (!files) return
-    setAiLabelDone(false)
-
-    Array.from(files).forEach(file => {
-      const id = uid()
-      // Show a placeholder immediately so the inspector sees something
-      const rawPreview = URL.createObjectURL(file)
-      setPhotos(prev => [...prev, { id, file, previewUrl: rawPreview, label: '', processing: true }])
-
-      processPhotoForUpload(file).then(processed => {
-        const processedPreview = URL.createObjectURL(processed)
-        setPhotos(prev => prev.map(p => {
-          if (p.id !== id) return p
-          URL.revokeObjectURL(p.previewUrl)   // drop the raw HEIC preview
-          return { ...p, file: processed, previewUrl: processedPreview, processing: false }
-        }))
-        armDraft()
-      })
-    })
-  }
-
-  const updatePhotoLabel = (id: string, label: string) => {
-    setPhotos(prev => prev.map(p => p.id === id ? { ...p, label } : p))
-    armDraft()
-  }
-
-  const removePhoto = (id: string) => {
-    setPhotos(prev => {
-      const p = prev.find(x => x.id === id)
-      if (p) URL.revokeObjectURL(p.previewUrl)
-      return prev.filter(x => x.id !== id)
-    })
-    armDraft()
-  }
-
-  const anyProcessing = photos.some(p => p.processing)
-
-  // Context for photo labeling comes from the raw report dump + whatever scope
-  // line items are filled in, rather than a separate photo-description field.
-  const buildPhotoLabelContext = useCallback(() => {
-    const scopeText = scopeRooms
-      .filter(r => r.name.trim() || r.items.some(i => i.text.trim()))
-      .map(r => `${r.name.trim() || 'Room'}: ${r.items.map(i => i.text).filter(Boolean).join('; ')}`)
-      .join('\n')
-    return [raw_report_notes.trim(), scopeText].filter(Boolean).join('\n\n')
-  }, [raw_report_notes, scopeRooms])
-
-  // The AI looks at the photos themselves, a batch at a time (in parallel), with the
-  // notes and scope only to help name rooms. Null when nothing came back at all.
-  const fetchAILabels = async (list: PhotoEntry[]): Promise<(AiPhotoLabel | null)[] | null> => {
-    const context = buildPhotoLabelContext()
-    const jobContext = { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address }
-    const batches: PhotoEntry[][] = []
-    for (let i = 0; i < list.length; i += AI_LABEL_BATCH_SIZE) batches.push(list.slice(i, i + AI_LABEL_BATCH_SIZE))
-    const results = await Promise.all(batches.map(async batch => {
-      try {
-        const photosPayload = await Promise.all(batch.map(async p => ({ data: await fileToBase64(p.file), mimeType: p.file.type || 'image/jpeg' })))
-        const res = await fetch(`${base}/ai-label`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photos: photosPayload, context, jobContext }),
-        })
-        const data = await res.json()
-        if (data.ok && Array.isArray(data.labels)) return batch.map((_, i) => (data.labels[i] ?? null) as AiPhotoLabel | null)
-      } catch { /* this batch keeps its existing labels */ }
-      return batch.map(() => null)
-    }))
-    const labels = results.flat()
-    return labels.some(Boolean) ? labels : null
-  }
-
-  // Labels from the AI, then the report order: View of Property, mud maps, the rest.
-  const labelAndOrder = (list: PhotoEntry[], ai: (AiPhotoLabel | null)[], keepExisting: boolean) => {
-    const labels = applyAiLabels(list.map(p => p.label), ai, { keepExisting })
-    return orderReportPhotos(list.map((p, i) => ({ ...p, label: labels[i] })))
+    if (!files?.length) return
+    fieldPhotos.addFiles(files)
   }
 
   const runAILabels = async () => {
     if (!photos.length) { alert('No photos to label.'); return }
-    if (anyProcessing) { alert('Photos are still processing — please wait a moment.'); return }
     setAiLabeling(true)
-    const list = photos
-    const ai = await fetchAILabels(list)
-    if (ai) {
-      const labelled = labelAndOrder(list, ai, false)
-      // Photos added while the AI was working stay at the end, unlabelled
-      setPhotos(prev => [...labelled, ...prev.filter(p => !list.some(l => l.id === p.id))])
-      setAiLabelDone(true)
-      armDraft()
-    } else {
-      alert('The photos couldn\'t be labelled just now. Try again in a moment, or label them by hand.')
+    try {
+      // Save the notes first so the server labels with what's written so far
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      await fetch(`${base}/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: collectDraft() }) })
+      await fieldPhotos.relabelAll()
+    } catch {
+      alert('The photos couldn\'t be relabelled just now. Try again in a moment.')
     }
     setAiLabeling(false)
-  }
-
-  // One-tap lead labels. Only one photo can be the View of Property, so tagging a
-  // new one clears the old; tapping a tag again clears it.
-  const tagPhoto = (id: string, tag: typeof VIEW_OF_PROPERTY_LABEL | typeof MUD_MAP_LABEL) => {
-    const kind = tag === VIEW_OF_PROPERTY_LABEL ? 'view_of_property' : 'mud_map'
-    setPhotos(prev => orderReportPhotos(prev.map(p => {
-      if (p.id === id) return { ...p, label: photoKindOfLabel(p.label) === kind ? '' : tag }
-      if (kind === 'view_of_property' && photoKindOfLabel(p.label) === 'view_of_property') return { ...p, label: '' }
-      return p
-    })))
-    armDraft()
   }
 
   // ─── Submit Flow ──────────────────────────────────────────────────────────
@@ -510,32 +376,21 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         body: JSON.stringify({ draft: collectDraft() }),
       })
 
-      // Upload all photos (field + roof) concurrently instead of one at a time
       const scopeRoomsPayload = scopeRooms.map(r => ({
         room: r.name,
         l: r.l, w: r.w, h: r.h,
         items: r.items.map(i => i.text).filter(Boolean),
       }))
 
-      // Attempt to auto-label any photos the inspector hasn't already labelled,
-      // using the report dump + scope notes as context, so they arrive on the
-      // desktop with a label the user can correct rather than blank.
-      let fieldPhotosForUpload = orderReportPhotos(photos)
-      if (!aiLabelDone && photos.some(p => !p.label.trim()) && !anyProcessing) {
-        const blank = photos.filter(p => !p.label.trim())
-        const ai = await fetchAILabels(blank)
-        if (ai) {
-          fieldPhotosForUpload = labelAndOrder(photos, photos.map(p => ai[blank.indexOf(p)] ?? null), true)
-          setPhotos(fieldPhotosForUpload)
-          setAiLabelDone(true)
-        }
+      // Inspection photos upload as they're added: wait for any still going (the bar shows progress)
+      if (!(await fieldPhotos.waitForUploads())) {
+        alert('Some photos haven\'t uploaded yet. Check your connection, tap "Try again" on the bar at the top, then submit again.')
+        setIsSubmitting(false)
+        return
       }
 
-      // Field and roof photos go to different reports, so each is numbered from 1
-      await uploadPhotoEntries([
-        ...fieldPhotosForUpload.map((p, i) => ({ file: p.file, label: p.label, sequenceNumber: i + 1 })),
-        ...roofPhotos.map((p, i) => ({ file: p.file, label: p.label, sequenceNumber: i + 1, isRoofPhoto: true })),
-      ], base)
+      // Roof photos still go up now, numbered in their own report
+      await uploadPhotoEntries(roofPhotos.map((p, i) => ({ file: p.file, label: p.label, sequenceNumber: i + 1, isRoofPhoto: true })), base)
 
       const res = await fetch(`${base}/submit`, {
         method: 'POST',
@@ -559,6 +414,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           lossType: initialData.lossType ?? '',
           roofRawNotes,
           roofPhotoContext,
+          // The server finishes the labels with these notes, then orders and attaches the photos
+          photoManifest: fieldPhotos.manifest(),
         }),
       })
 
@@ -568,6 +425,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         const ts = now.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         setSubmitTime(ts)
         setSubmitted(true)
+        fieldPhotos.clearSaved()
         setStep(7)
         setTimeout(() => document.getElementById('submitted-state')?.scrollIntoView({ behavior: 'smooth' }), 200)
       } else {
@@ -594,6 +452,19 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   return (
     <div className="fa-root">
+      {!submitted && (
+        <UploadBanner
+          total={photoCounts.total}
+          saved={photoCounts.saved}
+          uploaded={photoCounts.uploaded}
+          failed={photoCounts.failed}
+          busy={photosBusy}
+          online={fieldPhotos.online}
+          done={uploadDoneShown}
+          onDismissDone={() => setUploadDoneShown(false)}
+          onRetry={fieldPhotos.retryFailed}
+        />
+      )}
 
       {/* HEADER */}
       <div className="fa-header">
@@ -837,7 +708,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
         </div>
         <div className="fa-sc-body">
           {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
-          {/* AI Label (uses report notes + scope notes as context) */}
+          {/* AI labels: the server looks at each photo as it uploads */}
           <div className="fa-ai-dark" style={{ marginBottom: 0 }}>
             <div className="fa-ai-dark-head">
               <span style={{ fontSize: 14 }}>📷</span>
@@ -845,55 +716,75 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             </div>
             <div className="fa-ai-dark-body">
               <p style={{ fontSize: 11, color: 'var(--beige-dark)', margin: '0 0 10px' }}>
-                Looks at each photo, using your notes and scope for room names. Unlabelled photos are also labelled when you submit. The View of Property goes first, then the mud maps / floor plans.
+                Photos are labelled automatically as they upload, and finished with your notes when you submit. The View of Property goes first, then the mud maps / floor plans. Labels in orange are worth a check.
               </p>
+              {photoCounts.uploaded > 0 && (
+                <p className="fa-ai-status">
+                  {fieldPhotos.awaitingLabels
+                    ? `Labelling on the server · ${photoCounts.labelled} of ${photoCounts.uploaded}`
+                    : `${photoCounts.labelled} of ${photoCounts.uploaded} photos labelled`}
+                </p>
+              )}
               <button
-                className={`fa-ai-label-btn${aiLabelDone ? ' done' : ''}`}
+                className="fa-ai-label-btn"
                 onClick={runAILabels}
-                disabled={aiLabeling || anyProcessing}
+                disabled={aiLabeling || photosBusy || !photoCounts.uploaded}
               >
-                {anyProcessing ? <><span className="fa-spinner" /> Converting photos…</> : aiLabeling ? <><span className="fa-spinner" /> Labelling…</> : aiLabelDone ? '✓ Labels Applied' : '✦ AI Label All Photos'}
+                {aiLabeling ? <><span className="fa-spinner" /> Asking…</> : '✦ Re-label All Photos With My Notes'}
               </button>
             </div>
           </div>
           {/* Photo Grid */}
           <div className="fa-photo-grid">
-            {photos.map(photo => (
-              <div key={photo.id} className="fa-photo-card">
-                <img className="fa-photo-thumb" src={photo.previewUrl} alt="inspection" />
-                {photo.processing && (
-                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,26,26,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
-                    <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>Converting…</span>
-                  </div>
-                )}
-                {!photo.processing && <button className="fa-photo-del" onClick={() => removePhoto(photo.id)}>×</button>}
-                <div className="fa-photo-label-area">
-                  <textarea
-                    className="fa-photo-label-ta"
-                    rows={1}
-                    placeholder={photo.processing ? 'Processing…' : 'Add label'}
-                    value={photo.label}
-                    disabled={photo.processing}
-                    onChange={e => updatePhotoLabel(photo.id, e.target.value)}
-                  />
-                  {!photo.processing && (
-                    <div className="fa-photo-tags">
-                      {([[VIEW_OF_PROPERTY_LABEL, 'view_of_property', 'Front view'], [MUD_MAP_LABEL, 'mud_map', 'Mud map']] as const).map(([tag, kind, text]) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          className={`fa-photo-tag${photoKindOfLabel(photo.label) === kind ? ' on' : ''}`}
-                          onClick={() => tagPhoto(photo.id, tag)}
-                        >
-                          {text}
-                        </button>
-                      ))}
+            {shownPhotos.map(photo => {
+              const preparing = photo.status === 'waiting' || photo.status === 'converting'
+              const unsure = photo.labelSource === 'ai' && !!photo.ai &&
+                Math.min(photo.ai.confidence, photo.ai.kind === 'other' ? photo.ai.roomConfidence ?? 1 : 1) < LOW_CONFIDENCE
+              return (
+                <div key={photo.id} className="fa-photo-card">
+                  {photo.previewUrl
+                    ? <img className="fa-photo-thumb" src={photo.previewUrl} alt="inspection" loading="lazy" />
+                    : <div className="fa-photo-thumb-ph">📷</div>}
+                  {preparing && (
+                    <div className="fa-photo-status">
+                      <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
+                      <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
                     </div>
                   )}
+                  {!preparing && (
+                    <span className={`fa-photo-badge${photo.status === 'uploaded' ? ' up' : ''}`}>
+                      {photo.status === 'uploaded' ? '✓ Uploaded' : photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}
+                    </span>
+                  )}
+                  {!preparing && <button className="fa-photo-del" onClick={() => fieldPhotos.remove(photo.id)}>×</button>}
+                  <div className="fa-photo-label-area">
+                    <textarea
+                      className={`fa-photo-label-ta${unsure ? ' check' : ''}`}
+                      rows={1}
+                      placeholder={preparing ? 'Preparing…' : photo.status === 'uploaded' && photo.aiStatus !== 'done' ? 'AI label coming…' : 'Add label'}
+                      value={photo.label}
+                      disabled={preparing}
+                      onChange={e => fieldPhotos.setLabel(photo.id, e.target.value)}
+                    />
+                    {unsure && <div className="fa-photo-check">Check this label</div>}
+                    {!preparing && (
+                      <div className="fa-photo-tags">
+                        {([[VIEW_OF_PROPERTY_LABEL, 'view_of_property', 'Front view'], [MUD_MAP_LABEL, 'mud_map', 'Mud map']] as const).map(([tag, kind, text]) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            className={`fa-photo-tag${photoKindOfLabel(photo.label) === kind ? ' on' : ''}`}
+                            onClick={() => fieldPhotos.tagPhoto(photo.id, tag)}
+                          >
+                            {text}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {/* Upload Slot */}
             <button
               type="button"
@@ -1298,9 +1189,9 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           <button
             className={`fa-submit-btn${!safetyDone ? ' locked' : ''}`}
             onClick={handleSubmit}
-            disabled={!safetyDone || isSubmitting || anyProcessing}
+            disabled={!safetyDone || isSubmitting}
           >
-            {anyProcessing ? 'Converting photos…' : isSubmitting ? 'Submitting…' : 'Submit Inspection'}
+            {isSubmitting ? (photosBusy ? 'Waiting for photos…' : 'Submitting…') : 'Submit Inspection'}
           </button>
         </div>
       )}

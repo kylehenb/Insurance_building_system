@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { labelPendingPhotos } from '@/lib/photos/server-labels'
 
 export const dynamic = 'force-dynamic'
+// Labelling the batch an upload completes runs after the response (see POST)
+export const maxDuration = 60
 
 export async function GET(
   req: NextRequest,
@@ -21,20 +24,33 @@ export async function GET(
     .single()
   if (!userRow) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const { data: photos } = await service
+  // ?pending=1: the field app's photos uploaded before submit (with their AI labels so far)
+  const pendingOnly = req.nextUrl.searchParams.get('pending') === '1'
+  let query = service
     .from('photos')
-    .select('id, storage_path, label, crop_x, crop_y, crop_scale')
+    .select('id, storage_path, label, crop_x, crop_y, crop_scale, client_id, sequence_number, ai_status, ai_kind, ai_label, ai_confidence, ai_room, ai_room_confidence')
     .eq('inspection_id', inspectionId)
     .eq('tenant_id', userRow.tenant_id)
+  if (pendingOnly) query = query.not('client_id', 'is', null).is('report_id', null)
+  const { data: photos } = await query
     .order('sequence_number', { ascending: true, nullsFirst: false })
     .order('uploaded_at', { ascending: true })
 
+  // &labels=1: the field app checking for AI labels every few seconds — no image links needed
+  const labelsOnly = req.nextUrl.searchParams.get('labels') === '1'
   const result = await Promise.all(
-    (photos ?? []).map(async (p: { id: string; storage_path: string; label: string | null; crop_x: number; crop_y: number; crop_scale: number }) => {
-      const { data: signed } = await service.storage
-        .from('photos')
-        .createSignedUrl(p.storage_path, 60 * 60 * 24 * 7)
-      return { id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null, crop_x: p.crop_x ?? 0, crop_y: p.crop_y ?? 0, crop_scale: p.crop_scale ?? 1 }
+    (photos ?? []).map(async p => {
+      const { data: signed } = labelsOnly
+        ? { data: null }
+        : await service.storage.from('photos').createSignedUrl(p.storage_path, 60 * 60 * 24 * 7)
+      return {
+        id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null, crop_x: p.crop_x ?? 0, crop_y: p.crop_y ?? 0, crop_scale: p.crop_scale ?? 1,
+        clientId: p.client_id, sequenceNumber: p.sequence_number,
+        ai: p.ai_status === 'done' && p.ai_label
+          ? { kind: p.ai_kind, label: p.ai_label, confidence: p.ai_confidence ?? 0.5, room: p.ai_room ?? '', roomConfidence: p.ai_room_confidence ?? 0.5 }
+          : null,
+        aiStatus: p.ai_status,
+      }
     })
   )
 
@@ -77,9 +93,26 @@ export async function POST(
   const file = formData.get('file') as File | null
   const label = (formData.get('label') as string) ?? ''
   const isRoofPhoto = formData.get('isRoofPhoto') === 'true'
-  // Position in the report, from the field app's photo order (View of Property, mud maps, then the rest)
+  // Position: the field app's photo order (or the report order, for photos sent at submit)
   const seq = Number(formData.get('sequenceNumber'))
   const sequenceNumber = Number.isInteger(seq) && seq > 0 ? seq : null
+  // clientId: the field app uploads each photo as soon as it's added. Those stay out of the report
+  // (report_id NULL) until submit puts them in order, and are labelled on the server as they arrive.
+  // The same clientId again (a retry after a reload or dropped connection) returns the photo already stored.
+  const clientIdRaw = formData.get('clientId')
+  const clientId = typeof clientIdRaw === 'string' && /^[A-Za-z0-9_-]{4,64}$/.test(clientIdRaw) ? clientIdRaw : null
+  const earlyUpload = !!clientId && !isRoofPhoto
+
+  const existingUpload = async () => {
+    if (!clientId) return null
+    const { data } = await service.from('photos').select('id, storage_path, label')
+      .eq('tenant_id', tenantId).eq('inspection_id', inspectionId).eq('client_id', clientId).maybeSingle()
+    if (!data) return null
+    const { data: signed } = await service.storage.from('photos').createSignedUrl(data.storage_path, 60 * 60 * 24 * 7)
+    return NextResponse.json({ id: data.id, storagePath: data.storage_path, url: signed?.signedUrl ?? null, label: data.label ?? '', clientId })
+  }
+  const already = await existingUpload()
+  if (already) return already
 
   // Determine the correct report_id for this photo
   let photoReportId: string | null = (insp as any).report_id ?? null
@@ -134,13 +167,24 @@ export async function POST(
       size_bytes: file.size,
       label: label || null,
       sequence_number: sequenceNumber,
+      ...(earlyUpload ? { report_id: null, client_id: clientId, ai_status: 'pending' } : {}),
     })
     .select()
     .single()
 
   if (dbErr) {
     await service.storage.from('photos').remove([storagePath])
+    // Two copies of the same retry raced: the other one won
+    if (dbErr.code === '23505') {
+      const winner = await existingUpload()
+      if (winner) return winner
+    }
     return NextResponse.json({ error: dbErr.message }, { status: 500 })
+  }
+
+  if (earlyUpload) {
+    // Label once a full batch is waiting, so photos are seen with their neighbours
+    after(() => labelPendingPhotos(service, tenantId, inspectionId).catch(err => console.error('[photo-labels] after upload:', err)))
   }
 
   return NextResponse.json({
@@ -148,6 +192,7 @@ export async function POST(
     storagePath,
     url: signed?.signedUrl ?? null,
     label,
+    clientId,
   })
 }
 

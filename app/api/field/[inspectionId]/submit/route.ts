@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { notifySubmissionFailure } from '@/lib/email/notify-submission-failure'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
+import { attachPendingFieldPhotos, finaliseFieldPhotos, type FieldPhotoManifestEntry } from '@/lib/photos/server-labels'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -566,6 +567,7 @@ export async function POST(
     insurer,
     lossType,
     roofRawNotes,
+    photoManifest,
   }: {
     personMet: string
     safetyData: {
@@ -585,6 +587,8 @@ export async function POST(
     lossType: string
     roofRawNotes?: string
     roofPhotoContext?: string
+    /** Field photos (already uploaded) in the phone's order, with the inspector's labels */
+    photoManifest?: FieldPhotoManifestEntry[]
   } = body
 
   const now = new Date().toISOString()
@@ -629,10 +633,18 @@ export async function POST(
       extractPropertyDetails({ service, tenantId, jobId: insp.job_id, rawReportDump }),
       generateRoofReport({ service, tenantId, inspectionId, jobId: insp.job_id, roofRawNotes, assessorName: userRow.name, insurer, lossType, now }),
       parseAndInsertScope({ service, tenantId, resolvedQuoteId, scopeRooms, insurer, lossType }),
+      finaliseFieldPhotos({
+        service, tenantId, inspectionId, reportId: resolvedReportId,
+        manifest: Array.isArray(photoManifest) ? photoManifest : [],
+        notes: rawReportDump ?? '', scopeRooms,
+      }).catch(async err => {
+        await attachPendingFieldPhotos(service, tenantId, inspectionId, resolvedReportId)
+        throw err
+      }),
     ])
 
     const errors: string[] = []
-    const labels = ['BAR report generation', 'Property details extraction', 'Roof report generation', 'Scope parsing']
+    const labels = ['BAR report generation', 'Property details extraction', 'Roof report generation', 'Scope parsing', 'Photo labelling']
     results.forEach((r, i) => {
       if (r.status === 'rejected') {
         const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)

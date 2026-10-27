@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { applyAiLabels, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel } from '../report-order'
+import {
+  applyAiLabels, groupPhotosForReport, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, roomOfLabel,
+  VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel,
+} from '../report-order'
 
-// Report photo order: one View of Property, then every Mud Map/Floor Plan, then the rest as taken.
+// Report photo order: one View of Property, then every Mud Map/Floor Plan, then the rest —
+// grouped room by room in walk order for the report.
 
-const p = (id: string, label: string | null) => ({ id, label })
+const p = (id: string, label: string | null, room?: string, roomConfidence?: number) => ({ id, label, room, roomConfidence })
 const ids = (list: { id: string }[]) => list.map(x => x.id)
 const ai = (kind: AiPhotoLabel['kind'], label: string, confidence = 0.9): AiPhotoLabel => ({ kind, label, confidence })
+const none = () => false
 
 describe('photoKindOfLabel', () => {
   it('recognises the lead labels however they are typed', () => {
@@ -30,8 +35,7 @@ describe('orderReportPhotos', () => {
   })
 
   it('leaves photos without lead labels as they are', () => {
-    const list = [p('a', 'x'), p('b', null), p('c', '')]
-    expect(ids(orderReportPhotos(list))).toEqual(['a', 'b', 'c'])
+    expect(ids(orderReportPhotos([p('a', 'x'), p('b', null), p('c', '')]))).toEqual(['a', 'b', 'c'])
   })
 })
 
@@ -42,24 +46,62 @@ describe('applyAiLabels', () => {
       ai('view_of_property', 'Front elevation - street view', 0.6),
       ai('mud_map', 'Floor plan sketch'),
       ai('view_of_property', 'Front of house from driveway', 0.95),
-    ], { keepExisting: false })
+    ], { keep: none })
     expect(labels).toEqual(['Kitchen - water-stained ceiling', 'Front elevation - street view', MUD_MAP_LABEL, VIEW_OF_PROPERTY_LABEL])
   })
 
-  it('keeps the inspector’s labels when asked, and their view of property wins', () => {
+  it('keeps the inspector’s labels, and their view of property wins', () => {
     const labels = applyAiLabels([VIEW_OF_PROPERTY_LABEL, '', 'Laundry - my label'], [
       ai('view_of_property', 'Front - street', 0.9),
       ai('view_of_property', 'Front elevation - driveway', 0.99),
       ai('other', 'Laundry - tub'),
-    ], { keepExisting: true })
+    ], { keep: i => i !== 1 })
     expect(labels).toEqual([VIEW_OF_PROPERTY_LABEL, 'Front elevation - driveway', 'Laundry - my label'])
   })
 
-  it('overwrites everything when not keeping, and leaves a photo the AI missed alone', () => {
-    expect(applyAiLabels(['Old', 'Old 2'], [ai('other', 'New'), null], { keepExisting: false })).toEqual(['New', 'Old 2'])
+  it('leaves a photo the AI missed alone', () => {
+    expect(applyAiLabels(['Old', 'Old 2'], [ai('other', 'New'), null], { keep: none })).toEqual(['New', 'Old 2'])
   })
 
   it('never lets an ordinary photo carry a lead label', () => {
-    expect(applyAiLabels([''], [ai('other', VIEW_OF_PROPERTY_LABEL)], { keepExisting: false })).toEqual([''])
+    expect(applyAiLabels([''], [ai('other', VIEW_OF_PROPERTY_LABEL)], { keep: none })).toEqual([''])
+  })
+})
+
+describe('roomOfLabel', () => {
+  it('takes the part before the dash', () => {
+    expect(roomOfLabel('Bathroom 2 - no visible damage')).toBe('Bathroom 2')
+    expect(roomOfLabel('Kitchen – cabinet')).toBe('Kitchen')
+    expect(roomOfLabel('Water-damaged ceiling')).toBe('')
+    expect(roomOfLabel(null)).toBe('')
+  })
+})
+
+describe('groupPhotosForReport', () => {
+  it('groups rooms in walk order, keeping the order taken within each room', () => {
+    const list = [
+      p('k1', 'Kitchen - wide', 'Kitchen'),
+      p('b1', 'Bathroom - wide', 'Bathroom'),
+      p('k2', 'Kitchen - cabinet', 'kitchen'), // came back to the kitchen
+      p('v', VIEW_OF_PROPERTY_LABEL, 'External'),
+      p('b2', 'Bathroom - tiles', 'Bathroom'),
+      p('m', MUD_MAP_LABEL),
+    ]
+    expect(ids(groupPhotosForReport(list))).toEqual(['v', 'm', 'k1', 'k2', 'b1', 'b2'])
+  })
+
+  it('keeps a photo with an unknown or unsure room next to the one before it', () => {
+    const list = [
+      p('k1', 'Kitchen - wide', 'Kitchen'),
+      p('x', 'Internal - close-up', '', 0),
+      p('b1', 'Bathroom - wide', 'Bathroom'),
+      p('y', 'Lounge? - stain', 'Lounge', 0.3),
+      p('k2', 'Kitchen - floor', 'Kitchen'),
+    ]
+    expect(ids(groupPhotosForReport(list))).toEqual(['k1', 'x', 'k2', 'b1', 'y'])
+  })
+
+  it('leaves photos alone when no rooms are known', () => {
+    expect(ids(groupPhotosForReport([p('a', 'x'), p('b', 'y'), p('c', 'z')]))).toEqual(['a', 'b', 'c'])
   })
 })
