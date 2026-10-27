@@ -579,6 +579,8 @@ export async function POST(
       weather: boolean
       customNotes: string
       signedBy: string
+      /** When the inspector tapped to sign (ISO) */
+      signedAt?: string | null
     }
     scopeRooms: ScopeRoom[]
     rawReportDump: string
@@ -593,6 +595,12 @@ export async function POST(
 
   const now = new Date().toISOString()
 
+  // Signature stamp: signed by the signed-in user (from the session), at the time they tapped to sign.
+  // A missing, unreadable or future time falls back to now.
+  const signedAtMs = safetyData?.signedAt ? Date.parse(safetyData.signedAt) : NaN
+  const signedAt = Number.isFinite(signedAtMs) && signedAtMs <= Date.now() ? new Date(signedAtMs).toISOString() : now
+  const signedBy = userRow.name ?? safetyData?.signedBy ?? personMet ?? null
+
   // 1. Save safety record
   await service.from('safety_records').insert({
     tenant_id: tenantId,
@@ -600,14 +608,15 @@ export async function POST(
     inspection_id: inspectionId,
     inspector_id: user.id,
     date: now.split('T')[0],
-    confirmed_at: now,
+    confirmed_at: signedAt,
     structural_ok: safetyData?.structural ?? false,
     ppe_confirmed: safetyData?.ppe ?? false,
     asbestos_risk: !(safetyData?.asbestos ?? false),
     roof_access: safetyData?.roofPower ?? false,
     nearest_hospital: null,
     custom_notes: safetyData?.customNotes ?? null,
-    signed_by: safetyData?.signedBy ?? personMet ?? null,
+    signed_by: signedBy,
+    signature_data: `Signed electronically by ${signedBy ?? 'inspector'} (user ${user.id}) at ${signedAt}`,
     status: 'confirmed',
     type: 'field_inspection',
   })

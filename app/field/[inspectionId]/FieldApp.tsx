@@ -26,6 +26,8 @@ interface InitialData {
   reportRef: string | null
   inspector: string | null
   inspectorId: string
+  /** The signed-in user — the one who signs the safety section */
+  currentUserName: string | null
   tenantId: string
   personMet: string | null
   fieldDraft: Record<string, unknown> | null
@@ -38,6 +40,27 @@ interface ScopeRoom { id: string; name: string; l: string; w: string; h: string;
 interface PhotoEntry { id: string; file: File; previewUrl: string; label: string; processing: boolean }
 
 function uid() { return Math.random().toString(36).slice(2) }
+
+interface SafetySignature { name: string; at: string }
+
+function formatStamp(iso: string) {
+  return new Date(iso).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+// One list for the "Add a report" dropdown. Reports with both keys ask Internal or External when picked.
+// internal = the panel filled in here; external = a trade asked to report (keys match the saved draft)
+const REPORT_OPTIONS: { id: string; name: string; internal?: string; external?: string; extSub?: string }[] = [
+  { id: 'make-safe', name: 'Make Safe', internal: 'make-safe', external: 'make-safe-ext', extSub: 'External trade' },
+  { id: 'roof', name: 'Roof Report', internal: 'roof-report', external: 'roof-plumber', extSub: 'Roof plumber' },
+  { id: 'leak', name: 'Leak Detection', internal: 'leak-detection', external: 'leak-plumber', extSub: 'Plumber' },
+  { id: 'restoration', name: 'Restoration Assessment', internal: 'restoration', external: 'restoration-ext', extSub: 'Restoration trade' },
+  { id: 'electrical', name: 'Electrical', external: 'electrical', extSub: 'Test + report' },
+  { id: 'aircon', name: 'Air Conditioning', external: 'aircon', extSub: 'Report' },
+  { id: 'fencing', name: 'Fencing / Gates', external: 'fencing', extSub: 'Report' },
+  { id: 'asbestos', name: 'Asbestos Test', external: 'asbestos', extSub: 'Clearance report' },
+  { id: 'structural', name: 'Structural Engineer', external: 'structural', extSub: 'Report' },
+]
+const INTERNAL_DOT: Record<string, string> = { 'make-safe': 'ms', 'roof-report': 'rr', 'leak-detection': 'ld', restoration: 're' }
 
 // Roof photos upload at submit, a few at a time. (Inspection photos upload as they're added — see useFieldPhotos.)
 async function uploadPhotoEntries(entries: { file: File; label: string; sequenceNumber: number; isRoofPhoto?: boolean }[], base: string, concurrency = 4) {
@@ -69,9 +92,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const [commenceTime, setCommenceTime] = useState('')
   const [chips, setChips] = useState({ general: false, ppe: false, asbestos: false, structural: false, roofPower: false, weather: false })
   const [customSafetyNotes, setCustomSafetyNotes] = useState('')
-  const [hasSig, setHasSig] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const isDrawing = useRef(false)
+  const [signature, setSignature] = useState<SafetySignature | null>(null)
 
   // ─── Scope ────────────────────────────────────────────────────────────────
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
@@ -86,6 +107,10 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Additional Reports ───────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<string | null>(null)
+  // Internal reports added from the dropdown, in the order added
+  const [internalReports, setInternalReports] = useState<string[]>([])
+  // A report with both options waiting for Internal / External
+  const [reportChoice, setReportChoice] = useState<string | null>(null)
   // Make Safe
   const [msWorksCompleted, setMsWorksCompleted] = useState('')
   const [msTempFixes, setMsTempFixes] = useState('')
@@ -146,72 +171,24 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (idx >= 0 && idx < all.length - 1) all[idx + 1].focus()
   }
 
-  // ─── Signature Canvas ─────────────────────────────────────────────────────
-  // ctx is scaled by dpr, so draw-coordinates are CSS pixels — no extra scaling needed
-  const getCanvasPos = (canvas: HTMLCanvasElement, e: MouseEvent | Touch) => {
-    const rect = canvas.getBoundingClientRect()
-    const clientX = 'clientX' in e ? e.clientX : (e as Touch).clientX
-    const clientY = 'clientY' in e ? e.clientY : (e as Touch).clientY
-    return { x: clientX - rect.left, y: clientY - rect.top }
-  }
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
-    // Use actual layout dimensions so physical ↔ CSS mapping is exact
-    const rect = canvas.getBoundingClientRect()
-    const cssW = rect.width || canvas.offsetWidth || 300
-    const cssH = rect.height || canvas.offsetHeight || 90
-    canvas.width = Math.round(cssW * dpr)
-    canvas.height = Math.round(cssH * dpr)
-    const ctx = canvas.getContext('2d')!
-    ctx.scale(dpr, dpr)
-    ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-  }, [])
-
-  const sigStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    const canvas = canvasRef.current; if (!canvas) return
-    isDrawing.current = true
-    const pos = getCanvasPos(canvas, 'touches' in e.nativeEvent ? e.nativeEvent.touches[0] : e.nativeEvent as MouseEvent)
-    const ctx = canvas.getContext('2d')!
-    ctx.beginPath(); ctx.moveTo(pos.x, pos.y)
-  }, [])
-
-  const sigMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    if (!isDrawing.current) return
-    const canvas = canvasRef.current; if (!canvas) return
-    const pos = getCanvasPos(canvas, 'touches' in e.nativeEvent ? e.nativeEvent.touches[0] : e.nativeEvent as MouseEvent)
-    const ctx = canvas.getContext('2d')!
-    ctx.lineTo(pos.x, pos.y); ctx.stroke()
-    setHasSig(true)
-  }, [])
-
-  const sigEnd = useCallback(() => { isDrawing.current = false }, [])
-
-  const clearSig = () => {
-    const canvas = canvasRef.current; if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    setHasSig(false)
+  // ─── Signature ────────────────────────────────────────────────────────────
+  // Tap to sign as the signed-in user; the stamp keeps who and when
+  const signSafety = () => {
+    setSignature({ name: initialData.currentUserName ?? initialData.inspector ?? 'Inspector', at: new Date().toISOString() })
+    armDraft()
   }
 
   // ─── Draft Save/Restore ───────────────────────────────────────────────────
   const collectDraft = useCallback(() => ({
     raw_report_notes,
-    customSafetyNotes, chips, safetyDone, commenceTime, step,
+    customSafetyNotes, chips, safetyDone, commenceTime, step, signature, internalReports,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     roofRawNotes, roofPhotoContext,
     msWorksCompleted, msTempFixes, msHours,
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
     restType, restExtent, restRooms, restEquip, restNotes,
     extTrades, extTradeNotes,
-  }), [raw_report_notes, customSafetyNotes, chips, safetyDone, commenceTime, step, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
+  }), [raw_report_notes, customSafetyNotes, chips, safetyDone, commenceTime, step, signature, internalReports, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -248,6 +225,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.chips) setChips(d.chips as typeof chips)
     if (d.commenceTime) setCommenceTime(d.commenceTime as string)
     if (d.safetyDone) setSafetyDone(true)
+    if (d.signature) setSignature(d.signature as SafetySignature)
     if (typeof d.step === 'number' && d.step > 1) setStep(d.step as number)
     if (d.scopeRooms) {
       const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
@@ -270,6 +248,17 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.restNotes) setRestNotes(d.restNotes as string)
     if (d.extTrades) setExtTrades(d.extTrades as Record<string, boolean>)
     if (d.extTradeNotes) setExtTradeNotes(d.extTradeNotes as Record<string, string>)
+    if (Array.isArray(d.internalReports)) setInternalReports(d.internalReports as string[])
+    else {
+      // Drafts from before the dropdown: show any internal report that has something filled in
+      const has = (...v: unknown[]) => v.some(x => typeof x === 'string' ? x.trim() : Array.isArray(x) ? x.some(Boolean) : x && Object.values(x as object).some(Boolean))
+      setInternalReports([
+        has(d.msWorksCompleted, d.msTempFixes, d.msHours) && 'make-safe',
+        has(d.roofRawNotes, d.roofPhotoContext) && 'roof-report',
+        has(d.ldMethod, d.ldSource, d.ldLocation, d.ldReadings, d.ldFindings) && 'leak-detection',
+        has(d.restType, d.restExtent, d.restRooms, d.restEquip, d.restNotes) && 'restoration',
+      ].filter((k): k is string => !!k))
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -280,7 +269,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   const completeSafety = () => {
-    if (!hasSig) { alert('Please sign before confirming.'); return }
+    if (!signature) { alert('Please tap to sign before confirming.'); return }
     const now = new Date()
     const ts = now.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     setCommenceTime(ts)
@@ -405,7 +394,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             roofPower: chips.roofPower,
             weather: chips.weather,
             customNotes: customSafetyNotes,
-            signedBy: initialData.inspector ?? '',
+            signedBy: signature?.name ?? initialData.inspector ?? '',
+            signedAt: signature?.at ?? null,
           },
           scopeRooms: scopeRoomsPayload,
           rawReportDump: raw_report_notes,
@@ -442,9 +432,54 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     setActivePanel(prev => prev === key ? null : key)
   }
 
-  const toggleExtTrade = (key: string) => {
-    setExtTrades(prev => ({ ...prev, [key]: !prev[key] }))
+  const addInternalReport = (key: string) => {
+    setInternalReports(prev => prev.includes(key) ? prev : [...prev, key])
+    setActivePanel(key)
     armDraft()
+  }
+
+  const addExternalReport = (key: string) => {
+    setExtTrades(prev => ({ ...prev, [key]: true }))
+    armDraft()
+  }
+
+  // Removing an internal report clears what was entered, so it isn't sent with the inspection
+  const removeInternalReport = (key: string) => {
+    const filled = {
+      'make-safe': [msWorksCompleted, msTempFixes, msHours],
+      'roof-report': [roofRawNotes, roofPhotoContext, roofPhotos.length ? 'photos' : ''],
+      'leak-detection': [ldMethod, ldSource, ldLocation, ldFindings, ...ldReadings],
+      restoration: [restType, restExtent, restRooms, restNotes, Object.values(restEquip).some(Boolean) ? 'equip' : ''],
+    }[key]?.some(v => v.trim())
+    if (filled && !confirm('Remove this report? What you\'ve entered for it will be cleared.')) return
+    if (key === 'make-safe') { setMsWorksCompleted(''); setMsTempFixes(''); setMsHours('') }
+    if (key === 'roof-report') {
+      roofPhotos.forEach(p => URL.revokeObjectURL(p.previewUrl))
+      setRoofRawNotes(''); setRoofPhotoContext(''); setRoofPhotos([]); setRoofAiLabelDone(false)
+    }
+    if (key === 'leak-detection') { setLdMethod(''); setLdSource(''); setLdLocation(''); setLdReadings(['', '', '']); setLdFindings('') }
+    if (key === 'restoration') {
+      setRestType(''); setRestExtent(''); setRestRooms(''); setRestNotes('')
+      setRestEquip({ dehumidifiers: false, airMovers: false, airScrubbers: false, dryingMats: false })
+    }
+    setInternalReports(prev => prev.filter(k => k !== key))
+    setActivePanel(prev => prev === key ? null : prev)
+    armDraft()
+  }
+
+  const removeExternalReport = (key: string) => {
+    setExtTrades(prev => ({ ...prev, [key]: false }))
+    armDraft()
+  }
+
+  const pickReport = (id: string) => {
+    const opt = REPORT_OPTIONS.find(o => o.id === id)
+    if (!opt) return
+    const internalFree = opt.internal && !internalReports.includes(opt.internal)
+    const externalFree = opt.external && !extTrades[opt.external]
+    if (internalFree && externalFree) { setReportChoice(id); return }
+    if (internalFree) addInternalReport(opt.internal!)
+    else if (externalFree) addExternalReport(opt.external!)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -559,22 +594,23 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
               {/* Signature */}
               <div className="fa-fg">
                 <label className="fa-fl">Inspector Signature <span className="req">*</span></label>
-                <div className="fa-sig-wrap">
-                  <canvas
-                    ref={canvasRef}
-                    className="fa-sig-canvas"
-                    onMouseDown={sigStart} onMouseMove={sigMove} onMouseUp={sigEnd} onMouseLeave={sigEnd}
-                    onTouchStart={sigStart} onTouchMove={sigMove} onTouchEnd={sigEnd}
-                  />
-                  {!hasSig && <div className="fa-sig-ph">Sign here</div>}
-                </div>
-                <button className="fa-sig-clear" onClick={clearSig} style={{ marginTop: 4 }}>Clear</button>
+                {signature ? (
+                  <div className="fa-sig-stamp">
+                    <div className="fa-sig-name">{signature.name}</div>
+                    <div className="fa-sig-meta">✓ Signed electronically · {formatStamp(signature.at)}</div>
+                    <button className="fa-sig-clear" onClick={() => { setSignature(null); armDraft() }}>Undo</button>
+                  </div>
+                ) : (
+                  <button className="fa-sig-btn" onClick={signSafety}>
+                    ✍ Tap to sign as {initialData.currentUserName ?? initialData.inspector ?? 'Inspector'}
+                  </button>
+                )}
               </div>
               {/* Confirm Button */}
               <div style={{ padding: '0 18px 18px' }}>
                 <button
                   onClick={completeSafety}
-                  style={{ width: '100%', padding: '15px 18px', background: hasSig ? '#4a7c59' : 'var(--line-tan-2)', color: hasSig ? 'white' : 'var(--grey-500)', border: 'none', borderRadius: 6, fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 20, letterSpacing: '3px', cursor: hasSig ? 'pointer' : 'not-allowed' }}
+                  style={{ width: '100%', padding: '15px 18px', background: signature ? '#4a7c59' : 'var(--line-tan-2)', color: signature ? 'white' : 'var(--grey-500)', border: 'none', borderRadius: 6, fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 20, letterSpacing: '3px', cursor: signature ? 'pointer' : 'not-allowed' }}
                 >
                   Confirm Safety &amp; Commence
                 </button>
@@ -587,6 +623,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                 <div className="fa-sc-text">
                   <h4>Safety Confirmed</h4>
                   <p>Commenced · {commenceTime || formatDate(initialData.safetyConfirmedAt)} · {initialData.inspector}</p>
+                  {signature && <p>Signed by {signature.name} · {formatStamp(signature.at)}</p>}
                 </div>
                 <button className="fa-sc-edit" onClick={() => setSafetyDone(false)}>Edit</button>
               </div>
@@ -811,20 +848,43 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
       <div className={`fa-sc${safetyDone ? '' : ' locked'}`} id="sec-reports">
         <div className="fa-sc-head">
           <div className={`fa-sc-circle${safetyDone ? ' active' : ' pending'}`}>05</div>
-          <div className="fa-sc-meta"><h3>Additional Reports</h3><p>Make Safe · Roof Report · Leak Detection · Restoration</p></div>
+          <div className="fa-sc-meta"><h3>Additional Reports</h3><p>Internal reports · external trade reports</p></div>
           <span className="fa-badge opt">Optional</span>
         </div>
         <div className="fa-sc-body">
           {!safetyDone && <div className="fa-lock-notice">🔒 Complete safety section to unlock</div>}
 
-          {/* List */}
-          <div style={{ paddingTop: 4 }}>
-            {[
-              { key: 'make-safe', dot: 'ms', name: 'Make Safe', sub: 'Emergency works completed' },
-              { key: 'roof-report', dot: 'rr', name: 'Roof Report', sub: 'Roof-specific inspection' },
-              { key: 'leak-detection', dot: 'ld', name: 'Leak Detection', sub: 'Source identification' },
-              { key: 'restoration', dot: 're', name: 'Restoration Assessment', sub: 'Water / fire / mould' },
-            ].map(({ key, dot, name, sub }) => (
+          {/* Add a report */}
+          <div className="fa-fg" style={{ paddingTop: 14, marginBottom: 10 }}>
+            <select
+              className="fa-input fa-report-select"
+              value=""
+              onChange={e => pickReport(e.target.value)}
+            >
+              <option value="" disabled>+ Add a report…</option>
+              {REPORT_OPTIONS.map(o => {
+                const used = (!o.internal || internalReports.includes(o.internal)) && (!o.external || !!extTrades[o.external])
+                return <option key={o.id} value={o.id} disabled={used}>{o.name}</option>
+              })}
+            </select>
+            {reportChoice && (() => {
+              const opt = REPORT_OPTIONS.find(o => o.id === reportChoice)!
+              return (
+                <div className="fa-report-choice">
+                  <div className="fa-report-choice-q">{opt.name} — internal or external?</div>
+                  <div className="fa-rg inline">
+                    <button className="fa-ro" onClick={() => { addInternalReport(opt.internal!); setReportChoice(null) }}>Internal</button>
+                    <button className="fa-ro" onClick={() => { addExternalReport(opt.external!); setReportChoice(null) }}>External</button>
+                  </div>
+                  <button className="fa-sig-clear" onClick={() => setReportChoice(null)}>Cancel</button>
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* Internal reports added */}
+          <div>
+            {internalReports.map(key => ({ key, dot: INTERNAL_DOT[key], name: REPORT_OPTIONS.find(o => o.internal === key)?.name ?? key })).map(({ key, dot, name }) => (
               <div key={key}>
                 <div
                   className={`fa-ar-item${activePanel === key ? ' active' : ''}`}
@@ -833,9 +893,9 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                   <div className={`fa-ar-dot ${dot}`} />
                   <div className="fa-ar-info">
                     <div className="fa-ar-name">{name}</div>
-                    <div className="fa-ar-sub">{sub}</div>
+                    <div className="fa-ar-sub">Internal · {activePanel === key ? 'tap to collapse' : 'tap to open'}</div>
                   </div>
-                  <div className="fa-ar-check">{activePanel === key ? '✓' : '›'}</div>
+                  <button className="fa-ar-remove" aria-label={`Remove ${name}`} onClick={e => { e.stopPropagation(); removeInternalReport(key) }}>×</button>
                 </div>
 
                 {/* Make Safe Panel */}
@@ -1084,33 +1144,19 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             ))}
           </div>
 
-          {/* External Trades */}
-          <div className="fa-divider"><span>External Trades — Request Report</span></div>
-          <p style={{ fontSize: 12, color: 'var(--muted)', padding: '0 18px', marginBottom: 8 }}>Tap to select. A work order will be auto-triggered on submission.</p>
-          {[
-            { key: 'make-safe-ext', name: 'Make Safe', sub: 'External trade' },
-            { key: 'leak-plumber', name: 'Leak Detection', sub: 'Plumber' },
-            { key: 'electrical', name: 'Electrical', sub: 'Test + report' },
-            { key: 'roof-plumber', name: 'Roof Plumber', sub: 'Roof report' },
-            { key: 'aircon', name: 'Air Conditioning', sub: 'Report' },
-            { key: 'fencing', name: 'Fencing / Gates', sub: 'Report' },
-            { key: 'asbestos', name: 'Asbestos Test', sub: 'Clearance report' },
-            { key: 'structural', name: 'Structural Engineer', sub: 'Report' },
-          ].map(({ key, name, sub }) => (
-            <div key={key} className={`fa-ext-item${extTrades[key] ? ' checked' : ''}`} onClick={() => toggleExtTrade(key)}>
-              <div className="fa-ext-check">{extTrades[key] ? '✓' : ''}</div>
-              <div className="fa-ext-info">
-                <div className="fa-ext-name">{name}</div>
-                <div className="fa-ext-sub">{sub}</div>
+          {/* External trade reports added — a work order request goes with the inspection */}
+          {REPORT_OPTIONS.filter(o => o.external && extTrades[o.external]).map(o => (
+            <div key={o.external} className="fa-ext-added">
+              <div className="fa-ext-item checked">
+                <div className="fa-ext-info">
+                  <div className="fa-ext-name">{o.name}</div>
+                  <div className="fa-ext-sub">External · {o.extSub}</div>
+                </div>
+                <button className="fa-ar-remove" aria-label={`Remove ${o.name}`} onClick={() => removeExternalReport(o.external!)}>×</button>
               </div>
-              <span style={{ fontSize: 11, color: 'var(--border)' }}>›</span>
-            </div>
-          ))}
-          {/* Notes for selected external trades */}
-          {Object.entries(extTrades).filter(([, v]) => v).map(([key]) => (
-            <div key={key} style={{ padding: '0 18px 10px' }}>
-              <label className="fa-fl" style={{ fontSize: 9, marginBottom: 4 }}>{key.replace(/-/g, ' ')} — Instructions</label>
-              <textarea className="fa-ta" style={{ minHeight: 60, fontSize: 14 }} placeholder="Scope / instructions for this trade…" value={extTradeNotes[key] ?? ''} onChange={e => { setExtTradeNotes(prev => ({ ...prev, [key]: e.target.value })); armDraft() }} />
+              <div style={{ padding: '0 18px 10px' }}>
+                <textarea className="fa-ta" style={{ minHeight: 60, fontSize: 14 }} placeholder="Scope / instructions for this trade…" value={extTradeNotes[o.external!] ?? ''} onChange={e => { setExtTradeNotes(prev => ({ ...prev, [o.external!]: e.target.value })); armDraft() }} />
+              </div>
             </div>
           ))}
           <div style={{ height: 8 }} />

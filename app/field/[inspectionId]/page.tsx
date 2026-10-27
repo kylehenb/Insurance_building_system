@@ -106,6 +106,7 @@ export default async function FieldAppPage({ params }: Props) {
     reportRef,
     inspector: inspector?.name ?? userRow?.name ?? null,
     inspectorId: userData.session.user.id,
+    currentUserName: userRow?.name ?? null,
     tenantId: tenant_id as string,
     personMet: insp.person_met ?? null,
     fieldDraft: (insp.field_draft as Record<string, unknown> | null) ?? null,

@@ -84,9 +84,10 @@
 .fa-sc-edit{margin-left:auto;font-family:var(--font-dm-mono),monospace;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.6);text-transform:uppercase;border:1px solid rgba(255,255,255,.25);padding:4px 8px;border-radius:3px;cursor:pointer;background:none;flex-shrink:0}
 
 /* SIGNATURE */
-.fa-sig-wrap{border:1.5px solid var(--border);border-radius:var(--radius-sm);background:white;position:relative;overflow:hidden}
-.fa-sig-canvas{display:block;width:100%;height:90px;cursor:crosshair;touch-action:none}
-.fa-sig-ph{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:12px;color:var(--border);pointer-events:none;font-style:italic}
+.fa-sig-btn{width:100%;background:white;border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:16px 14px;font-family:var(--font-dm-sans),sans-serif;font-size:15px;color:var(--text);cursor:pointer;text-align:center}
+.fa-sig-stamp{border:1.5px solid #c5dfc9;background:var(--green-light);border-radius:var(--radius-sm);padding:10px 14px 4px}
+.fa-sig-name{font-family:'Snell Roundhand','Brush Script MT','Segoe Script',cursive;font-size:26px;line-height:1.2;color:var(--text)}
+.fa-sig-meta{font-family:var(--font-dm-mono),monospace;font-size:10px;letter-spacing:.5px;color:var(--green);margin-top:2px}
 .fa-sig-clear{font-family:var(--font-dm-mono),monospace;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;background:none;border:none;cursor:pointer;padding:5px 0}
 
 /* RADIO */
@@ -170,6 +171,12 @@
 .fa-ar-info{flex:1}
 .fa-ar-name{font-size:15px;font-weight:500;color:var(--text)}
 .fa-ar-sub{font-family:var(--font-dm-mono),monospace;font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:1px}
+.fa-ar-remove{background:none;border:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:4px 6px;flex-shrink:0}
+.fa-report-select{font-size:15px;padding:11px 14px;cursor:pointer}
+.fa-report-choice{margin-top:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:white}
+.fa-report-choice-q{font-size:14px;color:var(--text);margin-bottom:8px}
+.fa-ext-added{border-bottom:1px solid var(--border)}
+.fa-ext-added .fa-ext-item{border-bottom:none;cursor:default}
 .fa-ar-check{font-size:10px;color:var(--border);flex-shrink:0;width:20px;text-align:center}
 .fa-ar-item.active .fa-ar-check{color:var(--green)}
 
