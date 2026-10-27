@@ -1,61 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { createServiceClient } from '@/lib/supabase/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { AI_LABEL_BATCH_SIZE, labelPhotos, PhotoLabelError, type PhotoForLabelling } from '@/lib/photos/ai-label'
 
 export const dynamic = 'force-dynamic'
 
+const MAX_PHOTO_BASE64 = 2 * 1024 * 1024 // field app sends ~125 KB JPEGs; anything this big isn't one
+
+// Labels one batch of field photos by looking at them. Body:
+// { photos: [{ data: base64, mimeType }], context: notes + scope, jobContext }
+// → { ok, labels: [{ kind, label, confidence } | null] } in the same order.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ inspectionId: string }> }
 ) {
-  await params // consume
+  const { inspectionId } = await params
+  const session = await sessionUser()
+  if (!session) return unauthorized()
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { photos, context, jobContext } = await req.json()
+  const valid: PhotoForLabelling[] = Array.isArray(photos)
+    ? photos.filter((p): p is PhotoForLabelling =>
+        typeof p?.data === 'string' && p.data.length > 0 && p.data.length <= MAX_PHOTO_BASE64 &&
+        typeof p?.mimeType === 'string' && p.mimeType.startsWith('image/'))
+    : []
+  if (!valid.length || valid.length !== photos.length) return NextResponse.json({ ok: false, labels: [], error: 'No usable photos sent' }, { status: 400 })
+  if (valid.length > AI_LABEL_BATCH_SIZE) return NextResponse.json({ ok: false, labels: [], error: `Send at most ${AI_LABEL_BATCH_SIZE} photos at a time` }, { status: 400 })
 
-  const { context, photoCount, jobContext } = await req.json()
+  const service = createServiceClient()
+  const { data: insp } = await service
+    .from('inspections').select('id').eq('id', inspectionId).eq('tenant_id', session.tenantId).maybeSingle()
+  if (!insp) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
 
-  if (!context?.trim() || !photoCount) {
-    return NextResponse.json({ ok: false, labels: [] })
-  }
-
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-  const model = genAI.getGenerativeModel({ model: GEMINI_FLASH_MODEL })
-
-  const prompt = `You are labelling photos for a building insurance inspection report. You have not seen the photos themselves — only the inspector's report notes and scope of works below. Infer the most likely rooms/areas and damage types a field inspector would have photographed, in a plausible order.
-
-Job context:
-- Loss type: ${jobContext?.lossType || 'Unknown'}
-- Insurer: ${jobContext?.insurer || 'Unknown'}
-- Address: ${jobContext?.address || 'Unknown'}
-
-Inspector's report notes and scope of works:
-"${context}"
-
-Generate exactly ${photoCount} photo label(s). Each label should follow the format "Location - damage description" (e.g. "Living Room - water-damaged ceiling", "Kitchen - sagging plasterboard").
-
-Rules:
-- Labels should be professional and specific
-- Match the number of photos (${photoCount})
-- If the notes describe fewer locations than photos, distribute intelligently across them (e.g. multiple angles of the same area)
-- Keep each label under 80 characters
-- These are best-effort guesses the inspector will review and correct, so prefer plausible, generic-but-specific labels over inventing details not implied by the notes
-
-Return ONLY a JSON array of strings, one per photo, in order:
-["label 1", "label 2", ...]`
+  const { data: prompt } = await service
+    .from('prompts').select('system_prompt').eq('tenant_id', session.tenantId).eq('key', 'photo_label').maybeSingle()
 
   try {
-    const result = await model.generateContent(prompt)
-    const text = result.response.text().trim()
-    const match = text.match(/\[[\s\S]*\]/)
-    if (!match) return NextResponse.json({ ok: false, labels: [] })
-
-    const labels = JSON.parse(match[0])
-    return NextResponse.json({ ok: true, labels })
+    const labels = await labelPhotos(valid, {
+      notes: typeof context === 'string' ? context : '',
+      job: jobContext ?? {},
+      guidance: prompt?.system_prompt,
+    })
+    return NextResponse.json({ ok: labels.some(Boolean), labels })
   } catch (e) {
-    console.error('AI label error:', e)
-    return NextResponse.json({ ok: false, labels: [] })
+    if (!(e instanceof PhotoLabelError)) console.error('AI label error:', e)
+    return NextResponse.json({ ok: false, labels: [], error: e instanceof PhotoLabelError ? e.message : 'Labelling failed' })
   }
 }

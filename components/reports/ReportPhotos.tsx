@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Upload, Trash2, Loader2, RotateCcw, RotateCw, GripVertical } from 'lucide-react'
+import { orderReportPhotos, photoKindOfLabel } from '@/lib/photos/report-order'
 
 // — Types ——————————————————————————————————————————————————————————
 interface Photo {
@@ -260,6 +261,30 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
   const [isDraggingFile, setIsDraggingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const labelDebounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const photosRef = useRef(photos)
+  photosRef.current = photos
+
+  // Saves sequence numbers for the photos whose position changed
+  const saveOrder = useCallback(async (list: Photo[]) => {
+    await Promise.all(
+      list.map((photo, index) =>
+        photo.sequence_number === index + 1
+          ? null
+          : supabase.from('photos').update({ sequence_number: index + 1 }).eq('id', photo.id).eq('tenant_id', tenantId)
+      )
+    )
+  }, [supabase, tenantId])
+
+  // View of Property first, then mud maps / floor plans, then the rest — the order the report prints in
+  const applyReportOrder = useCallback((list: (Photo & { thumbnailUrl: string | null })[]) => {
+    const ordered = orderReportPhotos(list)
+    setPhotos(ordered)
+    if (!locked && ordered.some((p, i) => p.sequence_number !== i + 1)) {
+      saveOrder(ordered)
+      return ordered.map((p, i) => ({ ...p, sequence_number: i + 1 }))
+    }
+    return ordered
+  }, [locked, saveOrder])
 
   const isFileDrag = (e: React.DragEvent) =>
     Array.from(e.dataTransfer.types).includes('Files')
@@ -271,7 +296,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
       .select('*')
       .eq('report_id', reportId)
       .eq('tenant_id', tenantId)
-      .order('sequence_number', { ascending: true })
+      .order('sequence_number', { ascending: true, nullsFirst: false })
+      .order('uploaded_at', { ascending: true })
 
     const photoData = (data ?? []) as Photo[]
 
@@ -284,9 +310,9 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
       })
     )
 
-    setPhotos(withUrls)
+    setPhotos(applyReportOrder(withUrls))
     setLoading(false)
-  }, [reportId, tenantId, supabase])
+  }, [reportId, tenantId, supabase, applyReportOrder])
 
   useEffect(() => {
     loadPhotos()
@@ -367,6 +393,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
   }
 
   const handleLabelChange = (id: string, label: string) => {
+    const before = photosRef.current.find(p => p.id === id)
+    const kindChanged = photoKindOfLabel(before?.label) !== photoKindOfLabel(label)
     setPhotos(prev => prev.map(p => p.id === id ? { ...p, label } : p))
 
     const existing = labelDebounceRefs.current.get(id)
@@ -380,6 +408,8 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
         .eq('id', id)
         .eq('tenant_id', tenantId)
       if (error) console.error('Label save error:', error)
+      // Labelled (or no longer labelled) View of Property / Mud Map: move it into place
+      if (kindChanged) setPhotos(applyReportOrder(photosRef.current))
     }, 600)
 
     labelDebounceRefs.current.set(id, timer)
@@ -465,19 +495,10 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
     const [moved] = reordered.splice(fromIndex, 1)
     reordered.splice(toIndex, 0, moved)
 
-    setPhotos(reordered)
     setDraggedId(null)
     setDragOverId(null)
-
-    await Promise.all(
-      reordered.map((photo, index) =>
-        supabase
-          .from('photos')
-          .update({ sequence_number: index + 1 })
-          .eq('id', photo.id)
-          .eq('tenant_id', tenantId)
-      )
-    )
+    // The View of Property and mud maps stay at the front whatever is dragged
+    setPhotos(applyReportOrder(reordered))
   }
 
   if (loading) {
@@ -512,8 +533,9 @@ export function ReportPhotos({ reportId, jobId, tenantId, locked }: ReportPhotos
       {!locked && (
         <div className="flex justify-between items-center mb-4">
           <div className="text-[12px] text-faint">
-            {uploadingPhotos.filter(p => p.status === 'uploading').length > 0 &&
-              `${uploadingPhotos.filter(p => p.status === 'uploading').length} uploading...`}
+            {uploadingPhotos.filter(p => p.status === 'uploading').length > 0
+              ? `${uploadingPhotos.filter(p => p.status === 'uploading').length} uploading...`
+              : 'Photos labelled "View of Property" and "Mud Map/Floor Plan" always go first.'}
           </div>
           <button
             type="button"

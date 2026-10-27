@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AI_LABEL_BATCH_SIZE, applyAiLabels, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel } from '@/lib/photos/report-order'
 
 interface InitialData {
   inspectionId: string
@@ -37,7 +38,7 @@ function uid() { return Math.random().toString(36).slice(2) }
 
 // Upload photos concurrently (a few at a time) instead of one-by-one — this is what made
 // submission take minutes: N photos each waiting on a full round trip in series.
-async function uploadPhotoEntries(entries: { file: File; label: string; isRoofPhoto?: boolean }[], base: string, concurrency = 4) {
+async function uploadPhotoEntries(entries: { file: File; label: string; sequenceNumber: number; isRoofPhoto?: boolean }[], base: string, concurrency = 4) {
   let next = 0
   const worker = async () => {
     while (next < entries.length) {
@@ -45,11 +46,21 @@ async function uploadPhotoEntries(entries: { file: File; label: string; isRoofPh
       const fd = new FormData()
       fd.append('file', entry.file)
       fd.append('label', entry.label)
+      fd.append('sequenceNumber', String(entry.sequenceNumber))
       if (entry.isRoofPhoto) fd.append('isRoofPhoto', 'true')
       await fetch(`${base}/photos`, { method: 'POST', body: fd })
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker))
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
 // Convert any image (including HEIC) to a compressed JPEG ≤ TARGET_BYTES.
@@ -422,30 +433,64 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     return [raw_report_notes.trim(), scopeText].filter(Boolean).join('\n\n')
   }, [raw_report_notes, scopeRooms])
 
-  const fetchAILabels = async (photoCount: number): Promise<string[] | null> => {
-    try {
-      const res = await fetch(`${base}/ai-label`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: buildPhotoLabelContext(), photoCount, jobContext: { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address } }),
-      })
-      const data = await res.json()
-      if (data.ok && data.labels?.length) return data.labels
-    } catch { /* fallback: keep existing labels */ }
-    return null
+  // The AI looks at the photos themselves, a batch at a time (in parallel), with the
+  // notes and scope only to help name rooms. Null when nothing came back at all.
+  const fetchAILabels = async (list: PhotoEntry[]): Promise<(AiPhotoLabel | null)[] | null> => {
+    const context = buildPhotoLabelContext()
+    const jobContext = { lossType: initialData.lossType, insurer: initialData.insurer, address: initialData.address }
+    const batches: PhotoEntry[][] = []
+    for (let i = 0; i < list.length; i += AI_LABEL_BATCH_SIZE) batches.push(list.slice(i, i + AI_LABEL_BATCH_SIZE))
+    const results = await Promise.all(batches.map(async batch => {
+      try {
+        const photosPayload = await Promise.all(batch.map(async p => ({ data: await fileToBase64(p.file), mimeType: p.file.type || 'image/jpeg' })))
+        const res = await fetch(`${base}/ai-label`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ photos: photosPayload, context, jobContext }),
+        })
+        const data = await res.json()
+        if (data.ok && Array.isArray(data.labels)) return batch.map((_, i) => (data.labels[i] ?? null) as AiPhotoLabel | null)
+      } catch { /* this batch keeps its existing labels */ }
+      return batch.map(() => null)
+    }))
+    const labels = results.flat()
+    return labels.some(Boolean) ? labels : null
+  }
+
+  // Labels from the AI, then the report order: View of Property, mud maps, the rest.
+  const labelAndOrder = (list: PhotoEntry[], ai: (AiPhotoLabel | null)[], keepExisting: boolean) => {
+    const labels = applyAiLabels(list.map(p => p.label), ai, { keepExisting })
+    return orderReportPhotos(list.map((p, i) => ({ ...p, label: labels[i] })))
   }
 
   const runAILabels = async () => {
     if (!photos.length) { alert('No photos to label.'); return }
     if (anyProcessing) { alert('Photos are still processing — please wait a moment.'); return }
-    if (!buildPhotoLabelContext()) { alert('Add some report notes or scope items first so AI has context to label photos.'); return }
     setAiLabeling(true)
-    const labels = await fetchAILabels(photos.length)
-    if (labels) {
-      setPhotos(prev => prev.map((p, i) => ({ ...p, label: labels[i] ?? p.label })))
+    const list = photos
+    const ai = await fetchAILabels(list)
+    if (ai) {
+      const labelled = labelAndOrder(list, ai, false)
+      // Photos added while the AI was working stay at the end, unlabelled
+      setPhotos(prev => [...labelled, ...prev.filter(p => !list.some(l => l.id === p.id))])
       setAiLabelDone(true)
+      armDraft()
+    } else {
+      alert('The photos couldn\'t be labelled just now. Try again in a moment, or label them by hand.')
     }
     setAiLabeling(false)
+  }
+
+  // One-tap lead labels. Only one photo can be the View of Property, so tagging a
+  // new one clears the old; tapping a tag again clears it.
+  const tagPhoto = (id: string, tag: typeof VIEW_OF_PROPERTY_LABEL | typeof MUD_MAP_LABEL) => {
+    const kind = tag === VIEW_OF_PROPERTY_LABEL ? 'view_of_property' : 'mud_map'
+    setPhotos(prev => orderReportPhotos(prev.map(p => {
+      if (p.id === id) return { ...p, label: photoKindOfLabel(p.label) === kind ? '' : tag }
+      if (kind === 'view_of_property' && photoKindOfLabel(p.label) === 'view_of_property') return { ...p, label: '' }
+      return p
+    })))
+    armDraft()
   }
 
   // ─── Submit Flow ──────────────────────────────────────────────────────────
@@ -475,19 +520,21 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
       // Attempt to auto-label any photos the inspector hasn't already labelled,
       // using the report dump + scope notes as context, so they arrive on the
       // desktop with a label the user can correct rather than blank.
-      let fieldPhotosForUpload = photos
-      if (!aiLabelDone && photos.length && !anyProcessing && buildPhotoLabelContext()) {
-        const labels = await fetchAILabels(photos.length)
-        if (labels) {
-          fieldPhotosForUpload = photos.map((p, i) => ({ ...p, label: p.label || labels[i] || p.label }))
+      let fieldPhotosForUpload = orderReportPhotos(photos)
+      if (!aiLabelDone && photos.some(p => !p.label.trim()) && !anyProcessing) {
+        const blank = photos.filter(p => !p.label.trim())
+        const ai = await fetchAILabels(blank)
+        if (ai) {
+          fieldPhotosForUpload = labelAndOrder(photos, photos.map(p => ai[blank.indexOf(p)] ?? null), true)
           setPhotos(fieldPhotosForUpload)
           setAiLabelDone(true)
         }
       }
 
+      // Field and roof photos go to different reports, so each is numbered from 1
       await uploadPhotoEntries([
-        ...fieldPhotosForUpload.map(p => ({ file: p.file, label: p.label })),
-        ...roofPhotos.map(p => ({ file: p.file, label: p.label, isRoofPhoto: true })),
+        ...fieldPhotosForUpload.map((p, i) => ({ file: p.file, label: p.label, sequenceNumber: i + 1 })),
+        ...roofPhotos.map((p, i) => ({ file: p.file, label: p.label, sequenceNumber: i + 1, isRoofPhoto: true })),
       ], base)
 
       const res = await fetch(`${base}/submit`, {
@@ -798,7 +845,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
             </div>
             <div className="fa-ai-dark-body">
               <p style={{ fontSize: 11, color: 'var(--beige-dark)', margin: '0 0 10px' }}>
-                Uses your report notes and scope items as context — photos are also labelled automatically when you submit.
+                Looks at each photo, using your notes and scope for room names. Unlabelled photos are also labelled when you submit. The View of Property goes first, then the mud maps / floor plans.
               </p>
               <button
                 className={`fa-ai-label-btn${aiLabelDone ? ' done' : ''}`}
@@ -830,6 +877,20 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                     disabled={photo.processing}
                     onChange={e => updatePhotoLabel(photo.id, e.target.value)}
                   />
+                  {!photo.processing && (
+                    <div className="fa-photo-tags">
+                      {([[VIEW_OF_PROPERTY_LABEL, 'view_of_property', 'Front view'], [MUD_MAP_LABEL, 'mud_map', 'Mud map']] as const).map(([tag, kind, text]) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`fa-photo-tag${photoKindOfLabel(photo.label) === kind ? ' on' : ''}`}
+                          onClick={() => tagPhoto(photo.id, tag)}
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
+import { orderReportPhotos } from '@/lib/photos/report-order'
 
 // Data for the documents that started life as browser print pages (quote,
 // invoice, report, telephone clearance certificate, photo pages). The print
@@ -127,9 +128,10 @@ export async function loadReportPrintData(reportId: string, ctx: PrintDataContex
 
   const { data: photos } = await supabase
     .from('photos').select('*').eq('report_id', reportId).eq('tenant_id', tenantId)
-    .order('sequence_number', { ascending: true })
+    .order('sequence_number', { ascending: true, nullsFirst: false })
+    .order('uploaded_at', { ascending: true })
 
-  return { report, job, tenant, photos: photos ?? [] }
+  return { report, job, tenant, photos: orderReportPhotos(photos ?? []) }
 }
 
 // ── Telephone Clearance Certificate ──────────────────────────────────────

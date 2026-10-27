@@ -26,6 +26,8 @@ export async function GET(
     .select('id, storage_path, label, crop_x, crop_y, crop_scale')
     .eq('inspection_id', inspectionId)
     .eq('tenant_id', userRow.tenant_id)
+    .order('sequence_number', { ascending: true, nullsFirst: false })
+    .order('uploaded_at', { ascending: true })
 
   const result = await Promise.all(
     (photos ?? []).map(async (p: { id: string; storage_path: string; label: string | null; crop_x: number; crop_y: number; crop_scale: number }) => {
@@ -75,6 +77,9 @@ export async function POST(
   const file = formData.get('file') as File | null
   const label = (formData.get('label') as string) ?? ''
   const isRoofPhoto = formData.get('isRoofPhoto') === 'true'
+  // Position in the report, from the field app's photo order (View of Property, mud maps, then the rest)
+  const seq = Number(formData.get('sequenceNumber'))
+  const sequenceNumber = Number.isInteger(seq) && seq > 0 ? seq : null
 
   // Determine the correct report_id for this photo
   let photoReportId: string | null = (insp as any).report_id ?? null
@@ -128,6 +133,7 @@ export async function POST(
       mime_type: mimeType,
       size_bytes: file.size,
       label: label || null,
+      sequence_number: sequenceNumber,
     })
     .select()
     .single()
