@@ -14,7 +14,7 @@ export interface ReportOption {
 
 export const REPORT_OPTIONS: ReportOption[] = [
   { id: 'make-safe', name: 'Make Safe', internal: 'make-safe', external: 'make-safe-ext', extSub: 'Make safe trade', makeSafe: true },
-  { id: 'roof', name: 'Roof Report', internal: 'roof-report', external: 'roof-plumber', extSub: 'Roof plumber / tiler', tradeTypes: ['Roof Plumber', 'Roof Tiler', 'Roof Carpenter'] },
+  { id: 'roof', name: 'Roof Report', internal: 'roof-report', external: 'roof-plumber', extSub: 'Roof plumber', tradeTypes: ['Roof Plumber'] },
   { id: 'leak', name: 'Leak Detection', internal: 'leak-detection', external: 'leak-plumber', extSub: 'Plumber', tradeTypes: ['Plumber'] },
   { id: 'restoration', name: 'Restoration Assessment', internal: 'restoration', external: 'restoration-ext', extSub: 'Restorer', tradeTypes: ['Restorer'] },
   { id: 'electrical', name: 'Electrical', external: 'electrical', extSub: 'Electrician · test + report', tradeTypes: ['Electrician'] },
