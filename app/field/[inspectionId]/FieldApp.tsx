@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { LOW_CONFIDENCE, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL } from '@/lib/photos/report-order'
 import { processPhotoForUpload } from './photo-convert'
+import { REPORT_OPTIONS, type FieldTrade } from './report-options'
 import { UploadBanner } from './UploadBanner'
 import { useFieldPhotos } from './useFieldPhotos'
 
@@ -20,6 +21,7 @@ interface InitialData {
   lossType: string | null
   dateOfLoss: string | null
   claimNumber: string | null
+  claimDescription: string | null
   quoteId: string | null
   quoteRef: string | null
   reportId: string | null
@@ -33,6 +35,8 @@ interface InitialData {
   fieldDraft: Record<string, unknown> | null
   safetyConfirmedAt: string | null
   formSubmittedAt: string | null
+  /** Trades to pick from, keyed by external report */
+  reportTrades: Record<string, FieldTrade[]>
 }
 
 interface ScopeItem { id: string; text: string }
@@ -47,19 +51,6 @@ function formatStamp(iso: string) {
   return new Date(iso).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-// One list for the "Add a report" dropdown. Reports with both keys ask Internal or External when picked.
-// internal = the panel filled in here; external = a trade asked to report (keys match the saved draft)
-const REPORT_OPTIONS: { id: string; name: string; internal?: string; external?: string; extSub?: string }[] = [
-  { id: 'make-safe', name: 'Make Safe', internal: 'make-safe', external: 'make-safe-ext', extSub: 'External trade' },
-  { id: 'roof', name: 'Roof Report', internal: 'roof-report', external: 'roof-plumber', extSub: 'Roof plumber' },
-  { id: 'leak', name: 'Leak Detection', internal: 'leak-detection', external: 'leak-plumber', extSub: 'Plumber' },
-  { id: 'restoration', name: 'Restoration Assessment', internal: 'restoration', external: 'restoration-ext', extSub: 'Restoration trade' },
-  { id: 'electrical', name: 'Electrical', external: 'electrical', extSub: 'Test + report' },
-  { id: 'aircon', name: 'Air Conditioning', external: 'aircon', extSub: 'Report' },
-  { id: 'fencing', name: 'Fencing / Gates', external: 'fencing', extSub: 'Report' },
-  { id: 'asbestos', name: 'Asbestos Test', external: 'asbestos', extSub: 'Clearance report' },
-  { id: 'structural', name: 'Structural Engineer', external: 'structural', extSub: 'Report' },
-]
 const INTERNAL_DOT: Record<string, string> = { 'make-safe': 'ms', 'roof-report': 'rr', 'leak-detection': 'ld', restoration: 're' }
 
 // Roof photos upload at submit, a few at a time. (Inspection photos upload as they're added — see useFieldPhotos.)
@@ -137,6 +128,9 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   // External Trades
   const [extTrades, setExtTrades] = useState<Record<string, boolean>>({})
   const [extTradeNotes, setExtTradeNotes] = useState<Record<string, string>>({})
+  // The trade picked for each external report (trade id)
+  const [extTradeSelected, setExtTradeSelected] = useState<Record<string, string>>({})
+  const [workOrderNotice, setWorkOrderNotice] = useState<string | null>(null)
 
   // ─── Review / Submit ─────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -187,8 +181,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     msWorksCompleted, msTempFixes, msHours,
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
     restType, restExtent, restRooms, restEquip, restNotes,
-    extTrades, extTradeNotes,
-  }), [raw_report_notes, customSafetyNotes, chips, safetyDone, commenceTime, step, signature, internalReports, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes])
+    extTrades, extTradeNotes, extTradeSelected,
+  }), [raw_report_notes, customSafetyNotes, chips, safetyDone, commenceTime, step, signature, internalReports, scopeRooms, roofRawNotes, roofPhotoContext, msWorksCompleted, msTempFixes, msHours, ldMethod, ldSource, ldLocation, ldReadings, ldFindings, restType, restExtent, restRooms, restEquip, restNotes, extTrades, extTradeNotes, extTradeSelected])
 
   const armDraft = useCallback(() => {
     if (submitted) return
@@ -248,6 +242,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.restNotes) setRestNotes(d.restNotes as string)
     if (d.extTrades) setExtTrades(d.extTrades as Record<string, boolean>)
     if (d.extTradeNotes) setExtTradeNotes(d.extTradeNotes as Record<string, string>)
+    if (d.extTradeSelected) setExtTradeSelected(d.extTradeSelected as Record<string, string>)
     if (Array.isArray(d.internalReports)) setInternalReports(d.internalReports as string[])
     else {
       // Drafts from before the dropdown: show any internal report that has something filled in
@@ -534,6 +529,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
           <div className="fa-bf"><label>Inspector</label><span>{initialData.inspector ?? '—'}</span></div>
           <div className="fa-bf"><label>Loss Type</label><span>{initialData.lossType ?? '—'}</span></div>
           <div className="fa-bf"><label>Date of Loss</label><span>{formatDate(initialData.dateOfLoss)}</span></div>
+          <div className="fa-bf full"><label>Claim Description</label><span className="fa-claim-desc">{initialData.claimDescription?.trim() || '—'}</span></div>
         </div>
         <div className="fa-type-badge">{initialData.lossType?.toUpperCase() ?? 'INSPECTION'}</div>
       </div>
@@ -752,9 +748,6 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
               <span className="fa-ai-dark-title">AI Photo Labelling</span>
             </div>
             <div className="fa-ai-dark-body">
-              <p style={{ fontSize: 11, color: 'var(--beige-dark)', margin: '0 0 10px' }}>
-                Photos are labelled automatically as they upload, and finished with your notes when you submit. The View of Property goes first, then the mud maps / floor plans. Labels in orange are worth a check.
-              </p>
               {photoCounts.uploaded > 0 && (
                 <p className="fa-ai-status">
                   {fieldPhotos.awaitingLabels
@@ -1154,8 +1147,35 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                 </div>
                 <button className="fa-ar-remove" aria-label={`Remove ${o.name}`} onClick={() => removeExternalReport(o.external!)}>×</button>
               </div>
-              <div style={{ padding: '0 18px 10px' }}>
-                <textarea className="fa-ta" style={{ minHeight: 60, fontSize: 14 }} placeholder="Scope / instructions for this trade…" value={extTradeNotes[o.external!] ?? ''} onChange={e => { setExtTradeNotes(prev => ({ ...prev, [o.external!]: e.target.value })); armDraft() }} />
+              <div style={{ padding: '0 18px 12px' }}>
+                {(() => {
+                  const key = o.external!
+                  const trades = initialData.reportTrades[key] ?? []
+                  const picked = extTradeSelected[key] ?? ''
+                  return (
+                    <>
+                      <select
+                        className="fa-input fa-report-select"
+                        style={{ marginBottom: 8 }}
+                        value={trades.some(t => t.id === picked) ? picked : ''}
+                        onChange={e => { setExtTradeSelected(prev => ({ ...prev, [key]: e.target.value })); setWorkOrderNotice(null); armDraft() }}
+                      >
+                        <option value="" disabled>{trades.length ? 'Select trade…' : 'No trades of this type in the system'}</option>
+                        {trades.map(t => <option key={t.id} value={t.id}>{t.name}{t.trade && o.tradeTypes && o.tradeTypes.length > 1 ? ` · ${t.trade}` : ''}</option>)}
+                      </select>
+                      <textarea className="fa-ta" style={{ minHeight: 60, fontSize: 14 }} placeholder="Scope / instructions for this trade…" value={extTradeNotes[key] ?? ''} onChange={e => { setExtTradeNotes(prev => ({ ...prev, [key]: e.target.value })); armDraft() }} />
+                      {/* Not connected yet: will send a work order for this report to the picked trade */}
+                      <button
+                        className="fa-wo-send"
+                        disabled={!picked}
+                        onClick={() => setWorkOrderNotice(key)}
+                      >
+                        Send Work Order
+                      </button>
+                      {workOrderNotice === key && <div className="fa-wo-note">Sending work orders from the field app isn&apos;t set up yet.</div>}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           ))}

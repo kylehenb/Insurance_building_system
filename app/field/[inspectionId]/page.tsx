@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/supabase/get-user'
 import { createServiceClient } from '@/lib/supabase/server'
 import FieldApp from './FieldApp'
+import { REPORT_OPTIONS, tradesForReport, type FieldTrade } from './report-options'
 
 interface Props {
   params: Promise<{ inspectionId: string }>
@@ -25,7 +26,7 @@ export default async function FieldAppPage({ params }: Props) {
       safety_confirmed_at, form_submitted_at,
       jobs!job_id (
         id, job_number, property_address, insured_name, insured_phone,
-        insurer, loss_type, date_of_loss, claim_number
+        insurer, loss_type, date_of_loss, claim_number, claim_description
       ),
       users!inspector_id (name)
     `)
@@ -64,6 +65,23 @@ export default async function FieldAppPage({ params }: Props) {
     .single()
 
   const job = (insp as any).jobs
+
+  // Trades the inspector can ask for an external report, per report in the dropdown
+  const { data: tradeRows } = await service
+    .from('trades')
+    .select('id, business_name, entity_name, primary_contact, primary_trade, can_do_make_safe, makesafe_priority, priority_rank')
+    .eq('tenant_id', tenant_id as string)
+    .eq('status', 'active')
+  const allTrades = (tradeRows ?? []).map(t => ({
+    id: t.id,
+    name: t.business_name || t.entity_name || t.primary_contact || 'Unnamed trade',
+    trade: t.primary_trade,
+    makeSafe: !!t.can_do_make_safe,
+    makesafePriority: t.makesafe_priority,
+    priorityRank: t.priority_rank,
+  }))
+  const reportTrades: Record<string, FieldTrade[]> = {}
+  for (const opt of REPORT_OPTIONS) if (opt.external) reportTrades[opt.external] = tradesForReport(opt, allTrades)
   const inspector = (insp as any).users
 
   let quoteRef: string | null = null
@@ -100,6 +118,7 @@ export default async function FieldAppPage({ params }: Props) {
     lossType: job?.loss_type ?? null,
     dateOfLoss: job?.date_of_loss ?? null,
     claimNumber: job?.claim_number ?? null,
+    claimDescription: job?.claim_description ?? null,
     quoteId: (insp as any).quote_id ?? null,
     quoteRef,
     reportId: (insp as any).report_id ?? null,
@@ -112,6 +131,7 @@ export default async function FieldAppPage({ params }: Props) {
     fieldDraft: (insp.field_draft as Record<string, unknown> | null) ?? null,
     safetyConfirmedAt: insp.safety_confirmed_at ?? null,
     formSubmittedAt: insp.form_submitted_at ?? null,
+    reportTrades,
   }
 
   return <FieldApp initialData={initialData} />
