@@ -3,13 +3,17 @@ import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw, ensureAngleBrackets, type EmailAttachment } from '@/lib/email/build-raw'
-import { composeStandardEmail } from '@/lib/email/compose'
-import type { SignatureTenant } from '@/lib/email/signature'
+import { composeEmailBody } from '@/lib/email/rich-text'
+import { emailSignatureFor, type SignatureTenant } from '@/lib/email/signature'
+import { renderStandardEmailHtml, STANDARD_EMAIL_FONT_SIZE } from '@/lib/email/email-html'
+import { replyQuote } from '@/lib/mail/compose'
+import { quoteHtml, quoteText, type QuotedEmail } from '@/lib/mail/compose-rules'
 
 // Replying to an email on the job's comms log: sends in the same Gmail thread
 // (Re: subject, In-Reply-To/References) to whoever sent it, and records the
-// reply, with the company signature under the text. Used by the Reply box
-// (app/api/communications/reply) and the voice connector.
+// reply. It reads as a reply from Gmail does: the text, the company signature,
+// then the email quoted underneath with the conversation before it. Used by
+// the Reply box (app/api/communications/reply) and the voice connector.
 
 const FALLBACK_FROM = 'office@insurancerepairco.com.au'
 
@@ -19,6 +23,9 @@ interface CommRow {
   from_email: string | null
   subject: string | null
   gmail_message_id: string | null
+  created_at: string | null
+  body_text: string | null
+  content: string | null
 }
 
 export class ReplyError extends Error {
@@ -49,7 +56,7 @@ export async function replyToEmail(
 ): Promise<ReplyResult> {
   const { data: comm, error: commErr } = await supabase
     .from('communications')
-    .select('job_id,thread_id,from_email,subject,gmail_message_id')
+    .select('job_id,thread_id,from_email,subject,gmail_message_id,created_at,body_text,content')
     .eq('id', commId)
     .eq('tenant_id', tenantId)
     .eq('type', 'email')
@@ -73,8 +80,7 @@ export async function replyToEmail(
 
   const sender = tenant as (SignatureTenant & { contact_email: string | null }) | null
   const fromEmail = sender?.contact_email ?? FALLBACK_FROM
-  // The typed text with the signature, as the app's other sends do
-  const composed = sender ? composeStandardEmail(body, sender) : { html: undefined, text: body }
+  const companyName = sender?.trading_name || sender?.name || ''
 
   // Build Re: subject (avoid double-prefix)
   const originalSubject = source.subject ?? ''
@@ -82,20 +88,38 @@ export async function replyToEmail(
     ? originalSubject
     : `Re: ${originalSubject}`
 
-  // Build RFC 2822 threading headers from gmail_message_id
-  const msgId = source.gmail_message_id
-  const inReplyTo = msgId ? ensureAngleBrackets(msgId) : undefined
-  const references = inReplyTo ?? undefined
+  // The email quoted underneath, from Gmail with its References chain; if
+  // Gmail no longer has it, from the comms log
+  let quote: Awaited<ReturnType<typeof replyQuote>> = null
+  try {
+    quote = await replyQuote(source.thread_id, source.gmail_message_id)
+  } catch (err) {
+    console.error('[reply] Gmail quote lookup failed:', err)
+  }
+  if (!quote) {
+    const original: QuotedEmail = {
+      from: { name: '', email: source.from_email }, to: [], cc: [], subject: originalSubject,
+      date: source.created_at, html: '', text: (source.body_text ?? source.content ?? '').trim(),
+    }
+    const msgId = source.gmail_message_id ? ensureAngleBrackets(source.gmail_message_id) : null
+    quote = original.text
+      ? { html: quoteHtml(original, 'reply'), text: quoteText(original, 'reply'), inReplyTo: msgId, references: msgId }
+      : { html: '', text: '', inReplyTo: msgId, references: msgId }
+  }
+
+  // The typed text and signature, as the Mail page sends it
+  const signature = sender ? emailSignatureFor(sender) : null
+  const typed = composeEmailBody(body, { fontSize: STANDARD_EMAIL_FONT_SIZE, signature, signatureFallback: '', logo: signature?.image ?? null })
 
   const raw = buildEmailRaw({
     from: fromEmail,
     fromName: sender?.trading_name || sender?.name,
     to: source.from_email,
     subject: replySubject,
-    body: composed.text,
-    html: composed.html,
-    inReplyTo,
-    references,
+    body: [typed.text, quote.text].filter(Boolean).join('\n\n'),
+    html: renderStandardEmailHtml({ bodyHtml: typed.html + (quote.html ? `<br>${quote.html}` : ''), title: companyName }),
+    inReplyTo: quote.inReplyTo ?? undefined,
+    references: quote.references ?? undefined,
     attachments: attachments.length ? attachments : undefined,
   })
 

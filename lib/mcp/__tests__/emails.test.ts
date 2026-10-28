@@ -31,8 +31,23 @@ function query(table: string) {
 const client = { from: query }
 
 const gmailSend = vi.fn(async (_req: unknown) => ({ data: { id: 'sent1' } }))
+// The office's Gmail: the plumber's email in conversation th1, itself a reply to ours
+const b64 = (s: string) => Buffer.from(s).toString('base64url')
+const plumberEmail = {
+  id: 'g1', threadId: 'th1', internalDate: String(Date.UTC(2026, 9, 26, 1, 30)),
+  payload: {
+    mimeType: 'text/html',
+    headers: [
+      { name: 'From', value: 'Pete Plumber <plumber@example.com>' }, { name: 'To', value: 'office@insurancerepairco.com.au' },
+      { name: 'Subject', value: 'Access on Tuesday?' }, { name: 'Message-ID', value: '<abc@mail.example>' }, { name: 'References', value: '<first@irc.example>' },
+    ],
+    body: { data: b64('<p>Hi, can I get in on Tuesday at 8?</p><blockquote>Earlier: can you quote the leak?</blockquote>') },
+  },
+}
+const gmailThread = vi.fn(async (_req: unknown) => ({ data: { messages: [plumberEmail] } }))
+const gmailList = vi.fn(async (_req: unknown) => ({ data: { messages: [] } }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => client, createClient: async () => client }))
-vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { send: gmailSend } } }) }))
+vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { send: gmailSend, list: gmailList }, threads: { get: gmailThread } } }) }))
 // Permissions are tested in lib/permissions; here the user is allowed
 vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null, permissionGate: async () => null }))
 vi.mock('@/lib/supabase/get-user', () => ({ getUser: async () => ({ tenant_id: 't1' }) }))
@@ -45,6 +60,11 @@ const IN = '44444444-4444-4444-4444-444444444444'
 const OUT = '55555555-5555-5555-5555-555555555555'
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60000).toISOString()
 const sentRaw = () => Buffer.from((gmailSend.mock.calls[0][0] as { requestBody: { raw: string } }).requestBody.raw, 'base64url').toString()
+/** The sent email with its base64 parts decoded */
+const sentText = () => {
+  const raw = sentRaw()
+  return raw.split(/\r?\n\r?\n/).map(part => Buffer.from(part.replace(/\s+/g, ''), 'base64').toString()).join('\n') + raw
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -97,15 +117,33 @@ describe('reply_to_email', () => {
   it('adds the company signature under the reply, as the app’s other sends do', async () => {
     db.tenants[0] = { ...db.tenants[0], email_signature: 'Kyle Bindon\nInsurance Repair Co' }
     await replyToEmailTool.run({ email_id: IN, body: 'Tuesday at 8 is fine.' }, ctx)
-    const raw = sentRaw()
-    expect(raw).toMatch(/Content-Type: text\/html/)
-    const text = raw.split(/\r?\n\r?\n/).map(part => {
-      try { return Buffer.from(part.replace(/\s+/g, ''), 'base64').toString() } catch { return '' }
-    }).join('\n') + raw
+    expect(sentRaw()).toMatch(/Content-Type: text\/html/)
+    const text = sentText()
     expect(text).toContain('Tuesday at 8 is fine.')
     expect(text).toContain('Kyle Bindon')
+    expect(text.indexOf('Kyle Bindon')).toBeLessThan(text.indexOf('wrote:'))
     // The comms log keeps the text as typed (the repeat check compares it)
     expect(inserts[0]).toMatchObject({ content: 'Tuesday at 8 is fine.' })
+  })
+
+  it('quotes the email underneath with the conversation before it, as a Gmail reply does', async () => {
+    await replyToEmailTool.run({ email_id: IN, body: 'Tuesday at 8 is fine.' }, ctx)
+    const text = sentText()
+    expect(text).toMatch(/On .+, Pete Plumber <plumber@example\.com> wrote:/)
+    expect(text).toContain('class="gmail_quote"')
+    expect(text).toContain('Hi, can I get in on Tuesday at 8?')
+    expect(text).toContain('Earlier: can you quote the leak?')
+    expect(sentRaw()).toMatch(/References: <first@irc\.example> <abc@mail\.example>/)
+  })
+
+  it('quotes the email from the comms log when Gmail no longer has it', async () => {
+    gmailThread.mockResolvedValueOnce({ data: { messages: [] } })
+    await replyToEmailTool.run({ email_id: IN, body: 'Tuesday at 8 is fine.' }, ctx)
+    const text = sentText()
+    expect(gmailList).toHaveBeenCalledWith(expect.objectContaining({ q: 'rfc822msgid:abc@mail.example' }))
+    expect(text).toMatch(/plumber@example\.com wrote:/)
+    expect(text).toContain('> Hi, can I get in on Tuesday at 8?')
+    expect(sentRaw()).toMatch(/In-Reply-To: <abc@mail\.example>/)
   })
 
   it('won’t reply to our own email, or repeat the same reply minutes later', async () => {
