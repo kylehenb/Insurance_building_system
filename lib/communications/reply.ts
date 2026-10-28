@@ -3,11 +3,13 @@ import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw, ensureAngleBrackets, type EmailAttachment } from '@/lib/email/build-raw'
+import { composeStandardEmail } from '@/lib/email/compose'
+import type { SignatureTenant } from '@/lib/email/signature'
 
 // Replying to an email on the job's comms log: sends in the same Gmail thread
 // (Re: subject, In-Reply-To/References) to whoever sent it, and records the
-// reply. Used by the Reply box (app/api/communications/reply) and the voice
-// connector.
+// reply, with the company signature under the text. Used by the Reply box
+// (app/api/communications/reply) and the voice connector.
 
 const FALLBACK_FROM = 'office@insurancerepairco.com.au'
 
@@ -61,16 +63,18 @@ export async function replyToEmail(
     throw new ReplyError('Source email has no from_email — cannot reply', 422)
   }
 
-  // Resolve tenant From address
+  // Resolve tenant From address and signature
   const serviceClient = createServiceClient()
   const { data: tenant } = await serviceClient
     .from('tenants')
-    .select('contact_email, name, trading_name')
+    .select('contact_email, name, trading_name, email_signature, email_signature_image_path, email_signature_image_width, email_signature_image_height')
     .eq('id', tenantId)
     .single()
 
-  const sender = tenant as { contact_email: string | null; name: string | null; trading_name: string | null } | null
+  const sender = tenant as (SignatureTenant & { contact_email: string | null }) | null
   const fromEmail = sender?.contact_email ?? FALLBACK_FROM
+  // The typed text with the signature, as the app's other sends do
+  const composed = sender ? composeStandardEmail(body, sender) : { html: undefined, text: body }
 
   // Build Re: subject (avoid double-prefix)
   const originalSubject = source.subject ?? ''
@@ -88,7 +92,8 @@ export async function replyToEmail(
     fromName: sender?.trading_name || sender?.name,
     to: source.from_email,
     subject: replySubject,
-    body,
+    body: composed.text,
+    html: composed.html,
     inReplyTo,
     references,
     attachments: attachments.length ? attachments : undefined,

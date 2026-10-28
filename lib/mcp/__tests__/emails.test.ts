@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   inserts.length = 0
   db.jobs = [{ id: 'j1', tenant_id: 't1', job_number: 'IRC1001', property_address: '123 Test Street', insured_name: 'Smith' }]
-  db.tenants = [{ id: 't1', contact_email: 'office@insurancerepairco.com.au' }]
+  db.tenants = [{ id: 't1', name: 'Insurance Repair Co', contact_email: 'office@insurancerepairco.com.au' }]
   db.communications = [
     { id: IN, tenant_id: 't1', type: 'email', direction: 'inbound', job_id: 'j1', thread_id: 'th1', gmail_message_id: 'abc@mail.example',
       created_at: minutesAgo(60), from_email: 'plumber@example.com', to_email: 'office@insurancerepairco.com.au', subject: 'Access on Tuesday?',
@@ -92,6 +92,20 @@ describe('reply_to_email', () => {
     expect(gmailSend).toHaveBeenCalledWith(expect.objectContaining({ requestBody: expect.objectContaining({ threadId: 'th1' }) }))
     expect(sentRaw()).toMatch(/In-Reply-To: <abc@mail\.example>/)
     expect(inserts[0]).toMatchObject({ direction: 'outbound', job_id: 'j1', thread_id: 'th1', to_email: 'plumber@example.com', source: 'manual_reply' })
+  })
+
+  it('adds the company signature under the reply, as the app’s other sends do', async () => {
+    db.tenants[0] = { ...db.tenants[0], email_signature: 'Kyle Bindon\nInsurance Repair Co' }
+    await replyToEmailTool.run({ email_id: IN, body: 'Tuesday at 8 is fine.' }, ctx)
+    const raw = sentRaw()
+    expect(raw).toMatch(/Content-Type: text\/html/)
+    const text = raw.split(/\r?\n\r?\n/).map(part => {
+      try { return Buffer.from(part.replace(/\s+/g, ''), 'base64').toString() } catch { return '' }
+    }).join('\n') + raw
+    expect(text).toContain('Tuesday at 8 is fine.')
+    expect(text).toContain('Kyle Bindon')
+    // The comms log keeps the text as typed (the repeat check compares it)
+    expect(inserts[0]).toMatchObject({ content: 'Tuesday at 8 is fine.' })
   })
 
   it('won’t reply to our own email, or repeat the same reply minutes later', async () => {
