@@ -16,7 +16,8 @@ import { RemindMe } from './RemindMe'
 // emails open in the Mail page's composer — and Do steps / Skip. Doing runs
 // the ticked steps through the user's own permissions (lib/actions/confirm.ts).
 // "Tell the AI what to change" re-suggests the steps with the office's
-// instructions; Remind me sets a follow-up (lib/actions/followups.ts), and a
+// instructions — the whole card, or one step's Change (the rest stay); an
+// unticked step is skipped when the others are done. Remind me sets a follow-up (lib/actions/followups.ts), and a
 // follow-up that's due is a card like any other, saying what it was for.
 
 interface Props {
@@ -72,6 +73,9 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const [asking, setAsking] = useState(false)
   const [reminding, setReminding] = useState(false)
   const [feedback, setFeedback] = useState('')
+  // One step being changed by the AI, and what the office said
+  const [changing, setChanging] = useState<string | null>(null)
+  const [stepFeedback, setStepFeedback] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const flushers = useRef(new Map<string, () => Promise<void>>())
 
@@ -129,6 +133,12 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     setAsking(false)
     setFeedback('')
     onChanged(updated, instructions ? 'Steps re-suggested with your instructions.' : 'Suggestions updated.')
+  })
+  const changeStep = (stepId: string, instructions: string) => run(`change:${stepId}`, async () => {
+    const { card: updated } = await post('/api/actions/suggest', { cardId: card.id, stepId, feedback: instructions })
+    setChanging(null)
+    setStepFeedback('')
+    onChanged(updated, 'Step changed with your instructions.')
   })
 
   const toDo = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').length
@@ -193,8 +203,13 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                         <span className="ac-step-text">{step.summary}</span>
                       </label>
                       {step.draft && !done && <span className="ac-step-status">edited</span>}
+                      {editable && !ticked.has(step.id) && <span className="ac-step-status">will be skipped</span>}
                       {step.status && <span className="ac-step-status">{step.status === 'waiting' ? 'waiting for approval' : step.status}</span>}
                       <span className="ac-step-btns">
+                        {editable && redoable && changing !== step.id && (
+                          <button type="button" className="ac-link" disabled={!!busy} onClick={() => { setChanging(step.id); setStepFeedback('') }}
+                            title="Tell the AI what this step should do instead — the other steps stay">Change</button>
+                        )}
                         {step.kind === 'email' && editable && composing !== step.id && (
                           <button type="button" className="ac-link" onClick={() => { setShown(x => new Set(x).add(step.id)); setComposing(step.id) }}>Edit</button>
                         )}
@@ -203,6 +218,25 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                         </button>
                       </span>
                     </div>
+                    {changing === step.id && (
+                      <div className="ac-ask ac-step-ask">
+                        <textarea
+                          autoFocus
+                          value={stepFeedback}
+                          onChange={e => setStepFeedback(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && stepFeedback.trim()) { e.preventDefault(); changeStep(step.id, stepFeedback.trim()) } }}
+                          rows={2}
+                          placeholder="What should this step do instead? e.g. Send it to the strata manager, not the owner, and ask for access on Thursday."
+                        />
+                        <div className="ac-ask-btns">
+                          <button className="ac-btn primary" disabled={!!busy || !stepFeedback.trim()} onClick={() => changeStep(step.id, stepFeedback.trim())}>
+                            {busy === `change:${step.id}` ? 'Changing…' : 'Change this step'}
+                          </button>
+                          <button className="ac-btn" disabled={!!busy} onClick={() => setChanging(null)}>Cancel</button>
+                          <span className="ac-ask-note">Only this step changes{step.draft ? ', and your edits to this email are discarded' : ''}.</span>
+                        </div>
+                      </div>
+                    )}
                     {isShown && (step.kind === 'email' && step.tool === 'send_email' ? (
                       <EmailStep
                         card={card}
@@ -338,6 +372,7 @@ const CARD_CSS = `
   .ac-step-status { font-size: 11px; color: var(--subtle); }
   .ac-link { font: inherit; font-size: 12px; color: var(--info); background: none; border: none; padding: 0; cursor: pointer; }
   .ac-ask { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ac-step-ask { margin-top: 8px; }
   .ac-ask textarea { font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 0.5px solid var(--line-strong); border-radius: 6px; background: var(--paper); resize: vertical; }
   .ac-ask textarea:focus { outline: none; border-color: var(--gold); }
   .ac-ask-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

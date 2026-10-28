@@ -124,6 +124,8 @@ export async function generateCard(
     tools?: McpTool[]
     /** What the office asked for, having seen the card's earlier suggestion ("Tell the AI what to change") */
     feedback?: string
+    /** With feedback: change only this step; the card's other steps, title and summary stay as they are */
+    step?: string
   } = {},
 ): Promise<Outcome> {
   const db = opts.db ?? mailDb()
@@ -131,13 +133,16 @@ export async function generateCard(
     await db.from('action_queue').update({ ...o, updated_at: new Date().toISOString() }).eq('id', card.id)
     return o
   }
+  // One step being changed: the card goes back on the list as it was if the AI can't
+  const target = opts.feedback?.trim() && opts.step ? card.steps.find(s => s.id === opts.step) : undefined
+  const keepCard = async (reason: string): Promise<Outcome> => ({ ...(await save({ status: 'pending' })), error_log: reason })
   try {
     const tools = (opts.tools ?? MCP_TOOLS).filter(t => !LEFT_OUT.has(t.name))
     const ctx: McpContext = { supabase: db as unknown as SupabaseClient<Database>, tenantId: card.tenant_id, userId: await cardActor(db, card.tenant_id), via: 'chat' }
     const about = card.source === 'followup'
       ? await followUpContext(card, db, ctx)
       : await emailContext(card, db, ctx, !!card.starred_by || !!opts.feedback?.trim())
-    if (!('intro' in about)) return save(about)
+    if (!('intro' in about)) return target ? keepCard(about.outcome ?? about.error_log ?? 'The email can\'t be read') : save(about)
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const toolDefs: Anthropic.Beta.BetaTool[] = [
@@ -146,7 +151,9 @@ export async function generateCard(
     ]
     const feedback = opts.feedback?.trim()
     const earlier = card.steps.length ? card.steps.map((s, i) => `${i + 1}. ${s.summary}`).join('\n') : '(no steps)'
-    const instructions = feedback
+    const instructions = target
+      ? `\n\nTHE OFFICE'S INSTRUCTIONS FOR ONE STEP\nThe card "${card.title}" has these steps:\n${earlier}\n…and they want only step ${card.steps.indexOf(target) + 1} ("${target.summary}") changed:\n"${feedback}"\nPropose just what replaces that step — usually one step, none if they want it dropped. The other steps stay as they are: don't propose them again. Then call finish_card (the card keeps its title and summary).`
+      : feedback
       ? `\n\nTHE OFFICE'S INSTRUCTIONS\nThey looked at the earlier suggestion — "${card.title}":\n${earlier}\n…and asked for this instead:\n"${feedback}"`
       : ''
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
@@ -221,6 +228,8 @@ export async function generateCard(
       }
     }
 
+    if (target) return save({ status: 'pending', steps: replaceStep(card.steps, target.id, steps), error_log: null })
+
     const f = finish ?? {}
     const str = (k: string) => (typeof f[k] === 'string' ? (f[k] as string).trim() : '')
     let jobId = about.jobId
@@ -252,8 +261,15 @@ export async function generateCard(
     })
   } catch (err) {
     console.error(`[action-cards] card ${card.id} failed:`, err)
+    if (target) return keepCard(err instanceof Error ? err.message : String(err))
     return save({ status: 'failed', error_log: err instanceof Error ? err.message : String(err) })
   }
+}
+
+/** The card's steps with one replaced by what the AI proposed instead (nothing: it comes off) */
+export function replaceStep(steps: CardStep[], stepId: string, replacement: CardStep[]): CardStep[] {
+  const i = steps.findIndex(s => s.id === stepId)
+  return i < 0 ? steps : [...steps.slice(0, i), ...replacement, ...steps.slice(i + 1)]
 }
 
 type Context = { intro: string; jobId: string | null; title: string }
@@ -363,4 +379,38 @@ export async function resuggestCard(
     if (won) await generateCard(won as ActionCard, { db, feedback })
   }
   return getCard(db, tenantId, id)
+}
+
+/**
+ * "Tell the AI what to change" for one step: the AI replaces just that step
+ * (or takes it off) following the office's instructions; the other steps —
+ * emails edited in the composer included — the title and the summary stay.
+ * The card is held (generating) meanwhile so its steps can't be done. Throws
+ * if the AI couldn't, leaving the card as it was.
+ */
+export async function resuggestStep(
+  db: SupabaseClient,
+  tenantId: string,
+  cardId: string,
+  stepId: string,
+  feedback: string,
+): Promise<ActionCard> {
+  const card = await getCard(db, tenantId, cardId)
+  if (!card) throw new CardError('Card not found', 404)
+  const step = card.steps.find(s => s.id === stepId)
+  if (!step) throw new CardError('That step isn\'t on the card any more', 404)
+  if (step.status === 'done' || step.status === 'waiting') throw new CardError('That step has already been done', 409)
+  if (!feedback.trim()) throw new CardError('Say what this step should do instead')
+
+  const { data: won } = await db.from('action_queue').update({ status: 'generating', updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId).eq('id', card.id).in('status', ['pending', 'failed']).select('*').maybeSingle()
+  if (!won) throw new CardError('That card can\'t be changed now', 409)
+  const out = await generateCard(won as ActionCard, { db, feedback, step: stepId })
+  if (out.error_log) throw new CardError(`The AI couldn't change that step: ${out.error_log}`)
+  // The email it replaced was edited in the composer: that draft goes
+  if (step.draft) {
+    const { discardStepDrafts } = await import('./steps')
+    await discardStepDrafts({ ...card, steps: [step] }, db)
+  }
+  return (await getCard(db, tenantId, card.id))!
 }
