@@ -157,6 +157,8 @@
 .fa-scope-desc{flex:1;min-width:0;display:flex;flex-direction:column}
 .fa-scope-input.picked{border-color:var(--beige-dark);background:var(--off)}
 .fa-scope-qty{width:64px;flex-shrink:0;background:white;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 8px;font-family:var(--font-dm-mono),monospace;font-size:14px;color:var(--text);outline:none;text-align:center}
+.fa-scope-qty{-moz-appearance:textfield;appearance:textfield}
+.fa-scope-qty::-webkit-inner-spin-button,.fa-scope-qty::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .fa-scope-qty:focus{border-color:var(--beige-dark)}
 .fa-scope-lib-tag{font-family:var(--font-dm-mono),monospace;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-top:3px}
 .fa-scope-results{margin-top:4px;background:white;border:1.5px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 6px 20px rgba(0,0,0,.12);max-height:300px;overflow-y:auto}

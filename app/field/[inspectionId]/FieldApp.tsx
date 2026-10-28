@@ -48,7 +48,7 @@ interface PhotoEntry { id: string; file: File; previewUrl: string; label: string
 
 function uid() { return Math.random().toString(36).slice(2) }
 
-function blankScopeItem(): ScopeItem { return { id: uid(), text: '', qty: '', libraryId: null, unit: null } }
+function blankScopeItem(): ScopeItem { return { id: uid(), text: '', qty: '', libraryId: null, keyword: null, unit: null } }
 
 /** A saved scope item: the current shape, or a plain string from older drafts */
 function restoreScopeItem(saved: unknown): ScopeItem {
@@ -57,13 +57,14 @@ function restoreScopeItem(saved: unknown): ScopeItem {
     return {
       id: uid(), text: String(o.text ?? ''), qty: o.qty == null ? '' : String(o.qty),
       libraryId: typeof o.libraryId === 'string' && o.libraryId ? o.libraryId : null,
+      keyword: typeof o.keyword === 'string' && o.keyword ? o.keyword : null,
       unit: typeof o.unit === 'string' ? o.unit : null,
     }
   }
   return { ...blankScopeItem(), text: String(saved ?? '') }
 }
 
-const savedScopeItem = (i: ScopeItem) => ({ text: i.text, qty: i.qty, libraryId: i.libraryId, unit: i.unit })
+const savedScopeItem = (i: ScopeItem) => ({ text: i.text, qty: i.qty, libraryId: i.libraryId, keyword: i.keyword, unit: i.unit })
 
 interface SafetySignature { name: string; at: string }
 
@@ -691,7 +692,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                       item={item}
                       search={searchLibrary}
                       onChange={changes => updateScopeItem(room.id, item.id, changes)}
-                      onPick={result => updateScopeItem(room.id, item.id, { text: displayWording(result.item_description ?? ''), libraryId: result.id, unit: result.unit })}
+                      onPick={result => updateScopeItem(room.id, item.id, { text: displayWording(result.item_description ?? ''), libraryId: result.id, keyword: result.keyword, unit: result.unit })}
                       onRemove={() => removeScopeItem(room.id, item.id)}
                       onQtyEnter={() => {
                         // On to the next item's description, or a new one at the end

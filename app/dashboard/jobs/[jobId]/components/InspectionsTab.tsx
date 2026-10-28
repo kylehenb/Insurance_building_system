@@ -32,7 +32,7 @@ interface FieldDraftSnapshot {
   customSafetyNotes?: string
   chips?: Record<string, boolean>
   commenceTime?: string
-  scopeRooms?: Array<{ id?: string; name: string; l: string; w: string; h: string; items: Array<string | { text?: string; qty?: string; libraryId?: string | null; unit?: string | null }> }>
+  scopeRooms?: Array<{ id?: string; name: string; l: string; w: string; h: string; items: Array<string | { text?: string; qty?: string; libraryId?: string | null; keyword?: string | null; unit?: string | null }> }>
   roofRawNotes?: string
   msWorksCompleted?: string
   msTempFixes?: string
@@ -668,7 +668,7 @@ function FieldAppSnapshotPanel({
                           <li key={j} style={{ fontSize: 12, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>
                             {item.text}
                             {item.qty ? <span style={{ color: 'var(--subtle)' }}> × {item.qty}{item.unit ? ` ${item.unit}` : ''}</span> : null}
-                            {item.libraryId ? <span style={{ color: 'var(--subtle)', fontSize: 11 }}> · library</span> : null}
+                            {item.libraryId ? <span style={{ color: 'var(--subtle)', fontSize: 11 }}> · {item.keyword || 'library'}</span> : null}
                           </li>
                         ))}
                       </ul>

@@ -15,6 +15,8 @@ export interface FieldScopeItemState {
   qty: string
   /** The scope library item picked from the search; cleared by typing over it */
   libraryId: string | null
+  /** The picked item's keyword, shown under the (cut-off) description */
+  keyword: string | null
   unit: string | null
 }
 
@@ -42,7 +44,8 @@ export function ScopeItemRow({
 
   const focusQty = () => {
     qtyRef.current?.focus()
-    qtyRef.current?.select()
+    // Not every browser lets a number box be selected
+    try { qtyRef.current?.select() } catch {}
   }
 
   const pick = (result: ScopeSearchResult) => {
@@ -67,7 +70,7 @@ export function ScopeItemRow({
           onChange={e => {
             const text = e.target.value
             // Typing over a pick makes it a custom item
-            onChange({ text, libraryId: null, unit: null })
+            onChange({ text, libraryId: null, keyword: null, unit: null })
             const found = text.trim().length >= 2 ? search(text).slice(0, MAX_RESULTS) : []
             setResults(found)
             setOpen(found.length > 0)
@@ -82,7 +85,7 @@ export function ScopeItemRow({
             }
           }}
         />
-        {item.libraryId && <div className="fa-scope-lib-tag">Library item{item.unit ? ` · ${item.unit}` : ''}</div>}
+        {item.libraryId && <div className="fa-scope-lib-tag">{[item.keyword || 'Library item', item.unit].filter(Boolean).join(' · ')}</div>}
         {open && (
           <div className="fa-scope-results" role="listbox">
             {results.map(r => (
@@ -108,8 +111,11 @@ export function ScopeItemRow({
       <input
         ref={qtyRef}
         className="fa-scope-qty"
-        type="text"
-        inputMode="decimal"
+        // type="number" without inputMode: iOS opens the full keyboard on its numbers
+        // layer, which has a Return key (inputMode="decimal" gives a pad without one)
+        type="number"
+        step="any"
+        min="0"
         placeholder="Qty"
         value={item.qty}
         enterKeyHint="next"
