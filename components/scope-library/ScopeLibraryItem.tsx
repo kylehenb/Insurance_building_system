@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { normaliseUnit } from '@/lib/scope-library/pricing'
 import type { ScopeLibraryItem, ScopeLibraryOverride, InsurersOption, PricingTiers, PricingTier } from '@/lib/types/scope-library'
 import { ScopeLibraryOverrideRow } from './ScopeLibraryOverrideRow'
 
@@ -15,7 +16,8 @@ interface Props {
   onDuplicate: () => void
 }
 
-const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'item', 'set'] as const
+// The quote editor's units; older rows' "Each", "m2", "LM" show as their match (normaliseUnit)
+const UNITS = ['m²', 'm³', 'lm', 'ea', 'hr', 'set'] as const
 
 function isoToDisplay(iso: string | null): string {
   if (!iso) return ''
@@ -64,12 +66,13 @@ export function ScopeLibraryItemRow({
   onDuplicate,
 }: Props) {
   const [description, setDescription] = useState(item.item_description ?? '')
-  const [unit, setUnit] = useState(item.unit ?? '')
+  const [unit, setUnit] = useState(normaliseUnit(item.unit) ?? '')
   const [labour, setLabour] = useState(item.labour_per_unit !== null ? String(item.labour_per_unit) : '')
   const [materials, setMaterials] = useState(item.materials_per_unit !== null ? String(item.materials_per_unit) : '')
   const [estHrs, setEstHrs] = useState(item.estimated_hours !== null ? String(item.estimated_hours) : '')
   const [keyword, setKeyword] = useState(item.keyword ?? '')
   const [siteNotes, setSiteNotes] = useState(item.site_notes ?? '')
+  const [insurerOnly, setInsurerOnly] = useState(item.insurer_specific ?? '')
   const [priceDisplay, setPriceDisplay] = useState(isoToDisplay(item.price_updated_at))
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false)
   const [tiersExpanded, setTiersExpanded] = useState(false)
@@ -236,6 +239,9 @@ export function ScopeLibraryItemRow({
             }}
             onBlur={handleDescBlur}
           />
+          {item.insurer_specific && (
+            <span className="ml-1 inline-block text-[10px] font-medium uppercase tracking-wide text-gold">{item.insurer_specific} only</span>
+          )}
         </div>
 
         {/* Unit */}
@@ -334,7 +340,7 @@ export function ScopeLibraryItemRow({
       {isExpanded && (
         <div className="border-t border-line px-4 pb-4 space-y-4 pt-3">
           {/* Section 1: Meta row */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-body mb-1">Price updated</label>
               <div className="flex items-center gap-2">
@@ -361,6 +367,22 @@ export function ScopeLibraryItemRow({
                 placeholder="Unique keyword"
                 className="w-full border border-line rounded px-2.5 py-1 text-xs focus:outline-none focus:border-gold"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-body mb-1">Only for insurer</label>
+              <select
+                value={insurerOnly}
+                onChange={(e) => {
+                  setInsurerOnly(e.target.value)
+                  patch({ insurer_specific: e.target.value || null })
+                }}
+                className="w-full border border-line rounded px-2 py-1 text-xs focus:outline-none focus:border-gold bg-white"
+              >
+                <option value="">All insurers</option>
+                {[...new Set([...insurers.map((i) => i.name), ...(insurerOnly ? [insurerOnly] : [])])].map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-body mb-1">Site notes</label>

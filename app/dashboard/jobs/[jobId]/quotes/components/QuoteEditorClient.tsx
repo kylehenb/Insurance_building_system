@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useQuote } from '../hooks/useQuote'
 import type { ScopeItem } from '../hooks/useQuote'
-import { useScopeLibrary } from '../hooks/useScopeLibrary'
-import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
+import { ScopeLibraryWording, useScopeLibrary } from '@/lib/scope-library/useScopeLibrary'
+import type { ScopeSearchResult } from '@/lib/scope-library/useScopeLibrary'
 import { QuoteHeader } from './QuoteHeader'
 import { RoomSection } from './RoomSection'
 import { QuoteFooter } from './QuoteFooter'
@@ -321,7 +321,12 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
     flushAllPending,
   } = useQuote({ quoteId, tenantId })
 
-  const { search } = useScopeLibrary({ tenantId })
+  // Library items priced for this job's insurer
+  const { search, items: libraryItems } = useScopeLibrary({ jobId })
+  const libraryWording = useMemo(() => {
+    const byId = new Map(libraryItems.filter(i => i.result_type === 'library').map(i => [i.id, i.item_description]))
+    return (id: string) => byId.get(id) ?? null
+  }, [libraryItems])
   const trades = useTrades(tenantId)
   const [tradeTypes, setTradeTypes] = useState<string[]>([])
 
@@ -524,6 +529,7 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
   }
 
   return (
+    <ScopeLibraryWording.Provider value={libraryWording}>
     <div
       style={{
         background: 'var(--surface)',
@@ -760,5 +766,6 @@ export function QuoteEditorClient({ jobId, quoteId, tenantId, job, inline, onQuo
         tenantId={tenantId}
       />
     </div>
+    </ScopeLibraryWording.Provider>
   )
 }

@@ -8,6 +8,10 @@ import { notifySubmissionFailure } from '@/lib/email/notify-submission-failure'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
 import { attachPendingFieldPhotos, finaliseFieldPhotos, type FieldPhotoManifestEntry } from '@/lib/photos/server-labels'
+import { scopeItemTotals } from '@/lib/quotes/service'
+import { loadJobInsurer, loadScopeCatalogue } from '@/lib/scope-library/catalogue'
+import { buildFieldScopeLines, libraryText, normaliseFieldRooms, notesText, readParsedNotes, type ParsedNote, type ScopeNote } from '@/lib/scope-library/field-scope'
+import type { CatalogueItem } from '@/lib/scope-library/pricing'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -17,144 +21,81 @@ export const maxDuration = 120
 // Model used for every AI step in field submission
 const FIELD_AI_MODEL = 'claude-haiku-5-5'
 
-interface ScopeRoom {
-  room: string
-  l: string
-  w: string
-  h: string
-  items: string[]
-}
+// The field app's scope rooms (items: { text, qty, libraryId }, or plain strings from older clients)
+type ScopeRoom = { room: string; l: string; w: string; h: string; items: unknown[] }
 
-interface ScopeItem {
-  room: string
-  trade: string
-  keyword: string
-  item_description: string
-  qty: number | null
-  unit: string
-}
+const DEFAULT_SCOPE_PARSE_PROMPT = `You are an assistant for an Australian building inspector writing insurance repair scopes.
 
-interface LibraryItem {
-  id: string
-  trade: string | null
-  keyword: string | null
-  item_description: string | null
-  unit: string | null
-  labour_per_unit: number | null
-  materials_per_unit: number | null
-  total_per_unit: number | null
-  trade_rate_total: number | null
-  estimated_hours: number | null
-}
+Turn the inspector's scope notes into quote line items.
 
-const LIBRARY_MATCH_THRESHOLD = 0.55
+INSPECTOR SHORTHAND:
+- "rr" = remove and replace (remove, dispose, supply and install); "r/r" or "back" after a fitting = disconnect / reconnect or reinstate
+- "strip" = restoration strip-out
+- A number at the end of a note is the quantity, unless the inspector entered one separately
 
-function normalizeStr(s: string | null | undefined): string {
-  return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
-}
+SCOPE LIBRARY:
+{library}
 
-function wordOverlapScore(a: string, b: string): number {
-  const ta = new Set(a.split(/\s+/).filter(Boolean))
-  const tb = new Set(b.split(/\s+/).filter(Boolean))
-  if (ta.size === 0 || tb.size === 0) return 0
-  const intersection = [...ta].filter(t => tb.has(t)).length
-  return intersection / Math.max(ta.size, tb.size)
-}
+RULES:
+1. If a library item is clearly the same work, match it (its # as libId). Only match the same work — painting is not plastering, a downlight is not an exhaust fan.
+2. Otherwise write a new line in the same style and wording as the library items (e.g. "Remove, dispose, supply and install …", "Prepare and paint … in a similar colour and finish to existing.") and use one of the library's trade names.
+3. Keep any extra detail the inspector gave (location, size, material) in the new line's wording.`
 
-function computeLibraryMatchScore(parsed: ScopeItem, lib: LibraryItem): number {
-  let score = 0
-  const pk = normalizeStr(parsed.keyword)
-  const lk = normalizeStr(lib.keyword)
-  if (pk && lk) {
-    if (pk === lk) score += 0.55
-    else if (pk.includes(lk) || lk.includes(pk)) score += 0.35
-    else score += 0.2 * wordOverlapScore(pk, lk)
-  }
-  score += 0.3 * wordOverlapScore(normalizeStr(parsed.item_description), normalizeStr(lib.item_description))
-  const pt = normalizeStr(parsed.trade)
-  const lt = normalizeStr(lib.trade)
-  if (pt && lt && pt === lt) score += 0.15
-  return score
-}
+/**
+ * Custom field notes → quote lines with the AI: it sees the scope library
+ * (the tenant's scope_field_parse prompt, with {library} / ${libraryText}
+ * replaced) and matches a library item or writes a new line in its style.
+ */
+async function parseScopeNotesWithAI(opts: {
+  service: ServiceClient
+  tenantId: string
+  notes: ScopeNote[]
+  catalogue: CatalogueItem[]
+  insurer: string
+  lossType: string
+}): Promise<ParsedNote[]> {
+  const { service, tenantId, notes, catalogue, insurer, lossType } = opts
+  const { data: promptRow } = await service
+    .from('prompts').select('system_prompt').eq('tenant_id', tenantId).eq('key', 'scope_field_parse').maybeSingle()
+  const template = promptRow?.system_prompt?.trim() || DEFAULT_SCOPE_PARSE_PROMPT
+  const library = libraryText(catalogue)
+  const notesBlock = notesText(notes)
+  // Function replacements: a "$" in the library's wording stays as written
+  let system = template
+    .replaceAll('${libraryText}', () => library)
+    .replaceAll('{library}', () => library)
+    .replaceAll('{insurer}', () => insurer || 'Unknown')
+    .replaceAll('{loss_type}', () => lossType || 'Unknown')
+    .replaceAll('{scope_notes}', () => notesBlock)
+  // A prompt without a library placeholder still gets the library
+  if (!template.includes('${libraryText}') && !template.includes('{library}')) system += `\n\nSCOPE LIBRARY:\n${library}`
 
-function findBestLibraryMatch(parsed: ScopeItem, library: LibraryItem[]): LibraryItem | null {
-  let best: LibraryItem | null = null
-  let bestScore = 0
-  for (const lib of library) {
-    const s = computeLibraryMatchScore(parsed, lib)
-    if (s > bestScore) { bestScore = s; best = lib }
-  }
-  return bestScore >= LIBRARY_MATCH_THRESHOLD ? best : null
-}
-
-async function parseScopeWithAI(scopeRooms: ScopeRoom[], jobContext: { insurer: string; lossType: string }, tenantId: string, service: any): Promise<ScopeItem[]> {
+  const trades = [...new Set(catalogue.map(c => c.trade).filter(Boolean))].sort().join(', ')
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-  const scopeText = scopeRooms.map(r => {
-    const dims = [r.l, r.w, r.h].filter(Boolean).join('×')
-    const dimStr = dims ? ` (${dims}m)` : ''
-    const items = r.items.filter(Boolean).map(i => `  - ${i}`).join('\n')
-    return `${r.room || 'General'}${dimStr}:\n${items || '  (no items)'}`
-  }).join('\n\n')
-
-  // Fetch the scope parsing prompt from the database
-  let systemPrompt = `You are a building insurance scope parser. Parse the following field inspection scope notes into structured scope items.
-
-Insurer: {insurer}
-Loss Type: {loss_type}
-
-Scope Notes:
-{scope_notes}
-
-Return ONLY a valid JSON array with no additional text. Each object must have these exact keys:
-- room: room name (string)
-- trade: trade type e.g. "Plastering", "Carpentry", "Painting", "Tiling" (string)
-- keyword: short item keyword (string)
-- item_description: full description of work required (string)
-- qty: quantity as a number, or null if not quantifiable
-- unit: unit of measure e.g. "m2", "lm", "item", "hr" (string)
-
-Example: [{"room":"Living Room","trade":"Plastering","keyword":"ceiling","item_description":"Replaster damaged ceiling","qty":12,"unit":"m2"}]`
-  try {
-    const { data: promptData } = await service
-      .from('prompts')
-      .select('system_prompt')
-      .eq('tenant_id', tenantId)
-      .eq('key', 'scope_field_parse')
-      .single()
-    // Only use the DB prompt if it contains the scope_notes placeholder; otherwise the
-    // scope text would never be included in the message sent to Claude
-    if (promptData?.system_prompt?.includes('{scope_notes}')) {
-      systemPrompt = promptData.system_prompt
-    }
-  } catch (e) {
-    console.error('Failed to fetch scope parsing prompt, using default:', e)
-  }
-
-  // Replace placeholders in the prompt with actual values
-  const prompt = systemPrompt
-    .replace('{insurer}', jobContext.insurer || 'Unknown')
-    .replace('{loss_type}', jobContext.lossType || 'Unknown')
-    .replace('{scope_notes}', scopeText)
-
   const message = await anthropic.messages.create({
     model: FIELD_AI_MODEL,
     max_tokens: 16000,
     output_config: { effort: 'medium' },
-    messages: [{ role: 'user', content: prompt }],
+    system,
+    messages: [{
+      role: 'user',
+      content: `Insurer: ${insurer || 'Unknown'}
+Loss type: ${lossType || 'Unknown'}
+Trade names used in the library: ${trades || 'none yet'}
+
+Scope notes:
+${notesBlock}
+
+Return ONLY a JSON array, one object per note, in the same order:
+{"note": the note's number, "room": string, "trade": string, "keyword": short camelCase keyword, "qty": number or null, "unit": "m2", "lm", "ea", "hr" or "set", "itemDescription": the line's wording, "confidence": "MATCHED" or "NEW", "libId": the library item's # when MATCHED, else null}
+For MATCHED, itemDescription is the library item's wording.`,
+    }],
   })
 
-  // A refusal falls back to the basic one-item-per-line scope, like an unparseable reply
+  // A refusal adds the notes as typed, like an unparseable reply
   let text: string
   try { text = getResponseText(message) } catch { return [] }
-  const match = text.match(/\[[\s\S]*\]/)
-  if (!match) return []
-
-  try {
-    return JSON.parse(match[0]) as ScopeItem[]
-  } catch {
-    return []
-  }
+  return readParsedNotes(text)
 }
 
 async function generateBarReport(opts: {
@@ -423,34 +364,21 @@ Return ONLY a JSON object with these exact keys (empty string or null if unknown
 async function parseAndInsertScope(opts: {
   service: ServiceClient
   tenantId: string
+  jobId: string | null
   resolvedQuoteId: string | null
   scopeRooms: ScopeRoom[]
   insurer: string
   lossType: string
 }): Promise<void> {
-  const { service, tenantId, resolvedQuoteId, scopeRooms, insurer, lossType } = opts
-  if (!resolvedQuoteId || !scopeRooms || scopeRooms.length === 0) return
+  const { service, tenantId, jobId, resolvedQuoteId, insurer, lossType } = opts
+  const rooms = normaliseFieldRooms(opts.scopeRooms)
+  if (!resolvedQuoteId || rooms.length === 0) return
 
-  const validRooms = scopeRooms.filter(r => r.items && r.items.some(i => i.trim()))
-  if (validRooms.length === 0) return
-
-  let itemsToInsert: ScopeItem[] = await parseScopeWithAI(validRooms, { insurer, lossType }, tenantId, service)
-
-  // Fallback: if AI returned nothing, create basic items directly from scope rooms
-  if (itemsToInsert.length === 0) {
-    itemsToInsert = validRooms.flatMap(room =>
-      room.items.filter(i => i.trim()).map(item => ({
-        room: room.room || 'General',
-        trade: '',
-        keyword: '',
-        item_description: item,
-        qty: null,
-        unit: 'item',
-      }))
-    )
-  }
-
-  if (itemsToInsert.length === 0) return
+  // The library this job picks from, at its insurer's prices — the same list the field app searched
+  const catalogue = await loadScopeCatalogue(service, tenantId, await loadJobInsurer(service, tenantId, jobId))
+  const lines = await buildFieldScopeLines(rooms, catalogue, notes =>
+    parseScopeNotesWithAI({ service, tenantId, notes, catalogue, insurer, lossType }))
+  if (lines.length === 0) return
 
   const { data: maxSort } = await service
     .from('scope_items')
@@ -462,39 +390,14 @@ async function parseAndInsertScope(opts: {
     .maybeSingle()
 
   let sortOrder = (maxSort?.sort_order ?? 0) + 1
-
-  // Fetch scope library for auto-matching
-  const { data: libData } = await service
-    .from('scope_library')
-    .select('id, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, total_per_unit, trade_rate_total, estimated_hours')
-    .eq('tenant_id', tenantId)
-    .neq('approval_status', 'archived')
-  const library: LibraryItem[] = libData ?? []
-
-  const inserts = itemsToInsert.map(item => {
-    const match = library.length > 0 ? findBestLibraryMatch(item, library) : null
-    return {
-      tenant_id: tenantId,
-      quote_id: resolvedQuoteId as string,
-      room: item.room || null,
-      trade: item.trade || null,
-      keyword: item.keyword || null,
-      item_description: item.item_description || null,
-      qty: item.qty ?? null,
-      unit: match?.unit || item.unit || null,
-      is_custom: !match,
-      approval_status: 'pending',
-      sort_order: sortOrder++,
-      ...(match ? {
-        scope_library_id: match.id,
-        rate_labour: match.labour_per_unit,
-        rate_materials: match.materials_per_unit,
-        rate_total: match.total_per_unit,
-        trade_rate_total: match.trade_rate_total,
-        estimated_hours: match.estimated_hours,
-      } : {}),
-    }
-  })
+  const inserts = lines.map(line => ({
+    ...line,
+    tenant_id: tenantId,
+    quote_id: resolvedQuoteId,
+    approval_status: 'pending',
+    sort_order: sortOrder++,
+    ...scopeItemTotals(line.qty, line.rate_labour, line.rate_materials),
+  }))
 
   const { error: insertErr } = await service.from('scope_items').insert(inserts)
   if (insertErr) throw new Error(`Scope items insert failed: ${insertErr.message}`)
@@ -641,7 +544,7 @@ export async function POST(
       generateBarReport({ service, tenantId, inspectionId, resolvedReportId, rawReportDump, insurer, lossType, now }),
       extractPropertyDetails({ service, tenantId, jobId: insp.job_id, rawReportDump }),
       generateRoofReport({ service, tenantId, inspectionId, jobId: insp.job_id, roofRawNotes, assessorName: userRow.name, insurer, lossType, now }),
-      parseAndInsertScope({ service, tenantId, resolvedQuoteId, scopeRooms, insurer, lossType }),
+      parseAndInsertScope({ service, tenantId, jobId: insp.job_id, resolvedQuoteId, scopeRooms, insurer, lossType }),
       finaliseFieldPhotos({
         service, tenantId, inspectionId, reportId: resolvedReportId,
         manifest: Array.isArray(photoManifest) ? photoManifest : [],

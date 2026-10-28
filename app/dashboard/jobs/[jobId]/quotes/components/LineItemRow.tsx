@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { fillQuantity } from '@/lib/scope-library/pricing'
+import { ScopeLibraryWording, type ScopeSearchResult } from '@/lib/scope-library/useScopeLibrary'
 import type { ScopeItem, ItemType } from '../hooks/useQuote'
 import type { Trade } from '../hooks/useTrades'
 import { DescriptionSearch } from './DescriptionSearch'
@@ -527,6 +528,7 @@ export function LineItemRow({
 }: LineItemRowProps) {
   const [estHours, setEstHours] = useState<number | null>(null)
   const [showMenu, setShowMenu] = useState(false)
+  const libraryWording = useContext(ScopeLibraryWording)
   const [localUnit, setLocalUnit] = useState(item.unit ?? '')
   const [localTrade, setLocalTrade] = useState(item.trade ?? '')
   const menuAnchorRef = useRef<HTMLDivElement>(null)
@@ -556,7 +558,7 @@ export function LineItemRow({
       let changes: Record<string, unknown>
       if (result.result_type === 'library') {
         changes = {
-          item_description: result.item_description ?? '',
+          item_description: fillQuantity(result.item_description ?? '', item.qty),
           rate_labour: result.rate_labour,
           rate_materials: result.rate_materials,
           trade: result.trade ?? '',
@@ -589,7 +591,21 @@ export function LineItemRow({
       setShowMenu(false)
       onUpdate(item.id, changes)
     },
-    [item.id, onUpdate]
+    [item.id, item.qty, onUpdate]
+  )
+
+  // A new quantity on a library line still in the library's wording refills its {QTY} placeholders
+  const handleQtyChange = useCallback(
+    (qty: number | null) => {
+      const changes: Record<string, unknown> = { qty }
+      const wording = item.scope_library_id ? libraryWording(item.scope_library_id) : null
+      if (wording && /\{QTY\}/i.test(wording)) {
+        const current = item.item_description ?? ''
+        if (current === wording || current === fillQuantity(wording, item.qty)) changes.item_description = fillQuantity(wording, qty)
+      }
+      onUpdate(item.id, changes)
+    },
+    [item.id, item.qty, item.scope_library_id, item.item_description, libraryWording, onUpdate]
   )
 
   const handleDescriptionChange = useCallback(
@@ -680,7 +696,7 @@ export function LineItemRow({
         <div style={{ ...col, justifyContent: 'flex-end' }}>
           <NumericCell
             value={item.qty}
-            onChange={v => onUpdate(item.id, { qty: v })}
+            onChange={handleQtyChange}
             disabled={isLocked}
             onNavigateNext={onNavigateNext}
           />

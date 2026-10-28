@@ -288,7 +288,7 @@ const NEW_ITEMS_SCHEMA = {
     type: 'object',
     properties: {
       ...ITEM_FIELDS,
-      library_item_id: { type: 'string', description: 'A scope library item to use (find_line_items with include_library).' },
+      library_item_id: { type: 'string', description: 'A scope library item to use (find_line_items with include_library), at the rates for this quote\'s insurer, with the qty filled into its wording.' },
       copy_from_item_id: { type: 'string', description: 'A line on an earlier quote to copy (find_line_items or get_quote).' },
     },
     required: ['room'],
@@ -315,7 +315,7 @@ async function addItems(quoteId: string, inputs: Record<string, unknown>[], ctx:
       const own = itemFields(input)
       if (!own.room) throw new QuoteEditError(`Item ${idx + 1} needs a room`, 400)
       const base: Record<string, unknown> = str(input.library_item_id)
-        ? await scopeItemFromLibrary(ctx.supabase, ctx.tenantId, str(input.library_item_id)!)
+        ? await scopeItemFromLibrary(ctx.supabase, ctx.tenantId, str(input.library_item_id)!, { quoteId, qty: own.qty as number | undefined })
         : str(input.copy_from_item_id)
           ? await scopeItemFromEarlierItem(ctx.supabase, ctx.tenantId, str(input.copy_from_item_id)!)
           : {}

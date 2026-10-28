@@ -32,7 +32,7 @@ interface FieldDraftSnapshot {
   customSafetyNotes?: string
   chips?: Record<string, boolean>
   commenceTime?: string
-  scopeRooms?: Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>
+  scopeRooms?: Array<{ id?: string; name: string; l: string; w: string; h: string; items: Array<string | { text?: string; qty?: string; libraryId?: string | null; unit?: string | null }> }>
   roofRawNotes?: string
   msWorksCompleted?: string
   msTempFixes?: string
@@ -664,8 +664,12 @@ function FieldAppSnapshotPanel({
                         {room.name || 'Unnamed room'}{dims ? <span style={{ fontWeight: 400, color: 'var(--subtle)', marginLeft: 6 }}>{dims}m</span> : null}
                       </div>
                       <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {room.items.filter(Boolean).map((item, j) => (
-                          <li key={j} style={{ fontSize: 12, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>{item}</li>
+                        {room.items.map(item => typeof item === 'string' ? { text: item } : item).filter(item => item?.text).map((item, j) => (
+                          <li key={j} style={{ fontSize: 12, color: 'var(--body)', fontFamily: 'DM Sans, sans-serif' }}>
+                            {item.text}
+                            {item.qty ? <span style={{ color: 'var(--subtle)' }}> × {item.qty}{item.unit ? ` ${item.unit}` : ''}</span> : null}
+                            {item.libraryId ? <span style={{ color: 'var(--subtle)', fontSize: 11 }}> · library</span> : null}
+                          </li>
                         ))}
                       </ul>
                     </div>

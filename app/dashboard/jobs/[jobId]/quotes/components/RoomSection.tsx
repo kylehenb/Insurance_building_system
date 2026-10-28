@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { ScopeItem } from '../hooks/useQuote'
-import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '@/lib/scope-library/useScopeLibrary'
 import type { Trade } from '../hooks/useTrades'
 import { LineItemRow } from './LineItemRow'
 

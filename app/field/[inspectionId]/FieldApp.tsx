@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { LOW_CONFIDENCE, MUD_MAP_LABEL, orderReportPhotos, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL } from '@/lib/photos/report-order'
+import { displayWording } from '@/lib/scope-library/pricing'
+import { useScopeLibrary } from '@/lib/scope-library/useScopeLibrary'
 import { processPhotoForUpload } from './photo-convert'
 import { REPORT_OPTIONS, type FieldTrade } from './report-options'
+import { ScopeItemRow, type FieldScopeItemState } from './ScopeItemRow'
 import { UploadBanner } from './UploadBanner'
 import { useFieldPhotos } from './useFieldPhotos'
 
@@ -39,11 +42,28 @@ interface InitialData {
   reportTrades: Record<string, FieldTrade[]>
 }
 
-interface ScopeItem { id: string; text: string }
+type ScopeItem = FieldScopeItemState
 interface ScopeRoom { id: string; name: string; l: string; w: string; h: string; items: ScopeItem[] }
 interface PhotoEntry { id: string; file: File; previewUrl: string; label: string; processing: boolean }
 
 function uid() { return Math.random().toString(36).slice(2) }
+
+function blankScopeItem(): ScopeItem { return { id: uid(), text: '', qty: '', libraryId: null, unit: null } }
+
+/** A saved scope item: the current shape, or a plain string from older drafts */
+function restoreScopeItem(saved: unknown): ScopeItem {
+  if (saved && typeof saved === 'object') {
+    const o = saved as Record<string, unknown>
+    return {
+      id: uid(), text: String(o.text ?? ''), qty: o.qty == null ? '' : String(o.qty),
+      libraryId: typeof o.libraryId === 'string' && o.libraryId ? o.libraryId : null,
+      unit: typeof o.unit === 'string' ? o.unit : null,
+    }
+  }
+  return { ...blankScopeItem(), text: String(saved ?? '') }
+}
+
+const savedScopeItem = (i: ScopeItem) => ({ text: i.text, qty: i.qty, libraryId: i.libraryId, unit: i.unit })
 
 interface SafetySignature { name: string; at: string }
 
@@ -87,6 +107,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
 
   // ─── Scope ────────────────────────────────────────────────────────────────
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
+  // The scope library at this job's insurer's prices, for the item search
+  const { search: searchLibrary } = useScopeLibrary({ jobId: initialData.jobId, libraryOnly: true })
 
   // ─── Notes ────────────────────────────────────────────────────────────────
   const [raw_report_notes, setRawReportNotes] = useState('')
@@ -176,7 +198,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   const collectDraft = useCallback(() => ({
     raw_report_notes,
     customSafetyNotes, chips, safetyDone, commenceTime, step, signature, internalReports,
-    scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
+    scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(savedScopeItem) })),
     roofRawNotes, roofPhotoContext,
     msWorksCompleted, msTempFixes, msHours,
     ldMethod, ldSource, ldLocation, ldReadings, ldFindings,
@@ -222,8 +244,8 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
     if (d.signature) setSignature(d.signature as SafetySignature)
     if (typeof d.step === 'number' && d.step > 1) setStep(d.step as number)
     if (d.scopeRooms) {
-      const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: string[] }>)
-      setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: r.items.map(text => ({ id: uid(), text })) })))
+      const rooms = (d.scopeRooms as Array<{ id?: string; name: string; l: string; w: string; h: string; items: unknown[] }>)
+      setScopeRooms(rooms.map(r => ({ id: r.id ?? uid(), name: r.name, l: r.l, w: r.w, h: r.h, items: (r.items ?? []).map(restoreScopeItem) })))
     }
     if (d.roofRawNotes) setRoofRawNotes(d.roofRawNotes as string)
     if (d.roofPhotoContext) setRoofPhotoContext(d.roofPhotoContext as string)
@@ -275,7 +297,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   const addRoom = () => {
-    setScopeRooms(prev => [...prev, { id: uid(), name: '', l: '', w: '', h: '', items: [{ id: uid(), text: '' }] }])
+    setScopeRooms(prev => [...prev, { id: uid(), name: '', l: '', w: '', h: '', items: [blankScopeItem()] }])
     armDraft()
   }
 
@@ -285,11 +307,11 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
   }
 
   const addScopeItem = (roomId: string) => {
-    setScopeRooms(prev => prev.map(r => r.id === roomId ? { ...r, items: [...r.items, { id: uid(), text: '' }] } : r))
+    setScopeRooms(prev => prev.map(r => r.id === roomId ? { ...r, items: [...r.items, blankScopeItem()] } : r))
   }
 
-  const updateScopeItem = (roomId: string, itemId: string, text: string) => {
-    setScopeRooms(prev => prev.map(r => r.id === roomId ? { ...r, items: r.items.map(i => i.id === itemId ? { ...i, text } : i) } : r))
+  const updateScopeItem = (roomId: string, itemId: string, changes: Partial<ScopeItem>) => {
+    setScopeRooms(prev => prev.map(r => r.id === roomId ? { ...r, items: r.items.map(i => i.id === itemId ? { ...i, ...changes } : i) } : r))
     armDraft()
   }
 
@@ -363,7 +385,7 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
       const scopeRoomsPayload = scopeRooms.map(r => ({
         room: r.name,
         l: r.l, w: r.w, h: r.h,
-        items: r.items.map(i => i.text).filter(Boolean),
+        items: r.items.filter(i => i.text.trim() || i.libraryId).map(savedScopeItem),
       }))
 
       // Inspection photos upload as they're added: wait for any still going (the bar shows progress)
@@ -663,28 +685,27 @@ export default function FieldApp({ initialData }: { initialData: InitialData }) 
                   <button style={{ background: 'none', border: 'none', color: 'var(--border)', fontSize: 16, cursor: 'pointer', padding: '0 4px', flexShrink: 0 }} onClick={() => removeRoom(room.id)}>×</button>
                 </div>
                 <div className="fa-room-body">
-                  {room.items.map(item => (
-                    <div key={item.id} className="fa-scope-row">
-                      <input
-                        className="fa-scope-input"
-                        type="text"
-                        placeholder="Scope item"
-                        value={item.text}
-                        onChange={e => updateScopeItem(room.id, item.id, e.target.value)}
-                        enterKeyHint="done"
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            pendingFocusRoomRef.current = room.id
-                            addScopeItem(room.id)
-                            armDraft()
-                          }
-                        }}
-                      />
-                      <button className="fa-scope-del" onClick={() => removeScopeItem(room.id, item.id)}>×</button>
-                    </div>
+                  {room.items.map((item, idx) => (
+                    <ScopeItemRow
+                      key={item.id}
+                      item={item}
+                      search={searchLibrary}
+                      onChange={changes => updateScopeItem(room.id, item.id, changes)}
+                      onPick={result => updateScopeItem(room.id, item.id, { text: displayWording(result.item_description ?? ''), libraryId: result.id, unit: result.unit })}
+                      onRemove={() => removeScopeItem(room.id, item.id)}
+                      onQtyEnter={() => {
+                        // On to the next item's description, or a new one at the end
+                        if (idx < room.items.length - 1) {
+                          document.querySelectorAll<HTMLInputElement>(`[data-room-id="${room.id}"] .fa-scope-input`)[idx + 1]?.focus()
+                          return
+                        }
+                        pendingFocusRoomRef.current = room.id
+                        addScopeItem(room.id)
+                        armDraft()
+                      }}
+                    />
                   ))}
-                  <button className="fa-add-btn" onClick={() => addScopeItem(room.id)}>+ Add Item</button>
+                  <button className="fa-add-btn" onClick={() => { pendingFocusRoomRef.current = room.id; addScopeItem(room.id) }}>+ Add Item</button>
                 </div>
               </div>
             ))}
