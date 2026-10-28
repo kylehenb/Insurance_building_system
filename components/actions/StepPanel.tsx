@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CardStep, CardWithContext } from '@/lib/actions/cards'
 import type { StepDetail } from '@/lib/actions/steps'
 import type { StepField } from '@/lib/actions/step-fields'
@@ -8,7 +8,8 @@ import type { StepField } from '@/lib/actions/step-fields'
 // A step on an action card, opened: what it will do in full (the note's
 // text, the order to lodge, the work order or documents and their email),
 // with its details editable before it runs. Saving changes the step, not the
-// job — that happens when the step is done. An order can be corrected
+// job — that happens when the step is done; Do steps on the card saves what's
+// still unsaved here first. An order can be corrected
 // straight away, as on the Insurer Orders page.
 
 type Values = Record<string, string | number | boolean | null>
@@ -29,10 +30,11 @@ interface Props {
   editable: boolean
   onCard(card: CardWithContext): void
   onMessage(text: string, error?: boolean): void
-  onDirty(dirty: boolean): void
+  /** Lets the card save what's changed here before it runs its steps */
+  registerFlush(stepId: string, flush: (() => Promise<void>) | null): void
 }
 
-export function StepPanel({ card, step, editable, onCard, onMessage, onDirty }: Props) {
+export function StepPanel({ card, step, editable, onCard, onMessage, registerFlush }: Props) {
   const [detail, setDetail] = useState<StepDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [values, setValues] = useState<Values>({})
@@ -61,9 +63,18 @@ export function StepPanel({ card, step, editable, onCard, onMessage, onDirty }: 
 
   const stepChanges = detail ? changed(values, valuesOf(detail.fields)) : {}
   const recordChanges = detail?.record ? changed(record, valuesOf(detail.record.fields)) : {}
-  const dirty = Object.keys(stepChanges).length > 0 || Object.keys(recordChanges).length > 0
-  useEffect(() => { onDirty(dirty) }, [dirty, onDirty])
-  useEffect(() => () => onDirty(false), [onDirty])
+  // Unsaved changes go when the card's steps are done (a failed save stops them)
+  const pending = useRef({ stepChanges, recordChanges })
+  pending.current = { stepChanges, recordChanges }
+  useEffect(() => {
+    if (!editable) return
+    registerFlush(step.id, async () => {
+      const { stepChanges: s, recordChanges: r } = pending.current
+      if (Object.keys(r).length) await post(`${base}/record`, { values: r })
+      if (Object.keys(s).length) onCard((await post(base, { args: s })).card)
+    })
+    return () => registerFlush(step.id, null)
+  }, [editable, base, step.id, registerFlush, onCard])
 
   async function saveStep() {
     setBusy('step')

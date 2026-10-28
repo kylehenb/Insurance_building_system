@@ -9,10 +9,12 @@ import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { SIGNATURE_LOGO_TOKEN } from '@/lib/email/rich-text'
 
 // An email step on an action card: the email as it will go — recipients,
-// subject, text and the company signature — and Edit, which opens it in the
-// Mail page's composer (Cc/Bcc, attachments, signature, quoted email,
-// schedule send). What's written there is a Gmail draft the step then sends
-// as it is; Send in the composer does just this step.
+// subject, text and the company signature. Its recipients, subject and text
+// are edited right there, saved on the step as you type (and before Do
+// steps). More options opens it in the Mail page's composer (Cc/Bcc,
+// attachments, formatting, signature, quoted email, schedule send); what's
+// written there is a Gmail draft the step then sends as it is, and Send in
+// the composer does just this step.
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
@@ -41,6 +43,10 @@ async function post(url: string, body: unknown) {
 
 const WHO: Record<string, string> = { reply: 'the sender (reply)', reply_all: 'everyone on the email (reply all)' }
 
+/** The fields edited in place, as the step's args */
+type Fields = { to: string; cc: string; subject: string; body: string }
+const SAVE_AFTER_MS = 700
+
 interface Props {
   card: CardWithContext
   step: CardStep
@@ -64,6 +70,43 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
   const saving = useRef<Promise<unknown>>(Promise.resolve())
   const base = `/api/actions/${card.id}/steps/${step.id}`
 
+  // Edited in place: what's typed, and what the step has saved
+  const fieldsOf = (): Fields => ({ to: str(step.args.to), cc: str(step.args.cc), subject: str(step.args.subject), body: str(step.args.body) })
+  const [fields, setFields] = useState<Fields>(fieldsOf)
+  const saved = useRef<Fields>(fields)
+  const typed = useRef<Fields>(fields)
+  typed.current = fields
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [state, setState] = useState<'saved' | 'saving' | null>(null)
+  const inPlace = editable && !composing && !step.draft
+
+  const saveFields = useCallback(async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    const now = typed.current
+    const changes = Object.fromEntries(Object.entries(now).filter(([k, v]) => v !== saved.current[k as keyof Fields]))
+    if (!Object.keys(changes).length) return
+    setState('saving')
+    saving.current = saving.current
+      .catch(() => {})
+      .then(() => post(base, { args: changes }))
+      .then(({ card: updated }) => { saved.current = now; setState('saved'); onCard(updated) })
+    await saving.current.catch(err => { setState(null); onError(err instanceof Error ? err.message : 'Could not save the email'); throw err })
+  }, [base, onCard, onError])
+
+  const edit = (k: keyof Fields, v: string) => {
+    setFields(f => ({ ...f, [k]: v }))
+    setState(null)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => { void saveFields().catch(() => {}) }, SAVE_AFTER_MS)
+  }
+
+  // Do steps saves what's typed first
+  useEffect(() => {
+    if (!inPlace) return
+    registerFlush(step.id, saveFields)
+    return () => registerFlush(step.id, null)
+  }, [inPlace, step.id, registerFlush, saveFields])
+
   useEffect(() => {
     let cancelled = false
     companySignature().then(s => { if (!cancelled) setSig(s) })
@@ -74,7 +117,7 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
   useEffect(() => {
     if (!composing) { setStart(null); return }
     let cancelled = false
-    fetch(`${base}/compose`)
+    saveFields().catch(() => {}).then(() => fetch(`${base}/compose`))
       .then(async r => {
         const body = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(body.error ?? 'Could not open the email')
@@ -167,6 +210,30 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
   const sendAt = str(a.send_at)
   const files = (Array.isArray(a.attach_photos) ? a.attach_photos.length : 0) + (Array.isArray(a.attach_files) ? a.attach_files.length : 0)
 
+  if (inPlace) {
+    return (
+      <div className="es es-edit-in">
+        <div className="es-head">
+          <label className="es-row"><span>To</span><input value={fields.to} placeholder={WHO[mode] ?? 'name@example.com'} onChange={e => edit('to', e.target.value)} onBlur={() => void saveFields().catch(() => {})} /></label>
+          {(fields.cc || mode === 'reply_all') && <label className="es-row"><span>Cc</span><input value={fields.cc} onChange={e => edit('cc', e.target.value)} onBlur={() => void saveFields().catch(() => {})} /></label>}
+          <label className="es-row"><span>Subject</span><input value={fields.subject} placeholder={mode === 'new' ? '(no subject)' : `Re: ${card.conversation?.subject ?? ''}`} onChange={e => edit('subject', e.target.value)} onBlur={() => void saveFields().catch(() => {})} /></label>
+          {sendAt && <div className="es-row"><span>Sends</span>{/[zZ]$/.test(sendAt) ? spokenSendAt(sendAt) : sendAt}</div>}
+        </div>
+        <div className="es-body">
+          <textarea className="es-area" aria-label="The email" value={fields.body} rows={Math.max(4, fields.body.split('\n').length + 1)}
+            onChange={e => edit('body', e.target.value)} onBlur={() => void saveFields().catch(() => {})} />
+          {sig?.html && <div className="es-sig" title="Added when sent — change it in Settings → Email Templates" dangerouslySetInnerHTML={{ __html: sig.html }} />}
+          {files > 0 && <div className="es-note">📎 {files} job photo{files === 1 ? '' : 's'} or file{files === 1 ? '' : 's'} attached</div>}
+          <div className="es-foot">
+            <span className="es-note">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved on the card' : 'Type to change it'}{mode !== 'new' ? ' · the email it answers is quoted underneath' : ''}</span>
+            <button type="button" className="ac-link" onClick={() => onComposing(true)} title="Cc/Bcc, attachments, formatting, schedule send">More options</button>
+          </div>
+        </div>
+        <style>{EMAIL_CSS}</style>
+      </div>
+    )
+  }
+
   return (
     <div className="es">
       <div className="es-head">
@@ -202,6 +269,13 @@ const EMAIL_CSS = `
   .es-sig { margin-top: 10px; padding-top: 8px; border-top: 0.5px dashed var(--line); opacity: .85; }
   .es-sig img { max-width: 100%; height: auto; }
   .es-note { font-size: 11px; color: var(--faint); margin-top: 6px; }
+  .es-edit-in .es-row { padding-right: 0; align-items: center; }
+  .es-edit-in .es-row input { flex: 1; min-width: 0; font: inherit; font-size: 12px; color: var(--ink); border: 0.5px solid transparent; border-radius: 5px; padding: 3px 6px; margin: -3px 0 -3px -6px; background: none; }
+  .es-edit-in .es-row input:hover { border-color: var(--line); }
+  .es-edit-in .es-row input:focus, .es-area:focus { outline: none; border-color: var(--gold); background: var(--paper); }
+  .es-area { display: block; width: calc(100% + 12px); margin: -4px -6px; font: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); border: 0.5px solid transparent; border-radius: 6px; padding: 4px 6px; background: none; resize: vertical; }
+  .es-area:hover { border-color: var(--line); }
+  .es-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 6px; }
   .es-compose { margin-top: 8px; }
   .es-compose.busy { opacity: .6; pointer-events: none; }
   .es-compose .cmp-inline { margin: 0; }

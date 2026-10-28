@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CATEGORIES, type CardCategory, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
@@ -9,7 +9,9 @@ import { FollowUps } from './FollowUps'
 
 // The Action cards view on the dashboard: everything that needs the office,
 // most urgent first — the AI's suggestions for incoming email (and, later,
-// texts and time rules), plus approvals waiting on the user.
+// texts and time rules), plus approvals waiting on the user. Cards stay put
+// as they change; when one is done or skipped, the next one takes its place
+// in view (its top, if you had scrolled down into the one that went).
 
 const POLL_MS = 15_000
 const VIEWS: { key: CardView; label: string }[] = [
@@ -27,6 +29,9 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   const [category, setCategory] = useState<CardCategory | null>(null)
   const [cards, setCards] = useState<CardWithContext[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  /** The card to bring into view once the one before it has left the list */
+  const scrollTo = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     if (view === 'upcoming') return
@@ -56,11 +61,26 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
         if (!prev) return prev
         const stillHere = (view === 'pending' ? ['queued', 'generating', 'pending', 'running', 'failed'].includes(card.status) : true)
           && (!category || card.category === category)
-        return stillHere ? prev.map(c => (c.id === card.id ? card : c)) : prev.filter(c => c.id !== card.id)
+        if (stillHere) return prev.map(c => (c.id === card.id ? card : c))
+        // Its top was scrolled out of view: the next card would show from its middle
+        const list = listRef.current, gone = document.getElementById(`ac-${card.id}`)
+        if (list && gone && gone.getBoundingClientRect().top < list.getBoundingClientRect().top) {
+          const i = prev.findIndex(c => c.id === card.id)
+          scrollTo.current = (prev[i + 1] ?? prev[i - 1])?.id ?? null
+        }
+        return prev.filter(c => c.id !== card.id)
       })
     }
     void load()
   }
+
+  useLayoutEffect(() => {
+    const id = scrollTo.current, list = listRef.current
+    if (!id || !list) return
+    scrollTo.current = null
+    const el = document.getElementById(`ac-${id}`)
+    if (el) list.scrollTo({ top: list.scrollTop + el.getBoundingClientRect().top - list.getBoundingClientRect().top - 12, behavior: 'smooth' })
+  }, [cards])
 
   return (
     <div className="av">
@@ -79,7 +99,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
           ))}
         </div>}
       </div>
-      <div className="av-list">
+      <div className="av-list" ref={listRef}>
         {view === 'upcoming' && <FollowUps onMessage={onToast} />}
         {view === 'pending' && <ApprovalsPanel />}
         {view !== 'upcoming' && cards === null && !error && <div className="mail-empty">Loading…</div>}
@@ -88,7 +108,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
           <div className="mail-empty">{view === 'pending' ? (category ? 'Nothing starred here.' : 'All caught up — nothing needs you right now.') : 'Nothing done yet.'}</div>
         )}
         {view !== 'upcoming' && cards?.map(card => (
-          <ActionCardView key={`${card.id}:${card.updated_at}`} card={card} onChanged={changed} onOpenConversation={onOpenConversation} />
+          <ActionCardView key={card.id} card={card} onChanged={changed} onOpenConversation={onOpenConversation} />
         ))}
       </div>
       <style>{`
@@ -154,7 +174,7 @@ export function ConversationCard({ threadId, onToast, onChanged, version }: {
     <div className="cc">
       <div className="jp-label">Next steps</div>
       {card ? (
-        <ActionCardView key={`${card.id}:${card.updated_at}`} card={card} compact onChanged={(c, m, e) => {
+        <ActionCardView key={card.id} card={card} compact onChanged={(c, m, e) => {
           onToast(m, e)
           if (c) setCard(c)
           else void load()
@@ -194,7 +214,7 @@ export function JobCards({ jobId }: { jobId: string }) {
       {cards?.length === 0 && <div className="jc-empty">Nothing to do on this job — all clear.</div>}
       {cards?.map(card => (
         <ActionCardView
-          key={`${card.id}:${card.updated_at}`}
+          key={card.id}
           card={card}
           onChanged={(c, text, error) => {
             setMessage({ text, error })

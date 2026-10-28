@@ -12,8 +12,9 @@ import { RemindMe } from './RemindMe'
 
 // One action card: its star (category — click to change), what the email
 // says (and the email itself, opened in place), the AI's suggested steps —
-// each can be unticked, opened to see exactly what it will do, and changed;
-// emails open in the Mail page's composer — and Do steps / Skip. Doing runs
+// each can be unticked, opened to see exactly what it will do, and changed
+// right there (an email's text too; its composer for more) — and Do steps /
+// Skip, which first saves whatever is still being changed on the card. Doing runs
 // the ticked steps through the user's own permissions (lib/actions/confirm.ts).
 // "Tell the AI what to change" re-suggests the steps with the office's
 // instructions — the whole card, or one step's Change (the rest stay); an
@@ -67,7 +68,6 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   // Opened steps; the first email to send starts open
   const [shown, setShown] = useState<Set<string>>(() => new Set(card.steps.filter(s => s.kind === 'email' && s.status !== 'done').slice(0, 1).map(s => s.id)))
   const [composing, setComposing] = useState<string | null>(null)
-  const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [showWhy, setShowWhy] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -79,23 +79,28 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const [busy, setBusy] = useState<string | null>(null)
   const flushers = useRef(new Map<string, () => Promise<void>>())
 
+  // New or remade steps (the card stays mounted as it changes): new ones
+  // start ticked, the office's unticks are kept, done ones drop off
+  const stepIds = card.steps.map(s => `${s.id}:${s.status ?? ''}`).join()
+  const seen = useRef(new Set(card.steps.map(s => s.id)))
+  useEffect(() => {
+    const fresh = card.steps.filter(s => !seen.current.has(s.id))
+    seen.current = new Set(card.steps.map(s => s.id))
+    const todo = new Set(card.steps.filter(s => s.status !== 'done' && s.status !== 'skipped').map(s => s.id))
+    setTicked(t => new Set([...t, ...fresh.map(s => s.id)].filter(id => todo.has(id))))
+    // A remade card opens its first email, as a new one does
+    if (fresh.length) setShown(x => {
+      const kept = [...x].filter(id => seen.current.has(id))
+      const email = fresh.find(s => s.kind === 'email')
+      return new Set(email && !kept.length ? [...kept, email.id] : kept)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the steps themselves change
+  }, [stepIds])
+
   const registerFlush = useCallback((stepId: string, flush: (() => Promise<void>) | null) => {
     if (flush) flushers.current.set(stepId, flush)
     else flushers.current.delete(stepId)
   }, [])
-  const markDirty = useCallback((stepId: string, on: boolean) => setDirty(d => {
-    if (d.has(stepId) === on) return d
-    const n = new Set(d)
-    if (on) n.add(stepId)
-    else n.delete(stepId)
-    return n
-  }), [])
-  const dirtyHandlers = useRef(new Map<string, (on: boolean) => void>())
-  const onDirtyFor = (stepId: string) => {
-    let h = dirtyHandlers.current.get(stepId)
-    if (!h) dirtyHandlers.current.set(stepId, h = (on: boolean) => markDirty(stepId, on))
-    return h
-  }
   const toggleShown = (id: string) => setShown(x => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const message = useCallback((text: string, error?: boolean) => onChanged(null, text, error), [onChanged])
 
@@ -135,10 +140,14 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     onChanged(updated, instructions ? 'Steps re-suggested with your instructions.' : 'Suggestions updated.')
   })
   const changeStep = (stepId: string, instructions: string) => run(`change:${stepId}`, async () => {
+    const at = card.steps.findIndex(s => s.id === stepId)
     const { card: updated } = await post('/api/actions/suggest', { cardId: card.id, stepId, feedback: instructions })
     setChanging(null)
     setStepFeedback('')
     onChanged(updated, 'Step changed with your instructions.')
+    // Keep the changed step (what took its place) in view
+    const now = (updated as CardWithContext).steps[at]
+    if (now) requestAnimationFrame(() => document.getElementById(`ac-step-${now.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
   })
 
   const toDo = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').length
@@ -149,7 +158,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const redoable = card.source === 'email' ? !!card.source_ref : card.source === 'followup' && live
 
   return (
-    <article className={`ac${compact ? ' compact' : ''}${card.priority && card.priority >= 80 ? ' high' : ''} st-${card.status}`}>
+    <article id={`ac-${card.id}`} className={`ac${compact ? ' compact' : ''}${card.priority && card.priority >= 80 ? ' high' : ''} st-${card.status}`}>
       <header className="ac-head">
         {live && !compact && <StarButton category={card.category} cycleOff={false} disabled={!!busy} onCycle={recategorise} />}
         <div className="ac-titles">
@@ -195,7 +204,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                 const editable = open && !done
                 const isShown = shown.has(step.id) || composing === step.id
                 return (
-                  <li key={step.id} className={`ac-step k-${step.kind}${step.status ? ` s-${step.status}` : ''}`}>
+                  <li key={step.id} id={`ac-step-${step.id}`} className={`ac-step k-${step.kind}${step.status ? ` s-${step.status}` : ''}`}>
                     <div className="ac-step-row">
                       <label className="ac-step-tick">
                         <input type="checkbox" disabled={!open || done} checked={done || ticked.has(step.id)}
@@ -210,11 +219,8 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                           <button type="button" className="ac-link" disabled={!!busy} onClick={() => { setChanging(step.id); setStepFeedback('') }}
                             title="Tell the AI what this step should do instead — the other steps stay">Change</button>
                         )}
-                        {step.kind === 'email' && editable && composing !== step.id && (
-                          <button type="button" className="ac-link" onClick={() => { setShown(x => new Set(x).add(step.id)); setComposing(step.id) }}>Edit</button>
-                        )}
                         <button type="button" className="ac-link" onClick={() => { if (composing === step.id) setComposing(null); toggleShown(step.id) }}>
-                          {isShown ? 'Hide' : step.kind === 'email' || !editable ? 'View' : 'Edit'}
+                          {isShown ? 'Hide' : editable ? 'Edit' : 'View'}
                         </button>
                       </span>
                     </div>
@@ -250,7 +256,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                         registerFlush={registerFlush}
                       />
                     ) : (
-                      <StepPanel card={card} step={step} editable={editable} onCard={setEdited} onMessage={message} onDirty={onDirtyFor(step.id)} />
+                      <StepPanel card={card} step={step} editable={editable} onCard={setEdited} onMessage={message} registerFlush={registerFlush} />
                     ))}
                     {step.result && (step.status === 'failed' || done) && <div className="ac-result">{step.result}</div>}
                   </li>
@@ -302,13 +308,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
 
           <footer className="ac-foot">
             {open && card.steps.length > 0 && (
-              <button className="ac-btn primary" disabled={!!busy || toDo === 0 || dirty.size > 0} onClick={confirm}
-                title={dirty.size ? 'Save or undo your changes to the steps first' : undefined}>
+              <button className="ac-btn primary" disabled={!!busy || toDo === 0} onClick={confirm}>
                 {busy === 'confirm' ? 'Working…' : toDo === 1 ? 'Do this step' : `Do ${toDo} steps`}
               </button>
             )}
             {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
-            {dirty.size > 0 && <span className="ac-dirty">Save or undo your step changes first</span>}
             {card.status !== 'running' && (
               <span className="ac-foot-right">
                 {!reminding && (
@@ -376,7 +380,7 @@ const CARD_CSS = `
   .ac-ask textarea { font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 0.5px solid var(--line-strong); border-radius: 6px; background: var(--paper); resize: vertical; }
   .ac-ask textarea:focus { outline: none; border-color: var(--gold); }
   .ac-ask-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .ac-ask-note, .ac-dirty { font-size: 11px; color: var(--faint); }
+  .ac-ask-note { font-size: 11px; color: var(--faint); }
   .ac-result { font-size: 12px; color: var(--grey-600); margin-top: 4px; white-space: pre-wrap; }
   .ac-error { margin-top: 10px; font-size: 12px; color: var(--danger-dark); background: var(--danger-bg); border-radius: 6px; padding: 6px 10px; }
   .ac-outcome { margin-top: 10px; font-size: 12px; color: var(--subtle); }
