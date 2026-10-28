@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { ScopeLibraryItem, ScopeLibraryOverride, PricingTiers } from '@/lib/types/scope-library'
 import type { Database } from '@/lib/supabase/database.types'
+import { toScopeLibraryItem } from '@/lib/scope-library/rows'
 
 type OverrideRow = Database['public']['Tables']['scope_library_overrides']['Row']
 type LibraryRow = Database['public']['Tables']['scope_library']['Row']
@@ -101,26 +102,7 @@ export async function GET(request: NextRequest) {
     overridesByItemId.set(ov.scope_library_id, existing)
   }
 
-  const items: ScopeLibraryItem[] = libraryRows.map((row) => ({
-    id: row.id,
-    tenant_id: row.tenant_id,
-    trade: row.trade,
-    keyword: row.keyword,
-    site_notes: row.site_notes,
-    item_description: row.item_description,
-    unit: row.unit,
-    labour_per_unit: row.labour_per_unit,
-    materials_per_unit: row.materials_per_unit,
-    total_per_unit: row.total_per_unit,
-    pricing_tiers: row.pricing_tiers as PricingTiers | null,
-    estimated_hours: row.estimated_hours,
-    price_updated_at: row.price_updated_at,
-    is_draft: row.is_draft ?? false,
-    draft_source_quote_id: row.draft_source_quote_id,
-    draft_source_job_ref: row.draft_source_job_ref,
-    updated_at: row.updated_at,
-    overrides: overridesByItemId.get(row.id) ?? [],
-  }))
+  const items: ScopeLibraryItem[] = libraryRows.map((row) => toScopeLibraryItem(row, overridesByItemId.get(row.id) ?? []))
 
   return NextResponse.json(items)
 }
@@ -179,26 +161,7 @@ export async function POST(request: NextRequest) {
   }
 
   const row = data as LibraryRow
-  const item: ScopeLibraryItem = {
-    id: row.id,
-    tenant_id: row.tenant_id,
-    trade: row.trade,
-    keyword: row.keyword,
-    site_notes: row.site_notes,
-    item_description: row.item_description,
-    unit: row.unit,
-    labour_per_unit: row.labour_per_unit,
-    materials_per_unit: row.materials_per_unit,
-    total_per_unit: row.total_per_unit,
-    pricing_tiers: row.pricing_tiers as PricingTiers | null,
-    estimated_hours: row.estimated_hours,
-    price_updated_at: row.price_updated_at,
-    is_draft: row.is_draft ?? false,
-    draft_source_quote_id: row.draft_source_quote_id,
-    draft_source_job_ref: row.draft_source_job_ref,
-    updated_at: row.updated_at,
-    overrides: [],
-  }
+  const item: ScopeLibraryItem = toScopeLibraryItem(row)
 
   return NextResponse.json(item, { status: 201 })
 }

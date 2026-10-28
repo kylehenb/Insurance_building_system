@@ -41,6 +41,8 @@ export interface ScopeLibraryItem {
   estimated_hours: number | null
   price_updated_at: string | null
   is_draft: boolean
+  /** Only for this insurer (e.g. "Midcity"); null for every insurer */
+  insurer_specific: string | null
   draft_source_quote_id: string | null
   draft_source_job_ref: string | null
   updated_at: string | null

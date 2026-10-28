@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { loadJobInsurer, loadScopeCatalogue } from '@/lib/scope-library/catalogue'
 
 function formatRefDate(isoStr: string | null): string | null {
   if (!isoStr) return null
@@ -18,20 +19,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // ── Library items ────────────────────────────────────────────────────────
-  const { data: libData, error: libError } = await supabase
-    .from('scope_library')
-    .select(
-      'id, insurer_specific, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, total_per_unit, trade_rate_total, estimated_hours'
-    )
-    .eq('tenant_id', tenantId)
-    .neq('approval_status', 'archived')
-    .order('item_description')
+  // ── Library items: what this job can pick, at its insurer's prices ──────
+  const jobId = req.nextUrl.searchParams.get('jobId')
+  let catalogue
+  try {
+    catalogue = await loadScopeCatalogue(supabase, tenantId, await loadJobInsurer(supabase, tenantId, jobId))
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not load the scope library' }, { status: 500 })
+  }
 
-  if (libError) return NextResponse.json({ error: libError.message }, { status: 500 })
-
-  const libraryResults = (libData ?? []).map(item => ({
-    result_type: 'library' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.labour_per_unit, rate_materials: item.materials_per_unit, rate_total: item.total_per_unit, trade: item.trade, keyword: item.keyword, insurer_specific: item.insurer_specific, trade_rate_total: item.trade_rate_total, estimated_hours: item.estimated_hours, quote_ref: null, job_number: null, reference_date: null,
+  const libraryResults = catalogue.map(item => ({
+    result_type: 'library' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.rate_labour, rate_materials: item.rate_materials, rate_total: item.rate_labour == null && item.rate_materials == null ? null : (item.rate_labour ?? 0) + (item.rate_materials ?? 0), trade: item.trade, keyword: item.keyword, insurer_specific: item.insurer_specific, pending: item.pending, trade_rate_total: item.trade_rate_total, estimated_hours: item.estimated_hours, quote_ref: null, job_number: null, reference_date: null,
   }))
 
   // ── Reference items from scope_items ─────────────────────────────────────
@@ -87,11 +85,12 @@ export async function GET(req: NextRequest) {
     const quote = quoteMap.get(item.quote_id ?? '')
     const jobNumber = quote ? (jobMap.get(quote.job_id) ?? null) : null
     return {
-      result_type: 'reference' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.rate_labour, rate_materials: item.rate_materials, rate_total: item.rate_total, trade: item.trade, keyword: null, insurer_specific: null, trade_rate_total: null, estimated_hours: null, quote_ref: quote?.quote_ref ?? null, job_number: jobNumber, reference_date: formatRefDate(item.created_at),
+      result_type: 'reference' as const, id: item.id, item_description: item.item_description, unit: item.unit, rate_labour: item.rate_labour, rate_materials: item.rate_materials, rate_total: item.rate_total, trade: item.trade, keyword: null, insurer_specific: null, pending: false, trade_rate_total: null, estimated_hours: null, quote_ref: quote?.quote_ref ?? null, job_number: jobNumber, reference_date: formatRefDate(item.created_at),
     }
   })
 
+  // Not cached: a change in the scope library shows on the next search
   return NextResponse.json([...libraryResults, ...referenceResults], {
-    headers: { 'Cache-Control': 'private, max-age=300' },
+    headers: { 'Cache-Control': 'no-store' },
   })
 }

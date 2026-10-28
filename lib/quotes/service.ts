@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isPreliminary, preliminaryRate } from '@/lib/quotes/preliminaries'
+import { loadJobInsurer, loadScopeCatalogue, quoteJobId } from '@/lib/scope-library/catalogue'
+import { fillQuantity } from '@/lib/scope-library/pricing'
 
 // Creating and editing quotes and their line items (scope_items): new quote,
 // duplicate, quote details and status (approval creates the work orders and
@@ -388,17 +390,16 @@ export async function repricePreliminaries(supabase: Client, tenantId: string, q
 
 /**
  * A line's fields taken from a scope library item, as picking it in the
- * editor's description search does.
+ * editor's description search does: the wording and rates for the quote's
+ * insurer (lib/scope-library), with {QTY} filled in when a quantity is given.
  */
-export async function scopeItemFromLibrary(supabase: Client, tenantId: string, libraryId: string) {
-  const { data: lib, error } = await supabase
-    .from('scope_library')
-    .select('id, trade, keyword, item_description, unit, labour_per_unit, materials_per_unit, trade_rate_total')
-    .eq('id', libraryId).eq('tenant_id', tenantId).neq('approval_status', 'archived').maybeSingle()
-  if (error) throw error
+export async function scopeItemFromLibrary(supabase: Client, tenantId: string, libraryId: string, opts: { quoteId?: string; qty?: number | null } = {}) {
+  const jobId = opts.quoteId ? await quoteJobId(supabase, tenantId, opts.quoteId) : null
+  const catalogue = await loadScopeCatalogue(supabase, tenantId, await loadJobInsurer(supabase, tenantId, jobId))
+  const lib = catalogue.find(i => i.id === libraryId)
   if (!lib) throw new QuoteEditError('Library item not found', 404)
   return {
-    item_description: lib.item_description ?? '', rate_labour: lib.labour_per_unit, rate_materials: lib.materials_per_unit,
+    item_description: fillQuantity(lib.item_description, opts.qty), rate_labour: lib.rate_labour, rate_materials: lib.rate_materials,
     trade: lib.trade ?? '', keyword: lib.keyword ?? '', unit: lib.unit ?? '', scope_library_id: lib.id,
     is_custom: false, is_reference: false, library_writeback_approved: false, trade_rate_total: lib.trade_rate_total ?? null,
   }

@@ -2141,14 +2141,16 @@ The dashboard (`/dashboard`) is the primary work surface for office-based users.
 
 ### WF-6: Quote — Build, Review, Versioning & Approval ✅ LOCKED
 
-#### Scope library matching (AI, on field app submit)
-- AI reads structured scope notes from field app + checks the job's insurer
-- Matches against `scope_library` using both `keyword` and `item_description` columns
-- Insurer-specific rows always win over null (default) rows when both exist
-- High-confidence match → pulls library item with correct insurer variant
-- For split-insurer: AI selects both rows sharing a `pair_id` and creates two `scope_items` rows
-- Low-confidence match → AI creates a custom item at $0; split into paired rows if insurer requires it
-- Quantities from field app scope notes populate `qty` and fill `[{QTY}]` placeholders
+#### Scope library — one rule everywhere (`lib/scope-library/`)
+- **Which items, at what price** (`pricing.ts` `buildCatalogue`, loaded by `catalogue.ts` `loadScopeCatalogue` for a job's insurer from `loadJobInsurer` — the job's insurer client, or the insurer named in `jobs.insurer`): archived rows out; a row with `insurer_specific` (e.g. "Midcity") only for that insurer, blank/"Default" for all; a standard row is dropped where the insurer has its own row with the same keyword; `scope_library_overrides` for the insurer replace rates and wording. A total-only price goes on labour. Units normalised to the editor's (m², m³, lm, ea, hr, set). Used by the field app's search, field submission, the quote editor's search (`GET /api/scope-library/search?jobId=`, not cached) and `scopeItemFromLibrary` (voice connector).
+- **Fuzzy search** (`search.ts`, Fuse): every typed word must fuzzily match the description, keyword or trade, in any order; whole-word hits rank first, then the insurer's own items. Shared hook `useScopeLibrary` (reloads when the tab comes back into view).
+- **`{QTY}` placeholders** are filled from the line's quantity (`fillQuantity`): on a field submit, on a library pick with a quantity, and in the quote editor when the quantity changes on a line still in the library's wording.
+- Items saved from a quote (`approval_status = 'pending'`) show as drafts to approve in Settings → Scope Library; Settings shows and sets "Only for insurer" (`insurer_specific`).
+
+#### Field app scope → quote (on field app submit)
+- Each scope item is a description plus a quantity. Typing searches the library (job's insurer prices); picking a result fills the description and jumps to the quantity; Return on a custom description also jumps to the quantity; Return on the quantity goes to the next item (or a new one). Items are saved as `{ text, qty, libraryId, unit }` (older drafts: plain strings).
+- On submit (`lib/scope-library/field-scope.ts` `buildFieldScopeLines`): a library pick goes straight onto the quote — library wording with the qty filled in, unit, trade and the insurer's rates — no AI.
+- Custom items go to the AI (`scope_field_parse` prompt, its `${libraryText}` / `{library}` replaced with the numbered library): it matches a library item (`libId`) — then priced exactly like a pick — or writes a new line in the library's style, added at $0 (`is_custom`). The inspector's quantity wins over one read from the text. If the AI fails, the notes go on as typed at $0.
 
 #### Quote editor (front end — `/dashboard/quotes/[quoteId]`)
 - Room-grouped line items: Description, QTY, Labour/Unit, Materials/Unit, Trade, Line Total
@@ -2647,7 +2649,7 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 | `find_line_items(query, job_number?, include_library?)` | read | `findLineItems` (`lib/quotes/service.ts`) | Lines on earlier quotes (newest first, 15) whose description has every word, with job, quote ref and rates; optionally scope library items. Their ids feed `copy_from_item_id` / `library_item_id` |
 | `create_quote(job_number, copy_items_from_quote_id?, items?, notes?)` | change (`jobs.edit`) | `createQuote`, `copyScopeItems`, `addScopeItem`, `repricePreliminaries` (also `POST /api/quotes`, `…/clone`) | New draft at the client's builder's margin, `Q-<job>-<n>`. Copied lines (any job's quote) come in with approval reset to pending; added lines as in `edit_quote_items` |
 | `update_quote(quote_id, status?, approved_item_ids?, reason?, notes?, builders_margin_pct?)` | change (`jobs.edit`) | `setQuoteStatus`, `updateQuote` (also `PATCH /api/quotes/[id]`) | The Quotes tab's buttons: `ready` locks, `draft` unlocks, `approved` / `partially_approved` (chosen items approved, the rest declined) lock, record the approved amount, create the unplaced work orders and recompute the stage; `rejected` locks and saves the reason in `approval_notes`. `sent` only via `send_documents`. Margin/notes on a locked quote refused unless unlocking in the same call |
-| `edit_quote_items(quote_id, add?, update?, remove?)` | change (`jobs.edit`) | `addScopeItem`, `updateScopeItem`, `removeScopeItem`, `scopeItemFromLibrary`, `scopeItemFromEarlierItem`, `repricePreliminaries` | As the editor: totals from `scopeItemTotals`, a library pick or earlier line fills description/unit/trade/rates (a new description makes it custom), preliminaries re-priced with `preliminaryRate` (`lib/quotes/preliminaries.ts`, shared with `useQuote`). Locked quotes refused (`quoteItemsLockedReason`). Stops at the first failure and says how far it got |
+| `edit_quote_items(quote_id, add?, update?, remove?)` | change (`jobs.edit`) | `addScopeItem`, `updateScopeItem`, `removeScopeItem`, `scopeItemFromLibrary`, `scopeItemFromEarlierItem`, `repricePreliminaries` | As the editor: totals from `scopeItemTotals`, a library pick fills description (qty filled into `{QTY}`)/unit/trade and the quote's insurer's rates (`lib/scope-library`), an earlier line fills description/unit/trade/rates (a new description makes it custom), preliminaries re-priced with `preliminaryRate` (`lib/quotes/preliminaries.ts`, shared with `useQuote`). Locked quotes refused (`quoteItemsLockedReason`). Stops at the first failure and says how far it got |
 | `get_invoice(invoice_id? \| invoice_number? \| job_number?)` | read | — | Type, status, date, lines (charged or not), deductions, margin, totals, accounting status; warnings (voided, already sent — copies don't change, paid, $0). With only a job: its outbound, unvoided invoices. A voided one says when and why |
 | `create_invoice(job_number, type, report_id?, excess_amount_inc_gst?, lines?)` | change (`invoices.manage`) | `generateInvoice`, `addInvoiceLine` | The invoice buttons: report types need `report_id`; `custom` starts empty and takes `lines`. Draft only — sending is `send_documents` |
 | `update_invoice(invoice_id, issued_date?, notes?, builders_margin_pct?)` | change (`invoices.manage`) | `updateInvoice` (`lib/invoices/edit.ts`, also `PATCH /api/invoices/[id]`) | Date only while draft; a new margin re-totals. No status change here (sent = `send_documents`) |
@@ -2705,9 +2707,9 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 ## 11. AI Features
 
 ### Scope parsing
-- Input: structured scope items from field app (room/item/notes)
-- Model: claude-sonnet-4-20250514
-- Output: structured array of scope_items matched against scope_library entries
+- Input: the field app's custom scope items (room, text, quantity); library picks skip the AI (WF-6 "Field app scope → quote")
+- Model: `claude-haiku-5-5` (field submit's `FIELD_AI_MODEL`)
+- Output: per note, a matched library item or a new line in the library's style at $0
 - Fires automatically on field app submit
 - Saved to `scope_items` table; quote status auto-updates to `complete` when done
 

@@ -5,6 +5,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { ScopeLibraryItem, PricingTiers } from '@/lib/types/scope-library'
 import type { Database } from '@/lib/supabase/database.types'
+import { isStandardTag } from '@/lib/scope-library/pricing'
+import { toScopeLibraryItem } from '@/lib/scope-library/rows'
 
 type LibraryRow = Database['public']['Tables']['scope_library']['Row']
 
@@ -37,6 +39,7 @@ export async function PATCH(
     total_per_unit?: number | null
     estimated_hours?: number | null
     site_notes?: string | null
+    insurer_specific?: string | null
     pricing_tiers?: PricingTiers | null
     price_updated_at?: string | null
     is_draft?: boolean | null
@@ -94,6 +97,8 @@ export async function PATCH(
   if (body.total_per_unit !== undefined) updatePayload.total_per_unit = body.total_per_unit
   if (body.estimated_hours !== undefined) updatePayload.estimated_hours = body.estimated_hours
   if (body.site_notes !== undefined) updatePayload.site_notes = body.site_notes
+  // Blank or "Default" means every insurer
+  if (body.insurer_specific !== undefined) updatePayload.insurer_specific = isStandardTag(body.insurer_specific) ? null : body.insurer_specific!.trim()
   if (body.pricing_tiers !== undefined) {
     updatePayload.pricing_tiers = body.pricing_tiers as Database['public']['Tables']['scope_library']['Update']['pricing_tiers']
   }
@@ -116,26 +121,7 @@ export async function PATCH(
   }
 
   const row = updatedRow as LibraryRow
-  const item: ScopeLibraryItem = {
-    id: row.id,
-    tenant_id: row.tenant_id,
-    trade: row.trade,
-    keyword: row.keyword,
-    site_notes: row.site_notes,
-    item_description: row.item_description,
-    unit: row.unit,
-    labour_per_unit: row.labour_per_unit,
-    materials_per_unit: row.materials_per_unit,
-    total_per_unit: row.total_per_unit,
-    pricing_tiers: row.pricing_tiers as PricingTiers | null,
-    estimated_hours: row.estimated_hours,
-    price_updated_at: row.price_updated_at,
-    is_draft: row.is_draft ?? false,
-    draft_source_quote_id: row.draft_source_quote_id,
-    draft_source_job_ref: row.draft_source_job_ref,
-    updated_at: row.updated_at,
-    overrides: [],
-  }
+  const item: ScopeLibraryItem = toScopeLibraryItem(row)
 
   return NextResponse.json(item)
 }

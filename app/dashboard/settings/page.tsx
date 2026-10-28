@@ -130,7 +130,7 @@ export default async function SettingsPage() {
     },
     {
       name: 'Scope Library',
-      route: '/dashboard/settings/scope-library',
+      route: '/dashboard/scope-library',
       description: 'View and edit the scope item library used for AI quote generation',
       icon: <BookOpen className="w-4 h-4" />,
     },

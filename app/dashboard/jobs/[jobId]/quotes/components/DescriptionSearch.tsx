@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { ScopeSearchResult } from '../hooks/useScopeLibrary'
+import type { ScopeSearchResult } from '@/lib/scope-library/useScopeLibrary'
 
 interface DescriptionSearchProps {
   value: string
@@ -38,10 +38,13 @@ export function DescriptionSearch({
   const internalRef = useRef<HTMLTextAreaElement>(null)
   const textareaRef = inputRef ?? internalRef
   const isFocusedRef = useRef(false)
+  // After a pick, take the line's description as saved (its {QTY} filled in) even while focused
+  const justSelectedRef = useRef(false)
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const v = e.target.value
+      justSelectedRef.current = false
       setLocal(v)
 
       if (v.length >= 2) {
@@ -66,6 +69,7 @@ export function DescriptionSearch({
       setResults([])
       setNoMatch(false)
       setActiveIdx(-1)
+      justSelectedRef.current = true
       onSelect(item)
     },
     [onSelect]
@@ -112,12 +116,13 @@ export function DescriptionSearch({
         if (!containerRef.current?.contains(document.activeElement)) {
           setOpen(false)
           setActiveIdx(-1)
-          onChange(local)
+          // Only a real edit counts: leaving a library pick unchanged keeps it linked to the library
+          if (local !== (value ?? '')) onChange(local)
           onBlur?.()
         }
       }, 160)
     },
-    [local, onChange, onBlur]
+    [local, value, onChange, onBlur]
   )
 
   useEffect(() => {
@@ -132,7 +137,7 @@ export function DescriptionSearch({
   }, [])
 
   useEffect(() => {
-    if (!isFocusedRef.current) {
+    if (!isFocusedRef.current || justSelectedRef.current) {
       setLocal(value ?? '')
     }
   }, [value])
@@ -239,6 +244,9 @@ export function DescriptionSearch({
                   )}
                   {item.insurer_specific && (
                     <span style={{ fontSize: 11, color: 'var(--tan)' }}>· {item.insurer_specific}</span>
+                  )}
+                  {item.pending && (
+                    <span style={{ fontSize: 11, color: 'var(--warning)' }}>· awaiting approval</span>
                   )}
                   {item.rate_labour != null && (
                     <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Mono, monospace' }}>

@@ -3,8 +3,9 @@ import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { permissionDenied } from '@/lib/permissions/http'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
-import type { ScopeLibraryItem, PricingTiers } from '@/lib/types/scope-library'
+import type { ScopeLibraryItem } from '@/lib/types/scope-library'
 import type { Database } from '@/lib/supabase/database.types'
+import { toScopeLibraryItem } from '@/lib/scope-library/rows'
 
 type LibraryRow = Database['public']['Tables']['scope_library']['Row']
 
@@ -43,26 +44,7 @@ export async function POST(
   }
 
   const row = data as LibraryRow
-  const item: ScopeLibraryItem = {
-    id: row.id,
-    tenant_id: row.tenant_id,
-    trade: row.trade,
-    keyword: row.keyword,
-    site_notes: row.site_notes,
-    item_description: row.item_description,
-    unit: row.unit,
-    labour_per_unit: row.labour_per_unit,
-    materials_per_unit: row.materials_per_unit,
-    total_per_unit: row.total_per_unit,
-    pricing_tiers: row.pricing_tiers as PricingTiers | null,
-    estimated_hours: row.estimated_hours,
-    price_updated_at: row.price_updated_at,
-    is_draft: row.is_draft ?? false,
-    draft_source_quote_id: row.draft_source_quote_id,
-    draft_source_job_ref: row.draft_source_job_ref,
-    updated_at: row.updated_at,
-    overrides: [],
-  }
+  const item: ScopeLibraryItem = toScopeLibraryItem(row)
 
   return NextResponse.json(item)
 }
