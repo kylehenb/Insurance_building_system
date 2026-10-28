@@ -154,7 +154,7 @@ export const replyToEmailTool: McpTool = {
   name: 'reply_to_email',
   title: 'Reply to email',
   description: [
-    'Replies to an incoming email in the same conversation, to whoever sent it, from the office address — like the Reply box in the app — and records it on the job.',
+    'Replies to an incoming email in the same conversation, to whoever sent it, from the office address, with the company signature and the email quoted underneath as a Gmail reply has — like the Reply box in the app — and records it on the job.',
     'Write the reply as plain text in the user\'s words (a short greeting and sign-off are fine; don\'t add commitments they didn\'t make).',
     'ONLY call this after reading back who it goes to and the full reply, and the user has clearly said yes.',
     'attach_photos ("2", "45-47", a label) / attach_files / attach_documents attach the email\'s job\'s photos, files and quotes/reports/invoices (job_number if the email isn\'t on a job); say which in the read-back.',

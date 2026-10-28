@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { Readable } from 'stream'
 import type { gmail_v1 } from 'googleapis'
 import { getGmailClient } from '@/lib/gmail/client'
-import { buildEmailRaw, formatFromHeader, type EmailAttachment } from '@/lib/email/build-raw'
+import { buildEmailRaw, ensureAngleBrackets, formatFromHeader, type EmailAttachment } from '@/lib/email/build-raw'
 import { composeEmailBody, richToText, toRichHtml } from '@/lib/email/rich-text'
 import { emailSignatureFor, type SignatureTenant } from '@/lib/email/signature'
 import { renderStandardEmailHtml, STANDARD_EMAIL_FONT_SIZE } from '@/lib/email/email-html'
@@ -138,6 +138,39 @@ async function quoteFor(state: ComposeState): Promise<{ html: string; text: stri
     return { html: quoteHtml(quoted(m), state.mode), text: quoteText(quoted(m), state.mode), ...headers }
   }
   return { html: '', text: '', inReplyTo: state.inReplyTo, references: state.references }
+}
+
+const messageIdOf = (m: gmail_v1.Schema$Message) =>
+  (header(m.payload, 'Message-ID') || header(m.payload, 'Message-Id')).trim().toLowerCase()
+
+/**
+ * The quote and threading headers for replying to an email on the comms log
+ * (rfcMessageId is its Message-ID header), as replying in Gmail gives them:
+ * the email quoted underneath, with the earlier conversation it carries.
+ * Found in its Gmail conversation, else by Gmail search; null if Gmail no
+ * longer has it.
+ */
+export async function replyQuote(threadId: string | null, rfcMessageId: string | null): Promise<{ html: string; text: string; inReplyTo: string | null; references: string | null } | null> {
+  if (!rfcMessageId?.trim()) return null
+  const wanted = ensureAngleBrackets(rfcMessageId).toLowerCase()
+  const gmail = getGmailClient()
+  let message: gmail_v1.Schema$Message | undefined
+  if (threadId) {
+    try {
+      const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' })
+      message = res.data.messages?.find(m => messageIdOf(m) === wanted)
+    } catch (err) {
+      if (!isNotFound(err)) throw err
+    }
+  }
+  if (!message) {
+    const res = await gmail.users.messages.list({ userId: 'me', q: `rfc822msgid:${wanted.slice(1, -1)}`, maxResults: 1 })
+    const id = res.data.messages?.[0]?.id
+    if (id) message = await getMessage(id)
+  }
+  if (!message) return null
+  const m = parseMessage(message)
+  return { html: quoteHtml(quoted(m), 'reply'), text: quoteText(quoted(m), 'reply'), ...threadingHeaders(message) }
 }
 
 async function attachmentContent(tenantId: string, a: DraftAttachment, db = mailDb()): Promise<Buffer> {
