@@ -59,7 +59,11 @@ vi.mock('@/lib/actions/steps', () => ({
   saveStepEdits: (...a: unknown[]) => (saveStepEdits as (...x: unknown[]) => unknown)(...a),
   addStep: (...a: unknown[]) => (addStep as (...x: unknown[]) => unknown)(...a),
 }))
-vi.mock('@/lib/actions/propose', () => ({ resuggestCard: (...a: unknown[]) => (resuggestCard as (...x: unknown[]) => unknown)(...a) }))
+const resuggestStep = vi.fn(async (_db: unknown, _t: string, _card: string, stepId: string, feedback: string) => (stored = { ...stored!, steps: stored!.steps.map(s => (s.id === stepId ? { ...s, id: 's9', summary: `Changed: ${feedback}` } : s)) }))
+vi.mock('@/lib/actions/propose', () => ({
+  resuggestCard: (...a: unknown[]) => (resuggestCard as (...x: unknown[]) => unknown)(...a),
+  resuggestStep: (...a: unknown[]) => (resuggestStep as (...x: unknown[]) => unknown)(...a),
+}))
 vi.mock('@/lib/actions/confirm', () => {
   class CardError extends Error {}
   return { CardError, confirmCard: (...a: unknown[]) => (confirmCard as (...x: unknown[]) => unknown)(...a) }
@@ -70,7 +74,7 @@ const { listActionCards, readActionCard, confirmActionCard, skipActionCard, star
 
 beforeEach(() => {
   stored = card()
-  for (const f of [listCards, skipCard, confirmCard, starThread, updateCardText, markCardDone, reopenCard, removeSteps, saveStepEdits, addStep, resuggestCard]) f.mockClear()
+  for (const f of [listCards, skipCard, confirmCard, starThread, updateCardText, markCardDone, reopenCard, removeSteps, saveStepEdits, addStep, resuggestCard, resuggestStep]) f.mockClear()
   starredNow = []
 })
 
@@ -191,6 +195,19 @@ describe('update_action_card', () => {
     expect(resuggestCard).toHaveBeenCalledWith(ctx.supabase, 't1', { cardId: CARD_ID }, 'they want a quote')
     expect(out.text).toContain('had the AI redo it')
     expect((await updateActionCard.run({ card_id: CARD_ID, redo_with: 'x', remove_steps: ['s1'] }, ctx)).isError).toBe(true)
+  })
+
+  it('has the AI change one step, leaving the others', async () => {
+    const before = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = 'k'
+    const step = stored!.steps[0]
+    const out = await updateActionCard.run({ card_id: CARD_ID, redo_step: { step_id: step.id, with: 'make it shorter' } }, ctx)
+    process.env.ANTHROPIC_API_KEY = before
+    expect(resuggestStep).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, step.id, 'make it shorter')
+    expect(out.text).toContain(`had the AI change "${step.summary}"`)
+    expect(out.text).toContain('Changed: make it shorter')
+    expect((await updateActionCard.run({ card_id: CARD_ID, redo_step: { step_id: step.id, with: '' } }, ctx)).isError).toBe(true)
+    expect((await updateActionCard.run({ card_id: CARD_ID, redo_with: 'x', redo_step: { step_id: step.id, with: 'y' } }, ctx)).isError).toBe(true)
   })
 
   it('marks a card done, or puts a done one back on the list', async () => {

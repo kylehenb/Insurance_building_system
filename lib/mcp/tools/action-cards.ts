@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { addStep, removeSteps, saveStepEdits } from '@/lib/actions/steps'
-import { resuggestCard } from '@/lib/actions/propose'
+import { resuggestCard, resuggestStep } from '@/lib/actions/propose'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
 import { spokenDate } from '@/lib/mcp/tools/work-orders'
 import { messageText } from '@/lib/mail/message'
@@ -266,6 +266,7 @@ export const updateActionCard: McpTool = {
     'remove_steps (step_ids from read_action_card — not ones already done); change_steps (a step\'s details saved on the card, e.g. an email\'s to, subject or body, a note\'s text; the step\'s other details stay);',
     'add_steps (a step is a call to one of the action tools, as the card\'s AI proposes them — e.g. { tool: "add_job_note", args: { job_number, note } } or { tool: "send_email", args: { mode: "reply", body } }; recorded, not run);',
     'redo_with (tell the AI what to change in your own words — it rewrites the card\'s title, summary and steps from the email and job file; takes up to a minute);',
+    'redo_step (the same for one step: { step_id, with } — the AI replaces just that step, or takes it off if asked, and the other steps, edited emails included, stay as they are);',
     'status: done (dealt with another way, steps not run), skipped (as skip_action_card), or pending (put a done or skipped card back on the list).',
     'Nothing is sent or changed on the job — confirm_action_card does the steps. Read back the change and get a yes first; read_action_card shows the result.',
   ].join(' '),
@@ -297,6 +298,13 @@ export const updateActionCard: McpTool = {
         },
       },
       redo_with: { type: 'string', description: 'What the AI should do instead, e.g. "they want a quote, not a report — reply asking for access times".' },
+      redo_step: {
+        type: 'object',
+        description: 'Have the AI change one step from what the user says, e.g. { step_id, with: "make the email to Linda shorter" }.',
+        properties: { step_id: { type: 'string', description: 'step_id from read_action_card.' }, with: { type: 'string', description: 'What that step should do instead.' } },
+        required: ['step_id', 'with'],
+        additionalProperties: false,
+      },
       status: { type: 'string', enum: [...SET_STATUSES] },
     },
     required: ['card_id'],
@@ -316,14 +324,17 @@ export const updateActionCard: McpTool = {
     const changes = objs(args.change_steps)
     const adds = objs(args.add_steps)
     const redo = str(args.redo_with).slice(0, MAX_REDO)
+    const one = args.redo_step && typeof args.redo_step === 'object' ? args.redo_step as Record<string, unknown> : null
+    const redoStep = one ? { stepId: str(one.step_id), with: str(one.with).slice(0, MAX_REDO) } : null
+    if (redoStep && (!redoStep.stepId || !redoStep.with)) return { text: 'redo_step needs the step_id and what that step should do instead.', isError: true }
     const status = SET_STATUSES.find(x => x === args.status)
     const title = typeof args.title === 'string' ? args.title : undefined
     const summary = typeof args.summary === 'string' ? args.summary : undefined
     const category = isCategory(args.category) ? args.category : null
-    if (!title && summary === undefined && !category && !removes.length && !changes.length && !adds.length && !redo && !status) {
+    if (!title && summary === undefined && !category && !removes.length && !changes.length && !adds.length && !redo && !redoStep && !status) {
       return { text: 'What should change on the card — its title, steps, star or status?', isError: true }
     }
-    if (redo && (removes.length || changes.length || adds.length)) {
+    if (redo && (removes.length || changes.length || adds.length || redoStep)) {
       return { text: 'redo_with rewrites every step — give it on its own, or edit the steps instead.', isError: true }
     }
 
@@ -339,6 +350,12 @@ export const updateActionCard: McpTool = {
         if (!remade) return { text: 'The card couldn\'t be remade — try again in the app.', isError: true }
         card = remade
         done.push(remade.status === 'failed' ? `tried to redo it, but the AI stopped: ${remade.error_log ?? 'no reason given'}` : 'had the AI redo it')
+      }
+      if (redoStep) {
+        if (!process.env.ANTHROPIC_API_KEY) return { text: 'The AI isn\'t set up (no API key), so it can\'t change the step.', isError: true }
+        const name = card.steps.find(s => s.id === redoStep.stepId)?.summary
+        card = await resuggestStep(db(ctx), ctx.tenantId, card.id, redoStep.stepId, redoStep.with)
+        done.push(`had the AI change ${name ? `"${name}"` : 'that step'}`)
       }
       if (removes.length) {
         const names = removes.map(id => card.steps.find(s => s.id === id)?.summary).filter(Boolean)
