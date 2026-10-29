@@ -11,6 +11,7 @@ import { getMailbox, mailDb } from '@/lib/mail/sync'
 import type { Situation } from '@/lib/learning/events'
 import { CATEGORIES, CardError, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
 import { cardLearning, cardSituation, recordCardInstruction } from './learning'
+import { orderUpdateBrief } from '@/lib/insurer-orders/order-update'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
@@ -317,8 +318,10 @@ async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContex
   const jobFile = detail.job
     ? (await getJobSummary.run({ job_number: detail.job.job_number }, ctx)).text
     : `This conversation is not on a job yet.${detail.candidates.length ? ` The matcher suggests: ${detail.candidates.map(c => `${c.job_number} (${c.insured_name ?? c.property_address ?? ''}, matched on ${c.matched_on.join(', ')}, ${c.confidence})`).join('; ')}.` : ''}${detail.orderId ? ' It has already become an insurer order.' : ''}`
+  // An order email on a claim that already has one: what's new compared with the original order
+  const orderUpdate = await orderUpdateBrief(db, card.tenant_id, card.source_ref)
   return {
-    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
+    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${orderUpdate ? `\n\n${orderUpdate}` : ''}`,
     jobId: detail.job?.id ?? null,
     title: detail.subject || 'New email',
     situation: await cardSituation(db, card.tenant_id, { kind: 'email', sender, subject: detail.subject, jobId: detail.job?.id ?? null }),

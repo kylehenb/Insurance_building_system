@@ -15,6 +15,7 @@ import { applyContactDefaults } from '@/lib/contacts/defaults'
 import { useCurrentUser } from '@/components/layout/current-user'
 import { pendingApprovalFrom } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
+import { runOrderChecks } from '@/lib/insurer-orders/checks'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -1125,6 +1126,13 @@ function InsurerOrdersPageContent() {
                                     )}
                                   </div>
                                 </div>
+
+                                {/* What the order's checks found (lib/insurer-orders/checks.ts) — before it's lodged */}
+                                {!order.job_id && order.status !== 'rejected' && runOrderChecks(order).map(check => (
+                                  <div key={check.key} style={{ marginTop: 10, background: '#fffbeb', border: '1px solid var(--warning-bright)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--warning-dark)' }}>
+                                    {check.message}{check.acknowledgementLine && ' The acknowledgement will ask the sender about it.'}
+                                  </div>
+                                ))}
 
                                 {/* Action buttons */}
                                 <div style={{ marginTop: 10 }}>

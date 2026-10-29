@@ -9,6 +9,7 @@ import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 import { normaliseLossType } from '@/lib/loss-types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { recordOrderLodged } from './learning'
+import { runOrderChecks } from './checks'
 
 // Lodging an insurer order: creates the job (next job number, KPI due dates,
 // client), the inspection/report/quote/invoice its work order type needs, links
@@ -18,7 +19,10 @@ import { recordOrderLodged } from './learning'
 // (app/api/insurer-orders/lodge) and the voice connector. With
 // skipAcknowledgement (the office has already replied by hand) everything
 // happens the same except the acknowledgement, and a note on the job's Comms
-// feed says it was skipped on purpose.
+// feed says it was skipped on purpose. What the order's checks found (no
+// phone number, landline only… — lib/insurer-orders/checks.ts) is noted on the
+// job too, and the acknowledgement isn't sent when the office has already
+// replied to the sender.
 
 // Mapping of report types to reference prefixes
 const REPORT_TYPE_PREFIXES: Record<string, string> = {
@@ -487,24 +491,42 @@ export async function lodgeInsurerOrder(
     inspectionId,
   })
 
+  const userId = options.userId ?? null
   let acknowledgement: OrderAcknowledgementResult
+  const to = order.order_sender_email?.trim()
   if (options.skipAcknowledgement) {
     acknowledgement = { sent: false, skipped: ACKNOWLEDGEMENT_SKIPPED }
-    await noteSkippedAcknowledgement(supabase, { tenantId, jobId, userId: options.userId ?? null, senderEmail: order.order_sender_email })
+    await noteOnJob(supabase, {
+      tenantId, jobId, userId, source: 'order_acknowledgement_skipped',
+      content: `Order acknowledgement not emailed${to ? ` to ${to}` : ''}: skipped on purpose when the order was lodged.`,
+    })
   } else {
     acknowledgement = await sendOrderAcknowledgement(supabase, { tenantId, orderId, jobId })
     if (!acknowledgement.sent) console.warn('[lodge] acknowledgement not sent:', acknowledgement.skipped)
+    if (acknowledgement.alreadyReplied) {
+      await noteOnJob(supabase, {
+        tenantId, jobId, userId, source: 'order_acknowledgement_skipped',
+        content: `Order acknowledgement not emailed: ${acknowledgement.skipped}.`,
+      })
+    }
+  }
+
+  const checks = runOrderChecks(order)
+  if (checks.length) {
+    const lines = checks.map(c => `${c.message}${c.acknowledgementLine && acknowledgement.sent ? ' The acknowledgement asked the sender about it.' : ''}`)
+    await noteOnJob(supabase, { tenantId, jobId, userId, source: 'order_checks', content: lines.join('\n') })
   }
 
   console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
   return { jobNumber, jobId, acknowledgement }
 }
 
-// A note on the job's Comms feed, so the job's history shows the sender wasn't
-// sent an acknowledgement on purpose. Never fails the lodge.
-async function noteSkippedAcknowledgement(
+// A note on the job's Comms feed (signed by whoever lodged it): why the
+// sender wasn't sent an acknowledgement, or what the order's checks found.
+// Never fails the lodge.
+async function noteOnJob(
   supabase: SupabaseClient<Database>,
-  params: { tenantId: string; jobId: string; userId: string | null; senderEmail: string | null },
+  params: { tenantId: string; jobId: string; userId: string | null; content: string; source: string },
 ): Promise<void> {
   try {
     let author: string | null = null
@@ -513,18 +535,17 @@ async function noteSkippedAcknowledgement(
         .from('users').select('name').eq('tenant_id', params.tenantId).eq('id', params.userId).maybeSingle()
       author = user?.name?.trim() || null
     }
-    const to = params.senderEmail?.trim()
     const { error } = await supabase.from('communications').insert({
       tenant_id: params.tenantId,
       job_id: params.jobId,
       type: 'note',
-      content: `Order acknowledgement not emailed${to ? ` to ${to}` : ''}: skipped on purpose when the order was lodged.`,
+      content: params.content,
       contact_name: author ?? 'Note',
-      source: 'order_acknowledgement_skipped',
+      source: params.source,
       created_by: params.userId,
     })
     if (error) throw error
   } catch (err) {
-    console.error(`[lodge] couldn't note the skipped acknowledgement on job ${params.jobId}:`, err)
+    console.error(`[lodge] couldn't add the ${params.source} note on job ${params.jobId}:`, err)
   }
 }

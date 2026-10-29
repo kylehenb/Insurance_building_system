@@ -21,7 +21,7 @@ import { resolveCommunicationLink, type CommunicationLink } from '@/lib/communic
 import { linkThreadToJob, threadExists } from '@/lib/communications/thread-link'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
-import { writeInsurerOrder } from '@/lib/email/order-writer'
+import { saveOrderUpdate, writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const OUR_DOMAIN = 'insurancerepairco.com.au'
@@ -282,10 +282,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             matchedConfig as unknown as ClientEmailConfig | null,
             tenantId
           )
-          const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          if (orderId) {
-            await sendOrderNotification(orderId, parsed, msg, tenantId)
-            results.push({ messageId: msgId, status: 'order', detail: orderId })
+          const written = await writeInsurerOrder(parsed, msg, tenantId)
+          if (written.kind === 'created') {
+            await sendOrderNotification(written.orderId, parsed, msg, tenantId)
+            results.push({ messageId: msgId, status: 'order', detail: written.orderId })
+          } else if (written.kind === 'existing_claim') {
+            // More on a claim that already has an order, as the webhook does
+            await saveOrderUpdate(rawDb, tenantId, msg, written)
+            results.push({ messageId: msgId, status: written.jobId ? 'linked' : 'order', detail: written.jobId ?? written.orderId })
           } else {
             // Not a new order — keep it on the comms log, as the webhook does
             const link = await insertBackfillCommunication(rawDb, tenantId, msg)

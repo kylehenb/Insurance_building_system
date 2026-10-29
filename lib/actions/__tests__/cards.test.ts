@@ -155,6 +155,14 @@ describe('queueing', () => {
     expect(tables.action_queue.find(r => r.source_ref === 'th2')).toMatchObject({ status: 'done', outcome: 'Replied from Mail' })
   })
 
+  it('keeps the card for new instructions on an existing claim when we reply — the reply doesn\'t do the work', async () => {
+    await queueEmailCard(db as never, 't1', 'th3', 'x1')
+    tables.action_queue[0].status = 'pending'
+    tables.communications = [{ tenant_id: 't1', thread_id: 'th3', source: 'order_update', direction: 'inbound' }]
+    await onMailArrivals(db as never, 't1', { received: [], sentThreadIds: ['th3'] })
+    expect(tables.action_queue[0].status).toBe('pending')
+  })
+
   it('claims each queued card once, and gives up on stuck ones', async () => {
     const old = new Date(Date.now() - 60 * 60_000).toISOString()
     tables.action_queue = [
@@ -261,6 +269,29 @@ describe('generateCard', () => {
     const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
     expect(first).toMatch(/A FOLLOW-UP THE OFFICE SET \(on Sunday 18 October, for today\)\nWho: Ace Roofing\n"Chase the roof quote"\nJob: IRC1001/)
     expect(first).toMatch(/THE CONVERSATION IT WAS SET FROM \(conversation_id: abc1\)[\s\S]*THE JOB FILE \(as it is now\)/)
+  })
+
+  it('tells the card what\'s new when an order email lands on a claim that already has a job', async () => {
+    tables.communications = [{ tenant_id: 't1', thread_id: 'th1', direction: 'inbound', source: 'order_update', job_id: 'j1', insurer_order_id: null, created_at: '2026-10-28T02:02:00Z',
+      body_text: 'New Quote/Report Request\nClaim: CHCCLM010001723\nInsured: Charlie and Nina Ball\nPlease allocate an electrician to check the electrical components.' }]
+    tables.insurer_orders = [{ tenant_id: 't1', job_id: 'j1', claim_number: 'CHCCLM010001723', created_at: '2026-10-06T03:45:00Z',
+      raw_email_body: 'New Quote/Report Request\nClaim: CHCCLM010001723\nInsured: Charlie and Nina Ball' }]
+    const card = await claimed()
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Allocate an electrician', summary: 's', priority: 'high', category: 'other' } }]])
+    await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(first).toContain('MORE ON A CLAIM THAT ALREADY HAS AN ORDER')
+    expect(first).toContain('claim CHCCLM010001723 already has job IRC1001 from the order received 6 Oct 2026')
+    expect(first).toMatch(/Lines in this email that weren't in the original order:\n  Please allocate an electrician to check the electrical components\.\n/)
+    expect(first).not.toContain('Insured: Charlie')
+  })
+
+  it('leaves that out once a later email is the latest in the conversation', async () => {
+    tables.communications = [{ tenant_id: 't1', thread_id: 'th1', direction: 'inbound', source: 'auto_linked', job_id: 'j1', body_text: 'Any update?' }]
+    const card = await claimed()
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'x', summary: 's', priority: 'low' } }]])
+    await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).not.toContain('MORE ON A CLAIM')
   })
 
   it('marks notifications as no action', async () => {

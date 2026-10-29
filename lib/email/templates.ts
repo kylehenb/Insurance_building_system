@@ -328,6 +328,8 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
   ],
   order_acknowledgement: [
     { key: 'order_subject',    label: 'Order email subject', example: 'New BAR instruction – CLM-558213' },
+    // Filled by the order's checks (lib/insurer-orders/checks.ts); placed above the sign-off when the template has no {order_notes}
+    { key: 'order_notes',      label: 'Order notes (e.g. asking for a phone number)', example: 'There was no contact number for the insured on the order. Could you please send through the best phone number to reach them?' },
     ...INSURER_DOCUMENT_TOKENS,
   ],
   quote: [
@@ -381,7 +383,7 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
   {
     sendType: 'order_acknowledgement',
     label: 'Order acknowledgement',
-    description: 'Sent automatically to whoever sent the order when it is lodged as a new job, as a reply in the same email thread. Keep the subject as "Re: {order_subject}" so it stays in that thread.',
+    description: 'Sent automatically to whoever sent the order when it is lodged as a new job, as a reply in the same email thread. Keep the subject as "Re: {order_subject}" so it stays in that thread. When the order needs something (e.g. no phone number for the insured), a request is added where {order_notes} is, or above the sign-off. Not sent if the office has already replied to the sender.',
   },
   {
     sendType: 'quote',

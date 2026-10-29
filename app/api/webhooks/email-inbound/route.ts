@@ -36,7 +36,7 @@ import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import type { ClientEmailConfig } from '@/lib/email/order-parser'
-import { writeInsurerOrder } from '@/lib/email/order-writer'
+import { saveOrderUpdate, writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 import { threadExists } from '@/lib/communications/thread-link'
 import { recordSentMessage } from '@/lib/communications/record-sent'
@@ -451,16 +451,21 @@ async function processWebhook(body: PubSubBody): Promise<void> {
             ` reason="${parsed.isNewOrderReasoning}"`
           )
 
-          // writeInsurerOrder returns null when Gemini classified the email as
-          // not a new order (is_new_order: false). Null is intentional — do NOT
-          // write a fallback row in that case (the catch block below only runs
-          // on thrown exceptions, not on a null return).
-          orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          if (orderId) {
+          // 'not_order' (Gemini: is_new_order false) and 'existing_claim' are
+          // intentional — do NOT write a fallback row for them (the catch block
+          // below only runs on thrown exceptions).
+          const written = await writeInsurerOrder(parsed, msg, tenantId)
+          if (written.kind === 'created') {
+            orderId = written.orderId
             await sendOrderNotification(orderId, parsed, msg, tenantId)
             // Register this thread so subsequent messages in the same batch
             // are routed to communications rather than re-entering the order pipeline.
             if (msg.threadId) processedOrderThreadIds.add(msg.threadId)
+          } else if (written.kind === 'existing_claim') {
+            // More on a claim that already has an order (new instructions, or a
+            // re-send): onto the job, for its action card to compare with the original
+            orderId = written.orderId
+            await saveOrderUpdate(rawDb, tenantId, msg, written, { communicationId, attachments: storedAttachments })
           } else {
             // Matched an order rule but isn't a new order (a remittance advice,
             // a reply on an authorised job…): keep it on the comms log, linked

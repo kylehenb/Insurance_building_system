@@ -1,4 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
+import { linkThreadToJob } from '@/lib/communications/thread-link'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
@@ -35,16 +37,26 @@ export async function writeFallbackOrder(
   }
 }
 
-// Returns the new insurer_order UUID, or null when the Gemini classification
-// determined this is not a new work order (is_new_order: false). Null is an
-// intentional rejection, not an error — callers must not write a fallback row on null.
-// Throws only on genuine DB/IO errors so the caller's fallback path is not confused
-// with the intentional rejection path.
+export type WriteOrderResult =
+  | { kind: 'created'; orderId: string }
+  /** Gemini classified it as not a new work order (is_new_order: false) */
+  | { kind: 'not_order' }
+  /**
+   * The claim number already has an order (lodged as jobId, or still waiting).
+   * The email is more on that claim — often new instructions (an extra trade,
+   * more scope) on a copy of the original order email — so callers save it
+   * with saveOrderUpdate rather than dropping it.
+   */
+  | { kind: 'existing_claim'; orderId: string; jobId: string | null; claimNumber: string }
+
+// 'not_order' and 'existing_claim' are intentional, not errors — callers must
+// not write a fallback row for them. Throws only on genuine DB/IO errors so the
+// caller's fallback path is not confused with the intentional ones.
 export async function writeInsurerOrder(
   parsed: ParsedOrderResult,
   message: ExtractedMessage,
   tenantId: string
-): Promise<string | null> {
+): Promise<WriteOrderResult> {
   const supabase = createServiceClient()
 
   // --- ai_audit row ----------------------------------------------------------
@@ -97,23 +109,25 @@ export async function writeInsurerOrder(
       ` reasoning="${parsed.isNewOrderReasoning ?? 'none'}"` +
       ` ai_audit_id=${aiAuditId}`
     )
-    return null
+    return { kind: 'not_order' }
   }
 
   // --- claim_number dedup (primary) ------------------------------------------
-  // Prevents a second row for the same claim number within a tenant.
+  // Prevents a second row for the same claim number within a tenant. The
+  // email itself is still kept — see WriteOrderResult 'existing_claim'.
   if (parsed.data.claim_number) {
     const { data: existingOrder } = await supabase
       .from('insurer_orders')
-      .select('id, status, created_at')
+      .select('id, job_id')
       .eq('tenant_id', tenantId)
       .eq('claim_number', parsed.data.claim_number)
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
 
     if (existingOrder) {
-      console.log(`[order-writer] duplicate claim_number ${parsed.data.claim_number} detected, skipping insert`)
-      return existingOrder.id
+      console.log(`[order-writer] claim_number ${parsed.data.claim_number} already has order ${existingOrder.id}: saving as more on that claim`)
+      return { kind: 'existing_claim', orderId: existingOrder.id, jobId: existingOrder.job_id, claimNumber: parsed.data.claim_number }
     }
   }
 
@@ -136,7 +150,7 @@ export async function writeInsurerOrder(
     const existingOrderId = (existingComm as { insurer_order_id: string } | null)?.insurer_order_id
     if (existingOrderId) {
       console.log(`[order-writer] thread_id ${message.threadId} already linked to insurer_order ${existingOrderId}, skipping insert`)
-      return existingOrderId
+      return { kind: 'created', orderId: existingOrderId }
     }
   }
 
@@ -226,5 +240,44 @@ export async function writeInsurerOrder(
     console.error('[order-writer] communications insert error:', commError)
   }
 
-  return orderId
+  return { kind: 'created', orderId }
+}
+
+/**
+ * Keeps an order email for a claim that already has an order (writeInsurerOrder's
+ * 'existing_claim'): on the job's comms log, or on the order while it waits to
+ * be lodged, as source 'order_update'. That source tells the email's action
+ * card to compare it with the original order (lib/actions/propose.ts) — new
+ * instructions often arrive on a copy of the original email.
+ */
+export async function saveOrderUpdate(
+  db: SupabaseClient,
+  tenantId: string,
+  message: ExtractedMessage,
+  existing: { orderId: string; jobId: string | null },
+  opts: { communicationId?: string; attachments?: unknown[] } = {},
+): Promise<void> {
+  const { error } = await db.from('communications').insert({
+    ...(opts.communicationId ? { id: opts.communicationId } : {}),
+    tenant_id: tenantId,
+    job_id: existing.jobId,
+    insurer_order_id: existing.jobId ? null : existing.orderId,
+    type: 'email',
+    direction: 'inbound',
+    subject: message.subject,
+    content: message.bodyText,
+    created_at: message.receivedAt,
+    thread_id: message.threadId,
+    from_email: message.fromEmail,
+    to_email: message.to,
+    body_text: message.bodyText,
+    gmail_message_id: message.gmailMessageId || null,
+    source: 'order_update',
+    ...(opts.attachments ? { attachments: opts.attachments } : {}),
+  } as never)
+  if (error) {
+    console.error('[order-writer] order update insert error:', error)
+    return
+  }
+  if (existing.jobId && message.threadId) await linkThreadToJob(db, tenantId, message.threadId, existing.jobId)
 }

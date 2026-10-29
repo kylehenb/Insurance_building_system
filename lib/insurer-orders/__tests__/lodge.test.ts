@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Lodging an order: with skipAcknowledgement the job and everything its work
 // type needs are created exactly as before and the office is notified, but no
 // acknowledgement is emailed — a note on the job's Comms feed says it was
-// skipped on purpose. Without it, the acknowledgement goes as before.
+// skipped on purpose. Without it, the acknowledgement goes as before. What the
+// order's checks found (no phone, landline only) and an acknowledgement held
+// back because the office already replied are noted on the job too.
 
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = {}
@@ -62,7 +64,7 @@ beforeEach(() => {
   for (const k of Object.keys(inserted)) delete inserted[k]
   db.insurer_orders = [{
     id: 'o1', tenant_id: 't1', job_id: null, status: 'pending', claim_number: 'CLM1', wo_type: 'BAR', insurer: 'Castle', adjuster: null,
-    property_address: '45 Randell Cres', insured_name: 'Peter Laundy', order_sender_email: 'claims@castle.com.au', order_sender_name: 'Casey', client_id: 'c1',
+    property_address: '45 Randell Cres', insured_name: 'Peter Laundy', insured_phone: '0412 345 678', order_sender_email: 'claims@castle.com.au', order_sender_name: 'Casey', client_id: 'c1',
   }]
   db.tenants = [{ id: 't1', job_prefix: 'IRC', job_sequence: 1079 }]
   db.automation_config = []
@@ -99,6 +101,25 @@ describe('lodgeInsurerOrder', () => {
       tenant_id: 't1', job_id: result.jobId, type: 'note', contact_name: 'Kyle', created_by: 'u1', source: 'order_acknowledgement_skipped',
       content: 'Order acknowledgement not emailed to claims@castle.com.au: skipped on purpose when the order was lodged.',
     })])
+  })
+
+  it('notes what the order\'s checks found on the job, saying whether the acknowledgement asked about it', async () => {
+    db.insurer_orders[0].insured_phone = null
+    const result = await lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
+    expect(inserted.communications).toEqual([expect.objectContaining({
+      job_id: result.jobId, type: 'note', source: 'order_checks',
+      content: 'No phone number for the insured on the order. The acknowledgement asked the sender about it.',
+    })])
+  })
+
+  it('notes a landline-only number as possibly the broker\'s, and an acknowledgement held back because the office already replied', async () => {
+    db.insurer_orders[0].insured_phone = '(08) 9381 2200'
+    ack.mockResolvedValue({ sent: false, alreadyReplied: true, skipped: 'The office already replied to claims@castle.com.au about this order on 28 Oct, 10:22 am' })
+    await lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
+    expect(inserted.communications.map(c => [c.source, c.content])).toEqual([
+      ['order_acknowledgement_skipped', 'Order acknowledgement not emailed: The office already replied to claims@castle.com.au about this order on 28 Oct, 10:22 am.'],
+      ['order_checks', 'The only phone number on the order is a landline ((08) 9381 2200). It may be the broker\'s rather than the insured\'s.'],
+    ])
   })
 
   it('links to the job that already has the claim without acknowledging or noting, flag or not', async () => {

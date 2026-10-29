@@ -61,7 +61,7 @@ beforeEach(() => {
   db.insurer_orders = []
   db.communications = []
   parse.mockResolvedValue({ isNewOrder: false, isNewOrderReasoning: 'Looks like a reply', data: {} })
-  write.mockImplementation(async () => { db.insurer_orders.push(order()); return ORDER_ID })
+  write.mockImplementation(async () => { db.insurer_orders.push(order()); return { kind: 'created', orderId: ORDER_ID } })
   gmail.list.mockResolvedValue({ data: { messages: [{ id: 'abc12345' }] } })
   gmail.get.mockResolvedValue({ data: { threadId: 'th1', internalDate: String(Date.parse('2026-10-22T05:56:00Z')), payload: { headers: [
     { name: 'From', value: 'Castle <castleinsurance.mailer@primeeco.tech>' },
@@ -109,6 +109,12 @@ describe('create_order_from_email', () => {
     const res = await createOrderFromEmail.run({ message_id: 'abc12345' }, ctx)
     expect(res.text).toMatch(/^That email is already an order:/)
     expect(write).not.toHaveBeenCalled()
+  })
+
+  it('says when the claim number already has an order rather than making a second', async () => {
+    write.mockImplementationOnce(async () => { db.insurer_orders.push(order({ job_id: 'j1' })); return { kind: 'existing_claim', orderId: ORDER_ID, jobId: 'j1', claimNumber: 'CHCCLM010002035' } })
+    const res = await createOrderFromEmail.run({ message_id: 'abc12345' }, ctx)
+    expect(res.text).toMatch(/^That claim already has an order, so no second one was made: claim CHCCLM010002035, .* It is already lodged\.$/)
   })
 
   it('refuses our own emails and explains a reader failure', async () => {

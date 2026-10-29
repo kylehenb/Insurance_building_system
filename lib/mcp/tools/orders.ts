@@ -7,6 +7,7 @@ import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } from '@/lib/insurer-orders/from-email'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
+import { runOrderChecks } from '@/lib/insurer-orders/checks'
 
 // Insurer orders by voice: the orders waiting to be lodged, finding an order
 // email the auto job lodger missed and turning it into an order, and lodging
@@ -28,13 +29,15 @@ const WO_TYPE_LABELS: Record<string, string> = {
   BAR: 'assessment (BAR)', make_safe: 'make safe', roof_report: 'roof report', specialist: 'specialist report', quote_only: 'quote only',
 }
 
-/** Missing details that stop or weaken a lodge */
+/** Missing details that stop or weaken a lodge, and what the order's checks found */
 function orderWarnings(o: OrderSummaryRow): string[] {
   const warnings: string[] = []
   if (!o.claim_number) warnings.push('No claim number — it can\'t be lodged until one is added in the app.')
   if (!o.property_address) warnings.push('No property address.')
   if (!o.insured_name) warnings.push('No insured name.')
   if (o.parse_status === 'needs_review') warnings.push('Marked "needs review" — check the details.')
+  // The order's checks: no phone number, landline only… (lib/insurer-orders/checks.ts)
+  for (const check of runOrderChecks(o)) warnings.push(check.acknowledgementLine ? `${check.message} The acknowledgement will ask the sender about it.` : check.message)
   return warnings
 }
 
@@ -58,7 +61,7 @@ export const listInsurerOrders: McpTool = {
   name: 'list_insurer_orders',
   title: 'List insurer orders',
   description: [
-    'Lists insurer orders waiting to be lodged as jobs (newest first), with claim number, insurer, work type, insured, address and anything missing.',
+    'Lists insurer orders waiting to be lodged as jobs (newest first), with claim number, insurer, work type, insured, address and anything missing or worth knowing (no phone number, landline only).',
     'If an order the user expects isn\'t here, it may not have been picked up from the email — use find_order_emails.',
   ].join(' '),
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
@@ -167,7 +170,7 @@ export const createOrderFromEmail: McpTool = {
     'Turns an insurer\'s order email into an insurer order, using the auto job lodger\'s own reader — for an order email it missed.',
     'Use the message_id from find_order_emails, after the user confirms it\'s the right email. Nothing is lodged yet:',
     'read back the claim number, insurer, work type, insured and address, then offer lodge_order.',
-    'If an order already exists for the claim number, that order is returned instead of a new one.',
+    'If an order already exists for the claim number, that order is returned instead of a new one — the email is more on that claim (new instructions or a re-send), so check what it asks for.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -185,15 +188,17 @@ export const createOrderFromEmail: McpTool = {
     const existing = await emailStatus(ctx, id, null)
     if (existing.orderId) return orderResult(ctx, existing.orderId, 'That email is already an order:')
 
-    let orderId: string
+    let created: { orderId: string; existing: boolean }
     try {
-      orderId = await createOrderFromEmailFn(ctx.tenantId, id, 'by voice')
+      created = await createOrderFromEmailFn(ctx.tenantId, id, 'by voice')
     } catch (err) {
       if (err instanceof OrderFromEmailError) return { text: err.message, isError: true }
       console.error('[mcp] create_order_from_email failed:', err)
       return { text: `Couldn't read that email into an order: ${err instanceof Error ? err.message : String(err)}. It can be entered by hand on the Insurer Orders page.`, isError: true }
     }
-    return orderResult(ctx, orderId, 'Created the order:')
+    return created.existing
+      ? orderResult(ctx, created.orderId, 'That claim already has an order, so no second one was made:')
+      : orderResult(ctx, created.orderId, 'Created the order:')
   },
 }
 
@@ -214,6 +219,7 @@ export const lodgeOrder: McpTool = {
     'Lodges an insurer order as a job, exactly like the Lodge button: creates the job with the next job number and KPI due dates,',
     'plus the inspection, report, quote and invoice its work type needs, notifies the office, and emails the order\'s sender an acknowledgement (Settings → Email Templates → Order acknowledgement).',
     'If a job already has the claim number, the order is linked to that job instead. If another job has the same address with a different claim, nothing is created and the matching jobs are listed.',
+    'When the order has no phone number for the insured, the acknowledgement asks the sender for one. It isn\'t sent when the office has already replied to the sender about the order; a note on the job says so.',
     'With skip_acknowledgement, everything else happens the same but no acknowledgement is emailed, and a note on the job says it was skipped on purpose.',
     'Read back the claim number, insured and address, say whether the sender will be emailed an acknowledgement, and get a clear yes first. Pass on it if the acknowledgement wasn\'t sent.',
   ].join(' '),

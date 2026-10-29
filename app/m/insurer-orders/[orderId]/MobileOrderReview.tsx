@@ -7,6 +7,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { pendingApprovalFrom } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
+import { runOrderChecks } from '@/lib/insurer-orders/checks'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type JobHit = {
@@ -291,6 +292,13 @@ export default function MobileOrderReview({
         <div style={{ fontSize: 12, color: C.muted, textAlign: 'center', marginTop: 4 }}>
           Received {formatDate(order.created_at)}{order.order_sender_name ? ` from ${order.order_sender_name}` : ''}
         </div>
+
+        {/* What the order's checks found (lib/insurer-orders/checks.ts) — before it's lodged */}
+        {!isLinked && order.status !== 'rejected' && runOrderChecks(order).map(check => (
+          <div key={check.key} style={{ marginTop: 12, background: '#fffbeb', border: '1px solid var(--warning-bright)', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: 'var(--warning-dark)' }}>
+            {check.message}{check.acknowledgementLine && ' The acknowledgement will ask the sender about it.'}
+          </div>
+        ))}
 
         {/* Spacer so content isn't hidden behind the action bar */}
         {canAct && <div style={{ height: isLinked ? 90 : 280 }} />}

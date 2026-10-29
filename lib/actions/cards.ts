@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Situation } from '@/lib/learning/events'
 import type { Arrivals } from '@/lib/mail/summary'
 import { recordCardDecision } from './learning'
+import { orderUpdateThreads } from '@/lib/insurer-orders/order-update'
 
 // Action cards (tech spec §19, §23.11): the AI's suggested next steps,
 // stored in action_queue. This file is the card lifecycle — queueing a card
@@ -153,7 +154,8 @@ export async function queueEmailCard(db: SupabaseClient, tenantId: string, threa
  * What a mailbox sync saw: new incoming mail queues its conversation's
  * card; a send from us in a conversation means it's been dealt with —
  * unless the user starred it themselves (an invoice to pay isn't paid by
- * replying), which stays until they clear it.
+ * replying), which stays until they clear it, or it's an insurer's order
+ * email on a claim that already has an order (lib/insurer-orders/order-update).
  */
 export async function onMailArrivals(db: SupabaseClient, tenantId: string, arrivals: Arrivals | undefined): Promise<number> {
   if (!arrivals) return 0
@@ -166,6 +168,9 @@ export async function onMailArrivals(db: SupabaseClient, tenantId: string, arriv
     if (replied.has(threadId)) continue
     if (await queueEmailCard(db, tenantId, threadId, messageId)) queued++
   }
+  // New instructions on an existing claim aren't done by replying to them (an
+  // electrician still has to be allocated): their cards stay until confirmed or skipped
+  for (const threadId of await orderUpdateThreads(db, tenantId, [...replied])) replied.delete(threadId)
   if (replied.size) {
     // Not cards part-way through (a reply sent from the card, other steps still to do)
     const { data } = await db.from('action_queue').select('id, steps')

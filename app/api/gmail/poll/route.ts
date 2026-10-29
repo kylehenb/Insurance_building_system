@@ -17,7 +17,7 @@ import { getGmailClient } from '@/lib/gmail/client'
 import { gmail_v1 } from 'googleapis'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
-import { writeInsurerOrder } from '@/lib/email/order-writer'
+import { saveOrderUpdate, writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
 
 const WATCHED_EMAIL = 'office@insurancerepairco.com.au'
@@ -166,11 +166,14 @@ async function runPoll(): Promise<NextResponse> {
         // Inner catch: order pipeline errors
         try {
           const parsed = await parseInsurerOrder(msg, null, tenantId)
-          const orderId = await writeInsurerOrder(parsed, msg, tenantId)
-          if (orderId) {
-            await sendOrderNotification(orderId, parsed, msg, tenantId)
+          const written = await writeInsurerOrder(parsed, msg, tenantId)
+          if (written.kind === 'created') {
+            await sendOrderNotification(written.orderId, parsed, msg, tenantId)
             orderCount++
-            console.log(`[gmail-poll] order created ${orderId} for message ${msgId}`)
+            console.log(`[gmail-poll] order created ${written.orderId} for message ${msgId}`)
+          } else if (written.kind === 'existing_claim') {
+            await saveOrderUpdate(rawDb, tenantId, msg, written)
+            console.log(`[gmail-poll] more on claim ${written.claimNumber} (order ${written.orderId}) for message ${msgId}`)
           } else {
             console.log(`[gmail-poll] order rejected (is_new_order=false) for message ${msgId}`)
           }

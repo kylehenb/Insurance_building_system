@@ -33,19 +33,21 @@ export async function orderForEmail(db: SupabaseClient, tenantId: string, messag
 /**
  * Writes an order from the email. The user says it's an order, so it's
  * written even if the reader thought otherwise; `requestedBy` and the
- * reader's reasoning are kept on the audit record.
+ * reader's reasoning are kept on the audit record. When its claim number
+ * already has an order, that order is returned (existing) instead.
  */
-export async function createOrderFromEmail(tenantId: string, messageId: string, requestedBy: string): Promise<string> {
+export async function createOrderFromEmail(tenantId: string, messageId: string, requestedBy: string): Promise<{ orderId: string; existing: boolean }> {
   const msg = await extractMessageParts(await getFullMessage(messageId))
   if (msg.fromEmail.toLowerCase().endsWith(`@${OWN_DOMAIN}`)) {
     throw new OrderFromEmailError('That email is one of ours, not an insurer\'s order.', 400)
   }
   const parsed = await parseInsurerOrder(msg, null, tenantId)
-  const orderId = await writeInsurerOrder(
+  const written = await writeInsurerOrder(
     { ...parsed, isNewOrder: true, isNewOrderReasoning: `Created on request ${requestedBy}. Reader said: ${parsed.isNewOrderReasoning ?? 'no reason'}` },
     msg,
     tenantId,
   )
-  if (!orderId) throw new OrderFromEmailError('The order could not be created. Enter it on the Insurer Orders page.')
-  return orderId
+  if (written.kind === 'not_order') throw new OrderFromEmailError('The order could not be created. Enter it on the Insurer Orders page.')
+  // The claim already has an order: that one, not a second
+  return { orderId: written.orderId, existing: written.kind === 'existing_claim' }
 }

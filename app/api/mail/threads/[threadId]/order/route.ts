@@ -31,7 +31,8 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
   try {
     const existing = await orderForEmail(mailDb(), access.tenantId, messageId, threadId)
     if (existing) return NextResponse.json({ orderId: existing, existing: true })
-    const orderId = await createOrderFromEmail(access.tenantId, messageId, 'on the Mail page')
+    const { orderId, existing: claimHasOrder } = await createOrderFromEmail(access.tenantId, messageId, 'on the Mail page')
+    if (claimHasOrder) return NextResponse.json({ orderId, existing: true })
     await recordActivity({ tenantId: access.tenantId, userId: access.userId, action: 'orders.manage', summary: 'Created an insurer order from an email on the Mail page', via: 'app' })
     return NextResponse.json({ orderId, existing: false })
   } catch (err) {
