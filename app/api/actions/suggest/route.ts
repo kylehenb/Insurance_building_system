@@ -33,8 +33,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const db = mailDb()
     const card = stepId
-      ? await resuggestStep(db, access.tenantId, cardId!, stepId, feedback)
-      : await resuggestCard(db, access.tenantId, cardId ? { cardId } : { threadId: threadId! }, feedback)
+      ? await resuggestStep(db, access.tenantId, cardId!, stepId, feedback, access.userId)
+      : await resuggestCard(db, access.tenantId, cardId ? { cardId } : { threadId: threadId! }, feedback, access.userId)
     if (!card && !cardId) return NextResponse.json({ error: 'Could not queue the card' }, { status: 502 })
     return NextResponse.json({ card: card ? (await withContext(db, access.tenantId, [card]))[0] : null })
   } catch (err) {

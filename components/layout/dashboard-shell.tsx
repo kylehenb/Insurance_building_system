@@ -32,20 +32,6 @@ export function DashboardShell({ user, tenantId, currentUser, children }: Props)
     setHydrated(true)
   }, [])
 
-  // Global hotkey: Cmd+Shift+T (Mac) / Ctrl+Shift+T (Windows/Linux)
-  useEffect(() => {
-    function handleHotkey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
-        e.preventDefault()
-        setAssistantVisible(true)
-        try { localStorage.setItem('fai-visible', 'true') } catch {}
-        window.dispatchEvent(new CustomEvent('fai-open-teach'))
-      }
-    }
-    document.addEventListener('keydown', handleHotkey)
-    return () => document.removeEventListener('keydown', handleHotkey)
-  }, [])
-
   function toggleAssistant() {
     setAssistantVisible((v) => {
       const next = !v

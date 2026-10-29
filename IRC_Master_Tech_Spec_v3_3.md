@@ -2765,7 +2765,7 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 - When a human edits an AI-generated output, the edit is captured in `ai_audit.edit_delta` (field-level diff)
 - `ai_audit.outcome` tracks whether each AI output was accepted, edited, or rejected
 - These records power the AI & Automation Activity Dashboard (Section 21) — the "daily employee review" surface
-- The feedback loop: observe edited outputs → identify patterns → tune the relevant prompt in `/settings/prompts` → monitor accuracy improvement
+- The feedback loop: observe edited outputs → identify patterns → tune the relevant prompt in `/settings/prompts` → monitor accuracy improvement. For features on the **learning module (§24)** — action cards first — this happens by itself: edits, skips and instructions are recorded with their situation and fed back into the next proposal, with no prompt tuning or review needed
 - Autonomy promotion decisions for comms types (WF-9) use `ai_audit` accuracy rates as evidence
 
 ### Automation engine — pure function design
@@ -2904,7 +2904,7 @@ The e-signing module needs no new environment variables (it uses the Supabase se
 
 **Tenant from the session, never the request:** `/api/insurer-orders/lodge` requires a signed-in user and only lodges that user's tenant's orders; `/api/jobs/[jobId]/stage` takes the tenant from the session and ignores any `tenantId` in the body (fixed 23 Oct 2026).
 
-**User permissions:** see §6 "Permissions". The older `can_*` columns on `users` are no longer read anywhere (the sidebar's "teach the AI" uses settings.edit; the brain teach/approve routes check it); the columns are left in the table and can be dropped.
+**User permissions:** see §6 "Permissions". The older `can_*` columns on `users` are no longer read anywhere (the old "teach the AI" mode that used settings.edit is retired — §22.4); the columns are left in the table and can be dropped.
 
 **Claude voice connector:** the `Authorization` header key is the only credential — whoever has a personal key acts as its owner (revoke it in Settings → Voice connector); the legacy shared key acts as `MCP_USER_ID`. See §10b.
 
@@ -3871,7 +3871,7 @@ The AI & Automation Dashboard is designed to make prompt improvement fast and lo
 8. Monitor the feed over the next few jobs: edited rate for scope parsing drops; confidence rises
 9. If the new prompt made things worse: click **Revert** on the prompts page → `previous_prompt` becomes `system_prompt` again
 
-This cycle — observe → pattern-match → tune → monitor — is how the system improves over time without retraining any model.
+This cycle — observe → pattern-match → tune → monitor — is how the system improves over time without retraining any model. The learning module (§24) automates it for the features on it: the office's corrections become examples and lessons with no prompt editing.
 
 ---
 
@@ -3956,13 +3956,13 @@ This section slots in as **Phase 6c**, after Phase 6b (Action Queue) is complete
 
 ---
 
-## 22. AI Assistant — Three-Mode Architecture & Playbook System
+## 22. AI Assistant — Chat and Do It
 
 ### 22.1 Concept Overview
 
-The IRC Master AI assistant evolves beyond a conversational chatbot into a three-mode operator interface. The single assistant window handles asking questions, executing actions, and being taught new workflows — all without navigating to settings pages or requiring developer involvement for routine operational changes.
+The IRC Master AI assistant is an operator interface: the single assistant window handles asking questions and executing actions. It is **not taught by hand** — the Teach mode and its playbooks were retired in Oct 2026. The AI learns in the background from what the office actually does with its proposals: see §24 Learning module.
 
-The mental model is a new employee: starts knowing the basics, gets taught new things over time through normal operations, accumulates hundreds of workflows, handles insurer-specific variations, and gets progressively better at the job. Unlike a real employee, the teaching is fast — a 30-second dictation for a temporary rule, a 2-minute walkthrough for a repeating process.
+The mental model is a new employee: starts knowing the basics, picks things up by watching what the office does day to day, handles insurer-specific variations, and gets progressively better at the job — without anyone writing rules down for it.
 
 ---
 
@@ -4011,127 +4011,29 @@ This is the same execution layer as automatic Action Cards (Section 19) but with
 
 ---
 
-### 22.4 Mode 3 — Teach It (Playbook System)
+### 22.4 Mode 3 — Teach It (retired)
 
-**Status: Deferred — build after Mode 2 is solid in production**
+**Retired Oct 2026, replaced by §24 Learning module.** Teach mode had the office dictate rules and workflows, structured them into "Brain" entries (`brain_entries`) and playbooks (`playbooks`, `playbook_runs`), and needed each one approved by hand. In practice it held three entries and none ever ran in an action card. Removed: the Teach tab and its Cmd/Ctrl+Shift+T hotkey, `/api/brain/*`, `lib/brain`, `types/brain.ts`, `components/brain` (the review widget and correction prompt), `hooks/useTrackedField.ts`, and the three tables (migration `20261112_learning_module.sql` moved the two approved workflows into `learning_lessons`; `20261113_retire_brain.sql` drops them). Report generation reads `learning_lessons` instead of the Brain.
 
-The assistant can be taught new workflows through a guided interview flow, without any code changes or settings navigation. Taught workflows are saved as plain-language playbooks and executed by the AI reading them as instructions on future requests.
-
-#### 22.4.1 Three Teaching Tiers
-
-**Tier 1 — Temporary Override (30 seconds)**
-
-One-sentence operational notes with an optional expiry. Saved to `playbooks` table with `is_temporary = true`.
-
-Examples:
-- "Don't send automated emails to John Smith this week"
-- "For the next 3 days, treat all Sedgwick jobs as urgent"
-- "Hold all Gary SMS for IRC1042 until further notice"
-
-The AI reads all active temporary overrides as context before executing any action. Expired overrides are ignored automatically.
-
-**Tier 2 — New Playbook (2 minutes)**
-
-A repeating workflow described in plain language through a guided interview. The AI enters interview mode, asks the user to walk through the process step by step, then plays it back structured for confirmation before saving.
-
-**Teaching flow:**
-1. User clicks "Teach me something new" in the assistant
-2. Assistant enters interview mode: "Walk me through the process — what's the first step?"
-3. User dictates or types the steps as they would explain it to a new employee
-4. Plain-language description is sufficient — UI-level instructions work: "Click work orders, create a new one, assign it to the plumber, send it"
-5. Assistant plays it back structured: "Here's what I've recorded: Step 1... Step 2... This applies when... Does this look right?"
-6. User confirms or corrects
-7. Saved as a named playbook entry in Supabase
-
-**Tier 3 — Proper Action Card (developer work)**
-
-When a Tier 2 playbook proves it repeats frequently and is high-stakes, it gets promoted to a coded, deterministic action card in `rules.ts`. This is the signal: Tier 2 usage proves the pattern is worth the engineering investment.
-
-#### 22.4.2 Playbook Corrections and Modifications
-
-When the AI executes a playbook and something is wrong:
-- User corrects the execution outcome
-- Provides context: "This was wrong — here's the correct process. Note: this only applies when X"
-- Assistant saves the correction annotated alongside the original playbook
-- Next execution uses the corrected version
-- Persistent corrections that change the base process prompt a "Save as updated playbook?" confirmation
-
-Corrections do not automatically modify code. They modify the plain-language playbook. Code promotion remains a deliberate developer decision.
-
-#### 22.4.3 Insurer-Specific Overrides
-
-Playbooks support insurer-scoped variants. A base playbook runs for all jobs, but insurer-specific rules overlay on top.
-
-Example: "Sedgwick now wants BAR reports submitted with a cover sheet — add this step for all Sedgwick jobs."
-
-The overlay is saved tagged with `client_id` (the insurer's ID). The base playbook is unchanged. When the assistant executes for a Sedgwick job, it reads: base playbook + any active Sedgwick overlays.
+Standing instructions now come from normal work: what the office types in **Tell the AI what to change** is recorded as an instruction and weighs more than an edit (§24).
 
 ---
 
-### 22.5 Database — playbooks Table
+### 22.5 Assistant UI Layout
 
-```sql
-CREATE TABLE playbooks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  name TEXT NOT NULL,                        -- human-readable name e.g. "Reschedule appointment"
-  description TEXT,                          -- what this playbook does
-  steps TEXT NOT NULL,                       -- plain-language steps as dictated/confirmed
-  trigger_keywords TEXT[],                   -- keywords that help the AI match this playbook to a request
-  client_id UUID REFERENCES clients(id),     -- null = applies to all; set = insurer-specific overlay
-  job_type TEXT,                             -- null = all job types; or specific type filter
-  is_temporary BOOLEAN DEFAULT false,        -- true = temporary override
-  expires_at TIMESTAMPTZ,                    -- for temporary overrides; null = permanent
-  is_active BOOLEAN DEFAULT true,
-  tier INTEGER DEFAULT 2,                    -- 1 = temporary, 2 = playbook, 3 = promoted to action card
-  promoted_rule_key TEXT,                    -- if tier = 3, the rules.ts key it was promoted to
-  corrections JSONB DEFAULT '[]',            -- array of annotated corrections with context
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_playbooks_tenant ON playbooks(tenant_id);
-CREATE INDEX idx_playbooks_client ON playbooks(client_id);
-CREATE INDEX idx_playbooks_active ON playbooks(tenant_id, is_active, expires_at);
-```
-
----
-
-### 22.6 Assistant UI Layout
-
-The assistant panel (existing widget) gains a mode selector at the top:
+The assistant panel has a mode selector at the top:
 
 ```
-[ Chat ]  [ Do It ]  [ Teach ]
+[ Chat ]  [ Do It ]
 ```
 
 **Chat mode:** Existing conversational interface.
 
-**Do It mode:** Grid of intent buttons for common actions. Free-text input below for unlisted intents. Context dialog → confirmation → execution → result.
-
-**Teach mode:** Two options presented:
-- "Quick note or override" → single text input → optional expiry → save
-- "Teach a new process" → enters guided interview flow → structured playback → confirm → save
-
-A "Playbook Library" link in the Teach mode opens a simple list of all saved playbooks with edit/deactivate options. This is the only Settings navigation required — everything else happens inside the assistant window.
+**Do It mode:** Grid of intent buttons for common actions. Free-text input below for unlisted intents. Context dialog → confirmation → execution → result. (Not built yet: shows "Coming soon".)
 
 ---
 
-### 22.7 AI Execution with Playbooks
-
-When a Mode 2 action request comes in that doesn't match a known action card:
-
-1. Assistant searches `playbooks` for intent match (keyword + embedding similarity)
-2. If match found: reads playbook steps as instructions, executes, shows step-by-step result
-3. If no match found: attempts best-guess execution OR surfaces "I don't know how to do this — would you like to teach me?"
-4. Post-execution: user can confirm correct or flag incorrect → correction flow
-
-All active temporary overrides (`is_temporary = true`, `expires_at > now()`) are injected as context into every execution call, regardless of playbook match.
-
----
-
-### 22.8 iPhone Shortcut Integration (Future)
+### 22.6 iPhone Shortcut Integration (Future)
 
 A companion capability to the assistant — a native iPhone Shortcut that hits IRC Master API routes directly for field/phone-call scenarios.
 
@@ -4140,7 +4042,6 @@ A companion capability to the assistant — a native iPhone Shortcut that hits I
 **Capabilities:**
 - Same Mode 2 action card execution as the in-app assistant
 - Photo/file attachment: Apple Shortcuts can base64-encode an image or PDF and pass it to the API call. Claude vision parses the content (damage photo → job note, invoice photo → filed against job, insurer PDF → extracted and filed).
-- Reads active playbooks same as in-app assistant
 - Tenant ID and auth token stored in Shortcut as constants
 
 **Use case:** Phone call comes in mid-job. Tap shortcut, dictate "reschedule IRC1042 to Thursday 2pm, plumber confirmed". Done in 15 seconds without opening the app.
@@ -4149,52 +4050,12 @@ A companion capability to the assistant — a native iPhone Shortcut that hits I
 
 ---
 
-### 22.9 Build Sequence
-
-This section slots in as **Phase 7**, after Phase 6c (AI & Automation Dashboard) is complete.
-
-**Prerequisites before starting Phase 7:**
-- Mode 2 action cards working reliably in production for at least 5–6 common actions
-- `action_queue` and `automation_audit` tables live with real data
-- At least 2 weeks of real execution data visible in the AI Activity Dashboard
-
-**Phase 7a — Playbook Foundation**
-1. Create `playbooks` table + RLS + indexes (Section 22.5)
-2. Seed with 3–5 manually written playbooks for most common operations (gives the AI something to work from on day one)
-3. Wire playbook lookup into Mode 2 execution path — if no action card match, check playbooks before surfacing "unknown intent"
-
-**Phase 7b — Mode 3 Teach UI**
-4. Add mode selector (Chat / Do It / Teach) to assistant panel
-5. Build Tier 1 quick override flow — text input, optional expiry, save to `playbooks`
-6. Build Tier 2 guided interview flow — multi-turn conversation, structured playback, confirm, save
-7. Build Playbook Library view — list, edit, deactivate
-
-**Phase 7c — Corrections and Overlays**
-8. Build correction flow — post-execution flag, annotation save, updated playbook
-9. Build insurer overlay support — `client_id` scoped playbook variants
-10. Inject active temporary overrides into all execution calls
-
-**Phase 7d — iPhone Shortcut (deferred, separate build)**
-11. Build `/api/assistant/action/route.ts` — public-facing action endpoint with token auth
-12. Build Apple Shortcut with dictation input, base64 file handling, response display
-13. Document setup process for Kyle's iPhone
-
-**Do not start Phase 7 until** Mode 2 action cards are solid and proven in production. The playbook system has no value if the underlying execution layer is unreliable.
-
----
-
-### 22.10 Key Decisions
+### 22.7 Key Decisions
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Plain language playbooks, not structured code | Plain language | Kyle can create and edit without developer involvement; AI reads them as instructions |
-| Three tiers (temporary / playbook / action card) | Three tiers | Matches real operational urgency — not everything needs to be permanent or coded |
-| Playbooks stored in Supabase, not files | Supabase | Tenant-scoped, RLS-protected, queryable, editable via UI |
-| Corrections annotated, not overwriting | Annotated JSONB | Preserves history; context about when a correction applies is valuable |
-| Insurer overlays via client_id scoping | client_id on playbook | Base playbook unchanged; insurer-specific steps layered on top |
+| No hand-written playbooks or rules | Retired Teach mode | The office shouldn't maintain or review rules; the AI learns from what's done (§24) |
 | iPhone shortcut hits API routes directly | API routes | No dependency on UI navigation; same execution layer as in-app assistant |
-| Build after Mode 2 is solid | Deferred | Playbook system has no value if underlying action execution is unreliable |
-| Tier 3 promotion is a developer decision | Manual | Frequent Tier 2 usage signals the pattern is worth coding; promotion is never automatic |
 
 ---
 
@@ -4336,12 +4197,66 @@ Every incoming email gets an action card: what it says, where the job stands, an
 - **Tell the AI what to change:** the office types what they want; `POST /api/actions/suggest { threadId, feedback }` remakes the card with `generateCard(…, { feedback })` — the earlier title and steps and their instructions go in the first message, and the instructions override the AI's own view (a card they asked about isn't closed as "Already replied"). **For one step:** `POST /api/actions/suggest { cardId, stepId, feedback }` → `resuggestStep` (`lib/actions/propose.ts`) holds the card (`generating`), and `generateCard(…, { feedback, step })` tells the AI only that step is to change; what it proposes replaces that step in place (`replaceStep`; nothing proposed takes it off). The other steps — composer-edited emails included — the title and the summary stay; the replaced step's draft is discarded. If the AI fails the card goes back to `pending` unchanged and the route returns the reason.
 - **Routes** (all `mail.view`; changes also need permission `actions.review`, Email group, office on / inspectors off): `GET /api/actions?view=pending|done&category=&job=`, `GET /api/actions/thread/[threadId]`, `POST /api/actions/[id]/confirm` `{ steps: [{ id, args? }] }`, `POST /api/actions/[id]/skip`, `POST /api/actions/[id]/category` `{ category }`, `POST /api/actions/star` `{ threadId, category | null }` (logged), `POST /api/actions/suggest` `{ threadId }` (make or remake one now). `GET /api/mail/threads` returns each row's star (`cards`: id, status, title, category).
 - **Voice and chat:** `list_action_cards`, `read_action_card`, `confirm_action_card`, `skip_action_card`, `star_email` (§10b; `list_mailbox` shows stars) — the same functions; cards never propose these tools themselves.
+- **Learning** (§24.3, `lib/actions/learning.ts`, migration `20261112_learning_module.sql`: `ai_steps`, `situation`): each card keeps the AI's own steps and the situation it was made in. When it's done, skipped or sent back with instructions, what the office changed is recorded in `learning_events`. The next card in a like situation reads those cases (and the lessons) before proposing.
+
+---
+
+## 24. Learning module (`lib/learning`)
+
+The one way the AI learns, for every AI feature. It replaced the Brain and Teach mode (§22.4) in Oct 2026. The goal: proposals the office confirms untouched almost every time, without anyone writing, reviewing or approving rules.
+
+**The idea:** every time a person decides on something an AI proposed, the feature records the decision together with the *situation* it was in: who it was from, which insurer, the job's stage and so on. When the AI next proposes something, it's shown the most alike past cases and what the person actually did. Habits carry over only where the situation matches. "Copy in the assessor" learned on Allianz make safes from one assessor isn't applied to every Allianz email. Cases that differ in ways that matter don't match, and cases where the AI was left alone count as evidence that it got it right.
+
+### 24.1 Tables (migration `20261112_learning_module.sql`, server only — RLS on, no browser policies)
+
+- **`learning_events`**: one row per decision. `feature` (`action_card`, later `order_parse`, `report`, `quote`…), `source_table` / `source_id` (the record it was about), `situation` jsonb (flat facts the feature chooses), `situation_text` (one line, for the AI to read), `proposed` / `final` jsonb (the feature's own shape), `changes` jsonb (one plain line per change: "Dropped: Add job note", "Reply: cc changed from (nothing) to assessor@…", "Reply: the office rewrote the email. What went: "…""), `outcome` (`accepted` as proposed / `edited` / `skipped` nothing done / `instructed` sent back with instructions), `instruction` (what they typed), `user_id` (who; staff habits can be told apart from company practice later), `created_at`.
+- **`learning_lessons`**: what the cases add up to. `feature`, `applies_when` (the situation it applies to, in words), `lesson`, `status` (`active` / `retired`), `source` (`learned` by the nightly review, `migrated` from the Brain), `support_count` / `contradict_count` (its track record), `evidence_ids` (the events behind it), `retired_reason`.
+
+### 24.2 The shared functions (`lib/learning/events.ts`, `lib/learning/lessons.ts`)
+
+- `recordLearning(db, event)` records one decision. It never throws, so learning never gets in the way of the work.
+- `similarCases(db, { tenantId, feature, situation, likeness, excludeSourceId, limit = 4 })` finds the most alike past cases among the feature's last 400. A feature's `Likeness` gives a weight per situation fact. Plain facts must be equal (ignoring case); text facts such as a subject score by shared words. Cases below `minScore` aren't used. Ties go to the newer case. This is deterministic and cheap: no embeddings are needed at the office's volume.
+- `formatCases(cases)` and `formatLessons(lessons)` produce the blocks the AI reads ("WHAT THE OFFICE DID IN SIMILAR PAST CASES", "LESSONS FROM THE OFFICE'S PAST DECISIONS"), each telling it to follow a habit only where the case matches. `activeLessons(db, tenantId, feature)` returns a feature's active lessons, best supported first.
+
+### 24.3 Action cards — the first feature on it (`lib/actions/learning.ts`)
+
+- **Situation** (`cardSituation`, kept on the card in `action_queue.situation`): kind (email / follow-up), the latest sender from outside the office (email, name, and domain unless it's free mail like gmail), the subject (or the follow-up's note), whether it's on a job, and the job's insurer, job type, stage and loss type. Likeness weights: sender email 4, subject words 3, sender domain 2, insurer 2, stage 1.5, kind 1, job type 1, loss type 0.5, on a job 0.5; a case needs 3 to count.
+- **The AI's own proposal** is kept in `action_queue.ai_steps` when the card is made (and updated in place when the AI changes one step). The office's edits change `steps`, never `ai_steps`, so the two can be compared.
+- **Recorded** (`recordCardDecision`, `compareCard`):
+  - when a card is done (`confirmCard`, once every step has run or been skipped, including emails sent from a step's composer);
+  - when it's skipped (`skipCard`, from the page, voice and chat).
+
+  Each step is compared with the AI's version: a step that ran unchanged needs no line. An edited field gets a line. An email rewritten in the composer is read from its draft (`htmlText`) and its new text kept (up to 700 characters). A proposed step that didn't run is "Dropped", and a step the office added is "Added". **Tell the AI what to change** (whole card or one step, from the page, voice or chat) records an `instructed` event with what they typed (`recordCardInstruction`). A plain Re-suggest records nothing. Cards made before the module (no `ai_steps`) aren't recorded.
+- **Read** (`cardLearning`): when `generateCard` makes or remakes a card, the active lessons and the 4 most alike past cards (not this card's own) go into the first message after the conversation and job file. The system prompt says their habits outweigh the AI's defaults where the case matches, and that THE OFFICE'S INSTRUCTIONS outweigh both.
+
+### 24.4 Other features
+
+- **Reports** (`lib/reports/generate.ts`) read `activeLessons(…, 'report')` into the system prompt beside the similar-report lookup. They don't record yet.
+- **Order parsing** still has its own per-client examples (`parser_examples`, saved from the "Save as learning example" prompt on the Insurer orders page). It's the next feature to move onto this module, so that its corrections are recorded automatically and the prompt goes.
+
+**To add a feature:** pick its situation facts and a `Likeness`. Call `recordLearning` wherever a person confirms, edits, rejects or instructs one of its outputs (keeping the AI's original output alongside the record, as `ai_steps` does). Put `formatLessons` and `formatCases` into its prompt. Nothing else is needed: no settings, no review screen.
+
+### 24.5 Next
+
+1. **Nightly review:** a stronger model reads the day's events, including the untouched ones, and keeps `learning_lessons`:
+   - **Writes lessons narrow.** It writes lessons only for patterns seen more than once, scoped as tightly as the evidence shows. A single edit stays an example.
+   - **Keeps track records.** It adds support and contradictions as new cases come in.
+   - **Narrows `applies_when`** when a lesson is contradicted (the AI copied someone in and the office took them out).
+   - **Retires lessons on its own** when their track record drops.
+   - **Weighs instructions as general or one-off** before making them a lesson.
+
+   No one approves anything. An optional read-only "What the AI has learned" page will list lessons, with an off switch for a wrong one.
+2. **Measure it:** the share of cards confirmed untouched, by kind of card, over time.
+3. **Auto-confirm:** a kind of card that's consistently untouched (e.g. 98% over 50 cards) can be set to run by itself, within the user permissions (§6).
+4. **More features:** order parsing (above), then reports, quotes and scope, each recording their edits.
 
 ---
 
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Oct 2026): Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*
+
 *Changes in v3.3: Added Section 22 (AI Assistant Three-Mode Architecture & Playbook System — Mode 1 Chat, Mode 2 Do It / Manual Action Cards, Mode 3 Teach / Playbook System, three teaching tiers, playbooks table schema, assistant UI layout, AI execution with playbooks, iPhone Shortcut integration, build sequence Phase 7, key decisions). Concept derived from operational brainstorm: natural language operator interface, self-teaching playbook library, insurer-specific overlays, temporary overrides, iPhone shortcut for field/phone-call scenarios.)*
 
 ---

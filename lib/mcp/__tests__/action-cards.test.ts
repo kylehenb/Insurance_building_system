@@ -192,7 +192,7 @@ describe('update_action_card', () => {
     process.env.ANTHROPIC_API_KEY = 'k'
     const out = await updateActionCard.run({ card_id: CARD_ID, redo_with: 'they want a quote' }, ctx)
     process.env.ANTHROPIC_API_KEY = before
-    expect(resuggestCard).toHaveBeenCalledWith(ctx.supabase, 't1', { cardId: CARD_ID }, 'they want a quote')
+    expect(resuggestCard).toHaveBeenCalledWith(ctx.supabase, 't1', { cardId: CARD_ID }, 'they want a quote', 'u1')
     expect(out.text).toContain('had the AI redo it')
     expect((await updateActionCard.run({ card_id: CARD_ID, redo_with: 'x', remove_steps: ['s1'] }, ctx)).isError).toBe(true)
   })
@@ -203,7 +203,7 @@ describe('update_action_card', () => {
     const step = stored!.steps[0]
     const out = await updateActionCard.run({ card_id: CARD_ID, redo_step: { step_id: step.id, with: 'make it shorter' } }, ctx)
     process.env.ANTHROPIC_API_KEY = before
-    expect(resuggestStep).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, step.id, 'make it shorter')
+    expect(resuggestStep).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, step.id, 'make it shorter', 'u1')
     expect(out.text).toContain(`had the AI change "${step.summary}"`)
     expect(out.text).toContain('Changed: make it shorter')
     expect((await updateActionCard.run({ card_id: CARD_ID, redo_step: { step_id: step.id, with: '' } }, ctx)).isError).toBe(true)

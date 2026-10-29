@@ -4,49 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentUser } from '@/components/layout/current-user'
-import type {
-  StructuredTeachOutput,
-  SimilarityMatch,
-  BrainEntryCategory,
-} from '@/types/brain'
-
-// Web Speech API inline type declarations (no external package required)
-interface SpeechRecognitionAlternative {
-  readonly transcript: string
-  readonly confidence: number
-}
-interface SpeechRecognitionResult {
-  readonly isFinal: boolean
-  readonly length: number
-  item(index: number): SpeechRecognitionAlternative
-  [index: number]: SpeechRecognitionAlternative
-}
-interface SpeechRecognitionResultList {
-  readonly length: number
-  item(index: number): SpeechRecognitionResult
-  [index: number]: SpeechRecognitionResult
-}
-interface SpeechRecognitionEvent extends Event {
-  readonly resultIndex: number
-  readonly results: SpeechRecognitionResultList
-}
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start(): void
-  stop(): void
-  abort(): void
-  onresult: ((event: SpeechRecognitionEvent) => void) | null
-  onerror: (() => void) | null
-  onend: (() => void) | null
-}
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition
-    webkitSpeechRecognition?: new () => SpeechRecognition
-  }
-}
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,8 +35,7 @@ interface Props {
   tenantId: string
 }
 
-type ActiveMode = 'chat' | 'doit' | 'teach'
-type ProcessStep = 'form' | 'structuring' | 'review' | 'saved'
+type ActiveMode = 'chat' | 'doit'
 
 export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const pathname = usePathname()
@@ -121,33 +77,12 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   // ── Mode selector ──
   const [activeMode, setActiveMode] = useState<ActiveMode>('chat')
 
-  // ── Teach mode state ──
-  const [processStep, setProcessStep] = useState<ProcessStep>('form')
-  const [dictationText, setDictationText] = useState('')
-  const [triggerText, setTriggerText] = useState('')
-  const [structuredOutput, setStructuredOutput] = useState<StructuredTeachOutput | null>(null)
-  const [editedOutput, setEditedOutput] = useState<StructuredTeachOutput | null>(null)
-  const [isEditingReview, setIsEditingReview] = useState(false)
-  const [similarityMatches, setSimilarityMatches] = useState<SimilarityMatch[]>([])
-  const [isSaving, setIsSaving] = useState(false)
-  const [savedResult, setSavedResult] = useState<{ brainEntryId: string; playbookId: string | null } | null>(null)
-  const [structureError, setStructureError] = useState<string | null>(null)
-  const [newTagInput, setNewTagInput] = useState('')
-
-  // Dictation / Web Speech API state
-  const [isListening, setIsListening] = useState(false)
-  const [interimTranscript, setInterimTranscript] = useState('')
-  const [speechSupported, setSpeechSupported] = useState(false)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-
-  // Permission gate
-  const { userId, canTeach: userCanTeach } = useCurrentUser()
+  const { userId } = useCurrentUser()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   // The full conversation (tool calls included) the server hands back each turn
   const historyRef = useRef<unknown[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const teachTextareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPopoverRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -158,9 +93,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   const sizeRef = useRef(size)
   posRef.current = pos
   sizeRef.current = size
-
-  // Stable ref for the open-teach event handler (avoids stale closures in effect)
-  const handleOpenTeachRef = useRef<() => void>(() => {})
 
   // Initialise from localStorage after mount
   useEffect(() => {
@@ -177,14 +109,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
       setPos({ x: window.innerWidth - DEFAULT_W - 24, y: window.innerHeight - DEFAULT_H - 24 })
     }
     setMounted(true)
-  }, [])
-
-  // Detect Web Speech API support
-  useEffect(() => {
-    setSpeechSupported(
-      typeof window !== 'undefined' &&
-      !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-    )
   }, [])
 
   // Persist position
@@ -268,185 +192,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
     )
     setSlashSelectedIdx(0)
   }, [slashQuery, templates, showSlashPopover])
-
-  // Reset teach state when leaving teach mode
-  useEffect(() => {
-    if (activeMode !== 'teach') {
-      resetTeachState()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMode])
-
-  // Keep open-teach handler current (avoids stale closures)
-  handleOpenTeachRef.current = () => {
-    if (!userCanTeach) return
-    setActiveMode('teach')
-    setProcessStep('form')
-    setTimeout(() => teachTextareaRef.current?.focus(), 100)
-  }
-
-  // Listen for global fai-open-teach event (fired by dashboard hotkey)
-  useEffect(() => {
-    function handler() { handleOpenTeachRef.current() }
-    window.addEventListener('fai-open-teach', handler)
-    return () => window.removeEventListener('fai-open-teach', handler)
-  }, [])
-
-  // ── Teach helpers ──
-  function stopListening() {
-    if (recognitionRef.current) {
-      recognitionRef.current.abort()
-      recognitionRef.current = null
-    }
-    setIsListening(false)
-    setInterimTranscript('')
-  }
-
-  function resetTeachState() {
-    stopListening()
-    setProcessStep('form')
-    setDictationText('')
-    setTriggerText('')
-    setStructuredOutput(null)
-    setEditedOutput(null)
-    setIsEditingReview(false)
-    setSimilarityMatches([])
-    setIsSaving(false)
-    setSavedResult(null)
-    setStructureError(null)
-    setNewTagInput('')
-    setInterimTranscript('')
-  }
-
-  function toggleListening() {
-    if (isListening) {
-      stopListening()
-      return
-    }
-
-    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognitionCtor) return
-
-    const recognition = new SpeechRecognitionCtor()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-AU'
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i]
-        if (result.isFinal) {
-          const finalWord = result[0].transcript
-          setDictationText((prev) => prev + (prev ? ' ' : '') + finalWord.trim())
-          interim = ''
-        } else {
-          interim += result[0].transcript
-        }
-      }
-      setInterimTranscript(interim)
-    }
-
-    recognition.onerror = () => {
-      stopListening()
-    }
-
-    recognition.onend = () => {
-      setIsListening(false)
-      setInterimTranscript('')
-      recognitionRef.current = null
-    }
-
-    recognitionRef.current = recognition
-    recognition.start()
-    setIsListening(true)
-  }
-
-  async function handleTeachSubmit() {
-    if (!dictationText.trim()) return
-    stopListening()
-    setProcessStep('structuring')
-    setStructureError(null)
-    try {
-      const structureRes = await fetch('/api/brain/teach/structure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dictation: dictationText, trigger: triggerText, tenantId }),
-      })
-      if (!structureRes.ok) throw new Error('Structure failed')
-      const structured = await structureRes.json() as StructuredTeachOutput
-      setStructuredOutput(structured)
-
-      // Similarity check (non-blocking)
-      try {
-        const simRes = await fetch('/api/brain/teach/similarity-check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: structured.title, trigger_condition: structured.trigger_condition, tags: structured.tags, tenantId }),
-        })
-        if (simRes.ok) {
-          const { matches } = await simRes.json() as { matches: SimilarityMatch[] }
-          setSimilarityMatches(matches)
-        }
-      } catch {
-        // non-fatal
-      }
-
-      setProcessStep('review')
-    } catch {
-      setStructureError('Failed to structure your teaching. Please try again.')
-      setProcessStep('form')
-    }
-  }
-
-  async function approveSave(saveMode: 'new' | 'example' | 'variant' = 'new', sourceRefId?: string) {
-    const output = isEditingReview ? editedOutput : structuredOutput
-    if (!output) return
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/brain/teach/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ structured: output, tenantId, saveMode, sourceRefId }),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      const result = await res.json() as { brainEntryId: string; playbookId: string | null }
-      setSavedResult(result)
-      setProcessStep('saved')
-    } catch {
-      // keep review open on error
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  function enterEditMode() {
-    if (!structuredOutput) return
-    setEditedOutput(JSON.parse(JSON.stringify(structuredOutput)) as StructuredTeachOutput)
-    setIsEditingReview(true)
-  }
-
-  function updateEditedStep(index: number, value: string) {
-    if (!editedOutput) return
-    const steps = editedOutput.steps.map((s, i) =>
-      i === index ? { ...s, description: value } : s
-    )
-    setEditedOutput({ ...editedOutput, steps })
-  }
-
-  function removeEditedTag(tag: string) {
-    if (!editedOutput) return
-    setEditedOutput({ ...editedOutput, tags: editedOutput.tags.filter((t) => t !== tag) })
-  }
-
-  function addEditedTag(tag: string) {
-    if (!editedOutput || !tag.trim()) return
-    const clean = tag.trim().toLowerCase().replace(/\s+/g, '-')
-    if (!editedOutput.tags.includes(clean)) {
-      setEditedOutput({ ...editedOutput, tags: [...editedOutput.tags, clean] })
-    }
-    setNewTagInput('')
-  }
 
   // ── Chat helpers ──
   async function loadTemplates() {
@@ -676,8 +421,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
   if (!mounted || !visible) return null
 
   const isFormOpen = isCreating || editingTemplate !== null
-  const displayOutput = isEditingReview ? editedOutput : structuredOutput
-  const visibleModes: ActiveMode[] = userCanTeach ? ['chat', 'doit', 'teach'] : ['chat', 'doit']
+  const visibleModes: ActiveMode[] = ['chat', 'doit']
 
   return (
     <>
@@ -911,126 +655,10 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         }
         .fai-file-bubble-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* Teach mode */
         .fai-coming-soon {
           flex: 1; display: flex; align-items: center; justify-content: center;
           font-size: 13px; color: var(--faint-3); background: var(--paper);
         }
-        .fai-teach-panel {
-          flex: 1; overflow-y: auto; background: var(--paper); min-height: 0;
-        }
-        .fai-teach-panel::-webkit-scrollbar { width: 3px; }
-        .fai-teach-panel::-webkit-scrollbar-thumb { background: var(--line-5); border-radius: 2px; }
-
-        .fai-teach-section { padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 12px; }
-
-        .fai-teach-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--subtle-3); font-weight: 700; margin-bottom: 4px; display: block; }
-        .fai-teach-textarea {
-          width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 10px 12px;
-          font-size: 13px; font-family: inherit; color: var(--ink); outline: none;
-          transition: border-color 0.2s; resize: vertical; line-height: 1.55;
-          min-height: 90px;
-        }
-        .fai-teach-textarea:focus { border-color: var(--tan); background: var(--paper); }
-        .fai-teach-textarea::placeholder { color: var(--faint-3); }
-        .fai-teach-input {
-          width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 8px 12px;
-          font-size: 12px; font-family: inherit; color: var(--ink); outline: none;
-          transition: border-color 0.2s;
-        }
-        .fai-teach-input:focus { border-color: var(--tan); background: var(--paper); }
-        .fai-teach-input::placeholder { color: var(--faint-3); }
-        .fai-teach-select {
-          width: 100%; box-sizing: border-box; background: #f7f5f2;
-          border: 0.5px solid var(--line-2); border-radius: 8px; padding: 7px 10px;
-          font-size: 12px; font-family: inherit; color: var(--ink); outline: none;
-          transition: border-color 0.2s; cursor: pointer;
-        }
-        .fai-teach-select:focus { border-color: var(--tan); }
-
-        .fai-teach-btn {
-          font-family: inherit; font-size: 12px; font-weight: 600;
-          border-radius: 8px; border: none; cursor: pointer; padding: 9px 16px;
-          transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
-        }
-        .fai-teach-btn.primary { background: var(--ink); color: var(--cream); }
-        .fai-teach-btn.primary:hover { background: var(--ink-hover); }
-        .fai-teach-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-        .fai-teach-btn.success { background: var(--teal); color: var(--paper); }
-        .fai-teach-btn.success:hover { background: #235a42; }
-        .fai-teach-btn.success:disabled { opacity: 0.45; cursor: not-allowed; }
-        .fai-teach-btn.outline { background: transparent; color: var(--brown-500); border: 1px solid var(--line-strong-3); }
-        .fai-teach-btn.outline:hover { border-color: var(--subtle-3); }
-        .fai-teach-btn.sm { font-size: 11px; padding: 5px 10px; border-radius: 6px; }
-
-        /* Mic button */
-        .fai-mic-btn {
-          position: absolute; top: 8px; right: 8px;
-          width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          background: var(--line-faint); color: var(--subtle-3); transition: all 0.15s;
-          font-size: 13px;
-        }
-        .fai-mic-btn:hover { background: var(--line-5); color: var(--brown-500); }
-        .fai-mic-btn.listening { background: #fdf0ee; color: var(--rust); animation: fai-mic-pulse 1.4s ease-in-out infinite; }
-        @keyframes fai-mic-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(160,82,74,0.4); }
-          50% { box-shadow: 0 0 0 5px rgba(160,82,74,0); }
-        }
-        .fai-interim { font-size: 11px; color: var(--faint-3); font-style: italic; min-height: 16px; line-height: 1.4; }
-
-        /* Review card */
-        .fai-review-card {
-          border: 0.5px solid var(--line-2); border-radius: 8px; background: var(--surface-6);
-          overflow: hidden;
-        }
-        .fai-review-header { padding: 12px 14px; border-bottom: 0.5px solid var(--line-faint); }
-        .fai-review-title { font-size: 13px; font-weight: 700; color: var(--ink-brown); }
-        .fai-review-trigger { font-size: 11px; color: var(--brown-500); margin-top: 4px; line-height: 1.5; }
-        .fai-review-section { padding: 10px 14px; border-bottom: 0.5px solid var(--line-faint); }
-        .fai-review-section:last-child { border-bottom: none; }
-        .fai-review-section-label { font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint-3); font-weight: 700; margin-bottom: 6px; }
-        .fai-review-step { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--ink-brown); line-height: 1.5; }
-        .fai-review-step-num { color: var(--tan); font-weight: 700; flex-shrink: 0; min-width: 16px; }
-        .fai-review-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-        .fai-review-chip {
-          background: var(--cream); border: 0.5px solid var(--line-2); border-radius: 20px;
-          padding: 2px 8px; font-size: 10px; color: var(--brown-500); font-weight: 500;
-          display: inline-flex; align-items: center; gap: 4px;
-        }
-        .fai-chip-remove {
-          background: none; border: none; cursor: pointer; color: var(--faint-3);
-          padding: 0; line-height: 1; font-size: 11px; transition: color 0.15s;
-        }
-        .fai-chip-remove:hover { color: var(--rust); }
-        .fai-review-vars { font-size: 11px; color: var(--subtle-3); font-family: 'DM Mono', monospace; }
-
-        .fai-similar-header { font-size: 11px; color: #c8844a; font-weight: 600; margin: 4px 0; display: flex; align-items: center; gap: 6px; }
-        .fai-similar-card {
-          border: 0.5px solid var(--line-faint); border-radius: 6px; padding: 10px 12px;
-          background: var(--surface-9); margin-bottom: 6px;
-        }
-        .fai-similar-title { font-size: 12px; font-weight: 600; color: var(--ink-brown); margin-bottom: 2px; }
-        .fai-similar-meta { font-size: 10px; color: var(--subtle-3); margin-bottom: 6px; }
-        .fai-similar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-        .fai-review-actions { display: flex; gap: 8px; margin-top: 12px; }
-
-        .fai-teach-confirm {
-          border: 0.5px solid #c8e6d8; border-radius: 8px; background: #f0faf5;
-          padding: 14px; text-align: center;
-        }
-        .fai-teach-confirm-icon { font-size: 22px; margin-bottom: 6px; }
-        .fai-teach-confirm-text { font-size: 13px; font-weight: 600; color: var(--teal); margin-bottom: 4px; }
-        .fai-teach-confirm-sub { font-size: 11px; color: #4a8a68; }
-
-        .fai-teach-error { font-size: 11px; color: var(--rust); background: #fdf0ee; border: 0.5px solid #e8c8c4; border-radius: 6px; padding: 8px 10px; }
-
-        .fai-structuring { padding: 24px 16px; text-align: center; }
-        .fai-structuring-text { font-size: 13px; color: var(--brown-500); font-style: italic; }
-        .fai-structuring-sub { font-size: 11px; color: var(--faint-3); margin-top: 4px; }
       `}</style>
 
       <div
@@ -1076,7 +704,7 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => setActiveMode(mode)}
             >
-              {mode === 'chat' ? 'Chat' : mode === 'doit' ? 'Do It' : 'Teach'}
+              {mode === 'chat' ? 'Chat' : 'Do It'}
             </button>
           ))}
         </div>
@@ -1253,260 +881,6 @@ export function FloatingAssistant({ visible, onClose, tenantId }: Props) {
         {/* ── Do It mode ── */}
         {activeMode === 'doit' && (
           <div className="fai-coming-soon">Coming soon</div>
-        )}
-
-        {/* ── Teach mode ── */}
-        {activeMode === 'teach' && (
-          <div className="fai-teach-panel">
-
-            {/* Unified form */}
-            {processStep === 'form' && (
-              <div className="fai-teach-section">
-                {structureError && (
-                  <div className="fai-teach-error">{structureError}</div>
-                )}
-
-                <div>
-                  <div style={{ position: 'relative' }}>
-                    <textarea
-                      ref={teachTextareaRef}
-                      className="fai-teach-textarea"
-                      placeholder="Teach IRC something — a rule, a tone note, or walk through a process step by step..."
-                      value={dictationText}
-                      onChange={(e) => setDictationText(e.target.value)}
-                      style={{ minHeight: 110, paddingRight: speechSupported ? 44 : 12 }}
-                    />
-                    {speechSupported && (
-                      <button
-                        className={`fai-mic-btn${isListening ? ' listening' : ''}`}
-                        onClick={toggleListening}
-                        title={isListening ? 'Stop dictation' : 'Dictate with microphone'}
-                        type="button"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="5" y="1" width="6" height="9" rx="3" />
-                          <path d="M2 8a6 6 0 0 0 12 0M8 14v2M5 16h6" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                  {isListening && (
-                    <div className="fai-interim">
-                      {interimTranscript || 'Listening…'}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <span className="fai-teach-label">What triggers this? (optional)</span>
-                  <input
-                    className="fai-teach-input"
-                    placeholder="e.g. when a job is cash settled"
-                    value={triggerText}
-                    onChange={(e) => setTriggerText(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  className="fai-teach-btn primary"
-                  onClick={handleTeachSubmit}
-                  disabled={!dictationText.trim()}
-                  style={{ alignSelf: 'flex-start' }}
-                >
-                  ⚡ Teach
-                </button>
-              </div>
-            )}
-
-            {/* Structuring */}
-            {processStep === 'structuring' && (
-              <div className="fai-structuring">
-                <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.4 }}>⬡</div>
-                <div className="fai-structuring-text">Structuring what you taught…</div>
-                <div className="fai-structuring-sub">This takes a few seconds</div>
-              </div>
-            )}
-
-            {/* Review */}
-            {processStep === 'review' && displayOutput && (
-              <div className="fai-teach-section">
-                <div className="fai-review-card">
-                  <div className="fai-review-header">
-                    {isEditingReview && editedOutput ? (
-                      <input
-                        className="fai-teach-input"
-                        value={editedOutput.title}
-                        onChange={(e) => setEditedOutput({ ...editedOutput, title: e.target.value })}
-                        style={{ fontWeight: 700, fontSize: 13 }}
-                      />
-                    ) : (
-                      <div className="fai-review-title">
-                        {displayOutput.type === 'note' ? '📝' : '📋'} {displayOutput.title}
-                      </div>
-                    )}
-                    {displayOutput.trigger_condition && (
-                      isEditingReview && editedOutput ? (
-                        <textarea
-                          className="fai-teach-textarea"
-                          value={editedOutput.trigger_condition}
-                          onChange={(e) => setEditedOutput({ ...editedOutput, trigger_condition: e.target.value })}
-                          style={{ marginTop: 6, minHeight: 48, fontSize: 11 }}
-                        />
-                      ) : (
-                        <div className="fai-review-trigger">Triggers when: {displayOutput.trigger_condition}</div>
-                      )
-                    )}
-                  </div>
-
-                  {displayOutput.steps.length > 0 && (
-                    <div className="fai-review-section">
-                      <div className="fai-review-section-label">Steps</div>
-                      {displayOutput.steps.map((step, i) => (
-                        <div key={i} className="fai-review-step">
-                          <span className="fai-review-step-num">{step.order}.</span>
-                          {isEditingReview ? (
-                            <input
-                              className="fai-teach-input"
-                              value={editedOutput?.steps[i]?.description ?? step.description}
-                              onChange={(e) => updateEditedStep(i, e.target.value)}
-                              style={{ flex: 1 }}
-                            />
-                          ) : (
-                            <span>{step.description}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {displayOutput.variables.length > 0 && (
-                    <div className="fai-review-section">
-                      <div className="fai-review-section-label">Variables</div>
-                      <div className="fai-review-vars">{displayOutput.variables.join(', ')}</div>
-                    </div>
-                  )}
-
-                  <div className="fai-review-section">
-                    <div className="fai-review-section-label">Tags</div>
-                    <div className="fai-review-chips">
-                      {displayOutput.tags.map((tag) => (
-                        <span key={tag} className="fai-review-chip">
-                          {tag}
-                          {isEditingReview && (
-                            <button className="fai-chip-remove" onClick={() => removeEditedTag(tag)} title="Remove tag">×</button>
-                          )}
-                        </span>
-                      ))}
-                      {isEditingReview && (
-                        <input
-                          className="fai-teach-input"
-                          style={{ width: 100, padding: '2px 8px', fontSize: 10, borderRadius: 20, minHeight: 'unset' }}
-                          placeholder="+ add tag"
-                          value={newTagInput}
-                          onChange={(e) => setNewTagInput(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditedTag(newTagInput) } }}
-                          onBlur={() => { if (newTagInput.trim()) addEditedTag(newTagInput) }}
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="fai-review-section">
-                    <div className="fai-review-section-label">Category</div>
-                    {isEditingReview && editedOutput ? (
-                      <select
-                        className="fai-teach-select"
-                        value={editedOutput.category}
-                        onChange={(e) => setEditedOutput({ ...editedOutput, category: e.target.value as BrainEntryCategory })}
-                      >
-                        <option value="workflow">Workflow</option>
-                        <option value="rule">Rule</option>
-                        <option value="tone">Tone</option>
-                        <option value="classification">Classification</option>
-                        <option value="example">Example</option>
-                        <option value="correction">Correction</option>
-                      </select>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'var(--brown-500)', textTransform: 'capitalize' }}>{displayOutput.category}</div>
-                    )}
-                  </div>
-                </div>
-
-                {similarityMatches.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <div className="fai-similar-header">
-                      ⚠ Similar existing entries found
-                    </div>
-                    {similarityMatches.map((match) => (
-                      <div key={match.id} className="fai-similar-card">
-                        <div className="fai-similar-title">{match.title}</div>
-                        <div className="fai-similar-meta">{match.category} · {match.similarity} similarity</div>
-                        <div className="fai-similar-actions">
-                          <button
-                            className="fai-teach-btn outline sm"
-                            onClick={() => approveSave('example', match.id)}
-                            disabled={isSaving}
-                          >
-                            Add as example to this
-                          </button>
-                          <button
-                            className="fai-teach-btn outline sm"
-                            onClick={() => approveSave('variant', match.id)}
-                            disabled={isSaving}
-                          >
-                            Save as variant
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <div style={{ fontSize: 11, color: 'var(--subtle-3)', marginTop: 4 }}>Or save as new below ↓</div>
-                  </div>
-                )}
-
-                <div className="fai-review-actions">
-                  {!isEditingReview && (
-                    <button className="fai-teach-btn outline" onClick={enterEditMode}>
-                      ✏️ Edit
-                    </button>
-                  )}
-                  <button
-                    className="fai-teach-btn success"
-                    onClick={() => approveSave('new')}
-                    disabled={isSaving}
-                    style={{ flex: 1 }}
-                  >
-                    {isSaving ? 'Saving…' : '✅ Approve'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Saved */}
-            {processStep === 'saved' && (
-              <div className="fai-teach-section">
-                <div className="fai-teach-confirm">
-                  <div className="fai-teach-confirm-icon">✅</div>
-                  <div className="fai-teach-confirm-text">
-                    {savedResult?.playbookId ? 'Workflow saved to brain' : 'Note saved to brain'}
-                  </div>
-                  <div className="fai-teach-confirm-sub">IRC will use this next time.</div>
-                </div>
-                {savedResult && (
-                  <div style={{ fontSize: 10, color: 'var(--faint-3)', textAlign: 'center' }}>
-                    Entry ID: {savedResult.brainEntryId.slice(0, 8)}…
-                    {savedResult.playbookId && ` · Playbook: ${savedResult.playbookId.slice(0, 8)}…`}
-                  </div>
-                )}
-                <button
-                  className="fai-teach-btn outline"
-                  style={{ alignSelf: 'center' }}
-                  onClick={resetTeachState}
-                >
-                  Teach something else
-                </button>
-              </div>
-            )}
-          </div>
         )}
 
         {/* Resize handle */}

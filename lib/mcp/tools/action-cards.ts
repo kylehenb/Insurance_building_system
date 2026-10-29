@@ -346,7 +346,7 @@ export const updateActionCard: McpTool = {
       }
       if (redo) {
         if (!process.env.ANTHROPIC_API_KEY) return { text: 'The AI isn\'t set up (no API key), so it can\'t redo the card.', isError: true }
-        const remade = await resuggestCard(db(ctx), ctx.tenantId, { cardId: card.id }, redo)
+        const remade = await resuggestCard(db(ctx), ctx.tenantId, { cardId: card.id }, redo, ctx.userId)
         if (!remade) return { text: 'The card couldn\'t be remade — try again in the app.', isError: true }
         card = remade
         done.push(remade.status === 'failed' ? `tried to redo it, but the AI stopped: ${remade.error_log ?? 'no reason given'}` : 'had the AI redo it')
@@ -354,7 +354,7 @@ export const updateActionCard: McpTool = {
       if (redoStep) {
         if (!process.env.ANTHROPIC_API_KEY) return { text: 'The AI isn\'t set up (no API key), so it can\'t change the step.', isError: true }
         const name = card.steps.find(s => s.id === redoStep.stepId)?.summary
-        card = await resuggestStep(db(ctx), ctx.tenantId, card.id, redoStep.stepId, redoStep.with)
+        card = await resuggestStep(db(ctx), ctx.tenantId, card.id, redoStep.stepId, redoStep.with, ctx.userId)
         done.push(`had the AI change ${name ? `"${name}"` : 'that step'}`)
       }
       if (removes.length) {

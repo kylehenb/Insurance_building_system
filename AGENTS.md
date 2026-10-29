@@ -23,3 +23,11 @@ Every user has a level per action — allowed, needs approval, not allowed — f
 - Record it in the who-did-what log once it has happened: `recordOperation(...)` (`lib/activity/log.ts`) after success in the route. Voice tools and approvals are logged centrally.
 - Edits saved straight from the browser to Supabase are checked by database rules (`perm_*` policies using `public.user_can`, tech spec §6). A new table the browser writes to needs a rule there; changing `BUILT_IN_DEFAULTS` means changing the SQL function too (a test checks).
 - API routes take the tenant (and user) from the session — `sessionUser()` in `lib/auth/session.ts` — never from the request body or query string.
+
+# Learning module (`lib/learning`)
+
+The one way the AI learns from the office: every decision on an AI proposal is recorded with its situation, and the next proposal reads the most alike past cases and the lessons from them. Details: tech spec §24 "Learning module".
+
+- An AI feature that people confirm, edit, skip or instruct records it with `recordLearning(...)`: keep the AI's original output beside the record (as action cards keep `ai_steps`) so what was changed can be told.
+- Its prompt gets `formatLessons(activeLessons(...))` and `formatCases(similarCases(...))`, with a `Likeness` built from the facts that make two cases alike (sender, insurer, stage…).
+- No other rules store, teach screen or manual approval of what the AI learned — the Brain and Teach mode were retired for that (§22.4).

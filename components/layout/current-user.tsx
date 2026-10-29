@@ -11,8 +11,6 @@ export interface CurrentUser {
   userId: string
   tenantId: string
   role: string
-  /** Admins, or users allowed to edit settings, can teach the assistant. */
-  canTeach: boolean
 }
 
 const CurrentUserContext = createContext<CurrentUser | null>(null)

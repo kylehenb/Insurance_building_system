@@ -1,8 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
-import { getBrainContext } from '@/lib/brain/getBrainContext'
-import { formatBrainContext } from '@/lib/brain/formatBrainContext'
+import { activeLessons, formatLessons } from '@/lib/learning/lessons'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
@@ -54,15 +53,15 @@ export async function generateReportDraft(params: {
     insurer = (reportRow?.jobs as { insurer: string | null } | null)?.insurer ?? null
   }
 
-  // Fetch prompt, brain context, and the closest past locked reports in parallel
-  const [promptResult, brainEntries, similarReports] = await Promise.all([
+  // Fetch prompt, the lessons learned for reports (tech spec §24), and the closest past locked reports in parallel
+  const [promptResult, lessons, similarReports] = await Promise.all([
     supabase
       .from('prompts')
       .select('system_prompt')
       .eq('tenant_id', tenantId)
       .eq('key', promptKey)
       .single(),
-    getBrainContext({ tenantId, promptKey }),
+    activeLessons(supabase, tenantId, 'report'),
     getSimilarReportsBlock({
       service: supabase, tenantId, reportType, notes: rawReportDump, lossType, insurer, excludeReportId: reportId,
     }),
@@ -72,21 +71,7 @@ export async function generateReportDraft(params: {
     promptResult.data?.system_prompt ||
     'You are an expert building insurance assessor. Generate a professional, detailed report based on the inspection notes provided.'
 
-  const brainBlock = formatBrainContext(brainEntries)
-  const systemPrompt = [basePrompt, brainBlock, similarReports].filter(Boolean).join('\n\n')
-
-  // Fire and forget — increment times_applied for injected brain entries
-  if (brainEntries.length > 0) {
-    void Promise.all(
-      brainEntries.map(entry =>
-        supabase
-          .from('brain_entries')
-          .update({ times_applied: entry.times_applied + 1 })
-          .eq('id', entry.id)
-          .eq('tenant_id', tenantId)
-      )
-    )
-  }
+  const systemPrompt = [basePrompt, formatLessons(lessons), similarReports].filter(Boolean).join('\n\n')
 
   const userMessage = `Generate a structured report based on the following raw inspection notes.
 

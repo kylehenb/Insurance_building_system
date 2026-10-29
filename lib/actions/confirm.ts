@@ -4,6 +4,7 @@ import { callTool, type McpContext, type McpTool } from '@/lib/mcp/server'
 import { MCP_TOOLS } from '@/lib/mcp/tools'
 import { mailDb } from '@/lib/mail/sync'
 import { CardError, getCard, type ActionCard, type CardStep } from './cards'
+import { recordCardDecision } from './learning'
 import { applyEdits, cleanEdits } from './step-fields'
 
 // Confirming an action card: the chosen steps run in order, each through
@@ -106,5 +107,7 @@ export async function confirmCard(
     .update({ ...update, steps, updated_at: new Date().toISOString() })
     .eq('id', card.id).select('*').single()
   if (error) throw new Error(error.message)
+  // Done: what the office did with the AI's proposal is learned from
+  if (update.status === 'done') await recordCardDecision(db, data as ActionCard, userId, 'confirmed')
   return data as ActionCard
 }

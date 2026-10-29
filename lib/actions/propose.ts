@@ -8,13 +8,17 @@ import { getJobSummary } from '@/lib/mcp/tools/jobs'
 import { readConversation } from '@/lib/mcp/tools/mailbox'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
+import type { Situation } from '@/lib/learning/events'
 import { CATEGORIES, CardError, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
+import { cardLearning, cardSituation, recordCardInstruction } from './learning'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
 // next steps by calling the action tools — which are NOT run here, only
 // recorded on the card for the user to confirm (lib/actions/confirm.ts runs
-// them through the same callTool as the assistant).
+// them through the same callTool as the assistant). It reads what the office
+// did in the most alike past cards, and the lessons from them, first
+// (lib/actions/learning.ts, tech spec §24).
 
 export const CARD_MODEL = process.env.AI_CARD_MODEL || 'claude-haiku-5-5'
 
@@ -65,7 +69,8 @@ How it works:
 - Notifications, newsletters, receipts, spam-like mail, thank-yous and FYIs need nothing: call finish_card with needs_action false (you may propose organise_emails archive if it's clutter).
 - Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
 - If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
-- If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
+- The first message may show WHAT THE OFFICE DID IN SIMILAR PAST CASES and LESSONS FROM THE OFFICE'S PAST DECISIONS. Their habits there outweigh your own defaults — who to write to and copy in, how they word things, which steps they keep, drop or add — but only where this case matches in the ways that matter. Say in reasoning when a past case shaped a step.
+- If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view and the past cases. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
 - set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after).
 - Always end by calling finish_card.
@@ -110,7 +115,7 @@ async function cardActor(db: SupabaseClient, tenantId: string): Promise<string> 
 
 const today = () => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date())
 
-type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log' | 'category'>>
+type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log' | 'category' | 'ai_steps' | 'situation'>>
 
 /**
  * Makes one card (already claimed: status generating). Returns what was
@@ -149,6 +154,7 @@ export async function generateCard(
       ...tools.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Beta.BetaTool.InputSchema })),
       FINISH,
     ]
+    const learning = await cardLearning(db, card.tenant_id, about.situation, card.id)
     const feedback = opts.feedback?.trim()
     const earlier = card.steps.length ? card.steps.map((s, i) => `${i + 1}. ${s.summary}`).join('\n') : '(no steps)'
     const instructions = target
@@ -158,7 +164,7 @@ export async function generateCard(
       : ''
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
       role: 'user',
-      content: `Today: ${today()}.\n\n${about.intro}${instructions}`,
+      content: `Today: ${today()}.\n\n${about.intro}${learning ? `\n\n${learning}` : ''}${instructions}`,
     }]
 
     const steps: CardStep[] = []
@@ -228,7 +234,9 @@ export async function generateCard(
       }
     }
 
-    if (target) return save({ status: 'pending', steps: replaceStep(card.steps, target.id, steps), error_log: null })
+    if (target) {
+      return save({ status: 'pending', steps: replaceStep(card.steps, target.id, steps), ai_steps: replaceAiStep(card.ai_steps, target.id, steps), situation: about.situation, error_log: null })
+    }
 
     const f = finish ?? {}
     const str = (k: string) => (typeof f[k] === 'string' ? (f[k] as string).trim() : '')
@@ -255,6 +263,9 @@ export async function generateCard(
       description: str('summary') || lastText || null,
       reasoning: str('reasoning') || null,
       steps,
+      // The AI's own proposal, kept as it was: what the office changes is learned from
+      ai_steps: steps,
+      situation: about.situation,
       priority,
       job_id: jobId,
       error_log: finish ? null : 'The AI didn\'t finish the card — check the steps',
@@ -266,13 +277,23 @@ export async function generateCard(
   }
 }
 
+/**
+ * The AI's proposal after it changed one step: the old one replaced in
+ * place — or, for a step the office added themselves, the new ones added.
+ * Null (a card from before the learning module) stays null.
+ */
+export function replaceAiStep(aiSteps: CardStep[] | null, stepId: string, replacement: CardStep[]): CardStep[] | null {
+  if (!aiSteps) return null
+  return aiSteps.some(s => s.id === stepId) ? replaceStep(aiSteps, stepId, replacement) : [...aiSteps, ...replacement]
+}
+
 /** The card's steps with one replaced by what the AI proposed instead (nothing: it comes off) */
 export function replaceStep(steps: CardStep[], stepId: string, replacement: CardStep[]): CardStep[] {
   const i = steps.findIndex(s => s.id === stepId)
   return i < 0 ? steps : [...steps.slice(0, i), ...replacement, ...steps.slice(i + 1)]
 }
 
-type Context = { intro: string; jobId: string | null; title: string }
+type Context = { intro: string; jobId: string | null; title: string; situation: Situation }
 
 /** An email card: the conversation and the job file, up front — or no need for the model at all */
 async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContext, keep: boolean): Promise<Context | Outcome> {
@@ -290,6 +311,8 @@ async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContex
   if (!keep && latest && (latest.labelIds.includes('SENT') || latest.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))) {
     return { status: 'done', title: detail.subject || '(no subject)', outcome: 'Already replied', job_id: detail.job?.id ?? null }
   }
+  // Who wrote: the latest email from outside the office
+  const sender = [...sent].reverse().find(m => !m.labelIds.includes('SENT') && !m.from?.email.toLowerCase().endsWith(`@${OWN_DOMAIN}`))?.from ?? null
   const conversation = (await readConversation.run({ conversation_id: card.source_ref }, ctx)).text
   const jobFile = detail.job
     ? (await getJobSummary.run({ job_number: detail.job.job_number }, ctx)).text
@@ -298,6 +321,7 @@ async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContex
     intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}`,
     jobId: detail.job?.id ?? null,
     title: detail.subject || 'New email',
+    situation: await cardSituation(db, card.tenant_id, { kind: 'email', sender, subject: detail.subject, jobId: detail.job?.id ?? null }),
   }
 }
 
@@ -323,6 +347,7 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
     intro: `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"${jobNumber ? `\nJob: ${jobNumber}` : ''}${conversation}\n\nTHE JOB FILE (as it is now)\n${jobFile}`,
     jobId: card.job_id,
     title: card.title,
+    situation: await cardSituation(db, card.tenant_id, { kind: 'followup', who: f.who, subject: f.note, jobId: card.job_id }),
   }
 }
 
@@ -353,6 +378,8 @@ export async function resuggestCard(
   tenantId: string,
   target: { cardId: string } | { threadId: string },
   feedback = '',
+  /** Who asked — their instructions are learned from */
+  userId: string | null = null,
 ): Promise<ActionCard | null> {
   let id: string | null
   if ('cardId' in target) {
@@ -365,6 +392,7 @@ export async function resuggestCard(
   }
   if (!id) return null
   const before = await getCard(db, tenantId, id)
+  if (before && feedback.trim()) await recordCardInstruction(db, before, userId, feedback)
   if (before) {
     const { discardStepDrafts } = await import('./steps')
     await discardStepDrafts(before, db)
@@ -394,6 +422,8 @@ export async function resuggestStep(
   cardId: string,
   stepId: string,
   feedback: string,
+  /** Who asked — their instructions are learned from */
+  userId: string | null = null,
 ): Promise<ActionCard> {
   const card = await getCard(db, tenantId, cardId)
   if (!card) throw new CardError('Card not found', 404)
@@ -405,6 +435,7 @@ export async function resuggestStep(
   const { data: won } = await db.from('action_queue').update({ status: 'generating', updated_at: new Date().toISOString() })
     .eq('tenant_id', tenantId).eq('id', card.id).in('status', ['pending', 'failed']).select('*').maybeSingle()
   if (!won) throw new CardError('That card can\'t be changed now', 409)
+  await recordCardInstruction(db, card, userId, feedback, stepId)
   const out = await generateCard(won as ActionCard, { db, feedback, step: stepId })
   if (out.error_log) throw new CardError(`The AI couldn't change that step: ${out.error_log}`)
   // The email it replaced was edited in the composer: that draft goes

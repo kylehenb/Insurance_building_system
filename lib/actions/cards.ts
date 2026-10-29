@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Situation } from '@/lib/learning/events'
 import type { Arrivals } from '@/lib/mail/summary'
+import { recordCardDecision } from './learning'
 
 // Action cards (tech spec §19, §23.11): the AI's suggested next steps,
 // stored in action_queue. This file is the card lifecycle — queueing a card
@@ -94,12 +96,16 @@ export type ActionCard = {
   /** A follow-up: when it comes onto the list */
   due_at: string | null
   follow_up: FollowUp | null
+  /** The steps as the AI proposed them — what the office changed is learned from (lib/actions/learning.ts) */
+  ai_steps: CardStep[] | null
+  /** What the card was made about: sender, insurer, job stage… (lib/actions/learning.ts) */
+  situation: Situation | null
 }
 
 /** Cards that can still change: one per conversation (see the unique index) */
 export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'failed']
 
-export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up'
+export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up, ai_steps, situation'
 
 /** Priority from the model's high / normal / low */
 export const PRIORITY = { high: 90, normal: 50, low: 20 } as const
@@ -330,7 +336,8 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
   const { data } = await db.from('action_queue')
     .update({ status: 'skipped', outcome: 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
-    .select('id').maybeSingle()
+    .select(CARD_COLUMNS).maybeSingle()
+  if (data) await recordCardDecision(db, data as ActionCard, userId, 'skipped')
   return !!data
 }
 
