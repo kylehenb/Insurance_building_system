@@ -182,7 +182,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
         <div className="ac-thinking"><span className="ac-spin" aria-hidden /> {thinking}</div>
       ) : (
         <>
-          {f && (
+          {f?.waiting ? (
+            <div className="ac-followup">
+              ⏳ Waiting on {f.waiting.name} for <b>{f.waiting.asked}</b> since {setOn(f.waiting.sent_at)}{card.follow_up_for ? ` (for ${card.follow_up_for})` : ''}. {f.waiting.on_behalf_of ? `${f.waiting.on_behalf_of}. ` : ''}{f.waiting.reason}
+            </div>
+          ) : f && (
             <div className="ac-followup">
               ⏰ Follow-up you set {setOn(card.created_at)}{card.due_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.who ? `, with ${f.who}` : ''}: <b>{f.note}</b>
             </div>

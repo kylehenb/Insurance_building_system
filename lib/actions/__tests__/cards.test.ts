@@ -129,6 +129,7 @@ describe('historyArrivals', () => {
       { labelsAdded: [msg('e', 't5', ['INBOX'])] },
     ] as never)
     expect(out.received).toEqual([{ messageId: 'a', threadId: 't1' }])
+    expect(out.sent).toEqual([{ messageId: 'b', threadId: 't2' }])
     expect(out.sentThreadIds).toEqual(['t2'])
   })
 })
@@ -284,6 +285,22 @@ describe('generateCard', () => {
     expect(first).toContain('claim CHCCLM010001723 already has job IRC1001 from the order received 6 Oct 2026')
     expect(first).toMatch(/Lines in this email that weren't in the original order:\n  Please allocate an electrician to check the electrical components\.\n/)
     expect(first).not.toContain('Insured: Charlie')
+  })
+
+  it('shows what else the office is waiting on for the job, and brings one forward when this email makes it urgent', async () => {
+    tables.action_queue = [{ id: 'w1', tenant_id: 't1', job_id: 'j1', source: 'followup', rule_key: 'waiting_on', status: 'scheduled', due_at: '2099-11-09T00:00:00.000Z', steps: [],
+      follow_up: { kind: 'waiting_on', thread_id: 'abc2', waiting: { name: 'Sparky Bros', asked: 'the switchboard photos', sent_at: '2099-10-29T02:00:00.000Z', on_behalf_of: null } } }]
+    const card = await claimed()
+    const { client, create } = model([[{ name: 'finish_card', input: {
+      needs_action: true, title: 'Reply to Casey', summary: 's', priority: 'high', category: 'other',
+      chase_sooner: [{ follow_up_id: 'w1', when: 'now', reason: 'Casey is complaining about the delay' }],
+    } }]])
+    await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(first).toContain('THE OFFICE IS ALSO WAITING ON (other conversations on this job)\n- follow_up_id w1: Sparky Bros — the switchboard photos')
+    const w = tables.action_queue.find(r => r.id === 'w1')!
+    expect(new Date(w.due_at as string).getTime()).toBeLessThan(Date.now() + 2 * 60_000)
+    expect(w.priority).toBe(90)
   })
 
   it('leaves that out once a later email is the latest in the conversation', async () => {

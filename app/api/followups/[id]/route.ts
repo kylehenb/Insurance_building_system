@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
   if (typeof body.who === 'string' || body.who === null) changes.who = body.who as string | null
   const db = mailDb()
   try {
-    const card = await updateFollowUp(db, access.tenantId, id, changes)
+    const card = await updateFollowUp(db, access.tenantId, id, changes, access.userId)
     await recordActivity({
       tenantId: access.tenantId, userId: access.userId, action: 'actions.review', jobId: card.job_id, via: 'app',
       summary: `Changed a follow-up (now ${spokenDue(card.due_at!)}): ${card.follow_up?.note ?? card.title}`,

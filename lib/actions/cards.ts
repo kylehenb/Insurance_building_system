@@ -70,7 +70,36 @@ export type FollowUp = {
   /** The conversation it came from, if any */
   thread_id: string | null
   from_card_id: string | null
+  /** Who it's for: who set it, or who sent the email a waiting-on follow-up came from */
   created_by: string | null
+  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts) */
+  kind?: 'waiting_on'
+  waiting?: WaitingOn
+}
+
+/** A waiting-on follow-up: who was asked for what, and why the chase is when it is */
+export type WaitingOn = {
+  name: string
+  email: string | null
+  /** trade, insurer, assessor, insured, supplier, other */
+  role: string
+  /** What they were asked for, in a few words: "the switchboard photos" */
+  asked: string
+  /** information, photos, quote, invoice, report, booking, approval, documents, other */
+  ask_kind: string
+  /** Who's waiting on the office for it, if anyone: "Suncorp asked on 28 Oct" */
+  on_behalf_of: string | null
+  /** The email that asked */
+  message_id: string
+  sent_at: string
+  /** The chase as the AI set it, in working days after the email — what a person changes is learned from */
+  ai_days: number
+  ai_due_at: string
+  reason: string
+  /** Moved sooner by the AI when a later email made it more urgent */
+  brought_forward?: { at: string; to: string; reason: string }[]
+  /** Who, what and the job, for the learning module (the card's own situation is the chase card's) */
+  situation: Situation
 }
 
 export type ActionCard = {
@@ -116,6 +145,13 @@ const STUCK_MS = 10 * 60_000
 
 const now = () => new Date().toISOString()
 
+/** The person cards and the waiting-on reader read as (reads only): the company's first admin */
+export async function cardActor(db: SupabaseClient, tenantId: string): Promise<string> {
+  const { data } = await db.from('users').select('id').eq('tenant_id', tenantId).eq('role', 'admin')
+    .order('created_at', { ascending: true }).limit(1)
+  return ((data as { id: string }[] | null) ?? [])[0]?.id ?? ''
+}
+
 async function liveCard(db: SupabaseClient, tenantId: string, threadId: string): Promise<ActionCard | null> {
   const { data } = await db.from('action_queue').select(CARD_COLUMNS)
     .eq('tenant_id', tenantId).eq('source', 'email').eq('source_ref', threadId)
@@ -159,6 +195,12 @@ export async function queueEmailCard(db: SupabaseClient, tenantId: string, threa
  */
 export async function onMailArrivals(db: SupabaseClient, tenantId: string, arrivals: Arrivals | undefined): Promise<number> {
   if (!arrivals) return 0
+  // What the office is waiting on (lib/actions/waiting-on.ts): sends to read
+  // for what they ask, and replies that answer them
+  const { closeAnsweredWaits } = await import('./waits')
+  const { recordSyncedSends } = await import('@/lib/mail/sent-by')
+  await recordSyncedSends(db, tenantId, arrivals.sent ?? [])
+  await closeAnsweredWaits(db, tenantId, arrivals.received)
   const replied = new Set(arrivals.sentThreadIds)
   let queued = 0
   // Only the newest email per conversation matters
@@ -342,7 +384,11 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
     .update({ status: 'skipped', outcome: 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
     .select(CARD_COLUMNS).maybeSingle()
-  if (data) await recordCardDecision(db, data as ActionCard, userId, 'skipped')
+  if (data) {
+    await recordCardDecision(db, data as ActionCard, userId, 'skipped')
+    const { recordChaseDecision } = await import('./waits')
+    await recordChaseDecision(db, data as ActionCard, userId, 'skipped')
+  }
   return !!data
 }
 
@@ -408,16 +454,21 @@ export const cardThreadId = (c: Pick<ActionCard, 'source' | 'source_ref' | 'foll
 export type CardWithContext = ActionCard & {
   job: { id: string; job_number: string; insured_name: string | null } | null
   conversation: { subject: string | null; from: string | null; last_message_at: string | null; unread: boolean } | null
+  /** A follow-up: who it's for, by name */
+  follow_up_for: string | null
 }
 
 /** Adds the job chip and the conversation (subject, sender) each card is about */
 export async function withContext(db: SupabaseClient, tenantId: string, cards: ActionCard[]): Promise<CardWithContext[]> {
   const jobIds = [...new Set(cards.map(c => c.job_id).filter((id): id is string => !!id))]
   const threadIds = [...new Set(cards.map(cardThreadId).filter((id): id is string => !!id))]
-  const [{ data: jobs }, { data: threads }] = await Promise.all([
+  const userIds = [...new Set(cards.map(c => c.follow_up?.created_by).filter((id): id is string => !!id))]
+  const [{ data: jobs }, { data: threads }, { data: users }] = await Promise.all([
     jobIds.length ? db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', tenantId).in('id', jobIds) : Promise.resolve({ data: [] }),
     threadIds.length ? db.from('mail_threads').select('gmail_thread_id, subject, participants, last_message_at, unread').eq('tenant_id', tenantId).in('gmail_thread_id', threadIds) : Promise.resolve({ data: [] }),
+    userIds.length ? db.from('users').select('id, name').eq('tenant_id', tenantId).in('id', userIds) : Promise.resolve({ data: [] }),
   ])
+  const nameById = new Map(((users as { id: string; name: string }[] | null) ?? []).map(u => [u.id, u.name]))
   type ThreadRow = { gmail_thread_id: string; subject: string | null; participants: { name: string; email: string; me: boolean }[]; last_message_at: string | null; unread: boolean }
   const jobById = new Map(((jobs as CardWithContext['job'][] | null) ?? []).map(j => [j!.id, j]))
   const threadById = new Map(((threads as ThreadRow[] | null) ?? []).map(t => [t.gmail_thread_id, t]))
@@ -429,6 +480,7 @@ export async function withContext(db: SupabaseClient, tenantId: string, cards: A
       ...c,
       job: c.job_id ? jobById.get(c.job_id) ?? null : null,
       conversation: t ? { subject: t.subject, from: sender ? sender.name || sender.email : null, last_message_at: t.last_message_at, unread: t.unread } : null,
+      follow_up_for: c.follow_up?.created_by ? nameById.get(c.follow_up.created_by) ?? null : null,
     }
   })
 }

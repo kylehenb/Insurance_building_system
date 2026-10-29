@@ -111,6 +111,7 @@ describe('mcp route', () => {
       'set_follow_up',
       'list_follow_ups',
       'change_follow_up',
+      'list_waiting_on',
       'list_approvals',
       'decide_approval',
       'list_activity',

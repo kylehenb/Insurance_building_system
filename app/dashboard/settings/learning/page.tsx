@@ -19,7 +19,7 @@ interface LearningData {
   canChange: boolean
 }
 
-const FEATURE: Record<string, string> = { action_card: 'Action cards', order_parse: 'Reading insurer orders', report: 'Report writing', photo_labels: 'Photo labels' }
+const FEATURE: Record<string, string> = { action_card: 'Action cards', order_parse: 'Reading insurer orders', report: 'Report writing', photo_labels: 'Photo labels', waiting_on: 'Waiting on (when to chase)' }
 const KIND: Record<string, string> = {
   invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else',
   bar: 'BAR', make_safe: 'Make safe', roof: 'Roof', specialist: 'Specialist', ldr: 'Leak detection',
