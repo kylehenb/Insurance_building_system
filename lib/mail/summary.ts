@@ -144,21 +144,26 @@ export function historyThreadIds(history: gmail_v1.Schema$History[]): string[] {
   return [...ids]
 }
 
-/** Messages that arrived in the inbox, and conversations we sent in */
-export type Arrivals = { received: { messageId: string; threadId: string }[]; sentThreadIds: string[] }
+/** Messages that arrived in the inbox, the ones we sent, and conversations we sent in */
+export type Arrivals = { received: { messageId: string; threadId: string }[]; sent?: { messageId: string; threadId: string }[]; sentThreadIds: string[] }
 
 /** What arrived in a page of Gmail history: incoming mail (not spam, drafts or our own) and our sends */
 export function historyArrivals(history: gmail_v1.Schema$History[]): Arrivals {
   const received: Arrivals['received'] = []
+  const sentMessages: NonNullable<Arrivals['sent']> = []
   const sent = new Set<string>()
   for (const record of history) {
     for (const { message: m } of record.messagesAdded ?? []) {
       if (!m?.id || !m.threadId) continue
       const labels = m.labelIds ?? []
-      if (labels.includes('SENT')) { sent.add(m.threadId); continue }
+      if (labels.includes('SENT')) {
+        sent.add(m.threadId)
+        if (!sentMessages.some(s => s.messageId === m.id)) sentMessages.push({ messageId: m.id, threadId: m.threadId })
+        continue
+      }
       if (labels.some(l => l === 'DRAFT' || l === 'SPAM' || l === 'TRASH')) continue
       if (labels.includes('INBOX') && !received.some(r => r.messageId === m.id)) received.push({ messageId: m.id, threadId: m.threadId })
     }
   }
-  return { received, sentThreadIds: [...sent] }
+  return { received, sent: sentMessages, sentThreadIds: [...sent] }
 }

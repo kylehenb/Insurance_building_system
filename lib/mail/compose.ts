@@ -15,6 +15,7 @@ import { textToHtml } from './html'
 import { parseMessage, type MailMessage } from './message'
 import { header } from './summary'
 import { fetchThreads, mailDb, type Mailbox } from './sync'
+import { recordSent } from './sent-by'
 import { findThreadJobId, linkThreadToJob } from '@/lib/communications/thread-link'
 
 // Writing email from the office mailbox. Every email being written is a
@@ -45,6 +46,7 @@ type DraftRow = {
   references_header: string | null
   attachments: DraftAttachment[]
   job_id: string | null
+  created_by: string | null
 }
 
 const SIGNATURE_COLUMNS = 'name, trading_name, email_signature, email_signature_image_path, email_signature_image_width, email_signature_image_height'
@@ -420,6 +422,8 @@ export async function sendDraft(mailbox: Mailbox, draftId: string, db = mailDb()
   await db.from('mail_drafts').delete().eq('mailbox_id', mailbox.id).eq('gmail_draft_id', draftId)
   await unschedule(mailbox, draftId, db)
   await removeUploads(row, db)
+  // Who sent it: whoever last saved the draft (the Mail page, a card's step, voice or chat)
+  await recordSent(db, mailbox.tenant_id, sent.id, sent.threadId, row?.created_by ?? null)
   if (row?.job_id && sent.id) await fileSentOnJob(mailbox, row, sent.id, sent.threadId ?? null, db)
   if (sent.threadId) await fetchThreads(mailbox, [sent.threadId], db)
   return { messageId: sent.id ?? null, threadId: sent.threadId ?? null }

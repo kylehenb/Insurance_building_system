@@ -111,6 +111,11 @@ export async function confirmCard(
   if (error) throw new Error(error.message)
   // Done: what the office did with the AI's proposal is learned from (not
   // what auto-confirm did — that would only teach the AI to agree with itself)
-  if (update.status === 'done' && !auto) await recordCardDecision(db, data as ActionCard, userId, 'confirmed')
+  if (update.status === 'done' && !auto) {
+    await recordCardDecision(db, data as ActionCard, userId, 'confirmed')
+    // A waiting-on chase: how the wait ended
+    const { recordChaseDecision } = await import('./waits')
+    await recordChaseDecision(db, data as ActionCard, userId, 'confirmed')
+  }
   return data as ActionCard
 }

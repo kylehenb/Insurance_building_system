@@ -7,7 +7,7 @@ import { getResponseText } from '@/lib/ai/response-text'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 
 // Turns raw inspection notes into a report's fields with Claude: the
-// tenant's prompt for the report type, plus what the brain has learned and
+// tenant's prompt for the report type, plus what the learning module has learned and
 // the closest past locked reports. Returns the fields to fill in — nothing is
 // saved. Used by the report forms' "Generate" (app/api/ai/generate-report).
 

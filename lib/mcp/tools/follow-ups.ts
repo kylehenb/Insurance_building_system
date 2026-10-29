@@ -2,13 +2,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { CardError, listCards, withContext, type CardWithContext } from '@/lib/actions/cards'
 import { cancelFollowUp, createFollowUp, parseFollowUpWhen, spokenDue, updateFollowUp } from '@/lib/actions/followups'
+import { listWaits, sentOn, waitLine } from '@/lib/actions/waits'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 
 // Follow-ups by voice and chat — the Remind me button's own functions
 // (lib/actions/followups.ts): set one ("remind me in a week to chase the
 // roofer on IRC1042"), list what's coming up, move or cancel one. When it's
 // due it comes onto the action cards with the chase drafted; nothing is sent
-// by itself. Action cards also suggest set_follow_up as a step.
+// by itself. Action cards also suggest set_follow_up as a step. What the
+// office is waiting on — follow-ups IRC set from emails that asked someone
+// for something (lib/actions/waiting-on.ts) — is list_waiting_on; they move
+// and cancel like any follow-up.
 
 const MAX_LIST = 25
 const ID_RE = /^[0-9a-f-]{36}$/i
@@ -78,7 +82,7 @@ export const setFollowUp: McpTool = {
 export const listFollowUps: McpTool = {
   name: 'list_follow_ups',
   title: 'List follow-ups',
-  description: 'The follow-ups waiting for their date (soonest first), optionally for one job: when, what, who. Once due they\'re on the action cards instead (list_action_cards).',
+  description: 'The follow-ups waiting for their date (soonest first), optionally for one job: when, what, who — the ones the office set and the waiting-on ones IRC set from emails that asked for something. Once due they\'re on the action cards instead (list_action_cards). For "what am I waiting on?" use list_waiting_on.',
   inputSchema: {
     type: 'object',
     properties: { job_number: { type: 'string', description: 'Only this job\'s follow-ups.' } },
@@ -107,7 +111,8 @@ export const changeFollowUp: McpTool = {
   name: 'change_follow_up',
   title: 'Change follow-up',
   description: [
-    'Moves a follow-up from list_follow_ups to another date, changes what it says, or cancels it (cancel: true).',
+    'Moves a follow-up from list_follow_ups or list_waiting_on to another date ("chase the electrician in a week instead", "sooner — tomorrow"), changes what it says, or cancels it (cancel: true — e.g. they rang with the answer).',
+    'A waiting-on chase that\'s moved or cancelled teaches IRC when to chase that person or that kind of ask next time.',
     `${WHEN} Read back the change and get a yes first.`,
   ].join(' '),
   inputSchema: {
@@ -142,11 +147,79 @@ export const changeFollowUp: McpTool = {
     if (typeof args.note === 'string') changes.note = args.note
     if (typeof args.who === 'string') changes.who = args.who
     try {
-      const card = (await withContext(db(ctx), ctx.tenantId, [await updateFollowUp(db(ctx), ctx.tenantId, id, changes)]))[0]
+      const card = (await withContext(db(ctx), ctx.tenantId, [await updateFollowUp(db(ctx), ctx.tenantId, id, changes, ctx.userId || null)]))[0]
       return { text: `Follow-up now ${line(card)}.`, data: data(card) }
     } catch (err) {
       if (err instanceof CardError) return { text: err.message, isError: true }
       throw err
+    }
+  },
+}
+
+export const listWaitingOn: McpTool = {
+  name: 'list_waiting_on',
+  title: 'What I\'m waiting on',
+  description: [
+    'What the user is waiting on from other people — "what am I waiting on?", "has the electrician got back to me?". Every email the office sends is read, and when it asks someone for something (photos, a quote, a booking, an approval) IRC sets a follow-up for whoever sent it; a reply closes it, and if none comes the chase comes onto the action cards.',
+    'Each one: who, what was asked, when it was asked, when it will be chased (or that the chase is on the action cards now) and who else is waiting on it.',
+    'Just the user\'s own unless everyone is true (the whole office); optionally one job, or one person or trade (name or email, partly is fine).',
+    'Move or cancel one with change_follow_up (follow_up_id).',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      everyone: { type: 'boolean', description: 'The whole office\'s, not just the user\'s.' },
+      job_number: { type: 'string', description: 'Only this job, e.g. IRC1001.' },
+      person: { type: 'string', description: 'Only waits on this person or trade, e.g. "Sparky Bros", "jo@allianz.com.au".' },
+    },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+  permission: 'mail.view',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    let jobId: string | null = null
+    if (str(args.job_number)) {
+      const job = await jobFromArgs(args, ctx)
+      if (isToolResult(job)) return job
+      jobId = job.id
+    }
+    const everyone = args.everyone === true || !ctx.userId
+    const person = str(args.person).toLowerCase()
+    const waits = (await listWaits(db(ctx), ctx.tenantId, { userId: everyone ? null : ctx.userId, jobId, limit: 200 }))
+      .filter(c => !person || [c.follow_up?.waiting?.name, c.follow_up?.waiting?.email].some(v => v?.toLowerCase().includes(person)))
+      .slice(0, MAX_LIST)
+    if (!waits.length) {
+      const whose = everyone ? 'The office isn\'t' : 'You\'re not'
+      return { text: `${whose} waiting on ${person ? `"${str(args.person)}"` : 'anyone'}${jobId ? ' on that job' : ''}.${everyone ? '' : ' (Say "everyone" for the whole office.)'}`, data: { waiting_on: [] } }
+    }
+    const cards = await withContext(db(ctx), ctx.tenantId, waits)
+    const ids = [...new Set(waits.map(c => c.follow_up?.created_by).filter((id): id is string => !!id))]
+    const { data: users } = everyone && ids.length ? await db(ctx).from('users').select('id, name').in('id', ids) : { data: [] }
+    const names = new Map(((users as { id: string; name: string }[] | null) ?? []).map(u => [u.id, u.name]))
+    const lines = cards.map((c, i) => {
+      const w = c.follow_up!.waiting!
+      const chase = c.status === 'scheduled' ? `chase ${c.due_at ? spokenDue(c.due_at) : 'soon'}` : 'the chase is on the action cards now'
+      const forWho = everyone ? ` — for ${names.get(c.follow_up?.created_by ?? '') ?? 'the office'}` : ''
+      return `${i + 1}. ${w.name} — ${w.asked}${c.job ? `, ${c.job.job_number}` : ''} (asked ${sentOn(w.sent_at)}; ${chase})${w.on_behalf_of ? `. ${w.on_behalf_of}` : ''}${forWho}`
+    })
+    return {
+      text: [`${everyone ? 'The office is' : 'You\'re'} waiting on ${cards.length} thing${cards.length === 1 ? '' : 's'}:`, ...lines].join('\n'),
+      data: {
+        waiting_on: cards.map(c => ({
+          follow_up_id: c.id,
+          who: c.follow_up!.waiting!.name,
+          email: c.follow_up!.waiting!.email,
+          asked_for: c.follow_up!.waiting!.asked,
+          asked_on: c.follow_up!.waiting!.sent_at,
+          chase: c.status === 'scheduled' ? c.due_at : 'on the action cards',
+          why_then: c.follow_up!.waiting!.reason,
+          waiting_on_us: c.follow_up!.waiting!.on_behalf_of,
+          job_number: c.job?.job_number ?? null,
+          summary: waitLine(c),
+          ...(everyone ? { for: names.get(c.follow_up?.created_by ?? '') ?? null } : {}),
+        })),
+      },
     }
   },
 }

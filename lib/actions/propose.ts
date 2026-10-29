@@ -9,7 +9,8 @@ import { readConversation } from '@/lib/mcp/tools/mailbox'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
 import type { Situation } from '@/lib/learning/events'
-import { CATEGORIES, CardError, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
+import { bringForward, waitBrief } from './waits'
+import { CATEGORIES, CardError, cardActor, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
 import { cardLearning, cardSituation, recordCardInstruction } from './learning'
 import { orderUpdateBrief } from '@/lib/insurer-orders/order-update'
 
@@ -55,6 +56,19 @@ const FINISH: Anthropic.Beta.BetaTool = {
         description: 'invoice: a bill or invoice IRC has to pay (a trade, supplier or subcontractor invoice). attend_submit: a job to attend (inspection, make safe, site visit) or a report or quote to finish and submit after attending. other: everything else.',
       },
       job_number: { type: 'string', description: 'The job this is about, if you worked it out and the conversation is not on it yet.' },
+      chase_sooner: {
+        type: 'array',
+        description: 'Only when the first message lists what THE OFFICE IS ALSO WAITING ON and this email makes one of them more urgent: chase it sooner. Otherwise leave out.',
+        items: {
+          type: 'object',
+          properties: {
+            follow_up_id: { type: 'string' },
+            when: { type: 'string', description: '"now", a number of working days ("1"), or a Perth date "2026-11-02".' },
+            reason: { type: 'string', description: 'Why, in a sentence the office reads on the reminder.' },
+          },
+          required: ['follow_up_id', 'when', 'reason'],
+        },
+      },
     },
     required: ['needs_action', 'title', 'summary', 'priority', 'category'],
   },
@@ -73,7 +87,8 @@ How it works:
 - The first message may show WHAT THE OFFICE DID IN SIMILAR PAST CASES and LESSONS FROM THE OFFICE'S PAST DECISIONS. Their habits there outweigh your own defaults — who to write to and copy in, how they word things, which steps they keep, drop or add — but only where this case matches in the ways that matter. Say in reasoning when a past case shaped a step.
 - If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view and the past cases. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
-- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after).
+- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question.
+- A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it).
 - Always end by calling finish_card.
 
 Today is given in the first message. Times are Perth time (AWST).`
@@ -105,13 +120,6 @@ export function describeStep(tool: McpTool, args: Record<string, unknown>): { su
       return { summary: `${tool.title}${detail ? ` — ${detail.length > 80 ? `${detail.slice(0, 80)}…` : detail}` : ''}`, kind: 'change' }
     }
   }
-}
-
-/** The person cards are made as (reads only): the company's first admin */
-async function cardActor(db: SupabaseClient, tenantId: string): Promise<string> {
-  const { data } = await db.from('users').select('id').eq('tenant_id', tenantId).eq('role', 'admin')
-    .order('created_at', { ascending: true }).limit(1)
-  return ((data as { id: string }[] | null) ?? [])[0]?.id ?? ''
 }
 
 const today = () => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date())
@@ -257,6 +265,12 @@ export async function generateCard(
     const category = isCategory(f.category) ? f.category : 'other'
 
     await db.from('action_queue').update({ model: CARD_MODEL, usage }).eq('id', card.id)
+    // This email makes a wait on the job more urgent: its chase comes sooner
+    for (const c of Array.isArray(f.chase_sooner) ? f.chase_sooner.slice(0, 5) : []) {
+      const x = c && typeof c === 'object' ? c as Record<string, unknown> : {}
+      if (typeof x.follow_up_id !== 'string' || typeof x.when !== 'string') continue
+      await bringForward(db, card.tenant_id, x.follow_up_id, x.when, typeof x.reason === 'string' ? x.reason : '').catch(err => console.error('[action-cards] chase sooner failed:', err))
+    }
     return save({
       ...(starred ? {} : { category }),
       status: needsAction ? 'pending' : 'no_action',
@@ -320,8 +334,10 @@ async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContex
     : `This conversation is not on a job yet.${detail.candidates.length ? ` The matcher suggests: ${detail.candidates.map(c => `${c.job_number} (${c.insured_name ?? c.property_address ?? ''}, matched on ${c.matched_on.join(', ')}, ${c.confidence})`).join('; ')}.` : ''}${detail.orderId ? ' It has already become an insurer order.' : ''}`
   // An order email on a claim that already has one: what's new compared with the original order
   const orderUpdate = await orderUpdateBrief(db, card.tenant_id, card.source_ref)
+  // What the office is waiting on: the wait this answered, and others on the job it may make urgent
+  const waits = await waitBrief(db, card.tenant_id, card.source_ref, detail.job?.id ?? null)
   return {
-    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${orderUpdate ? `\n\n${orderUpdate}` : ''}`,
+    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${orderUpdate ? `\n\n${orderUpdate}` : ''}${waits ? `\n\n${waits}` : ''}`,
     jobId: detail.job?.id ?? null,
     title: detail.subject || 'New email',
     situation: await cardSituation(db, card.tenant_id, { kind: 'email', sender, subject: detail.subject, jobId: detail.job?.id ?? null }),
@@ -346,8 +362,12 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
     }
   }
   const set = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(card.created_at))
+  const w = f.waiting
+  const head = w
+    ? `A WAITING-ON FOLLOW-UP (set by IRC on ${set}, for today): the office emailed ${w.name}${w.email ? ` <${w.email}>` : ''} asking for ${w.asked}, and nothing has come back in that conversation.${w.on_behalf_of ? `\n${w.on_behalf_of}.` : ''}\nWhy today: ${w.reason}${(w.brought_forward ?? []).map(b => `\nBrought forward: ${b.reason}`).join('')}`
+    : `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"`
   return {
-    intro: `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"${jobNumber ? `\nJob: ${jobNumber}` : ''}${conversation}\n\nTHE JOB FILE (as it is now)\n${jobFile}`,
+    intro: `${head}${jobNumber ? `\nJob: ${jobNumber}` : ''}${conversation}\n\nTHE JOB FILE (as it is now)\n${jobFile}`,
     jobId: card.job_id,
     title: card.title,
     situation: await cardSituation(db, card.tenant_id, { kind: 'followup', who: f.who, subject: f.note, jobId: card.job_id }),

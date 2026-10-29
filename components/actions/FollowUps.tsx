@@ -81,9 +81,9 @@ export function FollowUps({ jobId, jobNumber, version = 0, onMessage, showNew = 
         <div key={f.id} className="fu-row">
           <span className="fu-when">{f.due_at ? spokenDue(f.due_at) : ''}</span>
           <span className="fu-what">
-            {f.follow_up?.note ?? f.title}
+            {f.follow_up?.waiting ? `Waiting on ${f.follow_up.waiting.name}: ${f.follow_up.waiting.asked}` : f.follow_up?.note ?? f.title}
             <span className="fu-sub">
-              {f.follow_up?.who && <>with {f.follow_up.who}</>}
+              {f.follow_up?.waiting ? <>set by IRC{f.follow_up_for ? ` for ${f.follow_up_for}` : ''}</> : f.follow_up?.who && <>with {f.follow_up.who}</>}
               {f.conversation?.subject && <>{f.follow_up?.who ? ' · ' : ''}re “{f.conversation.subject}”</>}
             </span>
           </span>
