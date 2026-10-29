@@ -2861,6 +2861,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 # AI
 ANTHROPIC_API_KEY=
 GEMINI_API_KEY=
+LEARNING_REVIEW_MODEL=           # optional: the nightly learning review's model (§24.5), default claude-opus-5-5
 
 # PDF generation (local development only — not needed on Vercel)
 CHROME_EXECUTABLE_PATH=            # optional: path to a local Chrome/Chromium; if unset, the puppeteer devDependency's Chrome is used
@@ -4210,7 +4211,7 @@ The one way the AI learns, for every AI feature. It replaced the Brain and Teach
 ### 24.1 Tables (migration `20261112_learning_module.sql`, server only — RLS on, no browser policies)
 
 - **`learning_events`**: one row per decision. `feature` (`action_card`, later `order_parse`, `report`, `quote`…), `source_table` / `source_id` (the record it was about), `situation` jsonb (flat facts the feature chooses), `situation_text` (one line, for the AI to read), `proposed` / `final` jsonb (the feature's own shape), `changes` jsonb (one plain line per change: "Dropped: Add job note", "Reply: cc changed from (nothing) to assessor@…", "Reply: the office rewrote the email. What went: "…""), `outcome` (`accepted` as proposed / `edited` / `skipped` nothing done / `instructed` sent back with instructions), `instruction` (what they typed), `user_id` (who; staff habits can be told apart from company practice later), `created_at`.
-- **`learning_lessons`**: what the cases add up to. `feature`, `applies_when` (the situation it applies to, in words), `lesson`, `status` (`active` / `retired`), `source` (`learned` by the nightly review, `migrated` from the Brain), `support_count` / `contradict_count` (its track record), `evidence_ids` (the events behind it), `retired_reason`.
+- **`learning_lessons`**: what the cases add up to. `feature`, `applies_when` (the situation it applies to, in words), `lesson`, `status` (`active` / `retired`), `source` (`learned` by the nightly review §24.5, `migrated` from the Brain), `support_count` / `contradict_count` (its track record), `evidence_ids` (the events behind it), `retired_reason`.
 
 ### 24.2 The shared functions (`lib/learning/events.ts`, `lib/learning/lessons.ts`)
 
@@ -4236,16 +4237,23 @@ The one way the AI learns, for every AI feature. It replaced the Brain and Teach
 
 **To add a feature:** pick its situation facts and a `Likeness`. Call `recordLearning` wherever a person confirms, edits, rejects or instructs one of its outputs (keeping the AI's original output alongside the record, as `ai_steps` does). Put `formatLessons` and `formatCases` into its prompt. Nothing else is needed: no settings, no review screen.
 
-### 24.5 Next
+### 24.5 Nightly review (`lib/learning/review.ts`, `/api/learning/review`)
 
-1. **Nightly review:** a stronger model reads the day's events, including the untouched ones, and keeps `learning_lessons`:
-   - **Writes lessons narrow.** It writes lessons only for patterns seen more than once, scoped as tightly as the evidence shows. A single edit stays an example.
-   - **Keeps track records.** It adds support and contradictions as new cases come in.
-   - **Narrows `applies_when`** when a lesson is contradicted (the AI copied someone in and the office took them out).
-   - **Retires lessons on its own** when their track record drops.
-   - **Weighs instructions as general or one-off** before making them a lesson.
+A cron every night at 2:13am Perth (`13 18 * * *` UTC, `CRON_SECRET`) runs `reviewAll`: for every company and feature with decisions in the last 14 days, `reviewFeature` reads the new decisions since the last review (`learning_reviews.reviewed_to`, migration `20261114_learning_reviews.sql`; up to 150), the earlier ones from the last 90 days (up to 150, for context) and the feature's lessons, active and retired. Nothing new: no model call.
 
-   No one approves anything. An optional read-only "What the AI has learned" page will list lessons, with an off switch for a wrong one.
+**The model and its output.** A stronger model (`LEARNING_REVIEW_MODEL`, default `claude-opus-5-5`, effort high, server-side refusal fallback) answers in a fixed JSON form: lessons a new case `support`s or `contradict`s, ones to `refine` (a narrower or truer situation), new ones to `add`, and ones to `retire`. The prompt has it scope lessons as narrowly as the cases show, and broaden only when cases that differ agree. It also says a confirmed-as-proposed case is evidence, and one edit is not a pattern.
+
+**The code holds the rules, whatever the model says:**
+- **A new lesson needs a pattern:** two real cases, or one instruction the office gave. It also mustn't repeat an active lesson.
+- **Track records count new cases only,** once each.
+- **Refining restarts the record:** a refined lesson's record starts again from the cases that show it.
+- **Contradicted lessons go:** an active lesson contradicted at least twice, and more often than borne out, is retired.
+
+**Failures.** If the model declines or the run fails, the watermark stays put and the next night retries. The watermark only moves to the newest case reviewed. The run's counts, model and token use are kept on `learning_reviews`. No one approves anything.
+
+### 24.6 Next
+
+1. **"What the AI has learned" page:** read-only, listing lessons with their track record and an off switch for a wrong one.
 2. **Measure it:** the share of cards confirmed untouched, by kind of card, over time.
 3. **Auto-confirm:** a kind of card that's consistently untouched (e.g. 98% over 50 cards) can be set to run by itself, within the user permissions (§6).
 4. **More features:** order parsing (above), then reports, quotes and scope, each recording their edits.
@@ -4255,7 +4263,7 @@ The one way the AI learns, for every AI feature. It replaced the Brain and Teach
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
-*Changes (Oct 2026): Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*
+*Changes (Oct 2026): Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases; the nightly review keeping the lessons, `learning_reviews`, `/api/learning/review`). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*
 
 *Changes in v3.3: Added Section 22 (AI Assistant Three-Mode Architecture & Playbook System — Mode 1 Chat, Mode 2 Do It / Manual Action Cards, Mode 3 Teach / Playbook System, three teaching tiers, playbooks table schema, assistant UI layout, AI execution with playbooks, iPhone Shortcut integration, build sequence Phase 7, key decisions). Concept derived from operational brainstorm: natural language operator interface, self-teaching playbook library, insurer-specific overlays, temporary overrides, iPhone shortcut for field/phone-call scenarios.)*
 

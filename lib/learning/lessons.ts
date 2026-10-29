@@ -2,8 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Lessons (tech spec §24): what the past cases add up to, each with the
 // situation it applies to and its track record. Read into a feature's prompt
-// beside the similar cases. (Learned lessons come from the nightly review —
-// §24 "Next"; the first ones are the Brain's two workflows, migrated.)
+// beside the similar cases. Kept by the nightly review (review.ts, §24.5);
+// the first ones were the Brain's two workflows, migrated.
 
 export type Lesson = {
   id: string
