@@ -17,6 +17,7 @@ import {
   Link2,
   Mic,
   History,
+  GraduationCap,
 } from 'lucide-react'
 
 interface SettingsCard {
@@ -35,6 +36,12 @@ export default async function SettingsPage() {
   }
 
   const aiAutomationCards: SettingsCard[] = [
+    {
+      name: 'What the AI has learned',
+      route: '/dashboard/settings/learning',
+      description: 'How often the AI gets action cards right, and the lessons it has learned from what the office does',
+      icon: <GraduationCap className="w-4 h-4" />,
+    },
     {
       name: 'AI Prompt Library',
       route: '/dashboard/settings/prompts',

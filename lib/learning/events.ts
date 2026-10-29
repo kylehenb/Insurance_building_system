@@ -26,6 +26,8 @@ export type LearningEvent = {
   changes: string[]
   outcome: LearningOutcome
   instruction: string | null
+  /** What sort of proposal, for accuracy by kind (an action card's category) */
+  kind: string | null
   user_id: string | null
   created_at: string
 }
@@ -42,6 +44,7 @@ export type NewLearningEvent = {
   changes?: string[]
   outcome: LearningOutcome
   instruction?: string
+  kind?: string | null
   userId?: string | null
 }
 
@@ -60,6 +63,7 @@ export async function recordLearning(db: SupabaseClient, e: NewLearningEvent): P
       changes: e.changes ?? [],
       outcome: e.outcome,
       instruction: e.instruction?.trim() || null,
+      kind: e.kind ?? null,
       user_id: e.userId || null,
     })
     if (error) console.error(`[learning] ${e.feature} event not recorded:`, error.message)
@@ -111,7 +115,7 @@ export async function similarCases(
 ): Promise<LearningEvent[]> {
   try {
     const { data, error } = await db.from('learning_events')
-      .select('id, tenant_id, feature, source_table, source_id, situation, situation_text, proposed, final, changes, outcome, instruction, user_id, created_at')
+      .select('id, tenant_id, feature, source_table, source_id, situation, situation_text, proposed, final, changes, outcome, instruction, kind, user_id, created_at')
       .eq('tenant_id', opts.tenantId).eq('feature', opts.feature)
       .order('created_at', { ascending: false }).limit(LOOK_BACK)
     if (error) throw new Error(error.message)

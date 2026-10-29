@@ -178,6 +178,7 @@ export async function recordCardDecision(db: SupabaseClient, card: ActionCard, u
     final: records(card.steps.filter(ran)),
     changes,
     outcome,
+    kind: card.category,
     userId,
   })
 }
@@ -202,6 +203,7 @@ export async function recordCardInstruction(
       : [`Sent back the whole card: ${card.steps.length ? card.steps.map(s => s.summary).join('; ') : '(no steps)'}`],
     outcome: 'instructed',
     instruction,
+    kind: card.category,
     userId,
   })
 }

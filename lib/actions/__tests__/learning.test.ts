@@ -120,7 +120,7 @@ describe('making a card', () => {
 
 describe('recording decisions', () => {
   const card = (extra: Row = {}): Row => ({
-    id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', attempts: 0,
+    id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', attempts: 0, category: 'other',
     steps: structuredClone(AI), ai_steps: structuredClone(AI), situation: { kind: 'email', sender_email: 'jane@allianz.com.au', subject: 'Access', on_job: 'no' }, ...extra,
   })
 
@@ -128,7 +128,7 @@ describe('recording decisions', () => {
     tables.action_queue = [card()]
     expect(await skipCard(db as never, 't1', 'k1', 'u1')).toBe(true)
     expect(tables.learning_events).toHaveLength(1)
-    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', source_id: 'k1', outcome: 'skipped', user_id: 'u1', situation_text: 'Email from jane@allianz.com.au — "Access" — not on a job' })
+    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', source_id: 'k1', outcome: 'skipped', kind: 'other', user_id: 'u1', situation_text: 'Email from jane@allianz.com.au — "Access" — not on a job' })
   })
 
   it('doesn\'t record cards made before the learning module', async () => {

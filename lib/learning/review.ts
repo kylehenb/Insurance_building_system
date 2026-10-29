@@ -75,7 +75,7 @@ You get the current lessons (L1, L2…), the NEW cases since the last review (N1
 - support: a lesson that a NEW case bore out (the situation matched and the office did what it says, or confirmed a proposal that followed it).
 - contradict: a lesson that a NEW case went against (the situation matched, but the office did otherwise).
 - refine: a lesson whose situation is too broad or too narrow, given the cases (e.g. it says "Allianz emails" but the office only copies the assessor in on Allianz make safes). Give the new applies_when and lesson text, and the cases that show it. When a contradiction is explained by a narrower situation, refine rather than leave it contradicted.
-- add: a new lesson, only for a pattern the cases show more than once (cite at least two cases, NEW or EARLIER), or for an instruction the office gave that is plainly general ("always…", "never…", "for X, do Y"), not a one-off. Scope applies_when as narrowly as the cases show — sender, insurer, kind of email, job stage — and broaden only when cases across those differences agree. Don't add what an existing lesson already says (support or refine it instead), and don't re-add a retired lesson unless new cases clearly show it again.
+- add: a new lesson, only for a pattern the cases show more than once (cite at least two cases, NEW or EARLIER), or for an instruction the office gave that is plainly general ("always…", "never…", "for X, do Y"), not a one-off. Scope applies_when as narrowly as the cases show — sender, insurer, kind of email, job stage — and broaden only when cases across those differences agree. Don't add what an existing lesson already says (support or refine it instead), and don't re-add a retired lesson unless new cases clearly show it again. A lesson a person turned off ("Turned off by …") stays off: don't add it back in any wording unless several new cases plainly show the office doing it.
 - retire: a lesson that is wrong or no longer followed.
 
 A case confirmed as proposed is evidence the proposal was right: it supports lessons the proposal followed. One edit on its own is not a pattern. Write lessons as plain instructions the feature can follow ("Copy in the assessor on the job"); applies_when names the situation ("Replies to Allianz on make safe jobs with an assessor named"). Leave every list empty when nothing calls for a change — that's the usual outcome.`
@@ -120,7 +120,7 @@ export function parseDecisions(text: string): Decisions {
   }
 }
 
-const EVENT_COLUMNS = 'id, tenant_id, feature, source_table, source_id, situation, situation_text, proposed, final, changes, outcome, instruction, user_id, created_at'
+const EVENT_COLUMNS = 'id, tenant_id, feature, source_table, source_id, situation, situation_text, proposed, final, changes, outcome, instruction, kind, user_id, created_at'
 
 /**
  * Reviews one feature's new decisions for one company and updates its
@@ -308,4 +308,10 @@ export async function reviewAll(db: SupabaseClient, opts: { client?: Pick<Anthro
     }
   }
   return out
+}
+
+/** When each feature was last reviewed, and what the run did (the "What the AI has learned" page) */
+export async function lastReviews(db: SupabaseClient, tenantId: string): Promise<{ feature: string; ran_at: string; summary: ReviewResult | null }[]> {
+  const { data } = await db.from('learning_reviews').select('feature, ran_at, summary').eq('tenant_id', tenantId)
+  return (data ?? []) as { feature: string; ran_at: string; summary: ReviewResult | null }[]
 }

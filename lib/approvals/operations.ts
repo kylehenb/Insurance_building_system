@@ -21,6 +21,7 @@ import { describeDraft, sendDraft } from '@/lib/mail/compose'
 import { scheduleDraft } from '@/lib/mail/scheduled'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { getMailbox } from '@/lib/mail/sync'
+import { getLesson, setLessonActive } from '@/lib/learning/lessons'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -256,6 +257,25 @@ const mailSchedule: Operation<{ draftId: string; sendAt: string }> = {
   },
 }
 
+const FEATURE_NAMES: Record<string, string> = { action_card: 'action cards', report: 'reports' }
+
+// A lesson the AI learned (tech spec §24), turned off or back on by a person
+const lessonStatus: Operation<{ lessonId: string; active: boolean }> = {
+  async describe(p, ctx) {
+    const l = await getLesson(ctx.service, ctx.tenantId, p.lessonId)
+    const what = l ? `"${clip(l.lesson, 100)}" (when: ${clip(l.applies_when, 80)}) for ${FEATURE_NAMES[l.feature] ?? l.feature}` : 'a lesson'
+    return { summary: `${p.active ? 'Turn back on' : 'Turn off'} the AI's lesson ${what}`, jobId: null }
+  },
+  async run(p, ctx) {
+    const { data: who } = ctx.requesterId
+      ? await ctx.service.from('users').select('name').eq('tenant_id', ctx.tenantId).eq('id', ctx.requesterId).maybeSingle()
+      : { data: null }
+    const done = await setLessonActive(ctx.service, ctx.tenantId, p.lessonId, p.active, (who as { name: string | null } | null)?.name || 'someone in the office')
+    if (!done) throw new Error('That lesson no longer exists')
+    return p.active ? 'Lesson turned back on.' : 'Lesson turned off.'
+  },
+}
+
 /** A readable description of a voice tool call, from the same lookups as the app's operations */
 async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: OperationContext): Promise<{ text: string; jobId: string | null }> {
   const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
@@ -309,6 +329,7 @@ export const OPERATIONS = {
   'invoice.void': invoiceVoid,
   'mail.send': mailSend,
   'mail.schedule': mailSchedule,
+  'lesson.status': lessonStatus,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -333,4 +354,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'invoice.void': 'invoices.manage',
   'mail.send': 'mail.send',
   'mail.schedule': 'mail.send',
+  'lesson.status': 'settings.edit',
 }
