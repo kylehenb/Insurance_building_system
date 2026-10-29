@@ -3,6 +3,7 @@ import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { orderSituation } from '@/lib/insurer-orders/learning'
 
 export async function writeFallbackOrder(
   message: ExtractedMessage,
@@ -179,6 +180,8 @@ export async function writeInsurerOrder(
       raw_email_body: parsed.rawEmailBody,
       email_attachments: parsed.emailAttachments,
       gemini_output: (parsed.rawGeminiOutput ?? parsed.data) as never,
+      // Who sent it, for learning from what the office corrects (lib/insurer-orders/learning.ts)
+      situation: orderSituation({ fromEmail: message.fromEmail, fromName: message.fromName, subject: message.subject, insurer: insurerFields.insurer ?? parsed.data.insurer }),
       ai_audit_id: aiAuditId,
       status: 'pending',
     } as never)

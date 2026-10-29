@@ -258,7 +258,7 @@ const mailSchedule: Operation<{ draftId: string; sendAt: string }> = {
   },
 }
 
-const FEATURE_NAMES: Record<string, string> = { action_card: 'action cards', report: 'reports' }
+const FEATURE_NAMES: Record<string, string> = { action_card: 'action cards', order_parse: 'reading insurer orders', report: 'report writing', photo_labels: 'photo labels' }
 
 // A lesson the AI learned (tech spec §24), turned off or back on by a person
 const lessonStatus: Operation<{ lessonId: string; active: boolean }> = {

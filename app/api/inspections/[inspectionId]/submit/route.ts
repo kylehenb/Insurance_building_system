@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { indexReports } from '@/lib/reports/similar-reports'
+import { recordReportsLocked } from '@/lib/reports/learning'
 
 export async function POST(
   req: NextRequest,
@@ -118,6 +119,8 @@ export async function POST(
     const lockedReportIds = [coreReport.id, ...(additionalReports ?? []).map(r => r.id)]
     after(() => indexReports(supabase, lockedReportIds).catch(err =>
       console.error(`[inspection submit ${inspectionId}] fingerprint failed:`, err)))
+    // How the AI's drafts and photo labels fared is learned from (tech spec §24.4)
+    after(() => recordReportsLocked(supabase, tenantId, lockedReportIds, me.userId))
 
     // TODO: Generate and send email to insurer with compiled package
     // This would involve:

@@ -42,7 +42,7 @@ export async function PATCH(
   switch (action) {
     case 'lock': {
       try {
-        await setReportLocked(supabase, tenantId, reportId, true)
+        await setReportLocked(supabase, tenantId, reportId, true, userId)
       } catch (err) {
         if (err instanceof ReportEditError) return NextResponse.json({ error: err.message }, { status: err.status })
         throw err

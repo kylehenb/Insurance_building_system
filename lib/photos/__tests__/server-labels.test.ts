@@ -8,7 +8,9 @@ const relabelWithNotes = vi.fn()
 vi.mock('../ai-label', () => ({ labelPhotos: vi.fn(), relabelWithNotes }))
 vi.mock('@/lib/images/downscale', () => ({ downscaleImage: vi.fn() }))
 
-const { finaliseFieldPhotos, scopeFromRooms, loadCorrections } = await import('../server-labels')
+vi.mock('../learning', () => ({ photoLearning: async () => ({ corrections: [], lessons: '' }) }))
+
+const { finaliseFieldPhotos, scopeFromRooms } = await import('../server-labels')
 
 type Row = Record<string, unknown>
 
@@ -89,17 +91,5 @@ describe('scopeFromRooms', () => {
     expect(scopeFromRooms([{ name: 'Kitchen', items: ['ceiling', ''] }, { room: 'Bed 2', items: [{ text: 'carpet' }] }, { name: '', items: [] }]))
       .toEqual({ scopeRooms: ['Kitchen', 'Bed 2'], scopeText: 'Kitchen: ceiling\nBed 2: carpet' })
     expect(scopeFromRooms(undefined)).toEqual({ scopeRooms: [], scopeText: '' })
-  })
-})
-
-describe('loadCorrections', () => {
-  it('keeps real changes to descriptive labels only', async () => {
-    const { service } = fakeService({ photos: [
-      { ai_seen: 's', ai_label: 'Lounge - stain', ai_kind: 'other', label: 'Family Room - water stain' },
-      { ai_seen: 's', ai_label: 'Kitchen - oven', ai_kind: 'other', label: 'kitchen -  oven' },
-      { ai_seen: 's', ai_label: 'Front - street', ai_kind: 'view_of_property', label: 'View of Property' },
-      { ai_seen: 's', ai_label: 'Hall - wall', ai_kind: 'other', label: null },
-    ] })
-    expect(await loadCorrections(service, 't1')).toEqual([{ seen: 's', aiLabel: 'Lounge - stain', finalLabel: 'Family Room - water stain' }])
   })
 })

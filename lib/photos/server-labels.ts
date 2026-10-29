@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { downscaleImage } from '@/lib/images/downscale'
-import { labelPhotos, relabelWithNotes, type PhotoCorrection, type PhotoLabelContext } from './ai-label'
-import { AI_LABEL_BATCH_SIZE, applyAiLabels, groupPhotosForReport, photoKindOfLabel, roomOfLabel, type AiPhotoLabel, type PhotoKind } from './report-order'
+import { labelPhotos, relabelWithNotes, type PhotoLabelContext } from './ai-label'
+import { photoLearning } from './learning'
+import { AI_LABEL_BATCH_SIZE, applyAiLabels, groupPhotosForReport, roomOfLabel, type AiPhotoLabel, type PhotoKind } from './report-order'
 
 // Server side of field photo labelling (tech spec "AI photo labels"):
 //   - labelPendingPhotos: called after each field photo upload (and when the
@@ -19,7 +20,6 @@ type PhotoRow = Database['public']['Tables']['photos']['Row']
 /** Long edge of the copy the AI looks at: enough to recognise a room and its damage, a fraction of the tokens */
 const AI_IMAGE_EDGE = 768
 const PARALLEL_BATCHES = 3
-const CORRECTIONS_SCAN = 200
 
 interface DraftShape { raw_report_notes?: unknown; scopeRooms?: unknown }
 interface ScopeRoomLike { name?: unknown; room?: unknown; items?: unknown }
@@ -37,24 +37,6 @@ export function scopeFromRooms(rooms: unknown): { scopeRooms: string[]; scopeTex
   }
 }
 
-/** The company's recent label corrections on locked reports: what the AI said, and what it became. */
-export async function loadCorrections(service: Service, tenantId: string): Promise<PhotoCorrection[]> {
-  const { data } = await service
-    .from('photos')
-    .select('ai_seen, ai_label, ai_kind, label, reports!inner(is_locked)')
-    .eq('tenant_id', tenantId)
-    .eq('reports.is_locked', true)
-    .not('ai_label', 'is', null)
-    .order('ai_labelled_at', { ascending: false })
-    .limit(CORRECTIONS_SCAN)
-  const squash = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
-  return (data ?? [])
-    // View of Property / Mud Map are fixed labels, not wording to learn from
-    .filter(p => p.ai_label && p.label?.trim() && squash(p.label) !== squash(p.ai_label) &&
-      p.ai_kind !== 'view_of_property' && p.ai_kind !== 'mud_map' && photoKindOfLabel(p.label) === 'other')
-    .map(p => ({ seen: p.ai_seen, aiLabel: p.ai_label!, finalLabel: p.label!.trim() }))
-}
-
 /** Notes, scope, job and company guidance for labelling this inspection's photos (from the saved field draft). */
 export async function loadLabelContext(
   service: Service,
@@ -65,13 +47,14 @@ export async function loadLabelContext(
   const { data: insp } = await service
     .from('inspections').select('job_id, field_draft, raw_report_notes').eq('id', inspectionId).eq('tenant_id', tenantId).maybeSingle()
   const draft = (insp?.field_draft ?? {}) as DraftShape
-  const [{ data: job }, { data: prompt }, corrections] = await Promise.all([
+  const [{ data: job }, { data: prompt }] = await Promise.all([
     insp?.job_id
       ? service.from('jobs').select('loss_type, insurer, property_address').eq('id', insp.job_id).eq('tenant_id', tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
     service.from('prompts').select('system_prompt').eq('tenant_id', tenantId).eq('key', 'photo_label').maybeSingle(),
-    loadCorrections(service, tenantId),
   ])
+  // The inspectors' renames on the most alike past reports, and the lessons (the learning module, tech spec §24.4)
+  const { corrections, lessons } = await photoLearning(service as unknown as SupabaseClient, tenantId, { insurer: job?.insurer ?? null, loss_type: job?.loss_type ?? null, report_type: 'bar' })
   const notes = overrides?.notes ?? (typeof draft.raw_report_notes === 'string' ? draft.raw_report_notes : insp?.raw_report_notes ?? '')
   return {
     notes: notes ?? '',
@@ -79,6 +62,7 @@ export async function loadLabelContext(
     job: { lossType: job?.loss_type, insurer: job?.insurer, address: job?.property_address },
     guidance: prompt?.system_prompt,
     corrections,
+    lessons,
   }
 }
 

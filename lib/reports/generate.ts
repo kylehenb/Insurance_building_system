@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
-import { activeLessons, formatLessons } from '@/lib/learning/lessons'
+import { reportLearning, reportSituation, saveAiDraft } from '@/lib/reports/learning'
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
@@ -53,15 +53,15 @@ export async function generateReportDraft(params: {
     insurer = (reportRow?.jobs as { insurer: string | null } | null)?.insurer ?? null
   }
 
-  // Fetch prompt, the lessons learned for reports (tech spec §24), and the closest past locked reports in parallel
-  const [promptResult, lessons, similarReports] = await Promise.all([
+  // Fetch prompt, what the assessors corrected on the most alike past drafts (tech spec §24.4), and the closest past locked reports in parallel
+  const [promptResult, learning, similarReports] = await Promise.all([
     supabase
       .from('prompts')
       .select('system_prompt')
       .eq('tenant_id', tenantId)
       .eq('key', promptKey)
       .single(),
-    activeLessons(supabase, tenantId, 'report'),
+    reportLearning(supabase, tenantId, reportSituation({ reportType, insurer, lossType }), reportId),
     getSimilarReportsBlock({
       service: supabase, tenantId, reportType, notes: rawReportDump, lossType, insurer, excludeReportId: reportId,
     }),
@@ -71,7 +71,7 @@ export async function generateReportDraft(params: {
     promptResult.data?.system_prompt ||
     'You are an expert building insurance assessor. Generate a professional, detailed report based on the inspection notes provided.'
 
-  const systemPrompt = [basePrompt, formatLessons(lessons), similarReports].filter(Boolean).join('\n\n')
+  const systemPrompt = [basePrompt, learning, similarReports].filter(Boolean).join('\n\n')
 
   const userMessage = `Generate a structured report based on the following raw inspection notes.
 
@@ -174,6 +174,9 @@ Guidelines:
     if (lossTypeValue) reportData.loss_type = lossTypeValue
     else delete reportData.loss_type
   }
+
+  // Kept on the report, so what the assessor changes before locking it is learned from
+  if (reportId) await saveAiDraft(supabase, tenantId, reportId, reportData)
 
   return reportData
 }

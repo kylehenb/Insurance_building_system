@@ -132,7 +132,12 @@ export async function updateReport(
  * Locks (finished — the similar-report fingerprint follows, see the reports
  * route and the index-embeddings cron) or unlocks a report.
  */
-export async function setReportLocked(supabase: Client, tenantId: string, reportId: string, locked: boolean): Promise<void> {
+export async function setReportLocked(supabase: Client, tenantId: string, reportId: string, locked: boolean, userId: string | null = null): Promise<void> {
   const { error } = await supabase.from('reports').update({ is_locked: locked }).eq('id', reportId).eq('tenant_id', tenantId)
   if (error) throw new ReportEditError(error.message, 500)
+  // Finished: how the AI's draft and photo labels fared is learned from (tech spec §24.4)
+  if (locked) {
+    const { recordReportsLocked } = await import('./learning')
+    await recordReportsLocked(supabase as unknown as SupabaseClient, tenantId, [reportId], userId)
+  }
 }

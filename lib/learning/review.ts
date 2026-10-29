@@ -70,7 +70,7 @@ const DECISIONS_SCHEMA = {
   },
 }
 
-export const REVIEW_SYSTEM_PROMPT = `You keep the lessons an AI feature in IRC Master learns from the office of Insurance Repair Co (building insurance repairs in Perth). The feature proposes things (for action cards: the next steps for an email — replies, filing, notes, follow-ups); a person then confirms the proposal as it was, changes it, skips it, or sends it back with instructions. Each of those decisions is a case, with the situation it was in.
+export const REVIEW_SYSTEM_PROMPT = `You keep the lessons an AI feature in IRC Master learns from the office of Insurance Repair Co (building insurance repairs in Perth). The feature proposes things — action_card: the next steps for an email (replies, filing, notes, follow-ups); order_parse: the fields read from an insurer's order email; report: the written sections of an assessment report; photo_labels: the captions on a report's photos — and a person then confirms the proposal as it was, changes it, skips it, or sends it back with instructions. Each of those decisions is a case, with the situation it was in.
 
 You get the current lessons (L1, L2…), the NEW cases since the last review (N1, N2…) and EARLIER cases for context (E1, E2…). Decide:
 - support: a lesson that a NEW case bore out (the situation matched and the office did what it says, or confirmed a proposal that followed it).

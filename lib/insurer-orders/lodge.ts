@@ -8,6 +8,7 @@ import { sendOrderAcknowledgement, type OrderAcknowledgementResult } from '@/lib
 import { resolveInsurerClient } from '@/lib/clients/resolve-insurer'
 import { normaliseLossType } from '@/lib/loss-types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
+import { recordOrderLodged } from './learning'
 
 // Lodging an insurer order: creates the job (next job number, KPI due dates,
 // client), the inspection/report/quote/invoice its work order type needs, links
@@ -468,6 +469,9 @@ export async function lodgeInsurerOrder(
     console.error('[lodge] order update error:', updateError)
     throw new LodgeError('Failed to update order', 500)
   }
+
+  // What the office corrected on the AI's parse is learned from (tech spec §24.4)
+  await recordOrderLodged(supabase as unknown as SupabaseClient, order as unknown as Parameters<typeof recordOrderLodged>[1], options.userId ?? null)
 
   // Move the order email thread (and any replies) out of the unlinked inbox
   await linkOrderThreadsToJob(supabase, tenantId, orderId, jobId)

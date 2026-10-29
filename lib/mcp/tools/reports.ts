@@ -262,7 +262,7 @@ export const updateReportTool: McpTool = {
       }
       if (writes) done.push(...await writeReport(reportId, before.type, args, ctx))
       if (args.lock === true && !before.locked) {
-        await setReportLocked(ctx.supabase, ctx.tenantId, reportId, true)
+        await setReportLocked(ctx.supabase, ctx.tenantId, reportId, true, ctx.userId)
         done.push('locked')
       }
     } catch (err) {

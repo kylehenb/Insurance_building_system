@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 let reply = ''
 const create = vi.fn(async () => ({ content: [{ type: 'text', text: reply }] }))
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create } } }))
-vi.mock('@/lib/learning/lessons', () => ({ activeLessons: async () => [], formatLessons: () => '' }))
+vi.mock('@/lib/reports/learning', () => ({ reportLearning: async () => '', reportSituation: () => ({}), saveAiDraft: async () => {} }))
 vi.mock('@/lib/reports/similar-reports', () => ({ getSimilarReportsBlock: async () => 'SIMILAR' }))
 
 const { generateReportDraft, ReportGenerateError } = await import('../generate')
