@@ -359,7 +359,12 @@ export async function drainCardQueue({ budgetMs = 60_000, db = mailDb() }: { bud
   while (Date.now() - started < budgetMs) {
     const [card] = await claimQueued(db, 1)
     if (!card) break
-    await generateCard(card, { db })
+    const out = await generateCard(card, { db })
+    // A kind of card the office has set to auto-confirm runs now
+    if (out.status === 'pending') {
+      const { autoConfirmCard } = await import('./auto-confirm')
+      await autoConfirmCard(db, card.tenant_id, card.id)
+    }
     made++
   }
   return { made }

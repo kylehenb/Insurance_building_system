@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LessonView } from '@/lib/learning/lessons'
 import type { FeatureStats, Tally } from '@/lib/learning/stats'
 import type { ReviewResult } from '@/lib/learning/review'
+import { AutoConfirmSettings } from '@/components/learning/AutoConfirm'
 
 // Settings → What the AI has learned (tech spec §24.6): how often the AI's
 // proposals are confirmed untouched, and the lessons it has picked up from
@@ -167,6 +168,9 @@ export default function LearningPage() {
         )}
         {data.stats.map(s => <Accuracy key={s.feature} s={s} days={data.days} />)}
       </div>
+
+      <h2 className="text-sm font-semibold text-ink mb-2">Auto-confirm action cards</h2>
+      <div className="mb-8"><AutoConfirmSettings /></div>
 
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-sm font-semibold text-ink">Lessons in use ({active.length})</h2>

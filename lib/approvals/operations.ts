@@ -22,6 +22,7 @@ import { scheduleDraft } from '@/lib/mail/scheduled'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { getMailbox } from '@/lib/mail/sync'
 import { getLesson, setLessonActive } from '@/lib/learning/lessons'
+import { setAutoConfirm } from '@/lib/learning/auto-confirm'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -276,6 +277,22 @@ const lessonStatus: Operation<{ lessonId: string; active: boolean }> = {
   },
 }
 
+const KIND_NAMES: Record<string, string> = { invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else' }
+
+// Auto-confirm for a kind of AI proposal (tech spec §24.7): on, its proposals
+// run without anyone confirming them, as the person who turned it on
+const autoConfirmSet: Operation<{ feature: string; kind: string; enabled: boolean }> = {
+  async describe(p) {
+    const what = `${FEATURE_NAMES[p.feature] ?? p.feature} — ${KIND_NAMES[p.kind] ?? p.kind}`
+    return { summary: `Turn auto-confirm ${p.enabled ? 'on' : 'off'} for ${what}`, jobId: null }
+  },
+  async run(p, ctx) {
+    if (!ctx.requesterId) throw new Error('Auto-confirm needs someone to run as')
+    await setAutoConfirm(ctx.service, ctx.tenantId, p.feature, p.kind, p.enabled, ctx.requesterId)
+    return p.enabled ? 'Auto-confirm on.' : 'Auto-confirm off.'
+  },
+}
+
 /** A readable description of a voice tool call, from the same lookups as the app's operations */
 async function voiceDetail(tool: string, args: Record<string, unknown>, ctx: OperationContext): Promise<{ text: string; jobId: string | null }> {
   const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
@@ -330,6 +347,7 @@ export const OPERATIONS = {
   'mail.send': mailSend,
   'mail.schedule': mailSchedule,
   'lesson.status': lessonStatus,
+  'auto_confirm.set': autoConfirmSet,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -355,4 +373,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'mail.send': 'mail.send',
   'mail.schedule': 'mail.send',
   'lesson.status': 'settings.edit',
+  'auto_confirm.set': 'settings.edit',
 }

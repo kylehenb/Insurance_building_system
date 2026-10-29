@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { refreshAutoConfirmSuggestions } from './auto-confirm'
 import type { LearningEvent } from './events'
 
 // The nightly review (tech spec §24.5): a stronger model reads a feature's
@@ -292,20 +293,35 @@ export async function reviewFeature(
 const ACTIVE_DAYS = 14
 
 /** Reviews every company's features that have new decisions (the nightly cron). One failing doesn't stop the rest */
-export async function reviewAll(db: SupabaseClient, opts: { client?: Pick<Anthropic, 'beta'>; now?: Date } = {}): Promise<(ReviewResult & { tenantId: string; error?: string })[]> {
+export async function reviewAll(db: SupabaseClient, opts: { client?: Pick<Anthropic, 'beta'>; now?: Date } = {}): Promise<(ReviewResult & { tenantId: string; error?: string; askAutoConfirm?: string[] })[]> {
   const now = opts.now ?? new Date()
-  const { data, error } = await db.from('learning_events').select('tenant_id, feature')
+  const { data, error } = await db.from('learning_events').select('tenant_id, feature, kind')
     .gte('created_at', new Date(now.getTime() - ACTIVE_DAYS * 86_400_000).toISOString()).limit(10_000)
   if (error) throw new Error(error.message)
-  const pairs = [...new Map(((data ?? []) as { tenant_id: string; feature: string }[]).map(r => [`${r.tenant_id}:${r.feature}`, r])).values()]
-  const out: (ReviewResult & { tenantId: string; error?: string })[] = []
-  for (const p of pairs) {
+  // Each company's features, with the kinds decided on lately
+  const pairs = new Map<string, { tenant_id: string; feature: string; kinds: Set<string> }>()
+  for (const r of (data ?? []) as { tenant_id: string; feature: string; kind: string | null }[]) {
+    const key = `${r.tenant_id}:${r.feature}`
+    if (!pairs.has(key)) pairs.set(key, { tenant_id: r.tenant_id, feature: r.feature, kinds: new Set() })
+    if (r.kind) pairs.get(key)!.kinds.add(r.kind)
+  }
+  const out: (ReviewResult & { tenantId: string; error?: string; askAutoConfirm?: string[] })[] = []
+  for (const p of pairs.values()) {
+    let result: ReviewResult & { tenantId: string; error?: string; askAutoConfirm?: string[] }
     try {
-      out.push({ tenantId: p.tenant_id, ...(await reviewFeature(db, { tenantId: p.tenant_id, feature: p.feature, client: opts.client, now })) })
+      result = { tenantId: p.tenant_id, ...(await reviewFeature(db, { tenantId: p.tenant_id, feature: p.feature, client: opts.client, now })) }
     } catch (err) {
       console.error(`[learning] review of ${p.feature} for ${p.tenant_id} failed:`, err)
-      out.push({ tenantId: p.tenant_id, feature: p.feature, reviewed: 0, added: 0, supported: 0, contradicted: 0, refined: 0, retired: 0, error: err instanceof Error ? err.message : String(err) })
+      result = { tenantId: p.tenant_id, feature: p.feature, reviewed: 0, added: 0, supported: 0, contradicted: 0, refined: 0, retired: 0, error: err instanceof Error ? err.message : String(err) }
     }
+    // Kinds now confirmed untouched almost every time: ask whether to auto-confirm them
+    try {
+      const asked = await refreshAutoConfirmSuggestions(db, p.tenant_id, p.feature, [...p.kinds], now)
+      if (asked.length) result.askAutoConfirm = asked
+    } catch (err) {
+      console.error(`[learning] auto-confirm check of ${p.feature} for ${p.tenant_id} failed:`, err)
+    }
+    out.push(result)
   }
   return out
 }

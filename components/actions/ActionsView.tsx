@@ -6,6 +6,7 @@ import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
 import { StarIcon } from './Star'
 import { FollowUps } from './FollowUps'
+import { AutoConfirmBanner } from '@/components/learning/AutoConfirm'
 
 // The Action cards view on the dashboard: everything that needs the office,
 // most urgent first — the AI's suggestions for incoming email (and, later,
@@ -101,6 +102,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
       </div>
       <div className="av-list" ref={listRef}>
         {view === 'upcoming' && <FollowUps onMessage={onToast} />}
+        {view === 'pending' && <AutoConfirmBanner />}
         {view === 'pending' && <ApprovalsPanel />}
         {view !== 'upcoming' && cards === null && !error && <div className="mail-empty">Loading…</div>}
         {error && <div className="mail-empty is-error">{error}</div>}

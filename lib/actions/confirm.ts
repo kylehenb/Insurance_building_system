@@ -25,8 +25,10 @@ export async function confirmCard(
   userId: string,
   cardId: string,
   choices: StepChoice[],
-  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId, only = false }: {
+  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId, only = false, auto = false }: {
     db?: SupabaseClient
+    /** Run by auto-confirm (lib/actions/auto-confirm.ts), not a person: said so on the card, and not learned from */
+    auto?: boolean
     /** Run just these steps and leave the rest on the card (an email sent from its composer) */
     only?: boolean
     tools?: McpTool[]
@@ -99,7 +101,7 @@ export async function confirmCard(
     : {
         status: 'done',
         error_log: null,
-        outcome: [doneCount ? `${doneCount} step${doneCount === 1 ? '' : 's'} done` : null, waiting ? `${waiting} waiting for approval` : null].filter(Boolean).join(', ') || 'Nothing done',
+        outcome: `${auto ? 'Auto-confirmed: ' : ''}${[doneCount ? `${doneCount} step${doneCount === 1 ? '' : 's'} done` : null, waiting ? `${waiting} waiting for approval` : null].filter(Boolean).join(', ') || 'Nothing done'}`,
         confirmed_by: userId,
         confirmed_at: new Date().toISOString(),
       }
@@ -107,7 +109,8 @@ export async function confirmCard(
     .update({ ...update, steps, updated_at: new Date().toISOString() })
     .eq('id', card.id).select('*').single()
   if (error) throw new Error(error.message)
-  // Done: what the office did with the AI's proposal is learned from
-  if (update.status === 'done') await recordCardDecision(db, data as ActionCard, userId, 'confirmed')
+  // Done: what the office did with the AI's proposal is learned from (not
+  // what auto-confirm did — that would only teach the AI to agree with itself)
+  if (update.status === 'done' && !auto) await recordCardDecision(db, data as ActionCard, userId, 'confirmed')
   return data as ActionCard
 }
