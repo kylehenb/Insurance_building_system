@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildCatalogue, displayWording, fillQuantity, insurerTagMatches, normaliseUnit, parseQty, type LibraryRow } from '../pricing'
-import { createScopeSearch } from '../search'
+import { createScopeSearch, usesByItem } from '../search'
 import { buildFieldScopeLines, normaliseFieldRooms, notesText, readParsedNotes, type ParsedNote } from '../field-scope'
 
 // The scope library rule shared by the field app, field submission, the quote
@@ -132,6 +132,55 @@ describe('fuzzy search', () => {
   it('needs two letters and finds nothing for unrelated words', () => {
     expect(search('p')).toEqual([])
     expect(search('swimming pool fence')).toEqual([])
+  })
+})
+
+describe('search order by use', () => {
+  const item = (id: string, keyword: string, item_description: string, uses: number, trade = 'Painter') =>
+    ({ id, keyword, item_description, trade, uses })
+  const items = [
+    item('wardrobeCeiling', 'paintWardrobeCeiling', 'Prepare and paint wardrobe ceiling in a similar colour and finish to existing.', 0),
+    item('ceilingReplace', 'ceiling', 'Remove, dispose, supply and install plasterboard ceiling ready for painting.', 3, 'Ceiling Fixer'),
+    item('paintCeiling', 'paintCeiling', 'Prepare and paint ceiling and cornice in a similar colour and finish to existing.', 40),
+    item('insulation', 'insulation', 'Remove, dispose, supply and install ceiling insulation batts R4.1.', 12, 'Ceiling Fixer'),
+    item('corniceReplace', 'replace cornice', 'Remove, dispose, supply and install plasterboard cornices.', 25, 'Ceiling Fixer'),
+    item('skirtingReplace', 'skirting', 'Remove, dispose, supply and install skirting boards.', 1, 'Carpenter'),
+    item('paintSkirting', 'paintSkirting', 'Prepare and paint skirting boards in a similar colour and finish to existing.', 0),
+    item('doorInternal', 'doorinternal', 'Remove, dispose, supply and install internal door, hollow core.', 0, 'Carpenter'),
+    item('cabinet', '', 'Remove, dispose, supply and install base cabinet carcass. Re use doors.', 30, 'Cabinet Maker'),
+  ]
+  const search = createScopeSearch(items)
+  const ids = (q: string) => search(q).map(i => i.id)
+
+  it('puts the most used match first, also while still typing', () => {
+    expect(ids('ceiling')[0]).toBe('paintCeiling')
+    expect(ids('cei')[0]).toBe('paintCeiling')
+    expect(ids('ceiling').indexOf('ceilingReplace')).toBeLessThan(ids('ceiling').indexOf('wardrobeCeiling'))
+  })
+
+  it('never lets a popular item jump ahead for a word it doesn\'t contain', () => {
+    expect(ids('skirting')).toEqual(['skirtingReplace', 'paintSkirting'])
+    expect(ids('sk')).not.toContain('paintCeiling')
+    // A Ceiling Fixer's cornice item still turns up (by its trade), but after every ceiling item
+    expect(ids('ceiling').slice(-1)).toEqual(['corniceReplace'])
+  })
+
+  it('puts items named by the words ahead of items that mention them in passing', () => {
+    expect(ids('door')[0]).toBe('doorInternal')
+    expect(ids('paint ceiling')[0]).toBe('paintCeiling')
+    expect(ids('paint ceiling').indexOf('wardrobeCeiling')).toBeLessThan(ids('paint ceiling').indexOf('ceilingReplace'))
+  })
+
+  it('counts uses per item, and an insurer\'s own item gets the uses of the row it replaces', () => {
+    const uses = usesByItem(
+      [{ id: 'paintCeiling', keyword: 'paintCeiling' }, { id: 'ceilingMidcity', keyword: 'ceiling' }, { id: 'unused', keyword: null }],
+      [
+        { scope_library_id: 'paintCeiling', keyword: 'paintCeiling', uses: 4 },
+        { scope_library_id: 'ceilingStd', keyword: 'Ceiling', uses: 3 },
+        { scope_library_id: 'ceilingMidcity', keyword: 'ceiling', uses: 1 },
+      ],
+    )
+    expect(Object.fromEntries(uses)).toEqual({ paintCeiling: 4, ceilingMidcity: 4, unused: 0 })
   })
 })
 

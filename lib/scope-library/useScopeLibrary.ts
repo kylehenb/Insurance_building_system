@@ -26,6 +26,8 @@ export interface ScopeSearchResult {
   quote_ref: string | null
   job_number: string | null
   reference_date: string | null
+  /** Quotes this library item has been used on (orders the search) */
+  uses: number
 }
 
 interface UseScopeLibraryOptions {

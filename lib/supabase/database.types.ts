@@ -4422,6 +4422,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      scope_library_usage: {
+        Args: { p_tenant_id: string }
+        Returns: { keyword: string | null; scope_library_id: string; uses: number }[]
+      }
       signing_rate_limit_hit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number }
         Returns: boolean
