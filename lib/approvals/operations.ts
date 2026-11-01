@@ -74,20 +74,20 @@ const workOrderSend: Operation<{ workOrderId: string; overrides: WorkOrderEmailO
 
 const documentsSend: Operation<{ refs: DocumentRef[]; mode: 'auto' | 'custom' | 'mark_sent'; overrides: DocumentEmailOverrides }> = {
   async describe(p, ctx) {
-    const draft = await buildDocumentEmailDraft(p.refs, { supabase: ctx.service, tenantId: ctx.tenantId })
+    const draft = await buildDocumentEmailDraft(p.refs, { supabase: ctx.service, tenantId: ctx.tenantId }, { replyToOrder: p.overrides.replyToOrder })
     const titles = draft.attachments.map(a => a.title).join(', ')
     const jobId = p.refs[0]?.kind === 'photos' ? p.refs[0].id : await jobOfDocument(ctx, p.refs[0])
     return {
       summary: p.mode === 'mark_sent'
         ? `Mark ${titles} as sent on ${await jobNumber(ctx, jobId)} (not emailed)`
-        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${p.overrides.body ? ', with changed wording' : ''}`,
+        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${draft.replyToOrder ? ', as a reply to the insurer order email' : ''}${p.overrides.body ? ', with changed wording' : ''}`,
       jobId,
     }
   },
   async run(p, ctx) {
     const ectx = { supabase: ctx.service, tenantId: ctx.tenantId, actorId: ctx.requesterId }
     const result = p.mode === 'mark_sent'
-      ? await markDocumentsSentWithoutEmail(p.refs, ectx)
+      ? await markDocumentsSentWithoutEmail(p.refs, ectx, p.overrides)
       : await sendDocumentEmail(p.refs, ectx, p.overrides)
     const changes = result.statusChanges.map(c => c.description)
     return `${p.mode === 'mark_sent' ? 'Marked as sent.' : 'Emailed.'}${changes.length ? ` ${changes.join('. ')}.` : ''}`

@@ -8,6 +8,8 @@ import { sendEmailViaGmail } from '@/lib/signing/email/gmail'
 import type { EmailAttachment } from '@/lib/email/build-raw'
 import type { PrintDataContext } from '@/lib/documents/print-data'
 import { reportDocumentName } from '@/lib/documents/print-document-pdfs'
+import { findOrderThread, type OrderThread } from '@/lib/documents/send/order-thread'
+import { inspectionForPackage, markInspectionPackageSent } from '@/lib/documents/send/inspection-package'
 import { PrintDataError } from '@/lib/documents/print-data'
 import {
   documentRefKey,
@@ -23,6 +25,9 @@ import {
 // The first document picks the email template and the recipients; any others
 // ride along as extra attachments (e.g. BAR + quote + photos to the insurer).
 // Auto send uses the template as-is; Customise send edits a copy of it.
+// With replyToOrder the email goes as a reply in the insurer order's Gmail
+// thread (the inspection package does this). With inspectionId the
+// inspection is marked Sent and Locked once the email has gone.
 // Nothing changes on the documents until Gmail has accepted the email.
 
 type Job = Database['public']['Tables']['jobs']['Row']
@@ -61,6 +66,8 @@ export interface DocumentEmailDraft {
   warnings: string[]
   /** Other documents on the job that can be attached as well */
   otherDocuments: DocumentEmailAttachment[]
+  /** Set when it will go as a reply in the insurer order's email thread */
+  replyToOrder: { subject: string } | null
 }
 
 export interface DocumentEmailOverrides {
@@ -71,7 +78,14 @@ export interface DocumentEmailOverrides {
   body?: string
   /** Other files to go with the documents (the voice connector's job photos and files) */
   extraAttachments?: EmailAttachment[]
+  /** Reply in the job's insurer order email thread instead of starting a new email */
+  replyToOrder?: boolean
+  /** The documents are this inspection's package: mark it Sent and Locked once sent */
+  inspectionId?: string
 }
+
+/** What shapes the email itself (no edits): used by the draft and the send alike */
+export type DocumentDraftOptions = Pick<DocumentEmailOverrides, 'replyToOrder'>
 
 export interface DocumentSendResult {
   communicationId: string | null
@@ -138,7 +152,12 @@ async function defaultRecipients(ctx: PrintDataContext, job: Job, audience: 'ins
   return { to, cc, contactName }
 }
 
-async function buildDraft(docs: PreparedDocument[], ctx: PrintDataContext): Promise<DocumentEmailDraft> {
+async function buildDraft(
+  docs: PreparedDocument[],
+  ctx: PrintDataContext,
+  options: DocumentDraftOptions = {},
+  orderThread?: OrderThread | null,
+): Promise<DocumentEmailDraft> {
   const main = docs[0]
   const { job, tenant } = main
   const template = await resolveEmailTemplate(ctx.supabase, ctx.tenantId, main.sendType, job.client_id)
@@ -152,11 +171,18 @@ async function buildDraft(docs: PreparedDocument[], ctx: PrintDataContext): Prom
       : 'No insurer email found (order sender or client submission email). Use Customise send to enter one.')
   }
 
+  // A reply keeps the order email's subject, or Gmail starts a new conversation
+  const thread = !options.replyToOrder || main.audience !== 'insurer' ? null
+    : orderThread !== undefined ? orderThread : await findOrderThread(ctx.supabase, ctx.tenantId, job.id)
+  if (options.replyToOrder && main.audience === 'insurer' && !thread) {
+    warnings.push("No insurer order email was found on this job, so this will go as a new email rather than a reply.")
+  }
+
   const body = renderRichTemplate(template.body, vars)
   return {
     to: to.join(', '),
     cc: cc.join(', '),
-    subject: renderTemplate(template.subject, vars),
+    subject: thread?.subject ?? renderTemplate(template.subject, vars),
     body,
     bodyText: richToText(body),
     attachments: docs.map(d => ({ ref: d.ref, filename: d.filename, title: d.title })),
@@ -165,6 +191,7 @@ async function buildDraft(docs: PreparedDocument[], ctx: PrintDataContext): Prom
     usingBuiltInTemplate: template.templateId === null,
     warnings,
     otherDocuments: (await listJobDocuments(ctx, job.id)).filter(o => !docs.some(d => documentRefKey(d.ref) === documentRefKey(o.ref))),
+    replyToOrder: thread ? { subject: thread.subject } : null,
   }
 }
 
@@ -195,8 +222,8 @@ export async function listJobDocuments(ctx: PrintDataContext, jobId: string): Pr
 }
 
 /** The pre-filled email for the send dialog. Renders no PDFs. */
-export async function buildDocumentEmailDraft(refs: DocumentRef[], ctx: PrintDataContext): Promise<DocumentEmailDraft> {
-  return buildDraft(await prepareAll(refs, ctx), ctx)
+export async function buildDocumentEmailDraft(refs: DocumentRef[], ctx: PrintDataContext, options: DocumentDraftOptions = {}): Promise<DocumentEmailDraft> {
+  return buildDraft(await prepareAll(refs, ctx), ctx, options)
 }
 
 function storageName(filename: string): string {
@@ -214,8 +241,12 @@ export async function sendDocumentEmail(
   overrides: DocumentEmailOverrides = {},
 ): Promise<DocumentSendResult> {
   const docs = await prepareAll(refs, ctx)
-  const draft = await buildDraft(docs, ctx)
   const main = docs[0]
+  const inspection = overrides.inspectionId ? await inspectionForPackage(ctx, overrides.inspectionId, main.job.id) : null
+  const orderThread = overrides.replyToOrder && main.audience === 'insurer'
+    ? await findOrderThread(ctx.supabase, ctx.tenantId, main.job.id)
+    : null
+  const draft = await buildDraft(docs, ctx, { replyToOrder: overrides.replyToOrder }, orderThread)
 
   const to = parseAddressList(overrides.to ?? draft.to)
   const cc = parseAddressList(overrides.cc ?? draft.cc).filter(e => !to.includes(e))
@@ -256,6 +287,11 @@ export async function sendDocumentEmail(
       text: body,
       html,
       attachments: [...files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })), ...extras],
+      ...(orderThread ? {
+        threadId: orderThread.threadId,
+        inReplyTo: orderThread.inReplyTo ?? undefined,
+        references: orderThread.references ?? undefined,
+      } : {}),
     })
   } catch (err) {
     console.error(`[document-send] Gmail send failed (${docs.map(d => d.title).join(', ')}):`, err)
@@ -286,9 +322,10 @@ export async function sendDocumentEmail(
     body_text:        body,
     from_email:       fromEmail,
     to_email:         [...to, ...cc].join(', '),
-    thread_id:        sent.threadId,
+    thread_id:        sent.threadId ?? orderThread?.threadId ?? null,
     gmail_message_id: sent.gmailId,
     attachments:      attachments as unknown as Json,
+    inspection_id:    inspection?.id ?? null,
     source:           'document_send',
     created_by:       ctx.actorId,
   })
@@ -299,6 +336,10 @@ export async function sendDocumentEmail(
     const change = await markDocumentSent(service, ctx.tenantId, doc)
     if (change) statusChanges.push(change)
   }
+  if (inspection) {
+    const change = await markInspectionPackageSent(service, ctx, inspection, docs)
+    if (change) statusChanges.push(change)
+  }
   return { communicationId: commErr ? null : communicationId, statusChanges }
 }
 
@@ -306,12 +347,21 @@ export async function sendDocumentEmail(
  * "Mark as sent" without emailing — for documents sent some other way
  * (insurer portal, the old print page). Records a note on the job.
  */
-export async function markDocumentsSentWithoutEmail(refs: DocumentRef[], ctx: DocumentEmailContext): Promise<DocumentSendResult> {
+export async function markDocumentsSentWithoutEmail(
+  refs: DocumentRef[],
+  ctx: DocumentEmailContext,
+  options: Pick<DocumentEmailOverrides, 'inspectionId'> = {},
+): Promise<DocumentSendResult> {
   const docs = await prepareAll(refs, ctx)
+  const inspection = options.inspectionId ? await inspectionForPackage(ctx, options.inspectionId, docs[0].job.id) : null
   const service = createServiceClient()
   const statusChanges: StatusChange[] = []
   for (const doc of docs) {
     const change = await markDocumentSent(service, ctx.tenantId, doc)
+    if (change) statusChanges.push(change)
+  }
+  if (inspection) {
+    const change = await markInspectionPackageSent(service, ctx, inspection, docs)
     if (change) statusChanges.push(change)
   }
   if (statusChanges.length > 0) {
@@ -323,6 +373,7 @@ export async function markDocumentsSentWithoutEmail(refs: DocumentRef[], ctx: Do
       subject:    'Marked as sent (not emailed from the system)',
       content:    statusChanges.map(c => c.description).join('\n'),
       body_text:  statusChanges.map(c => c.description).join('\n'),
+      inspection_id: inspection?.id ?? null,
       source:     'document_send',
       created_by: ctx.actorId,
     })

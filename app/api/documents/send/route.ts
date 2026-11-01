@@ -18,9 +18,13 @@ import { recordOperation } from '@/lib/activity/log'
 //   mode 'auto'      → send the template as-is
 //   mode 'custom'    → send with { to, cc, subject, body } as edited
 //   mode 'mark_sent' → no email; mark the documents sent (sent another way)
+// Any mode may add replyToOrder: true (reply in the job's insurer order email
+// thread) and inspectionId (the inspection package: mark it Sent and Locked).
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 async function context(): Promise<DocumentEmailContext | null> {
   const user = await getUser()
@@ -46,11 +50,18 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(parsed.documents)) throw new DocumentSendError('documents is required', 400)
     const refs = parsed.documents.map(parseDocumentRef)
 
-    if (mode === 'draft') return NextResponse.json(await buildDocumentEmailDraft(refs, ctx))
-    let overrides: DocumentEmailOverrides = {}
+    const str = (k: string) => (typeof parsed[k] === 'string' ? parsed[k] as string : undefined)
+    const replyToOrder = parsed.replyToOrder === true
+    const inspectionId = str('inspectionId')
+    if (inspectionId !== undefined && !UUID_RE.test(inspectionId)) throw new DocumentSendError('inspectionId is not valid', 400)
+
+    if (mode === 'draft') return NextResponse.json(await buildDocumentEmailDraft(refs, ctx, { replyToOrder }))
+    let overrides: DocumentEmailOverrides = {
+      ...(replyToOrder ? { replyToOrder } : {}),
+      ...(inspectionId ? { inspectionId } : {}),
+    }
     if (mode === 'custom') {
-      const str = (k: string) => (typeof parsed[k] === 'string' ? parsed[k] as string : undefined)
-      overrides = { to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body') }
+      overrides = { ...overrides, to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body') }
     } else if (mode !== 'auto' && mode !== 'mark_sent') {
       return NextResponse.json({ error: "mode must be 'draft', 'auto', 'custom' or 'mark_sent'" }, { status: 400 })
     }
@@ -61,7 +72,7 @@ export async function POST(req: NextRequest) {
     })
     if (gated) return gated
 
-    const result = mode === 'mark_sent' ? await markDocumentsSentWithoutEmail(refs, ctx) : await sendDocumentEmail(refs, ctx, overrides)
+    const result = mode === 'mark_sent' ? await markDocumentsSentWithoutEmail(refs, ctx, overrides) : await sendDocumentEmail(refs, ctx, overrides)
     await recordOperation({ tenantId: ctx.tenantId, userId: ctx.actorId, action: 'send.documents', operation: 'documents.send', payload: { refs, mode, overrides } })
     return NextResponse.json({ ok: true, ...result })
   } catch (err) {

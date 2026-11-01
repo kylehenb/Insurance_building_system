@@ -11,6 +11,8 @@ import { ApprovalNotice } from '@/components/approvals/approval-notice'
 // job. Auto send emails the standard template as-is; Customise send opens the
 // same pre-filled email to edit, and can attach more of the job's documents.
 // Mark as sent records it as sent without emailing (sent some other way).
+// replyToOrder sends it as a reply in the insurer order's email thread;
+// inspectionId marks that inspection Sent and Locked too (the package).
 // The documents only change status once the email has gone. Backdrop, × and
 // Escape close without sending. Same look as the work order send dialog.
 
@@ -28,6 +30,10 @@ export interface SendDocumentModalProps {
   allowMarkSent?: boolean
   /** What Mark as sent does, shown under the option */
   markSentDescription?: string
+  /** Reply in the job's insurer order email thread rather than a new email */
+  replyToOrder?: boolean
+  /** The inspection whose package this is: marked Sent and Locked once sent */
+  inspectionId?: string
   onDone: (outcome: DocumentSendOutcome) => void
   onClose: () => void
 }
@@ -49,6 +55,7 @@ interface Draft {
   usingBuiltInTemplate: boolean
   warnings: string[]
   otherDocuments: Attachment[]
+  replyToOrder: { subject: string } | null
 }
 
 /** The emailed PDF, rendered live, for the attachment link. */
@@ -72,7 +79,7 @@ async function post(body: Record<string, unknown>) {
   return data
 }
 
-export function SendDocumentModal({ documents, title, allowMarkSent, markSentDescription, onDone, onClose }: SendDocumentModalProps) {
+export function SendDocumentModal({ documents, title, allowMarkSent, markSentDescription, replyToOrder, inspectionId, onDone, onClose }: SendDocumentModalProps) {
   const [step, setStep]       = useState<'choose' | 'customise'>('choose')
   const [draft, setDraft]     = useState<Draft | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -90,7 +97,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
   const docsKey = JSON.stringify(documents)
   useEffect(() => {
     let cancelled = false
-    post({ mode: 'draft', documents: JSON.parse(docsKey) })
+    post({ mode: 'draft', documents: JSON.parse(docsKey), ...(replyToOrder ? { replyToOrder } : {}) })
       .then((d: Draft) => {
         if (cancelled) return
         setDraft(d)
@@ -99,7 +106,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
       })
       .catch(err => { if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err)) })
     return () => { cancelled = true }
-  }, [docsKey])
+  }, [docsKey, replyToOrder])
 
   const sending = busy !== null
   useEffect(() => {
@@ -114,9 +121,10 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
     setPending(null)
     try {
       const refs = mode === 'custom' ? attachments.map(a => a.ref) : documents
+      const pkg = { ...(replyToOrder ? { replyToOrder } : {}), ...(inspectionId ? { inspectionId } : {}) }
       const result = await post(mode === 'custom'
-        ? { mode, documents: refs, to, cc, subject, body }
-        : { mode, documents: refs })
+        ? { mode, documents: refs, to, cc, subject, body, ...pkg }
+        : { mode, documents: refs, ...pkg })
       onDone({ emailed: mode !== 'mark_sent', statusChanges: result.statusChanges ?? [] })
     } catch (err) {
       if (isPendingApproval(err)) setPending(err.message)
@@ -263,6 +271,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
                 {hasEmail ? <> at <strong>{draft.to}</strong></> : null}
                 {draft.cc ? <> (cc {draft.cc})</> : null}?
               </p>
+              {draft.replyToOrder && <ThreadNote subject={draft.replyToOrder.subject} />}
               {draft.warnings.length > 0 && (
                 <div style={{ fontSize: 11, color: '#92400e', background: '#fef3e2', border: '1px solid #fcd38d', borderRadius: 6, padding: '8px 10px', marginBottom: 12, lineHeight: 1.5 }}>
                   {draft.warnings.map(w => <div key={w}>{w}</div>)}
@@ -330,6 +339,11 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
               <div>
                 <label style={fieldLabel}>Subject</label>
                 <input style={input} value={subject} onChange={e => setSubject(e.target.value)} disabled={sending} />
+                {draft.replyToOrder && subject.trim() !== draft.replyToOrder.subject && (
+                  <div style={{ fontSize: 10, color: '#92400e', marginTop: 4 }}>
+                    Gmail keeps a reply in the order thread only while the subject matches the order email&apos;s — changing it may start a new conversation.
+                  </div>
+                )}
               </div>
               <div>
                 <label style={fieldLabel}>Message</label>
@@ -439,6 +453,14 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ThreadNote({ subject }: { subject: string }) {
+  return (
+    <div style={{ fontSize: 11, color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '8px 10px', marginBottom: 12, lineHeight: 1.5 }}>
+      Sent as a reply in the insurer&apos;s order email thread: <strong>{subject}</strong>
     </div>
   )
 }

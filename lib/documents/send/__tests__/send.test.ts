@@ -23,6 +23,7 @@ function query(table: string) {
     neq: (c: string, v: unknown) => { filters.push(`${c}!=${v}`); preds.push(r => r[c] !== v); return b },
     in: (c: string, vs: unknown[]) => { filters.push(`${c} in ${vs.join('|')}`); preds.push(r => vs.includes(r[c])); return b },
     is: (c: string, v: unknown) => { preds.push(r => (r[c] ?? null) === v); return b },
+    not: (c: string, _op: string, v: unknown) => { preds.push(r => (r[c] ?? null) !== v); return b },
     update: (values: Row) => { updateValues = values; return b },
     insert: async (row: Row) => { inserts.push({ table, row }); return { error: null } },
     upsert: async () => ({ error: null }),
@@ -60,7 +61,12 @@ vi.mock('@/lib/documents/render-print-document', () => ({ renderPrintDocumentPdf
 vi.mock('@/lib/jobs/recomputeStage', () => ({ recomputeAndSaveStage: (...a: unknown[]) => recompute(...a) }))
 vi.mock('@/lib/invoices/excess-invoice', () => ({ markInvoiceSent: (...a: unknown[]) => markInvoiceSent(...a) }))
 vi.mock('@/lib/reports/similar-reports', () => ({ indexReports: async () => 0 }))
-vi.mock('next/server', () => ({ after: () => undefined }))
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => { afterTasks.push(fn) } }))
+const afterTasks: (() => unknown)[] = []
+const threadsGet = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ data: { messages: [] } }))
+vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { threads: { get: (...a: unknown[]) => threadsGet(...a) } } }) }))
+const recordReportsLocked = vi.fn(async (..._args: unknown[]) => undefined)
+vi.mock('@/lib/reports/learning', () => ({ recordReportsLocked: (...a: unknown[]) => recordReportsLocked(...a) }))
 
 const { buildDocumentEmailDraft, sendDocumentEmail, markDocumentsSentWithoutEmail, MAX_ATTACHMENT_BYTES } = await import('../email')
 const { parseDocumentRef, DocumentSendError, invoiceDueText } = await import('../documents')
@@ -74,6 +80,7 @@ beforeEach(() => {
   updates.length = 0
   inserts.length = 0
   uploads.length = 0
+  afterTasks.length = 0
   vi.clearAllMocks()
   db.tenants = [fx.printTenant()]
   db.jobs = [fx.printJob({ client_id: CLIENT_ID })]
@@ -251,5 +258,107 @@ describe('invoiceDueText', () => {
   it('follows the tenant payment terms as the invoice does', () => {
     expect(invoiceDueText({ invoice_type: 'quoted_amounts', gst_treatment: 'exclusive', issued_date: '2026-10-20', created_at: null }, tenant)).toBe('3 Nov 2026')
     expect(invoiceDueText({ invoice_type: 'excess', gst_treatment: 'inclusive', issued_date: '2026-10-20', created_at: null }, tenant)).toBe('on receipt')
+  })
+})
+
+describe('inspection package: reply in the insurer order thread', () => {
+  const INSPECTION_ID = '00000000-0000-4000-8000-000000000701'
+  const ORDER_ID = '00000000-0000-4000-8000-000000000801'
+  const reportRef = () => ({ kind: 'report' as const, id: fx.printReport().id })
+  const invoiceRef = { kind: 'invoice' as const, id: fx.INVOICE_ID }
+  const header = (name: string, value: string) => ({ name, value })
+
+  beforeEach(() => {
+    db.inspections = [{ id: INSPECTION_ID, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, inspection_ref: 'INS-1', status: 'submitted' }]
+    db.insurer_orders = [{ id: ORDER_ID, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, raw_email_subject: 'New order CLM-555' }]
+    db.communications = [
+      { id: 'c-later', tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, direction: 'inbound', insurer_order_id: null, thread_id: 'other-thread', subject: 'Unrelated' },
+      { id: 'c-order', tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, direction: 'inbound', insurer_order_id: ORDER_ID, thread_id: 'order-thread', subject: 'New order CLM-555' },
+    ]
+    threadsGet.mockResolvedValue({ data: { messages: [
+      { labelIds: ['INBOX'], payload: { headers: [header('Message-ID', '<order@insurer>'), header('Subject', 'New order CLM-555')] } },
+      { labelIds: ['SENT'], payload: { headers: [header('Message-ID', '<ack@us>'), header('Subject', 'Re: New order CLM-555')] } },
+      { labelIds: ['DRAFT'], payload: { headers: [header('Message-ID', '<draft@us>')] } },
+    ] } })
+  })
+
+  it('drafts the reply with the order email subject', async () => {
+    const draft = await buildDocumentEmailDraft([reportRef(), quoteRef], ctx, { replyToOrder: true })
+    expect(draft.subject).toBe('Re: New order CLM-555')
+    expect(draft.replyToOrder).toEqual({ subject: 'Re: New order CLM-555' })
+    expect(threadsGet.mock.calls[0][0]).toMatchObject({ id: 'order-thread' })
+  })
+
+  it('leaves an ordinary send as a new email', async () => {
+    const draft = await buildDocumentEmailDraft([reportRef()], ctx)
+    expect(draft.replyToOrder).toBeNull()
+    expect(threadsGet).not.toHaveBeenCalled()
+  })
+
+  it('sends the report, quote and invoice in the order thread and marks the inspection Sent and Locked', async () => {
+    const result = await sendDocumentEmail([reportRef(), quoteRef, invoiceRef], ctx, { replyToOrder: true, inspectionId: INSPECTION_ID })
+
+    const email = gmailSend.mock.calls[0][1] as Record<string, unknown>
+    expect(email).toMatchObject({
+      subject: 'Re: New order CLM-555',
+      threadId: 'order-thread',
+      inReplyTo: '<ack@us>',
+      references: '<order@insurer> <ack@us>',
+    })
+    expect((email.attachments as unknown[]).length).toBe(3)
+
+    const comm = inserts.find(i => i.table === 'communications')!.row
+    expect(comm).toMatchObject({ inspection_id: INSPECTION_ID, thread_id: 't1' })
+    expect(db.inspections[0].status).toBe('sent_and_locked')
+    expect(db.reports[0]).toMatchObject({ status: 'sent', is_locked: true })
+    expect(db.quotes[0]).toMatchObject({ status: 'sent', is_locked: true })
+    expect(markInvoiceSent).toHaveBeenCalled()
+    expect(result.statusChanges.map(c => c.description)).toContain('Inspection INS-1 marked Sent and Locked')
+
+    for (const task of afterTasks) await task()
+    expect(recordReportsLocked).toHaveBeenCalledWith(expect.anything(), fx.TENANT_ID, [fx.printReport().id], 'user-1')
+  })
+
+  it('Customise send keeps the thread but uses the edited email', async () => {
+    await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true, to: 'casey@insurer.example', subject: 'Re: New order CLM-555', body: 'Report attached' })
+    expect(gmailSend.mock.calls[0][1]).toMatchObject({ to: 'casey@insurer.example', threadId: 'order-thread', text: 'Report attached' })
+  })
+
+  it('finds the order email through the lodged order when it is filed elsewhere', async () => {
+    db.communications = [{ id: 'c-order', tenant_id: fx.TENANT_ID, job_id: null, direction: 'inbound', insurer_order_id: ORDER_ID, thread_id: 'order-thread', subject: null }]
+    threadsGet.mockRejectedValue(new Error('gmail down'))
+    await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true })
+    // Still joins the thread; the subject comes from the order
+    expect(gmailSend.mock.calls[0][1]).toMatchObject({ threadId: 'order-thread', subject: 'Re: New order CLM-555', inReplyTo: undefined })
+  })
+
+  it('goes as a new email, with a warning, when the job has no order email', async () => {
+    db.communications = []
+    db.insurer_orders = []
+    const draft = await buildDocumentEmailDraft([reportRef()], ctx, { replyToOrder: true })
+    expect(draft.replyToOrder).toBeNull()
+    expect(draft.warnings.join(' ')).toMatch(/new email rather than a reply/)
+    await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true })
+    expect((gmailSend.mock.calls[0][1] as Record<string, unknown>).threadId).toBeUndefined()
+  })
+
+  it('refuses an inspection from another job before sending anything', async () => {
+    db.inspections[0].job_id = '00000000-0000-4000-8000-000000000999'
+    await expect(sendDocumentEmail([reportRef()], ctx, { inspectionId: INSPECTION_ID })).rejects.toThrow('different job')
+    expect(gmailSend).not.toHaveBeenCalled()
+    expect(db.reports[0].status).not.toBe('sent')
+  })
+
+  it('leaves the inspection as it was when Gmail fails', async () => {
+    gmailSend.mockRejectedValueOnce(new Error('boom'))
+    await expect(sendDocumentEmail([reportRef()], ctx, { replyToOrder: true, inspectionId: INSPECTION_ID })).rejects.toThrow('Nothing was sent')
+    expect(db.inspections[0].status).toBe('submitted')
+  })
+
+  it('Mark as sent marks the inspection too', async () => {
+    const result = await markDocumentsSentWithoutEmail([reportRef(), quoteRef], ctx, { inspectionId: INSPECTION_ID })
+    expect(gmailSend).not.toHaveBeenCalled()
+    expect(db.inspections[0].status).toBe('sent_and_locked')
+    expect(result.statusChanges.map(c => c.description)).toContain('Inspection INS-1 marked Sent and Locked')
   })
 })
