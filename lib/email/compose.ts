@@ -12,6 +12,8 @@ export function composeStandardEmail(
   tenant: SignatureTenant,
   /** A line that is exactly action.url becomes action.html (the signing button) */
   action?: { url: string; html: string },
+  /** The email being replied to, quoted under the signature as Gmail does */
+  quote?: { html: string; text: string } | null,
 ): { html: string; text: string } {
   const companyName = tenant.trading_name || tenant.name
   const { html, text } = composeEmailBody(body, {
@@ -20,5 +22,8 @@ export function composeStandardEmail(
     signatureFallback: companyName,
     action,
   })
-  return { html: renderStandardEmailHtml({ bodyHtml: html, title: companyName }), text }
+  return {
+    html: renderStandardEmailHtml({ bodyHtml: html + (quote?.html ? `<br>${quote.html}` : ''), title: companyName }),
+    text: [text, quote?.text].filter(Boolean).join('\n\n'),
+  }
 }

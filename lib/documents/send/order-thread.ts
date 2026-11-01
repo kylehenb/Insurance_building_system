@@ -3,12 +3,14 @@ import type { Database } from '@/lib/supabase/database.types'
 import { getGmailClient } from '@/lib/gmail/client'
 import { ensureAngleBrackets } from '@/lib/email/build-raw'
 import { replySubject } from '@/lib/mail/compose-rules'
+import { replyQuote } from '@/lib/mail/compose'
 
 // The Gmail conversation the insurer's order came in on, so documents sent
 // back to the insurer (the inspection package: report, quote, invoice) go as
 // a reply in it rather than as a new email. The order email is the job's
 // earliest inbound email tied to an insurer order. Its Message-ID often isn't
-// stored, so the headers are read from the Gmail thread itself.
+// stored, so the headers are read from the Gmail thread itself. When sending,
+// the message replied to is quoted underneath, as Reply in Gmail does.
 
 export interface OrderThread {
   /** Gmail thread to add the sent message to */
@@ -19,6 +21,8 @@ export interface OrderThread {
   references: string | null
   /** "Re: <order email subject>". Gmail only keeps a reply in the thread when the subject matches. */
   subject: string
+  /** The message replied to, quoted (only when asked for: withQuote) */
+  quote: { html: string; text: string } | null
 }
 
 type Db = SupabaseClient<Database>
@@ -54,7 +58,12 @@ async function orderEmail(db: Db, tenantId: string, jobId: string): Promise<{ th
  * no order email (entered by hand, or the email was never recorded).
  * Never throws: without it the email simply goes as a new one.
  */
-export async function findOrderThread(db: Db, tenantId: string, jobId: string): Promise<OrderThread | null> {
+export async function findOrderThread(
+  db: Db,
+  tenantId: string,
+  jobId: string,
+  options: { withQuote?: boolean } = {},
+): Promise<OrderThread | null> {
   try {
     const email = await orderEmail(db, tenantId, jobId)
     if (!email) return null
@@ -77,9 +86,22 @@ export async function findOrderThread(db: Db, tenantId: string, jobId: string): 
 
     const original = (gmailSubject || email.subject || '').trim()
     if (!original) return null
+    const inReplyTo = ids.length ? ids[ids.length - 1] : null
+
+    let quote: OrderThread['quote'] = null
+    if (options.withQuote && inReplyTo) {
+      try {
+        const q = await replyQuote(email.threadId, inReplyTo)
+        if (q && (q.html || q.text)) quote = { html: q.html, text: q.text }
+      } catch (err) {
+        // Sent without the quote: still a reply in the thread
+        console.error(`[order-thread] quote for thread ${email.threadId} failed:`, err)
+      }
+    }
     return {
+      quote,
       threadId: email.threadId,
-      inReplyTo: ids.length ? ids[ids.length - 1] : null,
+      inReplyTo,
       // Keep the header a sensible length on long threads: the first and the latest few
       references: ids.length ? [...new Set([ids[0], ...ids.slice(-9)])].join(' ') : null,
       subject: replySubject(original),

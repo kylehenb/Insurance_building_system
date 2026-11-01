@@ -83,7 +83,7 @@ describe('mcp route', () => {
       'find_job', 'get_job_summary', 'add_job_note',
       'find_work_orders', 'get_work_order', 'create_work_orders_from_quote', 'create_work_order', 'update_work_order', 'edit_work_order_items',
       'get_work_order_email', 'send_work_order',
-      'list_job_documents', 'get_document_email', 'send_documents',
+      'list_job_documents', 'get_document_email', 'send_documents', 'get_inspection_package', 'send_inspection_package',
       'get_quote', 'find_line_items', 'create_quote', 'update_quote', 'edit_quote_items',
       'get_invoice', 'create_invoice', 'update_invoice', 'edit_invoice_items', 'void_invoice',
       'get_report', 'create_report', 'update_report',

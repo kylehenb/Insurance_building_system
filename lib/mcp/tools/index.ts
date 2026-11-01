@@ -6,6 +6,7 @@ import { createQuoteTool, editQuoteItems, findLineItemsTool, getQuote, updateQuo
 import { createInvoiceTool, editInvoiceItems, getInvoice, updateInvoiceTool, voidInvoiceTool } from '@/lib/mcp/tools/invoices'
 import { createReportTool, getReport, updateReportTool } from '@/lib/mcp/tools/reports'
 import { getDocumentEmail, listJobDocumentsTool, sendDocuments } from '@/lib/mcp/tools/documents'
+import { getInspectionPackage, sendInspectionPackage } from '@/lib/mcp/tools/inspection-package'
 import { getJobExcess, setJobExcessDecision } from '@/lib/mcp/tools/excess'
 import { getSigning, resendSigningRequestTool, sendForSignatureTool } from '@/lib/mcp/tools/signing'
 import { createOrderFromEmail, findOrderEmails, linkOrderToJob, listInsurerOrders, lodgeOrder, updateInsurerOrder } from '@/lib/mcp/tools/orders'
@@ -39,6 +40,8 @@ export const MCP_TOOLS: McpTool[] = [
   listJobDocumentsTool,
   getDocumentEmail,
   sendDocuments,
+  getInspectionPackage,
+  sendInspectionPackage,
   getQuote,
   findLineItemsTool,
   createQuoteTool,

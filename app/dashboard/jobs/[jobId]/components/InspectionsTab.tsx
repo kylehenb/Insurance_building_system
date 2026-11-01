@@ -1046,26 +1046,27 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
     return labels[type] || type
   }
 
-  // Compile & Submit Package: the BAR (or core report) first — it picks the
-  // email template and the insurer recipients — then the quote, the invoice,
-  // and any extra reports and their invoices. Sent through the job's document
-  // send (Auto send / Customise send) as a reply in the insurer order thread.
-  const handleCompileAndSubmit = (item: InspectionWithRelations) => {
-    const { inspection, coreReport, coreQuote, coreInvoice, additionalReports, additionalInvoices } = item
-    if (!coreReport || !coreQuote) {
-      alert('Create the report and the quote for this inspection before sending the package.')
-      return
-    }
-    const live = (i: Invoice) => i.direction === 'outbound' && i.status !== 'voided'
-    const documents: DocumentRef[] = [
-      { kind: 'report', id: coreReport.id },
-      { kind: 'quote', id: coreQuote.id },
-      ...(coreInvoice && live(coreInvoice) ? [{ kind: 'invoice' as const, id: coreInvoice.id }] : []),
-      ...additionalReports.filter(r => !r.deleted_at).map(r => ({ kind: 'report' as const, id: r.id })),
-      ...additionalInvoices.filter(live).map(i => ({ kind: 'invoice' as const, id: i.id })),
-    ]
+  // Compile & Submit Package: the package's documents come from the server
+  // (lib/documents/send/inspection-package.ts, the same list the voice
+  // connector sends), then go through the job's document send (Auto send /
+  // Customise send) as a reply in the insurer order thread.
+  const [loadingPackageId, setLoadingPackageId] = useState<string | null>(null)
+  const handleCompileAndSubmit = async (inspection: Inspection) => {
+    setLoadingPackageId(inspection.id)
     setPackageNotice(null)
-    setPackageSend({ inspectionId: inspection.id, label: inspection.inspection_ref || 'inspection', documents })
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/package`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data.error || 'Could not load the inspection package')
+        return
+      }
+      setPackageSend({ inspectionId: inspection.id, label: inspection.inspection_ref || 'inspection', documents: data.documents as DocumentRef[] })
+    } catch {
+      alert('Could not load the inspection package')
+    } finally {
+      setLoadingPackageId(null)
+    }
   }
 
   const handlePackageSent = async (outcome: DocumentSendOutcome) => {
@@ -1109,7 +1110,7 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
               No inspections yet
             </div>
           ) : (
-            inspectionsWithRelations.map((item) => { const { inspection, coreReport, coreQuote, coreInvoice, additionalReports, additionalInvoices, tradeQuotes } = item; return (
+            inspectionsWithRelations.map(({ inspection, coreReport, coreQuote, coreInvoice, additionalReports, additionalInvoices, tradeQuotes }) => (
               <AccordionRow
                 key={inspection.id}
                 summary={
@@ -1379,15 +1380,15 @@ export function InspectionsTab({ jobId, tenantId, jobNumber }: InspectionsTabPro
                     )}
                     <button
                       className="px-4 py-2 bg-ink text-cream text-[12px] font-medium rounded-md hover:bg-[#252520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => handleCompileAndSubmit(item)}
-                      disabled={packageSend?.inspectionId === inspection.id}
+                      onClick={() => handleCompileAndSubmit(inspection)}
+                      disabled={packageSend?.inspectionId === inspection.id || loadingPackageId === inspection.id}
                     >
-                      {inspection.status === 'sent_and_locked' ? 'Resend Package' : 'Compile & Submit Package'}
+                      {loadingPackageId === inspection.id ? 'Compiling…' : inspection.status === 'sent_and_locked' ? 'Resend Package' : 'Compile & Submit Package'}
                     </button>
                   </div>
                 </div>
               </AccordionRow>
-            )})
+            ))
           )}
         </AccordionList>
       )}

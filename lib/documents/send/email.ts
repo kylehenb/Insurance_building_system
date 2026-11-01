@@ -244,14 +244,17 @@ export async function sendDocumentEmail(
   const main = docs[0]
   const inspection = overrides.inspectionId ? await inspectionForPackage(ctx, overrides.inspectionId, main.job.id) : null
   const orderThread = overrides.replyToOrder && main.audience === 'insurer'
-    ? await findOrderThread(ctx.supabase, ctx.tenantId, main.job.id)
+    ? await findOrderThread(ctx.supabase, ctx.tenantId, main.job.id, { withQuote: true })
     : null
   const draft = await buildDraft(docs, ctx, { replyToOrder: overrides.replyToOrder }, orderThread)
 
   const to = parseAddressList(overrides.to ?? draft.to)
   const cc = parseAddressList(overrides.cc ?? draft.cc).filter(e => !to.includes(e))
   const subject = (overrides.subject ?? draft.subject).trim()
-  const { html, text: body } = composeStandardEmail(overrides.body ?? draft.body, main.tenant)
+  const message = overrides.body ?? draft.body
+  const { html, text: sentText } = composeStandardEmail(message, main.tenant, undefined, orderThread?.quote)
+  // The job's comms log keeps what we wrote, not the quoted order email under it
+  const body = orderThread?.quote ? composeStandardEmail(message, main.tenant).text : sentText
   if (to.length === 0) throw new DocumentSendError('Add a recipient — use Customise send to enter an email address', 422)
   if (!subject) throw new DocumentSendError('Subject is required', 400)
 
@@ -284,7 +287,7 @@ export async function sendDocumentEmail(
       to: to.join(', '),
       cc: cc.length ? cc.join(', ') : undefined,
       subject,
-      text: body,
+      text: sentText,
       html,
       attachments: [...files.map(f => ({ filename: f.doc.filename, mimeType: 'application/pdf', content: f.pdf })), ...extras],
       ...(orderThread ? {

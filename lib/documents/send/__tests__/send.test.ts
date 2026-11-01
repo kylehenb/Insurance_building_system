@@ -65,11 +65,18 @@ vi.mock('next/server', () => ({ after: (fn: () => unknown) => { afterTasks.push(
 const afterTasks: (() => unknown)[] = []
 const threadsGet = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ data: { messages: [] } }))
 vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { threads: { get: (...a: unknown[]) => threadsGet(...a) } } }) }))
+const replyQuote = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({
+  html: '<div class="gmail_quote">On 1 Nov, Casey wrote:<blockquote>Please inspect</blockquote></div>',
+  text: 'On 1 Nov, Casey wrote:\n> Please inspect',
+  inReplyTo: '<ack@us>', references: '<order@insurer> <ack@us>',
+}))
+vi.mock('@/lib/mail/compose', () => ({ replyQuote: (...a: unknown[]) => replyQuote(...a) }))
 const recordReportsLocked = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock('@/lib/reports/learning', () => ({ recordReportsLocked: (...a: unknown[]) => recordReportsLocked(...a) }))
 
 const { buildDocumentEmailDraft, sendDocumentEmail, markDocumentsSentWithoutEmail, MAX_ATTACHMENT_BYTES } = await import('../email')
 const { parseDocumentRef, DocumentSendError, invoiceDueText } = await import('../documents')
+const { inspectionPackage } = await import('../inspection-package')
 
 const CLIENT_ID = '00000000-0000-4000-8000-000000000501'
 const ctx = { supabase: fakeClient as never, tenantId: fx.TENANT_ID, actorId: 'user-1' }
@@ -319,9 +326,34 @@ describe('inspection package: reply in the insurer order thread', () => {
     expect(recordReportsLocked).toHaveBeenCalledWith(expect.anything(), fx.TENANT_ID, [fx.printReport().id], 'user-1')
   })
 
+  it('quotes the message replied to under the email, but logs only our text', async () => {
+    await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true })
+    expect(replyQuote).toHaveBeenCalledWith('order-thread', '<ack@us>')
+    const email = gmailSend.mock.calls[0][1] as { html: string; text: string }
+    expect(email.html).toContain('<blockquote>Please inspect</blockquote>')
+    expect(email.text).toMatch(/\n\nOn 1 Nov, Casey wrote:\n> Please inspect$/)
+    const comm = inserts.find(i => i.table === 'communications')!.row
+    expect(comm.body_text).not.toContain('Please inspect')
+    expect(comm.content).toBe(comm.body_text)
+  })
+
+  it('still replies in the thread when the quote cannot be read', async () => {
+    replyQuote.mockRejectedValueOnce(new Error('gmail down'))
+    await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true })
+    const email = gmailSend.mock.calls[0][1] as { html: string; threadId: string }
+    expect(email.threadId).toBe('order-thread')
+    expect(email.html).not.toContain('gmail_quote')
+  })
+
+  it('does not look up the quote for the draft', async () => {
+    await buildDocumentEmailDraft([reportRef()], ctx, { replyToOrder: true })
+    expect(replyQuote).not.toHaveBeenCalled()
+  })
+
   it('Customise send keeps the thread but uses the edited email', async () => {
     await sendDocumentEmail([reportRef()], ctx, { replyToOrder: true, to: 'casey@insurer.example', subject: 'Re: New order CLM-555', body: 'Report attached' })
-    expect(gmailSend.mock.calls[0][1]).toMatchObject({ to: 'casey@insurer.example', threadId: 'order-thread', text: 'Report attached' })
+    expect(gmailSend.mock.calls[0][1]).toMatchObject({ to: 'casey@insurer.example', threadId: 'order-thread' })
+    expect((gmailSend.mock.calls[0][1] as { text: string }).text).toMatch(/^Report attached\n\nOn 1 Nov/)
   })
 
   it('finds the order email through the lodged order when it is filed elsewhere', async () => {
@@ -360,5 +392,42 @@ describe('inspection package: reply in the insurer order thread', () => {
     expect(gmailSend).not.toHaveBeenCalled()
     expect(db.inspections[0].status).toBe('sent_and_locked')
     expect(result.statusChanges.map(c => c.description)).toContain('Inspection INS-1 marked Sent and Locked')
+  })
+})
+
+describe('inspectionPackage', () => {
+  const INSPECTION_ID = '00000000-0000-4000-8000-000000000702'
+  const report = (id: string, extra: Row = {}) => ({ id, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, inspection_id: INSPECTION_ID, report_type: 'roof', deleted_at: null, created_at: id, ...extra })
+  const invoice = (id: string, report_id: string, extra: Row = {}) => ({ id, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, direction: 'outbound', report_id, status: 'draft', created_at: id, ...extra })
+
+  beforeEach(() => {
+    db.inspections = [{ id: INSPECTION_ID, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, inspection_ref: 'INS-2', status: 'submitted', report_id: null, quote_id: null }]
+    db.reports = [report('r-bar', { report_type: 'BAR' }), report('r-roof'), report('r-gone', { deleted_at: '2026-10-01' })]
+    db.quotes = [{ id: 'q-trade', tenant_id: fx.TENANT_ID, inspection_id: INSPECTION_ID, quote_type: 'additional_works', created_at: '1' }, { id: 'q-insp', tenant_id: fx.TENANT_ID, inspection_id: INSPECTION_ID, quote_type: 'inspection', created_at: '2' }]
+    db.invoices = [invoice('i-bar', 'r-bar'), invoice('i-roof', 'r-roof'), invoice('i-void', 'r-roof', { status: 'voided' }), invoice('i-in', 'r-bar', { direction: 'inbound' })]
+  })
+
+  it('puts the core report first, then the quote, its invoice, the extra reports and their invoices', async () => {
+    const pkg = await inspectionPackage(ctx, INSPECTION_ID)
+    expect(pkg.documents).toEqual([
+      { kind: 'report', id: 'r-bar' },
+      { kind: 'quote', id: 'q-insp' },
+      { kind: 'invoice', id: 'i-bar' },
+      { kind: 'report', id: 'r-roof' },
+      { kind: 'invoice', id: 'i-roof' },
+    ])
+    expect(pkg.inspection).toMatchObject({ id: INSPECTION_ID, job_id: fx.JOB_ID, inspection_ref: 'INS-2' })
+  })
+
+  it('uses the report and quote the inspection names', async () => {
+    Object.assign(db.inspections[0], { report_id: 'r-roof', quote_id: 'q-trade' })
+    const pkg = await inspectionPackage(ctx, INSPECTION_ID)
+    expect(pkg.documents.slice(0, 3)).toEqual([{ kind: 'report', id: 'r-roof' }, { kind: 'quote', id: 'q-trade' }, { kind: 'invoice', id: 'i-roof' }])
+  })
+
+  it('refuses a package without a report or quote, and another tenant\'s inspection', async () => {
+    db.quotes = []
+    await expect(inspectionPackage(ctx, INSPECTION_ID)).rejects.toThrow('Create the report and the quote')
+    await expect(inspectionPackage({ ...ctx, tenantId: 'other' }, INSPECTION_ID)).rejects.toThrow('Inspection not found')
   })
 })

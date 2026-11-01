@@ -23,6 +23,7 @@ import { applyEdits, cleanEdits, stepFields, type StepField } from './step-field
 const PREVIEWS: Record<string, { tool: string; title: string; args(a: Record<string, unknown>): Record<string, unknown> }> = {
   send_work_order: { tool: 'get_work_order_email', title: 'The work order and its email', args: a => ({ work_order_id: a.work_order_id }) },
   send_documents: { tool: 'get_document_email', title: 'The documents and their email', args: a => ({ documents: a.documents }) },
+  send_inspection_package: { tool: 'get_inspection_package', title: 'The inspection package and its email', args: a => ({ job_number: a.job_number, ...(a.inspection_ref ? { inspection_ref: a.inspection_ref } : {}) }) },
   send_for_signature: { tool: 'get_signing', title: 'Signing on this job', args: a => ({ job_number: a.job_number }) },
   set_job_excess_decision: { tool: 'get_job_excess', title: 'The job\'s excess now', args: a => ({ job_number: a.job_number }) },
 }
