@@ -1,13 +1,14 @@
 import type { PhotosPrintData } from '@/lib/documents/print-data'
 import { PHOTO_PAGE_GEOMETRY, type PhotoLayoutBox } from '@/lib/documents/photo-layout'
 
-// Photo pages for the emailed PDF (photos sent with work orders, Email
-// Photos): rows fitted to each photo's shape, so nothing is cropped, with
-// numbered labels in pills (lib/documents/photo-layout.ts). The browser print
-// page (/print/jobs/[jobId]/photos) still uses the older grid
-// (PhotosDocument) until it is retired.
+// Photo pages: rows fitted to each photo's shape, so nothing is cropped, with
+// numbered labels in pills (lib/documents/photo-layout.ts). Used on their own
+// (Photos PDF, photos sent with work orders, /print/jobs/[jobId]/photos) and
+// as the photographs section of a report (variant 'report').
 //
-// Sized for A4 with 10mm margins (lib/documents/render-print-document.ts).
+// The layout needs each photo's shape: the PDFs measure the photos in
+// Chromium (lib/documents/photo-pages.ts), the print pages in the browser
+// (PhotoPagesClient). Sized for A4 with 10mm margins.
 
 export interface PhotoPagesPhoto {
   /** Shown in the number chip (1, 2, 3… in order) */
@@ -22,6 +23,15 @@ export interface PhotoPagesDocumentProps {
   photos: PhotoPagesPhoto[]
   /** From layoutPhotoPages, indexes into photos */
   pages: PhotoLayoutBox[][]
+  /**
+   * 'photos' (default): job details header on every page.
+   * 'report': a PHOTOGRAPHS header in the report's style; starts on a new
+   * page, and the last page is only as tall as its photos so the report's
+   * footer follows straight after.
+   */
+  variant?: 'photos' | 'report'
+  /** Report variant: shown in the header, e.g. the report reference */
+  reportRef?: string | null
 }
 
 const PAGE_H = 1045
@@ -52,7 +62,12 @@ const CHIP: React.CSSProperties = {
   flexShrink: 0,
 }
 
-export function PhotoPagesDocument({ job, photos, pages }: PhotoPagesDocumentProps) {
+function contentHeight(boxes: PhotoLayoutBox[]): number {
+  return Math.max(0, ...boxes.map(b => b.y + b.h + b.belowHeight))
+}
+
+export function PhotoPagesDocument({ job, photos, pages, variant = 'photos', reportRef }: PhotoPagesDocumentProps) {
+  const isReport = variant === 'report'
   const headerFields = [
     { label: 'Job #', value: job.job_number },
     { label: 'Address', value: job.property_address },
@@ -62,18 +77,43 @@ export function PhotoPagesDocument({ job, photos, pages }: PhotoPagesDocumentPro
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", color: '#1a1a1a', background: 'white' }}>
-      {pages.map((boxes, pageIndex) => (
+      {pages.map((boxes, pageIndex) => {
+        const last = pageIndex === pages.length - 1
+        const height = isReport && last
+          ? HEADER_H + PAD_Y + contentHeight(boxes) + PAD_Y + FOOTER_H
+          : PAGE_H
+        return (
         <div
           key={pageIndex}
           style={{
             position: 'relative',
-            height: `${PAGE_H}px`,
+            height: `${height}px`,
             overflow: 'hidden',
             flexShrink: 0,
-            breakAfter: pageIndex < pages.length - 1 ? 'page' : 'auto',
+            breakBefore: isReport && pageIndex === 0 ? 'page' : 'auto',
+            breakAfter: last ? 'auto' : 'page',
+            breakInside: 'avoid',
           }}
         >
-          {/* Per-page header (as the photo print page) */}
+          {isReport ? (
+            // Report: section heading in the report's style
+            <div style={{
+              height: `${HEADER_H}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: `0 ${PAD_X}px`,
+              borderBottom: '1px solid #e0dbd4',
+              whiteSpace: 'nowrap',
+            }}>
+              <span style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: 800 }}>
+                Photographs{pageIndex > 0 ? ' (continued)' : ''}
+              </span>
+              <span style={{ fontSize: '10px', color: '#9e998f' }}>
+                {[reportRef, job.job_number].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+          ) : (
           <div style={{
             height: `${HEADER_H}px`,
             display: 'flex',
@@ -105,6 +145,7 @@ export function PhotoPagesDocument({ job, photos, pages }: PhotoPagesDocumentPro
               ))}
             </div>
           </div>
+          )}
 
           {/* Photos */}
           <div style={{
@@ -167,11 +208,12 @@ export function PhotoPagesDocument({ job, photos, pages }: PhotoPagesDocumentPro
             fontSize: '9px',
             color: '#9e998f',
           }}>
-            <span>Photos</span>
+            <span>{isReport ? 'Photographs' : 'Photos'}</span>
             <span>Page {pageIndex + 1} of {pages.length}</span>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

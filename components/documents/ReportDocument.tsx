@@ -283,17 +283,26 @@ export interface ReportDocumentProps {
   job: Job
   tenant: Tenant
   photos: Photo[]
+  /**
+   * The photographs section: PhotoPagesDocument (variant 'report') laid out
+   * from the photos' shapes — measured in Chromium for the PDF, in the browser
+   * on the print page (PhotoPagesClient). Not used by insurer templates, which
+   * lay out their own photos.
+   */
+  photoPages?: ReactNode
   /** Print page controls (hidden when printing). Omitted in the PDF. */
   toolbar?: ReactNode
 }
 
-export function ReportDocument({ report, job, tenant, photos, toolbar }: ReportDocumentProps) {
+/** Insurer templates (e.g. Allianz/Sedgwick BAR) have their own photo section. */
+export function reportUsesInsurerTemplate(report: Pick<Report, 'report_type'>, job: Pick<Job, 'insurer' | 'adjuster'>): boolean {
+  return getInsurerTemplateKey(job.insurer, job.adjuster) === 'allianz-sedgwick'
+    && (report.report_type === 'BAR' || report.report_type === 'storm_wind')
+}
+
+export function ReportDocument({ report, job, tenant, photos, photoPages, toolbar }: ReportDocumentProps) {
   // Route to insurer-specific template if applicable (BAR/storm_wind only)
-  const insurerTemplateKey = getInsurerTemplateKey(job.insurer, job.adjuster)
-  if (
-    insurerTemplateKey === 'allianz-sedgwick' &&
-    (report.report_type === 'BAR' || report.report_type === 'storm_wind')
-  ) {
+  if (reportUsesInsurerTemplate(report, job)) {
     return (
       <>
         {toolbar}
@@ -1199,64 +1208,8 @@ export function ReportDocument({ report, job, tenant, photos, toolbar }: ReportD
           </div>
         )}
 
-        {/* Photos Section */}
-        {photos && photos.length > 0 && (
-          <>
-            <div style={{ marginTop: '24px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#6a6460', fontWeight: '800', marginBottom: '8px' }}>
-                PHOTOGRAPHS
-              </div>
-            </div>
-            
-            {/* Photo grid - 6 per page (2x3 layout) */}
-            {(() => {
-              const photoPages: Photo[][] = []
-              for (let i = 0; i < photos.length; i += 6) {
-                photoPages.push(photos.slice(i, i + 6))
-              }
-              
-              return photoPages.map((pagePhotos, pageIndex) => (
-                <div key={pageIndex} style={{ marginBottom: pageIndex < photoPages.length - 1 ? '32px' : '0' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                    {pagePhotos.map((photo, photoIndex) => {
-                      const globalSequence = pageIndex * 6 + photoIndex + 1
-                      return (
-                        <div key={photo.id} style={{ breakInside: 'avoid' }}>
-                          <div style={{
-                            position: 'relative',
-                            height: 260,
-                            borderRadius: '6px',
-                            overflow: 'hidden',
-                            border: '1px solid #e0dbd4',
-                            background: '#f5f2ee',
-                            marginBottom: '8px'
-                          }}>
-                            <img
-                              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${photo.storage_path}?width=800&height=600`}
-                              alt={photo.label || photo.file_name || 'Photo'}
-                              style={{
-                                position: 'absolute', width: '100%', height: '100%',
-                                objectFit: 'contain',
-                                transformOrigin: 'center center',
-                                transform: `translate(${photo.crop_x ?? 0}%, ${photo.crop_y ?? 0}%) scale(${photo.crop_scale ?? 1})`,
-                              }}
-                            />
-                          </div>
-                          <div style={{ fontSize: '10px', color: '#3a3530', fontWeight: '500', textAlign: 'center', marginTop: '4px' }}>
-                            {globalSequence}.{photo.label ? ` ${photo.label}` : ''}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {pageIndex < photoPages.length - 1 && (
-                    <div style={{ height: '32px' }} />
-                  )}
-                </div>
-              ))
-            })()}
-          </>
-        )}
+        {/* Photographs: fitted photo pages (PhotoPagesDocument), from a new page */}
+        {photoPages}
 
         {/* Footer - matching invoice footer */}
         <div style={{ paddingTop: '32px' }}>

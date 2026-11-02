@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import type { DocumentSendType } from '@/lib/email/templates'
 import { QuoteDocument } from '@/components/documents/QuoteDocument'
-import { ReportDocument } from '@/components/documents/ReportDocument'
 import { TccDocument } from '@/components/documents/TccDocument'
 import { InvoiceDocument } from '@/components/documents/InvoiceDocument'
 import { renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
@@ -21,6 +20,7 @@ import {
   photosPdfFilename,
   quotePdfFilename,
   renderPhotoPagesPdf,
+  renderReportPdf,
   reportDocumentName,
   reportPdfFilename,
   tccPdfFilename,
@@ -186,7 +186,7 @@ export async function prepareDocument(ref: DocumentRef, ctx: PrintDataContext): 
         audience: 'insurer',
         vars: { report_name: name, report_ref: report.report_ref ?? '' },
         warnings,
-        render: () => renderPrintDocumentPdf(<ReportDocument {...data} />, report.report_ref || 'Report'),
+        render: () => renderReportPdf(data),
       }
     }
     case 'invoice': {

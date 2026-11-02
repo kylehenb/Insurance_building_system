@@ -57,7 +57,10 @@ const markInvoiceSent = vi.fn(async (..._args: unknown[]) => undefined)
 
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => fakeClient, createClient: async () => fakeClient }))
 vi.mock('@/lib/signing/email/gmail', () => ({ sendEmailViaGmail: (...a: unknown[]) => gmailSend(...a) }))
-vi.mock('@/lib/documents/render-print-document', () => ({ renderPrintDocumentPdf: (...a: unknown[]) => renderPdf(...a) }))
+vi.mock('@/lib/documents/render-print-document', () => ({
+  renderPrintDocumentPdf: (...a: unknown[]) => renderPdf(...a),
+  loadPhotoImages: async (paths: string[]) => paths.map(() => null),
+}))
 vi.mock('@/lib/jobs/recomputeStage', () => ({ recomputeAndSaveStage: (...a: unknown[]) => recompute(...a) }))
 vi.mock('@/lib/invoices/excess-invoice', () => ({ markInvoiceSent: (...a: unknown[]) => markInvoiceSent(...a) }))
 vi.mock('@/lib/reports/similar-reports', () => ({ indexReports: async () => 0 }))

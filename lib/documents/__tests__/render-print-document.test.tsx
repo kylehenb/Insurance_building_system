@@ -16,7 +16,8 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = STORAGE
 
 const { embedImages, printDocumentHtml } = await import('../render-print-document')
 const { QuoteDocument } = await import('@/components/documents/QuoteDocument')
-const { PhotosDocument } = await import('@/components/documents/PhotosDocument')
+const { PhotoPagesDocument } = await import('@/components/documents/PhotoPagesDocument')
+const { buildPhotoPages } = await import('../photo-layout')
 
 beforeEach(() => {
   evaluate.mockClear()
@@ -70,10 +71,22 @@ describe('printDocumentHtml', () => {
     expect(html).not.toContain('rel="preload"')
   })
 
-  it('renders the photo pages with every chosen photo', async () => {
-    const photos = fx.printPhotos(7)
-    const html = await printDocumentHtml(<PhotosDocument job={fx.printJob()} photos={photos} />, 'Photos')
-    expect(html.match(/class="print-page"/g)).toHaveLength(2)
-    expect(html.match(/<img /g)!.length).toBe(7 + 2) // photos + one logo per page
+  it('renders the photo pages with every photo, numbered and labelled', async () => {
+    const measured = Array.from({ length: 7 }, (_, i) => ({ src: `data:image/jpeg;base64,${i}`, label: i === 2 ? null : `Room ${i + 1} <x>`, width: 3, height: 4 }))
+    const { photos, pages } = buildPhotoPages(measured)
+    const html = await printDocumentHtml(<PhotoPagesDocument job={fx.printJob()} photos={photos} pages={pages} />, 'Photos')
+    expect(html.match(/<img /g)!.length).toBe(7 + pages.length) // photos + one logo per page
+    expect(html).toContain('Room 1 &lt;x&gt;')
+    expect(html).toContain(`Page 2 of ${pages.length}`)
+  })
+
+  it('renders the report variant with a Photographs heading and no job header', async () => {
+    const { photos, pages } = buildPhotoPages([{ src: 'data:image/jpeg;base64,0', label: 'Front', width: 4, height: 3 }])
+    const html = await printDocumentHtml(
+      <PhotoPagesDocument variant="report" reportRef="R-1" job={fx.printJob()} photos={photos} pages={pages} />, 'Report')
+    expect(html).toContain('Photographs')
+    expect(html).toContain('R-1 · IRC1234')
+    expect(html).not.toContain('Address: ')
+    expect(html).toContain('break-before:page')
   })
 })

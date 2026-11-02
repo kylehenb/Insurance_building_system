@@ -1,6 +1,8 @@
 import { printPageContext } from '@/lib/documents/print-page-context'
 import { loadReportPrintData, PrintDataError } from '@/lib/documents/print-data'
-import { ReportDocument } from '@/components/documents/ReportDocument'
+import { ReportDocument, reportUsesInsurerTemplate } from '@/components/documents/ReportDocument'
+import { PhotoPagesClient } from '@/components/documents/PhotoPagesClient'
+import { photoPublicUrl } from '@/lib/documents/photo-layout'
 import { PrintButton } from './PrintButton'
 
 export default async function ReportPrintPage({
@@ -20,9 +22,22 @@ export default async function ReportPrintPage({
   }
   const { report, job } = data
 
+  // Photographs: the same fitted photo pages as the report PDF, measured in the browser
+  const photoPages = data.photos.length > 0 && !reportUsesInsurerTemplate(report, job)
+    ? (
+      <PhotoPagesClient
+        variant="report"
+        reportRef={report.report_ref}
+        job={job}
+        photos={data.photos.map(p => ({ url: photoPublicUrl(p.storage_path), label: p.label }))}
+      />
+    )
+    : null
+
   return (
     <ReportDocument
       {...data}
+      photoPages={photoPages}
       toolbar={
         <PrintButton
           reportRef={report.report_ref}

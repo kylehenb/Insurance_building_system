@@ -1,9 +1,9 @@
 import { QuoteDocument } from '@/components/documents/QuoteDocument'
-import { ReportDocument } from '@/components/documents/ReportDocument'
+import { ReportDocument, reportUsesInsurerTemplate } from '@/components/documents/ReportDocument'
 import { TccDocument } from '@/components/documents/TccDocument'
 import { PhotoPagesDocument } from '@/components/documents/PhotoPagesDocument'
-import { loadPhotoImages, renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
-import { layoutPhotoPages } from '@/lib/documents/photo-layout'
+import { renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
+import { preparePhotoPages } from '@/lib/documents/photo-pages'
 import { filenamePart } from '@/lib/documents/document-assets'
 import {
   loadPhotosPrintData,
@@ -19,9 +19,10 @@ import {
 } from '@/lib/documents/print-data'
 
 // PDFs of the quote, report, TCC and photo pages — the same components and
-// data as the browser print pages (/print/...), rendered server-side, except
-// the photo pages, which have their own layout (renderPhotoPagesPdf). Nothing
-// here writes to the database or storage.
+// data as the browser print pages (/print/...), rendered server-side. Photos
+// (on their own or in a report) are measured here for the photo pages layout;
+// the print pages measure them in the browser. Nothing here writes to the
+// database or storage.
 
 export interface PrintDocumentPdf<T> {
   pdf: Buffer
@@ -58,6 +59,17 @@ export function reportDocumentName(reportType: string): string {
   return 'Building Assessment Report'
 }
 
+/** The report PDF, its photographs on the fitted photo pages. */
+export async function renderReportPdf(data: ReportPrintData): Promise<Buffer> {
+  const { photos, pages } = reportUsesInsurerTemplate(data.report, data.job)
+    ? { photos: [], pages: [] }
+    : await preparePhotoPages(data.photos)
+  const photoPages = pages.length > 0
+    ? <PhotoPagesDocument variant="report" reportRef={data.report.report_ref} job={data.job} photos={photos} pages={pages} />
+    : null
+  return renderPrintDocumentPdf(<ReportDocument {...data} photoPages={photoPages} />, data.report.report_ref || 'Report')
+}
+
 export function reportPdfFilename(data: Pick<ReportPrintData, 'report' | 'job'>): string {
   return pdfFilename(reportDocumentName(data.report.report_type), data.report.report_ref, address(data.job.property_address))
 }
@@ -65,7 +77,7 @@ export function reportPdfFilename(data: Pick<ReportPrintData, 'report' | 'job'>)
 export async function buildReportPdf(reportId: string, ctx: PrintDataContext): Promise<PrintDocumentPdf<ReportPrintData>> {
   const data = await loadReportPrintData(reportId, ctx)
   const filename = reportPdfFilename(data)
-  const pdf = await renderPrintDocumentPdf(<ReportDocument {...data} />, data.report.report_ref || 'Report')
+  const pdf = await renderReportPdf(data)
   return { pdf, filename, data }
 }
 
@@ -88,18 +100,9 @@ export function photosPdfFilename(data: Pick<PhotosPrintData, 'job'>): string {
   return pdfFilename('Photos', data.job.job_number, address(data.job.property_address))
 }
 
-/**
- * The photo pages PDF: rows fitted to each photo's shape (nothing cropped),
- * numbered labels. Unlike the other documents this is not the print page's
- * layout — the print page keeps the older grid until it is retired.
- */
+/** The photo pages PDF: rows fitted to each photo's shape, nothing cropped. */
 export async function renderPhotoPagesPdf(data: PhotosPrintData): Promise<Buffer> {
-  const images = await loadPhotoImages(data.photos.map(p => p.storage_path))
-  const pages = layoutPhotoPages(data.photos.map((p, i) => ({
-    aspect: images[i]?.width && images[i]?.height ? images[i]!.width / images[i]!.height : NaN,
-    label: p.label,
-  })))
-  const photos = data.photos.map((p, i) => ({ number: i + 1, label: p.label?.trim() || null, src: images[i]?.src ?? null }))
+  const { photos, pages } = await preparePhotoPages(data.photos)
   return renderPrintDocumentPdf(<PhotoPagesDocument job={data.job} photos={photos} pages={pages} />, `Photos ${data.job.job_number}`)
 }
 

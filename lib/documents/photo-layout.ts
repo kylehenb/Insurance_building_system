@@ -126,3 +126,30 @@ export function layoutPhotoPages(
   if (page.length > 0) pages.push(page)
   return pages
 }
+
+export interface MeasuredPhoto {
+  src: string | null
+  label: string | null
+  /** As displayed (orientation applied); 0 or missing when unknown */
+  width?: number
+  height?: number
+}
+
+/**
+ * Numbers, labels and lays out measured photos — what PhotoPagesDocument
+ * needs. Shared by the PDFs (measured in Chromium) and the print pages
+ * (measured in the browser), so both lay out the same.
+ */
+export function buildPhotoPages(measured: MeasuredPhoto[], geometry: PhotoLayoutGeometry = PHOTO_PAGE_GEOMETRY) {
+  const photos = measured.map((m, i) => ({ number: i + 1, label: m.label?.trim() || null, src: m.src }))
+  const pages = layoutPhotoPages(
+    measured.map((m, i) => ({ aspect: m.width && m.height ? m.width / m.height : NaN, label: photos[i].label })),
+    geometry,
+  )
+  return { photos, pages }
+}
+
+/** Public URL of a photo in the photos bucket (as the print pages load it). */
+export function photoPublicUrl(storagePath: string): string {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${storagePath.split('/').map(encodeURIComponent).join('/')}`
+}
