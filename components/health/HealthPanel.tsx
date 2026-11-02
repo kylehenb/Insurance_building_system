@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { HealthSummary, Light, MetricValue } from '@/lib/health/daily'
 import type { PeriodKind } from '@/lib/health/periods'
+import type { HealthReview, Fact } from '@/lib/health/review'
+
+type PanelData = HealthSummary & { review: HealthReview | null }
 
 // System & business health (tech spec §25.3): one line on the Today view
 // with a light per area, opening to the figures for a week, month, quarter or
@@ -48,11 +51,60 @@ function Dot({ light, size = 8 }: { light: Light; size?: number }) {
   return <span aria-label={LIGHT[light].label} style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: LIGHT[light].colour, flexShrink: 0 }} />
 }
 
+const KIND_LABEL: Record<string, string> = { automation: 'Automation', process: 'Process', wording: 'Wording', system: 'System' }
+
+function Cites({ ids, facts }: { ids: string[]; facts: Map<string, Fact> }) {
+  return (
+    <>
+      {ids.map(id => (
+        <span key={id} className="hp-cite" title={facts.get(id)?.text ?? ''}>{id}</span>
+      ))}
+    </>
+  )
+}
+
+function ReviewCard({ review, offset, kind }: { review: HealthReview | null; offset: number; kind: PeriodKind }) {
+  const [showFacts, setShowFacts] = useState(false)
+  if (offset === 0) return <div className="hp-review hp-review-empty">The written review of this {kind} comes the night after it ends.</div>
+  if (!review) return <div className="hp-review hp-review-empty">No written review yet. Reviews are written overnight once the {kind}&apos;s figures are in (the last 4 {kind}s are filled in over the first few nights).</div>
+  if (review.status === 'failed') return <div className="hp-review hp-review-empty">The review couldn&apos;t be written ({review.error}). It&apos;s tried again overnight{review.attempts >= 3 ? ' — no more tries left' : ''}.</div>
+  const facts = new Map(review.facts.map(f => [f.id, f]))
+  return (
+    <div className="hp-review">
+      <div className="hp-review-head">{review.headline}</div>
+      <div className="hp-review-cols">
+        {review.sections.filter(sec => sec.points.length).map(sec => (
+          <div key={sec.key}>
+            <div className="hp-group-name">{sec.title}</div>
+            <ul className="hp-points">
+              {sec.points.map((pt, i) => <li key={i}>{pt.text} <Cites ids={pt.facts} facts={facts} /></li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {review.suggestions.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="hp-group-name">Suggested changes</div>
+          {review.suggestions.map((sg, i) => (
+            <div key={i} className="hp-sugg">
+              <div className="hp-sugg-title">{sg.title} <span className="hp-tag">{KIND_LABEL[sg.kind] ?? sg.kind}</span><span className="hp-tag">{sg.effort} effort</span></div>
+              <div className="hp-sugg-why">{sg.why} <Cites ids={sg.facts} facts={facts} /></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="hp-link" onClick={() => setShowFacts(v => !v)}>{showFacts ? 'Hide' : 'Show'} the {review.facts.length} facts it was written from</button>
+      {showFacts && <ol className="hp-facts">{review.facts.map(f => <li key={f.id}><b>{f.id}</b> {f.text}</li>)}</ol>}
+      <div className="hp-note" style={{ marginTop: 6 }}>Written by AI from these facts only; hover a fact number to see it.</div>
+    </div>
+  )
+}
+
 export function HealthPanel() {
   const [open, setOpen] = useState(false)
   const [kind, setKind] = useState<PeriodKind>('week')
   const [offset, setOffset] = useState(0)
-  const [data, setData] = useState<HealthSummary | null>(null)
+  const [data, setData] = useState<PanelData | null>(null)
   const [hidden, setHidden] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +117,7 @@ export function HealthPanel() {
       if (res.status === 401 || res.status === 403) { setHidden(true); return }
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Could not load the health check')
-      setData(d as HealthSummary)
+      setData(d as PanelData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the health check')
     } finally {
@@ -114,6 +166,21 @@ export function HealthPanel() {
         .hp-table td:first-child { text-align: left; padding-left: 0; color: var(--body); white-space: normal; }
         .hp-val { color: var(--ink); font-weight: 600; }
         .hp-err { font-size: 12px; color: var(--danger); }
+        .hp-review { border: 0.5px solid var(--line-tan-5); background: var(--surface-9); border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; }
+        .hp-review-empty { font-size: 12px; color: var(--subtle); }
+        .hp-review-head { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 12px; line-height: 1.45; }
+        .hp-review-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 24px; }
+        .hp-points { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--body); line-height: 1.5; }
+        .hp-points li { margin-bottom: 5px; }
+        .hp-cite { display: inline-block; font-size: 9.5px; color: var(--bronze); background: var(--cream); border: 0.5px solid var(--line-tan-5); border-radius: 4px; padding: 0 4px; margin-left: 3px; cursor: help; vertical-align: 1px; }
+        .hp-sugg { padding: 8px 0; border-top: 0.5px solid var(--line-faint); }
+        .hp-sugg:first-of-type { border-top: 0; }
+        .hp-sugg-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+        .hp-sugg-why { font-size: 12px; color: var(--body-soft); margin-top: 3px; line-height: 1.45; }
+        .hp-tag { font-size: 10px; font-weight: 500; color: var(--subtle); border: 0.5px solid var(--line-strong); border-radius: 10px; padding: 0 7px; margin-left: 6px; }
+        .hp-link { background: none; border: 0; padding: 0; margin-top: 12px; font-size: 11.5px; color: var(--bronze); cursor: pointer; text-decoration: underline; }
+        .hp-facts { font-size: 11.5px; color: var(--body-soft); padding-left: 18px; margin: 8px 0 0; line-height: 1.5; max-height: 280px; overflow-y: auto; list-style: none; }
+        .hp-facts li { margin-bottom: 3px; }
       `}</style>
 
       <button className="hp-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
@@ -151,6 +218,8 @@ export function HealthPanel() {
 
           {data && (
             <>
+              <ReviewCard review={data.review} offset={data.period.offset} kind={kind} />
+
               <div className="hp-areas">
                 {data.areas.map(a => (
                   <div key={a.key} className="hp-area">

@@ -51,6 +51,10 @@
     {
       "path": "/api/health/daily",
       "schedule": "23 16 * * *"
+    },
+    {
+      "path": "/api/health/reviews",
+      "schedule": "13 17 * * *"
     }
   ]
 }

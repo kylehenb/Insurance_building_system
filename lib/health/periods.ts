@@ -78,3 +78,12 @@ export function periodFor(kind: PeriodKind, offset: number, now: Date = new Date
   const to = ymd(y - offset + 1, 0)
   return { kind, offset, from, to, label: offset === 0 ? 'This year' : String(y - offset) }
 }
+
+/** A label that stays right after the period has passed ("Week of 26 Oct", "Oct 2026", "Q4 2026", "2026"). */
+export function fixedLabel(p: Pick<Period, 'kind' | 'from'>): string {
+  const [y, m] = p.from.split('-').map(Number)
+  if (p.kind === 'week') return `Week of ${shortDay(p.from)}`
+  if (p.kind === 'month') return `${MONTHS[m - 1]} ${y}`
+  if (p.kind === 'quarter') return `Q${Math.floor((m - 1) / 3) + 1} ${y}`
+  return String(y)
+}

@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { permissionDenied } from '@/lib/permissions/http'
 import { loadSummary } from '@/lib/health/daily'
+import { getReview } from '@/lib/health/review'
 import { healthDb } from '@/lib/health/db'
 import { PERIOD_KINDS, type PeriodKind } from '@/lib/health/periods'
 
 // The dashboard's health panel (tech spec §25.3): figures for one week,
 // month, quarter or year (offset 0 = current, up to 4 back), against the
-// period before and the usual, with the open alerts. Needs health.view
+// period before and the usual, with the open alerts and the period's
+// written review. Needs health.view
 // (admins by default).
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -24,5 +26,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const db = healthDb()
   if (!db) return NextResponse.json({ error: 'No database configured' }, { status: 500 })
-  return NextResponse.json(await loadSummary(db, user.tenantId, kind, offset))
+  const summary = await loadSummary(db, user.tenantId, kind, offset)
+  // The written review of the period, once it has ended (§25.4)
+  const review = await getReview(db, user.tenantId, kind, summary.period.from)
+  return NextResponse.json({ ...summary, review })
 }

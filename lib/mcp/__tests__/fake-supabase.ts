@@ -74,12 +74,14 @@ export function fakeSupabase(db: Record<string, Row[]>) {
       is: (c: string, v: unknown) => { preds.push(r => (r[c] ?? null) === v); return b },
       in: (c: string, vs: unknown[]) => { preds.push(r => vs.includes(r[c])); return b },
       ilike: (c: string, p: string) => { preds.push(r => likeToRegex(p).test(String(r[c] ?? ''))); return b },
-      // "<col>.<eq|neq|is>.<value>,…" — any one matching
+      // "<col>.<eq|neq|is|gte|lt>.<value>,…" — any one matching
       or: (expr: string) => {
         const terms = expr.split(',').map(t => {
-          const [, col, op, value] = t.match(/^(\w+)\.(eq|neq|is)\.(.+)$/) ?? []
+          const [, col, op, value] = t.match(/^(\w+)\.(eq|neq|is|gte|lt)\.(.+)$/) ?? []
           return (r: Row) => op === 'is' ? (r[col] ?? null) === (value === 'null' ? null : value)
             : op === 'eq' ? String(r[col]) === value
+            : op === 'gte' ? r[col] != null && String(r[col]) >= value
+            : op === 'lt' ? r[col] != null && String(r[col]) < value
             : r[col] == null || String(r[col]) !== value
         })
         preds.push(r => terms.some(t => t(r)))

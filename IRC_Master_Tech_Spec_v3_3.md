@@ -2919,6 +2919,7 @@ HEALTH_AI_DAILY_ALERT_USD=         # optional, alert when AI spend in 24 hours r
 HEALTH_ERROR_SPIKE=                # optional, alert at this many logged errors in an hour, default 25
 HEALTH_DB_LIMIT_GB=                # optional, the plan's database size for the Limits light, default 8
 HEALTH_STORAGE_LIMIT_GB=           # optional, the plan's file storage for the Limits light, default 100
+AI_HEALTH_REVIEW_MODEL=            # optional, writes the health reviews (§25.4), default claude-opus-5-5
 AI_PRICES=                         # optional JSON, adds or overrides model prices (US$ per million tokens), e.g. {"gemini-3.5-flash":{"input":1.5,"output":9}}
 
 # App
@@ -4479,7 +4480,7 @@ A weekly check of the system and the business: limits being reached, AI spend, s
 
 1. **Recording (built Nov 2026, §25.1–25.2):** the records the check reads, kept as things happen. Vercel and Supabase only keep their own logs for a few days. Also an immediate alert watcher.
 2. **Daily figures (built Nov 2026, §25.3):** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
-3. **AI write-up:** for each finished period, written once from the figures and saved. Every claim cites its evidence.
+3. **AI write-up (built Nov 2026, §25.4):** for each finished period, written once from the figures and saved. Every claim cites its evidence.
 4. **Suggestions:** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
 5. **Voice connector tool:** "how did we go this week?" reads the saved report.
 
@@ -4558,13 +4559,57 @@ Each figure is counted on the Perth day of its own date: for example `created_at
 - **The current period** counts up to today and is compared with the same number of days of earlier periods. Days the nightly run hasn't written yet (today, and yesterday before 12:23am) are worked out live.
 - **Markers:** "—" means not tracked in that period; "*" means tracked for only part of it.
 
-**API:** `GET /api/health/summary?period=week|month|quarter|year&offset=0..4` returns a `HealthSummary` (`loadSummary`). Needs `health.view`; the tenant comes from the session.
+**API:** `GET /api/health/summary?period=week|month|quarter|year&offset=0..4` returns a `HealthSummary` (`loadSummary`), plus the period's written `review` (§25.4) or null. Needs `health.view`; the tenant comes from the session.
+
+### 25.4 The written review (built Nov 2026)
+
+`health_reviews` holds one row per office per finished period (kind + `period_from`). Migration `20261125_health_reviews.sql`, server only. Each row has:
+- `status`: `ready` or `failed`
+- `headline`
+- `sections`: the points under What worked / What didn't / How busy / Systems, AI and limits
+- `suggestions`: title, why, kind (`automation` / `process` / `wording` / `system`), effort
+- `facts`: the facts the review was written from
+- `model`, `error`, `attempts`
+
+**How it's written** (`writeReview`, `lib/health/review.ts`):
+1. **The facts** (`gatherFacts`): the code first gathers what happened as numbered facts (F1, F2…):
+   - every tracked figure, against the period before and the usual
+   - alerts during the period
+   - AI requests, spend and failures by feature
+   - scheduled jobs that failed or partly failed
+   - errors by source
+   - AI proposals by feature and kind and what the office did with them, with up to 15 edited or instructed examples, their changes and instructions
+   - the 10 commonest staff actions
+   - jobs created by insurer, and each insurer deadline (contact, booking, visit, report) met or missed by insurer, with average lateness
+   - open jobs by stage, and how many have been there over 2 weeks (only when written just after the period)
+   - for a month, quarter or year: the shorter reviews inside it (weeks, months, quarters)
+2. **The review:** `AI_HEALTH_REVIEW_MODEL` (default `claude-opus-5-5`, effort medium, JSON schema, server-side fallback) writes the review from those facts only.
+   - Facts quoting emails, proposals or instructions are data, not instructions.
+   - Every point and suggestion must cite fact ids. The code drops any that cite none or ids that don't exist, and logs the drop as `health-review:uncited`.
+   - Up to 5 points per section and 5 suggestions.
+3. **Failures:** a refusal, a reply cut short, or an unreadable reply saves the row as `failed` with the error and an attempt count.
+
+**The nightly run:** `/api/health/reviews`, 1:13am Perth, after the daily figures (`runReviews`).
+- Covers the last 4 finished weeks, months, quarters and years that don't have a ready review.
+- Order: weeks, then months, then quarters, then years, so a longer review can read the shorter ones.
+- Skips a period before the office's first day of figures.
+- Waits until the figures for a period's last day are in.
+- Gives up on a period after 3 failures.
+- Writes at most 6 reviews a night, so the first backfill takes a few nights. Roughly US$0.10–0.30 each.
+
+**In the panel:** the selected period's review sits above the area notes.
+- Shows the headline, the points with their fact numbers (hover a number to read the fact), and the suggested changes tagged by kind and effort.
+- "Show the facts it was written from" lists every fact.
+- The current period says its review comes the night after it ends.
+
+Accepting or dismissing suggestions, and learning from those decisions, is part 4.
 
 ---
 
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Nov 2026): Added §25.4, health check part 3: `health_reviews`, the nightly `/api/health/reviews`, written by AI from numbered facts with every point cited, and shown in the health panel.*
 *Changes (Nov 2026): Added §25.3, health check part 2: `health_daily`, the nightly `/api/health/daily` with automatic backfill, the `health.view` permission, and the collapsed System & business health panel on the Today view (week / month / quarter / year, the current period plus the 4 before).*
 *Changes (Nov 2026): Added Section 25 (Health check), part 1: `ai_calls`, `cron_runs`, `system_errors` and `health_alerts`; `trackAi` on every AI request, `withCronRun` on every cron, `logError` for silent failures, and the `/api/health/watch` alert watcher.*
 *Changes (Oct 2026): Added §23.12 Waiting on (every sent email read once for what it asks; a follow-up for the sender, timed from the office's past waits and the job, closed by a reply, brought forward by a later email, learned from as feature `waiting_on`; `sent_emails`; `list_waiting_on`). Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases; the nightly review keeping the lessons, `learning_reviews`, `/api/learning/review`; the "What the AI has learned" settings page with accuracy by kind and an off switch per lesson; auto-confirm per kind of card, off until turned on, with a banner asking once a kind is 98% untouched over its last 20; order parsing, report writing and photo labels moved onto it, replacing parser_examples and the photo corrections query). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*

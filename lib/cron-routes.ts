@@ -11,4 +11,5 @@ export const CRON_ROUTES = new Set([
   '/api/jobs/review',
   '/api/health/watch',
   '/api/health/daily',
+  '/api/health/reviews',
 ])
