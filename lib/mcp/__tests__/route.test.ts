@@ -80,7 +80,7 @@ describe('mcp route', () => {
     expect(list.headers.get('cache-control')).toBe('no-store')
     const body = await list.json() as { result: { tools: { name: string }[] } }
     expect(body.result.tools.map(t => t.name)).toEqual([
-      'find_job', 'get_job_summary', 'add_job_note', 'add_job_appointment',
+      'find_job', 'get_job_summary', 'add_job_note', 'add_job_appointment', 'close_job', 'reopen_job',
       'find_work_orders', 'get_work_order', 'create_work_orders_from_quote', 'create_work_order', 'update_work_order', 'edit_work_order_items',
       'get_work_order_email', 'send_work_order',
       'list_job_documents', 'get_document_email', 'send_documents', 'get_inspection_package', 'send_inspection_package',

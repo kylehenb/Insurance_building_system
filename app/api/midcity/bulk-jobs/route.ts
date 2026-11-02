@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { FIELD_APP_INSURER } from '@/lib/jobs/field-app'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
 import type { Database } from '@/lib/supabase/database.types'
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         job_number: job.job_number.trim(),
         job_type: 'insurance',
-        insurer: 'Midcity',
+        insurer: FIELD_APP_INSURER,
         property_address: job.property_address.trim(),
         created_at: now.toISOString(),
       } as Database['public']['Tables']['jobs']['Insert'])

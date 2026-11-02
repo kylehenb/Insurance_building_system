@@ -23,6 +23,8 @@ type JobStageRow = {
   phase?: string | null
   phase_step?: string | null
   closed_reason?: string | null
+  /** Closed by hand (the old-jobs clean-up): can be reopened */
+  closed_by_hand?: string | null
   review_note?: string | null
 }
 
@@ -79,7 +81,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
     )
     const { data } = await supabase
       .from('jobs')
-      .select('current_stage, current_stage_updated_at, override_stage, job_type, excess, excess_decision, phase, phase_step, closed_reason, review_note')
+      .select('current_stage, current_stage_updated_at, override_stage, job_type, excess, excess_decision, phase, phase_step, closed_reason, closed_by_hand, review_note')
       .eq('id', jobId)
       .single()
     setRow(data as unknown as JobStageRow | null)
@@ -295,6 +297,21 @@ export default function StageBanner({ jobId }: StageBannerProps) {
               {row.phase === 'closed'
                 ? CLOSED_LABELS[row.closed_reason as ClosedReason] ?? 'Closed'
                 : row.phase_step ? STEP_LABELS[row.phase_step as PhaseStep] ?? config.description : config.description}
+              {row.phase === 'closed' && row.closed_by_hand && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm('Reopen this job? Its phase will come from its records again.')) return
+                    const res = await fetch('/api/jobs/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reopen: jobId }) })
+                    const body = await res.json().catch(() => ({}))
+                    if (!res.ok) alert(body.error ?? 'Could not reopen the job')
+                    else fetchJobData()
+                  }}
+                  style={{ marginLeft: 8, background: 'none', border: 'none', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', fontSize: 12 }}
+                >
+                  Reopen
+                </button>
+              )}
             </div>
             {row.review_note && (
               <div style={{ fontSize: 11, color: stageDescriptionColor, opacity: 0.8, lineHeight: 1.3, marginTop: 4 }} title="IRC's note from this morning's review">

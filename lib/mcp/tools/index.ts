@@ -23,6 +23,7 @@ import { fileConversation, listJobFiles, listMailbox, organiseEmails, readConver
 import { getJobPhoto } from '@/lib/mcp/tools/job-attachments'
 import { changeFollowUp, listFollowUps, listWaitingOn, setFollowUp } from '@/lib/mcp/tools/follow-ups'
 import { addJobAppointment } from '@/lib/mcp/tools/calendar'
+import { closeJobTool, reopenJobTool } from '@/lib/mcp/tools/close-jobs'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -31,6 +32,8 @@ export const MCP_TOOLS: McpTool[] = [
   getJobSummary,
   addJobNote,
   addJobAppointment,
+  closeJobTool,
+  reopenJobTool,
   findWorkOrders,
   getWorkOrder,
   createWorkOrdersFromQuote,

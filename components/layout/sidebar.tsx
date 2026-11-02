@@ -1,5 +1,6 @@
 'use client'
 
+import { FIELD_APP_INSURER } from '@/lib/jobs/field-app'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -155,9 +156,11 @@ export function Sidebar({ user, tenantId, assistantVisible = false, onToggleAssi
     async function fetchUnscheduledCount() {
       const { count } = await supabase
         .from('inspections')
-        .select('*', { count: 'exact', head: true })
+        .select('id, jobs!inner(insurer)', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .eq('status', 'unscheduled')
+        // Midcity's inspections aren't IRC's (lib/jobs/field-app.ts)
+        .neq('jobs.insurer', FIELD_APP_INSURER)
       setUnscheduledInspectionsCount(count ?? 0)
     }
     fetchUnscheduledCount()
