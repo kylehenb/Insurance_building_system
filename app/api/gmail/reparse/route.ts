@@ -17,6 +17,7 @@ import { getGmailClient } from '@/lib/gmail/client'
 import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { trackAi } from '@/lib/health/ai-usage'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const userSession = await getUser()
@@ -72,11 +73,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         parts.push({ inlineData: { mimeType: 'application/pdf', data: pdf.data } })
       }
 
-      const result = await ai.models.generateContent({
+      const result = await trackAi({ feature: 'order-parser', provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
         model: GEMINI_FLASH_MODEL,
         contents: parts,
         config: { systemInstruction: 'Extract claim data as JSON. Return only valid JSON.' },
-      })
+      }))
       geminiRawText = result.text ?? null
     }
   } catch (err) {

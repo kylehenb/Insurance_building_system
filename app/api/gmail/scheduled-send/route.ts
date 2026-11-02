@@ -5,6 +5,7 @@ import { releaseDueFollowUps } from '@/lib/actions/followups'
 import { drainSentQueue } from '@/lib/actions/waiting-on'
 import { applyChangedKpis } from '@/lib/kpi/client-kpis'
 import { mailDb } from '@/lib/mail/sync'
+import { withCronRun } from '@/lib/health/cron'
 
 // Sends scheduled emails that are due (lib/mail/scheduled.ts), puts
 // follow-ups that are due on the list (lib/actions/followups.ts), makes
@@ -20,7 +21,7 @@ function checkCronAuth(req: NextRequest): boolean {
   return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const followUps = await releaseDueFollowUps(mailDb())
   const kpiJobs = await applyChangedKpis(mailDb()).catch(err => { console.error('[kpi] applying changed KPIs failed:', err); return 0 })
@@ -31,3 +32,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   return GET(req)
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/gmail/scheduled-send', runGet)

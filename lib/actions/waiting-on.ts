@@ -9,6 +9,7 @@ import { getMailbox, mailDb } from '@/lib/mail/sync'
 import { cardActor, CARD_COLUMNS, type ActionCard, type WaitingOn } from './cards'
 import { chaseDue, createFollowUp, spokenDue } from './followups'
 import { adoptFollowUp, days, openWaits, personFollowUpFor, pinnedTo, sentOn, waitLearning, waitLine, waitSituation } from './waits'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // Waiting on (tech spec §23.12): what the office has asked of other people.
 // Every email the office sends is read once (sent_emails, filled by the send
@@ -141,14 +142,14 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     ].filter(Boolean).join('\n\n')
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const response = await client.beta.messages.create({
+    const response = await trackAi({ feature: 'waiting-on', provider: 'anthropic', model: WAIT_MODEL, tenantId: row.tenant_id }, () => client.beta.messages.create({
       model: WAIT_MODEL,
       max_tokens: 2000,
       system: WAIT_SYSTEM_PROMPT,
       tools: [RECORD],
       tool_choice: { type: 'tool', name: RECORD.name },
       messages: [{ role: 'user', content: intro }],
-    } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+    } as Anthropic.Beta.MessageCreateParamsNonStreaming))
     const call = response.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === RECORD.name)
     if (!call) throw new Error('The AI didn\'t say what the email asks for')
     const out = (call.input ?? {}) as Record<string, unknown>

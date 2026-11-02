@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getAccountingProvider } from '@/lib/accounting/client'
+import { withCronRun } from '@/lib/health/cron'
 
 interface TenantRow {
   id: string
@@ -29,7 +30,7 @@ function checkCronAuth(req: NextRequest): boolean {
 }
 
 // Vercel cron calls with GET
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -166,3 +167,6 @@ async function runPoll(): Promise<NextResponse> {
 
   return NextResponse.json({ status: 'success', summary })
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/accounting/poll-payments', runGet)

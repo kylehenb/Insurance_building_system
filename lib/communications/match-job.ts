@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { extractReferenceTokens } from './references'
 import { compareAddresses, findAddressesInText, parseAddress, type ParsedAddress } from './address'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { trackAi } from '@/lib/health/ai-usage'
+import { logError } from '@/lib/health/errors'
 
 // Candidate match surfaced to the manual-link UI
 export type JobCandidate = {
@@ -87,7 +89,7 @@ async function extractIdentifiers(
 
   const ai = new GoogleGenAI({ apiKey })
 
-  const result = await ai.models.generateContent({
+  const result = await trackAi({ feature: 'email-job-match', provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
     model: GEMINI_FLASH_MODEL,
     contents: [
       { text: '\n<email_content>\n' },
@@ -95,7 +97,7 @@ async function extractIdentifiers(
       { text: '\n</email_content>' },
     ],
     config: { systemInstruction: EXTRACTION_SYSTEM },
-  })
+  }))
 
   const text = (result.text ?? '').trim()
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
@@ -105,8 +107,10 @@ async function extractIdentifiers(
   let raw: GeminiExtraction = {}
   try {
     raw = JSON.parse(jsonText) as GeminiExtraction
-  } catch {
-    // extraction failed — nothing to match against
+  } catch (err) {
+    // Extraction failed — nothing to match against. Counted, so a model that
+    // stops answering in the expected form shows up in the health check.
+    await logError('ai-parse:email-job-match', err, { detail: { reply: text.slice(0, 300) } })
   }
 
   return {

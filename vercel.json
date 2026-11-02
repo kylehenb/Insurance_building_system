@@ -43,6 +43,10 @@
     {
       "path": "/api/jobs/review",
       "schedule": "37 22 * * *"
+    },
+    {
+      "path": "/api/health/watch",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

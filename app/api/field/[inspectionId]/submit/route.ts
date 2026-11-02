@@ -12,6 +12,7 @@ import { scopeItemTotals } from '@/lib/quotes/service'
 import { loadJobInsurer, loadScopeCatalogue } from '@/lib/scope-library/catalogue'
 import { buildFieldScopeLines, libraryText, normaliseFieldRooms, notesText, readParsedNotes, type ParsedNote, type ScopeNote } from '@/lib/scope-library/field-scope'
 import type { CatalogueItem } from '@/lib/scope-library/pricing'
+import { trackAi } from '@/lib/health/ai-usage'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -72,7 +73,7 @@ async function parseScopeNotesWithAI(opts: {
 
   const trades = [...new Set(catalogue.map(c => c.trade).filter(Boolean))].sort().join(', ')
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const message = await anthropic.messages.create({
+  const message = await trackAi({ feature: 'field-scope-notes', provider: 'anthropic', model: FIELD_AI_MODEL, tenantId: opts.tenantId }, () => anthropic.messages.create({
     model: FIELD_AI_MODEL,
     max_tokens: 16000,
     output_config: { effort: 'medium' },
@@ -90,7 +91,7 @@ Return ONLY a JSON array, one object per note, in the same order:
 {"note": the note's number, "room": string, "trade": string, "keyword": short camelCase keyword, "qty": number or null, "unit": "m2", "lm", "ea", "hr" or "set", "itemDescription": the line's wording, "confidence": "MATCHED" or "NEW", "libId": the library item's # when MATCHED, else null}
 For MATCHED, itemDescription is the library item's wording.`,
     }],
-  })
+  }))
 
   // A refusal adds the notes as typed, like an unparseable reply
   let text: string
@@ -133,7 +134,7 @@ async function generateBarReport(opts: {
   if (promptResult.data?.system_prompt) barSystemPrompt = promptResult.data.system_prompt
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const barMsg = await anthropic.messages.create({
+  const barMsg = await trackAi({ feature: 'field-bar-report', provider: 'anthropic', model: FIELD_AI_MODEL, tenantId: opts.tenantId }, () => anthropic.messages.create({
     model: FIELD_AI_MODEL,
     max_tokens: 16000,
     output_config: { effort: 'medium' },
@@ -158,7 +159,7 @@ Return ONLY a JSON object with these exact keys (empty string if unknown):
   "conclusion": ""
 }`,
     }],
-  })
+  }))
 
   const barText = getResponseText(barMsg)
   const barMatch = barText.match(/\{[\s\S]*\}/)
@@ -191,7 +192,7 @@ async function extractPropertyDetails(opts: {
   if (!rawReportDump?.trim() || !jobId) return
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const pdMsg = await anthropic.messages.create({
+  const pdMsg = await trackAi({ feature: 'field-property-details', provider: 'anthropic', model: FIELD_AI_MODEL, tenantId: opts.tenantId, jobId: opts.jobId }, () => anthropic.messages.create({
     model: FIELD_AI_MODEL,
     max_tokens: 4000,
     output_config: { effort: 'low' },
@@ -216,7 +217,7 @@ JSON keys and types:
   "granny_flat": "boolean"
 }`,
     }],
-  })
+  }))
   const pdText = getResponseText(pdMsg)
   const pdMatch = pdText.match(/\{[\s\S]*\}/)
   if (!pdMatch) return
@@ -304,7 +305,7 @@ async function generateRoofReport(opts: {
   if (promptResult.data?.system_prompt) roofSystemPrompt = promptResult.data.system_prompt
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const roofMsg = await anthropic.messages.create({
+  const roofMsg = await trackAi({ feature: 'field-roof-report', provider: 'anthropic', model: FIELD_AI_MODEL, tenantId: opts.tenantId, jobId: opts.jobId }, () => anthropic.messages.create({
     model: FIELD_AI_MODEL,
     max_tokens: 16000,
     output_config: { effort: 'medium' },
@@ -338,7 +339,7 @@ Return ONLY a JSON object with these exact keys (empty string or null if unknown
   "conclusion": ""
 }`,
     }],
-  })
+  }))
 
   const roofText = getResponseText(roofMsg)
   const roofMatch = roofText.match(/\{[\s\S]*\}/)

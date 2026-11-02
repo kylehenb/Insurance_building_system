@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reviewAllJobs } from '@/lib/jobs/review'
 import { mailDb } from '@/lib/mail/sync'
+import { withCronRun } from '@/lib/health/cron'
 
 // The morning job review (lib/jobs/review.ts, tech spec §23.14): open jobs
 // changed since last read (and weekly, those gone quiet) are read and their
@@ -14,7 +15,7 @@ function checkCronAuth(req: NextRequest): boolean {
   return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const results = await reviewAllJobs(mailDb(), { budgetMs: 270_000 })
   return NextResponse.json({
@@ -23,3 +24,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     errors: results.filter(r => r.error).map(r => `${r.job}: ${r.error}`),
   })
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/jobs/review', runGet)

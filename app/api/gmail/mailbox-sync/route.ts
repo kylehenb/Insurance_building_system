@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMailbox, mailDb, syncMailbox } from '@/lib/mail/sync'
 import { onMailArrivals } from '@/lib/actions/cards'
+import { withCronRun } from '@/lib/health/cron'
 
 // Backstop for the mail client's mirror of the office mailbox (lib/mail/sync.ts).
 // The Gmail push webhook normally syncs within seconds; this catches anything
@@ -35,7 +36,7 @@ async function run(): Promise<NextResponse> {
   return NextResponse.json(result, { status: result.error ? 502 : 200 })
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   return run()
 }
@@ -44,3 +45,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   return run()
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/gmail/mailbox-sync', runGet)

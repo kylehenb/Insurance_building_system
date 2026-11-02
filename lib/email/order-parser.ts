@@ -7,6 +7,8 @@ import { mapWorkOrderType } from '@/lib/insurer-orders/work-order-type'
 import { createServiceClient } from '@/lib/supabase/server'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { trackAi } from '@/lib/health/ai-usage'
+import { logError } from '@/lib/health/errors'
 
 type InsurerOrderInsert = Database['public']['Tables']['insurer_orders']['Insert']
 
@@ -190,9 +192,11 @@ async function fetchPrompt(): Promise<string> {
       .limit(1)
       .single()
 
+    if (error) await logError('order-parser:prompt', error, { detail: { fallback: 'built-in prompt used' } })
     if (error || !data?.system_prompt) return FALLBACK_PROMPT
     return data.system_prompt
-  } catch {
+  } catch (err) {
+    await logError('order-parser:prompt', err, { detail: { fallback: 'built-in prompt used' } })
     return FALLBACK_PROMPT
   }
 }
@@ -263,11 +267,11 @@ export async function parseInsurerOrder(
 
   let raw: GeminiRawResult = {}
   try {
-    const result = await ai.models.generateContent({
+    const result = await trackAi({ feature: 'order-parser', provider: 'google', model: GEMINI_FLASH_MODEL, tenantId: tenantId }, () => ai.models.generateContent({
       model: GEMINI_FLASH_MODEL,
       contents: parts,
       config: { systemInstruction },
-    })
+    }))
     const text = (result.text ?? '').trim()
     // Extract JSON robustly: handle code fences anywhere in the response,
     // or fall back to the first {...} block, or the raw text.

@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { LOSS_TYPES_PROMPT_LIST } from '@/lib/loss-types'
 import { callTool, type McpContext, type McpTool } from '@/lib/mcp/server'
 import { MCP_TOOLS } from '@/lib/mcp/tools'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // The in-app assistant (floating chat and dashboard chat). Claude with the
 // voice connector's tools, run as the signed-in user through the same
@@ -205,7 +206,7 @@ export async function runAssistantTurn(params: {
 
   for (let step = 1; ; step++) {
     const lastStep = step >= MAX_STEPS
-    const response = await params.client.beta.messages.create({
+    const response = await trackAi({ feature: 'assistant', provider: 'anthropic', model: model, tenantId: ctx.tenantId }, () => params.client.beta.messages.create({
       model,
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
@@ -216,7 +217,7 @@ export async function runAssistantTurn(params: {
       cache_control: { type: 'ephemeral' },
       messages,
       ...fallback,
-    } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+    } as Anthropic.Beta.MessageCreateParamsNonStreaming))
     messages.push({ role: 'assistant', content: response.content as ContentBlockParam[] })
 
     if (response.stop_reason === 'pause_turn') continue

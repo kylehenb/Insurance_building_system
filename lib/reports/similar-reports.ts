@@ -8,6 +8,7 @@
 import OpenAI from 'openai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@/lib/supabase/database.types'
+import { trackAi } from '@/lib/health/ai-usage'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -57,11 +58,11 @@ function getOpenAI(): OpenAI | null {
 async function embedTexts(texts: string[]): Promise<number[][]> {
   const openai = getOpenAI()
   if (!openai) throw new Error('OPENAI_API_KEY is not set')
-  const res = await openai.embeddings.create({
+  const res = await trackAi({ feature: 'report-embeddings', provider: 'openai', model: EMBEDDING_MODEL }, () => openai.embeddings.create({
     model: EMBEDDING_MODEL,
     input: texts,
     dimensions: EMBEDDING_DIMENSIONS,
-  })
+  }))
   return res.data.sort((a, b) => a.index - b.index).map(d => d.embedding)
 }
 

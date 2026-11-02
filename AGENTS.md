@@ -31,3 +31,11 @@ The one way the AI learns from the office: every decision on an AI proposal is r
 - An AI feature that people confirm, edit, skip or instruct records it with `recordLearning(...)`: keep the AI's original output beside the record (as action cards keep `ai_steps`) so what was changed can be told.
 - Its prompt gets `formatLessons(activeLessons(...))` and `formatCases(similarCases(...))`, with a `Likeness` built from the facts that make two cases alike (sender, insurer, stage…).
 - No other rules store, teach screen or manual approval of what the AI learned — the Brain and Teach mode were retired for that (§22.4).
+
+# Health monitoring (`lib/health`)
+
+The weekly health check and the alert watcher read what's recorded as things happen. Details: tech spec §25 "Health check".
+
+- Every AI request goes through `trackAi({ feature, provider, model, tenantId?, jobId? }, () => call)` (a test fails untracked calls). A new model needs a price in `lib/health/pricing.ts`.
+- Every cron in `vercel.json` exports `GET = withCronRun('/api/…', run)` (a test checks), as well as being in `lib/cron-routes.ts`.
+- Where a failure would otherwise be silent (an AI reply that can't be read, a fallback because something is down), call `logError(source, err, ctx)`.

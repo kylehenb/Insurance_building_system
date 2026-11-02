@@ -9,4 +9,5 @@ export const CRON_ROUTES = new Set([
   '/api/learning/review',
   '/api/calendar/sync',
   '/api/jobs/review',
+  '/api/health/watch',
 ])
