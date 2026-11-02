@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Job summary (assembled from the app's stage logic, pending actions and the
+// Job summary (assembled from the job's phase and next step, pending actions and the
 // other tools' views), job notes, and correcting / linking insurer orders.
 
 type Row = Record<string, unknown>
@@ -37,10 +37,6 @@ const client = { from: query }
 
 const linkThreads = vi.fn(async (..._a: unknown[]) => undefined)
 const recompute = vi.fn(async (..._a: unknown[]) => 'works_in_progress')
-vi.mock('@/lib/jobs/fetchJobContext', () => ({ fetchJobContext: async () => ({}) }))
-vi.mock('@/lib/jobs/getJobStage', () => ({
-  getJobStage: () => ({ label: 'Awaiting approval', description: 'Report and quote sent to the insurer', primaryAction: { label: 'Chase insurer' }, contextualWarning: { message: 'Sent 9 days ago' } }),
-}))
 vi.mock('@/lib/jobs/recomputeStage', () => ({ recomputeAndSaveStage: (...a: unknown[]) => recompute(...a) }))
 vi.mock('@/lib/excess/server', () => ({
   ExcessError: class extends Error {},
@@ -67,16 +63,16 @@ beforeEach(() => {
   updates.length = 0
   db.users = [{ id: 'u1', tenant_id: 't1', name: 'Kyle' }]
   db.communications = [{ id: 'c0', tenant_id: 't1', job_id: 'j62', type: 'note', content: 'Owner prefers mornings', contact_name: 'Kyle', source: 'app', created_at: '2026-10-20T03:00:00Z' }]
-  db.jobs = [{ id: 'j62', tenant_id: 't1', job_number: 'IRC1062', property_address: '1 St', insured_name: 'Bruce Long', insured_phone: '0400 111 222', insurer: 'Castle', claim_number: 'CHCCLM010001697', notes: '1 Oct: Called Bruce' }]
+  db.jobs = [{ id: 'j62', tenant_id: 't1', job_number: 'IRC1062', property_address: '1 St', insured_name: 'Bruce Long', insured_phone: '0400 111 222', insurer: 'Castle', claim_number: 'CHCCLM010001697', notes: '1 Oct: Called Bruce', phase: 'awaiting_decision', phase_step: 'waiting_on_insurer', closed_reason: null, override_stage: null, phase_since: '2026-10-24T02:00:00Z', review_note: 'Waiting on Castle\'s decision on the $8,450 quote' }]
   db.action_queue = [{ tenant_id: 't1', job_id: 'j62', status: 'pending', title: 'Chase quote approval', description: null, priority: 1 }]
   db.insurer_orders = [{ id: ORDER, tenant_id: 't1', status: 'pending', job_id: null, claim_number: null, wo_type: 'BAR', insured_name: 'Peter Laundy' }]
 })
 
 describe('get_job_summary', () => {
-  it('leads with who, stage and next step, and keeps going when one part fails', async () => {
+  it('leads with who, phase and next step, and keeps going when one part fails', async () => {
     const res = await getJobSummary.run({ job_number: 'IRC1062' }, ctx)
     expect(res.text).toMatch(/^IRC1062, 1 St\. Insured: Bruce Long \(0400 111 222\)\. Insurer: Castle, claim CHCCLM010001697\./)
-    expect(res.text).toContain('Stage:\nAwaiting approval — Report and quote sent to the insurer Next step: Chase insurer. Note: Sent 9 days ago')
+    expect(res.text).toMatch(/Phase:\nAwaiting decision · Waiting on the insurer \(since \w+,? 24 Oct\)\. This morning's review: Waiting on Castle's decision on the \$8,450 quote/)
     expect(res.text).toContain('Waiting on you:\n- Chase quote approval')
     expect(res.text).toContain('Work orders:\n- Painter, $1,010, not sent.')
     expect(res.text).toContain('Documents:\n- Quote Q-IRC1062-1: sent, $8,450')

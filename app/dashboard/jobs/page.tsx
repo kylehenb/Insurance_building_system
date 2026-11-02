@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
-import { STAGE_CONFIG } from "@/lib/jobs/stageConfig";
-import type { JobStageKey } from "@/lib/jobs/getJobStage";
+import { describePhase, PHASES, type Phase } from "@/lib/jobs/phase";
 import { useCurrentUser } from "@/components/layout/current-user";
 
 type JobRow = {
@@ -19,92 +19,31 @@ type JobRow = {
   job_type: string | null
   override_stage: 'on_hold' | 'cancelled' | null
   current_stage: string | null
+  phase: Phase | null
+  phase_step: string | null
+  closed_reason: string | null
   created_at: string | null
 }
 
-type StageFilter =
-  | 'all'
-  | 'active'
-  | 'awaiting_action'
-  | 'waiting'
-  | 'complete'
-  | 'on_hold'
-  | 'cancelled'
-
-const STAGE_GROUPS: Record<Exclude<StageFilter, 'all'>, JobStageKey[]> = {
-  active: [
-    'awaiting_schedule',
-    'inspection_scheduled',
-    'awaiting_compilation',
-    'sent_awaiting_approval',
-    'approved_awaiting_signoff',
-    'awaiting_signed_document',
-    'signed_build_schedule',
-    'repairs_in_progress',
-    'awaiting_completion_signoff',
-    'awaiting_trade_invoices',
-    'ready_to_invoice',
-  ],
-  awaiting_action: [
-    'order_received',
-    'awaiting_schedule',
-    'awaiting_compilation',
-    'approved_awaiting_signoff',
-    'signed_build_schedule',
-    'awaiting_completion_signoff',
-    'awaiting_trade_invoices',
-    'ready_to_invoice',
-  ],
-  waiting: [
-    'inspection_scheduled',
-    'sent_awaiting_approval',
-    'awaiting_signed_document',
-    'repairs_in_progress',
-    'invoiced_awaiting_payment',
-  ],
-  complete: ['complete'],
-  on_hold: ['on_hold'],
-  cancelled: ['cancelled'],
-}
+type StageFilter = 'open' | Phase | 'on_hold' | 'all'
 
 const FILTER_TABS: { key: StageFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'awaiting_action', label: 'Awaiting Action' },
-  { key: 'waiting', label: 'Waiting' },
-  { key: 'complete', label: 'Complete' },
+  { key: 'open', label: 'Open' },
+  ...PHASES.map(p => ({ key: p.key as StageFilter, label: p.label })),
   { key: 'on_hold', label: 'On Hold' },
-  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'all', label: 'All' },
 ]
 
-function StagePill({ currentStage }: { currentStage: string | null }) {
-  if (!currentStage) {
-    return <span style={{ color: 'var(--faint)', fontSize: 11 }}>—</span>
+/** The job's phase and next step (lib/jobs/phase.ts): "In repair · Book the trades" */
+function StagePill({ job }: { job: Pick<JobRow, 'phase' | 'phase_step' | 'closed_reason' | 'override_stage'> }) {
+  if (!job.phase) {
+    return <span style={{ color: 'var(--faint)', fontSize: 11 }}>Working it out…</span>
   }
-  const config = currentStage in STAGE_CONFIG
-    ? STAGE_CONFIG[currentStage as JobStageKey]
-    : null
-  if (!config) {
-    return <span style={{ color: 'var(--faint)', fontSize: 11 }}>{currentStage}</span>
-  }
-  const isOnHold = currentStage === 'on_hold'
-  const isCancelled = currentStage === 'cancelled'
-  const isComplete = currentStage === 'complete'
-  const bgColor = isOnHold
-    ? '#fdf5e8'
-    : isCancelled
-      ? '#fdecea'
-      : isComplete
-        ? '#f0fdf4'
-        : '#f5f0e8'
-  const textColor = isOnHold
-    ? '#8a6020'
-    : isCancelled
-      ? '#b91c1c'
-      : isComplete
-        ? '#166534'
-        : '#6a5a40'
-
+  const isOnHold = job.override_stage === 'on_hold'
+  const isClosed = job.phase === 'closed'
+  const isComplete = isClosed && job.closed_reason === 'complete'
+  const bgColor = isOnHold ? '#fdf5e8' : isComplete ? '#f0fdf4' : isClosed ? '#f3f1ec' : '#f5f0e8'
+  const textColor = isOnHold ? '#8a6020' : isComplete ? '#166534' : isClosed ? '#6b6457' : '#6a5a40'
   return (
     <span
       style={{
@@ -117,7 +56,7 @@ function StagePill({ currentStage }: { currentStage: string | null }) {
         whiteSpace: 'nowrap',
       }}
     >
-      {config.label}
+      {describePhase(job)}
     </span>
   )
 }
@@ -136,26 +75,27 @@ export default function JobsListPage() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const { tenantId } = useCurrentUser();
-  const [activeFilter, setActiveFilter] = useState<StageFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<StageFilter>('open');
 
   const supabase = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const SELECT_FIELDS = 'id, job_number, insured_name, property_address, insurer, job_type, override_stage, current_stage, created_at'
+  const SELECT_FIELDS = 'id, job_number, insured_name, property_address, insurer, job_type, override_stage, current_stage, phase, phase_step, closed_reason, created_at'
 
   async function fetchJobs(tid: string, filter: StageFilter) {
-    let query = supabase
+    // phase* aren't in database.types.ts yet
+    let query = (supabase as unknown as SupabaseClient)
       .from('jobs')
       .select(SELECT_FIELDS)
       .eq('tenant_id', tid)
       .neq('insurer', 'Midcity')
       .order('created_at', { ascending: false })
 
-    if (filter !== 'all') {
-      query = query.in('current_stage', STAGE_GROUPS[filter])
-    }
+    if (filter === 'open') query = query.neq('phase', 'closed')
+    else if (filter === 'on_hold') query = query.eq('override_stage', 'on_hold')
+    else if (filter !== 'all') query = query.eq('phase', filter)
 
     const { data } = await query
     setJobs((data as unknown as JobRow[]) ?? []);
@@ -353,7 +293,7 @@ export default function JobsListPage() {
                           )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
-                          <StagePill currentStage={job.current_stage} />
+                          <StagePill job={job} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3">
                           <span className="text-xs text-faint">

@@ -4,6 +4,7 @@ import { drainCardQueue } from '@/lib/actions/propose'
 import { releaseDueFollowUps } from '@/lib/actions/followups'
 import { drainSentQueue } from '@/lib/actions/waiting-on'
 import { applyChangedKpis } from '@/lib/kpi/client-kpis'
+import { recomputeStalePhases } from '@/lib/jobs/phase'
 import { mailDb } from '@/lib/mail/sync'
 
 // Sends scheduled emails that are due (lib/mail/scheduled.ts), puts
@@ -24,8 +25,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const followUps = await releaseDueFollowUps(mailDb())
   const kpiJobs = await applyChangedKpis(mailDb()).catch(err => { console.error('[kpi] applying changed KPIs failed:', err); return 0 })
+  // Jobs whose phase may have moved (flagged by the database when what it's worked out from changed)
+  const phases = await recomputeStalePhases(mailDb()).catch(err => { console.error('[phase] recompute failed:', err); return 0 })
   const [sent, cards, waits] = await Promise.all([sendDueEmails(), drainCardQueue({ budgetMs: 200_000 }), drainSentQueue({ budgetMs: 120_000 })])
-  return NextResponse.json({ ...sent, followUps, cards: cards.made, sentRead: waits.read, kpiJobs })
+  return NextResponse.json({ ...sent, followUps, cards: cards.made, sentRead: waits.read, kpiJobs, phases })
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

@@ -7,6 +7,7 @@ import { cardActor, CARD_COLUMNS, type ActionCard } from '@/lib/actions/cards'
 import { createFollowUp, followUpDay, spokenDue } from '@/lib/actions/followups'
 import { pinnedTo } from '@/lib/actions/waits'
 import { pruneOldEvents } from '@/lib/calendar/sync'
+import { runLapses } from './lapse'
 
 // The daily job review (tech spec §23.14): IRC's own initiative. Each morning
 // it reads the open jobs that changed since it last read them — and, once a
@@ -210,6 +211,8 @@ export async function reviewAllJobs(db: SupabaseClient, opts: { client?: Pick<An
   const at = opts.at ?? new Date()
   const started = Date.now()
   const results: ReviewResult[] = []
+  // The safety net first: jobs the insurer never decided on
+  await runLapses(db, at).catch(err => console.error('[job-review] lapses failed:', err))
   if (opts.client || process.env.ANTHROPIC_API_KEY) {
     const { data } = await db.from('tenants').select('id')
     for (const t of (data as { id: string }[] | null) ?? []) {

@@ -4324,6 +4324,46 @@ IRC's own initiative: each morning it looks over the open jobs as a sharp office
   - Calendar matching (§23.13) reads a repeated event once: repeats of an event already decided take its decision, and one of each new series goes to the AI. It's capped at 150 AI reads per company per day.
 - **Clean-up** (`cleanUp`, after the review): calendar events that ended over 120 days ago, and sent-email reads finished over 60 days ago, are deleted.
 
+### 23.15 Job phases (`lib/jobs/phase.ts`, `lib/jobs/lapse.ts`, migration `20261123_job_phases.sql`)
+
+Five phases the office thinks in replace the 17 stages, which went stale because they were only worked out on a few events.
+
+**The phases and their steps** (`computePhase`, worked out from the job's records):
+
+| Phase | Steps |
+|---|---|
+| **Assessment** | book the inspection → attend → write the report and quote → submit |
+| **Awaiting decision** | waiting on the insurer |
+| **In repair** | get the homeowner to sign → waiting on the signature → book the trades → works under way → record the sign-off |
+| **Invoicing** | trade invoices in → invoice the insurer, or the report fee → waiting on payment |
+| **Closed** | complete / declined / cancelled / no decision (`jobs.closed_reason`) |
+
+**Rules for moving between phases:**
+- **On hold** is a flag on top (`override_stage 'on_hold'`), not a phase.
+- **Report-only jobs** (a report sent and no quote) go Assessment → Invoicing → Closed.
+- **A declined claim** goes through Invoicing until its report fee is paid.
+- **A job closes only when every outbound invoice on it is paid,** the excess included.
+- **Booked:** "attend" rather than "book" when a calendar appointment is linked (§23.13) or the inspection is confirmed.
+
+**Kept up to date by triggers.** Triggers on `quotes`, `reports`, `inspections`, `invoices` and `work_order_visits`, and on the job's own sign-off, completion, override, lapse and closed-by-hand fields, set `jobs.phase_stale`, whichever way a record is saved. The every-minute cron (`recomputeStalePhases`, 100 a run) works the flagged jobs out again and saves:
+- `phase`, `phase_step`, `closed_reason`;
+- `phase_since`. The first time a job is worked out into Awaiting decision, this is its sent quote's date, since sending isn't timed;
+- the matching old stage key in `current_stage` (`legacyStage`), so what still reads it agrees (the job page's action buttons, the signing flow, email-to-job matching).
+
+`recomputeAndSaveStage` now goes through `recomputePhase`.
+
+**Where it shows:**
+- **Job list:** tabs Open / each phase / On Hold / All, and a phase · step pill.
+- **Job page banner:** phase, step, and this morning's review note.
+- **Dashboard, job search and `get_job_summary`:** phase · step (and since when) in each.
+
+**The lapse safety net** (`runLapses`, in the morning cron before the review) is for insurers who never decide.
+- **Lapse time:** each insurer's `clients.decision_lapse_days`, set on the Clients page beside the KPIs, default 180, 0 means never.
+- **What happens when it passes:** a job awaiting a decision longer than that closes as **no decision** (`lapsed_at`), but only if every invoice on it is paid.
+- **Warning first:** 14 days before, the office gets one check ("chase or let it lapse?").
+- **Money still owed:** past the lapse time with money owed (or nothing invoiced), one check to invoice or chase payment instead. Checks have `rule_key` `lapse_warning` / `lapse_blocked`, once per wait, for the job's owner, at most 3 new a day, longest waits first.
+- **Late approval:** an approval after a lapse (or after a hand-close as no decision) reopens the job into In repair.
+
 ---
 
 ## 24. Learning module (`lib/learning`)
