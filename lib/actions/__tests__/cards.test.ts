@@ -272,6 +272,14 @@ describe('generateCard', () => {
     expect(first).toMatch(/THE CONVERSATION IT WAS SET FROM \(conversation_id: abc1\)[\s\S]*THE JOB FILE \(as it is now\)/)
   })
 
+  it('lets a check IRC planned find nothing\'s needed, unlike a follow-up the office set', async () => {
+    tables.action_queue = [{ id: 'w1', tenant_id: 't1', source: 'followup', source_ref: null, job_id: 'j1', status: 'generating', attempts: 1, title: 'Check: Did the painter go?', steps: [], created_at: '2026-11-01T22:37:00Z',
+      follow_up: { kind: 'watch', note: 'Did the painter go on Saturday? If so, close and invoice.', who: 'Great Lengths', thread_id: null, from_card_id: null, created_by: 'u1', watch: { why: 'Due Saturday', planned_at: '2026-11-01T22:37:00Z' } } }]
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Painter went Saturday', summary: 'A note on Saturday says painting is done; the invoice has gone.', priority: 'low', category: 'other' } }]])
+    expect(await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action' })
+    expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toMatch(/^Today: .*\n\nA CHECK IRC PLANNED \(reviewing the job on .*, for today\): "Did the painter go on Saturday\? If so, close and invoice\."\nWhy: Due Saturday/)
+  })
+
   it('checks in after a job appointment: nothing to do when it\'s sorted, and passes over a cancelled one', async () => {
     tables.calendar_events = [
       { id: 'e1', tenant_id: 't1', summary: 'IRC1001 site meeting', location: '3 Elm St', start_at: '2026-10-31T05:00:00Z', end_at: '2026-10-31T06:00:00Z', status: 'confirmed' },

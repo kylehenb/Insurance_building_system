@@ -72,9 +72,10 @@ export type FollowUp = {
   from_card_id: string | null
   /** Who it's for: who set it, or who sent the email a waiting-on follow-up came from */
   created_by: string | null
-  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts) */
-  kind?: 'waiting_on'
+  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts); watch: a check IRC planned reviewing the job (lib/jobs/review.ts) */
+  kind?: 'waiting_on' | 'watch'
   waiting?: WaitingOn
+  watch?: { why: string; planned_at: string }
 }
 
 /** A waiting-on follow-up: who was asked for what, and why the chase is when it is */

@@ -21,6 +21,12 @@ const LINK_BACK_DAYS = 30
 const LINK_AHEAD_DAYS = 90
 /** Events the AI reads per run (the rest wait for the next) */
 const AI_BATCH = 15
+/** Events the AI reads per company per day, whatever happens — a guard on cost */
+const AI_DAILY_LIMIT = 150
+/** Events that ended this long ago are let go (nothing reads them any more) */
+const KEEP_DAYS = 120
+/** How a repeat's link is told apart from the AI's own */
+const REPEAT_REASON = 'Same as the earlier'
 /** Jobs the AI chooses from: made, or written about, this recently */
 const ACTIVE_DAYS = 90
 
@@ -221,18 +227,42 @@ export async function linkEvents(db: SupabaseClient, tenantId: string, opts: { c
     }
   }
 
-  const batch = unmatched.slice(0, AI_BATCH)
+  // A repeat of an event already decided (a recurring workout, the same
+  // reminder every few days) takes that decision: the AI reads each once
+  const decided = await earlierDecisions(db, tenantId, unmatched)
+  const fresh: CalendarEventRow[] = []
+  for (const e of unmatched) {
+    const earlier = decided.get(eventKey(e))
+    if (!earlier) { fresh.push(e); continue }
+    const job = earlier.job_id ? jobs.find(j => j.id === earlier.job_id) : undefined
+    const reason = `${REPEAT_REASON} "${e.summary ?? 'event'}"`
+    if (job) {
+      await saveLink(db, e, { job, source: earlier.link_source === 'ai' ? 'ai' : 'address', reason })
+      linked++
+    } else {
+      await db.from('calendar_events').update({ job_id: null, link_source: 'none', link_reason: reason.slice(0, 300), linked_etag: e.etag, updated_at: now() }).eq('id', e.id)
+    }
+  }
+
+  // One of each repeated event goes to the AI; the rest take its answer
+  const byKey = new Map<string, CalendarEventRow[]>()
+  for (const e of fresh) byKey.set(eventKey(e), [...(byKey.get(eventKey(e)) ?? []), e])
+  const room = Math.max(0, Math.min(AI_BATCH, AI_DAILY_LIMIT - await aiReadToday(db, tenantId, at)))
+  const batch = [...byKey.values()].map(group => group[0]).slice(0, room)
   if (batch.length && (opts.client || process.env.ANTHROPIC_API_KEY)) {
     try {
       const links = await aiLinks(db, tenantId, batch, jobs, at, opts.client)
       for (const [i, e] of batch.entries()) {
         const l = links.get(`E${i + 1}`)
         const job = l?.job_number ? jobs.find(j => j.job_number.toUpperCase() === l.job_number.toUpperCase()) : undefined
-        if (job) {
-          await saveLink(db, e, { job, source: 'ai', reason: l!.reason })
-          linked++
-        } else {
-          await db.from('calendar_events').update({ job_id: null, link_source: 'none', link_reason: l?.reason?.slice(0, 300) || 'Not one of the jobs', linked_etag: e.etag, updated_at: now() }).eq('id', e.id)
+        for (const [n, same] of (byKey.get(eventKey(e)) ?? [e]).entries()) {
+          const reason = n === 0 ? l?.reason?.slice(0, 300) || (job ? 'Matched by the AI' : 'Not one of the jobs') : `${REPEAT_REASON} "${e.summary ?? 'event'}"`
+          if (job) {
+            await saveLink(db, same, { job, source: 'ai', reason })
+            linked++
+          } else {
+            await db.from('calendar_events').update({ job_id: null, link_source: 'none', link_reason: reason, linked_etag: same.etag, updated_at: now() }).eq('id', same.id)
+          }
         }
       }
     } catch (err) {
@@ -240,6 +270,35 @@ export async function linkEvents(db: SupabaseClient, tenantId: string, opts: { c
     }
   }
   return { linked, read: batch.length }
+}
+
+/** What makes two events repeats of each other: the same title and place */
+export const eventKey = (e: Pick<CalendarEventRow, 'summary' | 'location'>) =>
+  `${(e.summary ?? '').trim().toLowerCase().replace(/\s+/g, ' ')}|${(e.location ?? '').trim().toLowerCase().replace(/\s+/g, ' ')}`
+
+/** The decisions already made for events with the same titles, by eventKey */
+async function earlierDecisions(db: SupabaseClient, tenantId: string, events: CalendarEventRow[]): Promise<Map<string, Pick<CalendarEventRow, 'job_id' | 'link_source'>>> {
+  const summaries = [...new Set(events.map(e => e.summary).filter((s): s is string => !!s))]
+  const out = new Map<string, Pick<CalendarEventRow, 'job_id' | 'link_source'>>()
+  if (!summaries.length) return out
+  const { data } = await db.from('calendar_events').select('summary, location, job_id, link_source, linked_etag')
+    .eq('tenant_id', tenantId).in('summary', summaries).not('linked_etag', 'is', null)
+  for (const r of (data as (Pick<CalendarEventRow, 'summary' | 'location' | 'job_id' | 'link_source' | 'linked_etag'>)[] | null) ?? []) {
+    if (r.link_source && r.link_source !== 'manual') out.set(eventKey(r), { job_id: r.job_id, link_source: r.link_source })
+  }
+  return out
+}
+
+/** Events the AI has read for a company in the last day (repeats it didn't read aside) */
+async function aiReadToday(db: SupabaseClient, tenantId: string, at: Date): Promise<number> {
+  const { data } = await db.from('calendar_events').select('link_reason')
+    .eq('tenant_id', tenantId).in('link_source', ['ai', 'none']).gte('updated_at', new Date(at.getTime() - DAY_MS).toISOString())
+  return ((data as { link_reason: string | null }[] | null) ?? []).filter(r => !r.link_reason?.startsWith(REPEAT_REASON)).length
+}
+
+/** Lets go of events that ended long ago: nothing reads them any more */
+export async function pruneOldEvents(db: SupabaseClient, at = new Date()): Promise<void> {
+  await db.from('calendar_events').delete().lt('end_at', new Date(at.getTime() - KEEP_DAYS * DAY_MS).toISOString())
 }
 
 async function saveLink(db: SupabaseClient, e: CalendarEventRow, link: Link): Promise<void> {

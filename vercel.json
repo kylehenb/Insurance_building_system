@@ -39,6 +39,10 @@
     {
       "path": "/api/calendar/sync",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/jobs/review",
+      "schedule": "37 22 * * *"
     }
   ]
 }

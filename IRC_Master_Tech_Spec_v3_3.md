@@ -2911,6 +2911,7 @@ AI_ASSISTANT_MODEL=                # optional, default claude-haiku-5-5
 AI_CARD_MODEL=                     # optional, action cards (§23.11), default claude-haiku-5-5
 AI_WAIT_MODEL=                     # optional, reading sent emails for what they ask (§23.12), default claude-haiku-5-5
 AI_CALENDAR_MODEL=                 # optional, matching calendar events to jobs (§23.13), default claude-haiku-5-5
+AI_REVIEW_MODEL=                   # optional, the morning job review (§23.14), default claude-haiku-5-5
 
 # App
 NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead
@@ -4295,6 +4296,33 @@ The office's calendar is linked to its jobs, so IRC knows when a job's appointme
 
     Check-ins are never auto-confirmed, they're learned from like any card (situation kind `appointment`), and Re-suggest works on them.
 - **By voice and chat:** `add_job_appointment` (§10b) puts an appointment on the first watched calendar, titled with the job number and placed at the job's address, and adds the job note too. `get_job_summary` lists the job's appointments.
+
+### 23.14 The morning job review (`lib/jobs/review.ts`, `/api/jobs/review`)
+
+IRC's own initiative: each morning it looks over the open jobs as a sharp office manager would, and plans dated checks so nothing slips. For example, "the painter was going Saturday: did he go? Then close the job and invoice", or "the windows are a week out after months of waiting: still on track?".
+
+- **When:** 6:37am Perth daily (`37 22 * * *`, `CRON_SECRET`, a `CRON_ROUTES` entry).
+- **Which jobs** (`openJobs`, `jobsToReview`):
+  - **Open:** until job stages are fixed, a job counts as open if it was made or written about in the last 60 days, or has a card, follow-up or calendar appointment in that time or the next 30 days.
+  - **Read when:** never read before; something changed since it was last read (communications, its cards, its appointments); or it hasn't been read for 7 days (the weekly look at jobs gone quiet).
+  - **Order and limit:** least recently read first, up to the company's limit of jobs a day (`automation_config` `job_review_daily_limit`, default 40).
+- **Reading one job** (`reviewJob`): Claude (`AI_REVIEW_MODEL`, the prompt cached) reads the job file and the job's open follow-ups, waits, checks and cards, and answers `review_job`:
+  - `state`: one line on where it stands, kept as `jobs.review_note` with `jobs.reviewed_at` (migration `20261122_job_review.sql`);
+  - `checks`: dated checks, usually none, at most 2, for things due to have happened, important things coming up, or a KPI close or overdue (`now`);
+  - `cancel`: IRC's own checks no longer needed.
+
+  Each check is a follow-up (`createFollowUp` with `watch`: `rule_key 'job_watch'`, `follow_up.kind 'watch'`, titled "Check: …"), for the job's owner (`pinnedTo`), due at 8am that day. On the day, the card AI first sees whether it's still needed: unlike a follow-up the office set, a check can end `no_action`. A failed read leaves the job to be read next time.
+- **Guardrails, so cost grows with what changes, not with the number of jobs:**
+  - an unchanged job isn't read again for a week;
+  - a daily limit per company;
+  - at most 2 new checks per review, and none while 3 of IRC's are open on the job;
+  - the AI is shown what's already open, so it doesn't double up;
+  - only IRC's own checks can be cancelled.
+
+  Elsewhere:
+  - Every card, wait and check is made once and isn't read again unless something new arrives. A card left on the list for weeks costs nothing more.
+  - Calendar matching (§23.13) reads a repeated event once: repeats of an event already decided take its decision, and one of each new series goes to the AI. It's capped at 150 AI reads per company per day.
+- **Clean-up** (`cleanUp`, after the review): calendar events that ended over 120 days ago, and sent-email reads finished over 60 days ago, are deleted.
 
 ---
 
