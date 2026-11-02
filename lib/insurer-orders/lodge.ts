@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
-import { addDelay, parseTimeConfig } from '@/lib/scheduling/business-hours'
+import type { SupabaseClient as RawClient } from '@supabase/supabase-js'
+import { kpiDueDates, loadClientKpis, loadTimeConfig } from '@/lib/kpi/client-kpis'
 import { createInvoiceForReport } from '@/lib/invoices/report-to-invoice'
 import { notifyJobApproved } from '@/lib/email/notify-job-approved'
 import { sendOrderAcknowledgement, type OrderAcknowledgementResult } from '@/lib/email/order-acknowledgement'
@@ -108,31 +109,16 @@ export async function lodgeInsurerOrder(
 
   const prefix = tenant.job_prefix
 
-  // Step 4a: Load automation_config for KPI calculations
-  console.log('[lodge] loading automation_config for KPI calculations')
-  const { data: configData, error: configError } = await supabase
-    .from('automation_config')
-    .select('key, value')
-    .eq('tenant_id', tenantId)
-
-  if (configError) {
+  // Step 4a: Business hours for the KPI due dates (worked out once the insurer is known)
+  let timeConfig
+  try {
+    timeConfig = await loadTimeConfig(supabase as unknown as RawClient, tenantId)
+  } catch (configError) {
     console.error('[lodge] automation_config load error:', configError)
     throw new LodgeError('Failed to load automation config', 500)
   }
-
-  const rawConfig: Record<string, string> = {}
-  configData?.forEach(row => {
-    rawConfig[row.key] = row.value
-  })
-
-  const timeConfig = parseTimeConfig(rawConfig)
-  const orderedAt = new Date()
-
-  // Calculate KPI due dates using addDelay
-  const kpi_contact_due = addDelay(timeConfig, orderedAt, 2, 'hours')
-  const kpi_booking_due = addDelay(timeConfig, orderedAt, 24, 'hours')
-  const kpi_visit_due = addDelay(timeConfig, orderedAt, 2, 'business_days')
-  const kpi_report_due = addDelay(timeConfig, orderedAt, 4, 'business_days')
+  // The KPI clock starts when the insurer's order arrived, not when it's lodged
+  const orderedAt = order.created_at ? new Date(order.created_at) : new Date()
 
   // Step 4b: Check for existing job with same claim number
   console.log('[lodge] checking for existing job with claim_number:', order.claim_number)
@@ -264,6 +250,9 @@ export async function lodgeInsurerOrder(
   }
   console.log('[lodge] resolved client_id:', resolvedClientId)
 
+  // KPI due dates from this insurer's own times (the Clients page; defaults if none)
+  const kpiDue = kpiDueDates(timeConfig, orderedAt, await loadClientKpis(supabase as unknown as RawClient, tenantId, resolvedClientId))
+
   // Step 5: Create job
   console.log('[lodge] creating job')
   const { data: newJob, error: jobError } = await supabase
@@ -289,10 +278,8 @@ export async function lodgeInsurerOrder(
       sum_insured: order.sum_insured_building,
       excess: order.excess_building,
       client_id: resolvedClientId,
-      kpi_contact_due: kpi_contact_due.toISOString(),
-      kpi_booking_due: kpi_booking_due.toISOString(),
-      kpi_visit_due: kpi_visit_due.toISOString(),
-      kpi_report_due: kpi_report_due.toISOString(),
+      ...kpiDue,
+      kpi_started_at: orderedAt.toISOString(),
       created_at: new Date().toISOString(),
     } as Database['public']['Tables']['jobs']['Insert'])
     .select('id')

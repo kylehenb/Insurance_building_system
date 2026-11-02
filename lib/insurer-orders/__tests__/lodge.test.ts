@@ -76,6 +76,17 @@ beforeEach(() => {
 })
 
 describe('lodgeInsurerOrder', () => {
+  it('sets the KPI due dates from the insurer\'s own times, counted from when the order arrived', async () => {
+    db.insurer_orders[0].created_at = '2026-10-29T02:00:00.000Z' // Thu 10am Perth
+    db.clients = [{ id: 'c1', tenant_id: 't1', kpi_contact_hours: 4, kpi_booking_hours: 24, kpi_visit_days: 2, kpi_report_days: 1 }]
+    await lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
+    expect(inserted.jobs[0]).toMatchObject({
+      kpi_started_at: '2026-10-29T02:00:00.000Z',
+      kpi_contact_due: '2026-10-29T06:00:00.000Z',
+      kpi_report_due: '2026-10-30T09:30:00.000Z', // by the end of Friday
+    })
+  })
+
   it('emails the acknowledgement as before when not asked to skip it', async () => {
     const result = await lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
     expect(result).toMatchObject({ jobNumber: 'IRC1080', acknowledgement: { sent: true, to: 'claims@castle.com.au' } })

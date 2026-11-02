@@ -176,6 +176,16 @@ ALTER TABLE clients
 - Individual adjuster contacts sit under their firm via `parent_id`
 - Both submission emails are configured in client settings and are read-only on the job/order — they surface as reference fields labelled "From client config"
 - KPI framework (general — varies by insurer, configured per insurer): Contact within 2hr / Booking within 24hr / Visit within 2 days / Report within 4 days. Clock starts when insurer order is received.
+- **KPIs wired up (Nov 2026, `lib/kpi/client-kpis.ts`, migration `20261120_client_kpis.sql`):** each insurer's four times live on the insurer (`clients.kpi_*`, edited on the Clients page; a new insurer starts at the defaults 2 hours / 24 hours / 2 days / 4 days).
+  - **At lodge:** `lodgeInsurerOrder` sets the job's due dates from that insurer's own times (`loadClientKpis`, `kpiDueDates`), counted from when the order arrived (`insurer_orders.created_at`, kept as `jobs.kpi_started_at`), not from when it was lodged. Hours run on the clock. Days are business days (part days round up), due by the end of that office day (`business_hours_end`).
+  - **Changing an insurer's KPIs:** the trigger `trg_clients_kpi_touch` stamps `clients.kpi_updated_at`. The every-minute cron (`applyChangedKpis`) re-works the due dates of that insurer's jobs that still have a milestone to meet, then sets `kpi_applied_at`.
+  - **When each milestone happened** is recorded on the job by database triggers (security definer `jobs_kpi_mark`; a milestone is kept once set), whichever way the record is saved:
+    - **contacted:** the booking SMS (`inspections.scheduling_sms_sent_at`), or a text or email to the insured (`communications`, outbound, `type 'sms'` or `contact_type 'insured'`);
+    - **booked:** `inspections.booking_confirmed_at`, or the inspection first getting a date (booking also counts as contacted);
+    - **visited:** the safety tick or the field app submit;
+    - **reported:** a report's status becoming `sent`.
+
+    Existing jobs were filled in from their records once. A report's send time wasn't kept before, so for those it's the first document emailed from the job after the visit.
 
 ### 4.4 insurer_orders
 ```sql
