@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse, userAgent } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
+import { CRON_ROUTES } from "@/lib/cron-routes";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -48,6 +49,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/gmail/") ||
+    // Vercel crons (vercel.json) outside /api/gmail/: no session, each checks
+    // the CRON_SECRET bearer itself
+    CRON_ROUTES.has(pathname) ||
     // Claude voice connector: authorised by its own key header (lib/mcp/auth.ts)
     pathname === "/api/mcp" ||
     // E-signing: homeowners sign by link, with no account. These routes look
