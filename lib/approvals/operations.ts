@@ -26,6 +26,7 @@ import { getLesson, setLessonActive } from '@/lib/learning/lessons'
 import { setAutoConfirm } from '@/lib/learning/auto-confirm'
 import { closeJobs, reopenJob } from '@/lib/jobs/close'
 import { CLOSED_LABELS, type ClosedReason } from '@/lib/jobs/phase'
+import { decideSuggestion, type Decision } from '@/lib/health/suggestions'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -285,7 +286,7 @@ const mailSchedule: Operation<{ draftId: string; sendAt: string }> = {
   },
 }
 
-const FEATURE_NAMES: Record<string, string> = { action_card: 'action cards', order_parse: 'reading insurer orders', report: 'report writing', photo_labels: 'photo labels' }
+const FEATURE_NAMES: Record<string, string> = { action_card: 'action cards', order_parse: 'reading insurer orders', report: 'report writing', photo_labels: 'photo labels', waiting_on: 'when to chase', health_suggestion: 'health check suggestions' }
 
 // A lesson the AI learned (tech spec §24), turned off or back on by a person
 const lessonStatus: Operation<{ lessonId: string; active: boolean }> = {
@@ -317,6 +318,21 @@ const autoConfirmSet: Operation<{ feature: string; kind: string; enabled: boolea
     if (!ctx.requesterId) throw new Error('Auto-confirm needs someone to run as')
     await setAutoConfirm(ctx.service, ctx.tenantId, p.feature, p.kind, p.enabled, ctx.requesterId)
     return p.enabled ? 'Auto-confirm on.' : 'Auto-confirm off.'
+  },
+}
+
+const DECISION_WORDS: Record<Decision, string> = { accepted: 'Accept', dismissed: 'Dismiss', done: 'Mark done', open: 'Reopen' }
+
+// A change the health check's review suggested (tech spec §25.5), decided on
+const healthSuggestion: Operation<{ id: string; decision: Decision; note?: string | null }> = {
+  async describe(p, ctx) {
+    const { data } = await ctx.service.from('health_suggestions' as never).select('title').eq('tenant_id', ctx.tenantId).eq('id', p.id).maybeSingle()
+    const title = (data as { title?: string } | null)?.title
+    return { summary: `${DECISION_WORDS[p.decision]} the health check suggestion${title ? ` "${clip(title, 120)}"` : ''}`, jobId: null }
+  },
+  async run(p, ctx) {
+    await decideSuggestion(ctx.service as never, ctx.tenantId, p.id, p.decision, { userId: ctx.requesterId, note: p.note })
+    return `${DECISION_WORDS[p.decision]}: done.`
   },
 }
 
@@ -377,6 +393,7 @@ export const OPERATIONS = {
   'mail.schedule': mailSchedule,
   'lesson.status': lessonStatus,
   'auto_confirm.set': autoConfirmSet,
+  'health.suggestion': healthSuggestion,
   'voice.tool': voiceTool,
 } satisfies Record<string, Operation<never>>
 
@@ -405,4 +422,5 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'mail.schedule': 'mail.send',
   'lesson.status': 'settings.edit',
   'auto_confirm.set': 'settings.edit',
+  'health.suggestion': 'health.view',
 }

@@ -4512,7 +4512,7 @@ A weekly check of the system and the business: limits being reached, AI spend, s
 1. **Recording (built Nov 2026, §25.1–25.2):** the records the check reads, kept as things happen. Vercel and Supabase only keep their own logs for a few days. Also an immediate alert watcher.
 2. **Daily figures (built Nov 2026, §25.3):** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
 3. **AI write-up (built Nov 2026, §25.4):** for each finished period, written once from the figures and saved. Every claim cites its evidence.
-4. **Suggestions:** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
+4. **Suggestions (built Nov 2026, §25.5):** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
 5. **Voice connector tool:** "how did we go this week?" reads the saved report.
 
 ### 25.1 What's recorded
@@ -4568,6 +4568,11 @@ Migration `20261123_health_monitoring.sql`. Only the server writes or reads thes
 | **system** sum | the days added up, but only from `SYSTEM_TRACKING_SINCE` (3 Nov 2026). Before then the figure is left out, not zero | AI requests / failed / spend / unpriced, scheduled job runs / failed / partial, errors logged, alerts raised |
 | **snapshot** (last) | the latest day's value. Taken each night, so it can't be worked out for past days | open jobs, owed to us, owed over 30 days, open alerts, database size, file storage used (`public.health_storage_stats()`) |
 
+**Midcity** (a separate business run from the same system, §AGENTS / `lib/jobs/field-app.ts`) is left out of IRC's figures and review facts:
+- Its jobs are filtered with `IRC_JOBS` (`insurer.is.null,insurer.neq.Midcity`). A plain `neq` would also drop jobs with no insurer.
+- Records on its jobs (inspections, quotes, work orders, signing, invoices, emails, action cards, activity) are dropped by `job_id`.
+- Its AI use (features starting `midcity-`) is counted apart as `midcity_ai_calls` / `midcity_ai_cost_usd` (`METRICS_VERSION` 2).
+
 Each figure is counted on the Perth day of its own date: for example `created_at`, `form_submitted_at`, `completion_approved_at`, an invoice's `issued_date` / `paid_date`, or a job's `kpi_*_at` compared with its `kpi_*_due`. So past days can be worked out again at any time.
 
 **The nightly run** (`/api/health/daily`, 12:23am Perth, `runDailyFigures` in `lib/health/daily.ts`):
@@ -4575,7 +4580,6 @@ Each figure is counted on the Perth day of its own date: for example `created_at
 - Works out the day before again, for records that came in late. Snapshot readings already stored are kept.
 - Fills in every past day that is missing, or was worked out under an older `METRICS_VERSION`. It goes back to the office's first job, order or email (at most 5 years), newest first, 92 days per batch, for as long as the run has time.
 - To add a figure: add it to `METRICS`, work it out in `computeDays`, and bump `METRICS_VERSION`. The history is then rebuilt automatically.
-- **Midcity is left out** (version 2). Midcity is a separate business (`lib/jobs/field-app.ts`). Its jobs, their inspections, deadlines and the open-jobs count aren't IRC's figures. Its AI use (features `midcity-*`) is shown as its own lines, "Midcity AI requests / spend (separate business)", and is not counted in IRC's AI requests and spend. The written review (§25.4) gives it one line of its own and leaves it out of how IRC went.
 
 **The health panel:** `components/health/HealthPanel.tsx`, at the top of the dashboard's Today view.
 - Shown only to people with the new permission **`health.view`** ("See the health check", Admin group). It is admins only by default, and `user_permission_level` was updated to match.
@@ -4635,13 +4639,54 @@ Each figure is counted on the Perth day of its own date: for example `created_at
 - "Show the facts it was written from" lists every fact.
 - The current period says its review comes the night after it ends.
 
-Accepting or dismissing suggestions, and learning from those decisions, is part 4.
+A fifth section, **Changes made earlier**, follows up the changes the owner accepted or made (§25.5).
+
+### 25.5 Suggestions, decisions and repeated steps (built Nov 2026)
+
+**Suggestions as rows:** `health_suggestions` holds one row per suggested change. Migration `20261126_health_suggestions.sql`, server only. Each row has:
+- the first and latest review that raised it
+- title, why, kind, effort
+- `evidence`: the cited facts
+- `times_raised`
+- `status`: `open` / `accepted` / `dismissed` / `done`
+- `note`, decided by / at, `done_at`
+
+**Saving a review's suggestions** (`saveSuggestions`, `lib/health/suggestions.ts`): each suggestion is compared with existing ones by the words in its title (`alike`, threshold 0.5).
+- **Like an open, accepted or done one:** counted on that row (`times_raised`) instead of added.
+- **Like one dismissed in the last 180 days:** dropped.
+- **Otherwise:** added as `open`.
+
+**Deciding** (`decideSuggestion`): `POST /api/health/suggestions/[id] { decision: accepted | dismissed | done | open, note? }`.
+- Needs `health.view`, now labelled "See and act on the health check". It's on/off, so `permissionDenied`, not queued.
+- Logged as operation `health.suggestion`.
+- Every decision except reopening is recorded with `recordLearning`:
+  - feature `health_suggestion`, `kind` = the suggestion's kind
+  - situation: kind, effort, title
+  - `proposed`: the suggestion; `final`: the decision and note
+  - outcomes: accepted → `accepted`; done → `accepted`; dismissed → `skipped`, or `instructed` when a reason is given
+- The nightly learning review (§24.5) turns these decisions into lessons. They appear under "Health check suggestions" on the What the AI has learned page.
+
+**What the next review reads:**
+- `suggestionContext`: the active lessons (`formatLessons`), the 10 most recent decisions (`formatCases`), and every suggestion still open, accepted or done, or dismissed in the last 180 days, with the owner's notes. This is given as context: the review shouldn't repeat these and should learn what the owner values. It isn't citable facts.
+- `followUpFacts`: each accepted or done change, with dates and the original reason, given as facts, so the "Changes made earlier" section can say whether the figures since show the change working.
+
+**Repeated manual steps** (`repeatedSequences`, `lib/health/patterns.ts`), from `activity_log`:
+- A run is one person's actions on one job, no more than 30 minutes apart.
+- Opening the mailbox, failed actions and queued actions don't count. The same action twice in a row is one step.
+- Every 2- and 3-step sequence in a run is counted once per run. Those done 3+ times become facts ("Add job notes, then Reply to emails, on the same job within 30 minutes, 14 times, by 2 people on 12 jobs"). A 2-step sequence that only occurs inside a 3-step one isn't listed.
+- The review is told these are strong candidates for automation.
+
+**In the panel:**
+- Each suggestion in a review shows its status, how many times it has been raised, and its cited facts.
+- **Accept** and **Dismiss** buttons (Dismiss asks for an optional reason "the next reviews learn from"). Accepted ones get **Mark done** (asks how it was done). Decided ones get **Reopen**.
+- Accepted changes not yet done are listed under "Changes you've accepted, not yet done" on every period.
 
 ---
 
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Nov 2026): Added §25.5, health check part 4: `health_suggestions` (accept, dismiss, mark done or reopen; repeats counted; recent dismissals not raised again), decisions recorded in the learning module as `health_suggestion`, the review reading past decisions and following up accepted changes, and repeated manual steps from the activity log.*
 *Changes (Nov 2026): Added §25.4, health check part 3: `health_reviews`, the nightly `/api/health/reviews`, written by AI from numbered facts with every point cited, and shown in the health panel.*
 *Changes (Nov 2026): Added §25.3, health check part 2: `health_daily`, the nightly `/api/health/daily` with automatic backfill, the `health.view` permission, and the collapsed System & business health panel on the Today view (week / month / quarter / year, the current period plus the 4 before).*
 *Changes (Nov 2026): Added Section 25 (Health check), part 1: `ai_calls`, `cron_runs`, `system_errors` and `health_alerts`; `trackAi` on every AI request, `withCronRun` on every cron, `logError` for silent failures, and the `/api/health/watch` alert watcher.*

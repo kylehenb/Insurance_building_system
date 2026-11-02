@@ -20,7 +20,7 @@ interface LearningData {
   canChange: boolean
 }
 
-const FEATURE: Record<string, string> = { action_card: 'Action cards', order_parse: 'Reading insurer orders', report: 'Report writing', photo_labels: 'Photo labels', waiting_on: 'Waiting on (when to chase)' }
+const FEATURE: Record<string, string> = { action_card: 'Action cards', order_parse: 'Reading insurer orders', report: 'Report writing', photo_labels: 'Photo labels', waiting_on: 'Waiting on (when to chase)', health_suggestion: 'Health check suggestions' }
 const KIND: Record<string, string> = {
   ...Object.fromEntries(CATEGORIES.map(c => [c.key, c.label])),
   bar: 'BAR', make_safe: 'Make safe', roof: 'Roof', specialist: 'Specialist', ldr: 'Leak detection',

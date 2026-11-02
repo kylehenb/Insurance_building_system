@@ -47,12 +47,6 @@ beforeEach(() => {
     { id: 'j3', tenant_id: 't1', created_at: '2026-11-03T02:00:00Z', completion_approved_at: '2026-11-03T06:00:00Z', lapsed_at: null },
     { id: 'jx', tenant_id: 't2', created_at: '2026-11-02T02:00:00Z', completion_approved_at: null, lapsed_at: null },
     { id: 'j0', tenant_id: 't1', created_at: '2026-10-20T02:00:00Z', completion_approved_at: null, lapsed_at: null },
-    // Midcity's (a separate business): left out of IRC's figures
-    { id: 'm1', tenant_id: 't1', insurer: 'Midcity', created_at: '2026-11-02T02:00:00Z', completion_approved_at: null, lapsed_at: null },
-  ]
-  tables.inspections = [
-    { tenant_id: 't1', job_id: 'j1', form_submitted_at: '2026-11-03T02:00:00Z' },
-    { tenant_id: 't1', job_id: 'm1', form_submitted_at: '2026-11-03T02:00:00Z' },
   ]
   tables.insurer_orders = [{ tenant_id: 't1', created_at: '2026-11-02T01:00:00Z' }]
   tables.communications = [
@@ -76,7 +70,6 @@ beforeEach(() => {
     { tenant_id: 't1', created_at: '2026-11-03T01:00:00Z', ok: true, cost_usd: 0.25, model: 'claude-haiku-5-5' },
     { tenant_id: null, created_at: '2026-11-03T01:00:00Z', ok: false, cost_usd: null, model: 'gemini-3.5-flash' },
     { tenant_id: 't2', created_at: '2026-11-03T01:00:00Z', ok: true, cost_usd: 9, model: 'claude-haiku-5-5' },
-    { tenant_id: null, created_at: '2026-11-03T02:00:00Z', ok: true, cost_usd: 0.5, model: 'claude-sonnet-4-6', feature: 'midcity-roof-report' },
     // Before tracking began: not counted
     { tenant_id: 't1', created_at: '2026-11-02T01:00:00Z', ok: true, cost_usd: 1, model: 'claude-haiku-5-5' },
   ]
@@ -86,12 +79,6 @@ beforeEach(() => {
 })
 
 describe('a day\'s figures', () => {
-  it('leaves Midcity (a separate business) out, with its AI use on its own lines', async () => {
-    const days = await computeDays(db, 't1', '2026-11-02', '2026-11-04', { snapshotDay: '2026-11-03' })
-    expect(days['2026-11-02'].jobs_created).toBe(2) // not Midcity's m1
-    expect(days['2026-11-03']).toMatchObject({ inspections_done: 1, ai_calls: 2, ai_cost_usd: 0.25, midcity_ai_calls: 1, midcity_ai_cost_usd: 0.5, open_jobs: 3 })
-  })
-
   it('counts each record on its Perth day, for this office only', async () => {
     const days = await computeDays(db, 't1', '2026-11-02', '2026-11-04')
     expect(days['2026-11-02']).toMatchObject({ jobs_created: 2, orders_received: 1, emails_in: 1, emails_out: 1, paid_aud: 220, payments_received: 1, kpi_met: 1 })
@@ -111,6 +98,18 @@ describe('a day\'s figures', () => {
   it('takes a reading of levels on the snapshot day', async () => {
     const days = await computeDays(db, 't1', '2026-11-03', '2026-11-04', { snapshotDay: '2026-11-03', now: NOW })
     expect(days['2026-11-03']).toMatchObject({ open_jobs: 3, owed_aud: 1650.5, overdue_aud: 550.5, open_alerts: 1, db_bytes: 2 * 1024 ** 3, storage_bytes: 10 * 1024 ** 3 })
+  })
+})
+
+describe('Midcity (a separate business)', () => {
+  it("leaves its jobs and their records out of IRC's figures, and counts its AI apart", async () => {
+    tables.jobs.push({ id: 'm1', tenant_id: 't1', insurer: 'Midcity', created_at: '2026-11-03T02:00:00Z', completion_approved_at: null, lapsed_at: null })
+    tables.jobs.push({ id: 'j9', tenant_id: 't1', insurer: null, created_at: '2026-11-03T02:00:00Z', completion_approved_at: null, lapsed_at: null })
+    tables.inspections = [{ tenant_id: 't1', job_id: 'm1', form_submitted_at: '2026-11-03T03:00:00Z' }, { tenant_id: 't1', job_id: 'j3', form_submitted_at: '2026-11-03T03:00:00Z' }]
+    tables.ai_calls.push({ tenant_id: 't1', created_at: '2026-11-03T01:00:00Z', ok: true, cost_usd: 0.5, model: 'claude-haiku-5-5', feature: 'midcity-photo-labels' })
+    const days = await computeDays(db, 't1', '2026-11-03', '2026-11-04', { snapshotDay: '2026-11-03', now: NOW })
+    // j3 and j9 (no insurer is still IRC's), not Midcity's m1
+    expect(days['2026-11-03']).toMatchObject({ jobs_created: 2, inspections_done: 1, ai_calls: 2, ai_cost_usd: 0.25, midcity_ai_calls: 1, midcity_ai_cost_usd: 0.5, open_jobs: 4 })
   })
 })
 

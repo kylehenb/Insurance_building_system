@@ -3,6 +3,7 @@ import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { permissionDenied } from '@/lib/permissions/http'
 import { loadSummary } from '@/lib/health/daily'
 import { getReview } from '@/lib/health/review'
+import { listSuggestions } from '@/lib/health/suggestions'
 import { healthDb } from '@/lib/health/db'
 import { PERIOD_KINDS, type PeriodKind } from '@/lib/health/periods'
 
@@ -29,5 +30,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const summary = await loadSummary(db, user.tenantId, kind, offset)
   // The written review of the period, once it has ended (§25.4)
   const review = await getReview(db, user.tenantId, kind, summary.period.from)
-  return NextResponse.json({ ...summary, review })
+  // Its suggestions as the owner has decided them, and accepted changes not yet done (§25.5)
+  const [suggestions, inProgress] = await Promise.all([
+    review?.id ? listSuggestions(db, user.tenantId, { reviewId: review.id }) : Promise.resolve([]),
+    listSuggestions(db, user.tenantId, { statuses: ['accepted'], limit: 20 }),
+  ])
+  return NextResponse.json({ ...summary, review, suggestions, inProgress })
 }

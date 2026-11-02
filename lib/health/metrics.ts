@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { addDays, dayStartIso, daysBetween, perthDay } from './periods'
-import { FIELD_APP_INSURER, isFieldAppJob } from '@/lib/jobs/field-app'
+import { FIELD_APP_INSURER } from '@/lib/jobs/field-app'
 
 // The health check's daily figures (tech spec §25.3). Each is worked out per
 // Perth day from records that carry a date, so past days can be filled in
@@ -11,11 +11,21 @@ import { FIELD_APP_INSURER, isFieldAppJob } from '@/lib/jobs/field-app'
 // To add a figure: add it to METRICS, work it out in computeDays, and bump
 // METRICS_VERSION. The nightly run then recomputes every past day.
 //
-// Midcity (a separate business run from the same system, lib/jobs/field-app.ts)
-// is left out of IRC's figures: its jobs, their inspections and the open-jobs
-// count. Its AI use is shown on its own lines, not inside IRC's spend.
+// Midcity is a separate business (lib/jobs/field-app.ts): its jobs, and the
+// records on them, are left out of IRC's figures; its AI use is counted
+// apart (features starting "midcity-").
 
 export const METRICS_VERSION = 2
+
+/** Jobs that are IRC's (not Midcity's). A plain neq would also drop jobs with no insurer. */
+export const IRC_JOBS = `insurer.is.null,insurer.neq.${FIELD_APP_INSURER}`
+
+/** Ids of Midcity's jobs, whose records are left out */
+async function midcityJobIds(db: SupabaseClient, tenantId: string): Promise<Set<string>> {
+  const { data } = await db.from('jobs').select('id').eq('tenant_id', tenantId).eq('insurer', FIELD_APP_INSURER).limit(10000)
+  return new Set(((data ?? []) as { id: string }[]).map(r => r.id))
+}
+const notMidcity = (midcity: Set<string>) => (list: Row[]) => (midcity.size ? list.filter(r => !r.job_id || !midcity.has(String(r.job_id))) : list)
 
 /**
  * The first full day the system figures (AI calls, scheduled jobs, errors)
@@ -142,40 +152,42 @@ export async function computeDays(
       let q = db.from(table).select(cols).gte(col, fromIso).lt(col, toIso)
       if (scope === 'tenant') q = q.eq('tenant_id', tenantId)
       if (scope === 'tenant-or-none') q = q.or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      if (table === 'jobs') q = q.or(IRC_JOBS)
       return q.order(col, { ascending: true })
     })
   const dayOf = (v: unknown) => (typeof v === 'string' && v ? perthDay(v) : null)
 
+  // Records on Midcity's jobs are left out
+  const irc = notMidcity(await midcityJobIds(db, tenantId))
+
   const [orders, jobsNew, jobsDone, comms, inspections, quotes, wos, signSent, signSigned, issued, paid, learning, cards, activity] = await Promise.all([
     timed('insurer_orders', 'created_at', 'created_at'),
-    timed('jobs', 'created_at, insurer', 'created_at'),
-    timed('jobs', 'completion_approved_at, insurer', 'completion_approved_at'),
-    timed('communications', 'created_at, type, direction', 'created_at'),
-    timed('inspections', 'form_submitted_at, job_id', 'form_submitted_at'),
-    timed('quotes', 'created_at', 'created_at'),
-    timed('work_orders', 'created_at', 'created_at'),
-    timed('signing_requests', 'sent_at', 'sent_at'),
-    timed('signing_requests', 'signed_at', 'signed_at'),
+    timed('jobs', 'created_at', 'created_at'),
+    timed('jobs', 'completion_approved_at', 'completion_approved_at'),
+    timed('communications', 'created_at, type, direction, job_id', 'created_at').then(irc),
+    timed('inspections', 'form_submitted_at, job_id', 'form_submitted_at').then(irc),
+    timed('quotes', 'created_at, job_id', 'created_at').then(irc),
+    timed('work_orders', 'created_at, job_id', 'created_at').then(irc),
+    timed('signing_requests', 'sent_at, job_id', 'sent_at').then(irc),
+    timed('signing_requests', 'signed_at, job_id', 'signed_at').then(irc),
     // Invoice dates are calendar dates already
-    fetchAll(() => db.from('invoices').select('issued_date, amount_inc_gst, status, voided_at').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('issued_date', from).lt('issued_date', to).order('issued_date', { ascending: true })),
-    fetchAll(() => db.from('invoices').select('paid_date, amount_inc_gst, status, voided_at').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('paid_date', from).lt('paid_date', to).order('paid_date', { ascending: true })),
+    fetchAll(() => db.from('invoices').select('issued_date, amount_inc_gst, status, voided_at, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('issued_date', from).lt('issued_date', to).order('issued_date', { ascending: true })).then(irc),
+    fetchAll(() => db.from('invoices').select('paid_date, amount_inc_gst, status, voided_at, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('paid_date', from).lt('paid_date', to).order('paid_date', { ascending: true })).then(irc),
     timed('learning_events', 'created_at, outcome', 'created_at'),
-    timed('action_queue', 'created_at', 'created_at'),
-    timed('activity_log', 'created_at, via', 'created_at'),
+    timed('action_queue', 'created_at, job_id', 'created_at').then(irc),
+    timed('activity_log', 'created_at, via, job_id', 'created_at').then(irc),
   ])
 
   for (const r of orders) bump(dayOf(r.created_at), 'orders_received')
-  for (const r of jobsNew) if (!isFieldAppJob(r)) bump(dayOf(r.created_at), 'jobs_created')
-  for (const r of jobsDone) if (!isFieldAppJob(r)) bump(dayOf(r.completion_approved_at), 'jobs_completed')
+  for (const r of jobsNew) bump(dayOf(r.created_at), 'jobs_created')
+  for (const r of jobsDone) bump(dayOf(r.completion_approved_at), 'jobs_completed')
   for (const r of comms) {
     const d = dayOf(r.created_at)
     if (r.type === 'email' && r.direction === 'inbound') bump(d, 'emails_in')
     else if (r.type === 'email' && r.direction === 'outbound') bump(d, 'emails_out')
     else if (r.type === 'portal' && r.direction === 'inbound') bump(d, 'portal_in')
   }
-  // Midcity's inspections are on Midcity's jobs
-  const midcityJobs = new Set((await fetchAll(() => db.from('jobs').select('id').eq('tenant_id', tenantId).eq('insurer', FIELD_APP_INSURER).order('id'))).map(r => String(r.id)))
-  for (const r of inspections) if (!midcityJobs.has(String(r.job_id))) bump(dayOf(r.form_submitted_at), 'inspections_done')
+  for (const r of inspections) bump(dayOf(r.form_submitted_at), 'inspections_done')
   for (const r of quotes) bump(dayOf(r.created_at), 'quotes_created')
   for (const r of wos) bump(dayOf(r.created_at), 'work_orders_created')
   for (const r of signSent) bump(dayOf(r.sent_at), 'signing_sent')
@@ -200,10 +212,10 @@ export async function computeDays(
 
   // Insurer deadlines: each one reached in the range counts as met or missed
   const kpis: [string, string][] = [['kpi_contacted_at', 'kpi_contact_due'], ['kpi_booked_at', 'kpi_booking_due'], ['kpi_visited_at', 'kpi_visit_due'], ['kpi_reported_at', 'kpi_report_due']]
-  const kpiRows = await Promise.all(kpis.map(([at, due]) => timed('jobs', `${at}, ${due}, insurer`, at)))
+  const kpiRows = await Promise.all(kpis.map(([at, due]) => timed('jobs', `${at}, ${due}`, at)))
   kpis.forEach(([at, due], i) => {
     for (const r of kpiRows[i]) {
-      if (!r[due] || isFieldAppJob(r)) continue
+      if (!r[due]) continue
       bump(dayOf(r[at]), Date.parse(String(r[at])) <= Date.parse(String(r[due])) ? 'kpi_met' : 'kpi_missed')
     }
   })
@@ -218,10 +230,9 @@ export async function computeDays(
     ])
     for (const r of ai) {
       const d = dayOf(r.created_at)
-      // Midcity's AI use (features "midcity-…") on its own lines
-      if (String(r.feature ?? '').startsWith('midcity-')) {
+      if (String(r.feature).startsWith('midcity-')) {
         bump(d, 'midcity_ai_calls')
-        if (r.cost_usd != null) bump(d, 'midcity_ai_cost_usd', Number(r.cost_usd))
+        bump(d, 'midcity_ai_cost_usd', Number(r.cost_usd) || 0)
         continue
       }
       bump(d, 'ai_calls')
@@ -247,9 +258,10 @@ export async function computeDays(
 /** Levels right now: open jobs, money owed, open alerts, database and storage size. */
 export async function snapshot(db: SupabaseClient, tenantId: string, now: Date): Promise<DayMetrics> {
   const monthAgo = addDays(perthDay(now), -30)
+  const irc = notMidcity(await midcityJobIds(db, tenantId))
   const [open, owed, alerts, sizes] = await Promise.all([
-    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).is('completion_approved_at', null).is('lapsed_at', null).or(`insurer.is.null,insurer.neq.${FIELD_APP_INSURER}`),
-    fetchAll(() => db.from('invoices').select('amount_inc_gst, issued_date').eq('tenant_id', tenantId).eq('direction', 'outbound').eq('status', 'sent').is('paid_date', null).is('voided_at', null).order('issued_date', { ascending: true })),
+    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).or(IRC_JOBS).is('completion_approved_at', null).is('lapsed_at', null),
+    fetchAll(() => db.from('invoices').select('amount_inc_gst, issued_date, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').eq('status', 'sent').is('paid_date', null).is('voided_at', null).order('issued_date', { ascending: true })).then(irc),
     db.from('health_alerts').select('id', { count: 'exact', head: true }).is('resolved_at', null),
     db.rpc('health_storage_stats'),
   ])
