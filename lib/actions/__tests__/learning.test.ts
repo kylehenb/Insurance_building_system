@@ -48,7 +48,7 @@ beforeEach(() => {
   for (const k of Object.keys(tables)) delete tables[k]
   create.mockReset()
   create.mockImplementation(async () => {
-    const blocks = [...answer.map((a, i) => ({ type: 'tool_use', id: `t${i}`, name: a.name, input: a.input })), { type: 'tool_use', id: 'fin', name: 'finish_card', input: { needs_action: true, title: 'Reply to Jane', summary: 'Access', priority: 'normal', category: 'other' } }]
+    const blocks = [...answer.map((a, i) => ({ type: 'tool_use', id: `t${i}`, name: a.name, input: a.input })), { type: 'tool_use', id: 'fin', name: 'finish_card', input: { needs_action: true, title: 'Reply to Jane', summary: 'Access', priority: 'normal', category: 'insurer' } }]
     return { content: blocks, stop_reason: 'tool_use', usage: { input_tokens: 1, output_tokens: 1 } }
   })
   tables.users = [{ id: 'u1', tenant_id: 't1', role: 'admin', created_at: '2026-01-01' }]
@@ -120,7 +120,7 @@ describe('making a card', () => {
 
 describe('recording decisions', () => {
   const card = (extra: Row = {}): Row => ({
-    id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', attempts: 0, category: 'other',
+    id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', attempts: 0, category: 'insurer',
     steps: structuredClone(AI), ai_steps: structuredClone(AI), situation: { kind: 'email', sender_email: 'jane@allianz.com.au', subject: 'Access', on_job: 'no' }, ...extra,
   })
 
@@ -128,7 +128,13 @@ describe('recording decisions', () => {
     tables.action_queue = [card()]
     expect(await skipCard(db as never, 't1', 'k1', 'u1')).toBe(true)
     expect(tables.learning_events).toHaveLength(1)
-    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', source_id: 'k1', outcome: 'skipped', kind: 'other', user_id: 'u1', situation_text: 'Email from jane@allianz.com.au — "Access" — not on a job' })
+    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', source_id: 'k1', outcome: 'skipped', kind: 'insurer', user_id: 'u1', situation_text: 'Email from jane@allianz.com.au — "Access" — not on a job' })
+  })
+
+  it('records a card moved to another pile, so the AI learns where the office files it', async () => {
+    await recordCardDecision(db as never, card({ ai_category: 'insurer', category: 'trades' }) as never, 'u1', 'confirmed')
+    expect(tables.learning_events[0]).toMatchObject({ outcome: 'edited', kind: 'trades' })
+    expect(tables.learning_events[0].changes as string[]).toContain('Moved from the Insurer & client pile to Trades')
   })
 
   it('doesn\'t record cards made before the learning module', async () => {

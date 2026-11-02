@@ -31,28 +31,28 @@ beforeEach(() => {
 
 describe('/api/learning/auto-confirm', () => {
   it('turns a kind on as the signed-in user, logged, and shows who', async () => {
-    expect((await post({ feature: 'action_card', kind: 'invoice', enabled: true })).status).toBe(200)
-    expect(tables.learning_auto_confirm[0]).toMatchObject({ tenant_id: 't1', kind: 'invoice', enabled: true, changed_by: 'u1' })
-    expect(recorded).toEqual([expect.objectContaining({ action: 'settings.edit', operation: 'auto_confirm.set', payload: { feature: 'action_card', kind: 'invoice', enabled: true } })])
+    expect((await post({ feature: 'action_card', kind: 'money', enabled: true })).status).toBe(200)
+    expect(tables.learning_auto_confirm[0]).toMatchObject({ tenant_id: 't1', kind: 'money', enabled: true, changed_by: 'u1' })
+    expect(recorded).toEqual([expect.objectContaining({ action: 'settings.edit', operation: 'auto_confirm.set', payload: { feature: 'action_card', kind: 'money', enabled: true } })])
     const body = await (await GET()).json()
-    expect(body.state.find((s: Row) => s.kind === 'invoice')).toMatchObject({ enabled: true, changed_by_name: 'Kyle' })
-    expect(body.state.map((s: Row) => s.kind)).toEqual(['invoice', 'attend_submit', 'other'])
+    expect(body.state.find((s: Row) => s.kind === 'money')).toMatchObject({ enabled: true, changed_by_name: 'Kyle' })
+    expect(body.state.map((s: Row) => s.kind)).toEqual(['new_work', 'insurer', 'trades', 'reports_quotes', 'money'])
   })
 
   it('"Not now" is saved but not logged', async () => {
-    expect((await post({ feature: 'action_card', kind: 'other', dismiss: true })).status).toBe(200)
-    expect(tables.learning_auto_confirm[0]).toMatchObject({ kind: 'other', enabled: false })
+    expect((await post({ feature: 'action_card', kind: 'insurer', dismiss: true })).status).toBe(200)
+    expect(tables.learning_auto_confirm[0]).toMatchObject({ kind: 'insurer', enabled: false })
     expect(recorded).toHaveLength(0)
   })
 
   it('refuses unknown kinds, unclear requests, no permission and no session', async () => {
     expect((await post({ feature: 'action_card', kind: 'everything', enabled: true })).status).toBe(400)
-    expect((await post({ feature: 'report', kind: 'invoice', enabled: true })).status).toBe(400)
-    expect((await post({ feature: 'action_card', kind: 'invoice' })).status).toBe(400)
+    expect((await post({ feature: 'report', kind: 'money', enabled: true })).status).toBe(400)
+    expect((await post({ feature: 'action_card', kind: 'money' })).status).toBe(400)
     denied = new Response('{}', { status: 403 })
-    expect((await post({ feature: 'action_card', kind: 'invoice', enabled: true })).status).toBe(403)
+    expect((await post({ feature: 'action_card', kind: 'money', enabled: true })).status).toBe(403)
     me = null
-    expect((await post({ feature: 'action_card', kind: 'invoice', enabled: true })).status).toBe(401)
+    expect((await post({ feature: 'action_card', kind: 'money', enabled: true })).status).toBe(401)
     expect(tables.learning_auto_confirm ?? []).toHaveLength(0)
   })
 })

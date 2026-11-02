@@ -1,5 +1,6 @@
 'use client'
 
+import { CATEGORIES } from '@/lib/actions/cards'
 import { useCallback, useEffect, useState } from 'react'
 import type { AutoConfirmState, Readiness } from '@/lib/learning/auto-confirm'
 
@@ -13,7 +14,7 @@ interface AutoConfirmData {
   canChange: boolean
 }
 
-export const KIND_LABEL: Record<string, string> = { invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else' }
+export const KIND_LABEL: Record<string, string> = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]))
 const kindName = (k: string) => KIND_LABEL[k] ?? k
 
 function useAutoConfirm() {

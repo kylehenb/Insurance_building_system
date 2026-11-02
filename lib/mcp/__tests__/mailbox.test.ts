@@ -103,22 +103,22 @@ describe('list_mailbox', () => {
   })
 
   it('shows which are starred, and under which star', async () => {
-    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'invoice' }]
+    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'money' }]
     const out = await listMailbox.run({}, ctx)
-    expect(out.text).toContain('[IRC1001] [starred: Invoices to pay]')
-    expect((out.data!.conversations as { star: string }[])[0].star).toBe('invoice')
+    expect(out.text).toContain('[IRC1001] [on the list: Money]')
+    expect((out.data!.conversations as { star: string }[])[0].star).toBe('money')
   })
 
   it('lists the Starred folder — the starred emails on the to-do list', async () => {
-    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'invoice' }]
+    starRows = [{ id: 'k1', source_ref: 'abc1', status: 'pending', title: 'Pay Jane', category: 'money' }]
     const out = await listMailbox.run({ starred: true, search: 'ignored' }, ctx)
     expect(calls.listThreadsById[0][1]).toEqual(['abc1'])
     expect(calls.searchFolder).toBeUndefined()
-    expect(out.text).toMatch(/^Starred:\n- \(unread\) .*\[IRC1001\] \[starred: Invoices to pay\]$/)
-    expect(out.data).toMatchObject({ folder: 'starred', conversations: [{ conversation_id: 'abc1', job_number: 'IRC1001', star: 'invoice' }] })
+    expect(out.text).toMatch(/^My list:\n- \(unread\) .*\[IRC1001\] \[on the list: Money\]$/)
+    expect(out.data).toMatchObject({ folder: 'starred', conversations: [{ conversation_id: 'abc1', job_number: 'IRC1001', star: 'money' }] })
 
     starRows = []
-    expect((await listMailbox.run({ star: 'attend_submit' }, ctx)).text).toBe('Nothing in Starred (Attend and Submit).')
+    expect((await listMailbox.run({ star: 'reports_quotes' }, ctx)).text).toBe('Nothing in My list (Reports & quotes).')
   })
 
   it('searches Gmail for a search or unread only', async () => {

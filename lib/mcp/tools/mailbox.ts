@@ -70,8 +70,8 @@ export const listMailbox: McpTool = {
     'Conversations in the office Gmail mailbox, newest first — the Mail page\'s list: who, subject, the start of the latest message, unread, and the job it\'s filed on.',
     'folder: inbox (default; its Primary tab), sent, drafts, all, spam or trash (the Bin).',
     'search takes Gmail search syntax (from:castle, subject:quote, has:attachment, newer_than:2d) and reaches all mail, not just recent.',
-    'filing: to_file lists emails not on a job yet (the old unlinked inbox). starred: true lists the Mail page\'s Starred folder (starred emails — the to-do list; star narrows it to one star). Each shows its star if starred, and its job_number when it\'s on a job.',
-    'Gmail\'s own search also works (is:starred, label:…). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply, star_email to star it.',
+    'filing: to_file lists emails not on a job yet (the old unlinked inbox). starred: true lists the Mail page\'s My list folder (emails on the to-do list; star narrows it to one pile). Each shows its pile if it\'s on the list, and its job_number when it\'s on a job.',
+    'Gmail\'s own search also works (is:starred, label:…). Use read_conversation to read one, organise_emails to archive or bin, send_email to reply, star_email to put it on the list.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -80,8 +80,8 @@ export const listMailbox: McpTool = {
       unread_only: { type: 'boolean', description: 'Only unread conversations.' },
       search: { type: 'string', description: 'Gmail search, e.g. "from:castle newer_than:7d".' },
       filing: { type: 'string', enum: ['job', 'to_file', 'admin'], description: 'Only conversations on a job, still to file on one, or filed as admin.' },
-      starred: { type: 'boolean', description: 'Only starred conversations (the Starred folder); folder and search are then ignored.' },
-      star: { type: 'string', enum: CATEGORIES.map(c => c.key), description: 'With starred: only this star.' },
+      starred: { type: 'boolean', description: 'Only conversations on the list (the My list folder); folder and search are then ignored.' },
+      star: { type: 'string', enum: CATEGORIES.map(c => c.key), description: 'With starred: only this pile.' },
       limit: { type: 'number', description: `How many (default ${DEFAULT_LIST}, max ${MAX_LIST}).` },
     },
     additionalProperties: false,
@@ -104,7 +104,7 @@ export const listMailbox: McpTool = {
       : q ? await searchFolder(mailbox, folder, tab, q, null, undefined, filing) : await listFolder(mailbox, folder, tab, null, undefined, filing)
     const all = starred && unreadOnly(args) ? page.threads.filter(t => t.unread) : page.threads
     const threads = all.slice(0, limit)
-    const label = starred ? `Starred${star ? ` (${CATEGORIES.find(c => c.key === star)!.label})` : ''}` : FOLDERS.find(f => f.key === folder)!.label
+    const label = starred ? `My list${star ? ` (${CATEGORIES.find(c => c.key === star)!.label})` : ''}` : FOLDERS.find(f => f.key === folder)!.label
     // Each one's star (its action card), if it has one
     const stars = await cardsForThreads(ctx.supabase as unknown as SupabaseClient, ctx.tenantId, threads.map(t => t.id))
     if (!threads.length) {
@@ -113,7 +113,7 @@ export const listMailbox: McpTool = {
     const lines = threads.map(t =>
       `- ${t.unread ? '(unread) ' : ''}${t.last_message_at ? spokenDate(t.last_message_at) : ''}, ${who(t, folder)}: "${t.subject || '(no subject)'}" — ${t.snippet || '(no text)'}` +
       `${t.message_count > 1 ? ` [${t.message_count} messages]` : ''}${t.has_attachments ? ' [attachments]' : ''}${t.job ? ` [${t.job.job_number}]` : t.filing === 'to_file' ? ' [not on a job]' : ''}` +
-      `${stars[t.id] ? ` [starred: ${starLabel(stars[t.id])}]` : ''}`)
+      `${stars[t.id] ? ` [on the list: ${starLabel(stars[t.id])}]` : ''}`)
     return {
       text: [`${label}${q && !starred ? ` matching "${q}"` : ''}${starred && all.length > threads.length ? ` — the newest ${threads.length} of ${all.length}` : ''}:`, ...lines].join('\n'),
       data: { folder: starred ? 'starred' : folder, conversations: threads.map(t => threadSummary(t, stars[t.id])) },

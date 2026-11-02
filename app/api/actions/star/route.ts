@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cardAccess } from '@/lib/actions/access'
-import { CATEGORIES, isCategory, starThread, type CardCategory } from '@/lib/actions/cards'
+import { AUTO_PILE, isCategory, pileOf, starThread, type CardCategory } from '@/lib/actions/cards'
 import { recordActivity } from '@/lib/activity/log'
 import { mailDb } from '@/lib/mail/sync'
 
-// POST /api/actions/star { threadId, category } — the inbox's star button.
-// category invoice | attend_submit | other stars the conversation (or changes
-// its symbol); null takes the star off.
+// POST /api/actions/star { threadId, category } — the inbox's pile button.
+// category new_work | insurer | trades | reports_quotes | money puts the
+// conversation on the list in that pile (or moves it); 'auto' puts it on the
+// list for the AI to pick the pile; null takes it off the list.
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const access = await cardAccess(true)
   if (access instanceof NextResponse) return access
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const threadId = typeof body.threadId === 'string' && /^[0-9a-f]+$/i.test(body.threadId) ? body.threadId : null
   if (!threadId) return NextResponse.json({ error: 'Invalid conversation' }, { status: 400 })
-  if (body.category !== null && !isCategory(body.category)) return NextResponse.json({ error: 'Unknown star' }, { status: 400 })
-  const category = body.category === null ? null : (body.category as CardCategory)
+  if (body.category !== null && body.category !== AUTO_PILE && !isCategory(body.category)) return NextResponse.json({ error: 'Unknown pile' }, { status: 400 })
+  const category = body.category === null ? null : (body.category as CardCategory | typeof AUTO_PILE)
 
   try {
     const star = await starThread(mailDb(), access.tenantId, threadId, category, access.userId)
@@ -27,12 +28,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       tenantId: access.tenantId,
       userId: access.userId,
       action: 'actions.review',
-      summary: star ? `Starred "${star.title}" — ${CATEGORIES.find(c => c.key === star.category)!.label}` : 'Took the star off an email',
+      summary: star ? `Put "${star.title}" on the list${category === AUTO_PILE ? '' : ` — ${pileOf(star.category)?.label}`}` : 'Took an email off the list',
       via: 'app',
     })
     return NextResponse.json({ star })
   } catch (err) {
     console.error('[actions] star failed:', err)
-    return NextResponse.json({ error: 'Could not star the email' }, { status: 502 })
+    return NextResponse.json({ error: 'Could not put the email on the list' }, { status: 502 })
   }
 }
