@@ -48,6 +48,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/gmail/") ||
+    // Vercel crons (vercel.json) outside /api/gmail/: no session, each checks
+    // the CRON_SECRET bearer itself
+    CRON_ROUTES.has(pathname) ||
     // Claude voice connector: authorised by its own key header (lib/mcp/auth.ts)
     pathname === "/api/mcp" ||
     // E-signing: homeowners sign by link, with no account. These routes look
@@ -90,6 +93,16 @@ export async function proxy(request: NextRequest) {
 
   return supabaseResponse;
 }
+
+/** The vercel.json crons not under /api/gmail/ — add new ones here too (a test checks) */
+export const CRON_ROUTES = new Set([
+  "/api/accounting/poll-payments",
+  "/api/field/submission-watchdog",
+  "/api/reports/index-embeddings",
+  "/api/signing/reminders",
+  "/api/learning/review",
+  "/api/calendar/sync",
+]);
 
 export const config = {
   matcher: [
