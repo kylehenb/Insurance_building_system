@@ -272,6 +272,23 @@ describe('generateCard', () => {
     expect(first).toMatch(/THE CONVERSATION IT WAS SET FROM \(conversation_id: abc1\)[\s\S]*THE JOB FILE \(as it is now\)/)
   })
 
+  it('checks in after a job appointment: nothing to do when it\'s sorted, and passes over a cancelled one', async () => {
+    tables.calendar_events = [
+      { id: 'e1', tenant_id: 't1', summary: 'IRC1001 site meeting', location: '3 Elm St', start_at: '2026-10-31T05:00:00Z', end_at: '2026-10-31T06:00:00Z', status: 'confirmed' },
+      { id: 'e2', tenant_id: 't1', summary: 'IRC1001 cancelled', start_at: '2026-10-31T05:00:00Z', end_at: '2026-10-31T06:00:00Z', status: 'cancelled' },
+    ]
+    tables.action_queue = [
+      { id: 'a1', tenant_id: 't1', source: 'appointment', source_ref: 'e1', job_id: 'j1', status: 'generating', attempts: 1, title: 'After: IRC1001 site meeting', steps: [] },
+      { id: 'a2', tenant_id: 't1', source: 'appointment', source_ref: 'e2', job_id: 'j1', status: 'generating', attempts: 1, title: 'After: IRC1001 cancelled', steps: [] },
+    ]
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Site meeting sorted', summary: 'The note says all good.', priority: 'low', category: 'other' } }]])
+    expect(await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action', title: 'Site meeting sorted' })
+    const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(first).toMatch(/^Today: .*\n\nAN APPOINTMENT CHECK-IN: this appointment on IRC1001 has ended\.\n"IRC1001 site meeting", Saturday 31 October at 1:00 pm to Saturday 31 October at 2:00 pm, at 3 Elm St/)
+    expect(await generateCard(tables.action_queue[1] as never, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action', outcome: 'The appointment was cancelled' })
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
   it('tells the card what\'s new when an order email lands on a claim that already has a job', async () => {
     tables.communications = [{ tenant_id: 't1', thread_id: 'th1', direction: 'inbound', source: 'order_update', job_id: 'j1', insurer_order_id: null, created_at: '2026-10-28T02:02:00Z',
       body_text: 'New Quote/Report Request\nClaim: CHCCLM010001723\nInsured: Charlie and Nina Ball\nPlease allocate an electrician to check the electrical components.' }]

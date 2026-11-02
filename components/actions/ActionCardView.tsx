@@ -151,11 +151,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   })
 
   const toDo = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').length
-  const thinking = card.source === 'followup' && card.status === 'generating' ? 'Checking where the job is at…' : STATUS_NOTE[card.status]
+  const thinking = (card.source === 'followup' || card.source === 'appointment') && card.status === 'generating' ? 'Checking where the job is at…' : STATUS_NOTE[card.status]
   const f = card.follow_up
   const thread = cardThreadId(card)
-  // Email cards are remade from their conversation; a follow-up while it's on the list
-  const redoable = card.source === 'email' ? !!card.source_ref : card.source === 'followup' && live
+  // Email cards are remade from their conversation; a follow-up or appointment check-in while it's on the list
+  const redoable = card.source === 'email' ? !!card.source_ref : (card.source === 'followup' || card.source === 'appointment') && live
 
   return (
     <article id={`ac-${card.id}`} className={`ac${compact ? ' compact' : ''}${card.priority && card.priority >= 80 ? ' high' : ''} st-${card.status}`}>

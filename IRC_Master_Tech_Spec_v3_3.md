@@ -4285,6 +4285,15 @@ The office's calendar is linked to its jobs, so IRC knows when a job's appointme
 
   `link_source` and `link_reason` say how each event was linked.
 - **Booked:** a job's appointment counts as its KPI booking (`jobs_kpi_mark`, §WF-1) when it was made after the order came in and is for no later than the day after the visit. A site meeting months later doesn't count.
+- **The check-in after an appointment** (`lib/calendar/check-ins.ts`, run with each sync):
+  - **When:** 2 hours after a job's appointment ends, or 8am the next working day if that falls outside 7:00–17:30 Monday to Friday (`checkInDue`). Appointments that ended more than 3 days ago aren't checked, and cancelled or personal events never are.
+  - **One card per appointment:** an action card with `source 'appointment'`, `source_ref` the `calendar_events` row.
+  - **What the card AI reads** (`appointmentContext`): the appointment and the job file as it is now. It checks what's been recorded since the appointment started, then:
+    - **sorted** (a note says all good, or what should follow is done): `no_action`;
+    - **something outstanding** (a report drafted but not sent, a problem noted): the steps drafted, a report under Attend and Submit;
+    - **nothing recorded:** "What happened at …?", with a job note to fill in.
+
+    Check-ins are never auto-confirmed, they're learned from like any card (situation kind `appointment`), and Re-suggest works on them.
 - **By voice and chat:** `add_job_appointment` (§10b) puts an appointment on the first watched calendar, titled with the job number and placed at the job's address, and adds the job note too. `get_job_summary` lists the job's appointments.
 
 ---

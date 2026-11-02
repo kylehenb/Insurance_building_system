@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { calendar_v3 } from 'googleapis'
+import { queueAppointmentCheckIns } from './check-ins'
 
 // The office's calendar, linked to jobs (tech spec §23.13). Events on the
 // calendars the office watches (automation_config 'watch_calendar_ids') are
@@ -297,9 +298,9 @@ async function aiLinks(db: SupabaseClient, tenantId: string, events: CalendarEve
 }
 
 /** Every company's watched calendars: synced, then linked (the calendar cron) */
-export async function syncCalendars(db: SupabaseClient, calendar: () => calendar_v3.Calendar): Promise<{ events: number; linked: number; errors: string[] }> {
+export async function syncCalendars(db: SupabaseClient, calendar: () => calendar_v3.Calendar): Promise<{ events: number; linked: number; checkIns: number; errors: string[] }> {
   const { data } = await db.from('automation_config').select('tenant_id, value').eq('key', 'watch_calendar_ids')
-  const result = { events: 0, linked: 0, errors: [] as string[] }
+  const result = { events: 0, linked: 0, checkIns: 0, errors: [] as string[] }
   for (const row of (data as { tenant_id: string; value: string }[] | null) ?? []) {
     for (const calendarId of row.value.split(',').map(s => s.trim()).filter(Boolean)) {
       try {
@@ -315,6 +316,8 @@ export async function syncCalendars(db: SupabaseClient, calendar: () => calendar
       }
     }
     result.linked += (await linkEvents(db, row.tenant_id)).linked
+    // Linked appointments that have ended get their check-in
+    result.checkIns += await queueAppointmentCheckIns(db, row.tenant_id).catch(err => { console.error('[calendar] queueing check-ins failed:', err); return 0 })
   }
   return result
 }
