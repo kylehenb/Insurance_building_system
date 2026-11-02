@@ -100,6 +100,37 @@ describe('linking events to jobs', () => {
     expect(await linkEvents(db(), 't1', { client: { beta: { messages: { create } } } as never, at: NOW })).toEqual({ linked: 0, read: 0 })
   })
 
+  it('reads a repeated event once: repeats take the earlier decision, and only one of a new series goes to the AI', async () => {
+    tables.calendar_events = [
+      event({ id: 'old', google_event_id: 'g0', summary: 'Workout', start_at: '2026-10-20T22:00:00Z', link_source: 'none', linked_etag: 'e1', link_reason: 'Personal' }),
+      event({ id: 'c1', google_event_id: 'g1', summary: 'Workout', start_at: '2026-11-03T22:00:00Z' }),
+      event({ id: 'c2', google_event_id: 'g2', summary: 'Lex bday present', start_at: '2026-11-03T12:00:00Z' }),
+      event({ id: 'c3', google_event_id: 'g3', summary: 'Lex bday present', start_at: '2026-11-05T12:00:00Z' }),
+    ]
+    const create = vi.fn(async () => ({ content: [{ type: 'tool_use', id: 't', name: 'link_events', input: { links: [{ event: 'E1', job_number: '', reason: 'Personal' }] } }] }))
+    const out = await linkEvents(db(), 't1', { client: { beta: { messages: { create } } } as never, at: NOW })
+    expect(out.read).toBe(1)
+    const prompt = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(prompt).toContain('"Lex bday present"')
+    expect(prompt).not.toContain('Workout')
+    expect(tables.calendar_events.map(e => [e.id, e.link_source, e.link_reason])).toEqual([
+      ['old', 'none', 'Personal'],
+      ['c1', 'none', 'Same as the earlier "Workout"'],
+      ['c2', 'none', 'Personal'],
+      ['c3', 'none', 'Same as the earlier "Lex bday present"'],
+    ])
+  })
+
+  it('stops reading with the AI once the day\'s limit is reached', async () => {
+    tables.calendar_events = [
+      ...Array.from({ length: 150 }, (_, i) => event({ id: `done${i}`, google_event_id: `d${i}`, summary: `Done ${i}`, link_source: 'none', linked_etag: 'e1', link_reason: 'Personal', updated_at: '2026-11-02T01:00:00Z' })),
+      event({ id: 'c1', google_event_id: 'g1', summary: 'Something new' }),
+    ]
+    const create = vi.fn()
+    expect(await linkEvents(db(), 't1', { client: { beta: { messages: { create } } } as never, at: NOW })).toEqual({ linked: 0, read: 0 })
+    expect(create).not.toHaveBeenCalled()
+  })
+
   it('doesn\'t count a site meeting long after the visit, or one booked before the order, as the booking', async () => {
     tables.jobs[0].kpi_visited_at = '2026-10-31T06:47:00Z'
     tables.calendar_events = [

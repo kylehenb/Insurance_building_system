@@ -127,12 +127,15 @@ export type NewFollowUp = {
   clearCard?: boolean
   /** Set by IRC from an email the office sent (lib/actions/waiting-on.ts) */
   waiting?: WaitingOn
+  /** A check IRC planned reviewing the job (lib/jobs/review.ts): why, in a line */
+  watch?: { why: string }
   urgent?: boolean
 }
 
 /** A follow-up's title: what it's for, and with whom */
-export function followUpTitle(f: Pick<FollowUp, 'note' | 'who' | 'waiting'>): string {
+export function followUpTitle(f: Pick<FollowUp, 'note' | 'who' | 'waiting'> & { kind?: FollowUp['kind'] }): string {
   if (f.waiting) return `Waiting on ${f.waiting.name}: ${clip(f.waiting.asked, 80)}`
+  if (f.kind === 'watch') return `Check: ${clip(f.note.split('\n')[0], 90)}`
   return `Follow up${f.who ? ` with ${f.who}` : ''}: ${clip(f.note.split('\n')[0], 80)}`
 }
 
@@ -156,21 +159,22 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
   // it takes over that wait (a reply still closes it), and the date they
   // picked is learned from (lib/actions/waits.ts)
   const { waitToReplace } = await import('./waits')
-  const replaces = input.waiting ? null : await waitToReplace(db, tenantId, { fromCardId: input.fromCardId, threadId, jobId: input.jobId, who, note })
+  const replaces = input.waiting || input.watch ? null : await waitToReplace(db, tenantId, { fromCardId: input.fromCardId, threadId, jobId: input.jobId, who, note })
   const waiting = input.waiting ?? replaces?.follow_up?.waiting
   if (replaces) threadId ??= replaces.follow_up?.thread_id ?? null
   const followUp: FollowUp = {
     note, who, thread_id: threadId, from_card_id: input.fromCardId ?? null, created_by: userId,
     ...(waiting ? { kind: 'waiting_on' as const, waiting } : {}),
+    ...(input.watch ? { kind: 'watch' as const, watch: { why: input.watch.why, planned_at: now() } } : {}),
   }
 
   const { data, error } = await db.from('action_queue').insert({
     tenant_id: tenantId,
     job_id: input.jobId,
     source: 'followup',
-    rule_key: waiting ? 'waiting_on' : 'followup',
+    rule_key: waiting ? 'waiting_on' : input.watch ? 'job_watch' : 'followup',
     // A person's follow-up keeps their words as its title
-    title: followUpTitle(input.waiting ? followUp : { note, who }),
+    title: followUpTitle(input.waiting || input.watch ? followUp : { note, who }),
     description: note,
     status: 'scheduled',
     priority: input.urgent ? PRIORITY.high : PRIORITY.normal,
