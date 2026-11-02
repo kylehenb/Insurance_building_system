@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ClosedReason } from './phase'
+import { isFieldAppJob } from './field-app'
 
 // Closing jobs by hand (tech spec §23.15): the old-jobs clean-up, and the
 // office closing a job the records can't (a claim settled outside IRC). Sets
@@ -84,7 +85,7 @@ const ACTIVITY: { table: string; at: string }[] = [
 ]
 
 /**
- * Open jobs (not on hold) with nothing on them for 90 days, each with the
+ * Open IRC jobs (not on hold, not Midcity field-app jobs) with nothing on them for 90 days, each with the
  * reason it most likely closed and why: works invoiced → complete; a quote
  * approved → complete; declined → declined; with the insurer → no decision;
  * a fee invoiced → complete; never quoted or invoiced → cancelled. Most
@@ -102,7 +103,7 @@ export async function cleanupCandidates(db: SupabaseClient, tenantId: string, at
     const rows = await allRows((f, t) => db.from(table).select('job_id').eq('tenant_id', tenantId).not('job_id', 'is', null).gte(col, quiet).order('id').range(f, t))
     for (const r of rows) active.add(r.job_id!)
   }
-  const jobs = open.filter(j => j.override_stage !== 'on_hold' && (j.created_at ?? '') < quiet && !active.has(j.id))
+  const jobs = open.filter(j => !isFieldAppJob(j) && j.override_stage !== 'on_hold' && (j.created_at ?? '') < quiet && !active.has(j.id))
   if (!jobs.length) return []
 
   // Then everything on the quiet ones, a chunk of jobs at a time

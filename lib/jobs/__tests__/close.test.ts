@@ -28,6 +28,7 @@ beforeEach(() => {
     job('irc8', { created_at: daysAgo(10) }), // new
     job('irc9', { phase: null }), // not worked out yet → still offered
     job('other', { tenant_id: 't2' }), // another company
+    job('j74511', { insurer: 'Midcity', phase: 'assessment' }), // a Midcity field-app job, not IRC's
   ]
   tables.quotes = [
     { id: 'q1', tenant_id: 't1', job_id: 'irc1', status: 'sent', is_active_version: true, created_at: daysAgo(200) },
@@ -84,5 +85,21 @@ describe('closeJobs / reopenJob', () => {
     expect(await reopenJob(db, 't1', 'irc1')).toBe('IRC1')
     expect(tables.jobs[0].closed_by_hand).toBeNull()
     await expect(reopenJob(db, 't1', 'other')).rejects.toThrow(/not found/)
+  })
+})
+
+describe('Midcity field-app jobs', () => {
+  it('are told apart, and their AI use is named as Midcity\'s', async () => {
+    const { isFieldAppJob, aiFeature } = await import('../field-app')
+    expect(isFieldAppJob({ insurer: 'Midcity' })).toBe(true)
+    expect(isFieldAppJob({ insurer: 'Castle' })).toBe(false)
+    expect(isFieldAppJob(null)).toBe(false)
+    expect(aiFeature('photo-labels', { insurer: 'Midcity' })).toBe('midcity-photo-labels')
+    expect(aiFeature('midcity-roof-report', { insurer: 'Midcity' })).toBe('midcity-roof-report')
+    expect(aiFeature('photo-labels', { insurer: 'Allianz' })).toBe('photo-labels')
+  })
+
+  it('are never offered for closing', async () => {
+    expect((await cleanupCandidates(db, 't1', AT)).map(c => c.job_number)).not.toContain('J74511')
   })
 })

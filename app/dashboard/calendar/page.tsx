@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/database.types'
 import { Calendar, Clock, Users, Filter } from 'lucide-react'
 import { useCurrentUser } from '@/components/layout/current-user'
+import { isFieldAppJob } from '@/lib/jobs/field-app'
 
 type CalendarMode = 'inspections' | 'trades'
 type ViewType = 'week' | 'month'
@@ -121,7 +122,7 @@ export default function GlobalCalendarPage() {
           .in('status', ['unscheduled', 'proposed', 'confirmed', 'awaiting_reschedule'])
           .order('scheduled_date', { ascending: true, nullsFirst: false })
 
-        setInspections(((inspectionsData as any) || []).filter((i: any) => i.jobs?.insurer !== 'Midcity'))
+        setInspections(((inspectionsData as any) || []).filter((i: any) => !isFieldAppJob(i.jobs)))
         setWorkOrders([])
       } else {
         const { data: workOrdersData } = await supabase

@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { useAIActionRefresh } from "@/lib/hooks/useAIActionRefresh";
 import { describePhase, PHASES, type Phase } from "@/lib/jobs/phase";
+import { FIELD_APP_INSURER } from "@/lib/jobs/field-app";
 import { useCurrentUser } from "@/components/layout/current-user";
 
 type JobRow = {
@@ -90,7 +91,7 @@ export default function JobsListPage() {
       .from('jobs')
       .select(SELECT_FIELDS)
       .eq('tenant_id', tid)
-      .neq('insurer', 'Midcity')
+      .neq('insurer', FIELD_APP_INSURER)
       .order('created_at', { ascending: false })
 
     if (filter === 'open') query = query.neq('phase', 'closed')

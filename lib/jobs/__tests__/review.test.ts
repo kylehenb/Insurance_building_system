@@ -29,6 +29,8 @@ beforeEach(() => {
     { id: 'j41', tenant_id: 't1', job_number: 'IRC1041', created_at: '2026-10-20T00:00:00Z', reviewed_at: '2026-10-31T22:37:00Z' },
     { id: 'j42', tenant_id: 't1', job_number: 'IRC1042', created_at: '2026-10-01T00:00:00Z', reviewed_at: '2026-10-20T00:00:00Z' },
     { id: 'j10', tenant_id: 't1', job_number: 'IRC1010', created_at: '2026-01-01T00:00:00Z', reviewed_at: null },
+    // A Midcity field-app job, new today: not IRC's, never read
+    { id: 'm1', tenant_id: 't1', job_number: 'J77208', insurer: 'Midcity', created_at: '2026-11-01T00:00:00Z', reviewed_at: null },
   ]
   tables.communications = [
     { tenant_id: 't1', job_id: 'j33', created_at: '2026-10-28T00:00:00Z' },
@@ -38,7 +40,7 @@ beforeEach(() => {
 })
 
 describe('which jobs are read', () => {
-  it('reads the never-read and the changed, and weekly the quiet; not the unchanged or the long-closed', async () => {
+  it('reads the never-read and the changed, and weekly the quiet; not the unchanged, the long-closed or Midcity field-app jobs', async () => {
     expect((await jobsToReview(db, 't1', 10, MON)).map(j => j.job_number)).toEqual(['IRC1033', 'IRC1042', 'IRC1040'])
     expect((await jobsToReview(db, 't1', 1, MON)).map(j => j.job_number)).toEqual(['IRC1033'])
   })

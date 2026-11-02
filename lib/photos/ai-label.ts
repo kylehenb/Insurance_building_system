@@ -3,6 +3,7 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 import { getResponseText } from '@/lib/ai/response-text'
 import { MUD_MAP_LABEL, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel, type PhotoKind } from './report-order'
+import { aiFeature } from '@/lib/jobs/field-app'
 import { trackAi } from '@/lib/health/ai-usage'
 import { logError } from '@/lib/health/errors'
 
@@ -218,9 +219,9 @@ function providers(): Provider[] {
 const MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
 type MediaType = (typeof MEDIA_TYPES)[number]
 
-async function callAnthropic(system: string, parts: Part[], schema: object): Promise<string> {
+async function callAnthropic(system: string, parts: Part[], schema: object, feature: string): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const message = await trackAi({ feature: 'photo-labels', provider: 'anthropic', model: PHOTO_LABEL_MODEL }, () => client.messages.create({
+  const message = await trackAi({ feature, provider: 'anthropic', model: PHOTO_LABEL_MODEL }, () => client.messages.create({
     model: PHOTO_LABEL_MODEL,
     max_tokens: 8000,
     system,
@@ -242,9 +243,9 @@ async function callAnthropic(system: string, parts: Part[], schema: object): Pro
   return getResponseText(message) // throws on a refusal, so the other provider gets a go
 }
 
-async function callGemini(system: string, parts: Part[], schema: object): Promise<string> {
+async function callGemini(system: string, parts: Part[], schema: object, feature: string): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  const result = await trackAi({ feature: 'photo-labels', provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
+  const result = await trackAi({ feature, provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
     model: GEMINI_FLASH_MODEL,
     contents: parts.map(p => 'text' in p ? { text: p.text } : { inlineData: { mimeType: p.image.mimeType, data: p.image.data } }),
     config: {
@@ -258,13 +259,15 @@ async function callGemini(system: string, parts: Part[], schema: object): Promis
 }
 
 /** The model's JSON text, from the first provider that answers. */
-async function callModel(system: string, parts: Part[], schema: object): Promise<{ text: string; model: string }> {
+async function callModel(system: string, parts: Part[], schema: object, ctx: PhotoLabelContext): Promise<{ text: string; model: string }> {
+  // Midcity's photos are recorded as Midcity's AI use (lib/jobs/field-app.ts)
+  const feature = aiFeature('photo-labels', ctx.job)
   const list = providers()
   if (!list.length) throw new PhotoLabelError('Photo labelling isn\'t available right now (no AI key is set).')
   let lastError: unknown
   for (const p of list) {
     try {
-      const text = p === 'anthropic' ? await callAnthropic(system, parts, schema) : await callGemini(system, parts, schema)
+      const text = p === 'anthropic' ? await callAnthropic(system, parts, schema, feature) : await callGemini(system, parts, schema, feature)
       return { text, model: p === 'anthropic' ? PHOTO_LABEL_MODEL : GEMINI_FLASH_MODEL }
     } catch (err) {
       console.error(`[photo-labels] ${p} call failed:`, err)
@@ -322,14 +325,14 @@ export async function labelPhotos(photos: PhotoForLabelling[], ctx: PhotoLabelCo
     { text: photoLabelRequestText(ctx, photos.length) },
     ...photos.flatMap((image, i): Part[] => [{ text: `Photo ${i + 1}:` }, { image }]),
   ]
-  const { text, model } = await callModel(photoLabelSystemPrompt(ctx), parts, VISION_SCHEMA)
+  const { text, model } = await callModel(photoLabelSystemPrompt(ctx), parts, VISION_SCHEMA, ctx)
   return { labels: byPhotoNumber(parseEntries(text), photos.length, asLabel), model }
 }
 
 /** The text pass: finished room and label for each photo that isn't locked; null to leave it as it is. */
 export async function relabelWithNotes(items: RelabelItem[], ctx: PhotoLabelContext): Promise<({ room: string; label: string } | null)[]> {
   if (!items.some(i => !i.locked)) return items.map(() => null)
-  const { text } = await callModel(relabelSystemPrompt(ctx), [{ text: relabelRequestText(ctx, items) }], TEXT_SCHEMA)
+  const { text } = await callModel(relabelSystemPrompt(ctx), [{ text: relabelRequestText(ctx, items) }], TEXT_SCHEMA, ctx)
   const out = byPhotoNumber(parseEntries(text), items.length, o => {
     const label = str(o.label, 120)
     return label ? { room: str(o.room, 60), label } : null

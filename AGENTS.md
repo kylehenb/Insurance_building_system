@@ -39,3 +39,10 @@ The weekly health check and the alert watcher read what's recorded as things hap
 - Every AI request goes through `trackAi({ feature, provider, model, tenantId?, jobId? }, () => call)` (a test fails untracked calls). A new model needs a price in `lib/health/pricing.ts`.
 - Every cron in `vercel.json` exports `GET = withCronRun('/api/…', run)` (a test checks), as well as being in `lib/cron-routes.ts`.
 - Where a failure would otherwise be silent (an AI reply that can't be read, a fallback because something is down), call `logError(source, err, ctx)`.
+
+# Midcity is a separate business (`lib/jobs/field-app.ts`)
+
+Midcity's field app (`app/midcity`, `/api/midcity`) writes reports for another insurance builder from the same system. Its jobs have insurer `Midcity` (`FIELD_APP_INSURER`).
+
+- Anything that lists, counts, reviews or reports on IRC's jobs, inspections or photos leaves them out with `isFieldAppJob(...)`, or `.neq('insurer', FIELD_APP_INSURER)` in a query. That covers statistics, dashboards, the health check, AI reviews and checks.
+- AI calls made for a Midcity job use a feature starting `midcity-`; in shared code, use `aiFeature(name, job)`.

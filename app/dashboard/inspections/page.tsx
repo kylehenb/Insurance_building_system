@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getUser } from "@/lib/supabase/get-user";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { isFieldAppJob } from "@/lib/jobs/field-app";
 
 type InspectionRow = Database["public"]["Tables"]["inspections"]["Row"];
 
@@ -113,7 +114,7 @@ async function InspectionsListPage() {
   }
 
   const typedInspections = ((inspections as unknown as InspectionWithRelations[]) ?? [])
-    .filter(i => i.jobs?.insurer !== 'Midcity');
+    .filter(i => !isFieldAppJob(i.jobs));
 
   return (
     <div className="p-6 lg:p-8">

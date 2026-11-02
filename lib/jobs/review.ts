@@ -7,6 +7,7 @@ import { cardActor, CARD_COLUMNS, type ActionCard } from '@/lib/actions/cards'
 import { createFollowUp, followUpDay, spokenDue } from '@/lib/actions/followups'
 import { pinnedTo } from '@/lib/actions/waits'
 import { pruneOldEvents } from '@/lib/calendar/sync'
+import { isFieldAppJob } from './field-app'
 import { runLapses } from './lapse'
 import { trackAi } from '@/lib/health/ai-usage'
 
@@ -42,7 +43,7 @@ const DAY_MS = 86_400_000
 const now = () => new Date().toISOString()
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
-type JobRow = { id: string; job_number: string; created_at: string | null; reviewed_at: string | null }
+type JobRow = { id: string; job_number: string; created_at: string | null; reviewed_at: string | null; insurer?: string | null }
 
 /** The jobs worth looking at: made or written about lately, or with something open or coming up */
 export async function openJobs(db: SupabaseClient, tenantId: string, at = new Date()): Promise<Map<string, { lastActivity: string | null }>> {
@@ -72,10 +73,11 @@ export async function openJobs(db: SupabaseClient, tenantId: string, at = new Da
 export async function jobsToReview(db: SupabaseClient, tenantId: string, limit: number, at = new Date()): Promise<JobRow[]> {
   const open = await openJobs(db, tenantId, at)
   if (!open.size) return []
-  const { data } = await db.from('jobs').select('id, job_number, created_at, reviewed_at').eq('tenant_id', tenantId).in('id', [...open.keys()])
+  const { data } = await db.from('jobs').select('id, job_number, created_at, reviewed_at, insurer').eq('tenant_id', tenantId).in('id', [...open.keys()])
   const quiet = new Date(at.getTime() - QUIET_DAYS * DAY_MS).toISOString()
   return ((data as JobRow[] | null) ?? [])
     .filter(j => {
+      if (isFieldAppJob(j)) return false
       if (!j.reviewed_at) return true
       const last = open.get(j.id)?.lastActivity
       return (!!last && last > j.reviewed_at) || j.reviewed_at < quiet

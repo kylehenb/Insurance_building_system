@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createFollowUp } from '@/lib/actions/followups'
 import { pinnedTo } from '@/lib/actions/waits'
+import { isFieldAppJob } from './field-app'
 
 // The safety net for insurers who never decide (tech spec §5b "Job phases"):
 // a job awaiting a decision longer than its insurer's lapse time
@@ -34,7 +35,7 @@ export async function runLapses(db: SupabaseClient, at = new Date()): Promise<{ 
   const out = { lapsed: [] as string[], warned: [] as string[], blocked: [] as string[] }
   const { data } = await db.from('jobs').select('id, tenant_id, job_number, insurer, client_id, phase_since, override_stage')
     .eq('phase', 'awaiting_decision').is('lapsed_at', null).is('closed_by_hand', null)
-  const jobs = ((data as JobRow[] | null) ?? []).filter(j => j.phase_since && j.override_stage !== 'on_hold')
+  const jobs = ((data as JobRow[] | null) ?? []).filter(j => j.phase_since && j.override_stage !== 'on_hold' && !isFieldAppJob(j))
   if (!jobs.length) return out
   const clientIds = [...new Set(jobs.map(j => j.client_id).filter((id): id is string => !!id))]
   const { data: clients } = clientIds.length ? await db.from('clients').select('id, decision_lapse_days').in('id', clientIds) : { data: [] }
