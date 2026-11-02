@@ -227,7 +227,7 @@ export const replyToEmailTool: McpTool = {
     }
 
     try {
-      const result = await replyToEmail(ctx.supabase, ctx.tenantId, id, body, files)
+      const result = await replyToEmail(ctx.supabase, ctx.tenantId, id, body, files, ctx.userId || null)
       const names = files.map(f => f.filename)
       return {
         text: `Replied to ${result.to}: "${result.subject}"${names.length ? `, attached ${names.join(', ')}` : ''}.`,

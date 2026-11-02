@@ -364,7 +364,7 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
   const set = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(card.created_at))
   const w = f.waiting
   const head = w
-    ? `A WAITING-ON FOLLOW-UP (set by IRC on ${set}, for today): the office emailed ${w.name}${w.email ? ` <${w.email}>` : ''} asking for ${w.asked}, and nothing has come back in that conversation.${w.on_behalf_of ? `\n${w.on_behalf_of}.` : ''}\nWhy today: ${w.reason}${(w.brought_forward ?? []).map(b => `\nBrought forward: ${b.reason}`).join('')}`
+    ? `A WAITING-ON FOLLOW-UP (set on ${set}, for today): the office emailed ${w.name}${w.email ? ` <${w.email}>` : ''} asking for ${w.asked}, and nothing has come back in that conversation.${w.on_behalf_of ? `\n${w.on_behalf_of}.` : ''}${f.note.startsWith(`Chase ${w.name} for`) ? `\nWhy today: ${w.reason}` : `\nThe office's own note: "${f.note}"`}${(w.brought_forward ?? []).map(b => `\nBrought forward: ${b.reason}`).join('')}`
     : `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"`
   return {
     intro: `${head}${jobNumber ? `\nJob: ${jobNumber}` : ''}${conversation}\n\nTHE JOB FILE (as it is now)\n${jobFile}`,

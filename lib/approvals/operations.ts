@@ -67,7 +67,7 @@ const workOrderSend: Operation<{ workOrderId: string; overrides: WorkOrderEmailO
     }
   },
   async run(p, ctx) {
-    await sendWorkOrderEmail(p.workOrderId, { supabase: ctx.service, tenantId: ctx.tenantId }, p.overrides)
+    await sendWorkOrderEmail(p.workOrderId, { supabase: ctx.service, tenantId: ctx.tenantId, userId: ctx.requesterId }, p.overrides)
     return 'Work order sent.'
   },
 }
@@ -140,7 +140,7 @@ const replySend: Operation<{ commId: string; body: string }> = {
     }
   },
   async run(p, ctx) {
-    const result = await replyToEmail(ctx.service, ctx.tenantId, p.commId, p.body)
+    const result = await replyToEmail(ctx.service, ctx.tenantId, p.commId, p.body, [], ctx.requesterId)
     return `Replied to ${result.to}.`
   },
 }

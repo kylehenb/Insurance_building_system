@@ -1,4 +1,6 @@
+import type { SupabaseClient as RawClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recordSent } from '@/lib/mail/sent-by'
 import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw } from '@/lib/email/build-raw'
 import { renderTemplate, resolveEmailTemplate, workOrderTemplateVars } from '@/lib/email/templates'
@@ -207,6 +209,8 @@ export async function sendWorkOrderEmail(
   }
 
   const service = createServiceClient()
+  // Who sent it, for what the office is waiting on (lib/actions/waiting-on.ts)
+  await recordSent(service as unknown as RawClient, tenantId, gmailId, threadId, ctx.userId ?? null)
 
   // Mark the sent copy as processed so the Gmail SENT watch doesn't record it twice
   if (gmailId) {

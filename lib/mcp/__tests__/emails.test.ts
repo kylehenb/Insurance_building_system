@@ -47,6 +47,9 @@ const plumberEmail = {
 const gmailThread = vi.fn(async (_req: unknown) => ({ data: { messages: [plumberEmail] } }))
 const gmailList = vi.fn(async (_req: unknown) => ({ data: { messages: [] } }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => client, createClient: async () => client }))
+// Who sent it, for what the office is waiting on
+const recordSent = vi.fn()
+vi.mock('@/lib/mail/sent-by', () => ({ recordSent: (...a: unknown[]) => recordSent(...a) }))
 vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { send: gmailSend, list: gmailList }, threads: { get: gmailThread } } }) }))
 // Permissions are tested in lib/permissions; here the user is allowed
 vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null, permissionGate: async () => null }))
@@ -112,6 +115,7 @@ describe('reply_to_email', () => {
     expect(gmailSend).toHaveBeenCalledWith(expect.objectContaining({ requestBody: expect.objectContaining({ threadId: 'th1' }) }))
     expect(sentRaw()).toMatch(/In-Reply-To: <abc@mail\.example>/)
     expect(inserts[0]).toMatchObject({ direction: 'outbound', job_id: 'j1', thread_id: 'th1', to_email: 'plumber@example.com', source: 'manual_reply' })
+    expect(recordSent).toHaveBeenLastCalledWith(expect.anything(), 't1', expect.anything(), expect.anything(), ctx.userId || null)
   })
 
   it('adds the company signature under the reply, as the app’s other sends do', async () => {

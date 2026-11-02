@@ -149,19 +149,28 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
     const { data: job } = await db.from('jobs').select('id').eq('tenant_id', tenantId).eq('id', input.jobId).maybeSingle()
     if (!job) throw new CardError('Job not found', 404)
   }
-  const threadId = input.threadId && /^[0-9a-f]+$/i.test(input.threadId) ? input.threadId : null
+  let threadId = input.threadId && /^[0-9a-f]+$/i.test(input.threadId) ? input.threadId : null
   const who = input.who?.trim().slice(0, MAX_WHO) || null
+  // Set by a person for something IRC is already waiting on — "Remind me
+  // Thursday" on a due chase, or the card's Remind me step as its email went:
+  // it takes over that wait (a reply still closes it), and the date they
+  // picked is learned from (lib/actions/waits.ts)
+  const { waitToReplace } = await import('./waits')
+  const replaces = input.waiting ? null : await waitToReplace(db, tenantId, { fromCardId: input.fromCardId, threadId, jobId: input.jobId, who, note })
+  const waiting = input.waiting ?? replaces?.follow_up?.waiting
+  if (replaces) threadId ??= replaces.follow_up?.thread_id ?? null
   const followUp: FollowUp = {
     note, who, thread_id: threadId, from_card_id: input.fromCardId ?? null, created_by: userId,
-    ...(input.waiting ? { kind: 'waiting_on' as const, waiting: input.waiting } : {}),
+    ...(waiting ? { kind: 'waiting_on' as const, waiting } : {}),
   }
 
   const { data, error } = await db.from('action_queue').insert({
     tenant_id: tenantId,
     job_id: input.jobId,
     source: 'followup',
-    rule_key: input.waiting ? 'waiting_on' : 'followup',
-    title: followUpTitle(followUp),
+    rule_key: waiting ? 'waiting_on' : 'followup',
+    // A person's follow-up keeps their words as its title
+    title: followUpTitle(input.waiting ? followUp : { note, who }),
     description: note,
     status: 'scheduled',
     priority: input.urgent ? PRIORITY.high : PRIORITY.normal,
@@ -177,7 +186,19 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
       .update({ status: 'done', outcome: `Follow-up set for ${spokenDue(due.toISOString())}`, confirmed_by: userId, confirmed_at: now(), updated_at: now() })
       .eq('tenant_id', tenantId).eq('id', input.fromCardId).in('status', ['pending', 'failed', 'queued'])
   }
-  return data as ActionCard
+  const card = data as ActionCard
+  if (replaces) {
+    // One reminder, not two: the automatic one gives way
+    if (replaces.status === 'scheduled') {
+      await db.from('action_queue')
+        .update({ status: 'skipped', outcome: `Replaced by a follow-up you set for ${spokenDue(due.toISOString())}`, updated_at: now() })
+        .eq('id', replaces.id).eq('status', 'scheduled')
+    }
+    const { recordWaitMoved } = await import('./waits')
+    const wasDue = replaces.due_at ?? replaces.follow_up?.waiting?.ai_due_at
+    if (wasDue && wasDue !== card.due_at) await recordWaitMoved(db, card, wasDue, userId)
+  }
+  return card
 }
 
 /**

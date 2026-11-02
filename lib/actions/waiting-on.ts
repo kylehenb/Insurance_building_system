@@ -8,7 +8,7 @@ import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
 import { cardActor, CARD_COLUMNS, type ActionCard, type WaitingOn } from './cards'
 import { chaseDue, createFollowUp, spokenDue } from './followups'
-import { days, openWaits, sentOn, waitLearning, waitLine, waitSituation } from './waits'
+import { adoptFollowUp, days, openWaits, personFollowUpFor, pinnedTo, sentOn, waitLearning, waitLine, waitSituation } from './waits'
 
 // Waiting on (tech spec §23.12): what the office has asked of other people.
 // Every email the office sends is read once (sent_emails, filled by the send
@@ -175,7 +175,17 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
       await db.from('action_queue').update({ status: 'skipped', outcome: 'Replaced by a later email', updated_at: now() })
         .eq('id', c.id).eq('status', 'scheduled')
     }
-    const card = await createFollowUp(db, row.tenant_id, row.sent_by, {
+    // A person already set a follow-up for this (the card's Remind me step,
+    // as the email went): that one is the wait, with their date
+    const theirs = await personFollowUpFor(db, row.tenant_id, { threadId: row.thread_id, jobId, waiting })
+    if (theirs) {
+      await adoptFollowUp(db, theirs, waiting, row.thread_id)
+      return save({ status: 'done', outcome: `Asked ${name} for ${asked} — your follow-up for ${theirs.due_at ? spokenDue(theirs.due_at) : 'later'} stands`, follow_up_id: theirs.id })
+    }
+    // Always someone's: the sender, else the job's owner, else the business owner
+    const owner = await pinnedTo(db, row.tenant_id, row.sent_by, jobId)
+    waiting.pinned = owner.why
+    const card = await createFollowUp(db, row.tenant_id, owner.userId, {
       jobId,
       note: `Chase ${name} for ${asked}${onBehalf ? ` — ${onBehalf}` : ''}. ${reason}`,
       who: name,
