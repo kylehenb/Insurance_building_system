@@ -129,6 +129,8 @@ export type NewFollowUp = {
   waiting?: WaitingOn
   /** A check IRC planned reviewing the job (lib/jobs/review.ts): why, in a line */
   watch?: { why: string }
+  /** What sort of check, when it isn't the review's (the lapse safety net's: lapse_warning, lapse_blocked) */
+  ruleKey?: string
   urgent?: boolean
 }
 
@@ -172,7 +174,7 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
     tenant_id: tenantId,
     job_id: input.jobId,
     source: 'followup',
-    rule_key: waiting ? 'waiting_on' : input.watch ? 'job_watch' : 'followup',
+    rule_key: waiting ? 'waiting_on' : input.watch ? input.ruleKey ?? 'job_watch' : 'followup',
     // A person's follow-up keeps their words as its title
     title: followUpTitle(input.waiting || input.watch ? followUp : { note, who }),
     description: note,

@@ -1,20 +1,19 @@
 import type { SupabaseClient as RawClient } from '@supabase/supabase-js'
 import { jobAppointments, spokenEventTime } from '@/lib/calendar/sync'
+import { describePhase } from '@/lib/jobs/phase'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { findWorkOrders, spokenDate } from '@/lib/mcp/tools/work-orders'
 import { describeExcess, isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { listJobDocumentsTool } from '@/lib/mcp/tools/documents'
 import { listJobEmails } from '@/lib/mcp/tools/emails'
 import { describeRequest } from '@/lib/mcp/tools/signing'
-import { fetchJobContext } from '@/lib/jobs/fetchJobContext'
-import { getJobStage } from '@/lib/jobs/getJobStage'
 import { loadExcessContext } from '@/lib/excess/server'
 import { listSigningRequestsForJob } from '@/lib/signing/service'
 import { JobNoteError, addJobNote as saveJobNote, listJobNotes } from '@/lib/communications/notes'
 import { searchJobs, type JobMatch } from '@/lib/jobs/search'
 
 // Finding a job, a job at a glance, and adding a note to it. The summary is assembled from
-// the app's own stage logic (getJobStage), the dashboard's pending actions,
+// the job's phase and next step (lib/jobs/phase.ts), the dashboard's pending actions,
 // and the other connector tools' views of work orders, documents, signing,
 // excess and email — so it says what those say.
 
@@ -41,7 +40,7 @@ export const getJobSummary: McpTool = {
   name: 'get_job_summary',
   title: 'Job summary',
   description: [
-    'Everything about a job at a glance: who and where, its stage and the next step, pending actions from the dashboard, appointments in the calendar, work orders, quotes/reports/invoices,',
+    'Everything about a job at a glance: who and where, its phase (Assessment, Awaiting decision, In repair, Invoicing or Closed) and next step, pending actions from the dashboard, appointments in the calendar, work orders, quotes/reports/invoices,',
     'signing, excess, the latest emails and the job notes. Use it for "what\'s happening on IRC…" and summarise it for the user — lead with the stage, the next step and anything waiting on them.',
   ].join(' '),
   inputSchema: {
@@ -63,12 +62,15 @@ export const getJobSummary: McpTool = {
     if (error) throw error
 
     const sections = (await Promise.all([
-      section('Stage', async () => {
-        const stage = getJobStage(await fetchJobContext(job.id, ctx.supabase))
+      section('Phase', async () => {
+        // phase* aren't in database.types.ts yet
+        const { data: p } = await (ctx.supabase as unknown as RawClient).from('jobs')
+          .select('phase, phase_step, closed_reason, override_stage, phase_since, review_note').eq('id', job.id).maybeSingle()
+        const ph = p as { phase: string | null; phase_step: string | null; closed_reason: string | null; override_stage: string | null; phase_since: string | null; review_note: string | null } | null
+        if (!ph?.phase) return 'Not worked out yet.'
         return [
-          `${stage.label} — ${stage.description}`,
-          stage.primaryAction ? `Next step: ${stage.primaryAction.label}.` : null,
-          stage.contextualWarning ? `Note: ${stage.contextualWarning.message}` : null,
+          `${describePhase(ph)}${ph.phase_since ? ` (since ${spokenDate(ph.phase_since)})` : ''}.`,
+          ph.review_note ? `This morning's review: ${ph.review_note}` : null,
         ].filter(Boolean).join(' ')
       }),
       section('Waiting on you', async () => {

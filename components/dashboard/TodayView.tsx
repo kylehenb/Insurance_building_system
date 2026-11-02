@@ -7,6 +7,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import { useCurrentUser } from '@/components/layout/current-user'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
+import { describePhase } from '@/lib/jobs/phase'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +34,9 @@ interface FlaggedJob {
   insurer: string | null
   override_stage: 'on_hold' | 'cancelled' | null
   current_stage: string | null
+  phase: string | null
+  phase_step: string | null
+  closed_reason: string | null
   action_count: number
 }
 
@@ -144,7 +148,7 @@ export function TodayView() {
     if (!userId || !tenantId) return
     const { data } = await supabase
       .from('job_flags')
-      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage, current_stage)`)
+      .select(`job_id, jobs (id, job_number, property_address, insured_name, insurer, override_stage, current_stage, phase, phase_step, closed_reason)`)
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .limit(20)
@@ -178,6 +182,9 @@ export function TodayView() {
         insurer: job.insurer,
         override_stage: job.override_stage ?? null,
         current_stage: job.current_stage ?? null,
+        phase: job.phase ?? null,
+        phase_step: job.phase_step ?? null,
+        closed_reason: job.closed_reason ?? null,
         action_count: count,
       } as FlaggedJob
     })
@@ -556,6 +563,8 @@ export function TodayView() {
                             <span className="sbadge s-pending">
                               {job.override_stage === 'on_hold' ? 'On Hold' : 'Cancelled'}
                             </span>
+                          ) : job.phase ? (
+                            <span className="sbadge s-active">{describePhase(job)}</span>
                           ) : job.current_stage ? (
                             <span className="sbadge s-active">
                               {job.current_stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
+import { describePhase } from '@/lib/jobs/phase'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
 
 // Finding a job from what someone remembers about it: part of the street or
@@ -25,7 +26,7 @@ export interface JobMatch {
   created_at: string | null
 }
 
-const JOB_COLUMNS = 'id, job_number, property_address, insured_name, insurer, claim_number, adjuster_reference, client_id, current_stage, override_stage, created_at, contacts'
+const JOB_COLUMNS = 'id, job_number, property_address, insured_name, insurer, claim_number, adjuster_reference, client_id, current_stage, override_stage, phase, phase_step, closed_reason, created_at, contacts'
 /** Columns a word is looked up in, with what to call a hit */
 const FIELDS: [column: string, label: string][] = [
   ['job_number', 'job number'],
@@ -48,6 +49,7 @@ const squash = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '')
 type Row = {
   id: string; job_number: string; property_address: string | null; insured_name: string | null; insurer: string | null
   claim_number: string | null; adjuster_reference: string | null; client_id: string | null; current_stage: string | null
+  phase?: string | null; phase_step?: string | null; closed_reason?: string | null
   override_stage: string | null; created_at: string | null; contacts: unknown
 }
 
@@ -118,7 +120,7 @@ export async function searchJobs(db: Client, tenantId: string, query: string, { 
       client_name: job.client_id ? clientName.get(job.client_id) ?? null : null,
       insurer: job.insurer,
       claim_number: job.claim_number,
-      stage: stageKey ? STAGE_CONFIG[stageKey]?.label ?? stageKey : null,
+      stage: job.phase ? describePhase({ phase: job.phase, phase_step: job.phase_step ?? null, closed_reason: job.closed_reason ?? null, override_stage: job.override_stage }) : stageKey ? STAGE_CONFIG[stageKey]?.label ?? stageKey : null,
       matched_on: [...matched],
       created_at: job.created_at,
       score,

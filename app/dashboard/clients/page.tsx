@@ -321,6 +321,7 @@ export default function ClientsPage() {
       kpi_booking_hours: 24,
       kpi_visit_days: 2,
       kpi_report_days: 4,
+      decision_lapse_days: 180,
       send_booking_confirmation: false,
       notes: null,
       status: 'active',
@@ -351,6 +352,7 @@ export default function ClientsPage() {
       kpi_booking_hours: item.kpi_booking_hours,
       kpi_visit_days: item.kpi_visit_days,
       kpi_report_days: item.kpi_report_days,
+      decision_lapse_days: (item as any).decision_lapse_days ?? 180,
       send_booking_confirmation: item.send_booking_confirmation,
       notes: item.notes,
       status: item.status,
@@ -361,7 +363,7 @@ export default function ClientsPage() {
       make_safe_amount: (item as any).make_safe_amount || null,
       travel_allowance_outside_service_area: (item as any).travel_allowance_outside_service_area || null,
       builders_margin_pct: (item as any).builders_margin_pct || null,
-    });
+    } as any);
     setActiveModalTab('basic');
     loadEmailConfig(item.id);
     setNewPatternType('domain');
@@ -1104,6 +1106,21 @@ export default function ClientsPage() {
                             className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
                           />
                           <p className="text-xs text-subtle mt-1">Business days to submit report</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-1">
+                            Decision Lapse (days)
+                          </label>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={(formData as any).decision_lapse_days ?? 180}
+                            onChange={(e) => setFormData({ ...formData, decision_lapse_days: e.target.value ? parseInt(e.target.value, 10) : 180 } as any)}
+                            className="w-full border border-line-3 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gold"
+                          />
+                          <p className="text-xs text-subtle mt-1">With no approval or decline after this long (and everything paid), the job closes as &ldquo;no decision&rdquo;. 0 = never.</p>
                         </div>
 
                         <div className="col-span-2">

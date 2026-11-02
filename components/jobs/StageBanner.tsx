@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { RealtimePostgresUpdatePayload } from '@supabase/supabase-js'
 import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
+import { CLOSED_LABELS, phaseLabel, STEP_LABELS, type ClosedReason, type PhaseStep } from '@/lib/jobs/phase'
 import { OPEN_LOOP_CONFIG, type OpenLoop } from '@/lib/jobs/openLoops'
 import { excessNeedsConfirming } from '@/lib/excess/decision'
 import { SendForSignatureDialog } from '@/app/dashboard/jobs/[jobId]/signing/SendForSignatureDialog'
@@ -18,6 +19,11 @@ type JobStageRow = {
   job_type?: string | null
   excess?: number | null
   excess_decision?: string | null
+  /** The job's phase and next step (lib/jobs/phase.ts), and the morning review's note */
+  phase?: string | null
+  phase_step?: string | null
+  closed_reason?: string | null
+  review_note?: string | null
 }
 
 function getBorderColor(stageKey: JobStageKey): string {
@@ -73,7 +79,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
     )
     const { data } = await supabase
       .from('jobs')
-      .select('current_stage, current_stage_updated_at, override_stage, job_type, excess, excess_decision')
+      .select('current_stage, current_stage_updated_at, override_stage, job_type, excess, excess_decision, phase, phase_step, closed_reason, review_note')
       .eq('id', jobId)
       .single()
     setRow(data as unknown as JobStageRow | null)
@@ -148,7 +154,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
               marginBottom: 5,
             }}
           >
-            Current Stage
+            Phase
           </div>
           <div
             style={{
@@ -249,7 +255,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
             marginBottom: 5,
           }}
         >
-          Current Stage
+          Phase
         </div>
 
         {/* Stage name and action button row */}
@@ -277,7 +283,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
                 letterSpacing: '-0.2px',
               }}
             >
-              {config.label}
+              {row.phase ? `${row.override_stage === 'on_hold' ? 'On hold — ' : ''}${phaseLabel(row.phase)}` : config.label}
             </div>
             <div
               style={{
@@ -286,8 +292,15 @@ export default function StageBanner({ jobId }: StageBannerProps) {
                 lineHeight: 1.3,
               }}
             >
-              {config.description}
+              {row.phase === 'closed'
+                ? CLOSED_LABELS[row.closed_reason as ClosedReason] ?? 'Closed'
+                : row.phase_step ? STEP_LABELS[row.phase_step as PhaseStep] ?? config.description : config.description}
             </div>
+            {row.review_note && (
+              <div style={{ fontSize: 11, color: stageDescriptionColor, opacity: 0.8, lineHeight: 1.3, marginTop: 4 }} title="IRC's note from this morning's review">
+                {row.review_note}
+              </div>
+            )}
           </div>
 
           {/* Action button or waiting pill */}
