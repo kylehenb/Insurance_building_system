@@ -101,6 +101,18 @@ describe('a day\'s figures', () => {
   })
 })
 
+describe('Midcity (a separate business)', () => {
+  it("leaves its jobs and their records out of IRC's figures, and counts its AI apart", async () => {
+    tables.jobs.push({ id: 'm1', tenant_id: 't1', insurer: 'Midcity', created_at: '2026-11-03T02:00:00Z', completion_approved_at: null, lapsed_at: null })
+    tables.jobs.push({ id: 'j9', tenant_id: 't1', insurer: null, created_at: '2026-11-03T02:00:00Z', completion_approved_at: null, lapsed_at: null })
+    tables.inspections = [{ tenant_id: 't1', job_id: 'm1', form_submitted_at: '2026-11-03T03:00:00Z' }, { tenant_id: 't1', job_id: 'j3', form_submitted_at: '2026-11-03T03:00:00Z' }]
+    tables.ai_calls.push({ tenant_id: 't1', created_at: '2026-11-03T01:00:00Z', ok: true, cost_usd: 0.5, model: 'claude-haiku-5-5', feature: 'midcity-photo-labels' })
+    const days = await computeDays(db, 't1', '2026-11-03', '2026-11-04', { snapshotDay: '2026-11-03', now: NOW })
+    // j3 and j9 (no insurer is still IRC's), not Midcity's m1
+    expect(days['2026-11-03']).toMatchObject({ jobs_created: 2, inspections_done: 1, ai_calls: 2, ai_cost_usd: 0.25, midcity_ai_calls: 1, midcity_ai_cost_usd: 0.5, open_jobs: 4 })
+  })
+})
+
 describe('the nightly run', () => {
   it('writes yesterday with its reading, and fills in the past back to the first record', async () => {
     const [r] = await runDailyFigures(db, { now: NOW })

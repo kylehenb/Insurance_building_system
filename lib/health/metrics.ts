@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { addDays, dayStartIso, daysBetween, perthDay } from './periods'
+import { FIELD_APP_INSURER } from '@/lib/jobs/field-app'
 
 // The health check's daily figures (tech spec §25.3). Each is worked out per
 // Perth day from records that carry a date, so past days can be filled in
@@ -9,8 +10,22 @@ import { addDays, dayStartIso, daysBetween, perthDay } from './periods'
 //
 // To add a figure: add it to METRICS, work it out in computeDays, and bump
 // METRICS_VERSION. The nightly run then recomputes every past day.
+//
+// Midcity is a separate business (lib/jobs/field-app.ts): its jobs, and the
+// records on them, are left out of IRC's figures; its AI use is counted
+// apart (features starting "midcity-").
 
-export const METRICS_VERSION = 1
+export const METRICS_VERSION = 2
+
+/** Jobs that are IRC's (not Midcity's). A plain neq would also drop jobs with no insurer. */
+export const IRC_JOBS = `insurer.is.null,insurer.neq.${FIELD_APP_INSURER}`
+
+/** Ids of Midcity's jobs, whose records are left out */
+async function midcityJobIds(db: SupabaseClient, tenantId: string): Promise<Set<string>> {
+  const { data } = await db.from('jobs').select('id').eq('tenant_id', tenantId).eq('insurer', FIELD_APP_INSURER).limit(10000)
+  return new Set(((data ?? []) as { id: string }[]).map(r => r.id))
+}
+const notMidcity = (midcity: Set<string>) => (list: Row[]) => (midcity.size ? list.filter(r => !r.job_id || !midcity.has(String(r.job_id))) : list)
 
 /**
  * The first full day the system figures (AI calls, scheduled jobs, errors)
@@ -71,6 +86,8 @@ export const METRICS: MetricDef[] = [
   { key: 'ai_failed', label: 'AI requests failed', group: 'AI', kind: 'sum', unit: 'count', system: true },
   { key: 'ai_cost_usd', label: 'AI spend', group: 'AI', kind: 'sum', unit: 'usd', system: true },
   { key: 'ai_unpriced', label: 'AI requests with no price set', group: 'AI', kind: 'sum', unit: 'count', system: true },
+  { key: 'midcity_ai_calls', label: 'Midcity AI requests (separate business)', group: 'AI', kind: 'sum', unit: 'count', system: true },
+  { key: 'midcity_ai_cost_usd', label: 'Midcity AI spend (separate business)', group: 'AI', kind: 'sum', unit: 'usd', system: true },
   // Systems
   { key: 'cron_runs', label: 'Scheduled job runs', group: 'Systems', kind: 'sum', unit: 'count', system: true },
   { key: 'cron_failed', label: 'Scheduled job runs failed', group: 'Systems', kind: 'sum', unit: 'count', system: true },
@@ -135,26 +152,30 @@ export async function computeDays(
       let q = db.from(table).select(cols).gte(col, fromIso).lt(col, toIso)
       if (scope === 'tenant') q = q.eq('tenant_id', tenantId)
       if (scope === 'tenant-or-none') q = q.or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      if (table === 'jobs') q = q.or(IRC_JOBS)
       return q.order(col, { ascending: true })
     })
   const dayOf = (v: unknown) => (typeof v === 'string' && v ? perthDay(v) : null)
+
+  // Records on Midcity's jobs are left out
+  const irc = notMidcity(await midcityJobIds(db, tenantId))
 
   const [orders, jobsNew, jobsDone, comms, inspections, quotes, wos, signSent, signSigned, issued, paid, learning, cards, activity] = await Promise.all([
     timed('insurer_orders', 'created_at', 'created_at'),
     timed('jobs', 'created_at', 'created_at'),
     timed('jobs', 'completion_approved_at', 'completion_approved_at'),
-    timed('communications', 'created_at, type, direction', 'created_at'),
-    timed('inspections', 'form_submitted_at', 'form_submitted_at'),
-    timed('quotes', 'created_at', 'created_at'),
-    timed('work_orders', 'created_at', 'created_at'),
-    timed('signing_requests', 'sent_at', 'sent_at'),
-    timed('signing_requests', 'signed_at', 'signed_at'),
+    timed('communications', 'created_at, type, direction, job_id', 'created_at').then(irc),
+    timed('inspections', 'form_submitted_at, job_id', 'form_submitted_at').then(irc),
+    timed('quotes', 'created_at, job_id', 'created_at').then(irc),
+    timed('work_orders', 'created_at, job_id', 'created_at').then(irc),
+    timed('signing_requests', 'sent_at, job_id', 'sent_at').then(irc),
+    timed('signing_requests', 'signed_at, job_id', 'signed_at').then(irc),
     // Invoice dates are calendar dates already
-    fetchAll(() => db.from('invoices').select('issued_date, amount_inc_gst, status, voided_at').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('issued_date', from).lt('issued_date', to).order('issued_date', { ascending: true })),
-    fetchAll(() => db.from('invoices').select('paid_date, amount_inc_gst, status, voided_at').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('paid_date', from).lt('paid_date', to).order('paid_date', { ascending: true })),
+    fetchAll(() => db.from('invoices').select('issued_date, amount_inc_gst, status, voided_at, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('issued_date', from).lt('issued_date', to).order('issued_date', { ascending: true })).then(irc),
+    fetchAll(() => db.from('invoices').select('paid_date, amount_inc_gst, status, voided_at, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').gte('paid_date', from).lt('paid_date', to).order('paid_date', { ascending: true })).then(irc),
     timed('learning_events', 'created_at, outcome', 'created_at'),
-    timed('action_queue', 'created_at', 'created_at'),
-    timed('activity_log', 'created_at, via', 'created_at'),
+    timed('action_queue', 'created_at, job_id', 'created_at').then(irc),
+    timed('activity_log', 'created_at, via, job_id', 'created_at').then(irc),
   ])
 
   for (const r of orders) bump(dayOf(r.created_at), 'orders_received')
@@ -202,13 +223,18 @@ export async function computeDays(
   // System figures (§25.1), only from when they were first recorded
   if (to > SYSTEM_TRACKING_SINCE) {
     const [ai, runs, errors, alerts] = await Promise.all([
-      timed('ai_calls', 'created_at, ok, cost_usd, model', 'created_at', 'tenant-or-none'),
+      timed('ai_calls', 'created_at, ok, cost_usd, model, feature', 'created_at', 'tenant-or-none'),
       timed('cron_runs', 'started_at, status', 'started_at', 'all'),
       timed('system_errors', 'created_at', 'created_at', 'tenant-or-none'),
       timed('health_alerts', 'first_seen_at', 'first_seen_at', 'all'),
     ])
     for (const r of ai) {
       const d = dayOf(r.created_at)
+      if (String(r.feature).startsWith('midcity-')) {
+        bump(d, 'midcity_ai_calls')
+        bump(d, 'midcity_ai_cost_usd', Number(r.cost_usd) || 0)
+        continue
+      }
       bump(d, 'ai_calls')
       if (!r.ok) bump(d, 'ai_failed')
       if (r.cost_usd == null) { if (r.ok) bump(d, 'ai_unpriced') } else bump(d, 'ai_cost_usd', Number(r.cost_usd))
@@ -232,9 +258,10 @@ export async function computeDays(
 /** Levels right now: open jobs, money owed, open alerts, database and storage size. */
 export async function snapshot(db: SupabaseClient, tenantId: string, now: Date): Promise<DayMetrics> {
   const monthAgo = addDays(perthDay(now), -30)
+  const irc = notMidcity(await midcityJobIds(db, tenantId))
   const [open, owed, alerts, sizes] = await Promise.all([
-    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).is('completion_approved_at', null).is('lapsed_at', null),
-    fetchAll(() => db.from('invoices').select('amount_inc_gst, issued_date').eq('tenant_id', tenantId).eq('direction', 'outbound').eq('status', 'sent').is('paid_date', null).is('voided_at', null).order('issued_date', { ascending: true })),
+    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).or(IRC_JOBS).is('completion_approved_at', null).is('lapsed_at', null),
+    fetchAll(() => db.from('invoices').select('amount_inc_gst, issued_date, job_id').eq('tenant_id', tenantId).eq('direction', 'outbound').eq('status', 'sent').is('paid_date', null).is('voided_at', null).order('issued_date', { ascending: true })).then(irc),
     db.from('health_alerts').select('id', { count: 'exact', head: true }).is('resolved_at', null),
     db.rpc('health_storage_stats'),
   ])

@@ -87,7 +87,6 @@ export function fakeSupabase(db: Record<string, Row[]>) {
         preds.push(r => terms.some(t => t(r)))
         return b
       },
-      range: (a: number, z: number) => { offset = a; limit = z - a + 1; return b },
       order: (col: string, o?: { ascending?: boolean }) => { sort = { col, dir: o?.ascending === false ? -1 : 1 }; return b },
       limit: (n: number) => { limit = n; return b },
       range: (from: number, to: number) => { offset = from; limit = to - from + 1; return b },

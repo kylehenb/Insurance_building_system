@@ -5,6 +5,7 @@ import { logError } from './errors'
 import { loadSummary, type MetricValue } from './daily'
 import { addDays, dayStartIso, fixedLabel, perthDay, periodFor, type Period, type PeriodKind } from './periods'
 import { permissionAction } from '@/lib/permissions/catalogue'
+import { IRC_JOBS } from './metrics'
 import { repeatedSequences, type ActivityStep } from './patterns'
 import { followUpFacts, saveSuggestions, suggestionContext } from './suggestions'
 
@@ -106,7 +107,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
     rows(db.from('system_errors').select('source, message').gte('created_at', fromIso).lt('created_at', toIso).or(`tenant_id.eq.${tenantId},tenant_id.is.null`).limit(5000)),
     rows(db.from('learning_events').select('feature, kind, outcome, situation_text, changes, instruction').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).order('created_at', { ascending: true }).limit(2000)),
     rows(db.from('activity_log').select('action, via, outcome, user_id, job_id, created_at').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).limit(20000)),
-    rows(db.from('jobs').select('insurer').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).limit(5000)),
+    rows(db.from('jobs').select('insurer').eq('tenant_id', tenantId).or(IRC_JOBS).gte('created_at', fromIso).lt('created_at', toIso).limit(5000)),
   ])
 
   for (const a of alerts) {
@@ -123,7 +124,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
     byFeature.set(String(r.feature), f)
   }
   for (const [feature, f] of [...byFeature].sort((a, b) => b[1].cost - a[1].cost).slice(0, 12)) {
-    add(`AI feature "${feature}": ${f.n} requests, US$${f.cost.toFixed(2)}, ${f.failed} failed${f.error ? ` (latest error: ${f.error})` : ''}.`)
+    add(`AI feature "${feature}"${feature.startsWith('midcity-') ? ' (Midcity, a separate business run from the same system)' : ''}: ${f.n} requests, US$${f.cost.toFixed(2)}, ${f.failed} failed${f.error ? ` (latest error: ${f.error})` : ''}.`)
   }
 
   // Scheduled jobs that didn't run cleanly
@@ -192,7 +193,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
   for (const r of jobsIn) insurerIn.set(String(r.insurer ?? 'Unknown'), (insurerIn.get(String(r.insurer ?? 'Unknown')) ?? 0) + 1)
   if (insurerIn.size) add(`Jobs created by insurer: ${[...insurerIn].sort((a, b) => b[1] - a[1]).map(([i, n]) => `${clip(i, 40)} ${n}`).join(', ')}.`)
   const kpis: [string, string, string][] = [['contact', 'kpi_contacted_at', 'kpi_contact_due'], ['booking', 'kpi_booked_at', 'kpi_booking_due'], ['visit', 'kpi_visited_at', 'kpi_visit_due'], ['report', 'kpi_reported_at', 'kpi_report_due']]
-  const kpiRows = await Promise.all(kpis.map(([, at, due]) => rows(db.from('jobs').select(`insurer, ${at}, ${due}`).eq('tenant_id', tenantId).gte(at, fromIso).lt(at, toIso).limit(5000))))
+  const kpiRows = await Promise.all(kpis.map(([, at, due]) => rows(db.from('jobs').select(`insurer, ${at}, ${due}`).eq('tenant_id', tenantId).or(IRC_JOBS).gte(at, fromIso).lt(at, toIso).limit(5000))))
   kpis.forEach(([name, at, due], i) => {
     const by = new Map<string, { met: number; missed: number; lateHours: number }>()
     for (const r of kpiRows[i]) {
@@ -208,7 +209,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
 
   // Jobs sitting in a stage (only meaningful just after the period)
   if (period.to >= addDays(perthDay(now), -2)) {
-    const open = await rows(db.from('jobs').select('current_stage, current_stage_updated_at').eq('tenant_id', tenantId).is('completion_approved_at', null).is('lapsed_at', null).limit(5000))
+    const open = await rows(db.from('jobs').select('current_stage, current_stage_updated_at').eq('tenant_id', tenantId).or(IRC_JOBS).is('completion_approved_at', null).is('lapsed_at', null).limit(5000))
     const byStage = new Map<string, { n: number; old: number }>()
     const twoWeeks = Date.parse(toIso) - 14 * 86_400_000
     for (const r of open) {

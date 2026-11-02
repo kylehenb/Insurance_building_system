@@ -4546,6 +4546,11 @@ Migration `20261123_health_monitoring.sql`. Only the server writes or reads thes
 | **system** sum | the days added up, but only from `SYSTEM_TRACKING_SINCE` (3 Nov 2026). Before then the figure is left out, not zero | AI requests / failed / spend / unpriced, scheduled job runs / failed / partial, errors logged, alerts raised |
 | **snapshot** (last) | the latest day's value. Taken each night, so it can't be worked out for past days | open jobs, owed to us, owed over 30 days, open alerts, database size, file storage used (`public.health_storage_stats()`) |
 
+**Midcity** (a separate business run from the same system, §AGENTS / `lib/jobs/field-app.ts`) is left out of IRC's figures and review facts:
+- Its jobs are filtered with `IRC_JOBS` (`insurer.is.null,insurer.neq.Midcity`). A plain `neq` would also drop jobs with no insurer.
+- Records on its jobs (inspections, quotes, work orders, signing, invoices, emails, action cards, activity) are dropped by `job_id`.
+- Its AI use (features starting `midcity-`) is counted apart as `midcity_ai_calls` / `midcity_ai_cost_usd` (`METRICS_VERSION` 2).
+
 Each figure is counted on the Perth day of its own date: for example `created_at`, `form_submitted_at`, `completion_approved_at`, an invoice's `issued_date` / `paid_date`, or a job's `kpi_*_at` compared with its `kpi_*_due`. So past days can be worked out again at any time.
 
 **The nightly run** (`/api/health/daily`, 12:23am Perth, `runDailyFigures` in `lib/health/daily.ts`):
