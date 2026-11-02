@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse, userAgent } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
+import { CRON_ROUTES } from "@/lib/cron-routes";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -93,16 +94,6 @@ export async function proxy(request: NextRequest) {
 
   return supabaseResponse;
 }
-
-/** The vercel.json crons not under /api/gmail/ — add new ones here too (a test checks) */
-export const CRON_ROUTES = new Set([
-  "/api/accounting/poll-payments",
-  "/api/field/submission-watchdog",
-  "/api/reports/index-embeddings",
-  "/api/signing/reminders",
-  "/api/learning/review",
-  "/api/calendar/sync",
-]);
 
 export const config = {
   matcher: [

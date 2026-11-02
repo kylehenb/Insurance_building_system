@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
-import { CRON_ROUTES } from '../proxy'
+import { CRON_ROUTES } from '../lib/cron-routes'
 
 // Vercel calls the crons with no session, so the proxy must let each one
 // through (it would send them to the login page otherwise) — and each one
