@@ -308,7 +308,10 @@ export async function syncCalendars(db: SupabaseClient, calendar: () => calendar
         const message = err instanceof Error ? err.message : String(err)
         console.error(`[calendar] sync of ${calendarId} failed:`, err)
         result.errors.push(`${calendarId}: ${message}`)
-        await db.from('calendar_sync_state').update({ sync_error: message.slice(0, 500) }).eq('tenant_id', row.tenant_id).eq('calendar_id', calendarId)
+        // Kept even when the very first read fails, so it can be seen
+        const error = { sync_error: message.slice(0, 500), synced_at: now() }
+        const { data: had } = await db.from('calendar_sync_state').update(error).eq('tenant_id', row.tenant_id).eq('calendar_id', calendarId).select('calendar_id')
+        if (!(had as unknown[] | null)?.length) await db.from('calendar_sync_state').insert({ tenant_id: row.tenant_id, calendar_id: calendarId, ...error })
       }
     }
     result.linked += (await linkEvents(db, row.tenant_id)).linked
