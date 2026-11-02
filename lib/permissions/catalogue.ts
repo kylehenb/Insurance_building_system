@@ -66,6 +66,7 @@ export const PERMISSION_ACTIONS = [
   // Admin
   { key: 'settings.edit', group: 'Admin', label: 'Change company settings', description: 'Templates, automation, rates, integrations and company details', levels: ON_OFF, enforced: true },
   { key: 'users.manage', group: 'Admin', label: 'Manage users and permissions', description: 'Change roles and these permissions', levels: ON_OFF, enforced: true },
+  { key: 'health.view', group: 'Admin', label: 'See the health check', description: 'The System & business health panel on the dashboard: AI spend, failures, limits, how busy the office has been', levels: ON_OFF, enforced: true },
 ] as const satisfies readonly PermissionAction[]
 
 export type PermissionKey = typeof PERMISSION_ACTIONS[number]['key']
@@ -105,6 +106,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'excess.decide': 'allowed',
     'settings.edit': 'blocked',
     'users.manage': 'blocked',
+    'health.view': 'blocked',
   },
   inspector: {
     'jobs.notes': 'allowed',
@@ -126,6 +128,7 @@ export const BUILT_IN_DEFAULTS: Record<Role, Record<PermissionKey, PermissionLev
     'excess.decide': 'blocked',
     'settings.edit': 'blocked',
     'users.manage': 'blocked',
+    'health.view': 'blocked',
   },
 }
 

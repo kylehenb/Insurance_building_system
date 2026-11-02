@@ -2917,6 +2917,8 @@ AI_REVIEW_MODEL=                   # optional, the morning job review (§23.14),
 HEALTH_ALERT_EMAIL=                # optional, comma-separated; who gets the watcher's alert emails. Default: every admin
 HEALTH_AI_DAILY_ALERT_USD=         # optional, alert when AI spend in 24 hours reaches this (US$), default 25
 HEALTH_ERROR_SPIKE=                # optional, alert at this many logged errors in an hour, default 25
+HEALTH_DB_LIMIT_GB=                # optional, the plan's database size for the Limits light, default 8
+HEALTH_STORAGE_LIMIT_GB=           # optional, the plan's file storage for the Limits light, default 100
 AI_PRICES=                         # optional JSON, adds or overrides model prices (US$ per million tokens), e.g. {"gemini-3.5-flash":{"input":1.5,"output":9}}
 
 # App
@@ -4475,8 +4477,8 @@ Settings → **What the AI has learned**. Anyone signed in can read it; turning 
 
 A weekly check of the system and the business: limits being reached, AI spend, security, failures (seen and silent), how busy the office was, what worked and what didn't, and suggested changes. Built in parts:
 
-1. **Recording (built Nov 2026):** the records the check reads, kept as things happen. Vercel and Supabase only keep their own logs for a few days. Also an immediate alert watcher.
-2. **Daily figures:** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
+1. **Recording (built Nov 2026, §25.1–25.2):** the records the check reads, kept as things happen. Vercel and Supabase only keep their own logs for a few days. Also an immediate alert watcher.
+2. **Daily figures (built Nov 2026, §25.3):** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
 3. **AI write-up:** for each finished period, written once from the figures and saved. Every claim cites its evidence.
 4. **Suggestions:** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
 5. **Voice connector tool:** "how did we go this week?" reads the saved report.
@@ -4523,11 +4525,47 @@ Migration `20261123_health_monitoring.sql`. Only the server writes or reads thes
 
 **Clean-up:** each run also deletes `cron_runs` rows older than 60 days and `system_errors` rows older than a year. `ai_calls` rows are kept.
 
+### 25.3 Daily figures and the health panel (built Nov 2026)
+
+**Daily figures:** `health_daily` holds one row per office per Perth day: `metrics` (key → number), `version` and `computed_at`. Migration `20261124_health_daily.sql`, server only. The figures are listed in `METRICS` (`lib/health/metrics.ts`). Each figure is one of three types:
+
+| Type | How a week / month / quarter / year is worked out | Examples |
+|---|---|---|
+| **sum** | the days added up | orders received, jobs created and completed, emails in / out, inspections submitted, quotes, work orders, sent for signature / signed, invoices issued and paid ($ inc GST), insurer deadlines met / missed, action cards made, AI proposals accepted / edited / instructed / skipped (learning module), staff and voice actions |
+| **system** sum | the days added up, but only from `SYSTEM_TRACKING_SINCE` (3 Nov 2026). Before then the figure is left out, not zero | AI requests / failed / spend / unpriced, scheduled job runs / failed / partial, errors logged, alerts raised |
+| **snapshot** (last) | the latest day's value. Taken each night, so it can't be worked out for past days | open jobs, owed to us, owed over 30 days, open alerts, database size, file storage used (`public.health_storage_stats()`) |
+
+Each figure is counted on the Perth day of its own date: for example `created_at`, `form_submitted_at`, `completion_approved_at`, an invoice's `issued_date` / `paid_date`, or a job's `kpi_*_at` compared with its `kpi_*_due`. So past days can be worked out again at any time.
+
+**The nightly run** (`/api/health/daily`, 12:23am Perth, `runDailyFigures` in `lib/health/daily.ts`):
+- Writes yesterday's figures, with tonight's snapshot reading of levels.
+- Works out the day before again, for records that came in late. Snapshot readings already stored are kept.
+- Fills in every past day that is missing, or was worked out under an older `METRICS_VERSION`. It goes back to the office's first job, order or email (at most 5 years), newest first, 92 days per batch, for as long as the run has time.
+- To add a figure: add it to `METRICS`, work it out in `computeDays`, and bump `METRICS_VERSION`. The history is then rebuilt automatically.
+
+**The health panel:** `components/health/HealthPanel.tsx`, at the top of the dashboard's Today view.
+- Shown only to people with the new permission **`health.view`** ("See the health check", Admin group). It is admins only by default, and `user_permission_level` was updated to match.
+- **Collapsed by default:** one line with a light per area.
+  - **Systems:** red with a critical scheduled-job alert; amber with any job or error alert, or more than 2% of job runs failing.
+  - **AI:** red when a provider is failing; amber on a spend alert, more than 5% failed (with 20+ requests), or a model with no price.
+  - **Limits:** database against `HEALTH_DB_LIMIT_GB` (default 8) and file storage against `HEALTH_STORAGE_LIMIT_GB` (default 100). Amber from 75% full, red from 90%.
+  - **Security:** grey ("Not checked yet").
+  - **Business:** no colour, just busier or quieter than usual: orders, jobs and emails in against the usual, ±10%.
+- **Opened:**
+  - A Week / Month / Quarter / Year switch, and a choice of the current period or the 4 before. Weeks run Monday to Sunday, Perth time.
+  - A note per area and the open alerts.
+  - Every figure grouped as Work in, Work done, Money, On time, AI, Systems, Limits. Each figure shows its value, the change against the period before, and the change against the usual (the average of the 4 periods before).
+- **The current period** counts up to today and is compared with the same number of days of earlier periods. Days the nightly run hasn't written yet (today, and yesterday before 12:23am) are worked out live.
+- **Markers:** "—" means not tracked in that period; "*" means tracked for only part of it.
+
+**API:** `GET /api/health/summary?period=week|month|quarter|year&offset=0..4` returns a `HealthSummary` (`loadSummary`). Needs `health.view`; the tenant comes from the session.
+
 ---
 
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Nov 2026): Added §25.3, health check part 2: `health_daily`, the nightly `/api/health/daily` with automatic backfill, the `health.view` permission, and the collapsed System & business health panel on the Today view (week / month / quarter / year, the current period plus the 4 before).*
 *Changes (Nov 2026): Added Section 25 (Health check), part 1: `ai_calls`, `cron_runs`, `system_errors` and `health_alerts`; `trackAi` on every AI request, `withCronRun` on every cron, `logError` for silent failures, and the `/api/health/watch` alert watcher.*
 *Changes (Oct 2026): Added §23.12 Waiting on (every sent email read once for what it asks; a follow-up for the sender, timed from the office's past waits and the job, closed by a reply, brought forward by a later email, learned from as feature `waiting_on`; `sent_emails`; `list_waiting_on`). Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases; the nightly review keeping the lessons, `learning_reviews`, `/api/learning/review`; the "What the AI has learned" settings page with accuracy by kind and an off switch per lesson; auto-confirm per kind of card, off until turned on, with a banner asking once a kind is 98% untouched over its last 20; order parsing, report writing and photo labels moved onto it, replacing parser_examples and the photo corrections query). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*
 

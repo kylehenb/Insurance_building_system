@@ -1,6 +1,7 @@
 // A small in-memory stand-in for the Supabase query builder, enough for the
 // quote / invoice / work order / report tools and the lib functions they
-// call: filters, ordering, counts, insert / update / delete with .select().
+// call: filters, ordering, counts, paging, insert / update / delete with
+// .select(), and database functions (rpc).
 
 export type Row = Record<string, unknown>
 
@@ -13,10 +14,12 @@ let nextId = 1
 export function fakeSupabase(db: Record<string, Row[]>) {
   function from(table: string) {
     const preds: ((r: Row) => boolean)[] = []
-    let mode: 'select' | 'insert' | 'update' | 'delete' = 'select'
+    let mode: 'select' | 'insert' | 'update' | 'delete' | 'upsert' = 'select'
+    let conflict: string[] = []
     let payload: Row | Row[] | null = null
     let head = false
     let limit = Infinity
+    let offset = 0
     let sort: { col: string; dir: number } | null = null
 
     const rows = () => (db[table] ??= [])
@@ -25,6 +28,15 @@ export function fakeSupabase(db: Record<string, Row[]>) {
       if (mode === 'insert') {
         const list = (Array.isArray(payload) ? payload : [payload!]).map(r => ({ id: `${table}-${nextId++}`, created_at: new Date(Date.UTC(2026, 9, 1, 0, 0, nextId)).toISOString(), ...r }))
         rows().push(...list)
+        return { data: list, count: list.length }
+      }
+      if (mode === 'upsert') {
+        const list = Array.isArray(payload) ? payload : [payload!]
+        for (const r of list) {
+          const hit = rows().find(x => conflict.every(c => x[c] === r[c]))
+          if (hit) Object.assign(hit, r)
+          else rows().push({ id: `${table}-${nextId++}`, ...r })
+        }
         return { data: list, count: list.length }
       }
       if (mode === 'update') {
@@ -42,13 +54,14 @@ export function fakeSupabase(db: Record<string, Row[]>) {
         const { col, dir } = sort
         out = [...out].sort((a, b) => (a[col] === b[col] ? 0 : (a[col] as never) > (b[col] as never) ? dir : -dir))
       }
-      return { data: head ? null : out.slice(0, limit), count: out.length }
+      return { data: head ? null : out.slice(offset, offset + limit), count: out.length }
     }
 
     const b: Record<string, unknown> = {
       select: (_cols?: string, opts?: { head?: boolean }) => { if (opts?.head) head = true; return b },
       insert: (p: Row | Row[]) => { mode = 'insert'; payload = p; return b },
       update: (p: Row) => { mode = 'update'; payload = p; return b },
+      upsert: (p: Row | Row[], o?: { onConflict?: string }) => { mode = 'upsert'; payload = p; conflict = (o?.onConflict ?? 'id').split(','); return b },
       delete: () => { mode = 'delete'; return b },
       eq: (c: string, v: unknown) => { preds.push(r => r[c] === v); return b },
       neq: (c: string, v: unknown) => { preds.push(r => r[c] !== v); return b },
@@ -61,12 +74,18 @@ export function fakeSupabase(db: Record<string, Row[]>) {
       is: (c: string, v: unknown) => { preds.push(r => (r[c] ?? null) === v); return b },
       in: (c: string, vs: unknown[]) => { preds.push(r => vs.includes(r[c])); return b },
       ilike: (c: string, p: string) => { preds.push(r => likeToRegex(p).test(String(r[c] ?? ''))); return b },
-      // Only "<col>.is.null,<col>.neq.<value>"
+      // "<col>.<eq|neq|is>.<value>,…" — any one matching
       or: (expr: string) => {
-        const [, col, value] = expr.match(/^(\w+)\.is\.null,\w+\.neq\.(\w+)$/) ?? []
-        preds.push(r => r[col] == null || r[col] !== value)
+        const terms = expr.split(',').map(t => {
+          const [, col, op, value] = t.match(/^(\w+)\.(eq|neq|is)\.(.+)$/) ?? []
+          return (r: Row) => op === 'is' ? (r[col] ?? null) === (value === 'null' ? null : value)
+            : op === 'eq' ? String(r[col]) === value
+            : r[col] == null || String(r[col]) !== value
+        })
+        preds.push(r => terms.some(t => t(r)))
         return b
       },
+      range: (a: number, z: number) => { offset = a; limit = z - a + 1; return b },
       order: (col: string, o?: { ascending?: boolean }) => { sort = { col, dir: o?.ascending === false ? -1 : 1 }; return b },
       limit: (n: number) => { limit = n; return b },
       single: async () => {
@@ -83,5 +102,7 @@ export function fakeSupabase(db: Record<string, Row[]>) {
     }
     return b
   }
-  return { from }
+  // db['rpc:<name>'] holds what a database function returns
+  const rpc = async (name: string) => ({ data: db[`rpc:${name}`] ?? null, error: null })
+  return { from, rpc }
 }

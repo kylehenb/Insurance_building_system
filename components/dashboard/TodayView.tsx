@@ -8,6 +8,7 @@ import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import { useCurrentUser } from '@/components/layout/current-user'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { describePhase } from '@/lib/jobs/phase'
+import { HealthPanel } from '@/components/health/HealthPanel'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -382,6 +383,9 @@ export function TodayView() {
       `}</style>
 
       <div className="dash-main">
+
+        {/* ── SYSTEM & BUSINESS HEALTH (admins; collapsed) ── */}
+        <HealthPanel />
 
         {/* ── AI CHAT ── */}
         <div className="ai-hero">
