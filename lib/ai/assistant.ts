@@ -53,7 +53,7 @@ work_orders: id, tenant_id, job_id, quote_id, trade_id, report_id, blueprint_id,
 
 work_order_visits: id, tenant_id, work_order_id, job_id, visit_number, estimated_hours, scheduled_date, scheduled_end_date, confirmed_date, status, lag_days_after, lag_description, gary_triggered_at, gary_return_trigger_at, trade_confirmed_at, notes, created_at
 
-action_queue (action cards — the starred to-do list; prefer list_action_cards): id, tenant_id, job_id, source ('email' | 'rule'), source_ref (Gmail thread id), title, description, reasoning, steps, status (queued, generating, pending, running, failed = on the list; done, skipped, no_action), category (invoice = Invoices to pay, attend_submit = Attend and Submit, other = Everything else), starred_by, priority (90 urgent, 50 normal, 20 low), outcome, confirmed_by, confirmed_at, error_log, created_at
+action_queue (action cards — the to-do list, in piles; prefer list_action_cards): id, tenant_id, job_id, source ('email' | 'rule'), source_ref (Gmail thread id), title, description, reasoning, steps, status (queued, generating, pending, running, failed = on the list; done, skipped, no_action), category (the pile: new_work, insurer = Insurer & client, trades, reports_quotes, money), starred_by (put on the list by hand), pile_by (pile chosen by hand), ai_category (the pile the AI chose), priority (90 urgent, 50 normal, 20 low), outcome, confirmed_by, confirmed_at, error_log, created_at
 
 communications: id, tenant_id, job_id, inspection_id, work_order_id, type, direction, contact_type, contact_name, contact_detail, subject, content, attachments, ai_extracted_notes, requires_action, action_queue_id, persona, parse_confidence, linked_to, created_by, created_at
 

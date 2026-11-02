@@ -39,11 +39,11 @@ beforeEach(() => {
   discarded.length = 0
   create.mockReset()
   create.mockImplementation(async () => {
-    const blocks = [...answer.map((a, i) => ({ type: 'tool_use', id: `t${i}`, name: a.name, input: a.input })), { type: 'tool_use', id: 'fin', name: 'finish_card', input: { needs_action: true, title: 'New title', summary: 'New summary', priority: 'normal', category: 'other' } }]
+    const blocks = [...answer.map((a, i) => ({ type: 'tool_use', id: `t${i}`, name: a.name, input: a.input })), { type: 'tool_use', id: 'fin', name: 'finish_card', input: { needs_action: true, title: 'New title', summary: 'New summary', priority: 'normal', category: 'insurer' } }]
     return { content: blocks, stop_reason: 'tool_use', usage: { input_tokens: 1, output_tokens: 1 } }
   })
   tables.users = [{ id: 'u1', tenant_id: 't1', role: 'admin', created_at: '2026-01-01' }]
-  tables.action_queue = [{ id: 'k1', tenant_id: 't1', job_id: 'j1', source: 'email', source_ref: 'th1', status: 'pending', title: 'Reply to Casey', description: 'Casey asked about access', steps: structuredClone(STEPS), category: 'other', updated_at: 'then' }]
+  tables.action_queue = [{ id: 'k1', tenant_id: 't1', job_id: 'j1', source: 'email', source_ref: 'th1', status: 'pending', title: 'Reply to Casey', description: 'Casey asked about access', steps: structuredClone(STEPS), category: 'insurer', updated_at: 'then' }]
 })
 
 describe('replaceStep', () => {

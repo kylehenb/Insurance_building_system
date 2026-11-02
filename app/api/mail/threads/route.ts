@@ -18,7 +18,7 @@ const FRESH_MS = 30_000
 //   tab     primary | promotions | social — inbox only
 //   filing  job | to_file | admin — where it stands in IRC
 //   starred 1 — the Starred folder: conversations with a live action card
-//           (folder is ignored); star = invoice | attend_submit | other
+//           (folder is ignored); star = a pile: new_work | insurer | trades | reports_quotes | money
 //   q       Gmail search syntax; searches Gmail instead of the mirror
 //   cursor  from the previous page
 export async function GET(req: NextRequest): Promise<NextResponse> {

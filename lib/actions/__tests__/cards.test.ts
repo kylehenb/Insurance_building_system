@@ -87,7 +87,7 @@ const callTool = vi.fn(async (t: { name: string; run(a: Row): unknown }, args: R
 })
 vi.mock('@/lib/mcp/server', () => ({ callTool: (t: never, a: never, c: never) => callTool(t, a, c) }))
 
-const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, nextCategory, updateCardText, markCardDone, reopenCard } = await import('../cards')
+const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, updateCardText, markCardDone, reopenCard } = await import('../cards')
 const { generateCard, describeStep } = await import('../propose')
 const { confirmCard, CardError } = await import('../confirm')
 const { historyArrivals } = await import('@/lib/mail/summary')
@@ -179,34 +179,40 @@ describe('queueing', () => {
   })
 })
 
-describe('stars', () => {
-  it('cycles Invoices to pay → Attend and Submit → Everything else → off', () => {
-    expect([nextCategory(null), nextCategory('invoice'), nextCategory('attend_submit'), nextCategory('other')])
-      .toEqual(['invoice', 'attend_submit', 'other', null])
-  })
-
-  it('stars an email as a new card for the AI to fill in, changes its symbol, and takes it off', async () => {
+describe('piles', () => {
+  it('puts an email on the list in a pile as a new card for the AI to fill in, moves it, and takes it off', async () => {
     tables.mail_threads = [{ tenant_id: 't1', gmail_thread_id: 'th1', subject: 'Plumbing invoice #44' }]
-    expect(await starThread(db as never, 't1', 'th1', 'invoice', 'u1')).toMatchObject({ status: 'queued', title: 'Plumbing invoice #44', category: 'invoice' })
-    expect(tables.action_queue[0]).toMatchObject({ status: 'queued', starred_by: 'u1', category: 'invoice' })
-    await starThread(db as never, 't1', 'th1', 'attend_submit', 'u1')
+    expect(await starThread(db as never, 't1', 'th1', 'money', 'u1')).toMatchObject({ status: 'queued', title: 'Plumbing invoice #44', category: 'money' })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'queued', starred_by: 'u1', pile_by: 'u1', category: 'money' })
+    await starThread(db as never, 't1', 'th1', 'trades', 'u1')
     expect(tables.action_queue).toHaveLength(1)
-    expect(tables.action_queue[0].category).toBe('attend_submit')
-    expect(await starredThreadIds(db as never, 't1', 'attend_submit')).toEqual(['th1'])
-    expect(await starredThreadIds(db as never, 't1', 'invoice')).toEqual([])
+    expect(tables.action_queue[0].category).toBe('trades')
+    expect(await starredThreadIds(db as never, 't1', 'trades')).toEqual(['th1'])
+    expect(await starredThreadIds(db as never, 't1', 'money')).toEqual([])
     expect(await starThread(db as never, 't1', 'th1', null, 'u1')).toBeNull()
     expect(tables.action_queue[0]).toMatchObject({ status: 'done', outcome: 'Star taken off' })
     expect(await starredThreadIds(db as never, 't1')).toEqual([])
   })
 
-  it("keeps the user's own stars when we reply; the AI's close", async () => {
+  it('puts an email on the list for the AI to pick the pile', async () => {
+    tables.mail_threads = [{ tenant_id: 't1', gmail_thread_id: 'th1', subject: 'Roof quote' }]
+    await starThread(db as never, 't1', 'th1', 'auto', 'u1')
+    expect(tables.action_queue[0]).toMatchObject({ status: 'queued', starred_by: 'u1' })
+    expect(tables.action_queue[0].pile_by).toBeUndefined()
+    const card = (await claimQueued(db as never, 1))[0]
+    const { client } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Chase the roofer', summary: 's', priority: 'normal', category: 'trades' } }]])
+    await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'pending', category: 'trades', ai_category: 'trades' })
+  })
+
+  it("keeps the user's own cards when we reply; the AI's close", async () => {
     await queueEmailCard(db as never, 't1', 'th1', 'm1')
     await queueEmailCard(db as never, 't1', 'th2', 'x1')
     for (const r of tables.action_queue) r.status = 'pending'
-    expect(await setCardCategory(db as never, 't1', tables.action_queue[0].id as string, 'invoice', 'u1')).toBe(true)
+    expect(await setCardCategory(db as never, 't1', tables.action_queue[0].id as string, 'money', 'u1')).toBe(true)
     await onMailArrivals(db as never, 't1', { received: [], sentThreadIds: ['th1', 'th2'] })
     expect(tables.action_queue.map(r => r.status)).toEqual(['pending', 'done'])
-    expect(await setCardCategory(db as never, 't1', tables.action_queue[1].id as string, 'invoice', 'u1')).toBe(false)
+    expect(await setCardCategory(db as never, 't1', tables.action_queue[1].id as string, 'money', 'u1')).toBe(false)
   })
 })
 
@@ -224,13 +230,13 @@ describe('generateCard', () => {
         { name: 'send_email', input: { mode: 'reply', conversation_id: 'th1', to: 'casey@gmail.com', body: 'Hi Casey, Thursday works.' } },
         { name: 'add_job_note', input: { job_number: 'IRC1001', note: 'Access Thursday' } },
       ],
-      [{ name: 'finish_card', input: { needs_action: true, title: 'Reply to Casey', summary: 'Casey asks about Thursday.', priority: 'high', category: 'attend_submit' } }],
+      [{ name: 'finish_card', input: { needs_action: true, title: 'Reply to Casey', summary: 'Casey asks about Thursday.', priority: 'high', category: 'reports_quotes' } }],
     ])
     const out = await generateCard(card, { client, db: db as never, tools: TOOLS as never })
     expect(TOOLS[0].run).toHaveBeenCalledOnce()
     expect(TOOLS[1].run).not.toHaveBeenCalled()
     expect(TOOLS[3].run).not.toHaveBeenCalled()
-    expect(out).toMatchObject({ status: 'pending', title: 'Reply to Casey', priority: 90, job_id: 'j1', error_log: null, category: 'attend_submit' })
+    expect(out).toMatchObject({ status: 'pending', title: 'Reply to Casey', priority: 90, job_id: 'j1', error_log: null, category: 'reports_quotes' })
     expect(out.steps!.map(s => [s.tool, s.summary, s.kind])).toEqual([
       ['send_email', 'Reply to casey@gmail.com', 'email'],
       ['add_job_note', 'add job note — IRC1001', 'change'],
@@ -247,7 +253,7 @@ describe('generateCard', () => {
       steps: [{ id: 's1', tool: 'send_email', args: {}, summary: 'Reply to casey@gmail.com', kind: 'email' }] }]
     // Already answered: still remade, as asked
     detail = thread({ messages: [{ id: 'm2', labelIds: ['SENT'], from: { name: 'IRC', email: 'office@insurancerepairco.com.au' } }] })
-    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Add a note', summary: 's', priority: 'normal', category: 'other' } }]])
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Add a note', summary: 's', priority: 'normal', category: 'insurer' } }]])
     const out = await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never, feedback: 'Don\'t reply — just note we\'re waiting on the insurer' })
     expect(out.status).toBe('pending')
     const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
@@ -262,7 +268,7 @@ describe('generateCard', () => {
       follow_up: { note: 'Chase the roof quote', who: 'Ace Roofing', thread_id: 'abc1', from_card_id: null, created_by: 'u1' } }]
     const { client, create } = model([
       [{ name: 'send_email', input: { mode: 'reply', conversation_id: 'abc1', body: 'Hi, just following up on the roof quote.' } }],
-      [{ name: 'finish_card', input: { needs_action: false, title: 'Chase Ace Roofing for the quote', summary: 'No quote yet.', priority: 'normal', category: 'other' } }],
+      [{ name: 'finish_card', input: { needs_action: false, title: 'Chase Ace Roofing for the quote', summary: 'No quote yet.', priority: 'normal', category: 'insurer' } }],
     ])
     const out = await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })
     expect(out).toMatchObject({ status: 'pending', title: 'Chase Ace Roofing for the quote', job_id: 'j1' })
@@ -275,7 +281,7 @@ describe('generateCard', () => {
   it('lets a check IRC planned find nothing\'s needed, unlike a follow-up the office set', async () => {
     tables.action_queue = [{ id: 'w1', tenant_id: 't1', source: 'followup', source_ref: null, job_id: 'j1', status: 'generating', attempts: 1, title: 'Check: Did the painter go?', steps: [], created_at: '2026-11-01T22:37:00Z',
       follow_up: { kind: 'watch', note: 'Did the painter go on Saturday? If so, close and invoice.', who: 'Great Lengths', thread_id: null, from_card_id: null, created_by: 'u1', watch: { why: 'Due Saturday', planned_at: '2026-11-01T22:37:00Z' } } }]
-    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Painter went Saturday', summary: 'A note on Saturday says painting is done; the invoice has gone.', priority: 'low', category: 'other' } }]])
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Painter went Saturday', summary: 'A note on Saturday says painting is done; the invoice has gone.', priority: 'low', category: 'insurer' } }]])
     expect(await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action' })
     expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toMatch(/^Today: .*\n\nA CHECK IRC PLANNED \(reviewing the job on .*, for today\): "Did the painter go on Saturday\? If so, close and invoice\."\nWhy: Due Saturday/)
   })
@@ -289,7 +295,7 @@ describe('generateCard', () => {
       { id: 'a1', tenant_id: 't1', source: 'appointment', source_ref: 'e1', job_id: 'j1', status: 'generating', attempts: 1, title: 'After: IRC1001 site meeting', steps: [] },
       { id: 'a2', tenant_id: 't1', source: 'appointment', source_ref: 'e2', job_id: 'j1', status: 'generating', attempts: 1, title: 'After: IRC1001 cancelled', steps: [] },
     ]
-    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Site meeting sorted', summary: 'The note says all good.', priority: 'low', category: 'other' } }]])
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Site meeting sorted', summary: 'The note says all good.', priority: 'low', category: 'insurer' } }]])
     expect(await generateCard(tables.action_queue[0] as never, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action', title: 'Site meeting sorted' })
     const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
     expect(first).toMatch(/^Today: .*\n\nAN APPOINTMENT CHECK-IN: this appointment on IRC1001 has ended\.\n"IRC1001 site meeting", Saturday 31 October at 1:00 pm to Saturday 31 October at 2:00 pm, at 3 Elm St/)
@@ -303,7 +309,7 @@ describe('generateCard', () => {
     tables.insurer_orders = [{ tenant_id: 't1', job_id: 'j1', claim_number: 'CHCCLM010001723', created_at: '2026-10-06T03:45:00Z',
       raw_email_body: 'New Quote/Report Request\nClaim: CHCCLM010001723\nInsured: Charlie and Nina Ball' }]
     const card = await claimed()
-    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Allocate an electrician', summary: 's', priority: 'high', category: 'other' } }]])
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Allocate an electrician', summary: 's', priority: 'high', category: 'insurer' } }]])
     await generateCard(card, { client, db: db as never, tools: TOOLS as never })
     const first = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
     expect(first).toContain('MORE ON A CLAIM THAT ALREADY HAS AN ORDER')
@@ -317,7 +323,7 @@ describe('generateCard', () => {
       follow_up: { kind: 'waiting_on', thread_id: 'abc2', waiting: { name: 'Sparky Bros', asked: 'the switchboard photos', sent_at: '2099-10-29T02:00:00.000Z', on_behalf_of: null } } }]
     const card = await claimed()
     const { client, create } = model([[{ name: 'finish_card', input: {
-      needs_action: true, title: 'Reply to Casey', summary: 's', priority: 'high', category: 'other',
+      needs_action: true, title: 'Reply to Casey', summary: 's', priority: 'high', category: 'insurer',
       chase_sooner: [{ follow_up_id: 'w1', when: 'now', reason: 'Casey is complaining about the delay' }],
     } }]])
     await generateCard(card, { client, db: db as never, tools: TOOLS as never })
@@ -342,18 +348,18 @@ describe('generateCard', () => {
     expect(await generateCard(card, { client, db: db as never, tools: TOOLS as never })).toMatchObject({ status: 'no_action', steps: [], priority: 20 })
   })
 
-  it("keeps a star the user set: their symbol, and on the list even when there's nothing to do or we've replied", async () => {
+  it("keeps a pile the user set, and on the list even when there's nothing to do or we've replied", async () => {
     tables.mail_threads = [{ tenant_id: 't1', gmail_thread_id: 'th1', subject: 'Invoice' }]
-    await starThread(db as never, 't1', 'th1', 'invoice', 'u1')
+    await starThread(db as never, 't1', 'th1', 'money', 'u1')
     const card = (await claimQueued(db as never, 1))[0]
     detail = thread({ messages: [{ id: 'm1', labelIds: ['INBOX'], from: { email: 'casey@gmail.com' } }, { id: 'm2', labelIds: ['SENT'], from: { email: 'office@insurancerepairco.com.au' } }] })
-    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Invoice from Bob', summary: 'An invoice.', priority: 'low', category: 'other' } }]])
+    const { client, create } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Invoice from Bob', summary: 'An invoice.', priority: 'low', category: 'insurer' } }]])
     const out = await generateCard(card, { client, db: db as never, tools: TOOLS as never })
     expect(create).toHaveBeenCalledOnce()
-    expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toContain('starred this email themselves')
+    expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toContain('put this email on their list themselves')
     expect(out).toMatchObject({ status: 'pending', title: 'Invoice from Bob' })
     expect(out.category).toBeUndefined()
-    expect(tables.action_queue[0]).toMatchObject({ status: 'pending', category: 'invoice' })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'pending', category: 'money', ai_category: 'insurer' })
   })
 
   it("skips the model when we've already replied, or the conversation is in the Bin", async () => {

@@ -54,7 +54,7 @@ const FINISH: Anthropic.Beta.BetaTool = {
       category: {
         type: 'string',
         enum: CATEGORIES.map(c => c.key),
-        description: 'invoice: a bill or invoice IRC has to pay (a trade, supplier or subcontractor invoice). attend_submit: a job to attend (inspection, make safe, site visit) or a report or quote to finish and submit after attending. other: everything else.',
+        description: `The pile of work it goes in. ${CATEGORIES.map(c => `${c.key}: ${c.description}`).join('. ')}.`,
       },
       job_number: { type: 'string', description: 'The job this is about, if you worked it out and the conversation is not on it yet.' },
       chase_sooner: {
@@ -83,13 +83,13 @@ How it works:
 - Replies: send_email with mode "reply" and the conversation_id. Write the body as plain text in the office's voice — friendly, short, Australian English, a greeting with the person's first name. No sign-off or signature: the company signature is added. Don't promise dates, amounts or anything the job file doesn't support; if something needs the office to decide, leave a clear [placeholder] for them.
 - If the conversation isn't on a job and you can tell which job it's about, propose file_conversation with that job_number first. If it's an insurer's new work order that hasn't become an order, propose create_order_from_email.
 - Notifications, newsletters, receipts, spam-like mail, thank-yous and FYIs need nothing: call finish_card with needs_action false (you may propose organise_emails archive if it's clutter).
-- Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
-- If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
+- Pick the pile (category) by the work the next step is: new_work (lodge or book new work), insurer (the insurer, adjuster or homeowner), trades (a trade or supplier), reports_quotes (our report or quote to write or send) or money (pay, invoice, excess, payment). Past cases show where the office moved cards: follow them.
+- If the user put the email on their list themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
 - The first message may show WHAT THE OFFICE DID IN SIMILAR PAST CASES and LESSONS FROM THE OFFICE'S PAST DECISIONS. Their habits there outweigh your own defaults — who to write to and copy in, how they word things, which steps they keep, drop or add — but only where this case matches in the ways that matter. Say in reasoning when a past case shaped a step.
 - If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view and the past cases. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
 - AN APPOINTMENT CHECK-IN comes after a job's calendar appointment (an inspection, a make safe, a site meeting) has ended. Look at what's been recorded on the job since it started: job notes, emails, the field app, reports, quotes, work orders. Then:
   - Sorted: a note says it went fine and nothing more is needed, or everything that should follow is done (e.g. the report is already sent). Call finish_card with needs_action false and say so in the summary.
-  - Something outstanding: e.g. the report or make safe report is drafted but not sent (the insurer's report KPI is in the job file), or a note mentions a problem ("the tiles need replacing"). Propose the steps that move it on, and use category attend_submit for a report or quote to finish and send.
+  - Something outstanding: e.g. the report or make safe report is drafted but not sent (the insurer's report KPI is in the job file), or a note mentions a problem ("the tiles need replacing"). Propose the steps that move it on, and use category reports_quotes for a report or quote to finish and send.
   - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
 - set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question.
@@ -129,7 +129,7 @@ export function describeStep(tool: McpTool, args: Record<string, unknown>): { su
 
 const today = () => new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date())
 
-type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log' | 'category' | 'ai_steps' | 'situation'>>
+type Outcome = Partial<Pick<ActionCard, 'title' | 'description' | 'reasoning' | 'steps' | 'status' | 'priority' | 'job_id' | 'outcome' | 'error_log' | 'category' | 'ai_category' | 'ai_steps' | 'situation'>>
 
 /**
  * Makes one card (already claimed: status generating). Returns what was
@@ -263,14 +263,15 @@ export async function generateCard(
     }
     const priority = PRIORITY[(str('priority') || 'normal') as keyof typeof PRIORITY] ?? PRIORITY.normal
 
-    // Starred (or re-starred) by the user while it was being read? Then it
-    // stays, with their symbol
-    const { data: latestRow } = await db.from('action_queue').select('starred_by').eq('id', card.id).maybeSingle()
+    // Put on the list by the user while it was being read? Then it stays
+    const { data: latestRow } = await db.from('action_queue').select('starred_by, pile_by').eq('id', card.id).maybeSingle()
     const starred = !!(latestRow as { starred_by: string | null } | null)?.starred_by
+    // A pile the office picked stays
+    const pileSet = !!(latestRow as { pile_by?: string | null } | null)?.pile_by
     // A follow-up stays on the list: the office asked to be reminded
     // A follow-up the office set stays on the list; a check IRC planned itself can find nothing's needed
     const needsAction = starred || (card.source === 'followup' && card.follow_up?.kind !== 'watch') || f.needs_action !== false || steps.length > 0
-    const category = isCategory(f.category) ? f.category : 'other'
+    const category = isCategory(f.category) ? f.category : 'insurer'
 
     await db.from('action_queue').update({ model: CARD_MODEL, usage }).eq('id', card.id)
     // This email makes a wait on the job more urgent: its chase comes sooner
@@ -280,7 +281,8 @@ export async function generateCard(
       await bringForward(db, card.tenant_id, x.follow_up_id, x.when, typeof x.reason === 'string' ? x.reason : '').catch(err => console.error('[action-cards] chase sooner failed:', err))
     }
     return save({
-      ...(starred ? {} : { category }),
+      ...(pileSet ? {} : { category }),
+      ai_category: category,
       status: needsAction ? 'pending' : 'no_action',
       title: str('title') || about.title,
       description: str('summary') || lastText || null,
@@ -345,7 +347,7 @@ async function emailContext(card: ActionCard, db: SupabaseClient, ctx: McpContex
   // What the office is waiting on: the wait this answered, and others on the job it may make urgent
   const waits = await waitBrief(db, card.tenant_id, card.source_ref, detail.job?.id ?? null)
   return {
-    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user starred this email themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${orderUpdate ? `\n\n${orderUpdate}` : ''}${waits ? `\n\n${waits}` : ''}`,
+    intro: `conversation_id: ${card.source_ref}${card.starred_by ? '\n\nThe user put this email on their list themselves, as a to-do.' : ''}\n\nTHE CONVERSATION\n${conversation}\n\nTHE JOB FILE\n${jobFile}${orderUpdate ? `\n\n${orderUpdate}` : ''}${waits ? `\n\n${waits}` : ''}`,
     jobId: detail.job?.id ?? null,
     title: detail.subject || 'New email',
     situation: await cardSituation(db, card.tenant_id, { kind: 'email', sender, subject: detail.subject, jobId: detail.job?.id ?? null }),

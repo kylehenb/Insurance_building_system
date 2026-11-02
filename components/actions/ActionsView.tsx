@@ -5,18 +5,25 @@ import { CATEGORIES, type CardCategory, type CardView, type CardWithContext } fr
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
 import { StarIcon } from './Star'
+import { bundleCards, todayBundles, type Bundle } from '@/lib/actions/bundles'
 import { FollowUps } from './FollowUps'
 import { AutoConfirmBanner } from '@/components/learning/AutoConfirm'
 
 // The Action cards view on the dashboard: everything that needs the office,
-// most urgent first — the AI's suggestions for incoming email (and, later,
-// texts and time rules), plus approvals waiting on the user. Cards stay put
-// as they change; when one is done or skipped, the next one takes its place
-// in view (its top, if you had scrolled down into the one that went).
+// most urgent first — the AI's suggestions for incoming email, follow-ups and
+// checks, plus approvals waiting on the user. Cards sit in piles (New work,
+// Insurer & client, Trades, Reports & quotes, Money) and a job's cards are
+// bundled together. Today (the default) shows the first 15 bundles. Cards
+// stay put as they change; when one is done or skipped, the next one takes
+// its place in view (its top, if you had scrolled down into the one that went).
+
+type Tab = CardView | 'today'
+type PileCount = { key: CardCategory; label: string; cards: number; jobs: number }
 
 const POLL_MS = 15_000
-const VIEWS: { key: CardView; label: string }[] = [
-  { key: 'pending', label: 'Needs action' },
+const VIEWS: { key: Tab; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'pending', label: 'Everything' },
   { key: 'upcoming', label: 'Follow-ups' },
   { key: 'done', label: 'Done' },
 ]
@@ -26,7 +33,8 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   onToast(message: string, error?: boolean): void
   onCount?(pending: number): void
 }) {
-  const [view, setView] = useState<CardView>('pending')
+  const [view, setView] = useState<Tab>('today')
+  const [piles, setPiles] = useState<PileCount[]>([])
   const [category, setCategory] = useState<CardCategory | null>(null)
   const [cards, setCards] = useState<CardWithContext[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,10 +45,11 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   const load = useCallback(async () => {
     if (view === 'upcoming') return
     try {
-      const res = await fetch(`/api/actions?view=${view}${category ? `&category=${category}` : ''}`)
+      const res = await fetch(`/api/actions?view=${view === 'today' ? 'pending' : view}${category ? `&category=${category}` : ''}`)
       const body = await res.json()
       if (!res.ok) throw new Error(body.error ?? 'Could not load action cards')
       setCards(body.cards)
+      setPiles(body.piles ?? [])
       setError(null)
       onCount?.(body.pending)
     } catch (err) {
@@ -60,7 +69,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
     if (card) {
       setCards(prev => {
         if (!prev) return prev
-        const stillHere = (view === 'pending' ? ['queued', 'generating', 'pending', 'running', 'failed'].includes(card.status) : true)
+        const stillHere = (view !== 'done' ? ['queued', 'generating', 'pending', 'running', 'failed'].includes(card.status) : true)
           && (!category || card.category === category)
         if (stillHere) return prev.map(c => (c.id === card.id ? card : c))
         // Its top was scrolled out of view: the next card would show from its middle
@@ -91,27 +100,43 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
             <button key={v.key} role="tab" aria-selected={view === v.key} className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)}>{v.label}</button>
           ))}
         </div>
-        {view !== 'upcoming' && <div className="av-stars" role="group" aria-label="Filter by star">
+        {view !== 'upcoming' && <div className="av-stars" role="group" aria-label="Filter by pile">
           <button className={!category ? 'on' : ''} onClick={() => setCategory(null)}>All</button>
-          {CATEGORIES.map(c => (
-            <button key={c.key} className={category === c.key ? 'on' : ''} onClick={() => setCategory(c.key)}>
-              <StarIcon category={c.key} size={14} /> {c.label}
-            </button>
-          ))}
+          {CATEGORIES.map(c => {
+            const n = view === 'done' ? 0 : piles.find(p => p.key === c.key)?.cards ?? 0
+            return (
+              <button key={c.key} className={category === c.key ? 'on' : ''} onClick={() => setCategory(c.key)}>
+                <StarIcon category={c.key} size={14} /> {c.label}{n > 0 && <span className="av-n">{n}</span>}
+              </button>
+            )
+          })}
         </div>}
       </div>
       <div className="av-list" ref={listRef}>
         {view === 'upcoming' && <FollowUps onMessage={onToast} />}
-        {view === 'pending' && <AutoConfirmBanner />}
-        {view === 'pending' && <ApprovalsPanel />}
+        {view !== 'upcoming' && view !== 'done' && <AutoConfirmBanner />}
+        {view !== 'upcoming' && view !== 'done' && <ApprovalsPanel />}
         {view !== 'upcoming' && cards === null && !error && <div className="mail-empty">Loading…</div>}
         {error && <div className="mail-empty is-error">{error}</div>}
         {view !== 'upcoming' && cards?.length === 0 && (
-          <div className="mail-empty">{view === 'pending' ? (category ? 'Nothing starred here.' : 'All caught up — nothing needs you right now.') : 'Nothing done yet.'}</div>
+          <div className="mail-empty">{view !== 'done' ? (category ? 'Nothing in this pile.' : 'All caught up — nothing needs you right now.') : 'Nothing done yet.'}</div>
         )}
-        {view !== 'upcoming' && cards?.map(card => (
+        {view === 'done' && cards?.map(card => (
           <ActionCardView key={card.id} card={card} onChanged={changed} onOpenConversation={onOpenConversation} />
         ))}
+        {(view === 'today' || view === 'pending') && cards && (() => {
+          const { shown, more } = view === 'today' ? todayBundles(cards) : { shown: bundleCards(cards), more: 0 }
+          return (
+            <>
+              {shown.map(b => (b.cards.length === 1
+                ? <ActionCardView key={b.key} card={b.cards[0]} onChanged={changed} onOpenConversation={onOpenConversation} />
+                : <CardBundle key={b.key} bundle={b} onChanged={changed} onOpenConversation={onOpenConversation} />))}
+              {more > 0 && (
+                <button className="av-more" onClick={() => setView('pending')}>{more} more {more === 1 ? 'job or card' : 'jobs and cards'} — show everything</button>
+              )}
+            </>
+          )
+        })()}
       </div>
       <style>{`
         .av { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -124,6 +149,44 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
         .av-stars button { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: 0.5px solid transparent; border-radius: 14px; padding: 4px 10px; cursor: pointer; }
         .av-stars button:hover { background: var(--surface-2); }
         .av-stars button.on { border-color: var(--line-strong); background: var(--surface-2); color: var(--ink); font-weight: 600; }
+        .av-n { font-size: 10.5px; font-weight: 600; color: var(--grey-600); background: var(--surface-2); border-radius: 8px; padding: 1px 6px; }
+        .av-more { display: block; width: 100%; margin-top: 8px; padding: 10px; font: inherit; font-size: 13px; color: var(--grey-600); background: var(--paper); border: 0.5px dashed var(--line-strong); border-radius: 8px; cursor: pointer; }
+        .av-more:hover { color: var(--ink); }
+      `}</style>
+    </div>
+  )
+}
+
+/** A job's cards together: its number and what's to do, opening to the cards themselves */
+function CardBundle({ bundle, onChanged, onOpenConversation }: {
+  bundle: Bundle<CardWithContext>
+  onChanged(card: CardWithContext | null, message: string, isError?: boolean): void
+  onOpenConversation(threadId: string): void
+}) {
+  const [open, setOpen] = useState(false)
+  const job = bundle.cards[0].job
+  return (
+    <div className="ab">
+      <button type="button" className="ab-head" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <span className="ab-job">{job?.job_number ?? 'Job'}{job?.insured_name ? ` — ${job.insured_name}` : ''}</span>
+        <span className="ab-n">{bundle.cards.length} to do</span>
+        <span className="ab-caret" aria-hidden>{open ? '▾' : '▸'}</span>
+      </button>
+      {!open && (
+        <ul className="ab-items">
+          {bundle.cards.map(c => <li key={c.id}><StarIcon category={c.category} size={12} /> {c.title}</li>)}
+        </ul>
+      )}
+      {open && <div className="ab-cards">{bundle.cards.map(card => <ActionCardView key={card.id} card={card} onChanged={onChanged} onOpenConversation={onOpenConversation} />)}</div>}
+      <style>{`
+        .ab { background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+        .ab-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; font: inherit; background: none; border: none; cursor: pointer; text-align: left; }
+        .ab-job { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .ab-n { font-size: 11px; font-weight: 600; color: var(--tan); background: #faf5ee; border: 0.5px solid var(--line-tan-5); padding: 2px 9px; border-radius: 20px; }
+        .ab-caret { margin-left: auto; color: var(--grey-600); }
+        .ab-items { list-style: none; margin: 0; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 5px; }
+        .ab-items li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--grey-700, #444); }
+        .ab-cards { padding: 0 10px 2px; background: var(--surface-3); }
       `}</style>
     </div>
   )

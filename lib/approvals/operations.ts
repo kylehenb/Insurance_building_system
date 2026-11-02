@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { CATEGORIES } from '@/lib/actions/cards'
 import type { Database } from '@/lib/supabase/database.types'
 import type { PermissionKey } from '@/lib/permissions/catalogue'
 import { sendWorkOrderEmail, type WorkOrderEmailOverrides } from '@/lib/work-orders/work-order-email'
@@ -304,7 +305,7 @@ const lessonStatus: Operation<{ lessonId: string; active: boolean }> = {
   },
 }
 
-const KIND_NAMES: Record<string, string> = { invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else' }
+const KIND_NAMES: Record<string, string> = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]))
 
 // Auto-confirm for a kind of AI proposal (tech spec §24.7): on, its proposals
 // run without anyone confirming them, as the person who turned it on

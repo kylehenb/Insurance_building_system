@@ -24,7 +24,7 @@ const STEPS = [
   { id: 's2', tool: 'add_job_note', args: { note: 'x' }, summary: 'Add job note — x', kind: 'change' },
 ]
 const card = (extra: Row = {}): Row => ({
-  id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', category: 'invoice', starred_by: null, error_log: null,
+  id: 'k1', tenant_id: 't1', source: 'email', source_ref: 'th1', status: 'pending', category: 'money', starred_by: null, error_log: null,
   steps: structuredClone(STEPS), ai_steps: structuredClone(STEPS), situation: {}, attempts: 1, ...extra,
 })
 
@@ -32,7 +32,7 @@ beforeEach(() => {
   for (const k of Object.keys(tables)) delete tables[k]
   ran.length = 0
   level = 'allowed'
-  tables.learning_auto_confirm = [{ tenant_id: 't1', feature: 'action_card', kind: 'invoice', enabled: true, changed_by: 'u7' }]
+  tables.learning_auto_confirm = [{ tenant_id: 't1', feature: 'action_card', kind: 'money', enabled: true, changed_by: 'u7' }]
 })
 
 describe('autoConfirmCard', () => {
@@ -46,7 +46,7 @@ describe('autoConfirmCard', () => {
   })
 
   it('leaves the card when auto-confirm is off for its category', async () => {
-    tables.action_queue = [card({ category: 'other' })]
+    tables.action_queue = [card({ category: 'insurer' })]
     expect(await autoConfirmCard(db as never, 't1', 'k1')).toBeNull()
     tables.learning_auto_confirm[0].enabled = false
     tables.action_queue = [card()]

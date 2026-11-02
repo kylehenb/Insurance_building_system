@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { cardThreadId, type CardCategory, type CardWithContext } from '@/lib/actions/cards'
+import { AUTO_PILE, cardThreadId, pileOf, type CardCategory, type CardWithContext } from '@/lib/actions/cards'
 import { spokenDue } from '@/lib/actions/followups'
-import { StarButton } from './Star'
+import { StarButton, type PilePick } from './Star'
 import { EmailStep } from './EmailStep'
 import { OriginalEmail } from './OriginalEmail'
 import { StepPanel } from './StepPanel'
@@ -127,10 +127,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     await post(`/api/actions/${card.id}/skip`)
     onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, 'Card skipped.')
   })
-  const recategorise = (category: CardCategory | null) => run('star', async () => {
-    if (!category) return
+  const recategorise = (pick: PilePick) => run('star', async () => {
+    if (!pick || pick === AUTO_PILE) return
+    const category: CardCategory = pick
     await post(`/api/actions/${card.id}/category`, { category })
-    onChanged({ ...card, category }, 'Star changed.')
+    onChanged({ ...card, category }, `Moved to ${pileOf(category)?.label}.`)
   })
   const retry = (instructions?: string) => run(instructions ? 'ask' : 'retry', async () => {
     const which = card.source === 'followup' ? { cardId: card.id } : { threadId: card.source_ref }

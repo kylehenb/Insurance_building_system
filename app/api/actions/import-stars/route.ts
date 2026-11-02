@@ -7,7 +7,7 @@ import { getMailbox } from '@/lib/mail/sync'
 export const maxDuration = 300
 
 // POST /api/actions/import-stars — the conversations starred in Gmail go on
-// the list (as Everything else). Safe to run again: ones already on it stay.
+// the list (the AI picks each pile). Safe to run again: ones already on it stay.
 export async function POST(): Promise<NextResponse> {
   const access = await cardAccess(true)
   if (access instanceof NextResponse) return access

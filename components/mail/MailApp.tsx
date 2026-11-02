@@ -22,8 +22,8 @@ import type { ScheduledEmail } from '@/lib/mail/scheduled'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { ActionsView, ConversationCard } from '@/components/actions/ActionsView'
 import { TodayView } from '@/components/dashboard/TodayView'
-import { CATEGORIES, isCategory, nextCategory, type CardCategory, type RowStar } from '@/lib/actions/cards'
-import { StarButton, StarIcon } from '@/components/actions/Star'
+import { AUTO_PILE, CATEGORIES, isCategory, type CardCategory, type RowStar } from '@/lib/actions/cards'
+import { StarButton, StarIcon, type PilePick } from '@/components/actions/Star'
 
 // The mail client: the office Gmail mailbox, laid out like Gmail with no
 // reading pane — a full-width list, and a conversation opens full width.
@@ -482,14 +482,14 @@ function Mail() {
     }
   }
 
-  /** Stars, re-stars (next symbol) or unstars conversations — the star button and s */
-  async function star(ids: string[], category: CardCategory | null) {
+  /** Puts conversations on the list (in a pile, or for the AI to pick), moves them, or takes them off — the pile button and s */
+  async function star(ids: string[], category: PilePick) {
     if (!ids.length) return
     const before = rowCards
     setRowCards(prev => {
       const next = { ...prev }
       for (const id of ids) {
-        if (category) next[id] = { id: prev[id]?.id ?? '', status: prev[id]?.status ?? 'queued', title: prev[id]?.title ?? '', category }
+        if (category) next[id] = { id: prev[id]?.id ?? '', status: prev[id]?.status ?? 'queued', title: prev[id]?.title ?? '', category: category === AUTO_PILE ? prev[id]?.category ?? 'insurer' : category }
         else delete next[id]
       }
       return next
@@ -502,7 +502,7 @@ function Mail() {
     const failed = results.find(r => !r.ok)
     if (failed) {
       setRowCards(before)
-      showToast({ message: failed.body.error ?? 'Could not star the email', error: true })
+      showToast({ message: failed.body.error ?? 'Could not put the email on the list', error: true })
       return
     }
     setRowCards(prev => {
@@ -708,7 +708,7 @@ function Mail() {
           break
         case 's': {
           const t = targets()
-          if (t.length) { e.preventDefault(); star(t, nextCategory(rowCards[t[0]]?.category ?? null)) }
+          if (t.length) { e.preventDefault(); star(t, rowCards[t[0]] ? null : AUTO_PILE) }
           break
         }
         case 'r':
@@ -785,7 +785,7 @@ function Mail() {
                   className={`mail-folder${starred && !special ? ' active' : ''}`}
                   onClick={() => { setSpecial(null); setStarred(true); setFolder('all'); setFiling(null); setOpenId(null); setQuery(''); setSearchInput('') }}
                 >
-                  <span>Starred</span>
+                  <span>My list</span>
                 </button>
               )}
               {f.key === 'drafts' && (
@@ -913,7 +913,7 @@ function Mail() {
                     {actionsFor(checkedLabels, folder).map(a => (
                       <IconButton key={a} icon={a} title={ACTION_TITLE[a]} onClick={() => performAction([...checked], a)} />
                     ))}
-                    <IconButton icon="star" title="Star (s)" onClick={() => star([...checked], nextCategory(rowCards[[...checked][0]]?.category ?? null))} />
+                    <IconButton icon="star" title="Add to the list, or take off (s)" onClick={() => star([...checked], rowCards[[...checked][0]] ? null : AUTO_PILE)} />
                     <span className="mail-toolbar-note">{checked.size} selected</span>
                   </>
                 ) : (
@@ -921,12 +921,12 @@ function Mail() {
                 )}
                 {query && <span className="mail-toolbar-note">Search results in {folderMeta.label}</span>}
                 {starred && checked.size === 0 && (
-                  <button className="mail-text-btn" disabled={importing} onClick={importStars} title="Put the conversations starred in Gmail on this list (as Everything else)">
+                  <button className="mail-text-btn" disabled={importing} onClick={importStars} title="Put the conversations starred in Gmail on this list (the AI picks each pile)">
                     {importing ? 'Bringing over Gmail stars…' : 'Bring over Gmail stars'}
                   </button>
                 )}
                 {starred ? (
-                  <div className="mail-filing" role="group" aria-label="Filter by star">
+                  <div className="mail-filing" role="group" aria-label="Filter by pile">
                     <button className={!starFilter ? 'on' : ''} onClick={() => setStarFilter(null)}>All</button>
                     {CATEGORIES.map(c => (
                       <button key={c.key} className={starFilter === c.key ? 'on' : ''} onClick={() => setStarFilter(c.key)}>
@@ -1068,7 +1068,7 @@ function ThreadRow({ index, thread: t, folder, labels, focused, checked, onCheck
   onAction: (a: MailAction) => void
   scheduledAt: string | null
   star: CardCategory | null
-  onStar: (next: CardCategory | null) => void
+  onStar: (next: PilePick) => void
 }) {
   const isDraft = t.label_ids.includes('DRAFT')
   const hover = actionsFor([t.label_ids], folder).filter(a => a !== 'spam' && a !== 'not_spam')

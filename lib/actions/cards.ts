@@ -44,23 +44,26 @@ export type CardStep = {
 /** scheduled: a follow-up waiting for its date (due_at) */
 export type CardStatus = 'scheduled' | 'queued' | 'generating' | 'pending' | 'running' | 'done' | 'skipped' | 'no_action' | 'failed'
 
-export type CardCategory = 'invoice' | 'attend_submit' | 'other'
+export type CardCategory = 'new_work' | 'insurer' | 'trades' | 'reports_quotes' | 'money'
 
-/** The star symbols, in the order a click cycles through them */
-export const CATEGORIES: { key: CardCategory; label: string }[] = [
-  { key: 'invoice', label: 'Invoices to pay' },
-  { key: 'attend_submit', label: 'Attend and Submit' },
-  { key: 'other', label: 'Everything else' },
+/**
+ * The piles of work (tech spec §23.11) — what used to be the star symbols.
+ * The AI puts each card in one (and learns from the office moving it); a
+ * pile the office picks stays (pile_by).
+ */
+export const CATEGORIES: { key: CardCategory; label: string; short: string; colour: string; description: string }[] = [
+  { key: 'new_work', label: 'New work', short: 'New', colour: '#7a4fd1', description: 'a new order or instruction to lodge, an inspection, assessment or make safe to book' },
+  { key: 'insurer', label: 'Insurer & client', short: 'Insurer', colour: '#2f6fd6', description: 'a reply, update, approval or variation for the insurer, adjuster or homeowner; signing and sign-offs' },
+  { key: 'trades', label: 'Trades', short: 'Trades', colour: '#d9822b', description: 'chasing, booking or sending work to a trade or supplier; a trade\'s quote or schedule' },
+  { key: 'reports_quotes', label: 'Reports & quotes', short: 'Reports', colour: '#2f9e8f', description: 'a report or quote of ours to write, finish, correct or send' },
+  { key: 'money', label: 'Money', short: 'Money', colour: '#2f9e5b', description: 'a bill to pay, an invoice to raise or chase, the excess or a payment' },
 ]
 
 export const isCategory = (v: unknown): v is CardCategory => CATEGORIES.some(c => c.key === v)
+export const pileOf = (c: CardCategory | null | undefined) => CATEGORIES.find(x => x.key === c) ?? null
 
-/** The next star after this one; null after the last (the star comes off) */
-export function nextCategory(current: CardCategory | null): CardCategory | null {
-  if (!current) return CATEGORIES[0].key
-  const i = CATEGORIES.findIndex(c => c.key === current)
-  return CATEGORIES[i + 1]?.key ?? null
-}
+/** Putting an email on the list without choosing a pile: the AI picks it */
+export const AUTO_PILE = 'auto' as const
 
 /** What a follow-up is for, as the person set it (lib/actions/followups.ts) */
 export type FollowUp = {
@@ -120,6 +123,10 @@ export type ActionCard = {
   category: CardCategory
   /** Set when the user starred or re-starred it themselves */
   starred_by: string | null
+  /** Who put it in its pile; the AI leaves it there */
+  pile_by?: string | null
+  /** The pile the AI picked (a move is learned from) */
+  ai_category?: CardCategory | null
   priority: number | null
   outcome: string | null
   error_log: string | null
@@ -138,7 +145,7 @@ export type ActionCard = {
 /** Cards that can still change: one per conversation (see the unique index) */
 export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'failed']
 
-export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up, ai_steps, situation'
+export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, pile_by, ai_category, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up, ai_steps, situation'
 
 /** Priority from the model's high / normal / low */
 export const PRIORITY = { high: 90, normal: 50, low: 20 } as const
@@ -296,6 +303,17 @@ export async function countPending(db: SupabaseClient, tenantId: string): Promis
   return count ?? 0
 }
 
+/** How many cards need the office in each pile (pending and failed), and in how many jobs */
+export async function pileCounts(db: SupabaseClient, tenantId: string): Promise<{ key: CardCategory; label: string; cards: number; jobs: number }[]> {
+  const { data } = await db.from('action_queue').select('category, job_id')
+    .eq('tenant_id', tenantId).in('status', ['pending', 'failed']).limit(2000)
+  const rows = (data as { category: CardCategory; job_id: string | null }[] | null) ?? []
+  return CATEGORIES.map(c => {
+    const mine = rows.filter(r => r.category === c.key)
+    return { key: c.key, label: c.label, cards: mine.length, jobs: new Set(mine.map(r => r.job_id).filter(Boolean)).size }
+  })
+}
+
 export type RowStar = { id: string; status: CardStatus; title: string; category: CardCategory }
 
 /** Gmail thread → its live card (its star), for the list and the conversation */
@@ -321,11 +339,21 @@ export async function starredThreadIds(db: SupabaseClient, tenantId: string, cat
 }
 
 /**
- * Sets a conversation's star — the inbox's star button. A category stars it
- * (a new card, which the AI then fills in with a summary and steps) or
- * changes its symbol; null takes the star off (the card is done).
+ * Puts a conversation on the list, in a pile — the inbox's pile button. A
+ * pile puts it on the list there (a new card, which the AI then fills in with
+ * a summary and steps) or moves it; 'auto' puts it on the list and lets the AI
+ * pick the pile; null takes it off the list (the card is done).
  */
-export async function starThread(db: SupabaseClient, tenantId: string, threadId: string, category: CardCategory | null, userId: string): Promise<RowStar | null> {
+export async function starThread(db: SupabaseClient, tenantId: string, threadId: string, pile: CardCategory | typeof AUTO_PILE | null, userId: string): Promise<RowStar | null> {
+  const category = pile === AUTO_PILE ? null : pile
+  if (pile === AUTO_PILE) {
+    const live = await liveCard(db, tenantId, threadId)
+    if (live) {
+      await db.from('action_queue').update({ starred_by: userId, starred_at: now(), updated_at: now() }).eq('id', live.id)
+      return { id: live.id, status: live.status, title: live.title, category: live.category }
+    }
+    return addToList(db, tenantId, threadId, null, userId)
+  }
   const live = await liveCard(db, tenantId, threadId)
   if (!category) {
     if (live) {
@@ -336,9 +364,14 @@ export async function starThread(db: SupabaseClient, tenantId: string, threadId:
     return null
   }
   if (live) {
-    await db.from('action_queue').update({ category, starred_by: userId, starred_at: now(), updated_at: now() }).eq('id', live.id)
+    await db.from('action_queue').update({ category, pile_by: userId, starred_by: userId, starred_at: now(), updated_at: now() }).eq('id', live.id)
     return { id: live.id, status: live.status, title: live.title, category }
   }
+  return addToList(db, tenantId, threadId, category, userId)
+}
+
+/** A new card for a conversation put on the list by hand; with no pile, the AI picks it */
+async function addToList(db: SupabaseClient, tenantId: string, threadId: string, category: CardCategory | null, userId: string): Promise<RowStar> {
   const { data: thread } = await db.from('mail_threads').select('subject')
     .eq('tenant_id', tenantId).eq('gmail_thread_id', threadId).maybeSingle()
   const title = (thread as { subject: string | null } | null)?.subject || 'Starred email'
@@ -349,7 +382,7 @@ export async function starThread(db: SupabaseClient, tenantId: string, threadId:
     rule_key: 'email',
     title,
     status: 'queued',
-    category,
+    ...(category ? { category, pile_by: userId } : {}),
     starred_by: userId,
     starred_at: now(),
     priority: PRIORITY.normal,
@@ -358,15 +391,15 @@ export async function starThread(db: SupabaseClient, tenantId: string, threadId:
     // Starred twice at once, or a card was just queued: star that one
     const again = await liveCard(db, tenantId, threadId)
     if (!again) throw new Error(error.message)
-    return starThread(db, tenantId, threadId, category, userId)
+    return (await starThread(db, tenantId, threadId, category ?? AUTO_PILE, userId))!
   }
-  return { id: (data as { id: string }).id, status: 'queued', title, category }
+  return { id: (data as { id: string }).id, status: 'queued', title, category: category ?? 'insurer' }
 }
 
-/** Changes a card's symbol from the card itself (it then keeps it, as a star the user set) */
+/** Moves a card to another pile from the card itself (it then stays there, and on the list) */
 export async function setCardCategory(db: SupabaseClient, tenantId: string, id: string, category: CardCategory, userId: string): Promise<boolean> {
   const { data } = await db.from('action_queue')
-    .update({ category, starred_by: userId, starred_at: now(), updated_at: now() })
+    .update({ category, pile_by: userId, starred_by: userId, starred_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', LIVE_STATUSES)
     .select('id').maybeSingle()
   return !!data

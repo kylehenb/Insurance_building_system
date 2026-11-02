@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { searchFolder } from '@/lib/mail/list'
 import { mailDb, type Mailbox } from '@/lib/mail/sync'
-import { cardsForThreads, starThread } from './cards'
+import { AUTO_PILE, cardsForThreads, starThread } from './cards'
 
 // Brings the stars from Gmail onto IRC's list, once, when moving over: each
-// conversation starred in Gmail becomes a star the user set, as Everything
-// else (Gmail doesn't say which star symbol it had) — the AI then reads it.
+// conversation starred in Gmail goes on the list as one the user put there,
+// and the AI reads it and picks its pile.
 // Conversations already on the list are left as they are. Gmail's own stars
 // aren't changed.
 
@@ -30,7 +30,7 @@ export async function importGmailStars(
   let added = 0
   for (const id of ids.slice(0, MAX_IMPORT)) {
     if (already[id]) continue
-    await starThread(db, mailbox.tenant_id, id, 'other', userId)
+    await starThread(db, mailbox.tenant_id, id, AUTO_PILE, userId)
     added++
   }
   return { found: ids.length, added }

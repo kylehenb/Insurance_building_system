@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
-import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
+import { AUTO_PILE, CATEGORIES, cardForThread, pileCounts, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { addStep, removeSteps, saveStepEdits } from '@/lib/actions/steps'
 import { resuggestCard, resuggestStep } from '@/lib/actions/propose'
 import { CardError, confirmCard, type StepChoice } from '@/lib/actions/confirm'
@@ -80,15 +80,16 @@ export const listActionCards: McpTool = {
   name: 'list_action_cards',
   title: 'List action cards',
   description: [
-    'The action cards — the to-do list of starred emails, most urgent first, as on the dashboard. The AI makes one for each incoming email that needs doing (from the email and its job file, with suggested steps — a reply, filing it on a job, a job note… — that only run when confirmed), and the user stars others themselves.',
-    'Each has a category (its star): Invoices to pay (invoice), Attend and Submit (attend_submit — sites to attend, reports or quotes to submit), Everything else (other). category filters to one.',
+    'The action cards — the office\'s to-do list, most urgent first, as on the dashboard. The AI makes one for each incoming email that needs doing, for follow-ups and checks (from the email and its job file, with suggested steps — a reply, filing it on a job, a job note… — that only run when confirmed), and the user puts others on the list themselves.',
+    `Each is in a pile (category): ${CATEGORIES.map(c => `${c.label} (${c.key} — ${c.description})`).join('; ')}. category narrows to one pile.`,
+    'With no pile given, the answer starts with how many are in each pile and how many jobs: say those counts first, then offer to go through a pile, rather than reading every card.',
     'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, update_action_card to fix its title or steps, skip_action_card when it\'s dealt with.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       view: { type: 'string', enum: VIEWS },
-      category: { type: 'string', enum: CATEGORIES.map(c => c.key), description: 'Only this star.' },
+      category: { type: 'string', enum: CATEGORIES.map(c => c.key), description: 'Only this pile.' },
       limit: { type: 'number', description: `How many (default ${DEFAULT_LIST}, max ${MAX_LIST}).` },
     },
     additionalProperties: false,
@@ -109,7 +110,15 @@ export const listActionCards: McpTool = {
     const heading = view === 'pending'
       ? `${all.length} ${what}${all.length === 1 ? '' : 's'} need${all.length === 1 ? 's' : ''} you${all.length > cards.length ? ` — the first ${cards.length}` : ''}:`
       : `Done ${what}s:`
-    return { text: [heading, ...cards.map(cardLine)].join('\n'), data: { view, category, total: all.length, cards: cards.map(cardData) } }
+    // The piles first: how many in each, and in how many jobs
+    const piles = view === 'pending' && !category ? (await pileCounts(db(ctx), ctx.tenantId)).filter(p => p.cards > 0) : []
+    const pileLine = piles.length
+      ? `By pile: ${piles.map(p => `${p.label} ${p.cards}${p.jobs > 1 ? ` (${p.jobs} jobs)` : ''}`).join(', ')}.`
+      : null
+    return {
+      text: [pileLine, heading, ...cards.map(cardLine)].filter(Boolean).join('\n'),
+      data: { view, category, total: all.length, ...(piles.length ? { piles } : {}), cards: cards.map(cardData) },
+    }
   },
 }
 
@@ -262,7 +271,7 @@ export const updateActionCard: McpTool = {
   title: 'Edit action card',
   description: [
     'Changes an action card without doing its steps — when its title or steps are wrong or out of date. Any mix of:',
-    'title and summary (what the card says); category (its star: invoice, attend_submit, other);',
+    `title and summary (what the card says); category (move it to a pile: ${CATEGORIES.map(c => c.key).join(', ')} — it then stays there);`,
     'remove_steps (step_ids from read_action_card — not ones already done); change_steps (a step\'s details saved on the card, e.g. an email\'s to, subject or body, a note\'s text; the step\'s other details stay);',
     'add_steps (a step is a call to one of the action tools, as the card\'s AI proposes them — e.g. { tool: "add_job_note", args: { job_number, note } } or { tool: "send_email", args: { mode: "reply", body } }; recorded, not run);',
     'redo_with (tell the AI what to change in your own words — it rewrites the card\'s title, summary and steps from the email and job file; takes up to a minute);',
@@ -377,8 +386,8 @@ export const updateActionCard: McpTool = {
         done.push(title ? `retitled it "${card.title}"` : 'changed its summary')
       }
       if (category) {
-        if (!(await setCardCategory(db(ctx), ctx.tenantId, card.id, category, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — its star can't change now.`, isError: true }
-        done.push(`starred it ${categoryLabel(category)}`)
+        if (!(await setCardCategory(db(ctx), ctx.tenantId, card.id, category, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be moved now.`, isError: true }
+        done.push(`moved it to ${categoryLabel(category)}`)
       }
       if (status === 'done' || status === 'skipped') {
         const ok = status === 'done' ? await markCardDone(db(ctx), ctx.tenantId, card.id, ctx.userId) : await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId)
@@ -403,17 +412,17 @@ const MAX_STAR = 25
 
 export const starEmail: McpTool = {
   name: 'star_email',
-  title: 'Star email',
+  title: 'Put email on the list',
   description: [
-    'Stars conversations from list_mailbox — puts them on the to-do list (the action cards) under a star — or changes their star, or takes it off, as the star button on the Mail page does.',
-    'star: invoice (Invoices to pay), attend_submit (Attend and Submit — a site to attend, or a report or quote to submit), other (Everything else), or none to take the star off (it comes off the list).',
-    'A star the user sets stays until they take it off, even after a reply. A newly starred email gets a card the AI fills in with a summary and suggested steps.',
+    'Puts conversations from list_mailbox on the to-do list (the action cards), in a pile, moves them to another pile, or takes them off — as the pile button on the Mail page does.',
+    `star: auto (on the list, the AI picks the pile), a pile — ${CATEGORIES.map(c => `${c.key} (${c.label})`).join(', ')} — or none to take it off the list.`,
+    'An email the user puts on the list stays until they take it off, even after a reply. A new one gets a card the AI fills in with a summary and suggested steps.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       conversation_ids: { type: 'array', items: { type: 'string' }, description: 'conversation_id values from list_mailbox.' },
-      star: { type: 'string', enum: [...CATEGORIES.map(c => c.key), 'none'] },
+      star: { type: 'string', enum: [AUTO_PILE, ...CATEGORIES.map(c => c.key), 'none'] },
     },
     required: ['conversation_ids', 'star'],
     additionalProperties: false,
@@ -422,8 +431,8 @@ export const starEmail: McpTool = {
   permission: 'actions.review',
 
   async run(args, ctx): Promise<McpToolResult> {
-    const star = args.star === 'none' ? null : isCategory(args.star) ? args.star : undefined
-    if (star === undefined) return { text: 'Which star? invoice, attend_submit, other, or none to take it off.', isError: true }
+    const star = args.star === 'none' ? null : args.star === AUTO_PILE ? AUTO_PILE : isCategory(args.star) ? args.star : undefined
+    if (star === undefined) return { text: `Which pile? auto (the AI picks), ${CATEGORIES.map(c => c.key).join(', ')}, or none to take it off the list.`, isError: true }
     const ids = Array.isArray(args.conversation_ids)
       ? [...new Set(args.conversation_ids.map(str).filter(id => THREAD_ID_RE.test(id)))]
       : []
@@ -441,12 +450,12 @@ export const starEmail: McpTool = {
     const what = (k: number) => `${k} email${k === 1 ? '' : 's'}`
     if (!star) {
       return {
-        text: n ? `Took the star off ${what(n)}.` : 'None of those were starred.',
+        text: n ? `Took ${what(n)} off the list.` : 'None of those were on the list.',
         data: { unstarred: results.map(r => r.conversation_id) },
       }
     }
     return {
-      text: `Starred ${what(n)} as ${categoryLabel(star)}${n === 1 && results[0].title ? ` ("${results[0].title}")` : ''}.`,
+      text: `Put ${what(n)} on the list${star === AUTO_PILE ? ' — the AI will pick the pile' : ` in ${categoryLabel(star)}`}${n === 1 && results[0].title ? ` ("${results[0].title}")` : ''}.`,
       data: { star, starred: results },
     }
   },

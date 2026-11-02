@@ -8,7 +8,7 @@ const CARD_ID = '11111111-2222-3333-4444-555555555555'
 const card = (o: Record<string, unknown> = {}) => ({
   id: CARD_ID, tenant_id: 't1', job_id: 'j1', source: 'email', source_ref: 'abc1', trigger_ref: 'm1',
   title: 'Reply to Casey — confirm Thursday access', description: 'Casey asks about Thursday.', reasoning: 'Inspection is booked Thursday.',
-  status: 'pending', category: 'attend_submit', starred_by: null, priority: 90, outcome: null, error_log: null, attempts: 1,
+  status: 'pending', category: 'reports_quotes', starred_by: null, priority: 90, outcome: null, error_log: null, attempts: 1,
   created_at: '2026-10-23T00:00:00Z', updated_at: '2026-10-23T00:00:00Z',
   steps: [
     { id: 's1', tool: 'send_email', kind: 'email', summary: 'Reply to casey@gmail.com', args: { mode: 'reply', conversation_id: 'abc1', to: 'casey@gmail.com', subject: 'Re: Access', body: 'Hi Casey, Thursday works.' } },
@@ -35,13 +35,15 @@ vi.mock('@/lib/actions/cards', () => ({
   withContext: async (_db: unknown, _t: string, cards: unknown[]) => cards,
   skipCard: (...a: unknown[]) => (skipCard as (...x: unknown[]) => unknown)(...a),
   starThread: (...a: unknown[]) => (starThread as (...x: unknown[]) => unknown)(...a),
-  cardsForThreads: async (_db: unknown, _t: string, ids: string[]) => Object.fromEntries(ids.filter(id => starredNow.includes(id)).map(id => [id, { id: 'k', status: 'pending', title: `Card ${id}`, category: 'other' }])),
-  isCategory: (v: unknown) => ['invoice', 'attend_submit', 'other'].includes(v as string),
+  cardsForThreads: async (_db: unknown, _t: string, ids: string[]) => Object.fromEntries(ids.filter(id => starredNow.includes(id)).map(id => [id, { id: 'k', status: 'pending', title: `Card ${id}`, category: 'insurer' }])),
+  isCategory: (v: unknown) => ['new_work', 'insurer', 'trades', 'reports_quotes', 'money'].includes(v as string),
+  AUTO_PILE: 'auto',
+  pileCounts: async () => [{ key: 'reports_quotes', label: 'Reports & quotes', cards: 1, jobs: 1 }, { key: 'trades', label: 'Trades', cards: 0, jobs: 0 }, { key: 'insurer', label: 'Insurer & client', cards: 4, jobs: 3 }],
   updateCardText: (...a: unknown[]) => (updateCardText as (...x: unknown[]) => unknown)(...a),
   markCardDone: (...a: unknown[]) => (markCardDone as (...x: unknown[]) => unknown)(...a),
   reopenCard: (...a: unknown[]) => (reopenCard as (...x: unknown[]) => unknown)(...a),
   setCardCategory: async () => true,
-  CATEGORIES: [{ key: 'invoice', label: 'Invoices to pay' }, { key: 'attend_submit', label: 'Attend and Submit' }, { key: 'other', label: 'Everything else' }],
+  CATEGORIES: [{ key: 'new_work', label: 'New work', description: 'new' }, { key: 'insurer', label: 'Insurer & client', description: 'insurer' }, { key: 'trades', label: 'Trades', description: 'trades' }, { key: 'reports_quotes', label: 'Reports & quotes', description: 'reports' }, { key: 'money', label: 'Money', description: 'money' }],
 }))
 const updateCardText = vi.fn(async (_db: unknown, _t: string, _id: string, o: { title?: string }) => (stored = { ...stored!, ...(o.title ? { title: o.title } : {}) }))
 const markCardDone = vi.fn(async () => stored?.status === 'pending')
@@ -82,14 +84,14 @@ describe('list_action_cards', () => {
   it('lists what needs doing, with the job, sender and steps', async () => {
     const out = await listActionCards.run({}, ctx)
     expect(listCards).toHaveBeenCalledWith(ctx.supabase, 't1', 'pending', { category: null })
-    expect(out.text).toBe('1 action card needs you:\n1. Reply to Casey — confirm Thursday access (IRC1001, Casey Smith: "Access Thursday?") [Attend and Submit, urgent]. Steps: Reply to casey@gmail.com; Add job note — Access Thursday.')
+    expect(out.text).toBe('By pile: Reports & quotes 1, Insurer & client 4 (3 jobs).\n1 action card needs you:\n1. Reply to Casey — confirm Thursday access (IRC1001, Casey Smith: "Access Thursday?") [Reports & quotes, urgent]. Steps: Reply to casey@gmail.com; Add job note — Access Thursday.')
     expect((out.data!.cards as { card_id: string }[])[0].card_id).toBe(CARD_ID)
   })
 
   it('says when nothing needs doing', async () => {
     stored = null
-    expect((await listActionCards.run({ category: 'invoice' }, ctx)).text).toBe('No Invoices to pay cards need you right now.')
-    expect(listCards).toHaveBeenCalledWith(ctx.supabase, 't1', 'pending', { category: 'invoice' })
+    expect((await listActionCards.run({ category: 'money' }, ctx)).text).toBe('No Money cards need you right now.')
+    expect(listCards).toHaveBeenCalledWith(ctx.supabase, 't1', 'pending', { category: 'money' })
   })
 })
 
@@ -149,24 +151,30 @@ describe('skip_action_card', () => {
 })
 
 describe('star_email', () => {
-  it('stars conversations under a star, as the user', async () => {
-    const out = await starEmail.run({ conversation_ids: ['abc1'], star: 'invoice' }, ctx)
-    expect(starThread.mock.calls[0].slice(1)).toEqual(['t1', 'abc1', 'invoice', 'u1'])
-    expect(out.text).toBe('Starred 1 email as Invoices to pay ("Email abc1").')
+  it('puts conversations on the list in a pile, as the user', async () => {
+    const out = await starEmail.run({ conversation_ids: ['abc1'], star: 'money' }, ctx)
+    expect(starThread.mock.calls[0].slice(1)).toEqual(['t1', 'abc1', 'money', 'u1'])
+    expect(out.text).toBe('Put 1 email on the list in Money ("Email abc1").')
+  })
+
+  it('puts a conversation on the list for the AI to pick the pile', async () => {
+    const out = await starEmail.run({ conversation_ids: ['abc1'], star: 'auto' }, ctx)
+    expect(starThread.mock.calls[0].slice(1)).toEqual(['t1', 'abc1', 'auto', 'u1'])
+    expect(out.text).toBe('Put 1 email on the list — the AI will pick the pile ("Email abc1").')
   })
 
   it('takes stars off only where there is one', async () => {
     starredNow = ['abc1']
     const out = await starEmail.run({ conversation_ids: ['abc1', 'def2'], star: 'none' }, ctx)
     expect(starThread.mock.calls.map(c => c.slice(2, 4))).toEqual([['abc1', null]])
-    expect(out.text).toBe('Took the star off 1 email.')
+    expect(out.text).toBe('Took 1 email off the list.')
     starredNow = []
-    expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'none' }, ctx)).text).toBe('None of those were starred.')
+    expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'none' }, ctx)).text).toBe('None of those were on the list.')
   })
 
   it('refuses an unknown star or no conversations', async () => {
     expect((await starEmail.run({ conversation_ids: ['abc1'], star: 'gold' }, ctx)).isError).toBe(true)
-    expect((await starEmail.run({ conversation_ids: ['not an id'], star: 'other' }, ctx)).isError).toBe(true)
+    expect((await starEmail.run({ conversation_ids: ['not an id'], star: 'insurer' }, ctx)).isError).toBe(true)
     expect(starThread).not.toHaveBeenCalled()
   })
 })

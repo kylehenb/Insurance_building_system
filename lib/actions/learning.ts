@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { activeLessons, formatLessons } from '@/lib/learning/lessons'
 import { formatCases, recordLearning, similarCases, type Likeness, type LearningOutcome, type Situation } from '@/lib/learning/events'
 import { decodeEntities } from '@/lib/mail/summary'
-import type { ActionCard, CardStep } from './cards'
+import { pileOf, type ActionCard, type CardStep } from './cards'
 
 // Action cards on the learning module (tech spec §24): the situation a card
 // is made in, what the office did with the AI's proposal (recorded when the
@@ -165,7 +165,15 @@ const records = (steps: CardStep[]) => steps.map(s => ({ ...asDone(s), status: s
  */
 export async function recordCardDecision(db: SupabaseClient, card: ActionCard, userId: string | null, ended: 'confirmed' | 'skipped'): Promise<void> {
   if (!card.ai_steps) return
-  const { changes, outcome } = compareCard(card.ai_steps, card.steps, ended)
+  const compared = compareCard(card.ai_steps, card.steps, ended)
+  const changes = [...compared.changes]
+  let outcome = compared.outcome
+  // Moved to another pile: the AI learns where the office files this kind of card
+  const moved = card.ai_category && card.ai_category !== card.category
+  if (moved) {
+    changes.unshift(`Moved from the ${pileOf(card.ai_category)?.label ?? card.ai_category} pile to ${pileOf(card.category)?.label ?? card.category}`)
+    if (outcome === 'accepted') outcome = 'edited'
+  }
   const situation = card.situation ?? {}
   await recordLearning(db, {
     tenantId: card.tenant_id,

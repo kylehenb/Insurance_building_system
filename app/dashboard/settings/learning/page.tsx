@@ -1,5 +1,6 @@
 'use client'
 
+import { CATEGORIES } from '@/lib/actions/cards'
 import { useCallback, useEffect, useState } from 'react'
 import type { LessonView } from '@/lib/learning/lessons'
 import type { FeatureStats, Tally } from '@/lib/learning/stats'
@@ -21,7 +22,7 @@ interface LearningData {
 
 const FEATURE: Record<string, string> = { action_card: 'Action cards', order_parse: 'Reading insurer orders', report: 'Report writing', photo_labels: 'Photo labels', waiting_on: 'Waiting on (when to chase)', health_suggestion: 'Health check suggestions' }
 const KIND: Record<string, string> = {
-  invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else',
+  ...Object.fromEntries(CATEGORIES.map(c => [c.key, c.label])),
   bar: 'BAR', make_safe: 'Make safe', roof: 'Roof', specialist: 'Specialist', ldr: 'Leak detection',
 }
 const DAY_OPTIONS = [7, 30, 90]
