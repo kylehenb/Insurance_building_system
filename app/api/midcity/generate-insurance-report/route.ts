@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { trackAi } from '@/lib/health/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -943,7 +944,7 @@ export async function POST(req: NextRequest) {
 
     // ── AAI: JS autofill ─────────────────────────────────────────────────
     if (template === 'aai') {
-      const jsMessage = await anthropic.messages.create({
+      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 8192,
         system: AAI_JS_SYSTEM,
@@ -968,7 +969,7 @@ These notes cover a full site inspection and may include roof report details, ma
 TEMPLATE TO FILL:
 [${AAI_JS_DATA_TEMPLATE}]`,
         }],
-      })
+      }))
       const jsContent = jsMessage.content[0]
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
@@ -978,7 +979,7 @@ TEMPLATE TO FILL:
 
     // ── IAG: JS autofill ─────────────────────────────────────────────────
     if (template === 'iag') {
-      const jsMessage = await anthropic.messages.create({
+      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 8192,
         system: IAG_JS_SYSTEM,
@@ -1001,7 +1002,7 @@ These notes cover a full site inspection and may include roof report details, ma
 TEMPLATE TO FILL:
 [${IAG_JS_DATA_TEMPLATE}]`,
         }],
-      })
+      }))
       const jsContent = jsMessage.content[0]
       if (jsContent.type !== 'text') {
         return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })
@@ -1010,7 +1011,7 @@ TEMPLATE TO FILL:
     }
 
     // ── A&G: JS autofill ─────────────────────────────────────────────────
-    const jsMessage = await anthropic.messages.create({
+    const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       system: AUTO_GENERAL_JS_SYSTEM,
@@ -1035,7 +1036,7 @@ These notes cover a full site inspection and may include roof report details, ma
 TEMPLATE TO FILL:
 [${AUTO_GENERAL_JS_DATA_TEMPLATE}]`,
       }],
-    })
+    }))
     const jsContent = jsMessage.content[0]
     if (jsContent.type !== 'text') {
       return NextResponse.json({ error: 'Unexpected response format' }, { status: 500 })

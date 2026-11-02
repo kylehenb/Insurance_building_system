@@ -19,6 +19,7 @@ import { getFullMessage, extractMessageParts } from '@/lib/gmail/messages'
 import { parseInsurerOrder } from '@/lib/email/order-parser'
 import { saveOrderUpdate, writeInsurerOrder } from '@/lib/email/order-writer'
 import { sendOrderNotification } from '@/lib/email/order-notifier'
+import { withCronRun } from '@/lib/health/cron'
 
 const WATCHED_EMAIL = 'office@insurancerepairco.com.au'
 
@@ -207,7 +208,7 @@ async function runPoll(): Promise<NextResponse> {
 }
 
 // Vercel Cron triggers via GET
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -221,3 +222,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   return runPoll()
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/gmail/poll', runGet)

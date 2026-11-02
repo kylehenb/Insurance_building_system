@@ -3,6 +3,8 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
 import { getResponseText } from '@/lib/ai/response-text'
 import { MUD_MAP_LABEL, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel, type PhotoKind } from './report-order'
+import { trackAi } from '@/lib/health/ai-usage'
+import { logError } from '@/lib/health/errors'
 
 // AI photo labels. Two passes:
 //   1. Vision (labelPhotos): the model looks at a batch of photos, in the order
@@ -218,7 +220,7 @@ type MediaType = (typeof MEDIA_TYPES)[number]
 
 async function callAnthropic(system: string, parts: Part[], schema: object): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const message = await client.messages.create({
+  const message = await trackAi({ feature: 'photo-labels', provider: 'anthropic', model: PHOTO_LABEL_MODEL }, () => client.messages.create({
     model: PHOTO_LABEL_MODEL,
     max_tokens: 8000,
     system,
@@ -236,13 +238,13 @@ async function callAnthropic(system: string, parts: Part[], schema: object): Pro
             },
           }),
     }],
-  })
+  }))
   return getResponseText(message) // throws on a refusal, so the other provider gets a go
 }
 
 async function callGemini(system: string, parts: Part[], schema: object): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  const result = await ai.models.generateContent({
+  const result = await trackAi({ feature: 'photo-labels', provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
     model: GEMINI_FLASH_MODEL,
     contents: parts.map(p => 'text' in p ? { text: p.text } : { inlineData: { mimeType: p.image.mimeType, data: p.image.data } }),
     config: {
@@ -251,7 +253,7 @@ async function callGemini(system: string, parts: Part[], schema: object): Promis
       responseJsonSchema: schema,
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
     },
-  })
+  }))
   return result.text ?? ''
 }
 
@@ -277,8 +279,8 @@ function parseEntries(text: string): unknown[] {
     const parsed = JSON.parse(text.match(/[[{][\s\S]*[\]}]/)?.[0] ?? text)
     if (Array.isArray(parsed)) return parsed
     if (parsed && Array.isArray(parsed.photos)) return parsed.photos
-  } catch {
-    console.error('[photo-labels] Unreadable response:', text.slice(0, 200))
+  } catch (err) {
+    void logError('ai-parse:photo-labels', err, { detail: { reply: text.slice(0, 300) } })
   }
   return []
 }

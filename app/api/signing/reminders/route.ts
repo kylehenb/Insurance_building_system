@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendSigningReminders } from '@/lib/signing/reminders'
+import { withCronRun } from '@/lib/health/cron'
 
 // Daily Vercel Cron (vercel.json): reminds signers who haven't signed after
 // 7 days, up to 3 reminders, skipping requests with reminders turned off.
@@ -13,7 +14,7 @@ function checkCronAuth(req: NextRequest): boolean {
   return !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -26,3 +27,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Reminder run failed' }, { status: 500 })
   }
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/signing/reminders', runGet)

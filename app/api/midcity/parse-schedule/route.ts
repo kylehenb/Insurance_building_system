@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getUser } from '@/lib/supabase/get-user'
+import { trackAi } from '@/lib/health/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await trackAi({ feature: 'midcity-schedule', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [{
@@ -71,7 +72,7 @@ If no jobs are found, return an empty array: []`,
           },
         ],
       }],
-    })
+    }))
 
     const content = message.content[0]
     if (content.type !== 'text') {

@@ -2913,6 +2913,12 @@ AI_WAIT_MODEL=                     # optional, reading sent emails for what they
 AI_CALENDAR_MODEL=                 # optional, matching calendar events to jobs (§23.13), default claude-haiku-5-5
 AI_REVIEW_MODEL=                   # optional, the morning job review (§23.14), default claude-haiku-5-5
 
+# Health monitoring (§25)
+HEALTH_ALERT_EMAIL=                # optional, comma-separated; who gets the watcher's alert emails. Default: every admin
+HEALTH_AI_DAILY_ALERT_USD=         # optional, alert when AI spend in 24 hours reaches this (US$), default 25
+HEALTH_ERROR_SPIKE=                # optional, alert at this many logged errors in an hour, default 25
+AI_PRICES=                         # optional JSON, adds or overrides model prices (US$ per million tokens), e.g. {"gemini-3.5-flash":{"input":1.5,"output":9}}
+
 # App
 NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead
 ```
@@ -4465,9 +4471,64 @@ Settings → **What the AI has learned**. Anyone signed in can read it; turning 
 
 ---
 
+## 25. Health check (`lib/health`)
+
+A weekly check of the system and the business: limits being reached, AI spend, security, failures (seen and silent), how busy the office was, what worked and what didn't, and suggested changes. Built in parts:
+
+1. **Recording (built Nov 2026):** the records the check reads, kept as things happen. Vercel and Supabase only keep their own logs for a few days. Also an immediate alert watcher.
+2. **Daily figures:** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
+3. **AI write-up:** for each finished period, written once from the figures and saved. Every claim cites its evidence.
+4. **Suggestions:** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
+5. **Voice connector tool:** "how did we go this week?" reads the saved report.
+
+### 25.1 What's recorded
+
+Migration `20261123_health_monitoring.sql`. Only the server writes or reads these tables (service role, RLS on, no policies). The admin panel will read them through an API route that checks permissions.
+
+| Table | One row per | Written by |
+|---|---|---|
+| `ai_calls` | AI request: feature, provider, model that answered, input / output / cache tokens, `cost_usd`, duration, ok or failed with error, tenant, job | `trackAi(...)` (`lib/health/ai-usage.ts`) |
+| `cron_runs` | scheduled job run: route, started / finished, duration, `running` / `ok` / `partial` / `failed`, HTTP status, the response (trimmed) and error | `withCronRun(...)` (`lib/health/cron.ts`) |
+| `system_errors` | failure the app carried on past: `source` (e.g. `ai-parse:photo-labels`), message, small detail, tenant, job | `logError(...)` (`lib/health/errors.ts`) |
+| `health_alerts` | problem the watcher found: key, severity, title, detail, first / last seen, when emailed, when cleared, occurrences. One open row per key | the watcher (§25.2) |
+
+**Rules:**
+- **Every AI request goes through `trackAi`:** `await trackAi({ feature, provider, model, tenantId?, jobId? }, () => client.messages.create(...))`. It reads tokens from Anthropic, Google (both SDKs) and OpenAI replies, prices them from `lib/health/pricing.ts`, and passes the reply or error on unchanged. A test (`lib/health/__tests__/ai-coverage.test.ts`) fails any file in `lib/` or `app/` that calls a provider without it.
+- **New models need a price:** add the model to `MODEL_PRICES`, or set `AI_PRICES` without a deploy. A model with no price is still recorded, with `cost_usd` null.
+- **Every cron goes through `withCronRun`:** `export const GET = withCronRun('/api/…', run)`. A test checks every `vercel.json` cron. How a run is judged:
+  - **failed:** the handler threw, or answered 4xx/5xx.
+  - **partial:** HTTP 207, a non-empty `errors` array, or an `error` field on a 2xx.
+  - **ok:** anything else.
+  - Calls without the cron secret aren't recorded.
+- **Use `logError` only where a failure would otherwise be silent:** an AI reply that couldn't be read, or a fallback taken because something was down. A failure the user already sees doesn't need it. Uses today: email-to-job matching, photo labels, and the order parser's prompt fallback.
+- **Recording never fails or changes the thing it records.** With no database configured (tests), it skips.
+
+### 25.2 The watcher (`/api/health/watch`, every 10 minutes)
+
+`lib/health/watch.ts` alerts on things that can't wait for the weekly check:
+
+| Problem | When | Severity |
+|---|---|---|
+| A scheduled job has stopped | No run for two of its intervals (at least 15 minutes; daily jobs get 2 extra hours). Intervals are read from `vercel.json` (`lib/health/schedule.ts`). Not raised until monitoring has been on that long | critical |
+| A scheduled job keeps failing | Its last 3 finished runs failed (last 1 for daily jobs). A run still `running` after 20 minutes is closed as failed: it timed out or crashed | critical |
+| An AI provider is failing | Half or more of 5+ calls in the last hour failed | critical |
+| Errors are spiking | `HEALTH_ERROR_SPIKE` (default 25) `system_errors` rows in the last hour | warning |
+| AI spend is high | Last 24 hours at or over `HEALTH_AI_DAILY_ALERT_USD` (default US$25) | warning |
+
+**Emails:**
+- Sent through Gmail from office@ to `HEALTH_ALERT_EMAIL`, or else every admin.
+- One email when a problem starts, a reminder every 24 hours while it lasts, and one "Cleared" email when it stops.
+- If sending fails, the alert stays un-emailed and the next run tries again.
+- Known gap: when Gmail itself is the broken part, the email can't go out. The alert is still kept, and the panel in part 2 shows it.
+
+**Clean-up:** each run also deletes `cron_runs` rows older than 60 days and `system_errors` rows older than a year. `ai_calls` rows are kept.
+
+---
+
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Nov 2026): Added Section 25 (Health check), part 1: `ai_calls`, `cron_runs`, `system_errors` and `health_alerts`; `trackAi` on every AI request, `withCronRun` on every cron, `logError` for silent failures, and the `/api/health/watch` alert watcher.*
 *Changes (Oct 2026): Added §23.12 Waiting on (every sent email read once for what it asks; a follow-up for the sender, timed from the office's past waits and the job, closed by a reply, brought forward by a later email, learned from as feature `waiting_on`; `sent_emails`; `list_waiting_on`). Added Section 24 (Learning module — `learning_events`, `learning_lessons`, action cards recording what the office did with each proposal and reading the most alike past cases; the nightly review keeping the lessons, `learning_reviews`, `/api/learning/review`; the "What the AI has learned" settings page with accuracy by kind and an off switch per lesson; auto-confirm per kind of card, off until turned on, with a banner asking once a kind is 98% untouched over its last 20; order parsing, report writing and photo labels moved onto it, replacing parser_examples and the photo corrections query). Retired the Brain and Teach mode / playbooks (§22.4): code removed, tables dropped, the two approved workflows moved to lessons.*
 
 *Changes in v3.3: Added Section 22 (AI Assistant Three-Mode Architecture & Playbook System — Mode 1 Chat, Mode 2 Do It / Manual Action Cards, Mode 3 Teach / Playbook System, three teaching tiers, playbooks table schema, assistant UI layout, AI execution with playbooks, iPhone Shortcut integration, build sequence Phase 7, key decisions). Concept derived from operational brainstorm: natural language operator interface, self-teaching playbook library, insurer-specific overlays, temporary overrides, iPhone shortcut for field/phone-call scenarios.)*

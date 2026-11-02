@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { startGmailWatch } from '@/lib/gmail/watch'
+import { withCronRun } from '@/lib/health/cron'
 
 const WATCHED_EMAIL = 'office@insurancerepairco.com.au'
 
@@ -76,7 +77,7 @@ async function renewWatch(): Promise<NextResponse> {
 }
 
 // Vercel Cron triggers via GET — guard is the same CRON_SECRET Bearer check
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -90,3 +91,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   return renewWatch()
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/gmail/renew', runGet)

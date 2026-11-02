@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { trackAi } from '@/lib/health/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,7 +71,7 @@ Return ONLY a JSON array of strings, one per photo, in order:
 ["label 1", "label 2", ...]`
 
   try {
-    const result = await model.generateContent(prompt)
+    const result = await trackAi({ feature: 'roof-photo-labels', provider: 'google', model: GEMINI_FLASH_MODEL }, () => model.generateContent(prompt))
     const text = result.response.text().trim()
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) return NextResponse.json({ ok: false, labels: [] })

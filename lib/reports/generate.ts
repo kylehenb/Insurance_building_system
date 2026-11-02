@@ -5,6 +5,7 @@ import { reportLearning, reportSituation, saveAiDraft } from '@/lib/reports/lear
 import { getSimilarReportsBlock } from '@/lib/reports/similar-reports'
 import { getResponseText } from '@/lib/ai/response-text'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // Turns raw inspection notes into a report's fields with Claude: the
 // tenant's prompt for the report type, plus what the learning module has learned and
@@ -147,13 +148,13 @@ Guidelines:
 - For safe_to_occupy, use only: Yes, No, or Conditional
 `
 
-  const message = await anthropic.messages.create({
+  const message = await trackAi({ feature: 'report-generate', provider: 'anthropic', model: 'claude-sonnet-5-5' }, () => anthropic.messages.create({
     model: 'claude-sonnet-5-5',
     max_tokens: 16000,
     output_config: { effort: 'medium' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
-  })
+  }))
 
   const text = getResponseText(message)
 

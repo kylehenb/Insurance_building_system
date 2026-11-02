@@ -8,6 +8,7 @@ import { createFollowUp, followUpDay, spokenDue } from '@/lib/actions/followups'
 import { pinnedTo } from '@/lib/actions/waits'
 import { pruneOldEvents } from '@/lib/calendar/sync'
 import { runLapses } from './lapse'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // The daily job review (tech spec §23.14): IRC's own initiative. Each morning
 // it reads the open jobs that changed since it last read them — and, once a
@@ -143,14 +144,14 @@ export async function reviewJob(db: SupabaseClient, tenantId: string, job: JobRo
     })
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const response = await client.beta.messages.create({
+    const response = await trackAi({ feature: 'job-review', provider: 'anthropic', model: REVIEW_MODEL, tenantId: tenantId, jobId: job.id }, () => client.beta.messages.create({
       model: REVIEW_MODEL,
       max_tokens: 2000,
       system: [{ type: 'text', text: REVIEW_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: [REVIEW_TOOL],
       tool_choice: { type: 'tool', name: REVIEW_TOOL.name },
       messages: [{ role: 'user', content: `Today: ${today(at)}.\n\nTHE JOB FILE\n${jobFile}\n\nOPEN FOLLOW-UPS, WAITS, CHECKS AND CARDS ON THIS JOB\n${openLines.join('\n') || '(none)'}` }],
-    } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+    } as Anthropic.Beta.MessageCreateParamsNonStreaming))
     const call = response.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === REVIEW_TOOL.name)
     if (!call) throw new Error('The AI didn\'t review the job')
     const out = (call.input ?? {}) as { state?: unknown; checks?: unknown; cancel?: unknown }

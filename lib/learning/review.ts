@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { refreshAutoConfirmSuggestions } from './auto-confirm'
 import type { LearningEvent } from './events'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // The nightly review (tech spec §24.5): a stronger model reads a feature's
 // new decisions — the untouched ones too — beside the earlier ones and the
@@ -181,14 +182,14 @@ export async function reviewFeature(
   const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   // Server-side fallback when a safety check declines (not offered on Haiku)
   const fallback = REVIEW_MODEL.startsWith('claude-haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }
-  const response = await client.beta.messages.create({
+  const response = await trackAi({ feature: 'learning-review', provider: 'anthropic', model: REVIEW_MODEL, tenantId: tenantId }, () => client.beta.messages.create({
     model: REVIEW_MODEL,
     max_tokens: 16000,
     system: REVIEW_SYSTEM_PROMPT,
     output_config: { effort: 'high', format: { type: 'json_schema', schema: DECISIONS_SCHEMA } },
     messages: [{ role: 'user', content: prompt }],
     ...fallback,
-  } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+  } as Anthropic.Beta.MessageCreateParamsNonStreaming))
   if (response.stop_reason === 'refusal') throw new Error('The review model declined')
   if (response.stop_reason === 'max_tokens') throw new Error('The review was cut short')
   const text = response.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map(b => b.text).join('')

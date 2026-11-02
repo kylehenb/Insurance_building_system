@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { calendar_v3 } from 'googleapis'
 import { queueAppointmentCheckIns } from './check-ins'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // The office's calendar, linked to jobs (tech spec §23.13). Events on the
 // calendars the office watches (automation_config 'watch_calendar_ids') are
@@ -340,14 +341,14 @@ async function aiLinks(db: SupabaseClient, tenantId: string, events: CalendarEve
   const eventList = events.map((e, i) => `E${i + 1}: ${perth(e.start_at)}${e.all_day ? ' (all day)' : ''} — "${e.summary ?? ''}"${e.location ? ` at ${e.location}` : ''}${e.description ? ` — ${e.description.slice(0, 300)}` : ''}`).join('\n')
 
   const anthropic = client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await anthropic.beta.messages.create({
+  const response = await trackAi({ feature: 'calendar-link', provider: 'anthropic', model: LINK_MODEL, tenantId: tenantId }, () => anthropic.beta.messages.create({
     model: LINK_MODEL,
     max_tokens: 4000,
     system: LINK_PROMPT,
     tools: [LINK_TOOL],
     tool_choice: { type: 'tool', name: LINK_TOOL.name },
     messages: [{ role: 'user', content: `THE EVENTS\n${eventList}\n\nTHE JOBS (made or written about in the last ${ACTIVE_DAYS} days, with their latest notes)\n${jobList}` }],
-  } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+  } as Anthropic.Beta.MessageCreateParamsNonStreaming))
   const call = response.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === LINK_TOOL.name)
   const out = new Map<string, { job_number: string; reason: string }>()
   for (const l of ((call?.input as { links?: unknown[] } | undefined)?.links ?? []) as { event?: string; job_number?: string; reason?: string }[]) {

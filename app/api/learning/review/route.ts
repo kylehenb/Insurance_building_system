@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { reviewAll } from '@/lib/learning/review'
+import { withCronRun } from '@/lib/health/cron'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -15,7 +16,7 @@ function checkCronAuth(req: NextRequest): boolean {
 }
 
 // Vercel Cron triggers via GET — guard is the same CRON_SECRET Bearer check used by the other crons
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -28,3 +29,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/learning/review', runGet)

@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { trackAi } from '@/lib/health/ai-usage'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -147,12 +148,12 @@ ${notesText || '(none)'}
 Generate the summary JSON.`
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await trackAi({ feature: 'email-summary', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
-    })
+    }))
 
     const responseText = message.content[0]?.type === 'text' ? message.content[0].text : ''
 

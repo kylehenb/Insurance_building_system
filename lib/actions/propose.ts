@@ -13,6 +13,7 @@ import { bringForward, waitBrief } from './waits'
 import { CATEGORIES, CardError, cardActor, claimQueued, getCard, isCategory, PRIORITY, queueEmailCard, type ActionCard, type CardStep, type StepKind } from './cards'
 import { cardLearning, cardSituation, recordCardInstruction } from './learning'
 import { orderUpdateBrief } from '@/lib/insurer-orders/order-update'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
@@ -188,7 +189,7 @@ export async function generateCard(
     let lastText = ''
 
     for (let step = 1; step <= MAX_STEPS && !finish; step++) {
-      const response = await client.beta.messages.create({
+      const response = await trackAi({ feature: 'action-cards', provider: 'anthropic', model: CARD_MODEL, tenantId: card.tenant_id, jobId: card.job_id }, () => client.beta.messages.create({
         model: CARD_MODEL,
         max_tokens: 8000,
         system: CARD_SYSTEM_PROMPT,
@@ -197,7 +198,7 @@ export async function generateCard(
         output_config: { effort: 'medium' },
         cache_control: { type: 'ephemeral' },
         messages,
-      } as Anthropic.Beta.MessageCreateParamsNonStreaming)
+      } as Anthropic.Beta.MessageCreateParamsNonStreaming))
       usage.model_calls++
       usage.input_tokens += response.usage.input_tokens
       usage.output_tokens += response.usage.output_tokens

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
+import { trackAi } from '@/lib/health/ai-usage'
 
 // Turns an email attachment into text someone can act on: a short summary of
 // what it is and what it asks for, then its full contents. PDFs (typed or
@@ -86,14 +87,14 @@ async function readWithGemini(file: AttachmentFile, kind: 'pdf' | 'image'): Prom
   const ai = new GoogleGenAI({ apiKey })
   let result
   try {
-    result = await ai.models.generateContent({
+    result = await trackAi({ feature: 'attachment-read', provider: 'google', model: GEMINI_FLASH_MODEL }, () => ai.models.generateContent({
       model: GEMINI_FLASH_MODEL,
       contents: [
         { inlineData: { mimeType: kind === 'pdf' ? 'application/pdf' : imageType(file), data: file.data.toString('base64') } },
         { text: `Attachment file name: ${file.filename}` },
       ],
       config: { systemInstruction: SYSTEM },
-    })
+    }))
   } catch (err) {
     console.error(`[attachments] Gemini could not read ${file.filename}:`, err)
     throw new AttachmentReadError(`${file.filename} couldn't be read just now. Try again, or open it in the app.`)

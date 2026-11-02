@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifySubmissionFailure } from '@/lib/email/notify-submission-failure'
+import { withCronRun } from '@/lib/health/cron'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,9 +44,12 @@ async function checkStuckSubmissions(): Promise<NextResponse> {
 }
 
 // Vercel Cron triggers via GET — guard is the same CRON_SECRET Bearer check used by the Gmail crons
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function runGet(req: NextRequest): Promise<NextResponse> {
   if (!checkCronAuth(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return checkStuckSubmissions()
 }
+
+// Each run is recorded for the health watcher (tech spec §25)
+export const GET = withCronRun('/api/field/submission-watchdog', runGet)
