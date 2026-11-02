@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fakeSupabase, type Row } from '@/lib/mcp/__tests__/fake-supabase'
-import { eventRow, jobNumbersIn, linkEvents, plainLink, streetKey, syncCalendar } from '../sync'
+import { eventRow, jobNumbersIn, linkEvents, plainLink, streetKey, syncCalendar, syncCalendars } from '../sync'
 
 // The office's calendar linked to jobs: events copied in from Google (only
 // changes after the first read), then linked by job number, inspection,
@@ -55,6 +55,16 @@ describe('reading events', () => {
     await syncCalendar(db(), calendar, 't1', 'cal')
     expect(list.mock.calls[3][0]).not.toHaveProperty('syncToken')
     expect(tables.calendar_sync_state[0]).toMatchObject({ sync_token: 's3' })
+  })
+})
+
+describe('a calendar that can\'t be read', () => {
+  it('keeps the error, even on the first read', async () => {
+    tables.automation_config = [{ tenant_id: 't1', key: 'watch_calendar_ids', value: 'kyle@example.com' }]
+    const calendar = () => ({ events: { list: vi.fn().mockRejectedValue(new Error('Not Found')) } }) as never
+    const out = await syncCalendars(db(), calendar)
+    expect(out.errors).toEqual(['kyle@example.com: Not Found'])
+    expect(tables.calendar_sync_state).toEqual([expect.objectContaining({ tenant_id: 't1', calendar_id: 'kyle@example.com', sync_error: 'Not Found' })])
   })
 })
 
