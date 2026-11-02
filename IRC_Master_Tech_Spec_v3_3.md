@@ -2651,6 +2651,7 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 | `find_job(query)` | read | `searchJobs` (`lib/jobs/search.ts`) | A job from what's remembered: every word must match the job number, street/suburb, insured, client, insurer, claim number (dashes optional), adjuster ref or a contact's name. Best 8 with job number, address, insured, client, claim and stage |
 | `get_job_summary(job_number)` | read | `fetchJobContext` + `getJobStage`, pending `action_queue`, and the work order / document / signing / excess / email tools | Who and where, stage + next step + warning, what's waiting (pending action cards), work orders, documents, signing, excess, latest 3 emails, last 600 chars of notes. A section that fails says so; the rest still return |
 | `add_job_note(job_number, note)` | change (`jobs.notes`) | `addJobNote` (`lib/communications/notes.ts`, also the Comms feed's **Add note** box via `POST /api/communications/notes`) | Adds a `communications` row of type `note` (source `voice`, or `assistant` from the in-app chat; author in `contact_name`) so it shows in the job's Comms feed. `get_job_summary` lists the latest 5 under "Recent job notes"; the Overview tab's free-text Notes field (`jobs.notes`) is separate |
+| `add_job_appointment(job_number, title, start, duration_minutes?, note?)` | change (`jobs.notes`) | Google Calendar `events.insert` on the first watched calendar, `addJobNote` (§23.13) | "Put it in my calendar": an event titled "IRC1079 — …" at the job's address (linked to the job in `calendar_events`), plus the job note if given. `get_job_summary` lists the job's appointments (from 14 days ago to 60 days ahead) under "Appointments" |
 | `find_work_orders(job_number?, business_name?, trade?, suburb?, sent?, status?)` | read | `woIsSent`, `workOrderAmountFor`, `tradeLabelFor` | With a job: all its work orders (narrowed by any filter). With filters and no job: across all jobs — business (trade business, entity or contact name), trade (trade name, work type, scope summary, the trade's primary trade and specialties; "cabinets" finds Cabinetmaker), suburb (job address), sent, status (newest 500 searched, oldest 40 shown). With nothing: unsent work orders across jobs (oldest 40). Each has recipient, amount, sent date/recipient and warnings |
 | `get_work_order(work_order_id)` | read | `loadWorkOrderItems` (`lib/work-orders/edit.ts`: `resolveOwnedScopeItems` + `buildWODisplayItems`), `summariseWorkOrder` | The work order's items as the tab and PDF show them (the trade's quote items with the work order's overrides, its own added items, removed ones flagged), agreed amount vs items total, contractor, sent state and warnings |
 | `create_work_orders_from_quote(job_number)` | change | `syncWorkOrdersFromQuote` (also `POST /api/jobs/[jobId]/work-orders`) | Sync from quote: one per trade in the approved quote without one yet (declined and claimed items left out), with visits and contractor match. Nothing sent |
@@ -2909,6 +2910,7 @@ MCP_USER_ID=                       # optional, users.id the shared key acts as
 AI_ASSISTANT_MODEL=                # optional, default claude-haiku-5-5
 AI_CARD_MODEL=                     # optional, action cards (§23.11), default claude-haiku-5-5
 AI_WAIT_MODEL=                     # optional, reading sent emails for what they ask (§23.12), default claude-haiku-5-5
+AI_CALENDAR_MODEL=                 # optional, matching calendar events to jobs (§23.13), default claude-haiku-5-5
 
 # App
 NEXT_PUBLIC_APP_URL=               # base for links in emails, incl. e-signing links. On Vercel previews the signing link uses the preview URL instead
@@ -4264,6 +4266,26 @@ Action cards cover what people ask of the office. This covers what the office ha
 
   A move made by the AI isn't learned from. The nightly review (§24.5) keeps lessons for it, and Settings → What the AI has learned shows it as "Waiting on (when to chase)".
 - **Voice and chat:** `list_waiting_on` (`listWaits`) lists the user's own waits by default, or everyone's with who each is for, optionally for one job or one person. `change_follow_up` moves or cancels one. No new permission: setting a wait is IRC's own bookkeeping and sends nothing, and moving or cancelling uses `actions.review` as before.
+
+### 23.13 Calendar (`lib/calendar/sync.ts`, `/api/calendar/sync`)
+
+The office's calendar is linked to its jobs, so IRC knows when a job's appointment happened.
+
+- **Which calendars:** `automation_config` key `watch_calendar_ids` holds a comma list of Google calendar ids (for Insurance Repair Co, the owner's personal calendar). They're read with the app's Google credentials (`getCalendarClient`, the office account unless `GOOGLE_CALENDAR_*` say otherwise). A watched calendar must be shared with that account: "See all event details" to read it, and "Make changes to events" for `add_job_appointment`.
+- **Copied in** every 5 minutes (`syncCalendars`), into `calendar_events` (migration `20261121_calendar_events.sql`, server only).
+  - **First read:** the last 30 days and everything ahead.
+  - **After that, only changes**, via Google's sync token (`calendar_sync_state`). An expired token starts over.
+  - **Cancelled events** stay, marked `cancelled`.
+  - **Failures:** a calendar that can't be read keeps its error in `calendar_sync_state.sync_error`.
+- **Linked to a job** (`linkEvents`, for events from 30 days back to 90 days ahead, new or changed since last linked: `linked_etag` ≠ `etag`). The first match wins:
+  1. **job number:** a job number in the title or description (`jobNumbersIn`);
+  2. **inspection:** the inspection it was made for (`inspections.calendar_event_id`);
+  3. **address:** the only job at that street number and street (`streetKey`);
+  4. **AI:** for the rest, Claude (`AI_CALENDAR_MODEL`, up to 15 events a run) reads them beside the jobs made or written about in the last 90 days and their latest notes. A Belmont event at 1pm Saturday matches the job whose note says "Inspection tomorrow, Saturday 31 October, 1 to 2 pm". When unsure, it leaves the event unlinked (`none`; personal events stay that way).
+
+  `link_source` and `link_reason` say how each event was linked.
+- **Booked:** a job's appointment counts as its KPI booking (`jobs_kpi_mark`, §WF-1) when it was made after the order came in and is for no later than the day after the visit. A site meeting months later doesn't count.
+- **By voice and chat:** `add_job_appointment` (§10b) puts an appointment on the first watched calendar, titled with the job number and placed at the job's address, and adds the job note too. `get_job_summary` lists the job's appointments.
 
 ---
 

@@ -1,3 +1,5 @@
+import type { SupabaseClient as RawClient } from '@supabase/supabase-js'
+import { jobAppointments, spokenEventTime } from '@/lib/calendar/sync'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { findWorkOrders, spokenDate } from '@/lib/mcp/tools/work-orders'
 import { describeExcess, isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
@@ -39,7 +41,7 @@ export const getJobSummary: McpTool = {
   name: 'get_job_summary',
   title: 'Job summary',
   description: [
-    'Everything about a job at a glance: who and where, its stage and the next step, pending actions from the dashboard, work orders, quotes/reports/invoices,',
+    'Everything about a job at a glance: who and where, its stage and the next step, pending actions from the dashboard, appointments in the calendar, work orders, quotes/reports/invoices,',
     'signing, excess, the latest emails and the job notes. Use it for "what\'s happening on IRC…" and summarise it for the user — lead with the stage, the next step and anything waiting on them.',
   ].join(' '),
   inputSchema: {
@@ -84,6 +86,11 @@ export const getJobSummary: McpTool = {
       }),
       section('Excess', async () => describeExcess(await loadExcessContext(ctx.supabase, ctx.tenantId, job.id))),
       section('Latest emails', async () => body((await listJobEmails.run({ ...jobArgs, limit: 3 }, ctx)).text) || 'None yet.'),
+      section('Appointments', async () => {
+        const day = 86_400_000
+        const events = await jobAppointments(ctx.supabase as unknown as RawClient, ctx.tenantId, job.id, { from: new Date(Date.now() - 14 * day), to: new Date(Date.now() + 60 * day) })
+        return events.length ? events.map(e => `- ${spokenEventTime(e.start_at)}: ${e.summary ?? '(no title)'}${e.start_at && e.start_at < new Date().toISOString() ? ' (past)' : ''}`).join('\n') : null
+      }),
       section('Recent job notes', async () => {
         const notes = await listJobNotes(ctx.supabase, { tenantId: ctx.tenantId, jobId: job.id, limit: RECENT_NOTES })
         return notes.length
