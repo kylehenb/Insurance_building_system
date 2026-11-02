@@ -35,6 +35,10 @@
     {
       "path": "/api/learning/review",
       "schedule": "13 18 * * *"
+    },
+    {
+      "path": "/api/calendar/sync",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
