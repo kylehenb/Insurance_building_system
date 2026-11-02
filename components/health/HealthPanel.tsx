@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { HealthSummary, Light, MetricValue } from '@/lib/health/daily'
 import type { PeriodKind } from '@/lib/health/periods'
 import type { HealthReview, Fact } from '@/lib/health/review'
+import type { SuggestionRow, Decision } from '@/lib/health/suggestions'
 
-type PanelData = HealthSummary & { review: HealthReview | null }
+type PanelData = HealthSummary & { review: HealthReview | null; suggestions: SuggestionRow[]; inProgress: SuggestionRow[] }
+type Decide = (s: SuggestionRow, d: Decision) => void
 
 // System & business health (tech spec §25.3): one line on the Today view
 // with a light per area, opening to the figures for a week, month, quarter or
@@ -63,7 +65,32 @@ function Cites({ ids, facts }: { ids: string[]; facts: Map<string, Fact> }) {
   )
 }
 
-function ReviewCard({ review, offset, kind }: { review: HealthReview | null; offset: number; kind: PeriodKind }) {
+const STATUS_LABEL: Record<SuggestionRow['status'], string> = { open: 'Open', accepted: 'Accepted', dismissed: 'Dismissed', done: 'Done' }
+
+function SuggestionItem({ s, onDecide, busy }: { s: SuggestionRow; onDecide: Decide; busy: boolean }) {
+  const facts = new Map(s.evidence.map(f => [f.id, f]))
+  return (
+    <div className="hp-sugg">
+      <div className="hp-sugg-title">
+        {s.title} <span className="hp-tag">{KIND_LABEL[s.kind] ?? s.kind}</span><span className="hp-tag">{s.effort} effort</span>
+        {s.times_raised > 1 && <span className="hp-tag">raised {s.times_raised} times</span>}
+        {s.status !== 'open' && <span className={`hp-tag hp-status-${s.status}`}>{STATUS_LABEL[s.status]}</span>}
+      </div>
+      <div className="hp-sugg-why">{s.why} <Cites ids={s.evidence.map(f => f.id)} facts={facts} /></div>
+      {s.note && <div className="hp-sugg-note">Note: {s.note}</div>}
+      <div className="hp-sugg-actions">
+        {s.status === 'open' && <>
+          <button className="hp-btn hp-btn-dark" disabled={busy} onClick={() => onDecide(s, 'accepted')}>Accept</button>
+          <button className="hp-btn" disabled={busy} onClick={() => onDecide(s, 'dismissed')}>Dismiss</button>
+        </>}
+        {s.status === 'accepted' && <button className="hp-btn hp-btn-dark" disabled={busy} onClick={() => onDecide(s, 'done')}>Mark done</button>}
+        {s.status !== 'open' && <button className="hp-btn" disabled={busy} onClick={() => onDecide(s, 'open')}>Reopen</button>}
+      </div>
+    </div>
+  )
+}
+
+function ReviewCard({ review, offset, kind, suggestions, onDecide, busy }: { review: HealthReview | null; offset: number; kind: PeriodKind; suggestions: SuggestionRow[]; onDecide: Decide; busy: string | null }) {
   const [showFacts, setShowFacts] = useState(false)
   if (offset === 0) return <div className="hp-review hp-review-empty">The written review of this {kind} comes the night after it ends.</div>
   if (!review) return <div className="hp-review hp-review-empty">No written review yet. Reviews are written overnight once the {kind}&apos;s figures are in (the last 4 {kind}s are filled in over the first few nights).</div>
@@ -82,7 +109,12 @@ function ReviewCard({ review, offset, kind }: { review: HealthReview | null; off
           </div>
         ))}
       </div>
-      {review.suggestions.length > 0 && (
+      {suggestions.length > 0 ? (
+        <div style={{ marginTop: 14 }}>
+          <div className="hp-group-name">Suggested changes</div>
+          {suggestions.map(sg => <SuggestionItem key={sg.id} s={sg} onDecide={onDecide} busy={busy === sg.id} />)}
+        </div>
+      ) : review.suggestions.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <div className="hp-group-name">Suggested changes</div>
           {review.suggestions.map((sg, i) => (
@@ -108,6 +140,7 @@ export function HealthPanel() {
   const [hidden, setHidden] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
   const load = useCallback(async (k: PeriodKind, o: number) => {
     setLoading(true)
@@ -126,6 +159,27 @@ export function HealthPanel() {
   }, [])
 
   useEffect(() => { void load(kind, offset) }, [load, kind, offset])
+
+  const decide: Decide = async (sg, decision) => {
+    let note: string | null = null
+    if (decision === 'dismissed') {
+      note = window.prompt('Why dismiss it? (optional — the next reviews learn from this)')
+      if (note === null) return
+    } else if (decision === 'done') {
+      note = window.prompt('How was it done? (optional)')
+      if (note === null) return
+    }
+    setBusy(sg.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/health/suggestions/${sg.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, note }) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) setError(d.error ?? 'Could not save the decision')
+      await load(kind, offset)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   if (hidden) return null
 
@@ -181,6 +235,14 @@ export function HealthPanel() {
         .hp-link { background: none; border: 0; padding: 0; margin-top: 12px; font-size: 11.5px; color: var(--bronze); cursor: pointer; text-decoration: underline; }
         .hp-facts { font-size: 11.5px; color: var(--body-soft); padding-left: 18px; margin: 8px 0 0; line-height: 1.5; max-height: 280px; overflow-y: auto; list-style: none; }
         .hp-facts li { margin-bottom: 3px; }
+        .hp-sugg-note { font-size: 11.5px; color: var(--subtle); margin-top: 3px; font-style: italic; }
+        .hp-sugg-actions { display: flex; gap: 6px; margin-top: 6px; }
+        .hp-btn { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 0.5px solid var(--line-strong); background: var(--paper); color: var(--body); cursor: pointer; }
+        .hp-btn:disabled { opacity: .5; cursor: default; }
+        .hp-btn-dark { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+        .hp-status-accepted { color: var(--info-dark); border-color: var(--info-soft); }
+        .hp-status-done { color: var(--success); border-color: var(--success); }
+        .hp-status-dismissed { color: var(--faint); }
       `}</style>
 
       <button className="hp-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
@@ -218,7 +280,14 @@ export function HealthPanel() {
 
           {data && (
             <>
-              <ReviewCard review={data.review} offset={data.period.offset} kind={kind} />
+              <ReviewCard review={data.review} offset={data.period.offset} kind={kind} suggestions={data.suggestions ?? []} onDecide={decide} busy={busy} />
+
+              {(data.inProgress ?? []).filter(sg => !(data.suggestions ?? []).some(x => x.id === sg.id)).length > 0 && (
+                <div className="hp-review" style={{ background: 'var(--paper)' }}>
+                  <div className="hp-group-name">Changes you&apos;ve accepted, not yet done</div>
+                  {(data.inProgress ?? []).filter(sg => !(data.suggestions ?? []).some(x => x.id === sg.id)).map(sg => <SuggestionItem key={sg.id} s={sg} onDecide={decide} busy={busy === sg.id} />)}
+                </div>
+              )}
 
               <div className="hp-areas">
                 {data.areas.map(a => (

@@ -5,6 +5,8 @@ import { logError } from './errors'
 import { loadSummary, type MetricValue } from './daily'
 import { addDays, dayStartIso, fixedLabel, perthDay, periodFor, type Period, type PeriodKind } from './periods'
 import { permissionAction } from '@/lib/permissions/catalogue'
+import { repeatedSequences, type ActivityStep } from './patterns'
+import { followUpFacts, saveSuggestions, suggestionContext } from './suggestions'
 
 // The health check's written review (tech spec §25.4). When a week, month,
 // quarter or year ends, the code gathers what happened as numbered facts —
@@ -53,6 +55,7 @@ const SECTIONS: { key: string; title: string; brief: string }[] = [
   { key: 'didnt', title: "What didn't", brief: 'deadlines missed, drops, failures, alerts, AI proposals the office had to change or skip, jobs sitting in a stage' },
   { key: 'busy', title: 'How busy', brief: 'work coming in (orders, jobs, emails) and work done, against the period before and the usual' },
   { key: 'systems', title: 'Systems, AI and limits', brief: 'AI spend and failures, scheduled jobs, errors, database and storage' },
+  { key: 'followup', title: 'Changes made earlier', brief: 'for each change the owner accepted or made (in the facts), whether the figures since show it working; leave empty when there are none' },
 ]
 
 const clip = (s: unknown, n: number) => {
@@ -102,7 +105,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
     rows(db.from('cron_runs').select('route, status, error, duration_ms').gte('started_at', fromIso).lt('started_at', toIso).limit(50000)),
     rows(db.from('system_errors').select('source, message').gte('created_at', fromIso).lt('created_at', toIso).or(`tenant_id.eq.${tenantId},tenant_id.is.null`).limit(5000)),
     rows(db.from('learning_events').select('feature, kind, outcome, situation_text, changes, instruction').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).order('created_at', { ascending: true }).limit(2000)),
-    rows(db.from('activity_log').select('action, via, outcome').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).limit(20000)),
+    rows(db.from('activity_log').select('action, via, outcome, user_id, job_id, created_at').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).limit(20000)),
     rows(db.from('jobs').select('insurer').eq('tenant_id', tenantId).gte('created_at', fromIso).lt('created_at', toIso).limit(5000)),
   ])
 
@@ -178,6 +181,11 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
   for (const [action, x] of [...byAction].sort((a, b) => b[1].n - a[1].n).slice(0, 10)) {
     add(`Staff action "${permissionAction(action)?.label ?? action}": done ${x.n} times${x.voice ? ` (${x.voice} by voice)` : ''}${x.failed ? `, ${x.failed} failed` : ''}.`)
   }
+  // The same steps done one after another on a job, again and again (§25.5)
+  const label = (a: string) => permissionAction(a)?.label ?? a
+  for (const seq of repeatedSequences(activity as unknown as ActivityStep[])) {
+    add(`Repeated manual steps: "${seq.steps.map(label).join('" then "')}" on the same job within 30 minutes, ${seq.times} times, by ${seq.people} ${seq.people === 1 ? 'person' : 'people'} on ${seq.jobs} jobs.`)
+  }
 
   // Jobs in, and insurer deadlines, by insurer
   const insurerIn = new Map<string, number>()
@@ -212,6 +220,9 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
     if (byStage.size) add(`Open jobs by stage at the end of the period: ${[...byStage].sort((a, b) => b[1].n - a[1].n).map(([s, x]) => `${s} ${x.n} (${x.old} there over 2 weeks)`).join(', ')}.`)
   }
 
+  // Changes the owner accepted or made from earlier suggestions, to follow up
+  for (const text of await followUpFacts(db, tenantId)) add(text)
+
   // A longer period reads the shorter reviews inside it
   const childKind: Partial<Record<PeriodKind, PeriodKind>> = { month: 'week', quarter: 'month', year: 'quarter' }
   const child = childKind[period.kind]
@@ -230,13 +241,14 @@ const point = { type: 'object', additionalProperties: false, required: ['text', 
 const REVIEW_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['headline', 'worked', 'didnt', 'busy', 'systems', 'suggestions'],
+  required: ['headline', 'worked', 'didnt', 'busy', 'systems', 'followup', 'suggestions'],
   properties: {
     headline: { type: 'string' },
     worked: { type: 'array', items: point },
     didnt: { type: 'array', items: point },
     busy: { type: 'array', items: point },
     systems: { type: 'array', items: point },
+    followup: { type: 'array', items: point },
     suggestions: {
       type: 'array',
       items: {
@@ -264,7 +276,7 @@ You are given numbered facts (F1, F2…). They are the only things you know. Rul
 - "Figures against the usual" matter more than single numbers; a change on small numbers (say 2 to 3) isn't a trend, so don't make it one.
 - Sections: ${SECTIONS.map(s => `"${s.key}" (${s.title}): ${s.brief}`).join('; ')}. Up to 5 points each; fewer, or none, when there's little to say.
 - "headline": one sentence on the period.
-- "suggestions": up to 5 practical changes, the most valuable first, each from a pattern in the facts (not one-off events). Kinds: "automation" (the system could do something staff do by hand), "wording" (templates or AI wording the office keeps changing, or insurers ask to change), "process" (a change to how the business works), "system" (a fix or setting in IRC Master). "why" says what in the facts points to it and what it would save or fix. "effort" is your honest guess. No suggestion is better than a weak one.
+- "suggestions": up to 5 practical changes, the most valuable first, each from a pattern in the facts (not one-off events). Repeated manual steps are strong candidates for automation. Read the earlier suggestions and the owner's decisions: don't repeat one already made, and learn what the owner values from what they accepted and dismissed (and why). Kinds: "automation" (the system could do something staff do by hand), "wording" (templates or AI wording the office keeps changing, or insurers ask to change), "process" (a change to how the business works), "system" (a fix or setting in IRC Master). "why" says what in the facts points to it and what it would save or fix. "effort" is your honest guess. No suggestion is better than a weak one.
 - If the facts are thin (a quiet period, or tracking only just started), say so in the headline and keep it short.`
 
 function validated(raw: unknown, ids: Set<string>): { headline: string; sections: ReviewSection[]; suggestions: Suggestion[]; dropped: number } {
@@ -313,6 +325,7 @@ export async function writeReview(db: SupabaseClient, tenantId: string, kind: Pe
   let facts: Fact[] = []
   try {
     facts = await gatherFacts(db, tenantId, period, summary.metrics, now)
+    const earlier = await suggestionContext(db, tenantId)
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const fallback = HEALTH_REVIEW_MODEL.startsWith('claude-haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }
     const response = await trackAi({ feature: 'health-review', provider: 'anthropic', model: HEALTH_REVIEW_MODEL, tenantId }, () => client.beta.messages.create({
@@ -320,7 +333,7 @@ export async function writeReview(db: SupabaseClient, tenantId: string, kind: Pe
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: REVIEW_SCHEMA } },
-      messages: [{ role: 'user', content: `Write the review of ${fixedLabel(period)} (${period.kind} ${period.from} to ${addDays(period.to, -1)}).\n\nFACTS\n${facts.map(f => `${f.id}. ${f.text}`).join('\n')}` }],
+      messages: [{ role: 'user', content: `Write the review of ${fixedLabel(period)} (${period.kind} ${period.from} to ${addDays(period.to, -1)}).\n\nFACTS\n${facts.map(f => `${f.id}. ${f.text}`).join('\n')}${earlier ? `\n\nEARLIER SUGGESTIONS AND WHAT THE OWNER DECIDED (context for your suggestions, not facts to cite)\n${earlier}` : ''}` }],
       ...fallback,
     } as Anthropic.Beta.MessageCreateParamsNonStreaming))
     if (response.stop_reason === 'refusal') throw new Error('The review model declined')
@@ -336,7 +349,10 @@ export async function writeReview(db: SupabaseClient, tenantId: string, kind: Pe
     const row = { ...base, status: 'ready', headline, sections, suggestions, facts, error: null }
     const { data, error } = await db.from('health_reviews').upsert(row, { onConflict: 'tenant_id,kind,period_from' }).select('*').single()
     if (error) throw new Error(error.message)
-    return data as HealthReview
+    const saved = data as HealthReview
+    // Each suggestion becomes something the owner can accept or dismiss (§25.5)
+    await saveSuggestions(db, tenantId, saved.id, suggestions, facts, now)
+    return saved
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await logError('health-review', err, { tenantId, detail: { period: fixedLabel(period) } })

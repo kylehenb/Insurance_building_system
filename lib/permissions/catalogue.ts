@@ -66,7 +66,7 @@ export const PERMISSION_ACTIONS = [
   // Admin
   { key: 'settings.edit', group: 'Admin', label: 'Change company settings', description: 'Templates, automation, rates, integrations and company details', levels: ON_OFF, enforced: true },
   { key: 'users.manage', group: 'Admin', label: 'Manage users and permissions', description: 'Change roles and these permissions', levels: ON_OFF, enforced: true },
-  { key: 'health.view', group: 'Admin', label: 'See the health check', description: 'The System & business health panel on the dashboard: AI spend, failures, limits, how busy the office has been', levels: ON_OFF, enforced: true },
+  { key: 'health.view', group: 'Admin', label: 'See and act on the health check', description: 'The System & business health panel on the dashboard: AI spend, failures, limits, how busy the office has been, the written reviews, and accepting or dismissing their suggestions', levels: ON_OFF, enforced: true },
 ] as const satisfies readonly PermissionAction[]
 
 export type PermissionKey = typeof PERMISSION_ACTIONS[number]['key']
