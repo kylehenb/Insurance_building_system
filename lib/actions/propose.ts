@@ -86,6 +86,10 @@ How it works:
 - If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
 - The first message may show WHAT THE OFFICE DID IN SIMILAR PAST CASES and LESSONS FROM THE OFFICE'S PAST DECISIONS. Their habits there outweigh your own defaults — who to write to and copy in, how they word things, which steps they keep, drop or add — but only where this case matches in the ways that matter. Say in reasoning when a past case shaped a step.
 - If the office has told you what they want (THE OFFICE'S INSTRUCTIONS, in the first message), do that: their instructions override your own view and the past cases. Propose the steps they ask for, with the details they give, and say in reasoning how you followed them. If they ask for something no tool can do, say so in the summary.
+- AN APPOINTMENT CHECK-IN comes after a job's calendar appointment (an inspection, a make safe, a site meeting) has ended. Look at what's been recorded on the job since it started: job notes, emails, the field app, reports, quotes, work orders. Then:
+  - Sorted: a note says it went fine and nothing more is needed, or everything that should follow is done (e.g. the report is already sent). Call finish_card with needs_action false and say so in the summary.
+  - Something outstanding: e.g. the report or make safe report is drafted but not sent (the insurer's report KPI is in the job file), or a note mentions a problem ("the tiles need replacing"). Propose the steps that move it on, and use category attend_submit for a report or quote to finish and send.
+  - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
 - set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question.
 - A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it).
@@ -155,6 +159,8 @@ export async function generateCard(
     const ctx: McpContext = { supabase: db as unknown as SupabaseClient<Database>, tenantId: card.tenant_id, userId: await cardActor(db, card.tenant_id), via: 'chat' }
     const about = card.source === 'followup'
       ? await followUpContext(card, db, ctx)
+      : card.source === 'appointment'
+      ? await appointmentContext(card, db, ctx)
       : await emailContext(card, db, ctx, !!card.starred_by || !!opts.feedback?.trim())
     if (!('intro' in about)) return target ? keepCard(about.outcome ?? about.error_log ?? 'The email can\'t be read') : save(about)
 
@@ -371,6 +377,29 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
     jobId: card.job_id,
     title: card.title,
     situation: await cardSituation(db, card.tenant_id, { kind: 'followup', who: f.who, subject: f.note, jobId: card.job_id }),
+  }
+}
+
+/** An appointment check-in: what the appointment was, and the job file as it stands now (what's been recorded since) */
+async function appointmentContext(card: ActionCard, db: SupabaseClient, ctx: McpContext): Promise<Context | Outcome> {
+  const { data: event } = card.source_ref
+    ? await db.from('calendar_events').select('summary, description, location, start_at, end_at, status').eq('tenant_id', card.tenant_id).eq('id', card.source_ref).maybeSingle()
+    : { data: null }
+  const e = event as { summary: string | null; description: string | null; location: string | null; start_at: string | null; end_at: string | null; status: string } | null
+  if (!e) return { status: 'no_action', outcome: 'The appointment is no longer in the calendar' }
+  if (e.status === 'cancelled') return { status: 'no_action', outcome: 'The appointment was cancelled' }
+  const { data: job } = card.job_id
+    ? await db.from('jobs').select('job_number').eq('tenant_id', card.tenant_id).eq('id', card.job_id).maybeSingle()
+    : { data: null }
+  const jobNumber = (job as { job_number: string } | null)?.job_number
+  if (!jobNumber) return { status: 'no_action', outcome: 'The appointment isn\'t on a job any more' }
+  const jobFile = (await getJobSummary.run({ job_number: jobNumber }, ctx)).text
+  const when = (iso: string | null) => (iso ? new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : 'unknown')
+  return {
+    intro: `AN APPOINTMENT CHECK-IN: this appointment on ${jobNumber} has ended.\n"${e.summary ?? '(no title)'}", ${when(e.start_at)} to ${when(e.end_at)}${e.location ? `, at ${e.location}` : ''}${e.description ? `\nIts notes: ${e.description.slice(0, 1000)}` : ''}\nCheck what's been recorded on the job since ${when(e.start_at)} (list_job_emails and the job file's notes, documents and work orders).\n\nTHE JOB FILE (as it is now)\n${jobFile}`,
+    jobId: card.job_id,
+    title: card.title,
+    situation: await cardSituation(db, card.tenant_id, { kind: 'appointment', subject: e.summary ?? '', jobId: card.job_id }),
   }
 }
 

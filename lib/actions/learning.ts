@@ -33,7 +33,7 @@ async function jobFacts(db: SupabaseClient, tenantId: string, jobId: string | nu
 export async function cardSituation(
   db: SupabaseClient,
   tenantId: string,
-  about: { kind: 'email' | 'followup'; sender?: { name: string; email: string } | null; subject: string; jobId: string | null; who?: string | null },
+  about: { kind: 'email' | 'followup' | 'appointment'; sender?: { name: string; email: string } | null; subject: string; jobId: string | null; who?: string | null },
 ): Promise<Situation> {
   const job = await jobFacts(db, tenantId, about.jobId).catch(() => null)
   const email = about.sender?.email.trim().toLowerCase() || null
@@ -55,7 +55,7 @@ export async function cardSituation(
 /** One line saying what the card was about */
 export function situationText(s: Situation): string {
   const who = s.sender_name && s.sender_email ? `${s.sender_name} <${s.sender_email}>` : s.sender_email ?? s.sender_name
-  const head = s.kind === 'followup' ? `Follow-up the office set${who ? ` (with ${who})` : ''}` : `Email${who ? ` from ${who}` : ''}`
+  const head = s.kind === 'followup' ? `Follow-up the office set${who ? ` (with ${who})` : ''}` : s.kind === 'appointment' ? 'Check-in after a job appointment' : `Email${who ? ` from ${who}` : ''}`
   const job = s.on_job === 'yes'
     ? [s.insurer, s.job_type, s.loss_type, s.stage && `stage: ${s.stage}`].filter(Boolean).join(', ') || 'on a job'
     : 'not on a job'
