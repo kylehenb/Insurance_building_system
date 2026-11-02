@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recordSent } from '@/lib/mail/sent-by'
 import type { Database } from '@/lib/supabase/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailClient } from '@/lib/gmail/client'
@@ -53,6 +54,8 @@ export async function replyToEmail(
   commId: string,
   body: string,
   attachments: EmailAttachment[] = [],
+  /** Who's replying — recorded for what the office is waiting on (lib/mail/sent-by.ts) */
+  sentBy: string | null = null,
 ): Promise<ReplyResult> {
   const { data: comm, error: commErr } = await supabase
     .from('communications')
@@ -125,6 +128,7 @@ export async function replyToEmail(
 
   // Send via Gmail — threadId appends to the existing conversation
   let sentGmailId: string | null = null
+  let sentThreadId: string | null = source.thread_id
   try {
     const gmail = getGmailClient()
     const sendRes = await gmail.users.messages.send({
@@ -135,10 +139,13 @@ export async function replyToEmail(
       },
     })
     sentGmailId = sendRes.data.id ?? null
+    sentThreadId = sendRes.data.threadId ?? sentThreadId
   } catch (err) {
     console.error('[reply] Gmail send error:', err)
     throw new ReplyError('Failed to send email', 502)
   }
+  // Who sent it, for what the office is waiting on (lib/actions/waiting-on.ts)
+  await recordSent(createServiceClient() as unknown as SupabaseClient, tenantId, sentGmailId, sentThreadId, sentBy)
 
   // Mark the sent copy as processed so the Gmail SENT watch doesn't record it twice
   if (sentGmailId) {

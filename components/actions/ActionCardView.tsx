@@ -184,7 +184,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
         <>
           {f?.waiting ? (
             <div className="ac-followup">
-              ⏳ Waiting on {f.waiting.name} for <b>{f.waiting.asked}</b> since {setOn(f.waiting.sent_at)}{card.follow_up_for ? ` (for ${card.follow_up_for})` : ''}. {f.waiting.on_behalf_of ? `${f.waiting.on_behalf_of}. ` : ''}{f.waiting.reason}
+              ⏳ Waiting on {f.waiting.name} for <b>{f.waiting.asked}</b> since {setOn(f.waiting.sent_at)}{card.follow_up_for ? ` (for ${card.follow_up_for}${f.waiting.pinned === 'job_owner' ? ', the job owner' : ''})` : ''}. {f.waiting.on_behalf_of ? `${f.waiting.on_behalf_of}. ` : ''}{f.waiting.reason}
             </div>
           ) : f && (
             <div className="ac-followup">

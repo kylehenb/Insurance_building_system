@@ -1,4 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@/lib/supabase/database.types'
+import { recordSent } from '@/lib/mail/sent-by'
 import { createServiceClient } from '@/lib/supabase/server'
 import { documentTemplateVars, renderTemplate, resolveEmailTemplate } from '@/lib/email/templates'
 import { renderRichTemplate, richToText } from '@/lib/email/rich-text'
@@ -300,6 +302,8 @@ export async function sendDocumentEmail(
     console.error(`[document-send] Gmail send failed (${docs.map(d => d.title).join(', ')}):`, err)
     throw new DocumentSendError('Failed to send the email. Nothing was sent or changed.', 502)
   }
+  // Who sent it, for what the office is waiting on (lib/actions/waiting-on.ts)
+  await recordSent(service as unknown as SupabaseClient, ctx.tenantId, sent.gmailId, sent.threadId, ctx.actorId)
 
   // Keep a copy of exactly what was sent on the comms record. Non-fatal from
   // here on: the email has gone.

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { activeLessons, formatLessons } from '@/lib/learning/lessons'
 import { formatCases, recordLearning, similarCases, type LearningOutcome, type Likeness, type Situation } from '@/lib/learning/events'
-import { CARD_COLUMNS, PRIORITY, type ActionCard, type WaitingOn } from './cards'
+import { cardActor, CARD_COLUMNS, PRIORITY, type ActionCard, type WaitingOn } from './cards'
 import { chaseDue, followUpDay, spokenDue, workingDaysBetween } from './followups'
 
 // What the office is waiting on (tech spec §23.12) — the parts that are only
@@ -141,6 +141,94 @@ export async function recordChaseDecision(db: SupabaseClient, card: ActionCard, 
   if (card.follow_up?.kind !== 'waiting_on') return
   const chased = ended === 'confirmed' && card.steps.some(s => s.tool === 'send_email' && (s.status === 'done' || s.status === 'waiting'))
   await recordWaitEnded(db, card, chased ? 'chased' : 'chase_skipped', userId)
+}
+
+// ── Who it's pinned to, and follow-ups a person set for the same thing ──
+
+/** Why a wait is someone's: they sent the email, they own the job, or they own the business */
+export type PinnedTo = { userId: string | null; why: 'sender' | 'job_owner' | 'business_owner' }
+
+/**
+ * Who a wait belongs to. Always someone: whoever sent the email; when IRC
+ * can't tell (sent from Gmail itself, or by an automation), the job's owner
+ * (jobs.assigned_to); else the business owner (the company's first admin).
+ */
+export async function pinnedTo(db: SupabaseClient, tenantId: string, sentBy: string | null, jobId: string | null): Promise<PinnedTo> {
+  if (sentBy) return { userId: sentBy, why: 'sender' }
+  if (jobId) {
+    const { data } = await db.from('jobs').select('assigned_to').eq('tenant_id', tenantId).eq('id', jobId).maybeSingle()
+    const owner = (data as { assigned_to: string | null } | null)?.assigned_to
+    if (owner) return { userId: owner, why: 'job_owner' }
+  }
+  return { userId: (await cardActor(db, tenantId)) || null, why: 'business_owner' }
+}
+
+/** Words that say nothing about who someone is */
+const COMMON = new Set(['chase', 'follow', 'with', 'from', 'quote', 'services', 'service', 'group', 'the', 'and', 'pty', 'ltd', 'perth', 'insurance', 'about', 'their', 'they'])
+const nameWords = (s: string) => new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 3 && !COMMON.has(w)))
+
+/** Whether a person-set follow-up's "who" (or its note) names the one being waited on */
+export function samePerson(text: string | null | undefined, w: Pick<WaitingOn, 'name' | 'email'>): boolean {
+  if (!text) return false
+  const t = text.toLowerCase()
+  if (w.email && t.includes(w.email.toLowerCase())) return true
+  const theirs = nameWords(`${w.name} ${w.email?.split('@')[1]?.split('.')[0] ?? ''}`)
+  return [...nameWords(text)].some(x => theirs.has(x))
+}
+
+/** A person-set follow-up and an email only count as the same thing when set around the same time */
+const SAME_MOMENT_MS = 30 * 60_000
+
+/** Whether a person-set follow-up is about the same thing as a wait */
+export function coversWait(f: Pick<ActionCard, 'job_id' | 'created_at' | 'follow_up'>, w: { threadId: string | null; jobId: string | null; waiting: Pick<WaitingOn, 'name' | 'email' | 'sent_at'> }): boolean {
+  const fu = f.follow_up
+  if (!fu) return false
+  if (w.threadId && fu.thread_id === w.threadId) return true
+  if (!w.jobId || f.job_id !== w.jobId) return false
+  const apart = Math.abs(new Date(f.created_at).getTime() - new Date(w.waiting.sent_at).getTime())
+  return apart <= SAME_MOMENT_MS && (samePerson(fu.who, w.waiting) || samePerson(fu.note, w.waiting))
+}
+
+/** A follow-up a person already set for what this email asks — the card's Remind me step, set as the email went */
+export async function personFollowUpFor(db: SupabaseClient, tenantId: string, w: { threadId: string | null; jobId: string | null; waiting: WaitingOn }): Promise<ActionCard | null> {
+  const { data } = await db.from('action_queue').select(CARD_COLUMNS)
+    .eq('tenant_id', tenantId).eq('source', 'followup').eq('rule_key', 'followup').eq('status', 'scheduled')
+  return ((data as ActionCard[] | null) ?? []).find(c => coversWait(c, w)) ?? null
+}
+
+/**
+ * A person's follow-up becomes the wait: a reply closes it, it shows as
+ * waiting on them, and the date the person picked over the AI's is learned from.
+ */
+export async function adoptFollowUp(db: SupabaseClient, card: ActionCard, waiting: WaitingOn, threadId: string | null): Promise<ActionCard> {
+  const follow_up = { ...card.follow_up!, kind: 'waiting_on' as const, waiting, thread_id: card.follow_up?.thread_id ?? threadId }
+  const { data } = await db.from('action_queue').update({ rule_key: 'waiting_on', follow_up, updated_at: now() })
+    .eq('id', card.id).eq('status', 'scheduled').select(CARD_COLUMNS).maybeSingle()
+  const adopted = (data as ActionCard | null) ?? { ...card, rule_key: 'waiting_on', follow_up } as ActionCard
+  if (adopted.due_at && adopted.due_at !== waiting.ai_due_at) await recordWaitMoved(db, adopted, waiting.ai_due_at, card.follow_up?.created_by ?? null)
+  return adopted
+}
+
+/**
+ * The wait a follow-up a person is setting stands in for: the chase card
+ * it's set from ("Remind me Thursday" on a due chase), or a wait still
+ * waiting in the same conversation, or on the same job for the same person
+ * from around the same time. Null if none.
+ */
+export async function waitToReplace(
+  db: SupabaseClient, tenantId: string,
+  f: { fromCardId?: string | null; threadId: string | null; jobId: string | null; who: string | null; note: string },
+  at = new Date(),
+): Promise<ActionCard | null> {
+  if (f.fromCardId) {
+    const { data } = await db.from('action_queue').select(CARD_COLUMNS).eq('tenant_id', tenantId).eq('id', f.fromCardId).maybeSingle()
+    const from = data as ActionCard | null
+    if (from?.follow_up?.kind === 'waiting_on' && from.follow_up.waiting) return from
+  }
+  const { data } = await db.from('action_queue').select(CARD_COLUMNS)
+    .eq('tenant_id', tenantId).eq('source', 'followup').eq('rule_key', 'waiting_on').eq('status', 'scheduled')
+  const probe = { job_id: f.jobId, created_at: at.toISOString(), follow_up: { note: f.note, who: f.who, thread_id: f.threadId, from_card_id: null, created_by: null } }
+  return ((data as ActionCard[] | null) ?? []).find(c => !!c.follow_up?.waiting && coversWait(probe, { threadId: c.follow_up.thread_id, jobId: c.job_id, waiting: c.follow_up.waiting })) ?? null
 }
 
 // ── The mailbox sync: replies close waits ──

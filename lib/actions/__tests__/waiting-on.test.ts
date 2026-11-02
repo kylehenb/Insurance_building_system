@@ -17,8 +17,8 @@ vi.mock('@/lib/mcp/tools/mailbox', () => ({ readConversation: { run: async () =>
 vi.mock('@/lib/mcp/tools/jobs', () => ({ getJobSummary: { run: async () => ({ text: 'IRC1001 — homeowner complained twice about delays. Suncorp asked for the electrical report on 27 Oct.' }) } }))
 
 const { readSentEmail, claimSent } = await import('../waiting-on')
-const { closeAnsweredWaits, bringForward, waitBrief, recordChaseDecision, listWaits, FEATURE } = await import('../waits')
-const { chaseDue, workingDaysBetween, updateFollowUp, cancelFollowUp } = await import('../followups')
+const { closeAnsweredWaits, bringForward, waitBrief, recordChaseDecision, listWaits, pinnedTo, FEATURE } = await import('../waits')
+const { chaseDue, workingDaysBetween, updateFollowUp, cancelFollowUp, createFollowUp } = await import('../followups')
 const { recordSent, recordSyncedSends } = await import('@/lib/mail/sent-by')
 
 // Thu 29 Oct 2026, 10am in Perth
@@ -149,6 +149,28 @@ describe('reading a sent email', () => {
     expect(tables.action_queue.map(r => [r.id, r.status])).toEqual([['old', 'skipped'], [expect.any(String), 'scheduled']])
   })
 
+  it('keeps the follow-up a person set for it as the email went, learning the date they picked', async () => {
+    // The card's Remind me step ran as its email was sent: 9 Nov, not the AI's Fri 30 Oct
+    tables.action_queue = [{ id: 'mine', tenant_id: 't1', job_id: 'j1', source: 'followup', rule_key: 'followup', status: 'scheduled', title: 'Follow up with Sparky Bros: photos', due_at: '2026-11-09T00:00:00.000Z', created_at: THU.toISOString(),
+      follow_up: { note: 'Chase Sparky for the photos', who: 'Sparky Bros', thread_id: 'abc1', from_card_id: null, created_by: 'u2' } }]
+    const { client } = model({ asks: true, waiting_on_name: 'Sparky Bros Electrical', waiting_on_email: 'jobs@sparkybros.com.au', role: 'trade', asked: 'the switchboard photos', ask_kind: 'photos', chase_after_working_days: 1, reason: 'Tomorrow.' })
+    const out = await readSentEmail(sentRow() as never, { db, client, at: THU })
+    expect(out.outcome).toBe('Asked Sparky Bros Electrical for the switchboard photos — your follow-up for Mon 9 Nov stands')
+    expect(tables.action_queue).toHaveLength(1)
+    expect(tables.action_queue[0]).toMatchObject({ id: 'mine', rule_key: 'waiting_on', title: 'Follow up with Sparky Bros: photos', follow_up: { kind: 'waiting_on', waiting: { ai_days: 1 } } })
+    expect(tables.learning_events[0]).toMatchObject({ outcome: 'edited', user_id: 'u2', changes: [expect.stringMatching(/^The office moved the chase later: from Fri 30 Oct \(1 working day after the email\) to Mon 9 Nov/)] })
+  })
+
+  it('pins a wait no one in the office sent to the job\'s owner, else the business owner', async () => {
+    expect(await pinnedTo(db, 't1', 'u2', 'j1')).toEqual({ userId: 'u2', why: 'sender' })
+    expect(await pinnedTo(db, 't1', null, 'j1')).toEqual({ userId: 'admin1', why: 'business_owner' })
+    tables.jobs[0].assigned_to = 'u2'
+    expect(await pinnedTo(db, 't1', null, 'j1')).toEqual({ userId: 'u2', why: 'job_owner' })
+    const { client } = model({ asks: true, waiting_on_name: 'Sparky Bros', waiting_on_email: 'jobs@sparkybros.com.au', role: 'trade', asked: 'photos', ask_kind: 'photos', chase_after_working_days: 2, reason: 'r' })
+    await readSentEmail(sentRow({ sent_by: null }) as never, { db, client, at: THU })
+    expect(tables.action_queue[0].follow_up).toMatchObject({ created_by: 'u2', waiting: { pinned: 'job_owner' } })
+  })
+
   it('tries again later when it fails, then gives up', async () => {
     const client = { beta: { messages: { create: vi.fn(async () => { throw new Error('overloaded') }) } } } as never
     expect(await readSentEmail(sentRow() as never, { db, client, at: THU })).toMatchObject({ status: 'new' })
@@ -193,6 +215,27 @@ describe('what happens to a wait', () => {
     tables.action_queue = [wait({ id: '00000000-0000-0000-0000-00000000000b', rule_key: 'followup', follow_up: { note: 'Call Jo', who: null, thread_id: null, created_by: 'u1', from_card_id: null } })]
     await updateFollowUp(db, 't1', '00000000-0000-0000-0000-00000000000b', { dueAt: '2099-11-09T00:00:00.000Z' }, 'u1')
     expect(tables.learning_events).toHaveLength(2)
+  })
+
+  it('takes "Remind me Thursday" on a due chase as moving the wait, and keeps it a wait', async () => {
+    tables.action_queue = [wait({ status: 'pending', due_at: '2099-11-02T00:00:00.000Z' })]
+    const card = await createFollowUp(db, 't1', 'u1', { jobId: 'j1', note: 'Chase Sparky Bros for the photos', who: 'Sparky Bros', dueAt: '2099-11-05T00:00:00.000Z', fromCardId: wait().id as string, clearCard: true })
+    expect(card).toMatchObject({ rule_key: 'waiting_on', follow_up: { kind: 'waiting_on', thread_id: 'abc1', waiting: { name: 'Sparky Bros' } } })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'done', outcome: 'Follow-up set for Thu 5 Nov' })
+    expect(tables.learning_events[0]).toMatchObject({ outcome: 'edited', changes: ['The office moved the chase later: from Mon 2 Nov (2 working days after the email) to Thu 5 Nov (5 working days after)'] })
+  })
+
+  it('gives way to a follow-up a person sets for the same person on the job just after the email', async () => {
+    const sent = new Date(Date.now() - 5 * 60_000).toISOString()
+    tables.action_queue = [wait({ follow_up: { ...(wait().follow_up as Row), waiting: { ...((wait().follow_up as Row).waiting as Row), sent_at: sent } } })]
+    // No conversation on it — matched by the job and the person
+    const card = await createFollowUp(db, 't1', 'u1', { jobId: 'j1', note: 'Gentle check-in — they are away until mid-November', who: 'Laura at Sparky Bros', dueAt: '2099-11-16T00:00:00.000Z' })
+    expect(tables.action_queue[0]).toMatchObject({ status: 'skipped', outcome: 'Replaced by a follow-up you set for Mon 16 Nov' })
+    expect(card).toMatchObject({ rule_key: 'waiting_on', title: 'Follow up with Laura at Sparky Bros: Gentle check-in — they are away until mid-November', follow_up: { thread_id: 'abc1', created_by: 'u1' } })
+    // Another trade, or long after the email: left alone
+    tables.action_queue = [wait({ follow_up: { ...(wait().follow_up as Row), waiting: { ...((wait().follow_up as Row).waiting as Row), sent_at: sent } } })]
+    await createFollowUp(db, 't1', 'u1', { jobId: 'j1', note: 'Chase the plumber', who: 'Ace Plumbing', dueAt: '2099-11-16T00:00:00.000Z' })
+    expect(tables.action_queue[0].status).toBe('scheduled')
   })
 
   it('learns whether the chase was sent once it came onto the cards', async () => {

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Service client after the permission check; replyToEmail filters tenant_id
-    await replyToEmail(createServiceClient(), tenantId, commId, body)
+    await replyToEmail(createServiceClient(), tenantId, commId, body, [], userSession.session?.user.id ?? null)
   } catch (err) {
     if (err instanceof ReplyError) return NextResponse.json({ error: err.message }, { status: err.status })
     throw err

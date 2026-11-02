@@ -100,6 +100,8 @@ export type WaitingOn = {
   brought_forward?: { at: string; to: string; reason: string }[]
   /** Who, what and the job, for the learning module (the card's own situation is the chase card's) */
   situation: Situation
+  /** Why it's whose it is: they sent the email, own the job, or own the business */
+  pinned?: 'sender' | 'job_owner' | 'business_owner'
 }
 
 export type ActionCard = {

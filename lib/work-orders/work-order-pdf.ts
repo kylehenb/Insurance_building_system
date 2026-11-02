@@ -29,6 +29,8 @@ export interface WorkOrderPdfContext {
    *  or the service client for automations — tenantId is always enforced. */
   supabase: SupabaseClient<Database>
   tenantId: string
+  /** Who's sending, when it's sent — recorded for what the office is waiting on (lib/mail/sent-by.ts) */
+  userId?: string | null
 }
 
 export class WorkOrderPdfError extends Error {

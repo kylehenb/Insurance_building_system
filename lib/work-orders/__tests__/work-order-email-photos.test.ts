@@ -38,6 +38,9 @@ const client = { from: query, storage: { from: () => ({ upload: async () => ({ e
 const gmailSend = vi.fn(async (_req: unknown) => ({ data: { id: 'g1', threadId: 't1' } }))
 const buildPhotos = vi.fn(async (..._a: unknown[]) => ({ pdf: Buffer.from('photos'), filename: 'Photos - IRC1 - 1 Example St.pdf' }))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => client, createClient: async () => client }))
+// Who sent it, for what the office is waiting on
+const recordSent = vi.fn()
+vi.mock('@/lib/mail/sent-by', () => ({ recordSent: (...a: unknown[]) => recordSent(...a) }))
 vi.mock('@/lib/gmail/client', () => ({ getGmailClient: () => ({ users: { messages: { send: gmailSend } } }) }))
 vi.mock('@/lib/work-orders/work-order-pdf', () => ({
   buildWorkOrderPdf: async () => ({ pdf: Buffer.from('wo'), filename: 'WO-1 - Plaster Co - 1 Example St.pdf', isSent: true }),
