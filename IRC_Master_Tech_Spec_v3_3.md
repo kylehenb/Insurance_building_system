@@ -4370,6 +4370,11 @@ Five phases the office thinks in replace the 17 stages, which went stale because
 - **Money still owed:** past the lapse time with money owed (or nothing invoiced), one check to invoice or chase payment instead. Checks have `rule_key` `lapse_warning` / `lapse_blocked`, once per wait, for the job's owner, at most 3 new a day, longest waits first.
 - **Late approval:** an approval after a lapse (or after a hand-close as no decision) reopens the job into In repair.
 
+**Closing old jobs by hand** (`lib/jobs/close.ts`, Jobs → Close Old Jobs, `/dashboard/jobs/cleanup`):
+- **The list** (`cleanupCandidates`, `GET /api/jobs/cleanup`): open jobs, not on hold, older than 90 days with nothing on them for 90 days (emails, action cards, calendar events, quotes, invoices). Each comes with the reason it most likely closed and why: works invoiced or a quote approved → complete; quote declined → declined; quote with the insurer → no decision; a fee invoiced → complete; never quoted or invoiced → cancelled. Nothing closes until the office ticks jobs, checks each reason and presses Close.
+- **Closing** (`closeJobs`, `POST /api/jobs/close {items:[{jobId, reason}]}`): sets `jobs.closed_by_hand`; the phase is worked out again and shows Closed with that reason. Permission `jobs.change_stage`, queued as `jobs.close` when it needs approval.
+- **Reopening** (`reopenJob`, `POST /api/jobs/close {reopen: jobId}`, the Reopen link on a hand-closed job's banner): clears `closed_by_hand`, so the phase comes from the records again. Queued as `jobs.reopen`.
+
 ---
 
 ## 24. Learning module (`lib/learning`)

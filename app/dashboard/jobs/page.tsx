@@ -126,12 +126,20 @@ export default function JobsListPage() {
                 Manage insurance repair jobs for your organization
               </p>
             </div>
+            <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/jobs/cleanup"
+              className="inline-flex items-center justify-center rounded-lg border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-surface-3 transition-colors"
+            >
+              Close Old Jobs
+            </Link>
             <Link
               href="/dashboard/jobs/new"
               className="inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-cream hover:bg-ink/90 transition-colors"
             >
               New Job
             </Link>
+            </div>
           </div>
 
           {/* Stage filter tabs */}

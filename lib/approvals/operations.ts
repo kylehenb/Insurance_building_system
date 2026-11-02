@@ -23,6 +23,8 @@ import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { getMailbox } from '@/lib/mail/sync'
 import { getLesson, setLessonActive } from '@/lib/learning/lessons'
 import { setAutoConfirm } from '@/lib/learning/auto-confirm'
+import { closeJobs, reopenJob } from '@/lib/jobs/close'
+import { CLOSED_LABELS, type ClosedReason } from '@/lib/jobs/phase'
 
 // What an approval request does once approved. Each operation calls the same
 // shared function as the button (or voice tool) the request came from, so an
@@ -168,6 +170,30 @@ const jobStage: Operation<{ jobId: string; stage: string }> = {
   async run(p, ctx) {
     await setJobStage(ctx.service, ctx.tenantId, p.jobId, p.stage)
     return 'Stage changed.'
+  },
+}
+
+// Closing jobs by hand (the old-jobs clean-up), each with its reason
+const jobsClose: Operation<{ items: { jobId: string; reason: ClosedReason }[] }> = {
+  async describe(p, ctx) {
+    const first = p.items[0]
+    const what = p.items.length === 1 ? await jobNumber(ctx, first.jobId) : `${p.items.length} jobs`
+    const reasons = [...new Set(p.items.map(i => CLOSED_LABELS[i.reason]))].join(' / ')
+    return { summary: `Close ${what} as ${reasons}`, jobId: p.items.length === 1 ? first.jobId : null }
+  },
+  async run(p, ctx) {
+    const closed = await closeJobs(ctx.service as unknown as SupabaseClient, ctx.tenantId, p.items)
+    return `Closed ${closed.join(', ')}.`
+  },
+}
+
+// Taking a hand close off: the job's phase comes from its records again
+const jobsReopen: Operation<{ jobId: string }> = {
+  async describe(p, ctx) {
+    return { summary: `Reopen ${await jobNumber(ctx, p.jobId)}`, jobId: p.jobId }
+  },
+  async run(p, ctx) {
+    return `Reopened ${await reopenJob(ctx.service as unknown as SupabaseClient, ctx.tenantId, p.jobId)}.`
   },
 }
 
@@ -341,6 +367,8 @@ export const OPERATIONS = {
   'reply.send': replySend,
   'order.lodge': orderLodge,
   'job.stage': jobStage,
+  'jobs.close': jobsClose,
+  'jobs.reopen': jobsReopen,
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
   'invoice.void': invoiceVoid,
@@ -367,6 +395,8 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'reply.send': 'send.replies',
   'order.lodge': 'orders.lodge',
   'job.stage': 'jobs.change_stage',
+  'jobs.close': 'jobs.change_stage',
+  'jobs.reopen': 'jobs.change_stage',
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
   'invoice.void': 'invoices.manage',

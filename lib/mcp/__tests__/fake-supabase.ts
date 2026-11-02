@@ -17,6 +17,7 @@ export function fakeSupabase(db: Record<string, Row[]>) {
     let payload: Row | Row[] | null = null
     let head = false
     let limit = Infinity
+    let offset = 0
     let sort: { col: string; dir: number } | null = null
 
     const rows = () => (db[table] ??= [])
@@ -42,7 +43,7 @@ export function fakeSupabase(db: Record<string, Row[]>) {
         const { col, dir } = sort
         out = [...out].sort((a, b) => (a[col] === b[col] ? 0 : (a[col] as never) > (b[col] as never) ? dir : -dir))
       }
-      return { data: head ? null : out.slice(0, limit), count: out.length }
+      return { data: head ? null : out.slice(offset, offset + limit), count: out.length }
     }
 
     const b: Record<string, unknown> = {
@@ -69,6 +70,7 @@ export function fakeSupabase(db: Record<string, Row[]>) {
       },
       order: (col: string, o?: { ascending?: boolean }) => { sort = { col, dir: o?.ascending === false ? -1 : 1 }; return b },
       limit: (n: number) => { limit = n; return b },
+      range: (from: number, to: number) => { offset = from; limit = to - from + 1; return b },
       single: async () => {
         const { data } = execute()
         const row = Array.isArray(data) ? data[0] : null
