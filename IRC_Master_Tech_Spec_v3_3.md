@@ -4553,6 +4553,7 @@ Each figure is counted on the Perth day of its own date: for example `created_at
 - Works out the day before again, for records that came in late. Snapshot readings already stored are kept.
 - Fills in every past day that is missing, or was worked out under an older `METRICS_VERSION`. It goes back to the office's first job, order or email (at most 5 years), newest first, 92 days per batch, for as long as the run has time.
 - To add a figure: add it to `METRICS`, work it out in `computeDays`, and bump `METRICS_VERSION`. The history is then rebuilt automatically.
+- **Midcity is left out** (version 2). Midcity is a separate business (`lib/jobs/field-app.ts`). Its jobs, their inspections, deadlines and the open-jobs count aren't IRC's figures. Its AI use (features `midcity-*`) is shown as its own lines, "Midcity AI requests / spend (separate business)", and is not counted in IRC's AI requests and spend. The written review (§25.4) gives it one line of its own and leaves it out of how IRC went.
 
 **The health panel:** `components/health/HealthPanel.tsx`, at the top of the dashboard's Today view.
 - Shown only to people with the new permission **`health.view`** ("See the health check", Admin group). It is admins only by default, and `user_permission_level` was updated to match.

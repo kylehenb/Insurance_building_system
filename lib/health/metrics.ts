@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { addDays, dayStartIso, daysBetween, perthDay } from './periods'
+import { FIELD_APP_INSURER, isFieldAppJob } from '@/lib/jobs/field-app'
 
 // The health check's daily figures (tech spec §25.3). Each is worked out per
 // Perth day from records that carry a date, so past days can be filled in
@@ -9,8 +10,12 @@ import { addDays, dayStartIso, daysBetween, perthDay } from './periods'
 //
 // To add a figure: add it to METRICS, work it out in computeDays, and bump
 // METRICS_VERSION. The nightly run then recomputes every past day.
+//
+// Midcity (a separate business run from the same system, lib/jobs/field-app.ts)
+// is left out of IRC's figures: its jobs, their inspections and the open-jobs
+// count. Its AI use is shown on its own lines, not inside IRC's spend.
 
-export const METRICS_VERSION = 1
+export const METRICS_VERSION = 2
 
 /**
  * The first full day the system figures (AI calls, scheduled jobs, errors)
@@ -71,6 +76,8 @@ export const METRICS: MetricDef[] = [
   { key: 'ai_failed', label: 'AI requests failed', group: 'AI', kind: 'sum', unit: 'count', system: true },
   { key: 'ai_cost_usd', label: 'AI spend', group: 'AI', kind: 'sum', unit: 'usd', system: true },
   { key: 'ai_unpriced', label: 'AI requests with no price set', group: 'AI', kind: 'sum', unit: 'count', system: true },
+  { key: 'midcity_ai_calls', label: 'Midcity AI requests (separate business)', group: 'AI', kind: 'sum', unit: 'count', system: true },
+  { key: 'midcity_ai_cost_usd', label: 'Midcity AI spend (separate business)', group: 'AI', kind: 'sum', unit: 'usd', system: true },
   // Systems
   { key: 'cron_runs', label: 'Scheduled job runs', group: 'Systems', kind: 'sum', unit: 'count', system: true },
   { key: 'cron_failed', label: 'Scheduled job runs failed', group: 'Systems', kind: 'sum', unit: 'count', system: true },
@@ -141,10 +148,10 @@ export async function computeDays(
 
   const [orders, jobsNew, jobsDone, comms, inspections, quotes, wos, signSent, signSigned, issued, paid, learning, cards, activity] = await Promise.all([
     timed('insurer_orders', 'created_at', 'created_at'),
-    timed('jobs', 'created_at', 'created_at'),
-    timed('jobs', 'completion_approved_at', 'completion_approved_at'),
+    timed('jobs', 'created_at, insurer', 'created_at'),
+    timed('jobs', 'completion_approved_at, insurer', 'completion_approved_at'),
     timed('communications', 'created_at, type, direction', 'created_at'),
-    timed('inspections', 'form_submitted_at', 'form_submitted_at'),
+    timed('inspections', 'form_submitted_at, job_id', 'form_submitted_at'),
     timed('quotes', 'created_at', 'created_at'),
     timed('work_orders', 'created_at', 'created_at'),
     timed('signing_requests', 'sent_at', 'sent_at'),
@@ -158,15 +165,17 @@ export async function computeDays(
   ])
 
   for (const r of orders) bump(dayOf(r.created_at), 'orders_received')
-  for (const r of jobsNew) bump(dayOf(r.created_at), 'jobs_created')
-  for (const r of jobsDone) bump(dayOf(r.completion_approved_at), 'jobs_completed')
+  for (const r of jobsNew) if (!isFieldAppJob(r)) bump(dayOf(r.created_at), 'jobs_created')
+  for (const r of jobsDone) if (!isFieldAppJob(r)) bump(dayOf(r.completion_approved_at), 'jobs_completed')
   for (const r of comms) {
     const d = dayOf(r.created_at)
     if (r.type === 'email' && r.direction === 'inbound') bump(d, 'emails_in')
     else if (r.type === 'email' && r.direction === 'outbound') bump(d, 'emails_out')
     else if (r.type === 'portal' && r.direction === 'inbound') bump(d, 'portal_in')
   }
-  for (const r of inspections) bump(dayOf(r.form_submitted_at), 'inspections_done')
+  // Midcity's inspections are on Midcity's jobs
+  const midcityJobs = new Set((await fetchAll(() => db.from('jobs').select('id').eq('tenant_id', tenantId).eq('insurer', FIELD_APP_INSURER).order('id'))).map(r => String(r.id)))
+  for (const r of inspections) if (!midcityJobs.has(String(r.job_id))) bump(dayOf(r.form_submitted_at), 'inspections_done')
   for (const r of quotes) bump(dayOf(r.created_at), 'quotes_created')
   for (const r of wos) bump(dayOf(r.created_at), 'work_orders_created')
   for (const r of signSent) bump(dayOf(r.sent_at), 'signing_sent')
@@ -191,10 +200,10 @@ export async function computeDays(
 
   // Insurer deadlines: each one reached in the range counts as met or missed
   const kpis: [string, string][] = [['kpi_contacted_at', 'kpi_contact_due'], ['kpi_booked_at', 'kpi_booking_due'], ['kpi_visited_at', 'kpi_visit_due'], ['kpi_reported_at', 'kpi_report_due']]
-  const kpiRows = await Promise.all(kpis.map(([at, due]) => timed('jobs', `${at}, ${due}`, at)))
+  const kpiRows = await Promise.all(kpis.map(([at, due]) => timed('jobs', `${at}, ${due}, insurer`, at)))
   kpis.forEach(([at, due], i) => {
     for (const r of kpiRows[i]) {
-      if (!r[due]) continue
+      if (!r[due] || isFieldAppJob(r)) continue
       bump(dayOf(r[at]), Date.parse(String(r[at])) <= Date.parse(String(r[due])) ? 'kpi_met' : 'kpi_missed')
     }
   })
@@ -202,13 +211,19 @@ export async function computeDays(
   // System figures (§25.1), only from when they were first recorded
   if (to > SYSTEM_TRACKING_SINCE) {
     const [ai, runs, errors, alerts] = await Promise.all([
-      timed('ai_calls', 'created_at, ok, cost_usd, model', 'created_at', 'tenant-or-none'),
+      timed('ai_calls', 'created_at, ok, cost_usd, model, feature', 'created_at', 'tenant-or-none'),
       timed('cron_runs', 'started_at, status', 'started_at', 'all'),
       timed('system_errors', 'created_at', 'created_at', 'tenant-or-none'),
       timed('health_alerts', 'first_seen_at', 'first_seen_at', 'all'),
     ])
     for (const r of ai) {
       const d = dayOf(r.created_at)
+      // Midcity's AI use (features "midcity-…") on its own lines
+      if (String(r.feature ?? '').startsWith('midcity-')) {
+        bump(d, 'midcity_ai_calls')
+        if (r.cost_usd != null) bump(d, 'midcity_ai_cost_usd', Number(r.cost_usd))
+        continue
+      }
       bump(d, 'ai_calls')
       if (!r.ok) bump(d, 'ai_failed')
       if (r.cost_usd == null) { if (r.ok) bump(d, 'ai_unpriced') } else bump(d, 'ai_cost_usd', Number(r.cost_usd))
@@ -233,7 +248,7 @@ export async function computeDays(
 export async function snapshot(db: SupabaseClient, tenantId: string, now: Date): Promise<DayMetrics> {
   const monthAgo = addDays(perthDay(now), -30)
   const [open, owed, alerts, sizes] = await Promise.all([
-    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).is('completion_approved_at', null).is('lapsed_at', null),
+    db.from('jobs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).is('completion_approved_at', null).is('lapsed_at', null).or(`insurer.is.null,insurer.neq.${FIELD_APP_INSURER}`),
     fetchAll(() => db.from('invoices').select('amount_inc_gst, issued_date').eq('tenant_id', tenantId).eq('direction', 'outbound').eq('status', 'sent').is('paid_date', null).is('voided_at', null).order('issued_date', { ascending: true })),
     db.from('health_alerts').select('id', { count: 'exact', head: true }).is('resolved_at', null),
     db.rpc('health_storage_stats'),

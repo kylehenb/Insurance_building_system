@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { isFieldAppJob } from '@/lib/jobs/field-app'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { trackAi } from './ai-usage'
 import { logError } from './errors'
@@ -110,9 +111,14 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
     add(`Alert (${a.severity}): ${clip(a.title, 160)} — ${clip(a.detail, 240)} Raised ${day(String(a.first_seen_at))}; ${a.resolved_at ? `cleared ${day(String(a.resolved_at))}` : 'still open'}; seen ${a.occurrences ?? 1} times by the watcher.`)
   }
 
-  // AI by feature
+  // AI by feature. Midcity (a separate business, lib/jobs/field-app.ts) gets one line of its own
   const byFeature = new Map<string, { n: number; failed: number; cost: number; error: string | null }>()
+  const midcity = ai.filter(r => String(r.feature ?? '').startsWith('midcity-'))
+  if (midcity.length) {
+    add(`Midcity, a separate business run from the same system and not part of IRC: ${midcity.length} AI requests, US$${midcity.reduce((n, r) => n + (Number(r.cost_usd) || 0), 0).toFixed(2)}. It's on the same AI bill but isn't IRC's work.`)
+  }
   for (const r of ai) {
+    if (String(r.feature ?? '').startsWith('midcity-')) continue
     const f = byFeature.get(String(r.feature)) ?? { n: 0, failed: 0, cost: 0, error: null }
     f.n++
     if (!r.ok) { f.failed++; f.error = clip(r.error, 120) }
@@ -181,7 +187,7 @@ export async function gatherFacts(db: SupabaseClient, tenantId: string, period: 
 
   // Jobs in, and insurer deadlines, by insurer
   const insurerIn = new Map<string, number>()
-  for (const r of jobsIn) insurerIn.set(String(r.insurer ?? 'Unknown'), (insurerIn.get(String(r.insurer ?? 'Unknown')) ?? 0) + 1)
+  for (const r of jobsIn) if (!isFieldAppJob(r)) insurerIn.set(String(r.insurer ?? 'Unknown'), (insurerIn.get(String(r.insurer ?? 'Unknown')) ?? 0) + 1)
   if (insurerIn.size) add(`Jobs created by insurer: ${[...insurerIn].sort((a, b) => b[1] - a[1]).map(([i, n]) => `${clip(i, 40)} ${n}`).join(', ')}.`)
   const kpis: [string, string, string][] = [['contact', 'kpi_contacted_at', 'kpi_contact_due'], ['booking', 'kpi_booked_at', 'kpi_booking_due'], ['visit', 'kpi_visited_at', 'kpi_visit_due'], ['report', 'kpi_reported_at', 'kpi_report_due']]
   const kpiRows = await Promise.all(kpis.map(([, at, due]) => rows(db.from('jobs').select(`insurer, ${at}, ${due}`).eq('tenant_id', tenantId).gte(at, fromIso).lt(at, toIso).limit(5000))))
@@ -256,6 +262,8 @@ const REVIEW_SCHEMA = {
 }
 
 const SYSTEM_PROMPT = `You write the health review for Insurance Repair Co (IRC), an insurance building repair company in Perth, Western Australia, about one finished week, month, quarter or year. IRC gets repair orders from insurers, inspects, reports, quotes, sends work orders to trades, gets homeowners to sign, and invoices. Their system, IRC Master, does much of this with AI (parsing orders, action cards for emails, reports, photo labels) and scheduled jobs. The owner reads your review to see how the business and the system went, and what to change.
+
+Midcity is a separate business run from the same system (reports for another builder). Leave it out of how IRC went and of your suggestions; mention its AI spend only as its own line, if at all.
 
 You are given numbered facts (F1, F2…). They are the only things you know. Rules:
 - Every point and every suggestion cites the facts it rests on, by id, in "facts". A point you can't back with a fact, leave out. Never state a number that isn't in a fact.
