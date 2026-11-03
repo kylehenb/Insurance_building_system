@@ -5,6 +5,7 @@ import type { HealthSummary, Light, MetricValue } from '@/lib/health/daily'
 import type { PeriodKind } from '@/lib/health/periods'
 import type { HealthReview, Fact } from '@/lib/health/review'
 import type { SuggestionRow, Decision } from '@/lib/health/suggestions'
+import type { AiCosts, CostLine } from '@/lib/health/ai-costs'
 
 type PanelData = HealthSummary & { review: HealthReview | null; suggestions: SuggestionRow[]; inProgress: SuggestionRow[] }
 type Decide = (s: SuggestionRow, d: Decision) => void
@@ -132,6 +133,87 @@ function ReviewCard({ review, offset, kind, suggestions, onDecide, busy }: { rev
   )
 }
 
+const money = (n: number) => (n > 0 && n < 0.01 ? '<1¢' : `US$${n.toFixed(2)}`)
+
+function CostTable({ lines, first, showWhat }: { lines: CostLine[]; first: string; showWhat?: boolean }) {
+  return (
+    <table className="hp-table hp-cost">
+      <thead><tr><th>{first}</th><th>Requests</th><th>Spend</th><th>Share</th><th>Each</th><th>vs before</th></tr></thead>
+      <tbody>
+        {lines.map(l => (
+          <tr key={l.key}>
+            <td>
+              <div style={{ color: 'var(--ink)' }}>{l.label}</div>
+              {showWhat && l.what && <div className="hp-cost-what">{l.what}</div>}
+              {(l.failed > 0 || l.unpriced > 0) && <div className="hp-cost-what">{l.failed ? `${l.failed} failed` : ''}{l.failed && l.unpriced ? ' · ' : ''}{l.unpriced ? `${l.unpriced} with no price set` : ''}</div>}
+            </td>
+            <td>{l.calls.toLocaleString()}</td>
+            <td className="hp-val">{money(l.costUsd)}</td>
+            <td><span className="hp-share"><span style={{ width: `${Math.round(l.share * 100)}%` }} /></span>{Math.round(l.share * 100)}%</td>
+            <td>{l.costPerCall == null ? '—' : money(l.costPerCall)}</td>
+            <td><Change now={l.costUsd} then={l.previousCostUsd} unit="usd" /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/** Where the AI money goes: collapsed until asked for, then loaded for the period on show. */
+function AiCostSection({ kind, offset }: { kind: PeriodKind; offset: number }) {
+  const [open, setOpen] = useState(false)
+  const [costs, setCosts] = useState<AiCosts | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [byModel, setByModel] = useState(false)
+
+  const loadCosts = useCallback(async (k: PeriodKind, o: number) => {
+    setError(null)
+    try {
+      const r = await fetch(`/api/health/ai-costs?period=${k}&offset=${o}`)
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error ?? 'Could not load AI costs')
+      setCosts(d as AiCosts)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load AI costs')
+    }
+  }, [])
+
+  useEffect(() => { if (open) void loadCosts(kind, offset) }, [open, kind, offset, loadCosts])
+
+  return (
+    <div className="hp-costs">
+      <button className="hp-costs-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span>Where the AI money goes</span>
+        <span className="hp-chev" style={{ transform: open ? 'rotate(180deg)' : undefined }}>▾</span>
+      </button>
+      {open && (
+        <div className="hp-costs-body">
+          {error && <div className="hp-err">{error}</div>}
+          {!costs && !error && <div className="hp-note">Loading…</div>}
+          {costs && (costs.calls === 0 ? (
+            <div className="hp-note">{costs.trackedSince ? `No AI requests in ${costs.period.label.toLowerCase()}.` : 'AI costs have only just started being recorded.'}</div>
+          ) : (
+            <>
+              <div className="hp-costs-total">
+                <b>{money(costs.totalUsd)}</b> on {costs.calls.toLocaleString()} requests over {costs.daysCounted} day{costs.daysCounted === 1 ? '' : 's'} · about <b>{money(costs.perDayUsd)}</b> a day
+                {costs.previousTotalUsd > 0 && <> · <Change now={costs.totalUsd} then={costs.previousTotalUsd} unit="usd" /> on the same days before</>}
+              </div>
+              <div className="hp-tabs" style={{ marginBottom: 10 }}>
+                <button className={`hp-tab${!byModel ? ' on' : ''}`} onClick={() => setByModel(false)}>By feature</button>
+                <button className={`hp-tab${byModel ? ' on' : ''}`} onClick={() => setByModel(true)}>By model</button>
+              </div>
+              {byModel ? <CostTable lines={costs.models} first="Model" /> : <CostTable lines={costs.features} first="Feature" showWhat />}
+              <div className="hp-note" style={{ marginTop: 8 }}>
+                Recorded from {costs.trackedSince ?? '3 Nov 2026'}. Includes Midcity&apos;s features (marked), which are a separate business. Spend per person isn&apos;t recorded yet.
+              </div>
+            </>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function HealthPanel() {
   const [open, setOpen] = useState(false)
   const [kind, setKind] = useState<PeriodKind>('week')
@@ -235,6 +317,14 @@ export function HealthPanel() {
         .hp-link { background: none; border: 0; padding: 0; margin-top: 12px; font-size: 11.5px; color: var(--bronze); cursor: pointer; text-decoration: underline; }
         .hp-facts { font-size: 11.5px; color: var(--body-soft); padding-left: 18px; margin: 8px 0 0; line-height: 1.5; max-height: 280px; overflow-y: auto; list-style: none; }
         .hp-facts li { margin-bottom: 3px; }
+        .hp-costs { border: 0.5px solid var(--line-faint); border-radius: 8px; margin-bottom: 18px; }
+        .hp-costs-head { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 10px 12px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink); }
+        .hp-costs-body { padding: 0 12px 12px; }
+        .hp-costs-total { font-size: 12.5px; color: var(--body); margin-bottom: 10px; }
+        .hp-cost td:first-child { min-width: 200px; }
+        .hp-cost-what { font-size: 11px; color: var(--subtle); margin-top: 2px; line-height: 1.35; }
+        .hp-share { display: inline-block; width: 44px; height: 5px; background: var(--line-faint); border-radius: 3px; margin-right: 6px; vertical-align: middle; overflow: hidden; }
+        .hp-share span { display: block; height: 100%; background: var(--tan); }
         .hp-sugg-note { font-size: 11.5px; color: var(--subtle); margin-top: 3px; font-style: italic; }
         .hp-sugg-actions { display: flex; gap: 6px; margin-top: 6px; }
         .hp-btn { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 0.5px solid var(--line-strong); background: var(--paper); color: var(--body); cursor: pointer; }
@@ -312,6 +402,8 @@ export function HealthPanel() {
                   ))}
                 </div>
               )}
+
+              <AiCostSection kind={kind} offset={offset} />
 
               <div className="hp-groups">
                 {GROUPS.map(g => {

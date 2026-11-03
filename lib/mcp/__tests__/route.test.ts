@@ -116,6 +116,10 @@ describe('mcp route', () => {
       'decide_approval',
       'list_activity',
       'find_contact',
+      'get_health_check',
+      'get_ai_costs',
+      'list_health_suggestions',
+      'decide_health_suggestion',
     ])
 
     const note = await post(`Bearer ${SECRET}`, { jsonrpc: '2.0', method: 'notifications/initialized' })

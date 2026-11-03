@@ -20,8 +20,8 @@ export interface RepeatedSequence {
   jobs: number
 }
 
-/** Opening a page isn't a step anyone could automate */
-const IGNORED = new Set(['mail.view'])
+/** Opening a page, or reading or deciding on the health check, isn't a step anyone could automate */
+const IGNORED = new Set(['mail.view', 'health.view'])
 const GAP_MS = 30 * 60 * 1000
 
 export function repeatedSequences(rows: ActivityStep[], opts: { minTimes?: number; limit?: number } = {}): RepeatedSequence[] {

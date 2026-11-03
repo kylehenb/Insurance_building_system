@@ -33,6 +33,7 @@ describe('pricing', () => {
 
   it('knows a served model by its prefix, and has no price for an unknown one', () => {
     expect(priceFor('models/gemini-3.5-flash-001')?.input).toBe(1.5)
+    expect(priceFor('gemini-3.6-flash')?.input).toBe(0.75) // what Google answers requests for 3.5 with
     expect(costUsd('some-new-model', { input: 1000, output: 1000, cacheRead: 0, cacheWrite: 0 })).toBeNull()
   })
 

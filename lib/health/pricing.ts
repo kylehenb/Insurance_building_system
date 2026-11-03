@@ -27,6 +27,9 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'claude-haiku-4-5': { input: 1, output: 5 },
   // Google
   'gemini-3.5-flash': { input: 1.5, output: 9, cacheRead: 0.15 },
+  // Google answers requests for 3.5 with 3.6 (Nov 2026). Introductory price per third-party listings,
+  // reportedly rising to $1.50 / $7.50 from 1 Jan 2027 — check Google's pricing page then.
+  'gemini-3.6-flash': { input: 0.75, output: 3.75, cacheRead: 0.075 },
   // OpenAI (embeddings have no output tokens)
   'text-embedding-3-small': { input: 0.02, output: 0 },
 }

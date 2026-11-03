@@ -2721,6 +2721,10 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 | `decide_approval(approval_id, decision, note?)` | change | `decideApproval` | approve (runs the action as the requester) / reject / cancel; checks the caller is allowed to do the action and isn't the requester (`checksOwnPermission`) |
 | `list_activity(person?, job_number?, days?)` | read | `listActivity` (`lib/activity/log.ts`) | The who-did-what log, newest first (30 shown); everyone's for people who manage users, else the caller's own |
 | `find_contact(name)` | read | `findContacts` (`lib/contacts/search.ts`) | Phone, email, trade and jobs by name: the trades directory (business, entity, contact name, email; jobs from its work orders), people we've emailed (`communications`; phone from their latest email's own signature, not the quoted part or our number), insureds on jobs. When nothing has a phone and the user has `mail.view`: the newest senders matching the name in Gmail, with their signature phone |
+| `get_health_check(period?, periods_back?)` | read — permission `health.view` | `loadSummary`, `getReview`, `listSuggestions` (`lib/health/`, §25) | How a week / month / quarter / year went (current so far, or up to 4 back): area notes, work in and done, money, insurer deadlines, open alerts, and for a finished period the written review and its suggested changes with their `suggestion_id`s |
+| `get_ai_costs(period?, periods_back?)` | read — permission `health.view` | `loadAiCosts` (`lib/health/ai-costs.ts`, §25.6) | AI spend for the period by feature (what each does, share, cost per request, change on the same days before) and by model |
+| `list_health_suggestions(status?)` | read — permission `health.view` | `listSuggestions` (`lib/health/suggestions.ts`) | The health reviews' suggested changes (open and accepted by default), with why and `suggestion_id` |
+| `decide_health_suggestion(suggestion_id? \| title?, decision, note?)` | change (`health_suggestions`) — permission `health.view` | `decideSuggestion` (`lib/health/suggestions.ts`, §25.5) | Accepts, dismisses (asks why — passed as `note`), marks done or reopens a suggestion, found by id or by how the person described it (asks which when it fits more than one). Recorded in the learning module. Same as the panel's buttons |
 
 ### Planned
 1. Inspections (parked — booking flow to be reworked first), job stage override, accounting re-sync, Word/Excel attachments
@@ -4508,7 +4512,7 @@ A weekly check of the system and the business: limits being reached, AI spend, s
 2. **Daily figures (built Nov 2026, §25.3):** one row of counts per day, rolled up into any week, month, quarter or year (current plus the 4 before). Shown in an admin-only dashboard panel, collapsed by default.
 3. **AI write-up (built Nov 2026, §25.4):** for each finished period, written once from the figures and saved. Every claim cites its evidence.
 4. **Suggestions (built Nov 2026, §25.5):** you accept or dismiss them, and the decision is recorded through the learning module (§24). Also spots repeated manual steps.
-5. **Voice connector tool:** "how did we go this week?" reads the saved report.
+5. **Voice connector (built Nov 2026, §25.6):** "how did we go this week?", "what's the AI costing?", and accepting / dismissing / marking suggestions done, by voice and in the assistant chat.
 
 ### 25.1 What's recorded
 
@@ -4563,7 +4567,7 @@ Migration `20261123_health_monitoring.sql`. Only the server writes or reads thes
 | **system** sum | the days added up, but only from `SYSTEM_TRACKING_SINCE` (3 Nov 2026). Before then the figure is left out, not zero | AI requests / failed / spend / unpriced, scheduled job runs / failed / partial, errors logged, alerts raised |
 | **snapshot** (last) | the latest day's value. Taken each night, so it can't be worked out for past days | open jobs, owed to us, owed over 30 days, open alerts, database size, file storage used (`public.health_storage_stats()`) |
 
-**Midcity** (a separate business run from the same system, §AGENTS / `lib/jobs/field-app.ts`) is left out of IRC's figures and review facts:
+**Midcity** (a separate business run from the same system, `lib/jobs/field-app.ts`) is left out of IRC's figures and review facts:
 - Its jobs are filtered with `IRC_JOBS` (`insurer.is.null,insurer.neq.Midcity`). A plain `neq` would also drop jobs with no insurer.
 - Records on its jobs (inspections, quotes, work orders, signing, invoices, emails, action cards, activity) are dropped by `job_id`.
 - Its AI use (features starting `midcity-`) is counted apart as `midcity_ai_calls` / `midcity_ai_cost_usd` (`METRICS_VERSION` 2).
@@ -4676,12 +4680,31 @@ A fifth section, **Changes made earlier**, follows up the changes the owner acce
 - **Accept** and **Dismiss** buttons (Dismiss asks for an optional reason "the next reviews learn from"). Accepted ones get **Mark done** (asks how it was done). Decided ones get **Reopen**.
 - Accepted changes not yet done are listed under "Changes you've accepted, not yet done" on every period.
 
+### 25.6 AI costs by feature, and the health check by voice (built Nov 2026)
+
+**Where the AI money goes** (`loadAiCosts`, `lib/health/ai-costs.ts`): a section of the health panel, collapsed until opened, loaded for the period on show from `GET /api/health/ai-costs?period=…&offset=…` (`health.view`). Read straight from `ai_calls`. It shows:
+- **The total:** spend, requests, days counted, average per day, and the change on the same days of the period before.
+- **By feature:** each feature's plain-English description (`AI_FEATURES`; an unknown feature gets a readable name), requests, failed, spend, share of the total, cost per request, change on the same days before, and requests with no price set.
+- **By model:** the same figures per model.
+- Cost per request counts successful, priced requests only; a failed request costs nothing.
+- Midcity's features are included in the total but marked "Midcity:".
+
+**Not yet recorded:** spend per person. `ai_calls` has no user. Adding it means passing the user into `trackAi` from each feature that acts for someone (assistant chat, voice, a button press). Background work (crons, the morning review) belongs to no one. Per-person figures would only start from when it's added.
+
+**By voice and in the assistant chat** (`lib/mcp/tools/health.ts`, §10b). All four tools need `health.view`:
+- `get_health_check`: how a period went, its review, and its suggestions.
+- `get_ai_costs`: the breakdown above, spoken (`describeAiCosts`).
+- `list_health_suggestions`: the reviews' suggested changes.
+- `decide_health_suggestion`: accept, dismiss, mark done or reopen a suggestion, found by `suggestion_id` or by description (`alike` on title and why; asks which when two are close, says when none fits).
+- They call the same functions as the panel. Voice calls are logged centrally. Reading or deciding on the health check is left out of the repeated-steps detection.
+
 ---
 
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
 *Changes (Nov 2026): Action cards no longer propose job notes or filing (the card AI files a conversation itself, or as admin); quote decisions are never chased by IRC (waiting on, the job review, card reminders); the lapse warning was dropped. Added §23.16, the job ledger: system events (`recordSystemEvent`, `activity_log.via 'system'`) and the job's activity merged into its Comms feed, `get_job_history`, and "What happened lately" in `get_job_summary`.*
+*Changes (Nov 2026): Added §25.6: AI costs by feature and model (a collapsed section of the health panel, `/api/health/ai-costs`), and the voice tools `get_health_check`, `get_ai_costs`, `list_health_suggestions` and `decide_health_suggestion` (§10b).*
 *Changes (Nov 2026): Added §25.5, health check part 4: `health_suggestions` (accept, dismiss, mark done or reopen; repeats counted; recent dismissals not raised again), decisions recorded in the learning module as `health_suggestion`, the review reading past decisions and following up accepted changes, and repeated manual steps from the activity log.*
 *Changes (Nov 2026): Added §25.4, health check part 3: `health_reviews`, the nightly `/api/health/reviews`, written by AI from numbered facts with every point cited, and shown in the health panel.*
 *Changes (Nov 2026): Added §25.3, health check part 2: `health_daily`, the nightly `/api/health/daily` with automatic backfill, the `health.view` permission, and the collapsed System & business health panel on the Today view (week / month / quarter / year, the current period plus the 4 before).*
