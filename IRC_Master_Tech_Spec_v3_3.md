@@ -2649,7 +2649,8 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 | Tool | Type | Calls | Notes |
 |---|---|---|---|
 | `find_job(query)` | read | `searchJobs` (`lib/jobs/search.ts`) | A job from what's remembered: every word must match the job number, street/suburb, insured, client, insurer, claim number (dashes optional), adjuster ref or a contact's name. Best 8 with job number, address, insured, client, claim and stage |
-| `get_job_summary(job_number)` | read | `fetchJobContext` + `getJobStage`, pending `action_queue`, and the work order / document / signing / excess / email tools | Who and where, stage + next step + warning, what's waiting (pending action cards), work orders, documents, signing, excess, latest 3 emails, last 600 chars of notes. A section that fails says so; the rest still return |
+| `get_job_summary(job_number)` | read | `fetchJobContext` + `getJobStage`, pending `action_queue`, and the work order / document / signing / excess / email tools | Who and where, stage + next step + warning, what's waiting (pending action cards), work orders, documents, signing, excess, latest 3 emails, recent job notes, the last 8 things that happened ("What happened lately", from the ledger §23.16), last 600 chars of notes. A section that fails says so; the rest still return |
+| `get_job_history(job_number, limit?, kinds?)` | read | `jobLedger` (`lib/communications/ledger.ts`) | The job's ledger, newest first (default 30, up to 100): emails in and out, job notes, and everything done on it by people or by itself (§23.16). `kinds` narrows to emails / notes / events |
 | `add_job_note(job_number, note)` | change (`jobs.notes`) | `addJobNote` (`lib/communications/notes.ts`, also the Comms feed's **Add note** box via `POST /api/communications/notes`) | Adds a `communications` row of type `note` (source `voice`, or `assistant` from the in-app chat; author in `contact_name`) so it shows in the job's Comms feed. `get_job_summary` lists the latest 5 under "Recent job notes"; the Overview tab's free-text Notes field (`jobs.notes`) is separate |
 | `add_job_appointment(job_number, title, start, duration_minutes?, note?)` | change (`jobs.notes`) | Google Calendar `events.insert` on the first watched calendar, `addJobNote` (§23.13) | "Put it in my calendar": an event titled "IRC1079 — …" at the job's address (linked to the job in `calendar_events`), plus the job note if given. `get_job_summary` lists the job's appointments (from 14 days ago to 60 days ahead) under "Appointments" |
 | `close_job(job_number, reason)` | change (`jobs.closed_by_hand`) — permission `jobs.change_stage` | `closeJobs` (`lib/jobs/close.ts`, §23.15) | Closes a job by hand as complete / declined / cancelled / no_decision; the phase shows Closed with that reason. Same as Jobs → Close Old Jobs |
@@ -4385,6 +4386,19 @@ Five phases the office thinks in replace the 17 stages, which went stale because
 - **By voice:** `close_job` and `reopen_job` (§10b).
 - **Midcity field-app jobs** (`insurer = 'Midcity'`, made by `app/midcity`) aren't IRC jobs: `isFieldAppJob` (`lib/jobs/field-app.ts`) keeps them out of the clean-up list, the morning review and the lapse safety net, as the job list, inspections and calendar already do.
 
+
+### 23.16 The job ledger (`lib/communications/ledger.ts`, migration `20261127_activity_system_events.sql`)
+
+A job's Comms feed is its ledger: everything that happened on it, in one place, without anyone filing or noting it.
+
+- **Messages:** emails in and out and job notes are `communications` rows, as before. Emails get there by themselves (matched, or filed by the card AI, §23.11); a job note is something a person writes.
+- **Everything else** comes from `activity_log`:
+  - **What people do:** every action with a permission (sends, quotes, invoices, stage changes, follow-ups, approvals), from the app, by voice or chat, or run on approval — the who-did-what log (§6).
+  - **What happens by itself** (`recordSystemEvent`, `via 'system'`, no user, shown as "IRC (automatic)"): a change of phase or next step (`job.phase`, from `recomputePhase` — not the first time a job is worked out), and an invoice the accounts show as paid (`invoice.paid`, from `/api/accounting/poll-payments`, only when it changes). The Activity page shows these as "IRC · Automatic".
+  - **Not repeated:** logged actions whose record is already a feed row (`jobs.notes`, `mail.send`, `send.replies`) are left out.
+- **The feed** (`GET /api/communications?job_id=`): the job's communications and its events (`jobEvents` → `eventAsComm`, type `system`, ids `event:<id>`), oldest first. Events can't be starred or marked read; several close together group as "N updates". The filter has a System option.
+- **The AI reads it:** `get_job_summary` has "What happened lately" (the last 8 events), `get_job_history` reads the whole ledger (voice, the in-app assistant, and the card AI, which can call read tools), and the feed's AI summary reads the events beside the emails and notes.
+
 ---
 
 ## 24. Learning module (`lib/learning`)
@@ -4667,6 +4681,7 @@ A fifth section, **Changes made earlier**, follows up the changes the owner acce
 *Spec version: 3.3 — May 3, 2026*
 *Built for: Windsurf / Cursor AI-assisted development*
 *Owner: Kyle Bindon — Insurance Repair Co, Perth WA*
+*Changes (Nov 2026): Action cards no longer propose job notes or filing (the card AI files a conversation itself, or as admin); quote decisions are never chased by IRC (waiting on, the job review, card reminders); the lapse warning was dropped. Added §23.16, the job ledger: system events (`recordSystemEvent`, `activity_log.via 'system'`) and the job's activity merged into its Comms feed, `get_job_history`, and "What happened lately" in `get_job_summary`.*
 *Changes (Nov 2026): Added §25.5, health check part 4: `health_suggestions` (accept, dismiss, mark done or reopen; repeats counted; recent dismissals not raised again), decisions recorded in the learning module as `health_suggestion`, the review reading past decisions and following up accepted changes, and repeated manual steps from the activity log.*
 *Changes (Nov 2026): Added §25.4, health check part 3: `health_reviews`, the nightly `/api/health/reviews`, written by AI from numbered facts with every point cited, and shown in the health panel.*
 *Changes (Nov 2026): Added §25.3, health check part 2: `health_daily`, the nightly `/api/health/daily` with automatic backfill, the `health.view` permission, and the collapsed System & business health panel on the Today view (week / month / quarter / year, the current period plus the 4 before).*

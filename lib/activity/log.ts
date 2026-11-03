@@ -13,7 +13,7 @@ import { OPERATIONS, type OperationKey, type OperationPayload } from '@/lib/appr
 
 type Service = SupabaseClient<Database>
 
-export type ActivityVia = 'app' | 'voice' | 'approval'
+export type ActivityVia = 'app' | 'voice' | 'approval' | 'system'
 export type ActivityOutcome = 'done' | 'failed' | 'requested' | 'rejected' | 'cancelled'
 
 export interface ActivityEntry {
@@ -55,6 +55,22 @@ export async function recordActivity(entry: ActivityEntry): Promise<void> {
   } catch (err) {
     console.error(`[activity] couldn't record ${entry.action}:`, err)
   }
+}
+
+/** Kinds of thing that happen on a job by itself (via 'system', no user) */
+export const SYSTEM_EVENTS = {
+  'job.phase': 'Job phase changed',
+  'invoice.paid': 'Invoice paid',
+} as const
+export type SystemEvent = keyof typeof SYSTEM_EVENTS
+
+/**
+ * Records something that happened on a job by itself — no one did it — so the
+ * job's ledger (its Comms feed, lib/communications/ledger.ts) shows it. Never
+ * fails what it records.
+ */
+export async function recordSystemEvent(entry: { tenantId: string; jobId: string; event: SystemEvent; summary: string; detail?: string | null; service?: Service }): Promise<void> {
+  await recordActivity({ tenantId: entry.tenantId, userId: null, action: entry.event, summary: entry.summary, jobId: entry.jobId, via: 'system', detail: entry.detail, service: entry.service })
 }
 
 /** Records an app action, described the same way an approval request would be. */
@@ -145,7 +161,7 @@ export async function listActivity(
       createdAt: r.created_at,
       user: { id: r.user_id, name: r.user_id ? names.get(r.user_id) ?? null : null },
       action: r.action,
-      actionLabel: r.action === 'approval.decide' ? 'Decide an approval' : permissionAction(r.action)?.label ?? r.action,
+      actionLabel: r.action === 'approval.decide' ? 'Decide an approval' : SYSTEM_EVENTS[r.action as SystemEvent] ?? permissionAction(r.action)?.label ?? r.action,
       summary: r.summary,
       via: r.via as ActivityVia,
       outcome: r.outcome as ActivityOutcome,

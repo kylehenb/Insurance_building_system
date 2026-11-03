@@ -3,6 +3,24 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { createClient as createRawClient } from '@supabase/supabase-js'
 import { getAccountingProvider } from '@/lib/accounting/client'
 import { withCronRun } from '@/lib/health/cron'
+import { recordSystemEvent } from '@/lib/activity/log'
+
+const PAID_COLUMNS = 'job_id, direction, invoice_ref, trade_invoice_number, amount_inc_gst'
+type PaidRow = { job_id: string | null; direction: string | null; invoice_ref: string | null; trade_invoice_number: string | null; amount_inc_gst: number | null }
+
+const money = (n: number) => '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** Into each job's ledger: an invoice the accounts now show as paid (only the ones that just changed) */
+async function recordPaid(tenantId: string, rows: unknown): Promise<void> {
+  for (const r of (rows as PaidRow[] | null) ?? []) {
+    if (!r.job_id) continue
+    const amount = r.amount_inc_gst != null ? ` (${money(Number(r.amount_inc_gst))})` : ''
+    const summary = r.direction === 'inbound'
+      ? `Trade invoice${r.trade_invoice_number ? ` ${r.trade_invoice_number}` : ''}${amount} paid`
+      : `${r.invoice_ref ?? 'Invoice'}${amount} paid`
+    await recordSystemEvent({ tenantId, jobId: r.job_id, event: 'invoice.paid', summary, detail: 'Shown as paid in the accounts' })
+  }
+}
 
 interface TenantRow {
   id: string
@@ -127,6 +145,9 @@ async function runPoll(): Promise<NextResponse> {
               })
               .eq('accounting_ref_id', result.accountingRefId)
               .eq('tenant_id', tenant.id)
+              .neq('status', 'paid')
+              .select(PAID_COLUMNS)
+              .then(r => recordPaid(tenant.id, r.data))
 
             tenantSummary.arMarkedPaid++
           }
@@ -152,6 +173,9 @@ async function runPoll(): Promise<NextResponse> {
               })
               .eq('accounting_bill_id', result.accountingRefId)
               .eq('tenant_id', tenant.id)
+              .neq('status', 'paid')
+              .select(PAID_COLUMNS)
+              .then(r => recordPaid(tenant.id, r.data))
 
             tenantSummary.apMarkedPaid++
           }

@@ -19,6 +19,7 @@ function query(table: string) {
   const b: Record<string, unknown> = {
     select: () => b,
     eq: (c: string, v: unknown) => { preds.push(r => r[c] === v); return b },
+    in: (c: string, vs: unknown[]) => { preds.push(r => vs.includes(r[c])); return b },
     ilike: (c: string, p: string) => { preds.push(r => String(r[c]).toLowerCase() === p.toLowerCase()); return b },
     order: () => b,
     limit: () => b,
@@ -51,7 +52,7 @@ vi.mock('@/lib/mcp/tools/work-orders', async (orig) => ({
   findWorkOrders: { run: async () => ({ text: 'IRC1062, 1 St: 1 work orders, 1 not sent.\n- Painter, $1,010, not sent.' }) },
 }))
 
-const { getJobSummary, addJobNote } = await import('../tools/jobs')
+const { getJobSummary, getJobHistory, addJobNote } = await import('../tools/jobs')
 const { updateInsurerOrder, linkOrderToJob } = await import('../tools/orders')
 
 const ctx = { supabase: client as never, tenantId: 't1', userId: 'u1' }
@@ -64,6 +65,12 @@ beforeEach(() => {
   db.users = [{ id: 'u1', tenant_id: 't1', name: 'Kyle' }]
   db.communications = [{ id: 'c0', tenant_id: 't1', job_id: 'j62', type: 'note', content: 'Owner prefers mornings', contact_name: 'Kyle', source: 'app', created_at: '2026-10-20T03:00:00Z' }]
   db.jobs = [{ id: 'j62', tenant_id: 't1', job_number: 'IRC1062', property_address: '1 St', insured_name: 'Bruce Long', insured_phone: '0400 111 222', insurer: 'Castle', claim_number: 'CHCCLM010001697', notes: '1 Oct: Called Bruce', phase: 'awaiting_decision', phase_step: 'waiting_on_insurer', closed_reason: null, override_stage: null, phase_since: '2026-10-24T02:00:00Z', review_note: 'Waiting on Castle\'s decision on the $8,450 quote' }]
+  db.activity_log = [
+    { id: 'a1', tenant_id: 't1', job_id: 'j62', user_id: 'u1', action: 'send.documents', summary: 'Sent Quote Q-IRC1062-1 to Castle', via: 'voice', outcome: 'done', detail: null, created_at: '2026-10-24T01:00:00Z' },
+    { id: 'a2', tenant_id: 't1', job_id: 'j62', user_id: null, action: 'job.phase', summary: 'Moved to Awaiting decision · Waiting on the insurer (was Assessment)', via: 'system', outcome: 'done', detail: null, created_at: '2026-10-24T02:00:00Z' },
+    // Already in the feed as the note itself
+    { id: 'a3', tenant_id: 't1', job_id: 'j62', user_id: 'u1', action: 'jobs.notes', summary: 'Add job note: Owner prefers mornings', via: 'app', outcome: 'done', detail: null, created_at: '2026-10-20T03:00:00Z' },
+  ]
   db.action_queue = [{ tenant_id: 't1', job_id: 'j62', status: 'pending', title: 'Chase quote approval', description: null, priority: 1 }]
   db.insurer_orders = [{ id: ORDER, tenant_id: 't1', status: 'pending', job_id: null, claim_number: null, wo_type: 'BAR', insured_name: 'Peter Laundy' }]
 })
@@ -81,6 +88,24 @@ describe('get_job_summary', () => {
     expect(res.text).toContain('Recent job notes:\n- ')
     expect(res.text).toContain('Kyle: Owner prefers mornings')
     expect(res.text).toContain('Overview notes:\n1 Oct: Called Bruce')
+    expect(res.text).toMatch(/What happened lately:\n- \w+,? 24 Oct, IRC \(automatic\): Moved to Awaiting decision[^\n]*\n- \w+,? 24 Oct, Kyle \(by voice\): Sent Quote Q-IRC1062-1 to Castle/)
+    expect(res.text).not.toContain('Add job note: Owner prefers mornings')
+  })
+})
+
+describe('get_job_history', () => {
+  it('reads the whole ledger newest first: events, notes and emails, without doubling up', async () => {
+    db.communications.push({ id: 'c1', tenant_id: 't1', job_id: 'j62', type: 'email', direction: 'inbound', contact_name: 'Sharon (Castle)', subject: 'Re: quote', body_text: 'Thanks, reviewing.', created_at: '2026-10-25T01:00:00Z' })
+    const res = await getJobHistory.run({ job_number: 'IRC1062' }, ctx)
+    const lines = res.text.split('\n')
+    expect(lines[0]).toBe('IRC1062, newest first:')
+    expect(lines[1]).toMatch(/Email — From Sharon \(Castle\): "Re: quote" — Thanks, reviewing\.$/)
+    expect(lines[2]).toContain('IRC (automatic): Moved to Awaiting decision')
+    expect(lines[3]).toContain('Kyle (by voice): Sent Quote Q-IRC1062-1 to Castle')
+    expect(lines[4]).toContain('Note by Kyle: Owner prefers mornings')
+    expect(lines).toHaveLength(5)
+    const events = await getJobHistory.run({ job_number: 'IRC1062', kinds: ['events'] }, ctx)
+    expect(events.text.split('\n')).toHaveLength(3)
   })
 })
 

@@ -11,6 +11,7 @@ import { loadExcessContext } from '@/lib/excess/server'
 import { listSigningRequestsForJob } from '@/lib/signing/service'
 import { JobNoteError, addJobNote as saveJobNote, listJobNotes } from '@/lib/communications/notes'
 import { searchJobs, type JobMatch } from '@/lib/jobs/search'
+import { jobLedger } from '@/lib/communications/ledger'
 
 // Finding a job, a job at a glance, and adding a note to it. The summary is assembled from
 // the job's phase and next step (lib/jobs/phase.ts), the dashboard's pending actions,
@@ -19,6 +20,9 @@ import { searchJobs, type JobMatch } from '@/lib/jobs/search'
 
 const NOTES_SHOWN_CHARS = 600
 const RECENT_NOTES = 5
+const RECENT_EVENTS = 8
+const HISTORY_DEFAULT = 30
+const HISTORY_MAX = 100
 
 type Section = { title: string; text: string }
 
@@ -41,7 +45,7 @@ export const getJobSummary: McpTool = {
   title: 'Job summary',
   description: [
     'Everything about a job at a glance: who and where, its phase (Assessment, Awaiting decision, In repair, Invoicing or Closed) and next step, pending actions from the dashboard, appointments in the calendar, work orders, quotes/reports/invoices,',
-    'signing, excess, the latest emails and the job notes. Use it for "what\'s happening on IRC…" and summarise it for the user — lead with the stage, the next step and anything waiting on them.',
+    'signing, excess, the latest emails, the job notes and what happened lately (sends, changes, payments — get_job_history has it all). Use it for "what\'s happening on IRC…" and summarise it for the user — lead with the stage, the next step and anything waiting on them.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -99,6 +103,10 @@ export const getJobSummary: McpTool = {
           ? notes.map(n => `- ${n.created_at ? `${spokenDate(n.created_at)}, ` : ''}${n.author ?? 'note'}: ${n.content}`).join('\n')
           : null
       }),
+      section('What happened lately', async () => {
+        const lines = await jobLedger(ctx.supabase as unknown as RawClient, ctx.tenantId, job.id, { limit: RECENT_EVENTS, kinds: ['event'] })
+        return lines.length ? lines.map(l => `- ${spokenDate(l.at)}, ${l.text}`).join('\n') : null
+      }),
     ])).filter((s): s is Section => !!s)
 
     const notes = full?.notes?.trim()
@@ -122,6 +130,43 @@ export const getJobSummary: McpTool = {
         ...sections.map(s => `\n${s.title}:\n${s.text}`),
       ].join('\n'),
       data: { job_number: job.job_number, property_address: job.property_address, sections },
+    }
+  },
+}
+
+export const getJobHistory: McpTool = {
+  name: 'get_job_history',
+  title: 'Job history',
+  description: [
+    'A job\'s full history, newest first — its ledger, as in the job\'s Comms feed: every email in and out, the job notes, and everything done on it, by people (sends, quotes, invoices, stage changes, follow-ups, approvals) or by itself (phase changes, invoices paid).',
+    'Use it for "what\'s happened on IRC…", "when did we send…", "has … been paid", or to check something before acting. Give kinds to narrow it (emails, notes, events).',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      job_number: { type: 'string', description: 'Job number, e.g. IRC1001.' },
+      limit: { type: 'number', description: `How many entries, newest first (default ${HISTORY_DEFAULT}, up to ${HISTORY_MAX}).` },
+      kinds: { type: 'array', items: { type: 'string', enum: ['emails', 'notes', 'events'] }, description: 'Only these kinds. Leave out for everything.' },
+    },
+    required: ['job_number'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const job = await jobFromArgs(args, ctx)
+    if (isToolResult(job)) return job
+    const n = Number(args.limit)
+    const limit = Number.isFinite(n) && n > 0 ? Math.min(HISTORY_MAX, Math.round(n)) : HISTORY_DEFAULT
+    const KIND = { emails: 'email', notes: 'note', events: 'event' } as const
+    const kinds = Array.isArray(args.kinds)
+      ? args.kinds.map(k => KIND[k as keyof typeof KIND]).filter(Boolean)
+      : undefined
+    const lines = await jobLedger(ctx.supabase as unknown as RawClient, ctx.tenantId, job.id, { limit, kinds: kinds?.length ? kinds : undefined })
+    if (!lines.length) return { text: `${job.job_number}: nothing recorded yet.`, data: { job_number: job.job_number, entries: [] } }
+    return {
+      text: [`${job.job_number}, newest first:`, ...lines.map(l => `- ${spokenDate(l.at)}: ${l.text}`)].join('\n'),
+      data: { job_number: job.job_number, entries: lines },
     }
   },
 }

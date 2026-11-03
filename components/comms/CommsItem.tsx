@@ -619,7 +619,7 @@ function SysGroupItem({ comms }: { comms: Comm[] }) {
 
   const gist = (
     <span style={{ fontSize: 12.5, color: '#b7b0a0', fontStyle: 'italic' }}>
-      {comms.length} automated updates
+      {comms.length} {comms.every(c => c.source === 'system_event' || c.type === 'portal') ? 'automated updates' : 'updates'}
       {comms[0].work_order_id ? ' · work order' : ''}
     </span>
   )
@@ -646,6 +646,7 @@ function SysGroupItem({ comms }: { comms: Comm[] }) {
                   {c.created_at ? new Date(c.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) : '—'}
                 </span>
                 <span style={{ fontWeight: 600 }}>{c.content ?? c.type}</span>
+                {c.type === 'system' && c.contact_name && <span style={{ color: '#b7b0a0', fontSize: 11, marginLeft: 8 }}>· {c.contact_name}</span>}
                 {c.work_order_id && <span style={{ color: '#b7b0a0', fontSize: 11, marginLeft: 8 }}>· work order</span>}
               </div>
             ))}

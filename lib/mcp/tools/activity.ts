@@ -8,7 +8,7 @@ import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 const TIME_ZONE = 'Australia/Perth'
 const SHOWN = 30
 const when = (iso: string) => new Date(iso).toLocaleString('en-AU', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
-const VIA = { app: 'in the app', voice: 'by voice', approval: 'on approval' } as const
+const VIA = { app: 'in the app', voice: 'by voice', approval: 'on approval', system: 'automatically' } as const
 
 export const listActivityTool: McpTool = {
   name: 'list_activity',
@@ -51,7 +51,7 @@ export const listActivityTool: McpTool = {
     if (!entries.length) return { text: `Nothing in the last ${days === 1 ? 'day' : `${days} days`}.${note}`, data: { entries: [] } }
 
     const lines = entries.slice(0, SHOWN).map(e =>
-      `- ${when(e.createdAt)} — ${e.user.name ?? 'someone'} ${VIA[e.via]}: ${e.summary}${e.outcome === 'done' ? '' : ` [${e.outcome}]`}${e.approvedBy ? ` (approved by ${e.approvedBy})` : ''}`)
+      `- ${when(e.createdAt)} — ${e.via === 'system' ? 'IRC' : e.user.name ?? 'someone'} ${VIA[e.via]}: ${e.summary}${e.outcome === 'done' ? '' : ` [${e.outcome}]`}${e.approvedBy ? ` (approved by ${e.approvedBy})` : ''}`)
     return {
       text: [`${entries.length} thing${entries.length === 1 ? '' : 's'} in the last ${days === 1 ? 'day' : `${days} days`}${entries.length > SHOWN ? ` (latest ${SHOWN} shown)` : ''}:${note}`, ...lines].join('\n'),
       data: {

@@ -188,9 +188,11 @@ export function legacyStage(r: PhaseResult, overrideStage: string | null = null)
 
 // ── Loading, saving, and the stale-job sweep ──
 
-export async function loadPhaseContext(db: SupabaseClient, jobId: string): Promise<PhaseContext & { current: { phase: string | null; phase_since: string | null; closed_reason: string | null; created_at: string | null; current_stage: string | null } } | null> {
+type CurrentPhase = { tenant_id: string | null; phase: string | null; phase_step: string | null; phase_since: string | null; closed_reason: string | null; created_at: string | null; current_stage: string | null }
+
+export async function loadPhaseContext(db: SupabaseClient, jobId: string): Promise<PhaseContext & { current: CurrentPhase } | null> {
   const [{ data: job }, { data: quotes }, { data: reports }, { data: inspections }, { data: visits }, { data: invoices }, { count }] = await Promise.all([
-    db.from('jobs').select('override_stage, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at, lapsed_at, closed_by_hand, phase, phase_since, closed_reason, created_at, current_stage').eq('id', jobId).maybeSingle(),
+    db.from('jobs').select('override_stage, homeowner_signoff_sent_at, homeowner_signoff_received_at, completion_approved_at, lapsed_at, closed_by_hand, tenant_id, phase, phase_step, phase_since, closed_reason, created_at, current_stage').eq('id', jobId).maybeSingle(),
     db.from('quotes').select('status, created_at').eq('job_id', jobId).eq('is_active_version', true),
     db.from('reports').select('report_type, status, deleted_at').eq('job_id', jobId),
     db.from('inspections').select('status, form_submitted_at').eq('job_id', jobId),
@@ -199,7 +201,7 @@ export async function loadPhaseContext(db: SupabaseClient, jobId: string): Promi
     db.from('calendar_events').select('id', { count: 'exact', head: true }).eq('job_id', jobId).neq('status', 'cancelled'),
   ])
   if (!job) return null
-  const j = job as PhaseContext['job'] & { phase: string | null; phase_since: string | null; closed_reason: string | null; created_at: string | null; current_stage: string | null }
+  const j = job as PhaseContext['job'] & CurrentPhase
   return {
     job: j,
     quotes: (quotes as { status: string | null }[] | null) ?? [],
@@ -208,7 +210,7 @@ export async function loadPhaseContext(db: SupabaseClient, jobId: string): Promi
     visits: (visits as PhaseContext['visits'] | null) ?? [],
     invoices: (invoices as PhaseContext['invoices'] | null) ?? [],
     hasAppointment: (count ?? 0) > 0,
-    current: { phase: j.phase, phase_since: j.phase_since, closed_reason: j.closed_reason, created_at: j.created_at, current_stage: j.current_stage },
+    current: { tenant_id: j.tenant_id ?? null, phase: j.phase, phase_step: j.phase_step ?? null, phase_since: j.phase_since, closed_reason: j.closed_reason, created_at: j.created_at, current_stage: j.current_stage },
   }
 }
 
@@ -236,6 +238,16 @@ export async function recomputePhase(db: SupabaseClient, jobId: string, at = new
     // An approval after a lapse reopens the job
     ...(out.phase !== 'closed' && ctx.job.lapsed_at ? { lapsed_at: null } : {}),
   }).eq('id', jobId)
+  // Into the job's ledger: a move to another phase or step (not the first time a job is worked out)
+  const changed = moved || (ctx.current.phase_step ?? null) !== out.step || (ctx.current.closed_reason ?? null) !== out.closedReason
+  if (ctx.current.phase && changed && ctx.current.tenant_id) {
+    const { recordSystemEvent } = await import('@/lib/activity/log')
+    const now = describePhase({ phase: out.phase, phase_step: out.step, closed_reason: out.closedReason })
+    await recordSystemEvent({
+      tenantId: ctx.current.tenant_id, jobId, event: 'job.phase', service: db as never,
+      summary: moved ? `Moved to ${now} (was ${phaseLabel(ctx.current.phase)})` : `Next step: ${now}`,
+    })
+  }
   return out
 }
 

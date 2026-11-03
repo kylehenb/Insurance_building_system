@@ -11,7 +11,7 @@ import type { ActivityOutcome, ActivityVia, ActivityView } from '@/lib/activity/
 interface ActivityData { entries: ActivityView[]; seesEveryone: boolean }
 interface Person { id: string; name: string }
 
-const VIA_LABEL: Record<ActivityVia, string> = { app: 'App', voice: 'Voice', approval: 'On approval' }
+const VIA_LABEL: Record<ActivityVia, string> = { app: 'App', voice: 'Voice', approval: 'On approval', system: 'Automatic' }
 const OUTCOME: Record<ActivityOutcome, { label: string; className: string }> = {
   done: { label: 'Done', className: 'text-[#2d6a4f]' },
   failed: { label: 'Failed', className: 'text-[#9f1239]' },
@@ -89,7 +89,7 @@ export default function ActivityPage() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-ink">{e.summary}</div>
                 <div className="text-xs text-subtle mt-0.5">
-                  {e.user.name ?? 'Unknown'} · {VIA_LABEL[e.via]}{e.voiceKeyLabel && ` (${e.voiceKeyLabel})`}
+                  {e.via === 'system' ? 'IRC' : e.user.name ?? 'Unknown'} · {VIA_LABEL[e.via]}{e.voiceKeyLabel && ` (${e.voiceKeyLabel})`}
                   {e.approvedBy && ` · approved by ${e.approvedBy}`}
                   {e.job && <> · <Link href={`/dashboard/jobs/${e.job.id}`} className="text-tan hover:underline">{e.job.number ?? 'Job'}</Link></>}
                   {e.detail && <> · <button onClick={() => setOpen(open === e.id ? null : e.id)} className="text-tan hover:underline">{open === e.id ? 'Hide details' : 'Details'}</button></>}

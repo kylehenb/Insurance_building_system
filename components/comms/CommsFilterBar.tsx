@@ -18,7 +18,7 @@ export const DEFAULT_FILTERS: CommsFilters = {
   needsAction: false,
 }
 
-const TYPE_OPTIONS = ['Email', 'SMS', 'Phone', 'Note', 'Portal'] as const
+const TYPE_OPTIONS = ['Email', 'SMS', 'Phone', 'Note', 'Portal', 'System'] as const
 const CONTACT_OPTIONS = ['Insured', 'Insurer', 'Trade'] as const
 
 interface Props {

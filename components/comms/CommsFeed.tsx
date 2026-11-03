@@ -7,6 +7,7 @@ import { CommsFilterBar } from './CommsFilterBar'
 import type { CommsFilters } from './CommsFilterBar'
 import { DEFAULT_FILTERS } from './CommsFilterBar'
 import { useCurrentUser } from '@/components/layout/current-user'
+import { isEventId } from '@/lib/communications/ledger'
 
 // ── AI summary types ──────────────────────────────────────────────────────────
 
@@ -449,7 +450,8 @@ export function CommsFeed({ jobId }: { jobId: string }) {
     if (ids.length === 0) return
     const now = new Date().toISOString()
     setComms(prev => prev.map(c => ids.includes(c.id) && !c.read_at ? { ...c, read_at: now } : c))
-    ids.forEach(id => {
+    // Events from the job's log aren't messages: nothing to mark read
+    ids.filter(id => !isEventId(id)).forEach(id => {
       fetch(`/api/communications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -459,6 +461,7 @@ export function CommsFeed({ jobId }: { jobId: string }) {
   }, [])
 
   const handleToggleStar = useCallback((id: string, starred: boolean) => {
+    if (isEventId(id)) return
     setComms(prev => prev.map(c => c.id === id ? { ...c, is_starred: starred } : c))
     fetch(`/api/communications/${id}`, {
       method: 'PATCH',

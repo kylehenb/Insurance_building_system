@@ -4,6 +4,7 @@ import { getUser } from '@/lib/supabase/get-user'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { trackAi } from '@/lib/health/ai-usage'
+import { eventText, eventWho, jobEvents } from '@/lib/communications/ledger'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -98,6 +99,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .eq('job_id', jobId)
     .order('created_at', { ascending: true })
 
+  // Everything else that happened on the job (the ledger: sends, quotes, phase changes, payments…)
+  const cutoff = scope === 'recent' ? new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString() : ''
+  const events = job ? (await jobEvents(serviceClient as never, tenantId, jobId, 80).catch(() => [])).filter(e => e.at >= cutoff) : []
+  const eventsText = events.map(e => `[${new Date(e.at).toLocaleDateString('en-AU')}] ${eventWho(e)}: ${eventText(e)}`).join('\n')
+
   const jobLabel = job
     ? `${job.job_number} — ${job.insured_name ?? 'Unknown insured'} at ${job.property_address ?? 'Unknown address'}`
     : `Job ${jobId}`
@@ -144,6 +150,9 @@ ${commsText || '(none)'}
 
 --- JOB NOTES ---
 ${notesText || '(none)'}
+
+--- WHAT HAPPENED ON THE JOB (actions and automatic changes) ---
+${eventsText || '(none)'}
 
 Generate the summary JSON.`
 

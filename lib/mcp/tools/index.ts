@@ -14,7 +14,7 @@ import { getEmail, listJobEmails, replyToEmailTool } from '@/lib/mcp/tools/email
 import { readEmailAttachment } from '@/lib/mcp/tools/attachments'
 import { linkEmailToJob, saveEmail } from '@/lib/mcp/tools/inbox'
 import { recoverDroppedEmails } from '@/lib/mcp/tools/recovery'
-import { addJobNote, findJob, getJobSummary } from '@/lib/mcp/tools/jobs'
+import { addJobNote, findJob, getJobHistory, getJobSummary } from '@/lib/mcp/tools/jobs'
 import { findContact } from '@/lib/mcp/tools/contacts'
 import { decideApprovalTool, listApprovalsTool } from '@/lib/mcp/tools/approvals'
 import { listActivityTool } from '@/lib/mcp/tools/activity'
@@ -30,6 +30,7 @@ import { closeJobTool, reopenJobTool } from '@/lib/mcp/tools/close-jobs'
 export const MCP_TOOLS: McpTool[] = [
   findJob,
   getJobSummary,
+  getJobHistory,
   addJobNote,
   addJobAppointment,
   closeJobTool,

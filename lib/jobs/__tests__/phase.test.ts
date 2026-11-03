@@ -92,4 +92,17 @@ describe('saving the phase', () => {
     await recomputePhase(db, 'j1', at)
     expect(tables.jobs[0]).toMatchObject({ phase: 'in_repair', phase_since: at.toISOString(), current_stage: 'approved_awaiting_signoff' })
   })
+
+  it('puts each change in the job\'s ledger, but not the first time it\'s worked out or when nothing moved', async () => {
+    await recomputeStalePhases(db)
+    expect(tables.activity_log ?? []).toHaveLength(0)
+    await recomputePhase(db, 'j1')
+    expect(tables.activity_log ?? []).toHaveLength(0)
+    tables.quotes[0].status = 'approved'
+    await recomputePhase(db, 'j1')
+    expect(tables.activity_log).toEqual([expect.objectContaining({
+      tenant_id: 't1', job_id: 'j1', user_id: null, via: 'system', action: 'job.phase',
+      summary: expect.stringMatching(/^Moved to In repair · .+ \(was Awaiting decision\)$/),
+    })])
+  })
 })
