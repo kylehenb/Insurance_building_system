@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { trackAi } from '@/lib/health/ai-usage'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -901,6 +902,8 @@ function stripMarkdownFences(text: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
@@ -944,7 +947,7 @@ export async function POST(req: NextRequest) {
 
     // ── AAI: JS autofill ─────────────────────────────────────────────────
     if (template === 'aai') {
-      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
+      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6', tenantId: me.tenantId }, () => anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 8192,
         system: AAI_JS_SYSTEM,
@@ -979,7 +982,7 @@ TEMPLATE TO FILL:
 
     // ── IAG: JS autofill ─────────────────────────────────────────────────
     if (template === 'iag') {
-      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
+      const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6', tenantId: me.tenantId }, () => anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 8192,
         system: IAG_JS_SYSTEM,
@@ -1011,7 +1014,7 @@ TEMPLATE TO FILL:
     }
 
     // ── A&G: JS autofill ─────────────────────────────────────────────────
-    const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
+    const jsMessage = await trackAi({ feature: 'midcity-insurance-report', provider: 'anthropic', model: 'claude-sonnet-4-6', tenantId: me.tenantId }, () => anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       system: AUTO_GENERAL_JS_SYSTEM,

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { trackAi } from '@/lib/health/ai-usage'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
       timeAttendedFormatted ? `Time attended (use exactly for timeAttended): ${timeAttendedFormatted}` : null,
     ].filter(Boolean).join('\n')
 
-    const message = await trackAi({ feature: 'midcity-roof-report', provider: 'anthropic', model: 'claude-sonnet-4-6' }, () => anthropic.messages.create({
+    const message = await trackAi({ feature: 'midcity-roof-report', provider: 'anthropic', model: 'claude-sonnet-4-6', tenantId: me.tenantId }, () => anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: `You are an expert roof plumber and insurance building assessor in Australia. Extract and structure information from raw roof inspection notes into a JSON report. Use professional roofing industry terminology. For Yes/No fields use exactly "Yes" or "No". For Yes/No/N/A fields use "Yes", "No", or "N/A". For condition fields use "Good", "Fair", or "Poor". If a value cannot be determined from the notes, use an empty string "".

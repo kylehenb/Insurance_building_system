@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
+import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
 
 interface InitialData {
   inspectionId: string
@@ -438,10 +439,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Report enable states ─────────────────────────────────────────────────
   const [barEnabled, setBarEnabled] = useState(false)
   const [makeSafeEnabled, setMakeSafeEnabled] = useState(false)
-  const [roofEnabled, setRoofEnabled] = useState(false)
+  // Roof-only mode (no BAR) starts with the roof report ticked
+  const [roofEnabled, setRoofEnabled] = useState(!FIELD_APP_BAR_REPORTS)
 
   // ─── Scope notes ──────────────────────────────────────────────────────────
   const [scopeRooms, setScopeRooms] = useState<ScopeRoom[]>([])
+
+  // The BAR and its scope notes show when BARs are on, or when this job's draft
+  // already has one, so nothing written before roof-only mode is hidden
+  const showBar = FIELD_APP_BAR_REPORTS || barEnabled || scopeRooms.length > 0
 
   // ─── BAR fields ───────────────────────────────────────────────────────────
   const [insuranceTemplate, setInsuranceTemplate] = useState<InsuranceTemplate | ''>('')
@@ -532,7 +538,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.dictationNotes) setDictationNotes(d.dictationNotes as string)
     if (d.barEnabled) setBarEnabled(d.barEnabled as boolean)
     if (d.makeSafeEnabled) setMakeSafeEnabled(d.makeSafeEnabled as boolean)
-    if (d.roofEnabled) setRoofEnabled(d.roofEnabled as boolean)
+    if (typeof d.roofEnabled === 'boolean') setRoofEnabled(d.roofEnabled)
     if (d.insuranceTemplate) setInsuranceTemplate(d.insuranceTemplate as InsuranceTemplate)
     if (d.insuranceFields) setInsuranceFields(d.insuranceFields as Record<string, string>)
     if (d.insuranceFieldsOpen) setInsuranceFieldsOpen(d.insuranceFieldsOpen as boolean)
@@ -889,8 +895,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         <div className="fa-sc-head">
           <div className="fa-sc-circle active">01</div>
           <div className="fa-sc-meta">
-            <h3>Notes &amp; Scope</h3>
-            <p>Job notes · scope of works</p>
+            <h3>{showBar ? <>Notes &amp; Scope</> : 'Notes'}</h3>
+            <p>{showBar ? 'Job notes · scope of works' : 'Job notes'}</p>
           </div>
           <span className="fa-badge req">Required</span>
         </div>
@@ -904,14 +910,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                 <span className="fa-ai-dark-title">Job Notes</span>
               </div>
               <div className="fa-ai-hints">
-                {['Who you met', 'Property description', 'BAR findings', 'Cause of damage', 'Areas damaged', 'Roof inspection', 'Make safe works', 'Pre-existing conditions', 'Maintenance items'].map(hint => (
+                {['Who you met', 'Property description', ...(showBar ? ['BAR findings'] : []), 'Cause of damage', 'Areas damaged', 'Roof inspection', 'Make safe works', 'Pre-existing conditions', 'Maintenance items'].map(hint => (
                   <div key={hint} className="fa-ai-hint">{hint}</div>
                 ))}
               </div>
               <div className="fa-ai-dark-body">
                 <textarea
                   className="fa-ai-dark-ta"
-                  placeholder="Dictate all job notes here — who you met, property description, BAR findings, roof inspection details, make safe works, damage cause, pre-existing conditions, maintenance items, etc. Each report in Section 2 pulls from these notes…"
+                  placeholder={`Dictate all job notes here — who you met, property description, ${showBar ? 'BAR findings, ' : ''}roof inspection details, make safe works, damage cause, pre-existing conditions, maintenance items, etc. Each report in Section 2 pulls from these notes…`}
                   style={{ minHeight: 160 }}
                   value={dictationNotes}
                   onChange={e => { setDictationNotes(e.target.value); armDraft() }}
@@ -919,7 +925,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
               </div>
             </div>
 
-            {/* Scope Notes */}
+            {/* Scope Notes (feed the BAR only) */}
+            {showBar && (<>
             <div className="mc-section-head" style={{ marginTop: 16 }}>Scope Notes</div>
             <div style={{ paddingTop: 12 }}>
               {scopeRooms.map(room => (
@@ -976,6 +983,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                 <button onClick={addRoom} className="mc-add-room-btn">+ Add Room</button>
               </div>
             </div>
+            </>)}
 
           </div>
         </div>
@@ -994,6 +1002,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           <div className="mc-pills-wrap">
 
             {/* ── BAR ────────────────────────────────────────────────────── */}
+            {showBar && (
             <div className={`mc-pill${barEnabled ? ' enabled' : ''}`}>
               <div className="mc-pill-header" onClick={() => { setBarEnabled(p => !p); armDraft() }}>
                 <div className="mc-pill-check">{barEnabled ? '✓' : ''}</div>
@@ -1114,6 +1123,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                 </div>
               )}
             </div>
+            )}
 
             {/* ── MAKE SAFE ────────────────────────────────────────────────── */}
             <div className={`mc-pill${makeSafeEnabled ? ' enabled' : ''}`}>
