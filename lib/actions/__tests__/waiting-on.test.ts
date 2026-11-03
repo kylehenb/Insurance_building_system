@@ -142,6 +142,15 @@ describe('reading a sent email', () => {
     expect(tables.action_queue ?? []).toHaveLength(0)
   })
 
+  it('never chases an insurer for a decision on a quote', async () => {
+    const { client } = model({
+      asks: true, waiting_on_name: 'Castle Insurance', waiting_on_email: 'claims@castle.com.au', role: 'insurer',
+      asked: 'a decision on quote Q-IRC1001-1', ask_kind: 'approval', chase_after_working_days: 5, reason: 'Usual time for a decision.',
+    })
+    expect(await readSentEmail(sentRow() as never, { db, client, at: THU })).toMatchObject({ status: 'done', outcome: 'Asked Castle Insurance for a decision on quote Q-IRC1001-1 — a decision, not chased' })
+    expect(tables.action_queue ?? []).toHaveLength(0)
+  })
+
   it('replaces the reminder when the office asks again in the same conversation', async () => {
     tables.action_queue = [{ id: 'old', tenant_id: 't1', source: 'followup', rule_key: 'waiting_on', status: 'scheduled', follow_up: { thread_id: 'abc1', waiting: { name: 'Sparky Bros', asked: 'photos', sent_at: '2026-10-26T02:00:00.000Z' } }, due_at: '2026-10-30T00:00:00.000Z' }]
     const { client } = model({ asks: true, waiting_on_name: 'Sparky Bros', waiting_on_email: 'jobs@sparkybros.com.au', role: 'trade', asked: 'the photos', ask_kind: 'photos', chase_after_working_days: 2, reason: 'Second ask.' })

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { fakeSupabase, type Row } from '@/lib/mcp/__tests__/fake-supabase'
 import { runLapses } from '../lapse'
 
-// The safety net for insurers who never decide: a warning two weeks before,
-// then "no decision" once the insurer's lapse time has passed — but only with
+// The safety net for insurers who never decide: no warning beforehand, just
+// "no decision" once the insurer's lapse time has passed — but only with
 // everything paid; with money owed, a check to invoice or chase it instead.
 
 const tables: Record<string, Row[]> = {}
@@ -24,7 +24,7 @@ beforeEach(() => {
   tables.jobs = [
     job('irc1', 'castle', daysAgo(200)), // lapsed, all paid → closes
     job('irc2', 'castle', daysAgo(190)), // lapsed, invoice unpaid → check
-    job('irc3', 'castle', daysAgo(170)), // two weeks out → warning
+    job('irc3', 'castle', daysAgo(170)), // two weeks out → nothing (no warning)
     job('irc4', 'castle', daysAgo(30)), // fine
     job('irc5', 'never', daysAgo(900)), // never lapses
     job('irc6', 'quick', daysAgo(40)), // past its insurer's 30 days, nothing invoiced → check
@@ -36,19 +36,18 @@ beforeEach(() => {
 })
 
 describe('the lapse safety net', () => {
-  it('closes the paid-up, flags money owed, warns two weeks out, and leaves the rest', async () => {
+  it('closes the paid-up, flags money owed, and leaves the rest — with no warning before', async () => {
     const out = await runLapses(db, AT)
-    expect(out).toEqual({ lapsed: ['IRC1'], warned: ['IRC3'], blocked: ['IRC2', 'IRC6'] })
+    expect(out).toEqual({ lapsed: ['IRC1'], blocked: ['IRC2', 'IRC6'] })
     expect(tables.jobs.find(j => j.id === 'irc1')!.lapsed_at).toBe(AT.toISOString())
     const note = (c: Row) => (c.follow_up as { note: string }).note
-    expect(tables.action_queue.map(c => [c.job_id, c.rule_key])).toEqual([['irc2', 'lapse_blocked'], ['irc3', 'lapse_warning'], ['irc6', 'lapse_blocked']])
+    expect(tables.action_queue.map(c => [c.job_id, c.rule_key])).toEqual([['irc2', 'lapse_blocked'], ['irc6', 'lapse_blocked']])
     expect(note(tables.action_queue[0])).toMatch(/^Castle Insurance hasn't decided on IRC2 in over 6 months\. It can close as "no decision" once everything on it is paid/)
-    expect(note(tables.action_queue[1])).toMatch(/^Castle Insurance hasn't decided on IRC3 since Sat 16 May 2026\. It closes as "no decision" on Thu 12 Nov 2026/)
-    expect(note(tables.action_queue[2])).toMatch(/in over 30 days\./)
+    expect(note(tables.action_queue[1])).toMatch(/in over 30 days\./)
     expect((tables.action_queue[0].follow_up as { note: string }).note).toContain('1 invoice is still unpaid')
-    expect((tables.action_queue[2].follow_up as { note: string }).note).toContain('nothing has been invoiced on it yet')
+    expect((tables.action_queue[1].follow_up as { note: string }).note).toContain('nothing has been invoiced on it yet')
     // Once each per wait
-    expect(await runLapses(db, AT)).toEqual({ lapsed: [], warned: [], blocked: [] })
+    expect(await runLapses(db, AT)).toEqual({ lapsed: [], blocked: [] })
   })
 
   it('raises at most three new checks a day, the longest waits first', async () => {

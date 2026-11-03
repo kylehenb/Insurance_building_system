@@ -37,6 +37,21 @@ const LEFT_OUT = new Set([
   'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'update_action_card', 'star_email', 'change_follow_up',
 ])
 
+/**
+ * Record-keeping the system does by itself, so the AI doesn't offer it as a
+ * step: every email is already in the job's Comms feed (the ledger), and a
+ * conversation the AI can place on a job is filed there automatically. Offered
+ * only when the office asks for it in their instructions — and a job note for
+ * an appointment check-in, where the office fills in what happened.
+ */
+const RECORD_KEEPING = new Set(['add_job_note', 'file_conversation'])
+
+/** The tools offered while making a card */
+export function cardTools(tools: McpTool[], source: ActionCard['source'], instructed: boolean): McpTool[] {
+  return tools.filter(t => !LEFT_OUT.has(t.name)
+    && (instructed || !RECORD_KEEPING.has(t.name) || (source === 'appointment' && t.name === 'add_job_note')))
+}
+
 /** A tool a card can carry as a step: an action (not a read), and not one cards leave out */
 export const isStepTool = (tool: McpTool) => !tool.annotations.readOnlyHint && !LEFT_OUT.has(tool.name)
 
@@ -56,7 +71,8 @@ const FINISH: Anthropic.Beta.BetaTool = {
         enum: CATEGORIES.map(c => c.key),
         description: 'invoice: a bill or invoice IRC has to pay (a trade, supplier or subcontractor invoice). attend_submit: a job to attend (inspection, make safe, site visit) or a report or quote to finish and submit after attending. other: everything else.',
       },
-      job_number: { type: 'string', description: 'The job this is about, if you worked it out and the conversation is not on it yet.' },
+      job_number: { type: 'string', description: 'The job this is about, when the conversation is not on a job yet and you are sure which job it is (the job number, claim number or address match). The conversation is filed on it automatically. Leave out if unsure.' },
+      admin: { type: 'boolean', description: 'true when the conversation is not on a job and is not job related at all (the business\'s own bills, accounts, subscriptions, notices): it is filed as admin automatically.' },
       chase_sooner: {
         type: 'array',
         description: 'Only when the first message lists what THE OFFICE IS ALSO WAITING ON and this email makes one of them more urgent: chase it sooner. Otherwise leave out.',
@@ -79,9 +95,10 @@ export const CARD_SYSTEM_PROMPT = `You prepare action cards in IRC Master, the j
 
 How it works:
 - The conversation and the job file are below. Use the read tools to check anything else you need (other emails on the job, documents, work orders, signing, excess, orders). Don't guess facts.
-- To propose a step, call the tool you would use to do it (send_email, file_conversation, send_work_order, send_documents, send_for_signature, lodge_order, create_order_from_email, add_job_note, set_job_excess_decision, organise_emails…). Nothing runs: each call is recorded as a step on the card. Propose at most ${MAX_PROPOSED_STEPS} steps, in the order they should happen, and only steps the email or the job actually calls for.
+- To propose a step, call the tool you would use to do it (send_email, send_work_order, send_documents, send_for_signature, lodge_order, create_order_from_email, set_job_excess_decision, organise_emails…). Nothing runs: each call is recorded as a step on the card. Propose at most ${MAX_PROPOSED_STEPS} steps, in the order they should happen, and only steps the email or the job actually calls for.
 - Replies: send_email with mode "reply" and the conversation_id. Write the body as plain text in the office's voice — friendly, short, Australian English, a greeting with the person's first name. No sign-off or signature: the company signature is added. Don't promise dates, amounts or anything the job file doesn't support; if something needs the office to decide, leave a clear [placeholder] for them.
-- If the conversation isn't on a job and you can tell which job it's about, propose file_conversation with that job_number first. If it's an insurer's new work order that hasn't become an order, propose create_order_from_email.
+- Record-keeping is automatic, never a step: every email (in and out) and everything done on a job is already in the job's Comms feed. Don't propose job notes that record what an email says or what a step did, and don't propose filing. If the conversation isn't on a job and you're sure which job it's about, give its job_number in finish_card and it's filed there automatically; if it isn't job related at all, set admin true. If filing is all it needs, nothing needs doing (needs_action false).
+- If it's an insurer's new work order that hasn't become an order, propose create_order_from_email.
 - Notifications, newsletters, receipts, spam-like mail, thank-yous and FYIs need nothing: call finish_card with needs_action false (you may propose organise_emails archive if it's clutter).
 - Pick the category the office files this to-do under: invoice (a bill to pay), attend_submit (a site to attend, or a report or quote to finish and submit), or other.
 - If the user starred the email themselves (said in the first message), it stays on their list whatever you decide — still say what it's about and suggest steps if any help.
@@ -90,9 +107,9 @@ How it works:
 - AN APPOINTMENT CHECK-IN comes after a job's calendar appointment (an inspection, a make safe, a site meeting) has ended. Look at what's been recorded on the job since it started: job notes, emails, the field app, reports, quotes, work orders. Then:
   - Sorted: a note says it went fine and nothing more is needed, or everything that should follow is done (e.g. the report is already sent). Call finish_card with needs_action false and say so in the summary.
   - Something outstanding: e.g. the report or make safe report is drafted but not sent (the insurer's report KPI is in the job file), or a note mentions a problem ("the tiles need replacing"). Propose the steps that move it on, and use category attend_submit for a report or quote to finish and send.
-  - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in.
-- A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up, and add_job_note if useful; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
-- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question.
+  - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in (the one job note a card proposes by itself: the office writes it).
+- A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
+- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question. Never propose set_follow_up (or a chase) for an insurer's or homeowner's decision on a quote or variation: the office follows quotes up only when they ask to.
 - A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it).
 - Always end by calling finish_card.
 
@@ -156,7 +173,7 @@ export async function generateCard(
   const target = opts.feedback?.trim() && opts.step ? card.steps.find(s => s.id === opts.step) : undefined
   const keepCard = async (reason: string): Promise<Outcome> => ({ ...(await save({ status: 'pending' })), error_log: reason })
   try {
-    const tools = (opts.tools ?? MCP_TOOLS).filter(t => !LEFT_OUT.has(t.name))
+    const tools = cardTools(opts.tools ?? MCP_TOOLS, card.source, !!opts.feedback?.trim())
     const ctx: McpContext = { supabase: db as unknown as SupabaseClient<Database>, tenantId: card.tenant_id, userId: await cardActor(db, card.tenant_id), via: 'chat' }
     const about = card.source === 'followup'
       ? await followUpContext(card, db, ctx)
@@ -261,6 +278,10 @@ export async function generateCard(
       const { data: job } = await db.from('jobs').select('id').eq('tenant_id', card.tenant_id).ilike('job_number', str('job_number')).maybeSingle()
       jobId = (job as { id: string } | null)?.id ?? null
     }
+    // Filed by itself: the email goes into the job's Comms feed (or Admin) without a step
+    const filed = card.source === 'email' && card.source_ref && !about.jobId
+      ? await autoFile(db, card.tenant_id, card.source_ref, jobId ? { jobId } : f.admin === true ? { filing: 'admin' } : null)
+      : null
     const priority = PRIORITY[(str('priority') || 'normal') as keyof typeof PRIORITY] ?? PRIORITY.normal
 
     // Starred (or re-starred) by the user while it was being read? Then it
@@ -283,7 +304,7 @@ export async function generateCard(
       ...(starred ? {} : { category }),
       status: needsAction ? 'pending' : 'no_action',
       title: str('title') || about.title,
-      description: str('summary') || lastText || null,
+      description: [str('summary') || lastText, filed].filter(Boolean).join('\n\n') || null,
       reasoning: str('reasoning') || null,
       steps,
       // The AI's own proposal, kept as it was: what the office changes is learned from
@@ -297,6 +318,22 @@ export async function generateCard(
     console.error(`[action-cards] card ${card.id} failed:`, err)
     if (target) return keepCard(err instanceof Error ? err.message : String(err))
     return save({ status: 'failed', error_log: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+/** Files a conversation the card AI placed, as a person filing it would. A line for the card, or null */
+async function autoFile(db: SupabaseClient, tenantId: string, threadId: string, target: { jobId: string } | { filing: 'admin' } | null): Promise<string | null> {
+  if (!target) return null
+  try {
+    const { fileThread } = await import('@/lib/mail/file-thread')
+    await fileThread(await getMailbox(tenantId, db), threadId, target, db)
+    if ('filing' in target) return 'Filed as admin.'
+    const { data } = await db.from('jobs').select('job_number').eq('id', target.jobId).maybeSingle()
+    return `Filed on ${(data as { job_number: string } | null)?.job_number ?? 'the job'}.`
+  } catch (err) {
+    const { logError } = await import('@/lib/health/errors')
+    await logError('action-cards.auto-file', err, { tenantId, detail: { threadId } })
+    return null
   }
 }
 
@@ -372,7 +409,7 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
   const set = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(card.created_at))
   const w = f.waiting
   const head = f.kind === 'watch'
-    ? `A CHECK IRC PLANNED (reviewing the job on ${set}, for today): "${f.note}"${f.watch?.why ? `\nWhy: ${f.watch.why}` : ''}\nFirst see whether it's still needed: it may already have happened or been answered (a note, an email, a document, an invoice). If so, or it no longer matters, call finish_card with needs_action false and say so. Otherwise propose the step that moves the job on — usually a short email to the person involved, or a job note.`
+    ? `A CHECK IRC PLANNED (reviewing the job on ${set}, for today): "${f.note}"${f.watch?.why ? `\nWhy: ${f.watch.why}` : ''}\nFirst see whether it's still needed: it may already have happened or been answered (a note, an email, a document, an invoice). If so, or it no longer matters, call finish_card with needs_action false and say so. Otherwise propose the step that moves the job on — usually a short email to the person involved.`
     : w
     ? `A WAITING-ON FOLLOW-UP (set on ${set}, for today): the office emailed ${w.name}${w.email ? ` <${w.email}>` : ''} asking for ${w.asked}, and nothing has come back in that conversation.${w.on_behalf_of ? `\n${w.on_behalf_of}.` : ''}${f.note.startsWith(`Chase ${w.name} for`) ? `\nWhy today: ${w.reason}` : `\nThe office's own note: "${f.note}"`}${(w.brought_forward ?? []).map(b => `\nBrought forward: ${b.reason}`).join('')}`
     : `A FOLLOW-UP THE OFFICE SET (on ${set}, for today)${f.who ? `\nWho: ${f.who}` : ''}\n"${f.note}"`

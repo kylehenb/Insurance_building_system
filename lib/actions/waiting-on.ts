@@ -41,6 +41,9 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 const isOwn = (email: string | null | undefined) => !!email && email.toLowerCase().endsWith(`@${OWN_DOMAIN}`)
 
+/** An insurer asked to approve or decide (on a quote, variation or scope): never chased by itself */
+export const isQuoteDecision = (role: string, askKind: string) => role === 'insurer' && askKind === 'approval'
+
 // ── Reading sent emails ──
 
 type SentRow = { id: string; tenant_id: string; gmail_message_id: string; thread_id: string | null; sent_by: string | null; status: string; attempts: number; created_at: string }
@@ -68,7 +71,8 @@ const RECORD: Anthropic.Beta.BetaTool = {
 
 export const WAIT_SYSTEM_PROMPT = `You keep track of what Insurance Repair Co (building insurance repairs in Perth: storm and water damage, make safes, quotes, reports, trades) is waiting on from other people. Someone in the office has just sent the email marked THE EMAIL JUST SENT. Decide whether it asks someone outside the office for something the office needs back — information, photos, a quote, an invoice, a report, a booking or a time, an approval, documents — and if so, who, what, and when to chase it if nothing comes back. Call record_wait once.
 
-- Asks for nothing (asks false): answers, confirmations, thank-yous, FYIs, sending a report, quote or documents without asking anything back, booking confirmations, automatic notices and acknowledgements, emails only to the office itself. A work order sent to a trade counts only if it asks them to reply (a booking date, a quote, to confirm).
+- Asks for nothing (asks false): answers, confirmations, thank-yous, FYIs, sending a report, quote or documents without asking anything back, booking confirmations, automatic notices and acknowledgements, emails only to the office itself.
+- Quote decisions are never chased (asks false): sending a quote, variation or revised scope to an insurer, or asking an insurer (or the insured) to approve, accept or decide on one. The office follows a quote up only when they ask to, by setting a reminder themselves. Asking a trade or supplier for a quote IS a wait. A work order sent to a trade counts only if it asks them to reply (a booking date, a quote, to confirm).
 - One wait per email: if it asks several people, pick the one the office most needs to hear from.
 - If the office was already waiting on something in this conversation and this email asks again or chases, it's the same wait: answer for this email (it replaces the earlier reminder).
 - When to chase, in working days after this email (0 = later today):
@@ -160,6 +164,8 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     const asked = clip(str(out.asked) || 'a reply', 200)
     const role = (ROLES as readonly string[]).includes(str(out.role)) ? str(out.role) : 'other'
     const askKind = (ASK_KINDS as readonly string[]).includes(str(out.ask_kind)) ? str(out.ask_kind) : 'other'
+    // The office doesn't chase insurers for decisions on its quotes — only when they set a reminder themselves
+    if (isQuoteDecision(role, askKind)) return save({ status: 'done', outcome: `Asked ${name} for ${asked} — a decision, not chased` })
     const n = Number(out.chase_after_working_days)
     const aiDays = Number.isFinite(n) ? Math.min(MAX_DAYS, Math.max(0, Math.round(n))) : 2
     const due = chaseDue(aiDays, at)

@@ -85,6 +85,8 @@ const callTool = vi.fn(async (t: { name: string; run(a: Row): unknown }, args: R
   if (t.name === 'file_conversation' && args.job_number === 'IRC404') return { text: 'No job IRC404 found.', isError: true }
   return t.run(args)
 })
+const fileThread = vi.fn(async (..._a: unknown[]) => 'job')
+vi.mock('@/lib/mail/file-thread', () => ({ fileThread: (...a: unknown[]) => fileThread(...a) }))
 vi.mock('@/lib/mcp/server', () => ({ callTool: (t: never, a: never, c: never) => callTool(t, a, c) }))
 
 const { queueEmailCard, onMailArrivals, claimQueued, listCards, cardsForThreads, starThread, setCardCategory, starredThreadIds, nextCategory, updateCardText, markCardDone, reopenCard } = await import('../cards')
@@ -118,6 +120,7 @@ beforeEach(() => {
   tables.jobs = [{ id: 'j1', tenant_id: 't1', job_number: 'IRC1001' }]
   detail = thread()
   callTool.mockClear()
+  fileThread.mockClear()
   for (const t of TOOLS) t.run.mockClear()
 })
 
@@ -231,15 +234,44 @@ describe('generateCard', () => {
     expect(TOOLS[1].run).not.toHaveBeenCalled()
     expect(TOOLS[3].run).not.toHaveBeenCalled()
     expect(out).toMatchObject({ status: 'pending', title: 'Reply to Casey', priority: 90, job_id: 'j1', error_log: null, category: 'attend_submit' })
+    // A job note recording the email isn't offered: the email is already in the job's Comms feed
     expect(out.steps!.map(s => [s.tool, s.summary, s.kind])).toEqual([
       ['send_email', 'Reply to casey@gmail.com', 'email'],
-      ['add_job_note', 'add job note — IRC1001', 'change'],
     ])
     expect(tables.action_queue[0]).toMatchObject({ status: 'pending', model: 'claude-haiku-5-5' })
     // Left-out tools aren't offered; the job file and conversation go in up front
     const first = (create.mock.calls[0] as unknown as [{ tools: { name: string }[]; messages: { content: string }[] }])[0]
     expect(first.tools.map(t => t.name)).not.toContain('list_approvals')
+    expect(first.tools.map(t => t.name)).not.toContain('add_job_note')
+    expect(first.tools.map(t => t.name)).not.toContain('file_conversation')
+    expect(fileThread).not.toHaveBeenCalled()
     expect(first.messages[0].content).toMatch(/Casey: can you come Thursday\?[\s\S]*IRC1001 — Casey Smith/)
+  })
+
+  it('files a conversation the AI places on a job by itself, with no step', async () => {
+    detail = thread({ job: null })
+    const card = await claimed()
+    const { client } = model([[{ name: 'finish_card', input: { needs_action: false, title: 'Out of office', summary: 'Sally is away until Wednesday.', priority: 'low', category: 'other', job_number: 'IRC1001' } }]])
+    const out = await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    expect(fileThread).toHaveBeenCalledWith({ id: 'mb1', tenant_id: 't1' }, 'th1', { jobId: 'j1' }, db)
+    expect(out).toMatchObject({ status: 'no_action', job_id: 'j1', steps: [], description: 'Sally is away until Wednesday.\n\nFiled on IRC1001.' })
+  })
+
+  it('files a conversation that is not job related as admin', async () => {
+    detail = thread({ job: null })
+    const card = await claimed()
+    const { client } = model([[{ name: 'finish_card', input: { needs_action: true, title: 'Pay the accountant', summary: 'Bill $550.', priority: 'normal', category: 'invoice', admin: true } }]])
+    await generateCard(card, { client, db: db as never, tools: TOOLS as never })
+    expect(fileThread).toHaveBeenCalledWith({ id: 'mb1', tenant_id: 't1' }, 'th1', { filing: 'admin' }, db)
+  })
+
+  it('offers job notes and filing when the office asks, and a note for an appointment check-in', async () => {
+    const { cardTools } = await import('../propose')
+    const names = (source: string, instructed: boolean) => cardTools(TOOLS as never, source as never, instructed).map(t => t.name)
+    expect(names('email', true)).toEqual(expect.arrayContaining(['add_job_note', 'file_conversation']))
+    expect(names('followup', false)).not.toContain('add_job_note')
+    expect(names('appointment', false)).toContain('add_job_note')
+    expect(names('appointment', false)).not.toContain('file_conversation')
   })
 
   it("follows the office's instructions over its own view, with the earlier suggestion for context", async () => {
