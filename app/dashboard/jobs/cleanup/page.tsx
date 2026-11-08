@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CLOSED_LABELS, phaseLabel, STEP_LABELS, type ClosedReason } from "@/lib/jobs/phase";
+import { CLOSED_LABELS, phaseLabel, STEP_LABELS, type ClosedReason } from "@/lib/jobs/phase-labels";
 
 // The clean-up of old jobs (tech spec §23.15): open jobs with nothing on them
 // for 90 days, each with the reason it most likely closed. Nothing closes

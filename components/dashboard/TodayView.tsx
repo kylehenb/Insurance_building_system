@@ -7,7 +7,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { useAIActionRefresh } from '@/lib/hooks/useAIActionRefresh'
 import { useCurrentUser } from '@/components/layout/current-user'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
-import { describePhase } from '@/lib/jobs/phase'
+import { describePhase } from '@/lib/jobs/phase-labels'
 import { HealthPanel } from '@/components/health/HealthPanel'
 
 const supabase = createBrowserClient<Database>(
