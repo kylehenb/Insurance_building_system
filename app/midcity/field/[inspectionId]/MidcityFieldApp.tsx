@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { ROOF_TAGS, cleanPins, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemSummaries, sameTag, type OverviewPin, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { cleanMarks, type OverviewMark } from '@/lib/photos/overview-marks'
 import { OverviewPinTool } from './OverviewPinTool'
 import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
 import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
@@ -584,8 +585,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Roof Report structured fields ───────────────────────────────────────
   const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
-  // The problem letters pinned on the roof overview, for the report's first page
-  const [overviewPins, setOverviewPins] = useState<OverviewPin[]>([])
+  // Markup on the roof overview (problem pins, areas, arrows, labels), for the report's first page
+  const [overviewMarks, setOverviewMarks] = useState<OverviewMark[]>([])
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
@@ -639,10 +640,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    roofReportFields, roofFieldsOpen, overviewPins,
+    roofReportFields, roofFieldsOpen, overviewMarks,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewPins, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -679,7 +680,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.autofillScriptOpen) setAutofillScriptOpen(d.autofillScriptOpen as boolean)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
-    if (d.overviewPins) setOverviewPins(cleanPins(d.overviewPins))
+    // overviewPins: the first version's pins, read as marks
+    if (d.overviewMarks || d.overviewPins) setOverviewMarks(cleanMarks(d.overviewMarks ?? d.overviewPins))
     if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
     if (d.makeSafeFieldsOpen !== undefined) setMakeSafeFieldsOpen(d.makeSafeFieldsOpen as boolean)
     if (d.makeSafePhotoIds) makeSafePhotoIdsRef.current = new Set(d.makeSafePhotoIds as string[])
@@ -1778,11 +1780,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   </div>
 
                   {/* Page one: pin the problems on the roof overview */}
-                  <div className="mc-section-head">Roof Overview · Page One</div>
+                  <div className="mc-section-head">Roof Overview Markup · Page One</div>
                   <div style={{ padding: '12px 16px 4px' }}>
                     {overviewPhoto
-                      ? <OverviewPinTool url={overviewPhoto.url} pins={overviewPins} letters={pinLetters} onChange={pins => { setOverviewPins(pins); armDraft() }} />
-                      : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin the problems on it here.</p>}
+                      ? <OverviewPinTool url={overviewPhoto.url} marks={overviewMarks} letters={pinLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
+                      : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin and mark up the problems on it here.</p>}
                   </div>
 
                   {/* Roof Photos */}
@@ -1867,7 +1869,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           ...roofPhotos,
           ...newRoofPhotos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label })),
         ]}
-        overview={overviewPhoto ? { url: overviewPhoto.url, pins: overviewPins } : null}
+        overview={overviewPhoto ? { url: overviewPhoto.url, marks: overviewMarks } : null}
         jobInfo={{
           address: initialData.address,
           insuredName: initialData.insuredName,

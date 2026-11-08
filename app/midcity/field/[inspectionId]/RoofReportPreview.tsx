@@ -3,7 +3,8 @@
 import { Fragment, useEffect } from 'react'
 import { splitDotPoints } from '@/lib/reports/dot-points'
 import { RoofReportPageOne } from './RoofReportPageOne'
-import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters, type OverviewPin } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '@/lib/photos/roof-tags'
+import type { OverviewMark } from '@/lib/photos/overview-marks'
 
 type Fields = {
   claimDetails: string
@@ -155,8 +156,8 @@ export function RoofReportPreview({
   fields: Fields
   photos: Photo[]
   jobInfo: JobInfo
-  /** The roof overview photo with its problem pins, for page one */
-  overview?: { url: string; pins: OverviewPin[] } | null
+  /** The roof overview photo with its markup (problem pins, areas, arrows, labels), for page one */
+  overview?: { url: string; marks: OverviewMark[] } | null
   onClose: () => void
 }) {
   useEffect(() => {

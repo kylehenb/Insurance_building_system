@@ -118,23 +118,6 @@ export function splitIssueLetters(text: string): Array<{ letter: string | null; 
 
 // ── Page one (the roof overview and the problems at a glance) ──────────────
 
-/** A problem's pin on the roof overview: where it sits as a fraction of the image (0–1 across, 0–1 down). */
-export interface OverviewPin { letter: string; x: number; y: number }
-
-/** Pins kept from a saved draft: known letters, positions inside the image, one per letter. */
-export function cleanPins(value: unknown): OverviewPin[] {
-  if (!Array.isArray(value)) return []
-  const out = new Map<string, OverviewPin>()
-  for (const p of value) {
-    const letter = typeof p?.letter === 'string' ? p.letter : ''
-    const x = Number(p?.x)
-    const y = Number(p?.y)
-    if (!(ISSUE_LETTERS as readonly string[]).includes(letter) || !Number.isFinite(x) || !Number.isFinite(y)) continue
-    out.set(letter, { letter, x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) })
-  }
-  return [...out.values()].sort((a, b) => a.letter.localeCompare(b.letter))
-}
-
 /**
  * Page one's problem list: "(A) Enclosed patio - Roof tiles stop short of the gutter", one per
  * line (the AI writes it, the inspector can edit it). Without one, the first point of each problem

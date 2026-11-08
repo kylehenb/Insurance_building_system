@@ -1,90 +1,180 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { issueColour, type OverviewPin } from '@/lib/photos/roof-tags'
+import { issueColour } from '@/lib/photos/roof-tags'
+import { moveMark, newMarkId, type MarkKind, type OverviewMark } from '@/lib/photos/overview-marks'
+import { MarkupLayer } from './OverviewMarkup'
 
-// Pins the problem letters onto the roof overview screenshot for the report's
-// first page: pick a letter, tap the roof where the problem is. Drag a pin to
-// move it. Positions are kept as fractions of the image, so they stay put
-// whatever size the report draws it.
+// Marks up the roof overview screenshot for the report's first page:
+//   Pin    tap to drop the problem's letter (as many as there are spots)
+//   Area   drag across a patch to circle it (tap for a standard size)
+//   Arrow  drag from where to where
+//   Text   tap, type a few words ("Patio", "N ↑")
+//   Move   drag any mark; select it to delete it
+// Colour = the problem letter (A blue, B red…) or White for general marks.
 
-export function OverviewPinTool({ url, pins, letters, onChange }: {
+type Tool = MarkKind | 'move'
+const TOOLS: { key: Tool; label: string }[] = [
+  { key: 'pin', label: 'Pin' }, { key: 'area', label: 'Area' }, { key: 'arrow', label: 'Arrow' },
+  { key: 'text', label: 'Text' }, { key: 'move', label: 'Move' },
+]
+const HIT_PX = 28
+
+export function OverviewPinTool({ url, marks, letters, onChange }: {
   url: string
-  pins: OverviewPin[]
+  marks: OverviewMark[]
   letters: string[]
-  onChange: (pins: OverviewPin[]) => void
+  onChange: (marks: OverviewMark[]) => void
 }) {
-  const imgRef = useRef<HTMLImageElement>(null)
-  const [selected, setSelected] = useState<string>(() => letters.find(l => !pins.some(p => p.letter === l)) ?? letters[0] ?? 'A')
-  const [dragging, setDragging] = useState<OverviewPin | null>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  const [tool, setTool] = useState<Tool>('pin')
+  const [colour, setColour] = useState<string | null>(letters[0] ?? 'A')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [history, setHistory] = useState<OverviewMark[][]>([])
+  const [draft, setDraft] = useState<OverviewMark | null>(null)
+  const drag = useRef<{ x: number; y: number; moved: boolean; id?: string; orig?: OverviewMark } | null>(null)
 
-  const at = (clientX: number, clientY: number): { x: number; y: number } | null => {
-    const r = imgRef.current?.getBoundingClientRect()
-    if (!r || !r.width || !r.height) return null
-    const clamp = (n: number) => Math.round(Math.min(1, Math.max(0, n)) * 1000) / 1000
-    return { x: clamp((clientX - r.left) / r.width), y: clamp((clientY - r.top) / r.height) }
+  const commit = (next: OverviewMark[]) => { setHistory(h => [...h.slice(-30), marks]); onChange(next) }
+  const pinLetter = colour ?? letters[0] ?? 'A'
+
+  const at = (e: React.PointerEvent) => {
+    const r = boxRef.current!.getBoundingClientRect()
+    const c = (n: number) => Math.min(1, Math.max(0, n))
+    return { x: c((e.clientX - r.left) / r.width), y: c((e.clientY - r.top) / r.height), r }
   }
 
-  const place = (letter: string, pos: { x: number; y: number }) => {
-    onChange([...pins.filter(p => p.letter !== letter), { letter, ...pos }].sort((a, b) => a.letter.localeCompare(b.letter)))
+  /** The mark under a point, by its grab spot (pins, areas and labels by their centre, arrows by their middle). */
+  const hit = (x: number, y: number, r: DOMRect): OverviewMark | null => {
+    let best: OverviewMark | null = null
+    let bestD = HIT_PX
+    for (const m of marks) {
+      const g = m.kind === 'arrow' ? { x: (m.x1 + m.x2) / 2, y: (m.y1 + m.y2) / 2 } : { x: m.x, y: m.y }
+      const d = Math.hypot((g.x - x) * r.width, (g.y - y) * r.height)
+      if (d <= bestD) { best = m; bestD = d }
+    }
+    return best
   }
 
-  const tapImage = (e: React.MouseEvent) => {
-    const pos = at(e.clientX, e.clientY)
-    if (!pos) return
-    place(selected, pos)
-    // On to the next letter that hasn't been placed
-    const next = letters.find(l => l !== selected && !pins.some(p => p.letter === l))
-    if (next) setSelected(next)
+  const shapeFrom = (a: { x: number; y: number }, b: { x: number; y: number }, id: string): OverviewMark | null => {
+    if (tool === 'area') {
+      const rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2
+      return { id, kind: 'area', letter: colour, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, rx: Math.max(rx, 0.01), ry: Math.max(ry, 0.01) }
+    }
+    if (tool === 'arrow') return { id, kind: 'arrow', letter: colour, x1: a.x, y1: a.y, x2: b.x, y2: b.y }
+    return null
   }
 
-  const shown = dragging ? [...pins.filter(p => p.letter !== dragging.letter), dragging] : pins
-  const placed = pins.some(p => p.letter === selected)
+  const onDown = (e: React.PointerEvent) => {
+    if (!size) return
+    const p = at(e)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    if (tool === 'move') {
+      const m = hit(p.x, p.y, p.r)
+      setSelectedId(m?.id ?? null)
+      drag.current = { x: p.x, y: p.y, moved: false, id: m?.id, orig: m ?? undefined }
+      return
+    }
+    drag.current = { x: p.x, y: p.y, moved: false }
+  }
+
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current
+    if (!d) return
+    const p = at(e)
+    if (Math.hypot((p.x - d.x) * p.r.width, (p.y - d.y) * p.r.height) > 6) d.moved = true
+    if (!d.moved) return
+    if (tool === 'move' && d.orig) setDraft(moveMark(d.orig, p.x - d.x, p.y - d.y))
+    else if (tool === 'area' || tool === 'arrow') setDraft(shapeFrom(d, p, 'draft'))
+  }
+
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current
+    drag.current = null
+    setDraft(null)
+    if (!d) return
+    const p = at(e)
+    if (tool === 'move') {
+      if (d.moved && d.orig) commit(marks.map(m => (m.id === d.orig!.id ? moveMark(d.orig!, p.x - d.x, p.y - d.y) : m)))
+      return
+    }
+    if (tool === 'pin' && !d.moved) {
+      const m: OverviewMark = { id: newMarkId(), kind: 'pin', letter: pinLetter, x: p.x, y: p.y }
+      commit([...marks, m]); setSelectedId(m.id)
+    } else if (tool === 'text' && !d.moved) {
+      const text = window.prompt('Label (a few words)')?.trim().slice(0, 40)
+      if (text) { const m: OverviewMark = { id: newMarkId(), kind: 'text', letter: colour, x: p.x, y: p.y, text }; commit([...marks, m]); setSelectedId(m.id) }
+    } else if (tool === 'area') {
+      const m = d.moved ? shapeFrom(d, p, newMarkId()) : { id: newMarkId(), kind: 'area' as const, letter: colour, x: p.x, y: p.y, rx: 0.08, ry: 0.08 * (size ? size.w / size.h : 1) }
+      if (m) { commit([...marks, m]); setSelectedId(m.id) }
+    } else if (tool === 'arrow' && d.moved) {
+      const m = shapeFrom(d, p, newMarkId())
+      if (m) { commit([...marks, m]); setSelectedId(m.id) }
+    }
+  }
+
+  const shown = draft
+    ? (draft.id === 'draft' ? [...marks, draft] : marks.map(m => (m.id === draft.id ? draft : m)))
+    : marks
+  const hint = {
+    pin: `Tap where (${pinLetter}) is. Tap again for each spot.`,
+    area: 'Drag across the patch to circle it, or tap for a standard circle.',
+    arrow: 'Drag from where to where.',
+    text: 'Tap where the label goes, then type it.',
+    move: 'Drag a mark to move it. Tap one, then Delete to remove it.',
+  }[tool]
 
   return (
     <div className="op-tool">
-      <div className="rp-chips" style={{ marginBottom: 8 }}>
+      <div className="rp-chips" style={{ marginBottom: 6 }}>
+        {TOOLS.map(t => (
+          <button key={t.key} type="button" className={`rp-chip rp-type${tool === t.key ? ' on' : ''}`} aria-pressed={tool === t.key}
+            onClick={() => { setTool(t.key); if (t.key === 'pin' && !colour) setColour(letters[0] ?? 'A') }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="rp-chips" style={{ marginBottom: 6 }}>
         {letters.map(l => {
-          const on = l === selected
+          const on = colour === l
           const c = issueColour(l)
-          const done = pins.some(p => p.letter === l)
           return (
             <button key={l} type="button" className="rp-chip rp-letter" aria-pressed={on}
               style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
-              onClick={() => setSelected(l)}>
-              ({l}){done ? ' ✓' : ''}
+              onClick={() => setColour(l)}>
+              ({l})
             </button>
           )
         })}
-        {placed && (
-          <button type="button" className="rp-chip rp-none" onClick={() => onChange(pins.filter(p => p.letter !== selected))}>
-            Remove ({selected})
+        {tool !== 'pin' && (
+          <button type="button" className={`rp-chip rp-none${colour === null ? ' on' : ''}`} aria-pressed={colour === null} onClick={() => setColour(null)}>
+            White
           </button>
         )}
       </div>
-      <p className="fa-ai-status" style={{ margin: '0 0 8px' }}>
-        Tap the roof where ({selected}) is. Drag a pin to move it.
-      </p>
-      <div style={{ position: 'relative', lineHeight: 0, userSelect: 'none' }}>
+      <div className="rp-chips" style={{ marginBottom: 8 }}>
+        <button type="button" className="rp-chip rp-type" disabled={!history.length}
+          onClick={() => { const prev = history[history.length - 1]; setHistory(h => h.slice(0, -1)); setSelectedId(null); onChange(prev) }}>
+          Undo
+        </button>
+        <button type="button" className="rp-chip rp-type" disabled={!selectedId || !marks.some(m => m.id === selectedId)}
+          onClick={() => { commit(marks.filter(m => m.id !== selectedId)); setSelectedId(null) }}>
+          Delete
+        </button>
+        <button type="button" className="rp-chip rp-type" disabled={!marks.length}
+          onClick={() => { if (window.confirm('Clear all the markup on this image?')) { commit([]); setSelectedId(null) } }}>
+          Clear all
+        </button>
+      </div>
+      <p className="fa-ai-status" style={{ margin: '0 0 8px' }}>{hint}</p>
+      <div ref={boxRef} style={{ position: 'relative', lineHeight: 0, userSelect: 'none' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img ref={imgRef} src={url} alt="Roof overview" draggable={false} onClick={tapImage}
-          style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 6, cursor: 'crosshair' }} />
-        {shown.map(p => (
-          <button key={p.letter} type="button" aria-label={`Pin ${p.letter}`}
-            onPointerDown={e => { e.preventDefault(); (e.target as HTMLElement).setPointerCapture(e.pointerId); setSelected(p.letter); setDragging(p) }}
-            onPointerMove={e => { if (dragging?.letter !== p.letter) return; const pos = at(e.clientX, e.clientY); if (pos) setDragging({ letter: p.letter, ...pos }) }}
-            onPointerUp={() => { if (dragging) place(dragging.letter, { x: dragging.x, y: dragging.y }); setDragging(null) }}
-            onPointerCancel={() => setDragging(null)}
-            style={{
-              position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%, -50%)',
-              width: 34, height: 34, borderRadius: '50%', background: issueColour(p.letter), color: '#fff',
-              fontWeight: 800, fontSize: 14, lineHeight: 1, padding: 0, border: '3px solid #fff',
-              boxShadow: p.letter === selected ? '0 0 0 3px rgba(0,0,0,.55)' : '0 2px 6px rgba(0,0,0,.4)',
-              touchAction: 'none', cursor: 'grab',
-            }}>
-            {p.letter}
-          </button>
-        ))}
+        <img src={url} alt="Roof overview" draggable={false}
+          onLoad={e => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+          style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 6 }} />
+        {size && <MarkupLayer marks={shown} w={size.w} h={size.h} selectedId={tool === 'move' ? selectedId : null} />}
+        <div onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; setDraft(null) }}
+          style={{ position: 'absolute', inset: 0, cursor: tool === 'move' ? 'grab' : 'crosshair', touchAction: tool === 'pin' || tool === 'text' ? 'manipulation' : 'none' }} />
       </div>
     </div>
   )

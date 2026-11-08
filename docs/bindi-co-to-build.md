@@ -11,12 +11,7 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
     - signature, date and time
   - Saved as a PDF with the job, and stopped and re-done if conditions change.
   - Get the master SWMS content checked against the WA WHS regulations and WorkSafe WA guidance (or by a safety consultant) before relying on it.
-- [ ] **Overview markup:**
-  - several pins per letter (e.g. 7 broken tiles)
-  - an area circle for a cluster
-  - arrows
-  - short text labels
-- [ ] **"Problem" photo bursts:** tap "Problem B" before taking its photos, so they're tagged by the order taken instead of AI guesses.
+- [ ] **"Current problem" switch for photos:** set (B) and every photo taken is tagged (B) until it's switched. Switch back to (A) at any time, so photos taken out of order (from the roof space, or spotted on the way out) still land on the right problem. The AI sorting stays as the backup.
 - [ ] **Guided dictation:** prompts in report order, so the notes come out in the order the AI writes the report.
 - [ ] **Crop step for the overview screenshot**, before placing pins.
 - [ ] **Bindi Co logo** on the report (replaces the placeholder house).
@@ -31,3 +26,4 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - Cause of damage as dot points with colour-coded problem letters (A), (B)…
 - Roof photos: IRC uploader, one-tap tags (letters, fixed types, none), AI sorting
 - Page one: roof overview with pins, problems, short cause, maintenance
+- Overview markup: several pins per letter, area circles, arrows, text labels, move, undo, delete

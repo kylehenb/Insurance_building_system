@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { isWideImage, issueColour, problemSummaries, splitIssueLetters, type OverviewPin } from '@/lib/photos/roof-tags'
+import { isWideImage, issueColour, problemSummaries, splitIssueLetters } from '@/lib/photos/roof-tags'
+import type { OverviewMark } from '@/lib/photos/overview-marks'
+import { OverviewWithMarkup } from './OverviewMarkup'
 
 // The roof report's first page (layout "C2"): the roof from above with each
-// problem's letter pinned on it, the problems beside it, then the short cause,
+// problem's letter pinned on it (plus any areas, arrows and labels), the problems beside it, then the short cause,
 // what happens next and the roof at a glance. A wide screenshot goes full
-// width with the problems underneath; the image is never cropped, and the pins
+// width with the problems underneath; the image is never cropped, and the marks
 // sit at their place on the image (fractions across and down), whatever size it's drawn.
 
 export interface PageOneFields {
@@ -38,26 +40,6 @@ const Field = ({ label, value, colour }: { label: string; value: string; colour?
   <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}><Label>{label}</Label><Value colour={colour}>{value || '—'}</Value></div>
 )
 
-/** The overview image with its pins. `maxHeight` keeps a tall screenshot from running off the page. */
-export function PinnedOverview({ url, pins, maxHeight, onSize }: { url: string; pins: OverviewPin[]; maxHeight: number; onSize?: (w: number, h: number) => void }) {
-  return (
-    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', lineHeight: 0 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="Roof overview" style={{ display: 'block', maxWidth: '100%', maxHeight, height: 'auto', width: 'auto' }}
-        onLoad={e => onSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)} />
-      {pins.map(p => (
-        <div key={p.letter} style={{
-          position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`, transform: 'translate(-50%, -50%)',
-          width: 30, height: 30, borderRadius: '50%', background: issueColour(p.letter), color: '#fff',
-          fontWeight: 800, fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '3px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,.4)', boxSizing: 'border-box',
-          printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact',
-        }}>{p.letter}</div>
-      ))}
-    </div>
-  )
-}
-
 const Lettered = ({ text }: { text: string }) => (
   <>
     {splitIssueLetters(text).map((part, i) => part.letter
@@ -69,7 +51,7 @@ const Lettered = ({ text }: { text: string }) => (
 export function RoofReportPageOne({ fields, job, overview, rooferName, rooferQual, imageSize = null }: {
   fields: PageOneFields
   job: { address: string | null; insuredName: string | null; claimNumber: string | null; jobNumber: string | null }
-  overview: { url: string; pins: OverviewPin[] } | null
+  overview: { url: string; marks: OverviewMark[] } | null
   rooferName: string
   rooferQual: string
   /** The overview's size when already known; otherwise it's read when the image loads */
@@ -140,7 +122,7 @@ export function RoofReportPageOne({ fields, job, overview, rooferName, rooferQua
       {overview && wide ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'center', background: '#f4f1f0' }}>
-            <PinnedOverview url={overview.url} pins={overview.pins} maxHeight={420} onSize={(w, h) => setSize({ w, h })} />
+            <OverviewWithMarkup url={overview.url} marks={overview.marks} maxHeight={420} size={size} onSize={(w, h) => setSize({ w, h })} />
           </div>
           {problemList}
           {maintenanceBlock}
@@ -149,7 +131,7 @@ export function RoofReportPageOne({ fields, job, overview, rooferName, rooferQua
         <div style={{ display: 'grid', gridTemplateColumns: overview ? 'repeat(5, minmax(0, 1fr))' : '1fr', gap: 24 }}>
           {overview && (
             <div style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f4f1f0' }}>
-              <PinnedOverview url={overview.url} pins={overview.pins} maxHeight={470} onSize={(w, h) => setSize({ w, h })} />
+              <OverviewWithMarkup url={overview.url} marks={overview.marks} maxHeight={470} size={size} onSize={(w, h) => setSize({ w, h })} />
             </div>
           )}
           <div style={{ gridColumn: overview ? 'span 2' : undefined, display: 'flex', flexDirection: 'column' }}>
