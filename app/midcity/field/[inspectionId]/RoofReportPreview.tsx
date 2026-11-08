@@ -57,7 +57,7 @@ const PHOTO_PILL: React.CSSProperties = {
   printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact',
 }
 const PHOTO_CHIP: React.CSSProperties = {
-  background: 'var(--tan)', color: 'var(--ink)', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
+  background: '#ffffff', color: 'var(--ink)', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
 }
 
 // "(A)" problem letters in their colour, matching the photo pills
@@ -249,7 +249,7 @@ export function RoofReportPreview({
           <span style={{ flex: 1 }} />
           <button
             onClick={handlePrint}
-            style={{ background: 'var(--tan)', border: 'none', color: 'var(--ink)', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
+            style={{ background: '#007aff', border: 'none', color: 'white', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
           >
             Print / Download PDF
           </button>
@@ -504,7 +504,7 @@ export function RoofReportPreview({
 
             {/* Footer */}
             <div style={{ padding: '11px 24px', background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 9, color: 'var(--tan)', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
+              <div style={{ fontSize: 9, color: '#ffffff', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
                 Bindi Co
               </div>
               <div style={{ fontSize: 9, color: '#777' }}>
