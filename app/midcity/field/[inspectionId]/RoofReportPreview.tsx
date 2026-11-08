@@ -45,6 +45,17 @@ const ROOFER_QUAL = 'Roof Plumber, Registered Builder BP103432'
 
 const v = (val: string) => val || '—'
 
+const PHOTO_PILL: React.CSSProperties = {
+  position: 'absolute', top: 6, left: 6, maxWidth: '78%',
+  display: 'flex', alignItems: 'flex-start', gap: 5,
+  background: 'rgba(26,26,26,0.72)', color: '#ffffff', borderRadius: 4,
+  padding: '3px 7px 3px 3px', fontSize: 9.5, fontWeight: 500, lineHeight: 1.35,
+  printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact',
+}
+const PHOTO_CHIP: React.CSSProperties = {
+  background: '#c8b89a', color: '#1a1a1a', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
+}
+
 // Text with "• " dot points: each point on its own line with a hanging indent
 const Points = ({ text }: { text: string }) => {
   if (!text?.trim()) return <>—</>
@@ -415,9 +426,11 @@ export function RoofReportPreview({
                             transform: `translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`,
                           }}
                         />
-                      </div>
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 5, textAlign: 'center' as const }}>
-                        Photo {idx + 1}{photo.label ? ` — ${photo.label}` : ''}
+                        {/* Number and label in a pill on the photo, as in IRC's reports (components/documents/PhotoPagesDocument.tsx) */}
+                        <div style={PHOTO_PILL}>
+                          <span style={PHOTO_CHIP}>{idx + 1}</span>
+                          {photo.label && <span>{photo.label}</span>}
+                        </div>
                       </div>
                     </div>
                   ))}

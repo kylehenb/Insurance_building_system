@@ -4,6 +4,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
+import { LOW_CONFIDENCE, orderReportPhotos } from '@/lib/photos/report-order'
+import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
+import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
 
 interface InitialData {
   inspectionId: string
@@ -388,6 +391,47 @@ function MidcityPhotoCard({
   )
 }
 
+// A roof photo from the IRC field app's uploader: saved on the phone, uploaded,
+// then labelled by the AI on the server. The inspector's own label always wins.
+function RoofPhotoCard({ photo, onDelete, onLabelChange }: { photo: FieldPhoto; onDelete: () => void; onLabelChange: (label: string) => void }) {
+  const preparing = photo.status === 'waiting' || photo.status === 'converting'
+  const unsure = photo.labelSource === 'ai' && !!photo.ai &&
+    Math.min(photo.ai.confidence, photo.ai.kind === 'other' ? photo.ai.roomConfidence ?? 1 : 1) < LOW_CONFIDENCE
+  return (
+    <div className="fa-photo-card">
+      <div className="fa-photo-frame">
+        {photo.previewUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img className="fa-photo-thumb" src={photo.previewUrl} alt="roof photo" draggable={false} loading="lazy" />
+          : <div className="fa-photo-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📷</div>}
+        {preparing && (
+          <div className="fa-photo-status">
+            <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
+            <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
+          </div>
+        )}
+        {!preparing && (
+          <span className={`fa-photo-badge${photo.status === 'uploaded' ? ' up' : ''}`}>
+            {photo.status === 'uploaded' ? '✓ Uploaded' : photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}
+          </span>
+        )}
+        {!preparing && <button className="fa-photo-del" onClick={onDelete}>×</button>}
+      </div>
+      <div className="fa-photo-label-area">
+        <textarea
+          className={`fa-photo-label-ta${unsure ? ' check' : ''}`}
+          rows={1}
+          placeholder={preparing ? 'Preparing…' : photo.status === 'uploaded' && photo.aiStatus !== 'done' ? 'AI label coming…' : 'Add label'}
+          value={photo.label}
+          disabled={preparing}
+          onChange={e => onLabelChange(e.target.value)}
+        />
+        {unsure && <div className="fa-photo-check">Check this label</div>}
+      </div>
+    </div>
+  )
+}
+
 async function processPhotoForUpload(file: File): Promise<File> {
   const TARGET_BYTES = 62 * 1024
   const MAX_DIM = 1200
@@ -465,8 +509,37 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const makeSafePhotoIdsRef = useRef<Set<string>>(new Set())
 
   // ─── Roof Report fields ───────────────────────────────────────────────────
+  // Photos taken before the IRC uploader came in (no client id): shown as they were
   const [roofPhotos, setRoofPhotos] = useState<PhotoEntry[]>([])
   const roofPhotoInputRef = useRef<HTMLInputElement>(null)
+
+  // Roof photos, as in IRC's field app: saved on the phone, uploaded as they're
+  // added (red bar until all are up, then green) and labelled by the AI on the server
+  const fieldPhotos = useFieldPhotos({ base, inspectionId: initialData.inspectionId, active: true })
+  const { counts: photoCounts, busy: photosBusy } = fieldPhotos
+  // View of Property first, then the rest as taken
+  const newRoofPhotos = orderReportPhotos(fieldPhotos.photos)
+  const [uploadDoneShown, setUploadDoneShown] = useState(false)
+  const [relabelling, setRelabelling] = useState(false)
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (photosBusy) { wasBusy.current = true; setUploadDoneShown(false) }
+    else if (wasBusy.current) { wasBusy.current = false; setUploadDoneShown(true) }
+  }, [photosBusy])
+  // Leaving mid-upload: browsers that honour it warn first (iOS mostly doesn't — hence the bar)
+  useEffect(() => {
+    if (!photosBusy) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [photosBusy])
+  // The label is kept on the server too, so the report has it on any device
+  const setRoofPhotoLabel = (photo: FieldPhoto, label: string) => {
+    fieldPhotos.setLabel(photo.id, label)
+    if (photo.serverId) {
+      fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.serverId, label }) }).catch(() => {})
+    }
+  }
 
   // ─── Roof Report structured fields ───────────────────────────────────────
   const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
@@ -560,11 +633,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   useEffect(() => {
     fetch(`${base}/photos`)
       .then(r => r.json())
-      .then((data: { photos?: { id: string; url: string | null; label: string; crop_x: number; crop_y: number; crop_scale: number }[] }) => {
+      .then((data: { photos?: { id: string; url: string | null; label: string; crop_x: number; crop_y: number; crop_scale: number; clientId?: string | null }[] }) => {
         if (data.photos?.length) {
           const roofP: PhotoEntry[] = []
           const makeSafeP: PhotoEntry[] = []
           for (const p of data.photos) {
+            if (p.clientId) continue // the roof photo uploader's own (useFieldPhotos)
             const entry: PhotoEntry = { id: uid(), photoId: p.id, file: null, previewUrl: p.url ?? '', label: p.label, processing: false, uploading: false, cropX: p.crop_x ?? 0, cropY: p.crop_y ?? 0, cropScale: p.crop_scale ?? 1 }
             if (makeSafePhotoIdsRef.current.has(p.id)) {
               makeSafeP.push(entry)
@@ -612,35 +686,22 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Roof photo helpers ───────────────────────────────────────────────────
   const handleRoofPhotos = (files: FileList | null) => {
-    if (!files) return
-    Array.from(files).forEach(file => {
-      const id = uid()
-      const rawPreview = URL.createObjectURL(file)
-      setRoofPhotos(prev => [...prev, { id, photoId: null, file, previewUrl: rawPreview, label: '', processing: true, uploading: false, cropX: 0, cropY: 0, cropScale: 1 }])
-      processPhotoForUpload(file).then(async processed => {
-        const processedPreview = URL.createObjectURL(processed)
-        setRoofPhotos(prev => prev.map(p => {
-          if (p.id !== id) return p
-          URL.revokeObjectURL(p.previewUrl)
-          return { ...p, file: processed, previewUrl: processedPreview, processing: false, uploading: true }
-        }))
-        try {
-          const fd = new FormData()
-          fd.append('file', processed)
-          fd.append('isRoofPhoto', 'true')
-          const res = await fetch(`${base}/photos`, { method: 'POST', body: fd })
-          const data = await res.json()
-          if (data.id) {
-            setRoofPhotos(prev => prev.map(p => p.id !== id ? p : { ...p, photoId: data.id, previewUrl: data.url ?? p.previewUrl, file: null, uploading: false }))
-            armDraft()
-          } else {
-            setRoofPhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
-          }
-        } catch {
-          setRoofPhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
-        }
-      })
-    })
+    if (!files?.length) return
+    fieldPhotos.addFiles(files)
+  }
+
+  // "Re-label photos": save the notes first, so the AI labels with what's written so far
+  const relabelRoofPhotos = async () => {
+    if (!fieldPhotos.photos.length) { alert('No photos to label.'); return }
+    setRelabelling(true)
+    try {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      await fetch(`${base}/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: collectDraft() }) })
+      await fieldPhotos.relabelAll()
+    } catch {
+      alert('The photos couldn\'t be relabelled just now. Try again in a moment.')
+    }
+    setRelabelling(false)
   }
 
   const removeRoofPhoto = (id: string) => {
@@ -873,6 +934,17 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   return (
     <>
     <div className="fa-root">
+      <UploadBanner
+        total={photoCounts.total}
+        saved={photoCounts.saved}
+        uploaded={photoCounts.uploaded}
+        failed={photoCounts.failed}
+        busy={photosBusy}
+        online={fieldPhotos.online}
+        done={uploadDoneShown}
+        onDismissDone={() => setUploadDoneShown(false)}
+        onRetry={fieldPhotos.retryFailed}
+      />
 
       {/* HEADER */}
       <div className="fa-header">
@@ -1629,6 +1701,18 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   </div>
 
                   {/* Roof Photos */}
+                  {fieldPhotos.photos.length > 0 && (
+                    <div style={{ padding: '4px 16px 10px' }}>
+                      <p className="fa-ai-status">
+                        {fieldPhotos.awaitingLabels
+                          ? `AI labelling on the server · ${photoCounts.labelled} of ${photoCounts.uploaded}`
+                          : 'Photos are labelled by the AI as they upload. Change any label by typing over it.'}
+                      </p>
+                      <button className="fa-ai-label-btn" style={{ marginTop: 8 }} onClick={relabelRoofPhotos} disabled={relabelling || photosBusy}>
+                        {relabelling ? <><span className="fa-spinner" /> Asking…</> : '✦ Re-label Photos With My Notes'}
+                      </button>
+                    </div>
+                  )}
                   <div className="fa-photo-grid">
                     {roofPhotos.map(photo => (
                       <MidcityPhotoCard
@@ -1642,6 +1726,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           }
                           armDraft()
                         }}
+                      />
+                    ))}
+                    {newRoofPhotos.map(photo => (
+                      <RoofPhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        onDelete={() => fieldPhotos.remove(photo.id)}
+                        onLabelChange={label => setRoofPhotoLabel(photo, label)}
                       />
                     ))}
                     <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot">
@@ -1682,7 +1774,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     {roofPreviewOpen && (
       <RoofReportPreview
         fields={roofReportFields}
-        photos={roofPhotos}
+        photos={[
+          ...roofPhotos,
+          ...newRoofPhotos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label })),
+        ]}
         jobInfo={{
           address: initialData.address,
           insuredName: initialData.insuredName,

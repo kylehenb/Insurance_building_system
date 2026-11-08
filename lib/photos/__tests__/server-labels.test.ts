@@ -10,7 +10,7 @@ vi.mock('@/lib/images/downscale', () => ({ downscaleImage: vi.fn() }))
 
 vi.mock('../learning', () => ({ photoLearning: async () => ({ corrections: [], lessons: '' }) }))
 
-const { finaliseFieldPhotos, scopeFromRooms } = await import('../server-labels')
+const { finaliseFieldPhotos, scopeFromRooms, loadLabelContext, ROOF_PHOTO_LABEL_GUIDANCE } = await import('../server-labels')
 
 type Row = Record<string, unknown>
 
@@ -91,5 +91,29 @@ describe('scopeFromRooms', () => {
     expect(scopeFromRooms([{ name: 'Kitchen', items: ['ceiling', ''] }, { room: 'Bed 2', items: [{ text: 'carpet' }] }, { name: '', items: [] }]))
       .toEqual({ scopeRooms: ['Kitchen', 'Bed 2'], scopeText: 'Kitchen: ceiling\nBed 2: carpet' })
     expect(scopeFromRooms(undefined)).toEqual({ scopeRooms: [], scopeText: '' })
+  })
+})
+
+describe('loadLabelContext', () => {
+  it('labels Midcity field app photos in roof terms, from the field app notes', async () => {
+    const { service } = fakeService({
+      inspections: [{ job_id: 'j1', field_draft: { dictationNotes: 'Valley full of leaves', raw_report_notes: 'other' }, raw_report_notes: null }],
+      jobs: [{ insurer: 'Midcity', loss_type: 'Storm', property_address: '1 Example St' }],
+      prompts: [{ system_prompt: 'Room by room please' }],
+    })
+    const ctx = await loadLabelContext(service, 't1', 'i1')
+    expect(ctx.guidance).toBe(ROOF_PHOTO_LABEL_GUIDANCE)
+    expect(ctx.notes).toBe('Valley full of leaves')
+  })
+
+  it("keeps IRC's own labelling prompt and notes for IRC jobs", async () => {
+    const { service } = fakeService({
+      inspections: [{ job_id: 'j1', field_draft: { raw_report_notes: 'Kitchen ceiling stained' }, raw_report_notes: null }],
+      jobs: [{ insurer: 'IAG', loss_type: 'Storm', property_address: '1 Example St' }],
+      prompts: [{ system_prompt: 'Room by room please' }],
+    })
+    const ctx = await loadLabelContext(service, 't1', 'i1')
+    expect(ctx.guidance).toBe('Room by room please')
+    expect(ctx.notes).toBe('Kitchen ceiling stained')
   })
 })

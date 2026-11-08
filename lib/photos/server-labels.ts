@@ -3,6 +3,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { downscaleImage } from '@/lib/images/downscale'
 import { labelPhotos, relabelWithNotes, type PhotoLabelContext } from './ai-label'
 import { photoLearning } from './learning'
+import { isFieldAppJob } from '@/lib/jobs/field-app'
 import { AI_LABEL_BATCH_SIZE, applyAiLabels, groupPhotosForReport, roomOfLabel, type AiPhotoLabel, type PhotoKind } from './report-order'
 
 // Server side of field photo labelling (tech spec "AI photo labels"):
@@ -21,7 +22,14 @@ type PhotoRow = Database['public']['Tables']['photos']['Row']
 const AI_IMAGE_EDGE = 768
 const PARALLEL_BATCHES = 3
 
-interface DraftShape { raw_report_notes?: unknown; scopeRooms?: unknown }
+interface DraftShape { raw_report_notes?: unknown; dictationNotes?: unknown; scopeRooms?: unknown }
+
+/**
+ * Midcity's field app photos are for roof reports and make safes, not rooms of
+ * a house: they’re named by roof area or element (lib/jobs/field-app.ts).
+ */
+export const ROOF_PHOTO_LABEL_GUIDANCE =
+  'These are roof inspection photos for a roof report. For the location, use the roof area or element shown, such as "Front elevation", "Rear roof", "Valley", "Ridge capping", "Hip", "Box gutter", "Eaves gutter", "Downpipe", "Apron flashing", "Skylight", "Solar panels", "Roof space" or "Ceiling". Then say what is shown, e.g. "Valley - debris build-up and flattened upstands", "Roof space - water staining on valley board", "Eaves gutter - no overflow provisions". Use Australian roofing terms (pointing, bedding, sarking, anticon, flashing, upstand, overflow).'
 interface ScopeRoomLike { name?: unknown; room?: unknown; items?: unknown }
 
 /** Scope rooms (names) and a one-line-per-room scope text from the field app's scope rooms. */
@@ -54,13 +62,15 @@ export async function loadLabelContext(
     service.from('prompts').select('system_prompt').eq('tenant_id', tenantId).eq('key', 'photo_label').maybeSingle(),
   ])
   // The inspectors' renames on the most alike past reports, and the lessons (the learning module, tech spec §24.4)
-  const { corrections, lessons } = await photoLearning(service as unknown as SupabaseClient, tenantId, { insurer: job?.insurer ?? null, loss_type: job?.loss_type ?? null, report_type: 'bar' })
-  const notes = overrides?.notes ?? (typeof draft.raw_report_notes === 'string' ? draft.raw_report_notes : insp?.raw_report_notes ?? '')
+  const { corrections, lessons } = await photoLearning(service as unknown as SupabaseClient, tenantId, { insurer: job?.insurer ?? null, loss_type: job?.loss_type ?? null, report_type: isFieldAppJob(job) ? 'roof' : 'bar' })
+  const roof = isFieldAppJob(job)
+  const draftNotes = roof ? draft.dictationNotes : draft.raw_report_notes
+  const notes = overrides?.notes ?? (typeof draftNotes === 'string' ? draftNotes : insp?.raw_report_notes ?? '')
   return {
     notes: notes ?? '',
     ...scopeFromRooms(overrides?.scopeRooms ?? draft.scopeRooms),
     job: { lossType: job?.loss_type, insurer: job?.insurer, address: job?.property_address },
-    guidance: prompt?.system_prompt,
+    guidance: roof ? ROOF_PHOTO_LABEL_GUIDANCE : prompt?.system_prompt,
     corrections,
     lessons,
   }
