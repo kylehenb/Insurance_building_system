@@ -15,3 +15,10 @@ export const isFieldAppJob = (job: { insurer?: string | null } | null | undefine
 /** The AI feature name for work on this job: "midcity-…" for Midcity's */
 export const aiFeature = (feature: string, job: { insurer?: string | null } | null | undefined): string =>
   isFieldAppJob(job) && !feature.startsWith('midcity-') ? `midcity-${feature}` : feature
+
+/**
+ * Whether the field app offers building assessment reports. Off: it's roof
+ * reports and make safes only. Set to true to bring the BAR back — its code is
+ * all still there, and a job whose saved draft already has one still shows it.
+ */
+export const FIELD_APP_BAR_REPORTS = false

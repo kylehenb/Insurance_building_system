@@ -130,3 +130,33 @@ describe('relabelWithNotes', () => {
     expect(create).not.toHaveBeenCalled()
   })
 })
+
+describe('labelPhotos for roof reports (Midcity)', () => {
+  const roofCtx = { ...ctx, roof: { issues: [{ letter: 'A', text: 'Valley blocked with debris' }, { letter: 'B', text: '17 broken tiles' }] } }
+
+  it('only sorts each photo into a fixed type or a problem letter — no descriptions', async () => {
+    create.mockResolvedValue(claudeReply([
+      { photo: 1, seen: 'house front', tag: 'view_of_property', issue: '', confidence: 0.9 },
+      { photo: 2, seen: 'satellite image', tag: 'roof_overview', issue: '', confidence: 0.9 },
+      { photo: 3, seen: 'leaves in valley', tag: 'issue', issue: '(a)', confidence: 0.8 },
+      { photo: 4, seen: 'tile', tag: 'issue', issue: 'D', confidence: 0.7 },
+      { photo: 5, seen: 'roof sheets', tag: 'none', issue: '', confidence: 0.6 },
+      { photo: 6, seen: 'ladder with brackets', tag: 'ladder_setup', issue: '', confidence: 0.9 },
+    ]))
+    const { labels } = await labelPhotos(['1', '2', '3', '4', '5', '6'].map(photo), roofCtx)
+    expect(labels.map(l => l?.label)).toEqual(['View of Property', 'Roof Overview', '(A)', '', '', 'Ladder Setup'])
+    expect(labels[0]).toMatchObject({ kind: 'view_of_property' })
+    expect(labels[2]).toMatchObject({ kind: 'other', seen: 'leaves in valley' })
+    const req = create.mock.calls[0][0]
+    expect(req.system).toContain('(A) Valley blocked with debris')
+    expect(req.system).toContain("You don't describe them")
+    expect(req.output_config.format.schema.properties.photos.items.properties.tag.enum).toContain('gutter_profile')
+  })
+
+  it('never offers problem letters before the cause of damage has any', async () => {
+    create.mockResolvedValue(claudeReply([{ photo: 1, seen: 'x', tag: 'issue', issue: 'A', confidence: 0.9 }]))
+    const { labels } = await labelPhotos([photo('1')], { ...ctx, roof: { issues: [] } })
+    expect(labels[0]?.label).toBe('')
+    expect(create.mock.calls[0][0].system).toContain('never use "issue"')
+  })
+})

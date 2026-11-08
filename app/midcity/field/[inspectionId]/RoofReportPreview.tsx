@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Fragment, useEffect } from 'react'
+import { splitDotPoints } from '@/lib/reports/dot-points'
+import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '@/lib/photos/roof-tags'
 
 type Fields = {
   claimDetails: string
@@ -44,10 +46,49 @@ const ROOFER_QUAL = 'Roof Plumber, Registered Builder BP103432'
 
 const v = (val: string) => val || '—'
 
+const PHOTO_PILL: React.CSSProperties = {
+  position: 'absolute', top: 6, left: 6, maxWidth: '78%',
+  display: 'flex', alignItems: 'flex-start', gap: 5,
+  background: 'rgba(26,26,26,0.72)', color: '#ffffff', borderRadius: 4,
+  padding: '3px 7px 3px 3px', fontSize: 9.5, fontWeight: 500, lineHeight: 1.35,
+  printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact',
+}
+const PHOTO_CHIP: React.CSSProperties = {
+  background: 'var(--tan)', color: 'var(--ink)', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
+}
+
+// "(A)" problem letters in their colour, matching the photo pills
+const Lettered = ({ text }: { text: string }) => (
+  <>
+    {splitIssueLetters(text).map((part, i) => part.letter
+      ? <span key={i} style={{ color: issueColour(part.letter), fontWeight: 800 }}>{part.text}</span>
+      : <span key={i}>{part.text}</span>)}
+  </>
+)
+
+// Text with "• " dot points: each point on its own line with a hanging indent
+const Points = ({ text }: { text: string }) => {
+  if (!text?.trim()) return <>—</>
+  const lines = splitDotPoints(text)
+  const hasPoints = lines.some(l => l.point)
+  return (
+    <>
+      {lines.map((line, i) => line.point ? (
+        <div key={i} style={{ display: 'flex', gap: 7, marginTop: i ? 3 : 0 }}>
+          <span style={{ flexShrink: 0 }}>•</span>
+          <span><Lettered text={line.text} /></span>
+        </div>
+      ) : (
+        <div key={i} style={{ marginTop: i ? 5 : 0, fontWeight: hasPoints && i === 0 ? 600 : undefined }}><Lettered text={line.text} /></div>
+      ))}
+    </>
+  )
+}
+
 const SH = ({ title }: { title: string }) => (
   <tr>
     <td colSpan={2} style={{
-      background: '#2d2d2d', color: 'white',
+      background: 'var(--ink)', color: 'white',
       padding: '7px 14px', fontSize: 11, fontWeight: 700,
       letterSpacing: '0.8px', textTransform: 'uppercase' as const,
     }}>
@@ -79,8 +120,8 @@ const YNR = ({ label, answer, details }: { label: string; answer: string; detail
     </tr>
     {details && (
       <tr>
-        <td colSpan={2} style={{ padding: '2px 14px 8px 26px', fontSize: 11, color: '#333', borderBottom: '1px solid #ebebeb', whiteSpace: 'pre-wrap' as const, lineHeight: 1.55 }}>
-          {details}
+        <td colSpan={2} style={{ padding: '2px 14px 8px 26px', fontSize: 11, color: '#333', borderBottom: '1px solid #ebebeb', lineHeight: 1.55 }}>
+          <Points text={details} />
         </td>
       </tr>
     )}
@@ -95,8 +136,8 @@ const FR = ({ label, val }: { label: string; val: string }) => (
       </td>
     </tr>
     <tr>
-      <td colSpan={2} style={{ padding: '3px 14px 9px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', whiteSpace: 'pre-wrap' as const, lineHeight: 1.6 }}>
-        {v(val)}
+      <td colSpan={2} style={{ padding: '3px 14px 9px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', lineHeight: 1.6 }}>
+        <Points text={val} />
       </td>
     </tr>
   </>
@@ -118,6 +159,10 @@ export function RoofReportPreview({
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
   }, [])
+
+  // Report order: front view, roof overview, each problem's photos (A, B…), then the rest
+  const orderedPhotos = orderRoofPhotos(photos)
+  const issueText = new Map(issuePoints(fields.specificCause).map(i => [i.letter, i.text]))
 
   const jobLine = fields.claimDetails || [
     jobInfo.insuredName,
@@ -213,7 +258,7 @@ export function RoofReportPreview({
                   Roof Inspection Report
                 </div>
                 {jobLine && (
-                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid var(--ink)', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
                     {jobLine}
                   </div>
                 )}
@@ -382,25 +427,55 @@ export function RoofReportPreview({
                   Photo Record
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-                  {photos.map((photo, idx) => (
-                    <div key={photo.id} style={{ breakInside: 'avoid' as const }}>
-                      <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f0f0f0', borderRadius: 4, border: '1px solid #ddd' }}>
-                        <img
-                          src={photo.previewUrl}
-                          alt={photo.label || `Photo ${idx + 1}`}
-                          style={{
-                            position: 'absolute', width: '100%', height: '100%',
-                            objectFit: 'contain' as const,
-                            transformOrigin: 'center center',
-                            transform: `translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`,
-                          }}
-                        />
-                      </div>
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 5, textAlign: 'center' as const }}>
-                        Photo {idx + 1}{photo.label ? ` — ${photo.label}` : ''}
-                      </div>
-                    </div>
-                  ))}
+                  {orderedPhotos.map((photo, idx) => {
+                    const { tag, note } = parseRoofLabel(photo.label)
+                    const colour = tag.kind === 'issue' ? issueColour(tag.letter) : null
+                    const text = tag.kind === 'issue'
+                      ? [`(${tag.letter})`, note].filter(Boolean).join(' ')
+                      : tag.kind === 'type'
+                        ? [ROOF_TAGS.find(t => t.key === tag.key)!.label, note].filter(Boolean).join(' - ')
+                        : note
+                    // Each problem's photos start under a heading in its colour
+                    const prev = idx > 0 ? parseRoofLabel(orderedPhotos[idx - 1].label).tag : null
+                    const heading = tag.kind === 'issue' && !(prev?.kind === 'issue' && prev.letter === tag.letter)
+                      ? issueText.get(tag.letter) ?? ''
+                      : null
+                    // After the problems, the rest start on their own row so they don't read as part of the last one
+                    const otherPhotos = tag.kind !== 'issue' && prev?.kind === 'issue'
+                    return (
+                      <Fragment key={photo.id}>
+                        {heading !== null && (
+                          <div style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 700, color: colour!, borderBottom: `2px solid ${colour}`, paddingBottom: 4, marginTop: idx ? 4 : 0 }}>
+                            ({(tag as { letter: string }).letter}) {heading}
+                          </div>
+                        )}
+                        {otherPhotos && (
+                          <div style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 700, color: '#555', borderBottom: '2px solid #ddd', paddingBottom: 4, marginTop: 4 }}>
+                            Other photos
+                          </div>
+                        )}
+                        <div style={{ breakInside: 'avoid' as const }}>
+                          <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f0f0f0', borderRadius: 4, border: colour ? `2px solid ${colour}` : '1px solid #ddd' }}>
+                            <img
+                              src={photo.previewUrl}
+                              alt={photo.label || `Photo ${idx + 1}`}
+                              style={{
+                                position: 'absolute', width: '100%', height: '100%',
+                                objectFit: 'contain' as const,
+                                transformOrigin: 'center center',
+                                transform: `translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`,
+                              }}
+                            />
+                            {/* Number and label in a pill on the photo; a problem's pill is in its colour */}
+                            <div style={{ ...PHOTO_PILL, ...(colour ? { background: colour } : {}) }}>
+                              <span style={{ ...PHOTO_CHIP, ...(colour ? { background: 'white', color: colour } : {}) }}>{idx + 1}</span>
+                              {text && <span>{text}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </Fragment>
+                    )
+                  })}
                 </div>
               </div>
             )}

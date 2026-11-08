@@ -1,0 +1,17 @@
+/* Bindi Co's colours for the Midcity screens (home, field app, report preview):
+   earthy burgundy, a first pass. They replace IRC Master's colour tokens
+   (app/globals.css) inside .bindi-theme only, so IRC's screens are unchanged. */
+.bindi-theme {
+  --ink: #4a1820;
+  --ink-hover: #5e2029;
+  --body: #3a1d20;
+  --subtle: #8c5f5c;
+  --faint: #b49a92;
+  --line: #e6d4ca;
+  --surface: #f6eee8;
+  --cream: #faf5f1;
+  --tan: #d4a586;
+  --gold: #c08a5c;
+  background: var(--surface);
+  min-height: 100vh;
+}
