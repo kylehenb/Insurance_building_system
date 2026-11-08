@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, cleanPins, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemSummaries, sameTag, type OverviewPin, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { OverviewPinTool } from './OverviewPinTool'
 import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
 import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
 
@@ -68,6 +69,8 @@ interface RoofReportData {
   roofStructureTiedDown: string; battenSizeCompliant: string; trussRafterCompliant: string
   // Cause of Damage
   claimType: string; specificCause: string
+  // Page one: the short cause and one line per problem, "(A) where - problem"
+  causeSummary: string; problemSummaries: string
   // Client Discussion
   clientDiscussion: string
   // Roof Conditions
@@ -97,7 +100,7 @@ function emptyRoofReport(): RoofReportData {
     guttersCompliant: '', guttersNotes: '',
     downpipesCompliant: '', corrosionIronizedWater: '', downpipeSize: '',
     roofStructureTiedDown: '', battenSizeCompliant: '', trussRafterCompliant: '',
-    claimType: '', specificCause: '',
+    claimType: '', specificCause: '', causeSummary: '', problemSummaries: '',
     clientDiscussion: '',
     propertyConditionsContributed: '', propertyConditionsDetails: '',
     damageWithoutConditions: '', damageWithoutConditionsDetails: '',
@@ -581,6 +584,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
   // ─── Roof Report structured fields ───────────────────────────────────────
   const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
+  // The problem letters pinned on the roof overview, for the report's first page
+  const [overviewPins, setOverviewPins] = useState<OverviewPin[]>([])
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
@@ -589,6 +594,17 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     ...issuePoints(roofReportFields.specificCause).map(i => i.letter),
     ...fieldPhotos.photos.map(p => parseRoofLabel(p.label).tag).flatMap(t => (t.kind === 'issue' ? [t.letter] : [])),
   ])
+
+  // The roof overview screenshot (the photo tagged Overview) and the letters to pin on it
+  const overviewPhoto = (() => {
+    const tagged = [...fieldPhotos.photos.map(p => ({ label: p.label, url: p.previewUrl })), ...roofPhotos.map(p => ({ label: p.label, url: p.previewUrl }))]
+      .find(p => { const t = parseRoofLabel(p.label).tag; return t.kind === 'type' && t.key === 'roof_overview' && !!p.url })
+    return tagged ? { url: tagged.url! } : null
+  })()
+  const pinLetters = (() => {
+    const fromReport = problemSummaries(roofReportFields.problemSummaries, roofReportFields.specificCause).map(p => p.letter)
+    return fromReport.length ? fromReport : issueLettersToOffer([])
+  })()
 
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
@@ -623,10 +639,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    roofReportFields, roofFieldsOpen,
+    roofReportFields, roofFieldsOpen, overviewPins,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewPins, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -663,6 +679,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.autofillScriptOpen) setAutofillScriptOpen(d.autofillScriptOpen as boolean)
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
+    if (d.overviewPins) setOverviewPins(cleanPins(d.overviewPins))
     if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
     if (d.makeSafeFieldsOpen !== undefined) setMakeSafeFieldsOpen(d.makeSafeFieldsOpen as boolean)
     if (d.makeSafePhotoIds) makeSafePhotoIdsRef.current = new Set(d.makeSafePhotoIds as string[])
@@ -1593,6 +1610,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           <label className="fa-fl">Specific Cause</label>
                           <textarea className="fa-ta" style={{ minHeight: 100 }} placeholder="Describe the specific cause and water entry points…" value={roofReportFields.specificCause} onChange={e => setRoofField('specificCause', e.target.value)} />
                         </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Page One · Short Cause</label>
+                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="One or two sentences with the letters, e.g. Stormwater entry from 2 defects: (A) … (B) …" value={roofReportFields.causeSummary} onChange={e => setRoofField('causeSummary', e.target.value)} />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Page One · Problems (one per line)</label>
+                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="(A) Enclosed patio - Roof tiles stop short of the gutter" value={roofReportFields.problemSummaries} onChange={e => setRoofField('problemSummaries', e.target.value)} />
+                        </div>
 
                         {/* ── Client Discussion ── */}
                         <div className="mc-rrf-sub">Client Discussion</div>
@@ -1752,6 +1777,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                     )}
                   </div>
 
+                  {/* Page one: pin the problems on the roof overview */}
+                  <div className="mc-section-head">Roof Overview · Page One</div>
+                  <div style={{ padding: '12px 16px 4px' }}>
+                    {overviewPhoto
+                      ? <OverviewPinTool url={overviewPhoto.url} pins={overviewPins} letters={pinLetters} onChange={pins => { setOverviewPins(pins); armDraft() }} />
+                      : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin the problems on it here.</p>}
+                  </div>
+
                   {/* Roof Photos */}
                   {fieldPhotos.photos.length > 0 && (
                     <div style={{ padding: '4px 16px 10px' }}>
@@ -1834,6 +1867,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           ...roofPhotos,
           ...newRoofPhotos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label })),
         ]}
+        overview={overviewPhoto ? { url: overviewPhoto.url, pins: overviewPins } : null}
         jobInfo={{
           address: initialData.address,
           insuredName: initialData.insuredName,

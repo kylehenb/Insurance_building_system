@@ -62,3 +62,29 @@ describe('colours', () => {
     ])
   })
 })
+
+describe('page one helpers', () => {
+  it('keeps clean pins only, one per letter', async () => {
+    const { cleanPins } = await import('../roof-tags')
+    expect(cleanPins([{ letter: 'B', x: 0.5, y: 1.4 }, { letter: 'A', x: '0.2', y: 0.3 }, { letter: 'Z', x: 0, y: 0 }, { letter: 'A', x: 0.25, y: 0.35 }, null])).toEqual([
+      { letter: 'A', x: 0.25, y: 0.35 }, { letter: 'B', x: 0.5, y: 1 },
+    ])
+    expect(cleanPins('nope')).toEqual([])
+  })
+
+  it('reads the problem lines, falling back to the cause of damage', async () => {
+    const { problemSummaries } = await import('../roof-tags')
+    expect(problemSummaries('(B) Rear gutter - Falls the wrong way\n(A) Enclosed patio – Tiles short of gutter\nnot a problem', '')).toEqual([
+      { letter: 'A', location: 'Enclosed patio', text: 'Tiles short of gutter' },
+      { letter: 'B', location: 'Rear gutter', text: 'Falls the wrong way' },
+    ])
+    expect(problemSummaries('', '• (A) 17 broken tiles.')).toEqual([{ letter: 'A', location: '', text: '17 broken tiles.' }])
+  })
+
+  it('treats only clearly wide screenshots as wide', async () => {
+    const { isWideImage } = await import('../roof-tags')
+    expect(isWideImage(1600, 900)).toBe(true)
+    expect(isWideImage(1000, 1000)).toBe(false)
+    expect(isWideImage(1170, 2532)).toBe(false)
+  })
+})

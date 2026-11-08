@@ -115,3 +115,44 @@ export function splitIssueLetters(text: string): Array<{ letter: string | null; 
   if (last < text.length) out.push({ letter: null, text: text.slice(last) })
   return out
 }
+
+// ── Page one (the roof overview and the problems at a glance) ──────────────
+
+/** A problem's pin on the roof overview: where it sits as a fraction of the image (0–1 across, 0–1 down). */
+export interface OverviewPin { letter: string; x: number; y: number }
+
+/** Pins kept from a saved draft: known letters, positions inside the image, one per letter. */
+export function cleanPins(value: unknown): OverviewPin[] {
+  if (!Array.isArray(value)) return []
+  const out = new Map<string, OverviewPin>()
+  for (const p of value) {
+    const letter = typeof p?.letter === 'string' ? p.letter : ''
+    const x = Number(p?.x)
+    const y = Number(p?.y)
+    if (!(ISSUE_LETTERS as readonly string[]).includes(letter) || !Number.isFinite(x) || !Number.isFinite(y)) continue
+    out.set(letter, { letter, x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) })
+  }
+  return [...out.values()].sort((a, b) => a.letter.localeCompare(b.letter))
+}
+
+/**
+ * Page one's problem list: "(A) Enclosed patio - Roof tiles stop short of the gutter", one per
+ * line (the AI writes it, the inspector can edit it). Without one, the first point of each problem
+ * in the cause of damage is used.
+ */
+export function problemSummaries(summaryText: string | null | undefined, cause: string | null | undefined): { letter: string; location: string; text: string }[] {
+  const out = new Map<string, { letter: string; location: string; text: string }>()
+  for (const line of (summaryText ?? '').split('\n')) {
+    const body = line.trim().replace(/^[•\-*–]\s*/, '')
+    const m = body.match(ISSUE_AT_START)
+    if (!m || out.has(m[1])) continue
+    const rest = body.slice(m[0].length).trim()
+    const parts = rest.match(/^(.+?)\s+[-–—]\s+(.+)$/)
+    out.set(m[1], parts ? { letter: m[1], location: parts[1].trim(), text: parts[2].trim() } : { letter: m[1], location: '', text: rest })
+  }
+  if (!out.size) for (const p of issuePoints(cause)) out.set(p.letter, { letter: p.letter, location: '', text: p.text })
+  return [...out.values()].sort((a, b) => a.letter.localeCompare(b.letter))
+}
+
+/** A wide screenshot sits full width with the problems under it; anything squarer or taller sits beside them. */
+export const isWideImage = (width: number, height: number): boolean => height > 0 && width / height > 1.35

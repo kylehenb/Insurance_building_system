@@ -2,7 +2,8 @@
 
 import { Fragment, useEffect } from 'react'
 import { splitDotPoints } from '@/lib/reports/dot-points'
-import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '@/lib/photos/roof-tags'
+import { RoofReportPageOne } from './RoofReportPageOne'
+import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters, type OverviewPin } from '@/lib/photos/roof-tags'
 
 type Fields = {
   claimDetails: string
@@ -18,6 +19,7 @@ type Fields = {
   downpipesCompliant: string; corrosionIronizedWater: string; downpipeSize: string
   roofStructureTiedDown: string; battenSizeCompliant: string; trussRafterCompliant: string
   claimType: string; specificCause: string
+  causeSummary?: string; problemSummaries?: string
   clientDiscussion: string
   propertyConditionsContributed: string; propertyConditionsDetails: string
   damageWithoutConditions: string; damageWithoutConditionsDetails: string
@@ -147,11 +149,14 @@ export function RoofReportPreview({
   fields,
   photos,
   jobInfo,
+  overview = null,
   onClose,
 }: {
   fields: Fields
   photos: Photo[]
   jobInfo: JobInfo
+  /** The roof overview photo with its problem pins, for page one */
+  overview?: { url: string; pins: OverviewPin[] } | null
   onClose: () => void
 }) {
   useEffect(() => {
@@ -208,6 +213,12 @@ export function RoofReportPreview({
             overflow: visible !important;
             padding: 0 !important;
           }
+          .mc-rrp-page-one {
+            min-height: 0 !important;
+            height: 262mm;
+            padding: 0 !important;
+          }
+          .mc-rrp-page-gap { display: none !important; }
           .mc-rrp-doc {
             max-width: 100% !important;
             box-shadow: none !important;
@@ -250,6 +261,16 @@ export function RoofReportPreview({
             boxShadow: '0 2px 20px rgba(0,0,0,0.14)',
             fontFamily: 'system-ui, -apple-system, Arial, sans-serif',
           }}>
+
+            {/* Page one: the roof overview with the problems pinned on it, at a glance */}
+            <RoofReportPageOne
+              fields={fields}
+              job={{ address: jobInfo.address, insuredName: jobInfo.insuredName, claimNumber: jobInfo.claimNumber, jobNumber: jobInfo.jobNumber }}
+              overview={overview}
+              rooferName={ROOFER_NAME}
+              rooferQual={ROOFER_QUAL}
+            />
+            <div className="mc-rrp-page-gap" style={{ height: 18, background: '#edebe7' }} />
 
             {/* Header */}
             <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid var(--ink)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>

@@ -23,7 +23,11 @@ Stormwater entry through the roof cover at the enclosed patio from 3 defects:
 • (B) Incorrect falls on the gutters cause pooling and overflow.
 • (B) Water staining on the fascia below the low point of the gutter.
 • (C) Approximately 17 broken roof tiles allow stormwater entry.
-• No other breaches were found in the roof cover.`
+• No other breaches were found in the roof cover.
+
+PAGE ONE SUMMARY (causeSummary, problemSummaries) — the report's first page shows the roof from above with the problem letters pinned on it. Write both from the cause of damage, using the same letters:
+- causeSummary: the short version of the cause of damage, one or two sentences (under 45 words), with each problem's letter in brackets where it's mentioned. The assessor may paste it straight into their report. Example: "Stormwater entry through the roof cover at the enclosed patio from 3 defects: (A) roof tiles stop short of the gutter; (B) the gutter falls the wrong way and overflows; (C) 17 broken tiles over the rear roof."
+- problemSummaries: one line per problem letter, in letter order: "(A) <where, 2–4 words> - <the problem, under 10 words>". Example: "(A) Enclosed patio - Roof tiles stop short of the gutter". Empty when there are no problems.`
 
 export async function POST(req: NextRequest) {
   const me = await sessionUser()
@@ -130,6 +134,8 @@ JSON structure to fill:
   "trussRafterCompliant": "Yes|No|N/A",
   "claimType": "e.g. Storm, Accidental damage, Flood",
   "specificCause": "lead line, then one '• ' dot point per line — see CAUSE OF DAMAGE FORMAT",
+  "causeSummary": "short version of the cause for page one — see PAGE ONE SUMMARY",
+  "problemSummaries": "one line per problem: (A) where - problem — see PAGE ONE SUMMARY",
   "clientDiscussion": "what the insured/client stated",
   "propertyConditionsContributed": "Yes|No",
   "propertyConditionsDetails": "list of contributing conditions",

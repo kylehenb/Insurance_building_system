@@ -56,5 +56,6 @@ describe('Midcity report routes', () => {
     const res = await post(roof, { rawNotes: 'Patio leak' })
     expect((await res.json()).reportData.specificCause).toBe('Stormwater entry at the patio:\n• Tiles short of the gutter\n• 17 broken tiles')
     expect(aiCalls[0].system).toContain('CAUSE OF DAMAGE FORMAT')
+    expect(aiCalls[0].system).toContain('PAGE ONE SUMMARY')
   })
 })
