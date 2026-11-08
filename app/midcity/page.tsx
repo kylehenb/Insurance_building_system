@@ -236,16 +236,17 @@ export default function MidcityDashboard() {
       {/* Header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: 'var(--ink)', padding: '14px 18px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '2px solid var(--tan)',
+        background: 'rgba(255,255,255,.92)', WebkitBackdropFilter: 'saturate(180%) blur(20px)', backdropFilter: 'saturate(180%) blur(20px)',
+        padding: '14px 16px 12px',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        borderBottom: '1px solid var(--line)',
       }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-bebas-neue), sans-serif', fontSize: 22, letterSpacing: 3, color: 'var(--tan)' }}>
-            Bindi Co
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--subtle)' }}>
+            Bindi Co · Midcity
           </div>
-          <div style={{ fontFamily: 'var(--font-dm-mono), monospace', fontSize: 9, letterSpacing: 2, color: 'var(--grey-500)', textTransform: 'uppercase' }}>
-            Midcity Jobs
+          <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: -0.6, color: 'var(--ink)', lineHeight: 1.1 }}>
+            Jobs
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -255,8 +256,8 @@ export default function MidcityDashboard() {
             aria-label="Import schedule from screenshot"
             title="Import from screenshot"
             style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: 'transparent', border: '1.5px solid var(--tan)',
+              width: 44, height: 44, borderRadius: '50%',
+              background: '#e8f1ff', border: 'none',
               color: 'var(--tan)', display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}
@@ -272,8 +273,8 @@ export default function MidcityDashboard() {
             onClick={() => setShowModal(true)}
             aria-label="Add job"
             style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: 'var(--tan)', border: 'none', color: 'var(--ink)',
+              width: 44, height: 44, borderRadius: '50%',
+              background: 'var(--tan)', border: 'none', color: 'white',
               fontSize: 26, lineHeight: 1, fontWeight: 300,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
@@ -298,9 +299,8 @@ export default function MidcityDashboard() {
           grouped.map(({ dateKey, jobs: dayJobs }) => (
             <div key={dateKey}>
               <div style={{
-                padding: '16px 18px 6px',
-                fontFamily: 'var(--font-dm-mono), monospace',
-                fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--grey-500)',
+                padding: '22px 20px 8px',
+                fontSize: 13, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--subtle)',
               }}>
                 {formatSectionDate(dateKey)}
               </div>
@@ -317,39 +317,38 @@ export default function MidcityDashboard() {
                     onClick={() => inspection && router.push(`/midcity/field/${inspection.id}`)}
                     onKeyDown={e => { if (e.key === 'Enter' && inspection) router.push(`/midcity/field/${inspection.id}`) }}
                     style={{
-                      margin: '5px 12px',
+                      margin: '8px 16px',
                       background: 'white',
-                      borderRadius: 12,
-                      padding: '14px 16px',
+                      borderRadius: 16,
+                      padding: '16px 18px',
+                      minHeight: 76,
                       cursor: inspection ? 'pointer' : 'default',
-                      boxShadow: '0 2px 8px rgba(0,0,0,.07)',
-                      border: '1px solid #e8e4df',
+                      boxShadow: '0 1px 3px rgba(0,0,0,.06)',
                       display: 'flex', alignItems: 'center', gap: 12,
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <span style={{
-                          fontFamily: 'var(--font-dm-mono), monospace',
-                          fontSize: 12, fontWeight: 500, color: 'var(--tan)',
+                          fontSize: 13, fontWeight: 700, color: 'var(--tan)',
+                          background: '#e8f1ff', borderRadius: 999, padding: '3px 10px',
                         }}>
                           {job.job_number ?? '—'}
                         </span>
                         <span style={{
-                          fontFamily: 'var(--font-dm-mono), monospace',
-                          fontSize: 10, color: 'var(--faint)',
+                          fontSize: 14, color: 'var(--subtle)', fontVariantNumeric: 'tabular-nums',
                         }}>
                           {displayTime}
                         </span>
                       </div>
                       <div style={{
-                        fontSize: 14, color: 'var(--ink)',
+                        fontSize: 17, fontWeight: 600, color: 'var(--ink)',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>
                         {job.property_address ?? '—'}
                       </div>
                     </div>
-                    <div style={{ color: 'var(--tan)', fontSize: 20, flexShrink: 0 }}>›</div>
+                    <div style={{ color: 'var(--faint)', fontSize: 26, fontWeight: 300, flexShrink: 0 }}>›</div>
                   </div>
                 )
               })}
@@ -479,7 +478,7 @@ export default function MidcityDashboard() {
                 style={{
                   width: '100%', padding: '16px 18px',
                   background: creating || !canSubmit ? 'var(--line-tan-2)' : 'var(--ink)',
-                  color: creating || !canSubmit ? 'var(--grey-500)' : 'var(--tan)',
+                  color: creating || !canSubmit ? 'var(--grey-500)' : 'white',
                   border: 'none', borderRadius: 8,
                   fontFamily: 'var(--font-bebas-neue), sans-serif',
                   fontSize: 20, letterSpacing: 3,
@@ -716,7 +715,7 @@ export default function MidcityDashboard() {
                   style={{
                     width: '100%', padding: '16px 18px',
                     background: validBulkCount === 0 ? 'var(--line-tan-2)' : 'var(--ink)',
-                    color: validBulkCount === 0 ? 'var(--grey-500)' : 'var(--tan)',
+                    color: validBulkCount === 0 ? 'var(--grey-500)' : 'white',
                     border: 'none', borderRadius: 8,
                     fontFamily: 'var(--font-bebas-neue), sans-serif',
                     fontSize: 20, letterSpacing: 3,
