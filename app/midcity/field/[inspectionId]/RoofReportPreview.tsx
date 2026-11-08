@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { splitDotPoints } from '@/lib/reports/dot-points'
 
 type Fields = {
   claimDetails: string
@@ -44,6 +45,25 @@ const ROOFER_QUAL = 'Roof Plumber, Registered Builder BP103432'
 
 const v = (val: string) => val || '—'
 
+// Text with "• " dot points: each point on its own line with a hanging indent
+const Points = ({ text }: { text: string }) => {
+  if (!text?.trim()) return <>—</>
+  const lines = splitDotPoints(text)
+  const hasPoints = lines.some(l => l.point)
+  return (
+    <>
+      {lines.map((line, i) => line.point ? (
+        <div key={i} style={{ display: 'flex', gap: 7, marginTop: i ? 3 : 0 }}>
+          <span style={{ flexShrink: 0 }}>•</span>
+          <span>{line.text}</span>
+        </div>
+      ) : (
+        <div key={i} style={{ marginTop: i ? 5 : 0, fontWeight: hasPoints && i === 0 ? 600 : undefined }}>{line.text}</div>
+      ))}
+    </>
+  )
+}
+
 const SH = ({ title }: { title: string }) => (
   <tr>
     <td colSpan={2} style={{
@@ -79,8 +99,8 @@ const YNR = ({ label, answer, details }: { label: string; answer: string; detail
     </tr>
     {details && (
       <tr>
-        <td colSpan={2} style={{ padding: '2px 14px 8px 26px', fontSize: 11, color: '#333', borderBottom: '1px solid #ebebeb', whiteSpace: 'pre-wrap' as const, lineHeight: 1.55 }}>
-          {details}
+        <td colSpan={2} style={{ padding: '2px 14px 8px 26px', fontSize: 11, color: '#333', borderBottom: '1px solid #ebebeb', lineHeight: 1.55 }}>
+          <Points text={details} />
         </td>
       </tr>
     )}
@@ -95,8 +115,8 @@ const FR = ({ label, val }: { label: string; val: string }) => (
       </td>
     </tr>
     <tr>
-      <td colSpan={2} style={{ padding: '3px 14px 9px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', whiteSpace: 'pre-wrap' as const, lineHeight: 1.6 }}>
-        {v(val)}
+      <td colSpan={2} style={{ padding: '3px 14px 9px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', lineHeight: 1.6 }}>
+        <Points text={val} />
       </td>
     </tr>
   </>

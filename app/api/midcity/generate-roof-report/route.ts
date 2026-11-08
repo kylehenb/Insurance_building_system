@@ -2,8 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { trackAi } from '@/lib/health/ai-usage'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { toDotPoints } from '@/lib/reports/dot-points'
 
 export const dynamic = 'force-dynamic'
+
+// The cause of damage is the paragraph the builder's assessor copies into their
+// own report, so it's short dot points, never a long paragraph
+const CAUSE_FORMAT = `CAUSE OF DAMAGE FORMAT (specificCause) — this is the most important field. The builder's assessor copies it straight into their own report, so it must be short and scannable:
+- Line 1: one short lead sentence stating the conclusion. Examples: "Stormwater entry through a failed box gutter joint above the living room." / "Multiple causes of stormwater entry were identified:" / "In my opinion, the ceiling damage has not been caused by issues relating to the roof cover."
+- Then dot points, each on its own line starting with "• ". One fact per point: an entry point, a defect, or the evidence for it (staining, water tracking, the hose test result). One sentence per point, ideally under 25 words.
+- Where the damage is in more than one area, put a short area line such as "Living room:" before that area's points.
+- Never a single long paragraph. No "(1)", "1." or dashes — only "• ".
+- Keep to the inspector's facts and their order. Don't add causes or evidence that aren't in the notes, and don't pad with general statements.
+- Leave out the client's statement and maintenance items here — they have their own fields.
+- Use numerals ("2 broken tiles"), not number words.
+
+Example:
+Stormwater entry through the roof cover at the enclosed patio from multiple defects:
+• Roof tiles do not overlap far enough into the gutter, depositing stormwater behind the back lip of the gutter.
+• Incorrect falls on the gutters cause pooling and overflow.
+• Flashing tape and sealant on the gutters have failed.
+• Approximately 17 broken roof tiles allow stormwater entry.`
 
 export async function POST(req: NextRequest) {
   const me = await sessionUser()
@@ -55,7 +74,9 @@ FIXED DEFAULTS — use these exact values unless the raw notes explicitly state 
 - rooferName: "Kyle Bindon"
 - rooferQualification: "Roof Plumber, Registered Builder BP103432"
 - timeOnSite: "30 mins" (only override if raw notes state a specific different duration)
-- scopeOfAssessment: "Carry out roof inspection and provide a roof report relating to the claim" (only override if explicitly different)`,
+- scopeOfAssessment: "Carry out roof inspection and provide a roof report relating to the claim" (only override if explicitly different)
+
+${CAUSE_FORMAT}`,
       messages: [{
         role: 'user',
         content: `Extract structured data from these raw roof inspection notes and return ONLY valid JSON (no markdown fences, no explanation):
@@ -107,7 +128,7 @@ JSON structure to fill:
   "battenSizeCompliant": "Yes|No|N/A",
   "trussRafterCompliant": "Yes|No|N/A",
   "claimType": "e.g. Storm, Accidental damage, Flood",
-  "specificCause": "detailed description of cause and water entry points",
+  "specificCause": "lead line, then one '• ' dot point per line — see CAUSE OF DAMAGE FORMAT",
   "clientDiscussion": "what the insured/client stated",
   "propertyConditionsContributed": "Yes|No",
   "propertyConditionsDetails": "list of contributing conditions",
@@ -148,6 +169,8 @@ JSON structure to fill:
     } catch {
       return NextResponse.json({ error: 'Failed to parse AI response', details: content.text }, { status: 500 })
     }
+
+    if (typeof reportData.specificCause === 'string') reportData.specificCause = toDotPoints(reportData.specificCause)
 
     return NextResponse.json({ ok: true, reportData })
   } catch (error) {

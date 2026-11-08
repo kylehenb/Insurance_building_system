@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 let me: { tenantId: string; userId: string } | null = null
 const tracked: Array<Record<string, unknown>> = []
-const aiCalls: unknown[] = []
+const aiCalls: Array<{ system?: string }> = []
+let aiReply = '{"roofType":"Colorbond"}'
 
 vi.mock('@/lib/auth/session', () => ({ sessionUser: async () => me, unauthorized: () => new Response('{}', { status: 401 }) }))
 vi.mock('@/lib/health/ai-usage', () => ({
@@ -14,9 +15,9 @@ vi.mock('@/lib/health/ai-usage', () => ({
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
     messages = {
-      create: async (args: unknown) => {
+      create: async (args: { system?: string }) => {
         aiCalls.push(args)
-        return { content: [{ type: 'text', text: '{"roofType":"Colorbond"}' }] }
+        return { content: [{ type: 'text', text: aiReply }] }
       },
     }
   },
@@ -31,6 +32,7 @@ beforeEach(() => {
   me = null
   tracked.length = 0
   aiCalls.length = 0
+  aiReply = '{"roofType":"Colorbond"}'
 })
 
 describe('Midcity report routes', () => {
@@ -46,5 +48,13 @@ describe('Midcity report routes', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true, reportData: { roofType: 'Colorbond' } })
     expect(tracked).toEqual([expect.objectContaining({ feature: 'midcity-roof-report', tenantId: 't1' })])
+  })
+
+  it('asks for the cause of damage as dot points, and tidies what comes back into "• " points', async () => {
+    me = { tenantId: 't1', userId: 'u1' }
+    aiReply = JSON.stringify({ specificCause: 'Stormwater entry at the patio: (1) tiles short of the gutter; (2) 17 broken tiles' })
+    const res = await post(roof, { rawNotes: 'Patio leak' })
+    expect((await res.json()).reportData.specificCause).toBe('Stormwater entry at the patio:\n• Tiles short of the gutter\n• 17 broken tiles')
+    expect(aiCalls[0].system).toContain('CAUSE OF DAMAGE FORMAT')
   })
 })
