@@ -368,7 +368,7 @@ function MidcityPhotoCard({
           draggable={false}
         />
         {busy && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(44,26,14,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(74,24,32,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
             <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: 9, color: 'var(--beige)', letterSpacing: 1 }}>{photo.processing ? 'Converting…' : 'Saving…'}</span>
           </div>

@@ -53,7 +53,7 @@ const PHOTO_PILL: React.CSSProperties = {
   printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact',
 }
 const PHOTO_CHIP: React.CSSProperties = {
-  background: '#c8b89a', color: '#1a1a1a', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
+  background: 'var(--tan)', color: 'var(--ink)', borderRadius: 3, padding: '0 5px', fontWeight: 700, flexShrink: 0,
 }
 
 // Text with "• " dot points: each point on its own line with a hanging indent
@@ -78,7 +78,7 @@ const Points = ({ text }: { text: string }) => {
 const SH = ({ title }: { title: string }) => (
   <tr>
     <td colSpan={2} style={{
-      background: '#2d2d2d', color: 'white',
+      background: 'var(--ink)', color: 'white',
       padding: '7px 14px', fontSize: 11, fontWeight: 700,
       letterSpacing: '0.8px', textTransform: 'uppercase' as const,
     }}>
@@ -244,7 +244,7 @@ export function RoofReportPreview({
                   Roof Inspection Report
                 </div>
                 {jobLine && (
-                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid #2d2d2d', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid var(--ink)', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
                     {jobLine}
                   </div>
                 )}
