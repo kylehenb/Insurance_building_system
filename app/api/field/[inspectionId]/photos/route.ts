@@ -46,7 +46,8 @@ export async function GET(
       return {
         id: p.id, label: p.label ?? '', url: signed?.signedUrl ?? null, crop_x: p.crop_x ?? 0, crop_y: p.crop_y ?? 0, crop_scale: p.crop_scale ?? 1,
         clientId: p.client_id, sequenceNumber: p.sequence_number,
-        ai: p.ai_status === 'done' && p.ai_label
+        // An empty AI label is a roof photo the AI left untagged (lib/photos/roof-tags.ts)
+        ai: p.ai_status === 'done' && p.ai_label != null
           ? { kind: p.ai_kind, label: p.ai_label, confidence: p.ai_confidence ?? 0.5, room: p.ai_room ?? '', roomConfidence: p.ai_room_confidence ?? 0.5 }
           : null,
         aiStatus: p.ai_status,

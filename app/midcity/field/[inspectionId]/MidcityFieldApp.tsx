@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { LOW_CONFIDENCE, orderReportPhotos } from '@/lib/photos/report-order'
+import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
 import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
 
@@ -392,41 +392,78 @@ function MidcityPhotoCard({
 }
 
 // A roof photo from the IRC field app's uploader: saved on the phone, uploaded,
-// then labelled by the AI on the server. The inspector's own label always wins.
-function RoofPhotoCard({ photo, onDelete, onLabelChange }: { photo: FieldPhoto; onDelete: () => void; onLabelChange: (label: string) => void }) {
+// then sorted by the AI on the server. One tap tags it: a problem letter (the
+// colours match the report), a fixed type, or nothing (just its number in the
+// report). The note is optional and rarely used. Tags: lib/photos/roof-tags.ts
+export function RoofPhotoCard({ photo, letters, onTag, onNote, onDelete }: {
+  photo: FieldPhoto
+  letters: string[]
+  onTag: (tag: RoofPhotoTag) => void
+  onNote: (note: string) => void
+  onDelete: () => void
+}) {
   const preparing = photo.status === 'waiting' || photo.status === 'converting'
-  const unsure = photo.labelSource === 'ai' && !!photo.ai &&
-    Math.min(photo.ai.confidence, photo.ai.kind === 'other' ? photo.ai.roomConfidence ?? 1 : 1) < LOW_CONFIDENCE
+  const { tag, note } = parseRoofLabel(photo.label)
+  const aiPick = photo.labelSource === 'ai' && tag.kind !== 'none'
+  const waitingForAi = photo.status === 'uploaded' && photo.labelSource !== 'inspector' && photo.aiStatus !== 'done' && photo.aiStatus !== 'failed'
+  const tagColour = tag.kind === 'issue' ? issueColour(tag.letter) : tag.kind === 'type' ? 'var(--black)' : null
+  const tagText = tag.kind === 'issue' ? `(${tag.letter})` : tag.kind === 'type' ? ROOF_TAGS.find(t => t.key === tag.key)!.label : ''
+  const toggle = (t: RoofPhotoTag) => onTag(sameTag(t, tag) ? { kind: 'none' } : t)
   return (
-    <div className="fa-photo-card">
-      <div className="fa-photo-frame">
+    <div className="rp-card">
+      <div className="rp-thumb">
         {photo.previewUrl
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img className="fa-photo-thumb" src={photo.previewUrl} alt="roof photo" draggable={false} loading="lazy" />
-          : <div className="fa-photo-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📷</div>}
+          ? <img src={photo.previewUrl} alt="roof photo" draggable={false} loading="lazy" />
+          : <span style={{ fontSize: 22 }}>📷</span>}
         {preparing && (
           <div className="fa-photo-status">
-            <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
+            <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 20, height: 20 }} />
             <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
           </div>
         )}
         {!preparing && (
           <span className={`fa-photo-badge${photo.status === 'uploaded' ? ' up' : ''}`}>
-            {photo.status === 'uploaded' ? '✓ Uploaded' : photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}
+            {photo.status === 'uploaded' ? '✓' : photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}
           </span>
         )}
-        {!preparing && <button className="fa-photo-del" onClick={onDelete}>×</button>}
+        {tagColour && <span className="rp-thumb-tag" style={{ background: tagColour }}>{tagText}</span>}
+        {!preparing && <button className="fa-photo-del" onClick={onDelete} aria-label="Delete photo">×</button>}
       </div>
-      <div className="fa-photo-label-area">
-        <textarea
-          className={`fa-photo-label-ta${unsure ? ' check' : ''}`}
-          rows={1}
-          placeholder={preparing ? 'Preparing…' : photo.status === 'uploaded' && photo.aiStatus !== 'done' ? 'AI label coming…' : 'Add label'}
-          value={photo.label}
-          disabled={preparing}
-          onChange={e => onLabelChange(e.target.value)}
-        />
-        {unsure && <div className="fa-photo-check">Check this label</div>}
+      <div className="rp-controls">
+        <div className="rp-chips">
+          {letters.map(l => {
+            const on = tag.kind === 'issue' && tag.letter === l
+            const c = issueColour(l)
+            return (
+              <button key={l} type="button" className="rp-chip rp-letter" disabled={preparing}
+                style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
+                onClick={() => toggle({ kind: 'issue', letter: l })}>
+                ({l})
+              </button>
+            )
+          })}
+          <button type="button" className={`rp-chip rp-none${tag.kind === 'none' && photo.labelSource === 'inspector' ? ' on' : ''}`} disabled={preparing}
+            onClick={() => onTag({ kind: 'none' })}>
+            None
+          </button>
+        </div>
+        <div className="rp-chips">
+          {ROOF_TAGS.map(t => {
+            const on = tag.kind === 'type' && tag.key === t.key
+            return (
+              <button key={t.key} type="button" className={`rp-chip rp-type${on ? ' on' : ''}`} disabled={preparing}
+                onClick={() => toggle({ kind: 'type', key: t.key })}>
+                {t.chip}
+              </button>
+            )
+          })}
+        </div>
+        <div className="rp-status">
+          {waitingForAi ? 'AI sorting…' : aiPick ? 'AI pick · tap to change' : ''}
+        </div>
+        <input className="rp-note" type="text" placeholder="Add a note (optional)" value={note} disabled={preparing}
+          onChange={e => onNote(e.target.value)} />
       </div>
     </div>
   )
@@ -517,8 +554,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // added (red bar until all are up, then green) and labelled by the AI on the server
   const fieldPhotos = useFieldPhotos({ base, inspectionId: initialData.inspectionId, active: true })
   const { counts: photoCounts, busy: photosBusy } = fieldPhotos
-  // View of Property first, then the rest as taken
-  const newRoofPhotos = orderReportPhotos(fieldPhotos.photos)
+  // On the phone, the order taken (so photos don't jump while tagging); the report sorts them
+  const newRoofPhotos = fieldPhotos.photos
   const [uploadDoneShown, setUploadDoneShown] = useState(false)
   const [relabelling, setRelabelling] = useState(false)
   const wasBusy = useRef(false)
@@ -533,9 +570,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [photosBusy])
-  // The label is kept on the server too, so the report has it on any device
-  const setRoofPhotoLabel = (photo: FieldPhoto, label: string) => {
-    fieldPhotos.setLabel(photo.id, label)
+  // The label is kept on the server too, so the report has it on any device.
+  // A tag tapped by the inspector stays theirs (the AI won't change it), "None" included.
+  const setRoofPhotoLabel = (photo: FieldPhoto, label: string, chosen = true) => {
+    fieldPhotos.setLabel(photo.id, label, chosen)
     if (photo.serverId) {
       fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.serverId, label }) }).catch(() => {})
     }
@@ -545,6 +583,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
+
+  // Problem letters to offer on each photo: those in the cause of damage or already on a photo, plus a spare
+  const problemLetters = issueLettersToOffer([
+    ...issuePoints(roofReportFields.specificCause).map(i => i.letter),
+    ...fieldPhotos.photos.map(p => parseRoofLabel(p.label).tag).flatMap(t => (t.kind === 'issue' ? [t.letter] : [])),
+  ])
 
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
@@ -836,6 +880,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         }))
         setRoofFieldsOpen(true)
         armDraft()
+        // The problems (A), (B)… are written now: have the AI sort the photos against them.
+        // Tags the inspector tapped are kept.
+        if (fieldPhotos.photos.length && issuePoints(rd.specificCause).length) {
+          const draft = { ...collectDraft(), roofReportFields: { ...roofReportFields, ...rd } }
+          fetch(`${base}/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft }) })
+            .then(() => fieldPhotos.relabelAll())
+            .catch(() => {})
+        }
       } else {
         alert('Failed to generate report. Please try again.')
       }
@@ -1705,11 +1757,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                     <div style={{ padding: '4px 16px 10px' }}>
                       <p className="fa-ai-status">
                         {fieldPhotos.awaitingLabels
-                          ? `AI labelling on the server · ${photoCounts.labelled} of ${photoCounts.uploaded}`
-                          : 'Photos are labelled by the AI as they upload. Change any label by typing over it.'}
+                          ? `AI sorting on the server · ${photoCounts.labelled} of ${photoCounts.uploaded}`
+                          : 'The AI tags the front view, roof overview, ladder, gutter, downpipe and safety photos, and the problems (A), (B)… once the report is generated. Tap to change any.'}
                       </p>
                       <button className="fa-ai-label-btn" style={{ marginTop: 8 }} onClick={relabelRoofPhotos} disabled={relabelling || photosBusy}>
-                        {relabelling ? <><span className="fa-spinner" /> Asking…</> : '✦ Re-label Photos With My Notes'}
+                        {relabelling ? <><span className="fa-spinner" /> Asking…</> : '✦ Re-sort Photos With My Report'}
                       </button>
                     </div>
                   )}
@@ -1728,17 +1780,21 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         }}
                       />
                     ))}
+                  </div>
+                  <div className="rp-list">
                     {newRoofPhotos.map(photo => (
                       <RoofPhotoCard
                         key={photo.id}
                         photo={photo}
+                        letters={problemLetters}
+                        onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
+                        onNote={note => setRoofPhotoLabel(photo, composeRoofLabel(parseRoofLabel(photo.label).tag, note), photo.labelSource === 'inspector')}
                         onDelete={() => fieldPhotos.remove(photo.id)}
-                        onLabelChange={label => setRoofPhotoLabel(photo, label)}
                       />
                     ))}
-                    <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot">
+                    <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
                       <span style={{ fontSize: 24 }}>📷</span>
-                      <span>Add Photo</span>
+                      <span>Add Photos</span>
                     </button>
                     <input
                       ref={roofPhotoInputRef}

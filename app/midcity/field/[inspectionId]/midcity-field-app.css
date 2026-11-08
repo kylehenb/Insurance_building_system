@@ -190,3 +190,22 @@
 .fa-photo-label-ta.check{border-bottom:1.5px solid var(--orange);background:var(--orange-light)}
 .fa-photo-check{font-family:var(--font-dm-mono),monospace;font-size:9px;color:var(--orange);letter-spacing:.5px;margin-top:3px}
 .fa-ai-status{font-family:var(--font-dm-mono),monospace;font-size:10px;color:var(--beige-dark);margin:8px 0 0;letter-spacing:.5px}
+
+/* Roof photos: one per row, tap chips to tag (lib/photos/roof-tags.ts) */
+.rp-list{display:flex;flex-direction:column;gap:10px;padding:0 12px 16px}
+.rp-card{display:flex;gap:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:white;padding:8px}
+.rp-thumb{position:relative;width:112px;height:112px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--off);display:flex;align-items:center;justify-content:center}
+.rp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.rp-thumb .fa-photo-del{position:absolute;top:3px;right:3px}
+.rp-thumb-tag{position:absolute;left:4px;bottom:4px;max-width:calc(100% - 8px);padding:2px 6px;border-radius:4px;color:white;font-size:10px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-controls{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.rp-chips{display:flex;flex-wrap:wrap;gap:5px}
+.rp-chip{min-height:32px;border-radius:999px;border:1.5px solid var(--border);background:white;font-family:var(--font-dm-sans),sans-serif;font-size:12px;font-weight:600;padding:0 10px;cursor:pointer;color:var(--text)}
+.rp-chip:disabled{opacity:.45}
+.rp-letter{min-width:40px;padding:0 6px;font-size:13px;font-weight:800}
+.rp-none.on{background:var(--muted);border-color:var(--muted);color:white}
+.rp-type{min-height:28px;font-size:11px;font-weight:500;color:var(--muted)}
+.rp-type.on{background:var(--black);border-color:var(--black);color:white}
+.rp-status{font-family:var(--font-dm-mono),monospace;font-size:9px;letter-spacing:.5px;color:var(--beige-dark);min-height:11px}
+.rp-note{width:100%;border:none;border-bottom:1px solid var(--border);background:transparent;font-size:13px;padding:4px 0;color:var(--text);outline:none}
+.rp-add{width:100%;min-height:70px}

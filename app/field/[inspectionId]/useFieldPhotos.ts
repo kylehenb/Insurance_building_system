@@ -269,8 +269,9 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
     setPhotos(prev => [...prev, ...added])
   }, [])
 
-  const setLabel = useCallback((id: string, label: string) => {
-    const labelSource: LabelSource = label.trim() ? 'inspector' : 'none'
+  /** The inspector's label. An empty one hands the photo back to the AI, unless `chosen` (Midcity's "no tag" chip). */
+  const setLabel = useCallback((id: string, label: string, chosen = false) => {
+    const labelSource: LabelSource = label.trim() || chosen ? 'inspector' : 'none'
     update(id, { label, labelSource })
     patchPhoto(id, { label, labelSource })
   }, [update])

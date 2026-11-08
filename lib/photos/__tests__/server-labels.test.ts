@@ -10,7 +10,7 @@ vi.mock('@/lib/images/downscale', () => ({ downscaleImage: vi.fn() }))
 
 vi.mock('../learning', () => ({ photoLearning: async () => ({ corrections: [], lessons: '' }) }))
 
-const { finaliseFieldPhotos, scopeFromRooms, loadLabelContext, ROOF_PHOTO_LABEL_GUIDANCE } = await import('../server-labels')
+const { finaliseFieldPhotos, scopeFromRooms, loadLabelContext } = await import('../server-labels')
 
 type Row = Record<string, unknown>
 
@@ -95,14 +95,14 @@ describe('scopeFromRooms', () => {
 })
 
 describe('loadLabelContext', () => {
-  it('labels Midcity field app photos in roof terms, from the field app notes', async () => {
+  it('sorts Midcity field app photos by the problems in the cause of damage, with the field app notes', async () => {
     const { service } = fakeService({
-      inspections: [{ job_id: 'j1', field_draft: { dictationNotes: 'Valley full of leaves', raw_report_notes: 'other' }, raw_report_notes: null }],
+      inspections: [{ job_id: 'j1', field_draft: { dictationNotes: 'Valley full of leaves', raw_report_notes: 'other', roofReportFields: { specificCause: 'Two defects:\n• (A) Valley blocked\n• (B) Broken tile' } }, raw_report_notes: null }],
       jobs: [{ insurer: 'Midcity', loss_type: 'Storm', property_address: '1 Example St' }],
       prompts: [{ system_prompt: 'Room by room please' }],
     })
     const ctx = await loadLabelContext(service, 't1', 'i1')
-    expect(ctx.guidance).toBe(ROOF_PHOTO_LABEL_GUIDANCE)
+    expect(ctx.roof).toEqual({ issues: [{ letter: 'A', text: 'Valley blocked' }, { letter: 'B', text: 'Broken tile' }] })
     expect(ctx.notes).toBe('Valley full of leaves')
   })
 
@@ -114,6 +114,7 @@ describe('loadLabelContext', () => {
     })
     const ctx = await loadLabelContext(service, 't1', 'i1')
     expect(ctx.guidance).toBe('Room by room please')
+    expect(ctx.roof).toBeUndefined()
     expect(ctx.notes).toBe('Kitchen ceiling stained')
   })
 })

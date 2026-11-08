@@ -7,6 +7,8 @@ export const DOT = '•'
 
 // "(1)", "1.", "1)" or a dash/asterisk/bullet at the start of a line
 const MARKER = /^\s*(?:\(\d{1,2}\)|\d{1,2}[.)](?!\d)|[-*•–])\s*/
+// "(A) " at the start of a line: a roof report problem letter (lib/photos/roof-tags.ts)
+const PROBLEM_LETTER = /^\([A-H]\)\s/
 // "(2) " part-way through a line: a run-together list
 const INLINE_NUMBER = /\s+(?=\(\d{1,2}\)\s)/g
 
@@ -22,6 +24,8 @@ export function toDotPoints(text: string | null | undefined): string {
 
   return lines
     .map(line => {
+      // A point that starts with its problem letter, "(A) …", without a bullet
+      if (PROBLEM_LETTER.test(line)) return `${DOT} ${line}`
       if (!MARKER.test(line)) return line
       const body = line.replace(MARKER, '').replace(/[;,]\s*$/, '').trim()
       return body ? `${DOT} ${body.charAt(0).toUpperCase()}${body.slice(1)}` : ''

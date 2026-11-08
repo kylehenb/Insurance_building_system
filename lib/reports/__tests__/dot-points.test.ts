@@ -25,6 +25,12 @@ describe('toDotPoints', () => {
     expect(toDotPoints('1.5m of gutter had pulled away')).toBe('1.5m of gutter had pulled away')
   })
 
+  it('keeps "(A)" problem letters at the start of each point', () => {
+    expect(toDotPoints('Two defects:\n• (A) Broken tiles\n(B) Gutter overflow\n- (B) Staining on fascia\n• No other breaches')).toBe(
+      'Two defects:\n• (A) Broken tiles\n• (B) Gutter overflow\n• (B) Staining on fascia\n• No other breaches',
+    )
+  })
+
   it('leaves a plain paragraph alone, and empty as empty', () => {
     expect(toDotPoints('No breaches were found in the roof cover.')).toBe('No breaches were found in the roof cover.')
     expect(toDotPoints('  ')).toBe('')
