@@ -139,3 +139,16 @@ export function problemSummaries(summaryText: string | null | undefined, cause: 
 
 /** A wide screenshot sits full width with the problems under it; anything squarer or taller sits beside them. */
 export const isWideImage = (width: number, height: number): boolean => height > 0 && width / height > 1.35
+
+/**
+ * A short name for each problem, to remind the inspector what (A), (B)… are while tagging photos:
+ * the location from page one's problem lines ("Rear roof"), or the first few words of the problem.
+ */
+export function problemNames(summaryText: string | null | undefined, cause: string | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const p of problemSummaries(summaryText, cause)) {
+    const words = p.text.replace(/[.,;:]+$/, '').split(/\s+/)
+    out[p.letter] = p.location || (words.length > 4 ? `${words.slice(0, 4).join(' ')}…` : words.join(' '))
+  }
+  return out
+}

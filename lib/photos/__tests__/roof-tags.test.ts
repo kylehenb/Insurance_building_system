@@ -80,3 +80,11 @@ describe('page one helpers', () => {
     expect(isWideImage(1170, 2532)).toBe(false)
   })
 })
+
+describe('problemNames', () => {
+  it("names each problem by its location, or the start of the problem when there's no location", async () => {
+    const { problemNames } = await import('../roof-tags')
+    expect(problemNames('(A) Rear roof - 7 broken tiles\n(B) Box gutter - Failed joint', '')).toEqual({ A: 'Rear roof', B: 'Box gutter' })
+    expect(problemNames('', '• (A) Roof tiles do not overlap far enough into the gutter.\n• (B) 17 broken tiles.')).toEqual({ A: 'Roof tiles do not…', B: '17 broken tiles' })
+  })
+})

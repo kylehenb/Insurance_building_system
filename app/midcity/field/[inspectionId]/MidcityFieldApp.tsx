@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemNames, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { cleanMarks, type OverviewMark } from '@/lib/photos/overview-marks'
 import { OverviewPinTool } from './OverviewPinTool'
 import { reviewFlags, type ReviewFlag } from '@/lib/reports/roof-review'
@@ -481,10 +481,12 @@ export function RoofPhotoCard({ photo, number, letters, onTag, onNote, onDelete,
 }
 
 // A roof photo full screen, with the same one-tap letters, to check what's in it
-function RoofPhotoViewer({ photo, number, letters, onTag, onClose }: {
+function RoofPhotoViewer({ photo, number, letters, names, onTag, onClose }: {
   photo: FieldPhoto
   number: number
   letters: string[]
+  /** What each problem is ("Rear roof"), shown on its button */
+  names: Record<string, string>
   onTag: (tag: RoofPhotoTag) => void
   onClose: () => void
 }) {
@@ -507,10 +509,10 @@ function RoofPhotoViewer({ photo, number, letters, onTag, onClose }: {
           const on = tag.kind === 'issue' && tag.letter === l
           const c = issueColour(l)
           return (
-            <button key={l} type="button" className="rp-chip rp-letter" aria-pressed={on}
+            <button key={l} type="button" className="rp-chip rp-letter rp-named" aria-pressed={on}
               style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
               onClick={() => onTag(on ? { kind: 'none' } : { kind: 'issue', letter: l })}>
-              ({l})
+              ({l}){names[l] ? <span className="rp-name"> {names[l]}</span> : null}
             </button>
           )
         })}
@@ -609,6 +611,16 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [uploadDoneShown, setUploadDoneShown] = useState(false)
   // The roof photo open full screen
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null)
+  // The problem key shows along the bottom while the roof photo list is on screen
+  const photoListRef = useRef<HTMLDivElement>(null)
+  const [photoListInView, setPhotoListInView] = useState(false)
+  useEffect(() => {
+    const el = photoListRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => setPhotoListInView(e.isIntersecting), { rootMargin: '0px 0px -30% 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [roofEnabled])
   const [relabelling, setRelabelling] = useState(false)
   const wasBusy = useRef(false)
   useEffect(() => {
@@ -649,6 +661,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     ...issuePoints(roofReportFields.specificCause).map(i => i.letter),
     ...fieldPhotos.photos.map(p => parseRoofLabel(p.label).tag).flatMap(t => (t.kind === 'issue' ? [t.letter] : [])),
   ])
+
+  // What each problem is ("(A) Rear roof"), so the letters make sense while tagging photos
+  const problemKey = problemNames(roofReportFields.problemSummaries, roofReportFields.specificCause)
+  const problemKeyLetters = Object.keys(problemKey).sort()
 
   // The roof overview screenshot (the photo tagged Overview) and the letters to pin on it
   const overviewPhoto = (() => {
@@ -1101,11 +1117,21 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
             photo={photo}
             number={roofPhotos.length + i + 1}
             letters={problemLetters}
+            names={problemKey}
             onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
             onClose={() => setViewingPhotoId(null)}
           />
         )
       })()}
+      {photoListInView && !viewingPhotoId && problemKeyLetters.length > 0 && (
+        <div className="rp-keybar" aria-label="Problem key">
+          {problemKeyLetters.map(l => (
+            <span key={l} className="rp-key">
+              <b style={{ color: issueColour(l) }}>({l})</b> {problemKey[l]}
+            </span>
+          ))}
+        </div>
+      )}
       <UploadBanner
         total={photoCounts.total}
         saved={photoCounts.saved}
@@ -1931,7 +1957,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       />
                     ))}
                   </div>
-                  <div className="rp-list">
+                  <div className="rp-list" ref={photoListRef}>
                     {newRoofPhotos.map((photo, i) => (
                       <RoofPhotoCard
                         key={photo.id}
