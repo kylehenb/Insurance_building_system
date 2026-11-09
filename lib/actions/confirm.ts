@@ -48,7 +48,7 @@ export async function confirmCard(
   // The job moved on since this was written (the report sent another way, a
   // note after a phone call): asked first, so nothing's done twice
   if (!stillDo) {
-    const { cardChanges, changeLine } = await import('./recheck')
+    const { cardChanges, changeLine } = await import('./recheck-rules')
     const since = (await cardChanges(db, tenantId, [card])).get(card.id) ?? []
     if (since.length) {
       const lines = since.slice(-5).map(changeLine)

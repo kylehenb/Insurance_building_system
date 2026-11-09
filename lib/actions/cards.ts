@@ -467,7 +467,7 @@ export async function reopenCard(db: SupabaseClient, tenantId: string, id: strin
   if (error) throw new CardError('That conversation already has a card on the list — edit that one instead', 409)
   if (!data) throw new CardError('This card just changed — check it again', 409)
   // IRC closed it as done and it wasn't: learned from
-  const { recordRecheckUndone } = await import('./recheck')
+  const { recordRecheckUndone } = await import('./recheck-rules')
   await recordRecheckUndone(db, card, userId)
   return data as ActionCard
 }
@@ -490,7 +490,7 @@ export async function withContext(db: SupabaseClient, tenantId: string, cards: A
   const jobIds = [...new Set(cards.map(c => c.job_id).filter((id): id is string => !!id))]
   const threadIds = [...new Set(cards.map(cardThreadId).filter((id): id is string => !!id))]
   const userIds = [...new Set(cards.map(c => c.follow_up?.created_by).filter((id): id is string => !!id))]
-  const { cardChanges, changeLine } = await import('./recheck')
+  const { cardChanges, changeLine } = await import('./recheck-rules')
   const [{ data: jobs }, { data: threads }, { data: users }, changes] = await Promise.all([
     jobIds.length ? db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', tenantId).in('id', jobIds) : Promise.resolve({ data: [] }),
     threadIds.length ? db.from('mail_threads').select('gmail_thread_id, subject, participants, last_message_at, unread').eq('tenant_id', tenantId).in('gmail_thread_id', threadIds) : Promise.resolve({ data: [] }),
