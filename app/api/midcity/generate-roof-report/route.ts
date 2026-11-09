@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { trackAi } from '@/lib/health/ai-usage'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { toDotPoints } from '@/lib/reports/dot-points'
+import { cleanUncertain } from '@/lib/reports/roof-review'
 
 export const dynamic = 'force-dynamic'
 
@@ -135,6 +136,7 @@ JSON structure to fill:
   "claimType": "e.g. Storm, Accidental damage, Flood",
   "specificCause": "lead line, then one '• ' dot point per line — see CAUSE OF DAMAGE FORMAT",
   "causeSummary": "short version of the cause for page one — see PAGE ONE SUMMARY",
+  "uncertainFields": ["the keys of fields you filled by guessing or inferring rather than from something the notes clearly say, e.g. \"propertyAge\", \"roofPitch\" — the inspector checks these first; [] if none"],
   "problemSummaries": "one line per problem: (A) where - problem — see PAGE ONE SUMMARY",
   "clientDiscussion": "what the insured/client stated",
   "propertyConditionsContributed": "Yes|No",
@@ -178,8 +180,11 @@ JSON structure to fill:
     }
 
     if (typeof reportData.specificCause === 'string') reportData.specificCause = toDotPoints(reportData.specificCause)
+    // The fields the AI guessed: shown first for the inspector to check (lib/reports/roof-review.ts)
+    const uncertainFields = cleanUncertain((reportData as Record<string, unknown>).uncertainFields, reportData)
+    delete (reportData as Record<string, unknown>).uncertainFields
 
-    return NextResponse.json({ ok: true, reportData })
+    return NextResponse.json({ ok: true, reportData, uncertainFields })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to generate report', details: String(error) }, { status: 500 })
   }

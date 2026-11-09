@@ -7,6 +7,7 @@ import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
 import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { cleanMarks, type OverviewMark } from '@/lib/photos/overview-marks'
 import { OverviewPinTool } from './OverviewPinTool'
+import { reviewFlags, type ReviewFlag } from '@/lib/reports/roof-review'
 import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
 import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
 
@@ -635,6 +636,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // Markup on the roof overview (problem pins, areas, arrows, labels), for the report's first page
   const [overviewMarks, setOverviewMarks] = useState<OverviewMark[]>([])
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
+  // Review list: after the AI writes the report, only the fields worth a look show first
+  // (lib/reports/roof-review.ts). The list is fixed when it's shown, so a field doesn't
+  // vanish while it's being filled in; its marker goes as soon as it's done.
+  const [roofUncertain, setRoofUncertain] = useState<string[]>([])
+  const [roofView, setRoofView] = useState<'review' | 'all'>('all')
+  const [reviewKeys, setReviewKeys] = useState<string[]>([])
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
   // Problem letters to offer on each photo: those in the cause of damage or already on a photo, plus a spare
@@ -653,6 +660,28 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     const fromReport = problemSummaries(roofReportFields.problemSummaries, roofReportFields.specificCause).map(p => p.letter)
     return fromReport.length ? fromReport : issueLettersToOffer([])
   })()
+
+  // Review list (lib/reports/roof-review.ts): live markers, and the fields shown in "To review"
+  const liveFlags = reviewFlags(roofReportFields as unknown as Record<string, string>, roofUncertain)
+  const liveReviewCount = liveFlags.size
+  const reviewSet = new Set(reviewKeys)
+  const fg = (key: string) => `fa-fg${reviewSet.has(key) || liveFlags.has(key) ? ' rv-on' : ''}`
+  const flagOf = (key: string): ReviewFlag | undefined => liveFlags.get(key)
+  const showReview = () => { setReviewKeys([...liveFlags.keys()]); setRoofView('review'); armDraft() }
+
+  // Text boxes grow to fit what's in them, so a long cause can be read in full without scrolling inside the box
+  useEffect(() => {
+    const root = document.querySelector('.fa-root')
+    if (!root) return
+    const grow = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px` }
+    root.querySelectorAll<HTMLTextAreaElement>('textarea.fa-ta, textarea.fa-ai-dark-ta').forEach(grow)
+    const onInput = (e: Event) => {
+      const t = e.target
+      if (t instanceof HTMLTextAreaElement && (t.classList.contains('fa-ta') || t.classList.contains('fa-ai-dark-ta'))) grow(t)
+    }
+    root.addEventListener('input', onInput)
+    return () => root.removeEventListener('input', onInput)
+  }, [roofFieldsOpen, roofView, reviewKeys, roofReportGenerating, makeSafeFieldsOpen, roofEnabled, makeSafeEnabled])
 
   // ─── Save / export state ─────────────────────────────────────────────────
   const [saveStatus, setSaveStatus] = useState('')
@@ -687,10 +716,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    roofReportFields, roofFieldsOpen, overviewMarks,
+    roofReportFields, roofFieldsOpen, overviewMarks, roofUncertain, roofView, reviewKeys,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, roofUncertain, roofView, reviewKeys, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -728,6 +757,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.roofReportFields) setRoofReportFields(prev => ({ ...prev, ...(d.roofReportFields as RoofReportData) }))
     if (d.roofFieldsOpen) setRoofFieldsOpen(d.roofFieldsOpen as boolean)
     // overviewPins: the first version's pins, read as marks
+    if (Array.isArray(d.roofUncertain)) setRoofUncertain((d.roofUncertain as unknown[]).filter((k): k is string => typeof k === 'string'))
+    if (d.roofView === 'review' || d.roofView === 'all') setRoofView(d.roofView)
+    if (Array.isArray(d.reviewKeys)) setReviewKeys((d.reviewKeys as unknown[]).filter((k): k is string => typeof k === 'string'))
     if (d.overviewMarks || d.overviewPins) setOverviewMarks(cleanMarks(d.overviewMarks ?? d.overviewPins))
     if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
     if (d.makeSafeFieldsOpen !== undefined) setMakeSafeFieldsOpen(d.makeSafeFieldsOpen as boolean)
@@ -831,6 +863,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Roof report field helper ─────────────────────────────────────────────
   const setRoofField = (key: keyof RoofReportData, value: string) => {
     setRoofReportFields(prev => ({ ...prev, [key]: value }))
+    // Edited by the inspector: no longer the AI's guess
+    setRoofUncertain(prev => (prev.includes(key) ? prev.filter(k => k !== key) : prev))
     if (key === 'claimDetails') setMakeSafeFields(prev => ({ ...prev, claimDetails: value }))
     armDraft()
   }
@@ -944,6 +978,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           timeOnSite: rd.timeOnSite || prev.timeOnSite,
           scopeOfAssessment: rd.scopeOfAssessment || prev.scopeOfAssessment,
         }))
+        // Open on the review list: empty fields, the AI's guesses, the cause and maintenance
+        const uncertain = Array.isArray(data.uncertainFields) ? (data.uncertainFields as string[]) : []
+        const generated = { ...roofReportFields, ...rd } as unknown as Record<string, string>
+        setRoofUncertain(uncertain)
+        setReviewKeys([...reviewFlags(generated, uncertain).keys()])
+        setRoofView('review')
         setRoofFieldsOpen(true)
         armDraft()
         // The problems (A), (B)… are written now: have the AI sort the photos against them.
@@ -1489,53 +1529,67 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <span className="mc-rrf-arrow">{roofFieldsOpen ? '▾' : '›'}</span>
                     </div>
                     {roofFieldsOpen && (
-                      <div className="mc-rrf-body">
+                      <div className={`mc-rrf-body${roofView === 'review' ? ' mc-rrf-review' : ''}`}>
+                        {/* Review first, or every field */}
+                        <div className="mc-rrf-viewbar">
+                          <div className="fa-rg inline">
+                            <button type="button" className={`fa-ro${roofView === 'review' ? ' sel' : ''}`} onClick={showReview}>
+                              To review ({liveReviewCount})
+                            </button>
+                            <button type="button" className={`fa-ro${roofView === 'all' ? ' sel' : ''}`} onClick={() => { setRoofView('all'); armDraft() }}>
+                              All fields
+                            </button>
+                          </div>
+                          <div className="mc-rrf-legend">
+                            <span className="rv-dot empty" /> Empty <span className="rv-dot check" /> AI guessed <span className="rv-dot always" /> Always check
+                          </div>
+                        </div>
 
                         {/* ── Claim Details ── */}
                         <div className="mc-rrf-sub">Claim Details</div>
-                        <div className="fa-fg">
+                        <div className={fg('claimDetails')} data-flag={flagOf('claimDetails')}>
                           <label className="fa-fl">Customer Name, Loss Address, Insurer, Claim Number</label>
                           <input className="fa-input" type="text" placeholder="e.g. Mr & Mrs Smith · 123 Example St · IAG · Claim #123456" value={roofReportFields.claimDetails} onChange={e => setRoofField('claimDetails', e.target.value)} />
                         </div>
 
                         {/* ── Assessment Report Details ── */}
                         <div className="mc-rrf-sub">Assessment Report Details</div>
-                        <div className="fa-fg">
+                        <div className={fg('attendanceDate')} data-flag={flagOf('attendanceDate')}>
                           <label className="fa-fl">Attendance Date</label>
                           <input className="fa-input" type="text" placeholder="DD.MM.YYYY" value={roofReportFields.attendanceDate} onChange={e => setRoofField('attendanceDate', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('timeAttended')} data-flag={flagOf('timeAttended')}>
                           <label className="fa-fl">Time Attended</label>
                           <input className="fa-input" type="text" placeholder="e.g. 11:00 AWST" value={roofReportFields.timeAttended} onChange={e => setRoofField('timeAttended', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('rooferMetWith')} data-flag={flagOf('rooferMetWith')}>
                           <label className="fa-fl">Roofer Met With</label>
                           <input className="fa-input" type="text" placeholder="e.g. Mrs De Silva" value={roofReportFields.rooferMetWith} onChange={e => setRoofField('rooferMetWith', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('timeOnSite')} data-flag={flagOf('timeOnSite')}>
                           <label className="fa-fl">Time on Site</label>
                           <input className="fa-input" type="text" placeholder="e.g. 30 mins" value={roofReportFields.timeOnSite} onChange={e => setRoofField('timeOnSite', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('scopeOfAssessment')} data-flag={flagOf('scopeOfAssessment')}>
                           <label className="fa-fl">Scope of Assessment</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="e.g. Carry out a roof inspection and provide a roof report relating to the claim." value={roofReportFields.scopeOfAssessment} onChange={e => setRoofField('scopeOfAssessment', e.target.value)} />
                         </div>
 
                         {/* ── Property Details ── */}
                         <div className="mc-rrf-sub">Property Details</div>
-                        <div className="fa-fg">
+                        <div className={fg('propertyAge')} data-flag={flagOf('propertyAge')}>
                           <label className="fa-fl">Approximate Age of Property</label>
                           <input className="fa-input" type="text" placeholder="e.g. 50+ Years" value={roofReportFields.propertyAge} onChange={e => setRoofField('propertyAge', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('wallConstruction')} data-flag={flagOf('wallConstruction')}>
                           <label className="fa-fl">Wall Construction Type</label>
                           <input className="fa-input" type="text" placeholder="e.g. Double brick, Brick veneer" value={roofReportFields.wallConstruction} onChange={e => setRoofField('wallConstruction', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('propertyType')} data-flag={flagOf('propertyType')}>
                           <label className="fa-fl">Property Type</label>
                           <input className="fa-input" type="text" placeholder="e.g. Residential, Commercial" value={roofReportFields.propertyType} onChange={e => setRoofField('propertyType', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('propertyCondition')} data-flag={flagOf('propertyCondition')}>
                           <label className="fa-fl">Property Condition</label>
                           <div className="fa-rg inline">
                             {(['Good', 'Fair', 'Poor'] as const).map(o => (
@@ -1543,18 +1597,18 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('numberOfStoreys')} data-flag={flagOf('numberOfStoreys')}>
                           <label className="fa-fl">Number of Storeys</label>
                           <input className="fa-input" type="text" placeholder="e.g. 1" value={roofReportFields.numberOfStoreys} onChange={e => setRoofField('numberOfStoreys', e.target.value)} />
                         </div>
 
                         {/* ── Roof Details ── */}
                         <div className="mc-rrf-sub">Roof Details</div>
-                        <div className="fa-fg">
+                        <div className={fg('roofType')} data-flag={flagOf('roofType')}>
                           <label className="fa-fl">Roof Type</label>
                           <input className="fa-input" type="text" placeholder="e.g. Terracotta Tile, Colorbond" value={roofReportFields.roofType} onChange={e => setRoofField('roofType', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('roofGeneralCondition')} data-flag={flagOf('roofGeneralCondition')}>
                           <label className="fa-fl">General Condition of Roof</label>
                           <div className="fa-rg inline">
                             {(['Good', 'Fair', 'Poor'] as const).map(o => (
@@ -1562,19 +1616,19 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('roofPitch')} data-flag={flagOf('roofPitch')}>
                           <label className="fa-fl">Roof Pitch (degrees)</label>
                           <input className="fa-input" type="text" placeholder="e.g. 18" value={roofReportFields.roofPitch} onChange={e => setRoofField('roofPitch', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('numberOfPenetrations')} data-flag={flagOf('numberOfPenetrations')}>
                           <label className="fa-fl">Number of Penetrations</label>
                           <input className="fa-input" type="text" placeholder="e.g. 6" value={roofReportFields.numberOfPenetrations} onChange={e => setRoofField('numberOfPenetrations', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('roofInsulationType')} data-flag={flagOf('roofInsulationType')}>
                           <label className="fa-fl">Roof Insulation Type</label>
                           <input className="fa-input" type="text" placeholder="e.g. None, Sarking, Anticon, Air-cell" value={roofReportFields.roofInsulationType} onChange={e => setRoofField('roofInsulationType', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('solarPV')} data-flag={flagOf('solarPV')}>
                           <label className="fa-fl">Solar PV</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1582,7 +1636,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('roofMountedSolarHWS')} data-flag={flagOf('roofMountedSolarHWS')}>
                           <label className="fa-fl">Roof Mounted Solar HWS</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1590,11 +1644,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('numberOfSkylights')} data-flag={flagOf('numberOfSkylights')}>
                           <label className="fa-fl">Number of Skylights</label>
                           <input className="fa-input" type="text" placeholder="e.g. 2" value={roofReportFields.numberOfSkylights} onChange={e => setRoofField('numberOfSkylights', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('skylightFlashingsWatertight')} data-flag={flagOf('skylightFlashingsWatertight')}>
                           <label className="fa-fl">Skylight Flashings — Watertight &amp; Flashed Correctly?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1602,11 +1656,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('skylightFlashingsNotes')} data-flag={flagOf('skylightFlashingsNotes')}>
                           <label className="fa-fl">Skylight Flashing Notes</label>
                           <textarea className="fa-ta" style={{ minHeight: 60 }} placeholder="e.g. Leak through 1 x skylight dome" value={roofReportFields.skylightFlashingsNotes} onChange={e => setRoofField('skylightFlashingsNotes', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('guttersCompliant')} data-flag={flagOf('guttersCompliant')}>
                           <label className="fa-fl">Gutters Compliant with Current Building Codes?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1614,11 +1668,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('guttersNotes')} data-flag={flagOf('guttersNotes')}>
                           <label className="fa-fl">Gutter Notes</label>
                           <textarea className="fa-ta" style={{ minHeight: 60 }} placeholder="e.g. No overflow provisions" value={roofReportFields.guttersNotes} onChange={e => setRoofField('guttersNotes', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('downpipesCompliant')} data-flag={flagOf('downpipesCompliant')}>
                           <label className="fa-fl">Number of Downpipes Compliant?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1626,7 +1680,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('corrosionIronizedWater')} data-flag={flagOf('corrosionIronizedWater')}>
                           <label className="fa-fl">Corrosion Due to Ironized Water?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1634,11 +1688,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('downpipeSize')} data-flag={flagOf('downpipeSize')}>
                           <label className="fa-fl">Downpipe Size</label>
                           <input className="fa-input" type="text" placeholder="e.g. 95x45mm / 75mm round" value={roofReportFields.downpipeSize} onChange={e => setRoofField('downpipeSize', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('roofStructureTiedDown')} data-flag={flagOf('roofStructureTiedDown')}>
                           <label className="fa-fl">Roof Structure Tied Down / Compliant?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No', 'N/A'] as const).map(o => (
@@ -1646,7 +1700,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('battenSizeCompliant')} data-flag={flagOf('battenSizeCompliant')}>
                           <label className="fa-fl">Batten Size &amp; Spacing Compliant?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No', 'N/A'] as const).map(o => (
@@ -1654,7 +1708,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('trussRafterCompliant')} data-flag={flagOf('trussRafterCompliant')}>
                           <label className="fa-fl">Truss/Rafter Size &amp; Spacing Compliant?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No', 'N/A'] as const).map(o => (
@@ -1665,33 +1719,33 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
                         {/* ── Cause of Damage ── */}
                         <div className="mc-rrf-sub">Cause of Damage</div>
-                        <div className="fa-fg">
+                        <div className={fg('claimType')} data-flag={flagOf('claimType')}>
                           <label className="fa-fl">Claim Type</label>
                           <input className="fa-input" type="text" placeholder="e.g. Storm, Accidental damage, Flood" value={roofReportFields.claimType} onChange={e => setRoofField('claimType', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('specificCause')} data-flag={flagOf('specificCause')}>
                           <label className="fa-fl">Specific Cause</label>
                           <textarea className="fa-ta" style={{ minHeight: 100 }} placeholder="Describe the specific cause and water entry points…" value={roofReportFields.specificCause} onChange={e => setRoofField('specificCause', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('causeSummary')} data-flag={flagOf('causeSummary')}>
                           <label className="fa-fl">Page One · Short Cause</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="One or two sentences with the letters, e.g. Stormwater entry from 2 defects: (A) … (B) …" value={roofReportFields.causeSummary} onChange={e => setRoofField('causeSummary', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('problemSummaries')} data-flag={flagOf('problemSummaries')}>
                           <label className="fa-fl">Page One · Problems (one per line)</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="(A) Enclosed patio - Roof tiles stop short of the gutter" value={roofReportFields.problemSummaries} onChange={e => setRoofField('problemSummaries', e.target.value)} />
                         </div>
 
                         {/* ── Client Discussion ── */}
                         <div className="mc-rrf-sub">Client Discussion</div>
-                        <div className="fa-fg">
+                        <div className={fg('clientDiscussion')} data-flag={flagOf('clientDiscussion')}>
                           <label className="fa-fl">Client Stated</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="What did the insured/client state about the loss…" value={roofReportFields.clientDiscussion} onChange={e => setRoofField('clientDiscussion', e.target.value)} />
                         </div>
 
                         {/* ── Roof Conditions ── */}
                         <div className="mc-rrf-sub">Roof Conditions</div>
-                        <div className="fa-fg">
+                        <div className={fg('propertyConditionsContributed')} data-flag={flagOf('propertyConditionsContributed')}>
                           <label className="fa-fl">Property Conditions Contributed to Claim Damage?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1699,11 +1753,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('propertyConditionsDetails')} data-flag={flagOf('propertyConditionsDetails')}>
                           <label className="fa-fl">Contributing Conditions Details</label>
                           <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List contributing property conditions…" value={roofReportFields.propertyConditionsDetails} onChange={e => setRoofField('propertyConditionsDetails', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('damageWithoutConditions')} data-flag={flagOf('damageWithoutConditions')}>
                           <label className="fa-fl">If in Good Condition Prior, Would Damage Still Have Occurred?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1711,7 +1765,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('customerAwareOfConditions')} data-flag={flagOf('customerAwareOfConditions')}>
                           <label className="fa-fl">Would Customer Have Been Reasonably Aware of Property Conditions?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1719,7 +1773,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('otherPropertyConditionIssues')} data-flag={flagOf('otherPropertyConditionIssues')}>
                           <label className="fa-fl">Any Other Issues Relating to Property Conditions?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1728,12 +1782,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           </div>
                         </div>
                         {roofReportFields.otherPropertyConditionIssues === 'Yes' && (
-                          <div className="fa-fg">
+                          <div className={fg('otherPropertyConditionDetails')} data-flag={flagOf('otherPropertyConditionDetails')}>
                             <label className="fa-fl">Other Condition Issue Details</label>
                             <textarea className="fa-ta" style={{ minHeight: 70 }} value={roofReportFields.otherPropertyConditionDetails} onChange={e => setRoofField('otherPropertyConditionDetails', e.target.value)} />
                           </div>
                         )}
-                        <div className="fa-fg">
+                        <div className={fg('maintenanceRepairsRequired')} data-flag={flagOf('maintenanceRepairsRequired')}>
                           <label className="fa-fl">Maintenance Repairs Required?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1741,15 +1795,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('requiredMaintenanceDetails')} data-flag={flagOf('requiredMaintenanceDetails')}>
                           <label className="fa-fl">Required / Urgent Maintenance</label>
                           <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List urgent maintenance items…" value={roofReportFields.requiredMaintenanceDetails} onChange={e => setRoofField('requiredMaintenanceDetails', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('recommendedMaintenanceDetails')} data-flag={flagOf('recommendedMaintenanceDetails')}>
                           <label className="fa-fl">Recommended / Other Maintenance</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="List recommended maintenance items…" value={roofReportFields.recommendedMaintenanceDetails} onChange={e => setRoofField('recommendedMaintenanceDetails', e.target.value)} />
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('conditionsPreventRepairs')} data-flag={flagOf('conditionsPreventRepairs')}>
                           <label className="fa-fl">Conditions / Maintenance Items Prevent Warrantable Claim Repairs?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1758,12 +1812,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           </div>
                         </div>
                         {roofReportFields.conditionsPreventRepairs === 'Yes' && (
-                          <div className="fa-fg">
+                          <div className={fg('conditionsPreventRepairsDetails')} data-flag={flagOf('conditionsPreventRepairsDetails')}>
                             <label className="fa-fl">Details</label>
                             <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.conditionsPreventRepairsDetails} onChange={e => setRoofField('conditionsPreventRepairsDetails', e.target.value)} />
                           </div>
                         )}
-                        <div className="fa-fg">
+                        <div className={fg('previousRepairs')} data-flag={flagOf('previousRepairs')}>
                           <label className="fa-fl">Previous Repairs Revealed?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1772,12 +1826,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           </div>
                         </div>
                         {roofReportFields.previousRepairs === 'Yes' && (
-                          <div className="fa-fg">
+                          <div className={fg('previousRepairsDetails')} data-flag={flagOf('previousRepairsDetails')}>
                             <label className="fa-fl">Previous Repair Details</label>
                             <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.previousRepairsDetails} onChange={e => setRoofField('previousRepairsDetails', e.target.value)} />
                           </div>
                         )}
-                        <div className="fa-fg">
+                        <div className={fg('buildingCodeViolations')} data-flag={flagOf('buildingCodeViolations')}>
                           <label className="fa-fl">Building Code Violations Revealed?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1786,7 +1840,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           </div>
                         </div>
                         {roofReportFields.buildingCodeViolations === 'Yes' && (
-                          <div className="fa-fg">
+                          <div className={fg('buildingCodeViolationsDetails')} data-flag={flagOf('buildingCodeViolationsDetails')}>
                             <label className="fa-fl">Violation Details</label>
                             <textarea className="fa-ta" style={{ minHeight: 60 }} value={roofReportFields.buildingCodeViolationsDetails} onChange={e => setRoofField('buildingCodeViolationsDetails', e.target.value)} />
                           </div>
@@ -1794,7 +1848,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
                         {/* ── Access and Safety ── */}
                         <div className="mc-rrf-sub">Access and Safety</div>
-                        <div className="fa-fg">
+                        <div className={fg('accessConcerns')} data-flag={flagOf('accessConcerns')}>
                           <label className="fa-fl">Access Concerns Preventing Repairs?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1802,7 +1856,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                             ))}
                           </div>
                         </div>
-                        <div className="fa-fg">
+                        <div className={fg('healthSafetyConcerns')} data-flag={flagOf('healthSafetyConcerns')}>
                           <label className="fa-fl">Health &amp; Safety Concerns Preventing Repairs?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1813,7 +1867,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
 
                         {/* ── Additional Information ── */}
                         <div className="mc-rrf-sub">Additional Information</div>
-                        <div className="fa-fg">
+                        <div className={fg('makeSafeCompleted')} data-flag={flagOf('makeSafeCompleted')}>
                           <label className="fa-fl">Has a Make Safe Been Completed?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (
@@ -1822,12 +1876,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           </div>
                         </div>
                         {roofReportFields.makeSafeCompleted === 'Yes' && (
-                          <div className="fa-fg">
+                          <div className={fg('makeSafeCompletedDetails')} data-flag={flagOf('makeSafeCompletedDetails')}>
                             <label className="fa-fl">Make Safe Works Completed</label>
                             <textarea className="fa-ta" style={{ minHeight: 80 }} placeholder="List make safe works carried out on site…" value={roofReportFields.makeSafeCompletedDetails} onChange={e => setRoofField('makeSafeCompletedDetails', e.target.value)} />
                           </div>
                         )}
-                        <div className="fa-fg" style={{ paddingBottom: 16 }}>
+                        <div className={fg('makeSafeRequired')} data-flag={flagOf('makeSafeRequired')} style={{ paddingBottom: 16 }}>
                           <label className="fa-fl">Is a Make Safe Required?</label>
                           <div className="fa-rg inline">
                             {(['Yes', 'No'] as const).map(o => (

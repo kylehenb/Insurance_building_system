@@ -58,4 +58,12 @@ describe('Midcity report routes', () => {
     expect(aiCalls[0].system).toContain('CAUSE OF DAMAGE FORMAT')
     expect(aiCalls[0].system).toContain('PAGE ONE SUMMARY')
   })
+
+  it('returns the fields the AI guessed apart from the report', async () => {
+    me = { tenantId: 't1', userId: 'u1' }
+    aiReply = JSON.stringify({ roofType: 'Tile', roofPitch: '20', uncertainFields: ['roofPitch', 'notAField', 'roofPitch'] })
+    const body = await (await post(roof, { rawNotes: 'Tile roof' })).json()
+    expect(body.uncertainFields).toEqual(['roofPitch'])
+    expect(body.reportData).toEqual({ roofType: 'Tile', roofPitch: '20' })
+  })
 })
