@@ -396,18 +396,23 @@ function MidcityPhotoCard({
 }
 
 // A roof photo from the IRC field app's uploader: saved on the phone, uploaded,
-// then sorted by the AI on the server. One tap tags it: a problem letter (the
-// colours match the report), a fixed type, or nothing (just its number in the
-// report). The note is optional and rarely used. Tags: lib/photos/roof-tags.ts
-export function RoofPhotoCard({ photo, letters, onTag, onNote, onDelete }: {
+// then sorted by the AI on the server. Compact so a long list scrolls quickly:
+// the photo on the left (tap it to see it full screen), the problem letters as
+// one-tap buttons beside it (colours match the report), the rarer fixed types
+// (Front, Overview, Ladder…) in a dropdown, and a note only when wanted.
+// Tags: lib/photos/roof-tags.ts
+export function RoofPhotoCard({ photo, number, letters, onTag, onNote, onDelete, onView }: {
   photo: FieldPhoto
+  number: number
   letters: string[]
   onTag: (tag: RoofPhotoTag) => void
   onNote: (note: string) => void
   onDelete: () => void
+  onView: () => void
 }) {
   const preparing = photo.status === 'waiting' || photo.status === 'converting'
   const { tag, note } = parseRoofLabel(photo.label)
+  const [noteOpen, setNoteOpen] = useState(false)
   const aiPick = photo.labelSource === 'ai' && tag.kind !== 'none'
   const waitingForAi = photo.status === 'uploaded' && photo.labelSource !== 'inspector' && photo.aiStatus !== 'done' && photo.aiStatus !== 'failed'
   const tagColour = tag.kind === 'issue' ? issueColour(tag.letter) : tag.kind === 'type' ? 'var(--black)' : null
@@ -415,59 +420,99 @@ export function RoofPhotoCard({ photo, letters, onTag, onNote, onDelete }: {
   const toggle = (t: RoofPhotoTag) => onTag(sameTag(t, tag) ? { kind: 'none' } : t)
   return (
     <div className="rp-card">
-      <div className="rp-thumb">
-        {photo.previewUrl
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={photo.previewUrl} alt="roof photo" draggable={false} loading="lazy" />
-          : <span style={{ fontSize: 22 }}>📷</span>}
-        {preparing && (
-          <div className="fa-photo-status">
-            <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 20, height: 20 }} />
-            <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
+      <div className="rp-row">
+        <button type="button" className="rp-thumb" onClick={onView} disabled={!photo.previewUrl} aria-label={`View photo ${number}`}>
+          {photo.previewUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={photo.previewUrl} alt="" draggable={false} loading="lazy" />
+            : <span style={{ fontSize: 22 }}>📷</span>}
+          {preparing && (
+            <div className="fa-photo-status">
+              <span className="fa-spinner" style={{ borderColor: 'white', borderTopColor: 'transparent', width: 20, height: 20 }} />
+              <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
+            </div>
+          )}
+          <span className="rp-num">{number}</span>
+          {!preparing && photo.status !== 'uploaded' && (
+            <span className="fa-photo-badge">{photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}</span>
+          )}
+          {tagColour && <span className="rp-thumb-tag" style={{ background: tagColour }}>{tagText}</span>}
+        </button>
+        <div className="rp-controls">
+          <div className="rp-letters">
+            {letters.map(l => {
+              const on = tag.kind === 'issue' && tag.letter === l
+              const c = issueColour(l)
+              return (
+                <button key={l} type="button" className="rp-chip rp-letter" disabled={preparing} aria-pressed={on}
+                  style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
+                  onClick={() => toggle({ kind: 'issue', letter: l })}>
+                  ({l})
+                </button>
+              )
+            })}
+            <button type="button" className={`rp-chip rp-none${tag.kind === 'none' && photo.labelSource === 'inspector' ? ' on' : ''}`} disabled={preparing}
+              onClick={() => onTag({ kind: 'none' })}>
+              None
+            </button>
           </div>
-        )}
-        {!preparing && (
-          <span className={`fa-photo-badge${photo.status === 'uploaded' ? ' up' : ''}`}>
-            {photo.status === 'uploaded' ? '✓' : photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}
-          </span>
-        )}
-        {tagColour && <span className="rp-thumb-tag" style={{ background: tagColour }}>{tagText}</span>}
-        {!preparing && <button className="fa-photo-del" onClick={onDelete} aria-label="Delete photo">×</button>}
+          <select className={`rp-type-select${tag.kind === 'type' ? ' on' : ''}`} disabled={preparing} aria-label="Photo type"
+            value={tag.kind === 'type' ? tag.key : ''}
+            onChange={e => onTag(e.target.value ? { kind: 'type', key: e.target.value as (typeof ROOF_TAGS)[number]['key'] } : { kind: 'none' })}>
+            <option value="">Photo type…</option>
+            {ROOF_TAGS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+          <div className="rp-foot">
+            <span className="rp-status">{waitingForAi ? 'AI sorting…' : aiPick ? 'AI pick' : ''}</span>
+            {!noteOpen && !note && (
+              <button type="button" className="rp-link" disabled={preparing} onClick={() => setNoteOpen(true)}>+ Note</button>
+            )}
+            {!preparing && <button type="button" className="rp-link rp-del" onClick={onDelete} aria-label={`Delete photo ${number}`}>Delete</button>}
+          </div>
+        </div>
       </div>
-      <div className="rp-controls">
-        <div className="rp-chips">
-          {letters.map(l => {
-            const on = tag.kind === 'issue' && tag.letter === l
-            const c = issueColour(l)
-            return (
-              <button key={l} type="button" className="rp-chip rp-letter" disabled={preparing}
-                style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
-                onClick={() => toggle({ kind: 'issue', letter: l })}>
-                ({l})
-              </button>
-            )
-          })}
-          <button type="button" className={`rp-chip rp-none${tag.kind === 'none' && photo.labelSource === 'inspector' ? ' on' : ''}`} disabled={preparing}
-            onClick={() => onTag({ kind: 'none' })}>
-            None
-          </button>
-        </div>
-        <div className="rp-chips">
-          {ROOF_TAGS.map(t => {
-            const on = tag.kind === 'type' && tag.key === t.key
-            return (
-              <button key={t.key} type="button" className={`rp-chip rp-type${on ? ' on' : ''}`} disabled={preparing}
-                onClick={() => toggle({ kind: 'type', key: t.key })}>
-                {t.chip}
-              </button>
-            )
-          })}
-        </div>
-        <div className="rp-status">
-          {waitingForAi ? 'AI sorting…' : aiPick ? 'AI pick · tap to change' : ''}
-        </div>
-        <input className="rp-note" type="text" placeholder="Add a note (optional)" value={note} disabled={preparing}
-          onChange={e => onNote(e.target.value)} />
+      {(noteOpen || !!note) && (
+        <input className="rp-note" type="text" placeholder="Note (optional)" value={note} disabled={preparing} autoFocus={noteOpen && !note}
+          onChange={e => onNote(e.target.value)} onBlur={() => { if (!note) setNoteOpen(false) }} />
+      )}
+    </div>
+  )
+}
+
+// A roof photo full screen, with the same one-tap letters, to check what's in it
+function RoofPhotoViewer({ photo, number, letters, onTag, onClose }: {
+  photo: FieldPhoto
+  number: number
+  letters: string[]
+  onTag: (tag: RoofPhotoTag) => void
+  onClose: () => void
+}) {
+  const { tag } = parseRoofLabel(photo.label)
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+  return (
+    <div className="rp-viewer" role="dialog" aria-label={`Photo ${number}`}>
+      <div className="rp-viewer-bar">
+        <span>Photo {number}</span>
+        <button type="button" className="rp-viewer-close" onClick={onClose}>Done</button>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {photo.previewUrl && <img src={photo.previewUrl} alt={`Photo ${number}`} className="rp-viewer-img" />}
+      <div className="rp-viewer-tags">
+        {letters.map(l => {
+          const on = tag.kind === 'issue' && tag.letter === l
+          const c = issueColour(l)
+          return (
+            <button key={l} type="button" className="rp-chip rp-letter" aria-pressed={on}
+              style={{ borderColor: c, color: on ? 'white' : c, background: on ? c : 'white' }}
+              onClick={() => onTag(on ? { kind: 'none' } : { kind: 'issue', letter: l })}>
+              ({l})
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -561,6 +606,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // On the phone, the order taken (so photos don't jump while tagging); the report sorts them
   const newRoofPhotos = fieldPhotos.photos
   const [uploadDoneShown, setUploadDoneShown] = useState(false)
+  // The roof photo open full screen
+  const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null)
   const [relabelling, setRelabelling] = useState(false)
   const wasBusy = useRef(false)
   useEffect(() => {
@@ -1005,6 +1052,20 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   return (
     <>
     <div className="fa-root">
+      {(() => {
+        const i = newRoofPhotos.findIndex(p => p.id === viewingPhotoId)
+        if (i < 0) return null
+        const photo = newRoofPhotos[i]
+        return (
+          <RoofPhotoViewer
+            photo={photo}
+            number={roofPhotos.length + i + 1}
+            letters={problemLetters}
+            onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
+            onClose={() => setViewingPhotoId(null)}
+          />
+        )
+      })()}
       <UploadBanner
         total={photoCounts.total}
         saved={photoCounts.saved}
@@ -1817,14 +1878,16 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                     ))}
                   </div>
                   <div className="rp-list">
-                    {newRoofPhotos.map(photo => (
+                    {newRoofPhotos.map((photo, i) => (
                       <RoofPhotoCard
                         key={photo.id}
                         photo={photo}
+                        number={roofPhotos.length + i + 1}
                         letters={problemLetters}
                         onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
                         onNote={note => setRoofPhotoLabel(photo, composeRoofLabel(parseRoofLabel(photo.label).tag, note), photo.labelSource === 'inspector')}
-                        onDelete={() => fieldPhotos.remove(photo.id)}
+                        onDelete={() => { if (window.confirm(`Delete photo ${roofPhotos.length + i + 1}?`)) fieldPhotos.remove(photo.id) }}
+                        onView={() => setViewingPhotoId(photo.id)}
                       />
                     ))}
                     <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
