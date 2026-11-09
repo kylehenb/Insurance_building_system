@@ -189,22 +189,63 @@
 .fa-photo-check{font-size:13px;color:var(--orange);font-weight:600;margin-top:3px}
 .fa-ai-status{font-size:14px;color:var(--muted);margin:8px 0 0;line-height:1.4}
 
-/* ROOF PHOTOS: one per row, tap a chip to tag (lib/photos/roof-tags.ts) */
-.rp-list{display:flex;flex-direction:column;gap:12px;padding:4px 16px 18px}
-.rp-card{display:flex;flex-direction:column;gap:12px;border:1px solid var(--hairline);border-radius:var(--radius);background:white;padding:12px}
-.rp-thumb{position:relative;width:100%;aspect-ratio:4/3;flex-shrink:0;border-radius:var(--radius-sm);overflow:hidden;background:var(--off);display:flex;align-items:center;justify-content:center}
+/* ROOF PHOTOS: compact rows — photo left (tap to view full screen), one-tap
+   problem letters beside it, the rarer photo types in a dropdown (lib/photos/roof-tags.ts) */
+.rp-list{display:flex;flex-direction:column;gap:10px;padding:4px 16px 18px}
+.rp-card{display:flex;flex-direction:column;gap:10px;border:1px solid var(--hairline);border-radius:var(--radius);background:white;padding:10px}
+.rp-row{display:flex;gap:12px;align-items:stretch}
+.rp-thumb{position:relative;width:42%;max-width:220px;aspect-ratio:1/1;flex-shrink:0;border-radius:var(--radius-sm);overflow:hidden;background:var(--off);display:flex;align-items:center;justify-content:center;border:none;padding:0;cursor:zoom-in}
 .rp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.rp-thumb .fa-photo-del{position:absolute;top:8px;right:8px}
-.rp-thumb-tag{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);padding:5px 10px;border-radius:8px;color:white;font-size:15px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rp-controls{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.rp-num{position:absolute;top:6px;left:6px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:rgba(0,0,0,.6);color:white;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.rp-thumb .fa-photo-badge{top:auto;bottom:6px;left:6px}
+.rp-thumb-tag{position:absolute;right:6px;bottom:6px;max-width:calc(100% - 12px);padding:4px 8px;border-radius:8px;color:white;font-size:13px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-controls{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.rp-letters{display:flex;flex-wrap:wrap;gap:6px}
 .rp-chips{display:flex;flex-wrap:wrap;gap:8px}
-.rp-chip{min-height:44px;border-radius:999px;border:1.5px solid var(--border);background:white;font-family:var(--font-dm-sans);font-size:16px;font-weight:600;padding:0 16px;cursor:pointer;color:var(--text)}
+.rp-chip{min-height:44px;border-radius:999px;border:1.5px solid var(--border);background:white;font-family:var(--font-dm-sans);font-size:16px;font-weight:600;padding:0 14px;cursor:pointer;color:var(--text)}
 .rp-chip:disabled{opacity:.4}
-.rp-letter{min-width:58px;padding:0 10px;font-size:17px;font-weight:800}
+.rp-letter{min-width:50px;padding:0 6px;font-size:16px;font-weight:800}
+.rp-none{font-size:15px;padding:0 12px}
 .rp-none.on{background:var(--muted);border-color:var(--muted);color:white}
 .rp-type{min-height:40px;font-size:15px;font-weight:500;color:var(--text);background:var(--off);border-color:transparent}
 .rp-type.on{background:var(--black);border-color:var(--black);color:white}
-.rp-status{font-size:13px;font-weight:500;color:var(--indigo);min-height:16px}
+.rp-type-select{width:100%;min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--off);font-family:var(--font-dm-sans);font-size:16px;color:var(--muted);padding:0 12px;appearance:auto}
+.rp-type-select.on{background:var(--black);border-color:var(--black);color:white;font-weight:600}
+.rp-foot{display:flex;align-items:center;gap:12px;margin-top:auto}
+.rp-status{flex:1;font-size:13px;font-weight:500;color:var(--indigo);min-height:16px}
+.rp-link{background:none;border:none;color:var(--blue);font-family:var(--font-dm-sans);font-size:16px;font-weight:500;padding:8px 2px;min-height:40px;cursor:pointer}
+.rp-link:disabled{opacity:.4}
+.rp-del{color:var(--red)}
 .rp-note{width:100%;min-height:48px;border:1px solid var(--border);border-radius:var(--radius-sm);background:white;font-size:17px;padding:12px 14px;color:var(--text);outline:none;font-family:var(--font-dm-sans)}
 .rp-note:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
 .rp-add{width:100%;min-height:96px;aspect-ratio:auto}
+
+/* A roof photo full screen */
+.rp-viewer{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column}
+.rp-viewer-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;color:white;font-size:17px;font-weight:600}
+.rp-viewer-close{background:none;border:none;color:#4da3ff;font-size:17px;font-weight:600;min-height:44px;padding:0 4px;cursor:pointer}
+.rp-viewer-img{flex:1;min-height:0;width:100%;object-fit:contain}
+.rp-viewer-tags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:12px 16px calc(env(safe-area-inset-bottom) + 14px)}
+
+/* PHONE: use the full width — sections run edge to edge, no boxes within boxes */
+@media (max-width: 600px){
+  .fa-sc{margin:12px 0 0;border-radius:0;box-shadow:none;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)}
+  .fa-sc-head{padding:16px 16px 12px}
+  .fa-fg{padding:0 16px}
+  .fa-ai-dark{margin:0;border:none;border-radius:0}
+  .fa-ai-hints,.fa-ai-dark-head,.fa-ai-dark-body{padding-left:16px;padding-right:16px}
+  .mc-pills-wrap{padding:0}
+  .mc-pill{margin:0;border:none;border-radius:0;border-top:1px solid var(--hairline)}
+  .mc-pill.enabled{box-shadow:inset 4px 0 0 var(--blue)}
+  .mc-pill-header{padding:16px}
+  .mc-pill-body{border-top:1px solid var(--hairline)}
+  .mc-section-head{padding:22px 16px 8px}
+  .mc-rrf-head{padding:16px}
+  .mc-rrf-sub{padding:26px 16px 10px}
+  .mc-rrf-body .fa-fg{padding:4px 16px 0}
+  .rp-list{padding:4px 0 16px;gap:0}
+  .rp-card{border:none;border-bottom:1px solid var(--hairline);border-radius:0;padding:12px 16px}
+  .fa-photo-grid{padding:12px 16px}
+  .mc-export-wrap{padding:16px}
+}
+@media (max-width: 600px){.rp-add{margin:12px 16px;width:calc(100% - 32px)}}

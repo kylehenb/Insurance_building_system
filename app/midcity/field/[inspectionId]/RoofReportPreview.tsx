@@ -49,6 +49,25 @@ const ROOFER_QUAL = 'Roof Plumber, Registered Builder BP103432'
 
 const v = (val: string) => val || '—'
 
+// The report body in page one's look (RoofReportPageOne.tsx): white page, the
+// phone's own font, section titles over a hairline, grey labels with dark
+// answers, yes/no answers as small pills, charcoal only for the rule and footer.
+const INK = '#1c1c1e'
+const MUTED = '#6e6e73'
+const LINE = '#e5e5ea'
+const PAD = 40
+const HEAD_FONT = 'var(--font-geist-sans), var(--font-dm-sans), system-ui, sans-serif'
+const PRINT_EXACT = { printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' } as const
+
+// "Yes" / "No" / "N/A" (and Good / Fair / Poor) as a small pill; anything else as text
+const Answer = ({ val }: { val: string }) => {
+  const t = (val ?? '').trim()
+  if (!/^(yes|no|n\/a|good|fair|poor)$/i.test(t)) return <>{v(t)}</>
+  return (
+    <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 999, background: '#f2f2f7', color: INK, fontWeight: 700, fontSize: 11, ...PRINT_EXACT }}>{t}</span>
+  )
+}
+
 const PHOTO_PILL: React.CSSProperties = {
   position: 'absolute', top: 6, left: 6, maxWidth: '78%',
   display: 'flex', alignItems: 'flex-start', gap: 5,
@@ -89,42 +108,36 @@ const Points = ({ text }: { text: string }) => {
 }
 
 const SH = ({ title }: { title: string }) => (
-  <tr>
+  <tr style={{ breakAfter: 'avoid' as const }}>
     <td colSpan={2} style={{
-      background: 'var(--ink)', color: 'white',
-      padding: '7px 14px', fontSize: 11, fontWeight: 700,
-      letterSpacing: '0.8px', textTransform: 'uppercase' as const,
+      padding: '22px 0 6px', fontFamily: HEAD_FONT, fontSize: 15, fontWeight: 600, color: INK,
+      borderBottom: `1.5px solid ${INK}`,
     }}>
       {title}
     </td>
   </tr>
 )
 
+const LABEL_TD: React.CSSProperties = { padding: '8px 16px 8px 0', fontSize: 11, color: MUTED, width: '58%', verticalAlign: 'top', lineHeight: 1.45 }
+const VALUE_TD: React.CSSProperties = { padding: '8px 0', fontSize: 12, fontWeight: 600, color: INK, verticalAlign: 'top', lineHeight: 1.45 }
+
 const R = ({ label, val }: { label: string; val: string }) => (
-  <tr>
-    <td style={{ padding: '6px 14px', fontSize: 11, fontWeight: 600, color: '#444', borderBottom: '1px solid #ebebeb', width: '58%', verticalAlign: 'top' as const }}>
-      {label}
-    </td>
-    <td style={{ padding: '6px 14px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', verticalAlign: 'top' as const }}>
-      {v(val)}
-    </td>
+  <tr style={{ breakInside: 'avoid' as const }}>
+    <td style={{ ...LABEL_TD, borderBottom: `1px solid ${LINE}` }}>{label}</td>
+    <td style={{ ...VALUE_TD, borderBottom: `1px solid ${LINE}` }}><Answer val={val} /></td>
   </tr>
 )
 
 const YNR = ({ label, answer, details }: { label: string; answer: string; details?: string }) => (
   <>
-    <tr>
-      <td style={{ padding: '6px 14px', fontSize: 11, fontWeight: 600, color: '#444', borderBottom: details ? 'none' : '1px solid #ebebeb', width: '58%', verticalAlign: 'top' as const }}>
-        {label}
-      </td>
-      <td style={{ padding: '6px 14px', fontSize: 11, color: '#111', borderBottom: details ? 'none' : '1px solid #ebebeb', verticalAlign: 'top' as const }}>
-        {v(answer)}
-      </td>
+    <tr style={{ breakInside: 'avoid' as const }}>
+      <td style={{ ...LABEL_TD, borderBottom: details ? 'none' : `1px solid ${LINE}` }}>{label}</td>
+      <td style={{ ...VALUE_TD, borderBottom: details ? 'none' : `1px solid ${LINE}` }}><Answer val={answer} /></td>
     </tr>
     {details && (
-      <tr>
-        <td colSpan={2} style={{ padding: '2px 14px 8px 26px', fontSize: 11, color: '#333', borderBottom: '1px solid #ebebeb', lineHeight: 1.55 }}>
-          <Points text={details} />
+      <tr style={{ breakInside: 'avoid' as const }}>
+        <td colSpan={2} style={{ padding: '0 0 10px 14px', fontSize: 11.5, color: INK, borderBottom: `1px solid ${LINE}`, lineHeight: 1.55 }}>
+          <div style={{ borderLeft: `2px solid ${LINE}`, paddingLeft: 10 }}><Points text={details} /></div>
         </td>
       </tr>
     )}
@@ -133,13 +146,13 @@ const YNR = ({ label, answer, details }: { label: string; answer: string; detail
 
 const FR = ({ label, val }: { label: string; val: string }) => (
   <>
-    <tr>
-      <td colSpan={2} style={{ padding: '7px 14px 3px', fontSize: 11, fontWeight: 600, color: '#444', borderBottom: 'none' }}>
+    <tr style={{ breakAfter: 'avoid' as const }}>
+      <td colSpan={2} style={{ padding: '9px 0 3px', fontSize: 11, color: MUTED }}>
         {label}
       </td>
     </tr>
     <tr>
-      <td colSpan={2} style={{ padding: '3px 14px 9px', fontSize: 11, color: '#111', borderBottom: '1px solid #ebebeb', lineHeight: 1.6 }}>
+      <td colSpan={2} style={{ padding: '2px 0 10px', fontSize: 12, color: INK, borderBottom: `1px solid ${LINE}`, lineHeight: 1.6 }}>
         <Points text={val} />
       </td>
     </tr>
@@ -271,27 +284,25 @@ export function RoofReportPreview({
             />
             <div className="mc-rrp-page-gap" style={{ height: 18, background: '#edebe7' }} />
 
-            {/* Header */}
-            <div style={{ padding: '18px 24px 16px', borderBottom: '3px solid var(--ink)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20 }}>
-              <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.3px', marginBottom: 6 }}>
-                  Roof Inspection Report
+            {/* Header: as page one — company and contact, the charcoal rule, the title */}
+            <div className="mc-rrp-body-head" style={{ padding: `30px ${PAD}px 0`, fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+                  <span style={{ fontFamily: HEAD_FONT, fontWeight: 800, fontSize: 19, letterSpacing: 1.5, color: INK }}>BINDI CO</span>
+                  <span style={{ fontFamily: HEAD_FONT, fontWeight: 600, fontSize: 8.5, letterSpacing: 3.5, color: MUTED, marginTop: 3 }}>ROOF REPORTS</span>
                 </div>
-                {jobLine && (
-                  <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500, padding: '6px 10px', background: '#f5f5f5', borderLeft: '3px solid var(--ink)', borderRadius: '0 3px 3px 0', marginTop: 4 }}>
-                    {jobLine}
-                  </div>
-                )}
+                <div style={{ textAlign: 'right' as const, fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                  <div><b style={{ color: INK }}>{ROOFER_NAME}</b> · {ROOFER_QUAL}</div>
+                  <div>0431 132 077 · kyle@binditrades.com.au</div>
+                  <div>BC103561 · BP103432</div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' as const, flexShrink: 0, fontSize: 11, color: '#444', lineHeight: 1.7 }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 2 }}>Bindi Co</div>
-                <div>Contact: {ROOFER_NAME}</div>
-                <div>Ph: 0431 132 077</div>
-                <div>E: kyle@binditrades.com.au</div>
-                <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>BC103561 &nbsp; BP103432</div>
-              </div>
+              <div style={{ height: 9, borderRadius: 6, background: INK, margin: '18px 0 16px', ...PRINT_EXACT }} />
+              <div style={{ fontFamily: HEAD_FONT, fontSize: 24, fontWeight: 600, letterSpacing: -0.3, color: INK }}>Roof Inspection Report</div>
+              {jobLine && <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>{jobLine}</div>}
             </div>
 
+            <div style={{ padding: `0 ${PAD}px`, fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <tbody>
 
@@ -412,13 +423,14 @@ export function RoofReportPreview({
 
               </tbody>
             </table>
+            </div>
 
             {/* Statement of Objectivity */}
-            <div style={{ padding: '18px 24px', borderTop: '1px solid #ddd' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.6px', color: '#222', marginBottom: 10 }}>
+            <div style={{ padding: `26px ${PAD}px 8px`, fontFamily: 'var(--font-dm-sans), system-ui, sans-serif', breakInside: 'avoid' as const }}>
+              <div style={{ fontFamily: HEAD_FONT, fontSize: 15, fontWeight: 600, color: INK, borderBottom: `1.5px solid ${INK}`, paddingBottom: 6, marginBottom: 10 }}>
                 Statement of Objectivity
               </div>
-              <div style={{ fontSize: 11, color: '#333', lineHeight: 1.65 }}>
+              <div style={{ fontSize: 11, color: '#3a3a3c', lineHeight: 1.65 }}>
                 <p style={{ marginTop: 0, marginBottom: 8 }}>
                   I {ROOFER_NAME} have prepared this expert report for Bindi Co. I confirm the following:
                 </p>
@@ -442,9 +454,9 @@ export function RoofReportPreview({
 
             {/* Photos */}
             {photos.length > 0 && (
-              <div style={{ padding: '18px 24px', borderTop: '1px solid #ddd' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.6px', color: '#222', marginBottom: 14 }}>
-                  Photo Record
+              <div style={{ padding: `26px ${PAD}px 18px`, fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
+                <div style={{ fontFamily: HEAD_FONT, fontSize: 15, fontWeight: 600, color: INK, borderBottom: `1.5px solid ${INK}`, paddingBottom: 6, marginBottom: 14 }}>
+                  Photographs
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                   {orderedPhotos.map((photo, idx) => {
@@ -465,17 +477,17 @@ export function RoofReportPreview({
                     return (
                       <Fragment key={photo.id}>
                         {heading !== null && (
-                          <div style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 700, color: colour!, borderBottom: `2px solid ${colour}`, paddingBottom: 4, marginTop: idx ? 4 : 0 }}>
+                          <div style={{ gridColumn: '1 / -1', fontSize: 12, fontWeight: 700, color: colour!, borderBottom: `2px solid ${colour}`, paddingBottom: 4, marginTop: idx ? 6 : 0 }}>
                             ({(tag as { letter: string }).letter}) {heading}
                           </div>
                         )}
                         {otherPhotos && (
-                          <div style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 700, color: '#555', borderBottom: '2px solid #ddd', paddingBottom: 4, marginTop: 4 }}>
+                          <div style={{ gridColumn: '1 / -1', fontSize: 12, fontWeight: 700, color: MUTED, borderBottom: `2px solid ${LINE}`, paddingBottom: 4, marginTop: 6 }}>
                             Other photos
                           </div>
                         )}
                         <div style={{ breakInside: 'avoid' as const }}>
-                          <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f0f0f0', borderRadius: 4, border: colour ? `2px solid ${colour}` : '1px solid #ddd' }}>
+                          <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f2f2f7', borderRadius: 8, border: colour ? `2px solid ${colour}` : `1px solid ${LINE}` }}>
                             <img
                               src={photo.previewUrl}
                               alt={photo.label || `Photo ${idx + 1}`}
@@ -501,12 +513,11 @@ export function RoofReportPreview({
             )}
 
             {/* Footer */}
-            <div style={{ padding: '11px 24px', background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 9, color: '#ffffff', letterSpacing: '1px', textTransform: 'uppercase' as const, fontWeight: 700 }}>
-                Bindi Co
-              </div>
-              <div style={{ fontSize: 9, color: '#777' }}>
-                Roof Inspection Report · Private &amp; Confidential
+            <div style={{ padding: `0 ${PAD}px 22px`, fontFamily: 'var(--font-dm-sans), system-ui, sans-serif' }}>
+              <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 9, color: '#8e8e93', letterSpacing: 1 }}>
+                <span style={{ background: INK, color: '#ffffff', fontFamily: HEAD_FONT, fontWeight: 800, fontSize: 11, letterSpacing: 2, padding: '3px 7px', ...PRINT_EXACT }}>BINDI CO</span>
+                <span>BINDITRADES.COM.AU</span>
+                <span>ROOF INSPECTION REPORT · PRIVATE &amp; CONFIDENTIAL</span>
               </div>
             </div>
 
