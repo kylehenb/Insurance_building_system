@@ -11,7 +11,7 @@ vi.mock('@/lib/mcp/tools/excess', () => ({
   jobFromArgs: async (args: Row) => (args.job_number === 'IRC1001' ? { id: 'j1', job_number: 'IRC1001' } : { text: 'No job found.', isError: true }),
 }))
 
-const { setFollowUp, listFollowUps, changeFollowUp } = await import('../tools/follow-ups')
+const { setFollowUp, listFollowUps, changeFollowUp, addTodo } = await import('../tools/follow-ups')
 const ctx = () => ({ supabase: fakeSupabase(tables) as never, tenantId: 't1', userId: 'u1' })
 
 beforeEach(() => {
@@ -47,5 +47,25 @@ describe('list_follow_ups and change_follow_up', () => {
     expect((await changeFollowUp.run({ follow_up_id: id, when: '2099-01-05' }, ctx())).text).toMatch(/^Follow-up now Mon 5 Jan: Chase quote/)
     expect((await changeFollowUp.run({ follow_up_id: id, cancel: true }, ctx())).text).toBe('Follow-up cancelled.')
     expect((await changeFollowUp.run({ follow_up_id: id, cancel: true }, ctx())).isError).toBe(true)
+  })
+})
+
+describe('add_todo', () => {
+  it('puts a to-do on the list now, in the user\'s words', async () => {
+    const out = await addTodo.run({ note: 'Ring Brett about the excess', job_number: 'IRC1001' }, ctx())
+    expect(out.text).toBe('To-do on your action cards now on IRC1001: Ring Brett about the excess.')
+    expect(tables.action_queue[0]).toMatchObject({ status: 'pending', rule_key: 'todo_remind', job_id: 'j1', title: 'Ring Brett about the excess' })
+  })
+
+  it('adds one for a day, for IRC to draft the steps then', async () => {
+    const out = await addTodo.run({ note: 'Email the plumber for a booking', when: '3', mode: 'do', urgent: true }, ctx())
+    expect(out.text).toMatch(/^To-do added for \w{3} \d+ \w{3}: Email the plumber for a booking\. IRC will draft the steps then\.$/)
+    expect(tables.action_queue[0]).toMatchObject({ status: 'scheduled', rule_key: 'todo_do', priority: 90 })
+  })
+
+  it('asks when it can\'t read the day, and passes on an unknown job', async () => {
+    expect(await addTodo.run({ note: 'x', when: 'soonish' }, ctx())).toMatchObject({ isError: true, text: expect.stringMatching(/^When should it be\?/) })
+    expect(await addTodo.run({ note: 'x', job_number: 'IRC9' }, ctx())).toMatchObject({ isError: true, text: 'No job found.' })
+    expect(tables.action_queue ?? []).toHaveLength(0)
   })
 })

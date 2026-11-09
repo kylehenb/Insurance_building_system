@@ -15,7 +15,14 @@ import { orderUpdateThreads } from '@/lib/insurer-orders/order-update'
 // category and stays until they clear it.
 
 export class CardError extends Error {
-  constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
+  constructor(
+    message: string,
+    public readonly status: 400 | 404 | 409 = 400,
+    /** changed_since: the job moved on since the card was written — confirm again with still_do to go ahead */
+    public readonly code?: 'changed_since',
+    /** For changed_since: what happened, a line each */
+    public readonly changes?: string[],
+  ) {
     super(message)
     this.name = 'CardError'
   }
@@ -72,11 +79,19 @@ export type FollowUp = {
   from_card_id: string | null
   /** Who it's for: who set it, or who sent the email a waiting-on follow-up came from */
   created_by: string | null
-  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts); watch: a check IRC planned reviewing the job (lib/jobs/review.ts) */
-  kind?: 'waiting_on' | 'watch'
+  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts); watch: a check IRC planned reviewing the job (lib/jobs/review.ts); todo: a to-do a person added (lib/actions/followups.ts) */
+  kind?: 'waiting_on' | 'watch' | 'todo'
+  /** A to-do: remind (on the list in their words, no AI) or do (the AI drafts the steps that do it) */
+  todo?: { mode: TodoMode }
   waiting?: WaitingOn
   watch?: { why: string; planned_at: string }
 }
+
+export type TodoMode = 'remind' | 'do'
+
+/** A to-do or reminder a person set: theirs to clear — IRC never closes it by itself */
+export const isPersonsOwn = (c: Pick<ActionCard, 'source' | 'follow_up' | 'starred_by'>): boolean =>
+  !!c.starred_by || (c.source === 'followup' && (!c.follow_up?.kind || c.follow_up.kind === 'todo'))
 
 /** A waiting-on follow-up: who was asked for what, and why the chase is when it is */
 export type WaitingOn = {
@@ -133,12 +148,14 @@ export type ActionCard = {
   ai_steps: CardStep[] | null
   /** What the card was made about: sender, insurer, job stage… (lib/actions/learning.ts) */
   situation: Situation | null
+  /** When the card last saw its job: made, or checked against what's happened since (lib/actions/recheck.ts) */
+  checked_at: string | null
 }
 
 /** Cards that can still change: one per conversation (see the unique index) */
 export const LIVE_STATUSES: CardStatus[] = ['queued', 'generating', 'pending', 'failed']
 
-export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up, ai_steps, situation'
+export const CARD_COLUMNS = 'id, tenant_id, job_id, source, source_ref, trigger_ref, title, description, reasoning, steps, status, category, starred_by, priority, outcome, error_log, attempts, created_at, updated_at, due_at, follow_up, ai_steps, situation, checked_at'
 
 /** Priority from the model's high / normal / low */
 export const PRIORITY = { high: 90, normal: 50, low: 20 } as const
@@ -434,19 +451,24 @@ export async function markCardDone(db: SupabaseClient, tenantId: string, id: str
  * Puts a done, skipped or no-action card back on the to-do list. A
  * conversation has one live card, so not if it already has another.
  */
-export async function reopenCard(db: SupabaseClient, tenantId: string, id: string): Promise<ActionCard> {
-  const card = await getCard(db, tenantId, id)
-  if (!card) throw new CardError('Card not found', 404)
+export async function reopenCard(db: SupabaseClient, tenantId: string, id: string, userId: string | null = null): Promise<ActionCard> {
+  const found = await getCard(db, tenantId, id)
+  if (!found) throw new CardError('Card not found', 404)
+  // As it was closed: how it was closed is what's learned from
+  const card = { ...found }
   if (!['done', 'skipped', 'no_action'].includes(card.status)) throw new CardError(`This card is ${card.status} — it's already on the list or on its way`, 409)
   if (card.source === 'email' && card.source_ref && await liveCard(db, tenantId, card.source_ref)) {
     throw new CardError('That conversation already has a card on the list — edit that one instead', 409)
   }
   const { data, error } = await db.from('action_queue')
-    .update({ status: 'pending', outcome: null, error_log: null, updated_at: now() })
+    .update({ status: 'pending', outcome: null, error_log: null, checked_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', ['done', 'skipped', 'no_action'])
     .select(CARD_COLUMNS).maybeSingle()
   if (error) throw new CardError('That conversation already has a card on the list — edit that one instead', 409)
   if (!data) throw new CardError('This card just changed — check it again', 409)
+  // IRC closed it as done and it wasn't: learned from
+  const { recordRecheckUndone } = await import('./recheck-rules')
+  await recordRecheckUndone(db, card, userId)
   return data as ActionCard
 }
 
@@ -459,6 +481,8 @@ export type CardWithContext = ActionCard & {
   conversation: { subject: string | null; from: string | null; last_message_at: string | null; unread: boolean } | null
   /** A follow-up: who it's for, by name */
   follow_up_for: string | null
+  /** What's happened on its job since the card was written, oldest first (lib/actions/recheck.ts) */
+  changed_since: { at: string; line: string }[]
 }
 
 /** Adds the job chip and the conversation (subject, sender) each card is about */
@@ -466,10 +490,12 @@ export async function withContext(db: SupabaseClient, tenantId: string, cards: A
   const jobIds = [...new Set(cards.map(c => c.job_id).filter((id): id is string => !!id))]
   const threadIds = [...new Set(cards.map(cardThreadId).filter((id): id is string => !!id))]
   const userIds = [...new Set(cards.map(c => c.follow_up?.created_by).filter((id): id is string => !!id))]
-  const [{ data: jobs }, { data: threads }, { data: users }] = await Promise.all([
+  const { cardChanges, changeLine } = await import('./recheck-rules')
+  const [{ data: jobs }, { data: threads }, { data: users }, changes] = await Promise.all([
     jobIds.length ? db.from('jobs').select('id, job_number, insured_name').eq('tenant_id', tenantId).in('id', jobIds) : Promise.resolve({ data: [] }),
     threadIds.length ? db.from('mail_threads').select('gmail_thread_id, subject, participants, last_message_at, unread').eq('tenant_id', tenantId).in('gmail_thread_id', threadIds) : Promise.resolve({ data: [] }),
     userIds.length ? db.from('users').select('id, name').eq('tenant_id', tenantId).in('id', userIds) : Promise.resolve({ data: [] }),
+    cardChanges(db, tenantId, cards).catch((): Awaited<ReturnType<typeof cardChanges>> => new Map()),
   ])
   const nameById = new Map(((users as { id: string; name: string }[] | null) ?? []).map(u => [u.id, u.name]))
   type ThreadRow = { gmail_thread_id: string; subject: string | null; participants: { name: string; email: string; me: boolean }[]; last_message_at: string | null; unread: boolean }
@@ -484,6 +510,7 @@ export async function withContext(db: SupabaseClient, tenantId: string, cards: A
       job: c.job_id ? jobById.get(c.job_id) ?? null : null,
       conversation: t ? { subject: t.subject, from: sender ? sender.name || sender.email : null, last_message_at: t.last_message_at, unread: t.unread } : null,
       follow_up_for: c.follow_up?.created_by ? nameById.get(c.follow_up.created_by) ?? null : null,
+      changed_since: (changes.get(c.id) ?? []).slice(-5).map(ch => ({ at: ch.at, line: changeLine(ch) })),
     }
   })
 }

@@ -158,6 +158,7 @@ export const readActionCard: McpTool = {
         card.description ?? '',
         card.reasoning ? `Why: ${card.reasoning}` : '',
         card.error_log ? `Stopped: ${card.error_log}` : '',
+        card.changed_since?.length ? `Since this was written (check it's still to do): ${card.changed_since.map(c => c.line).join('; ')}` : '',
         ...(stepLines.length ? ['', ...stepLines] : ['No steps suggested.']),
       ].filter(Boolean).join('\n'),
       data: { ...cardData(card), reasoning: card.reasoning, steps: card.steps.map(s => ({ step_id: s.id, tool: s.tool, summary: s.summary, args: s.args, edited_email: s.draft ? { to: s.draft.to, cc: s.draft.cc, subject: s.draft.subject } : null, status: s.status ?? 'to do', result: s.result ?? null })) },
@@ -172,6 +173,7 @@ export const confirmActionCard: McpTool = {
     'Does an action card\'s steps — the dashboard\'s "Do steps" button. Steps run in order as the user (each with its own permission; some may go for approval instead), and the first failure stops the rest.',
     'step_ids picks which steps (default: every step not done yet). changes edits a step first: for an email to, cc, bcc, subject, body (plain text) or send_at (Perth time); for a note, note; for filing, job_number or filing.',
     'ONLY call after reading the steps back — for an email, who it goes to and what it says — and getting a clear yes.',
+    'If the job has moved on since the card was written (a report sent another way, a note), it stops and says what happened: tell the user, and only if they say it\'s still to do, call again with still_do true.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -191,6 +193,7 @@ export const confirmActionCard: McpTool = {
           additionalProperties: false,
         },
       },
+      still_do: { type: 'boolean', description: 'true only after the user heard what has happened on the job since the card was written and said to go ahead anyway.' },
     },
     required: ['card_id'],
     additionalProperties: false,
@@ -215,7 +218,7 @@ export const confirmActionCard: McpTool = {
     }
     const choices: StepChoice[] = ids.map(id => ({ id, args: changes.get(id) }))
     try {
-      const done = await confirmCard(ctx.tenantId, ctx.userId, card.id, choices, { db: db(ctx), via: ctx.via === 'chat' ? 'chat' : 'voice', voiceKeyId: ctx.voiceKeyId })
+      const done = await confirmCard(ctx.tenantId, ctx.userId, card.id, choices, { db: db(ctx), via: ctx.via === 'chat' ? 'chat' : 'voice', voiceKeyId: ctx.voiceKeyId, stillDo: args.still_do === true })
       const ran = done.steps.filter(s => ids.includes(s.id))
       const lines = ran.map(s => `- ${s.summary}: ${s.status === 'done' ? 'done' : s.status === 'waiting' ? 'sent for approval' : s.status === 'failed' ? `failed — ${s.result ?? 'no reason given'}` : 'not run'}`)
       return {
@@ -224,6 +227,13 @@ export const confirmActionCard: McpTool = {
         isError: done.status === 'failed',
       }
     } catch (err) {
+      if (err instanceof CardError && err.code === 'changed_since') {
+        return {
+          text: `Not done yet — ${err.message} Tell the user what happened; if it's still to do, call again with still_do true, or skip the card if it's dealt with.`,
+          data: { card_id: card.id, changed_since: err.changes ?? [] },
+          isError: true,
+        }
+      }
       if (err instanceof CardError) return { text: err.message, isError: true }
       throw err
     }
@@ -341,7 +351,7 @@ export const updateActionCard: McpTool = {
     try {
       // Back on the list first, so its steps can then change
       if (status === 'pending') {
-        card = await reopenCard(db(ctx), ctx.tenantId, card.id)
+        card = await reopenCard(db(ctx), ctx.tenantId, card.id, ctx.userId)
         done.push('put it back on the list')
       }
       if (redo) {

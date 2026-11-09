@@ -34,7 +34,7 @@ const OWN_DOMAIN = 'insurancerepairco.com.au'
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
-  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'update_action_card', 'star_email', 'change_follow_up',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'update_action_card', 'star_email', 'change_follow_up', 'add_todo',
 ])
 
 /**
@@ -108,9 +108,10 @@ How it works:
   - Sorted: a note says it went fine and nothing more is needed, or everything that should follow is done (e.g. the report is already sent). Call finish_card with needs_action false and say so in the summary.
   - Something outstanding: e.g. the report or make safe report is drafted but not sent (the insurer's report KPI is in the job file), or a note mentions a problem ("the tiles need replacing"). Propose the steps that move it on, and use category attend_submit for a report or quote to finish and send.
   - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in (the one job note a card proposes by itself: the office writes it).
+- A TO-DO is something the office added for itself (someone rang, an idea, a job to remember). Propose the steps that do it, from the job file; if it's a call or a visit, say who, the number or address, and propose nothing. Never decide it isn't needed: it's theirs to clear.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
 - set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question. Never propose set_follow_up (or a chase) for an insurer's or homeowner's decision on a quote or variation: the office follows quotes up only when they ask to.
-- A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it).
+- A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it). If it has come in some other way (another conversation, a note, a phone call) or no longer matters, call finish_card with needs_action false and say so: it comes off the list.
 - Always end by calling finish_card.
 
 Today is given in the first message. Times are Perth time (AWST).`
@@ -162,11 +163,15 @@ export async function generateCard(
     feedback?: string
     /** With feedback: change only this step; the card's other steps, title and summary stay as they are */
     step?: string
+    /** Made again because the job moved on since (lib/actions/recheck.ts): what happened, in a sentence */
+    since?: string
   } = {},
 ): Promise<Outcome> {
   const db = opts.db ?? mailDb()
+  // What the card saw of the job: as it was when making started
+  const started = new Date().toISOString()
   const save = async (o: Outcome) => {
-    await db.from('action_queue').update({ ...o, updated_at: new Date().toISOString() }).eq('id', card.id)
+    await db.from('action_queue').update({ ...o, checked_at: started, updated_at: new Date().toISOString() }).eq('id', card.id)
     return o
   }
   // One step being changed: the card goes back on the list as it was if the AI can't
@@ -195,9 +200,12 @@ export async function generateCard(
       : feedback
       ? `\n\nTHE OFFICE'S INSTRUCTIONS\nThey looked at the earlier suggestion — "${card.title}":\n${earlier}\n…and asked for this instead:\n"${feedback}"`
       : ''
+    const since = !feedback && opts.since?.trim()
+      ? `\n\nTHE JOB HAS MOVED ON SINCE THIS CARD WAS WRITTEN\nIt said "${card.title}":\n${earlier}\nSince then: ${opts.since.trim()}\nPropose only what's still to do now, from the job as it is (call finish_card with needs_action false if nothing is).`
+      : ''
     const messages: Anthropic.Beta.BetaMessageParam[] = [{
       role: 'user',
-      content: `Today: ${today()}.\n\n${about.intro}${learning ? `\n\n${learning}` : ''}${instructions}`,
+      content: `Today: ${today()}.\n\n${about.intro}${learning ? `\n\n${learning}` : ''}${instructions}${since}`,
     }]
 
     const steps: CardStep[] = []
@@ -288,9 +296,11 @@ export async function generateCard(
     // stays, with their symbol
     const { data: latestRow } = await db.from('action_queue').select('starred_by').eq('id', card.id).maybeSingle()
     const starred = !!(latestRow as { starred_by: string | null } | null)?.starred_by
-    // A follow-up stays on the list: the office asked to be reminded
-    // A follow-up the office set stays on the list; a check IRC planned itself can find nothing's needed
-    const needsAction = starred || (card.source === 'followup' && card.follow_up?.kind !== 'watch') || f.needs_action !== false || steps.length > 0
+    // A reminder the office set stays on the list; what IRC set itself (a
+    // check it planned, a waiting-on chase) can find nothing's needed — or a
+    // card made again after the job moved on
+    const officeReminder = card.source === 'followup' && (!card.follow_up?.kind || card.follow_up.kind === 'todo') && !opts.since
+    const needsAction = starred || officeReminder || f.needs_action !== false || steps.length > 0
     const category = isCategory(f.category) ? f.category : 'other'
 
     await db.from('action_queue').update({ model: CARD_MODEL, usage }).eq('id', card.id)
@@ -303,7 +313,8 @@ export async function generateCard(
     return save({
       ...(starred ? {} : { category }),
       status: needsAction ? 'pending' : 'no_action',
-      title: str('title') || about.title,
+      // A to-do keeps the person's own words as its title
+      title: card.follow_up?.kind === 'todo' ? card.title : str('title') || about.title,
       description: [str('summary') || lastText, filed].filter(Boolean).join('\n\n') || null,
       reasoning: str('reasoning') || null,
       steps,
@@ -408,7 +419,9 @@ async function followUpContext(card: ActionCard, db: SupabaseClient, ctx: McpCon
   }
   const set = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(card.created_at))
   const w = f.waiting
-  const head = f.kind === 'watch'
+  const head = f.kind === 'todo'
+    ? `A TO-DO THE OFFICE ADDED (on ${set}): "${f.note}"${f.who ? `\nWho: ${f.who}` : ''}\nPropose the steps that get it done (an email, a work order, documents, signing…) with the details from the job file, for the office to check. If no tool can do it (a phone call, a site visit, a payment), propose nothing and say in the summary what's needed — who to ring and their number, or the address, from the job file. It stays on the office's list whatever you find.`
+    : f.kind === 'watch'
     ? `A CHECK IRC PLANNED (reviewing the job on ${set}, for today): "${f.note}"${f.watch?.why ? `\nWhy: ${f.watch.why}` : ''}\nFirst see whether it's still needed: it may already have happened or been answered (a note, an email, a document, an invoice). If so, or it no longer matters, call finish_card with needs_action false and say so. Otherwise propose the step that moves the job on — usually a short email to the person involved.`
     : w
     ? `A WAITING-ON FOLLOW-UP (set on ${set}, for today): the office emailed ${w.name}${w.email ? ` <${w.email}>` : ''} asking for ${w.asked}, and nothing has come back in that conversation.${w.on_behalf_of ? `\n${w.on_behalf_of}.` : ''}${f.note.startsWith(`Chase ${w.name} for`) ? `\nWhy today: ${w.reason}` : `\nThe office's own note: "${f.note}"`}${(w.brought_forward ?? []).map(b => `\nBrought forward: ${b.reason}`).join('')}`

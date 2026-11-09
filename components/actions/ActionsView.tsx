@@ -6,6 +6,7 @@ import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { ActionCardView } from './ActionCardView'
 import { StarIcon } from './Star'
 import { FollowUps } from './FollowUps'
+import { NewTodo } from './NewTodo'
 import { AutoConfirmBanner } from '@/components/learning/AutoConfirm'
 
 // The Action cards view on the dashboard: everything that needs the office,
@@ -13,6 +14,7 @@ import { AutoConfirmBanner } from '@/components/learning/AutoConfirm'
 // texts and time rules), plus approvals waiting on the user. Cards stay put
 // as they change; when one is done or skipped, the next one takes its place
 // in view (its top, if you had scrolled down into the one that went).
+// + To-do adds one of the office's own (components/actions/NewTodo.tsx).
 
 const POLL_MS = 15_000
 const VIEWS: { key: CardView; label: string }[] = [
@@ -30,6 +32,7 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
   const [category, setCategory] = useState<CardCategory | null>(null)
   const [cards, setCards] = useState<CardWithContext[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   /** The card to bring into view once the one before it has left the list */
   const scrollTo = useRef<string | null>(null)
@@ -99,8 +102,16 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
             </button>
           ))}
         </div>}
+        {!adding && <button className="av-new" onClick={() => setAdding(true)} title="Add something to do — a call, an idea, a job to remember">+ To-do</button>}
       </div>
       <div className="av-list" ref={listRef}>
+        {adding && (
+          <NewTodo
+            onDone={text => { setAdding(false); onToast(text); void load() }}
+            onError={text => onToast(text, true)}
+            onCancel={() => setAdding(false)}
+          />
+        )}
         {view === 'upcoming' && <FollowUps onMessage={onToast} />}
         {view === 'pending' && <AutoConfirmBanner />}
         {view === 'pending' && <ApprovalsPanel />}
@@ -123,6 +134,8 @@ export function ActionsView({ onOpenConversation, onToast, onCount }: {
         .av-stars { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
         .av-stars button { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; color: var(--grey-600); background: none; border: 0.5px solid transparent; border-radius: 14px; padding: 4px 10px; cursor: pointer; }
         .av-stars button:hover { background: var(--surface-2); }
+        .av-new { margin-left: auto; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 14px; padding: 4px 12px; cursor: pointer; }
+        .av-new:hover { background: var(--surface-2); }
         .av-stars button.on { border-color: var(--line-strong); background: var(--surface-2); color: var(--ink); font-weight: 600; }
       `}</style>
     </div>
@@ -195,6 +208,7 @@ export function JobCards({ jobId }: { jobId: string }) {
   const [cards, setCards] = useState<CardWithContext[] | null>(null)
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null)
   const [version, setVersion] = useState(0)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -210,7 +224,16 @@ export function JobCards({ jobId }: { jobId: string }) {
         <span className="jc-title">To do</span>
         {!!cards?.length && <span className="jc-n">{cards.length} on the list</span>}
         {message && <span className={`jc-msg${message.error ? ' err' : ''}`}>{message.text}</span>}
+        {!adding && <button className="jc-new" onClick={() => setAdding(true)}>+ To-do</button>}
       </div>
+      {adding && (
+        <NewTodo
+          jobId={jobId}
+          onDone={text => { setAdding(false); setMessage({ text }); setVersion(v => v + 1) }}
+          onError={text => setMessage({ text, error: true })}
+          onCancel={() => setAdding(false)}
+        />
+      )}
       <FollowUps jobId={jobId} compact version={version} onMessage={(text, error) => setMessage({ text, error })} />
       {cards === null && <div className="jc-empty">Loading…</div>}
       {cards?.length === 0 && <div className="jc-empty">Nothing to do on this job — all clear.</div>}
@@ -231,6 +254,7 @@ export function JobCards({ jobId }: { jobId: string }) {
         .jc-title { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -0.5px; line-height: 1; }
         .jc-n { font-size: 11px; color: var(--tan); font-weight: 600; background: #faf5ee; border: 0.5px solid var(--line-tan-5); padding: 2px 9px; border-radius: 20px; }
         .jc-msg { font-size: 12px; color: var(--subtle); }
+        .jc-new { margin-left: auto; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 14px; padding: 4px 12px; cursor: pointer; }
         .jc-msg.err { color: var(--danger-dark); }
         .jc-empty { padding: 32px; text-align: center; font-size: 13px; color: var(--faint); background: var(--paper); border: 0.5px solid var(--line-2); border-radius: 8px; }
       `}</style>

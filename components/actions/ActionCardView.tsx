@@ -20,6 +20,9 @@ import { RemindMe } from './RemindMe'
 // instructions — the whole card, or one step's Change (the rest stay); an
 // unticked step is skipped when the others are done. Remind me sets a follow-up (lib/actions/followups.ts), and a
 // follow-up that's due is a card like any other, saying what it was for.
+// When the job has moved on since the card was written, it says what happened
+// ("Since this was written"), and Do steps asks before anything runs; a card
+// IRC closed because the job moved on can be put back (lib/actions/recheck.ts).
 
 interface Props {
   card: CardWithContext
@@ -48,12 +51,21 @@ function ago(iso: string | null): string {
 /** "on 25 Oct" */
 const setOn = (iso: string) => `on ${new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Perth', day: 'numeric', month: 'short' }).format(new Date(iso))}`
 
+/** The job moved on since the card was written: what happened, to ask about before doing it */
+class ChangedSince extends Error {
+  constructor(message: string, readonly changes: string[]) { super(message) }
+}
+
 async function post(url: string, body?: unknown) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
   const data = await res.json().catch(() => ({}))
+  if (!res.ok && data.code === 'changed_since') throw new ChangedSince(data.error, Array.isArray(data.changes) ? data.changes : [])
   if (!res.ok) throw new Error(data.error ?? 'Something went wrong')
   return data
 }
+
+/** Outcomes of cards IRC closed itself because the job moved on (lib/actions/recheck.ts) */
+const LOOKS_DONE = ['Looks done: ', 'Same as another card: ']
 
 export function ActionCardView({ card: given, compact, onChanged, onOpenConversation }: Props) {
   // Step changes saved on the card (a draft, an edited note) show straight
@@ -77,6 +89,8 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const [changing, setChanging] = useState<string | null>(null)
   const [stepFeedback, setStepFeedback] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  // Do steps found the job had moved on: what happened, waiting for "still do it"
+  const [askChanged, setAskChanged] = useState<string[] | null>(null)
   const flushers = useRef(new Map<string, () => Promise<void>>())
 
   // New or remade steps (the card stays mounted as it changes): new ones
@@ -115,13 +129,24 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     }
   }
 
-  const confirm = () => run('confirm', async () => {
+  const confirm = (stillDo = false) => run('confirm', async () => {
     // What's being written in a composer is saved first, so it's what goes
     for (const flush of flushers.current.values()) await flush()
     const steps = card.steps.filter(s => ticked.has(s.id) && s.status !== 'done').map(s => ({ id: s.id }))
-    const { card: updated } = await post(`/api/actions/${card.id}/confirm`, { steps })
+    let updated: CardWithContext
+    try {
+      ({ card: updated } = await post(`/api/actions/${card.id}/confirm`, { steps, ...(stillDo ? { still_do: true } : {}) }))
+    } catch (err) {
+      if (err instanceof ChangedSince) { setAskChanged(err.changes); return }
+      throw err
+    }
+    setAskChanged(null)
     const failed = (updated as CardWithContext).steps.find(s => s.status === 'failed')
     onChanged(updated, failed ? `Stopped: ${failed.summary} — ${failed.result ?? 'failed'}` : (updated as CardWithContext).outcome ?? 'Done.', !!failed)
+  })
+  const putBack = () => run('reopen', async () => {
+    const { card: updated } = await post(`/api/actions/${card.id}/reopen`)
+    onChanged(updated, 'Back on the list.')
   })
   const skip = () => run('skip', async () => {
     await post(`/api/actions/${card.id}/skip`)
@@ -186,12 +211,22 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             <div className="ac-followup">
               ⏳ Waiting on {f.waiting.name} for <b>{f.waiting.asked}</b> since {setOn(f.waiting.sent_at)}{card.follow_up_for ? ` (for ${card.follow_up_for}${f.waiting.pinned === 'job_owner' ? ', the job owner' : ''})` : ''}. {f.waiting.on_behalf_of ? `${f.waiting.on_behalf_of}. ` : ''}{f.waiting.reason}
             </div>
+          ) : f?.kind === 'todo' ? (
+            <div className="ac-followup">
+              📝 To-do {card.follow_up_for ? `${card.follow_up_for} added` : 'added'} {setOn(card.created_at)}{card.due_at && card.due_at > card.created_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.todo?.mode === 'do' ? ' — IRC drafted the steps' : ''}
+            </div>
           ) : f && (
             <div className="ac-followup">
               ⏰ Follow-up you set {setOn(card.created_at)}{card.due_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.who ? `, with ${f.who}` : ''}: <b>{f.note}</b>
             </div>
           )}
           {card.description && <p className="ac-summary">{card.description}</p>}
+          {open && !askChanged && card.changed_since?.length > 0 && (
+            <div className="ac-since">
+              <b>Since this was written</b> — check it&apos;s still to do:
+              <ul>{card.changed_since.map(c => <li key={c.at + c.line}>{c.line}</li>)}</ul>
+            </div>
+          )}
           <div className="ac-why">
             {card.reasoning && <button onClick={() => setShowWhy(w => !w)}>{showWhy ? 'Hide why' : 'Why?'}</button>}
             {!compact && thread && (
@@ -270,7 +305,25 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
           )}
 
           {card.status === 'failed' && card.error_log && <div className="ac-error">{card.error_log}</div>}
-          {(card.status === 'done' || card.status === 'skipped' || card.status === 'no_action') && card.outcome && <div className="ac-outcome">{card.outcome}</div>}
+          {(card.status === 'done' || card.status === 'skipped' || card.status === 'no_action') && card.outcome && (
+            <div className="ac-outcome">
+              {LOOKS_DONE.some(p => card.outcome!.startsWith(p)) && <span className="ac-auto">Closed by IRC · </span>}
+              {card.outcome}
+            </div>
+          )}
+
+          {askChanged && (
+            <div className="ac-since ask">
+              <b>The job has moved on since this card was written:</b>
+              <ul>{askChanged.map(line => <li key={line}>{line}</li>)}</ul>
+              Is it still to do?
+              <div className="ac-ask-btns">
+                <button className="ac-btn primary" disabled={!!busy} onClick={() => confirm(true)}>{busy === 'confirm' ? 'Working…' : 'Yes, do it'}</button>
+                <button className="ac-btn" disabled={!!busy} onClick={() => { setAskChanged(null); skip() }}>No — it&apos;s dealt with</button>
+                <button className="ac-btn ghost" disabled={!!busy} onClick={() => setAskChanged(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
 
           {asking && (
             <div className="ac-ask">
@@ -311,8 +364,13 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
           )}
 
           <footer className="ac-foot">
-            {open && card.steps.length > 0 && (
-              <button className="ac-btn primary" disabled={!!busy || toDo === 0} onClick={confirm}>
+            {(card.status === 'done' || card.status === 'skipped' || card.status === 'no_action') && (
+              <button className="ac-btn" disabled={!!busy} onClick={putBack} title="It still needs doing: put it back on the to-do list">
+                {busy === 'reopen' ? 'Putting back…' : 'Put back on the list'}
+              </button>
+            )}
+            {open && card.steps.length > 0 && !askChanged && (
+              <button className="ac-btn primary" disabled={!!busy || toDo === 0} onClick={() => confirm()}>
                 {busy === 'confirm' ? 'Working…' : toDo === 1 ? 'Do this step' : `Do ${toDo} steps`}
               </button>
             )}
@@ -388,6 +446,10 @@ const CARD_CSS = `
   .ac-result { font-size: 12px; color: var(--grey-600); margin-top: 4px; white-space: pre-wrap; }
   .ac-error { margin-top: 10px; font-size: 12px; color: var(--danger-dark); background: var(--danger-bg); border-radius: 6px; padding: 6px 10px; }
   .ac-outcome { margin-top: 10px; font-size: 12px; color: var(--subtle); }
+  .ac-auto { font-weight: 600; color: var(--grey-600); }
+  .ac-since { margin: 8px 0 0; font-size: 12px; color: var(--ink); background: var(--warning-bg); border: 0.5px solid var(--warning-soft); border-radius: 6px; padding: 6px 10px; line-height: 1.5; }
+  .ac-since ul { margin: 4px 0 0; padding-left: 18px; }
+  .ac-since.ask { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
   .ac-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
   .ac-btn { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 0.5px solid var(--line-strong); border-radius: 16px; padding: 6px 14px; cursor: pointer; }
   .ac-btn.primary { color: var(--cream); background: var(--ink); border-color: var(--ink); font-weight: 600; }

@@ -25,8 +25,10 @@ export async function confirmCard(
   userId: string,
   cardId: string,
   choices: StepChoice[],
-  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId, only = false, auto = false }: {
+  { db = mailDb(), tools = MCP_TOOLS, via = 'chat', voiceKeyId, only = false, auto = false, stillDo = false }: {
     db?: SupabaseClient
+    /** The person has seen what's happened on the job since the card was written and wants it done anyway */
+    stillDo?: boolean
     /** Run by auto-confirm (lib/actions/auto-confirm.ts), not a person: said so on the card, and not learned from */
     auto?: boolean
     /** Run just these steps and leave the rest on the card (an email sent from its composer) */
@@ -42,6 +44,17 @@ export async function confirmCard(
   if (card.status !== 'pending' && card.status !== 'failed') throw new CardError(`This card is ${card.status} — refresh to see where it's at`, 409)
   const chosen = new Map(choices.map(c => [c.id, c]))
   if (!card.steps.some(s => chosen.has(s.id) && s.status !== 'done')) throw new CardError('Choose at least one step to do')
+
+  // The job moved on since this was written (the report sent another way, a
+  // note after a phone call): asked first, so nothing's done twice
+  if (!stillDo) {
+    const { cardChanges, changeLine } = await import('./recheck-rules')
+    const since = (await cardChanges(db, tenantId, [card])).get(card.id) ?? []
+    if (since.length) {
+      const lines = since.slice(-5).map(changeLine)
+      throw new CardError(`Since this card was written: ${lines.join('; ')}. Is it still to do?`, 409, 'changed_since', lines)
+    }
+  }
 
   // Claim it, so a second click doesn't run the steps twice
   const { data: claimed } = await db.from('action_queue').update({ status: 'running', updated_at: new Date().toISOString() })
@@ -105,8 +118,9 @@ export async function confirmCard(
         confirmed_by: userId,
         confirmed_at: new Date().toISOString(),
       }
+  // What its own steps just did isn't news to it
   const { data, error } = await db.from('action_queue')
-    .update({ ...update, steps, updated_at: new Date().toISOString() })
+    .update({ ...update, steps, checked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', card.id).select('*').single()
   if (error) throw new Error(error.message)
   // Done: what the office did with the AI's proposal is learned from (not

@@ -109,6 +109,7 @@ describe('mcp route', () => {
       'update_action_card',
       'star_email',
       'set_follow_up',
+      'add_todo',
       'list_follow_ups',
       'change_follow_up',
       'list_waiting_on',
