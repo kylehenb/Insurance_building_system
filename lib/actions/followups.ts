@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isoToPerthLocal, parseSendAt, perthLocalToIso, spokenSendAt } from '@/lib/mail/schedule-rules'
-import { CardError, CARD_COLUMNS, PRIORITY, type ActionCard, type FollowUp, type WaitingOn } from './cards'
+import { CardError, CARD_COLUMNS, PRIORITY, type ActionCard, type CardCategory, type FollowUp, type TodoMode, type WaitingOn } from './cards'
 
 // Follow-ups (tech spec §23.11): "remind me in a week to chase the roofer".
 // One is an action card with a date: it waits (status scheduled) until
@@ -9,6 +9,12 @@ import { CardError, CARD_COLUMNS, PRIORITY, type ActionCard, type FollowUp, type
 // the office to send, a note — like any other card. Nothing goes out by
 // itself. Set from a card or the job page (Remind me), by voice or chat
 // (set_follow_up), or as a step the AI suggests on a card.
+//
+// A to-do (kind 'todo') is one a person adds for anything — "call the
+// insured on IRC1035 Thursday", someone rang, an idea — now or on a day:
+// remind puts it on the list in their words with no AI; do has the AI draft
+// the steps that do it when it comes up. Either way it stays until they
+// clear it (add_todo, + To-do).
 // Pure apart from the database calls — the date helpers are safe for client code.
 
 /** A follow-up set for a day comes onto the list at the start of that day */
@@ -132,24 +138,32 @@ export type NewFollowUp = {
   /** What sort of check, when it isn't the review's (the lapse safety net's: lapse_warning, lapse_blocked) */
   ruleKey?: string
   urgent?: boolean
+  /** A to-do a person added: dueAt may be empty (now) */
+  todo?: { mode: TodoMode; category?: CardCategory }
 }
 
 /** A follow-up's title: what it's for, and with whom */
 export function followUpTitle(f: Pick<FollowUp, 'note' | 'who' | 'waiting'> & { kind?: FollowUp['kind'] }): string {
   if (f.waiting) return `Waiting on ${f.waiting.name}: ${clip(f.waiting.asked, 80)}`
   if (f.kind === 'watch') return `Check: ${clip(f.note.split('\n')[0], 90)}`
+  if (f.kind === 'todo') return clip(f.note.split('\n')[0], 120)
   return `Follow up${f.who ? ` with ${f.who}` : ''}: ${clip(f.note.split('\n')[0], 80)}`
 }
+
+/** A to-do's rule_key: a reminder comes onto the list as it is (releaseDueFollowUps) */
+export const TODO_RULE: Record<TodoMode, string> = { remind: 'todo_remind', do: 'todo_do' }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 const now = () => new Date().toISOString()
 
 export async function createFollowUp(db: SupabaseClient, tenantId: string, userId: string | null, input: NewFollowUp): Promise<ActionCard> {
   const note = input.note.trim().slice(0, MAX_NOTE)
-  if (!note) throw new CardError('What should the follow-up be?')
-  const due = new Date(input.dueAt)
+  if (!note) throw new CardError(input.todo ? 'What\'s the to-do?' : 'What should the follow-up be?')
+  // A to-do with no date, or one already passed (earlier today), is on the list now
+  const due = input.todo && !input.dueAt ? new Date() : new Date(input.dueAt)
   if (Number.isNaN(due.getTime())) throw new CardError('When should it be? Give a date.')
-  if (due.getTime() < Date.now() + 60_000) throw new CardError('Choose a time in the future')
+  const now_ = !!input.todo && due.getTime() < Date.now() + 60_000
+  if (!input.todo && due.getTime() < Date.now() + 60_000) throw new CardError('Choose a time in the future')
   if (input.jobId) {
     const { data: job } = await db.from('jobs').select('id').eq('tenant_id', tenantId).eq('id', input.jobId).maybeSingle()
     if (!job) throw new CardError('Job not found', 404)
@@ -161,26 +175,30 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
   // it takes over that wait (a reply still closes it), and the date they
   // picked is learned from (lib/actions/waits.ts)
   const { waitToReplace } = await import('./waits')
-  const replaces = input.waiting || input.watch ? null : await waitToReplace(db, tenantId, { fromCardId: input.fromCardId, threadId, jobId: input.jobId, who, note })
+  const replaces = input.waiting || input.watch || input.todo ? null : await waitToReplace(db, tenantId, { fromCardId: input.fromCardId, threadId, jobId: input.jobId, who, note })
   const waiting = input.waiting ?? replaces?.follow_up?.waiting
   if (replaces) threadId ??= replaces.follow_up?.thread_id ?? null
   const followUp: FollowUp = {
     note, who, thread_id: threadId, from_card_id: input.fromCardId ?? null, created_by: userId,
     ...(waiting ? { kind: 'waiting_on' as const, waiting } : {}),
     ...(input.watch ? { kind: 'watch' as const, watch: { why: input.watch.why, planned_at: now() } } : {}),
+    ...(input.todo ? { kind: 'todo' as const, todo: { mode: input.todo.mode } } : {}),
   }
+  // A to-do for now: a reminder is on the list as it is; one to do is read by the AI first
+  const status = now_ ? (input.todo!.mode === 'remind' ? 'pending' : 'queued') : 'scheduled'
 
   const { data, error } = await db.from('action_queue').insert({
     tenant_id: tenantId,
     job_id: input.jobId,
     source: 'followup',
-    rule_key: waiting ? 'waiting_on' : input.watch ? input.ruleKey ?? 'job_watch' : 'followup',
+    rule_key: waiting ? 'waiting_on' : input.watch ? input.ruleKey ?? 'job_watch' : input.todo ? TODO_RULE[input.todo.mode] : 'followup',
     // A person's follow-up keeps their words as its title
-    title: followUpTitle(input.waiting || input.watch ? followUp : { note, who }),
-    description: note,
-    status: 'scheduled',
+    title: followUpTitle(input.waiting || input.watch || input.todo ? followUp : { note, who }),
+    // A to-do that's all in its title doesn't say it twice
+    description: input.todo && followUpTitle(followUp) === note ? null : note,
+    status,
     priority: input.urgent ? PRIORITY.high : PRIORITY.normal,
-    category: 'other',
+    category: input.todo?.category ?? 'other',
     due_at: due.toISOString(),
     follow_up: followUp,
   }).select(CARD_COLUMNS).single()
@@ -234,7 +252,7 @@ export async function updateFollowUp(
     const who = changes.who === undefined ? current.follow_up?.who ?? null : changes.who?.trim().slice(0, MAX_WHO) || null
     patch.follow_up = { ...current.follow_up, note, who }
     patch.description = note
-    patch.title = followUpTitle({ note, who, waiting: current.follow_up?.waiting })
+    patch.title = followUpTitle({ note, who, waiting: current.follow_up?.waiting, kind: current.follow_up?.kind })
   }
   if (!Object.keys(patch).length) throw new CardError('Nothing to change')
   const wasDue = current.due_at
@@ -265,9 +283,14 @@ export async function cancelFollowUp(db: SupabaseClient, tenantId: string, id: s
 
 /** Follow-ups now due go on the list: queued for the AI to draft their steps (the minute cron) */
 export async function releaseDueFollowUps(db: SupabaseClient, at = new Date()): Promise<number> {
+  // A to-do reminder needs no AI: it's on the list in the person's words
+  const { data: reminders } = await db.from('action_queue')
+    .update({ status: 'pending', checked_at: at.toISOString(), updated_at: at.toISOString() })
+    .eq('status', 'scheduled').eq('rule_key', TODO_RULE.remind).lte('due_at', at.toISOString())
+    .select('id')
   const { data } = await db.from('action_queue')
     .update({ status: 'queued', attempts: 0, updated_at: at.toISOString() })
     .eq('status', 'scheduled').lte('due_at', at.toISOString())
     .select('id')
-  return ((data as { id: string }[] | null) ?? []).length
+  return ((data as { id: string }[] | null) ?? []).length + ((reminders as { id: string }[] | null) ?? []).length
 }

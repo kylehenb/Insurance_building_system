@@ -12,7 +12,8 @@ import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 // by itself. Action cards also suggest set_follow_up as a step. What the
 // office is waiting on — follow-ups IRC set from emails that asked someone
 // for something (lib/actions/waiting-on.ts) — is list_waiting_on; they move
-// and cancel like any follow-up.
+// and cancel like any follow-up. add_todo adds one of the office's own
+// to-dos (someone rang, an idea) — the + To-do button's function.
 
 const MAX_LIST = 25
 const ID_RE = /^[0-9a-f-]{36}$/i
@@ -72,6 +73,59 @@ export const setFollowUp: McpTool = {
         text: `Follow-up set for ${spokenDue(dueAt)}${job ? ` on ${job.job_number}` : ''}: ${card.follow_up?.note}. It'll come onto the action cards then.`,
         data: { follow_up_id: card.id, due: card.due_at, job_number: job?.job_number ?? null },
       }
+    } catch (err) {
+      if (err instanceof CardError) return { text: err.message, isError: true }
+      throw err
+    }
+  },
+}
+
+export const addTodo: McpTool = {
+  name: 'add_todo',
+  title: 'Add a to-do',
+  description: [
+    'Adds something to the user\'s action cards that didn\'t come from an email — "add a to-do to call Brett about the excess on IRC1052", "someone rang, remind me Thursday to book the plumber", "put on my list: order the tiles". It goes on the list now, or comes onto it on the day given, in the user\'s own words.',
+    'mode remind (the default): just the reminder, as said. mode do: when it comes up, IRC drafts the steps that do it (the email, work order or documents) for the user to check — use it when they ask for something to be done, not just remembered. Nothing is sent by itself, and it stays until they clear it.',
+    `when: leave out (or "now") for now; otherwise ${WHEN.replace(/^When: /, '')} Read back what, when and which job, and get a yes first.`,
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      note: { type: 'string', description: 'The to-do in the user\'s words, e.g. "Ring Brett about the excess — he said after 3".' },
+      when: { type: 'string', description: 'Leave out or "now"; or days ("3"), "1 week", a Perth date "2026-11-12" (8am) or date and time "2026-11-12T15:00".' },
+      mode: { type: 'string', enum: ['remind', 'do'], description: 'remind (default): just put it on the list. do: IRC drafts the steps that do it.' },
+      job_number: { type: 'string', description: 'The job it\'s about, if any, e.g. IRC1052.' },
+      who: { type: 'string', description: 'Who it involves, if anyone, e.g. "Brett", "Ace Roofing".' },
+      urgent: { type: 'boolean', description: 'true if the user says it\'s urgent: it goes to the top.' },
+    },
+    required: ['note'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  permission: 'actions.review',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const when = str(args.when)
+    const now = !when || /^(now|today|asap|straight away|right now)$/i.test(when)
+    const dueAt = now ? '' : parseFollowUpWhen(args.when)
+    if (dueAt === null) return { text: `When should it be? Leave it out for now, or ${WHEN.replace(/^When: /, '')}`, isError: true }
+    let job: { id: string; job_number: string } | null = null
+    if (str(args.job_number)) {
+      const found = await jobFromArgs(args, ctx)
+      if (isToolResult(found)) return found
+      job = found
+    }
+    const mode = args.mode === 'do' ? 'do' : 'remind'
+    try {
+      const card = await createFollowUp(db(ctx), ctx.tenantId, ctx.userId || null, {
+        jobId: job?.id ?? null, note: str(args.note), who: str(args.who) || null, dueAt, todo: { mode }, urgent: args.urgent === true,
+      })
+      const on = job ? ` on ${job.job_number}` : ''
+      const what = card.follow_up?.note ?? card.title
+      const text = card.status === 'scheduled'
+        ? `To-do added${on} for ${spokenDue(card.due_at!)}: ${what}.${mode === 'do' ? ' IRC will draft the steps then.' : ''}`
+        : `To-do on your action cards now${on}: ${what}.${mode === 'do' ? ' IRC is drafting the steps.' : ''}`
+      return { text, data: { card_id: card.id, due: card.status === 'scheduled' ? card.due_at : null, mode, job_number: job?.job_number ?? null } }
     } catch (err) {
       if (err instanceof CardError) return { text: err.message, isError: true }
       throw err

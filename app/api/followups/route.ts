@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cardAccess, isUuid } from '@/lib/actions/access'
-import { CardError, listCards, withContext } from '@/lib/actions/cards'
+import { CardError, isCategory, listCards, withContext } from '@/lib/actions/cards'
 import { createFollowUp, spokenDue } from '@/lib/actions/followups'
 import { recordActivity } from '@/lib/activity/log'
 import { mailDb } from '@/lib/mail/sync'
@@ -9,6 +9,9 @@ import { mailDb } from '@/lib/mail/sync'
 // POST /api/followups { note, dueAt, who?, jobId?, threadId?, fromCardId?, clearCard? }
 // — Remind me (lib/actions/followups.ts). On the day it becomes an action
 // card with the chase drafted; nothing is sent by itself.
+// POST /api/followups { todo: 'remind' | 'do', note, dueAt?, who?, jobId?, category?, urgent? }
+// — + To-do: a to-do in the person's own words, now (no dueAt) or on a day;
+// remind puts it on the list as it is, do has the AI draft the steps.
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const access = await cardAccess(false)
@@ -43,15 +46,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const { data } = await db.from('action_queue').select('job_id').eq('tenant_id', access.tenantId).eq('id', fromCardId).maybeSingle()
       jobId = (data as { job_id: string | null } | null)?.job_id ?? null
     }
+    const mode = body.todo === 'remind' || body.todo === 'do' ? body.todo : null
     const card = await createFollowUp(db, access.tenantId, access.userId, {
       jobId, note: s('note'), who: s('who') || null, dueAt: s('dueAt'), threadId: s('threadId') || null,
       fromCardId, clearCard: body.clearCard === true,
+      ...(mode ? { todo: { mode, category: isCategory(body.category) ? body.category : undefined }, urgent: body.urgent === true } : {}),
     })
+    const when = card.status === 'scheduled' ? ` for ${spokenDue(card.due_at!)}` : ''
     await recordActivity({
       tenantId: access.tenantId,
       userId: access.userId,
       action: 'actions.review',
-      summary: `Set a follow-up for ${spokenDue(card.due_at!)}: ${card.follow_up?.note ?? card.title}`,
+      summary: mode ? `Added a to-do${when}: ${card.title}` : `Set a follow-up${when}: ${card.follow_up?.note ?? card.title}`,
       jobId: card.job_id,
       via: 'app',
     })

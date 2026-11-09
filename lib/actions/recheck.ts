@@ -9,7 +9,7 @@ import { logError } from '@/lib/health/errors'
 import { activeLessons, formatLessons } from '@/lib/learning/lessons'
 import { formatCases, recordLearning, similarCases } from '@/lib/learning/events'
 import { mailDb } from '@/lib/mail/sync'
-import { CARD_COLUMNS, cardActor, cardThreadId, type ActionCard } from './cards'
+import { CARD_COLUMNS, cardActor, cardThreadId, isPersonsOwn, type ActionCard } from './cards'
 import { CARD_LIKENESS, situationText } from './learning'
 
 // Out-of-date action cards (tech spec §23.17). A card is written from the job
@@ -241,11 +241,12 @@ const now = () => new Date().toISOString()
 function cardBrief(c: ActionCard, review: JobChange[], flag: JobChange[]): string {
   const steps = c.steps.length ? c.steps.map((s, i) => `   ${i + 1}. ${s.summary}${s.status ? ` (${s.status})` : ''}`).join('\n') : '   (no steps)'
   const kind = c.source === 'followup'
-    ? c.follow_up?.kind === 'waiting_on' ? 'Waiting-on chase IRC set' : c.follow_up?.kind === 'watch' ? 'A check IRC planned' : 'A reminder the office set'
+    ? c.follow_up?.kind === 'todo' ? 'A to-do the office added'
+    : c.follow_up?.kind === 'waiting_on' ? 'Waiting-on chase IRC set' : c.follow_up?.kind === 'watch' ? 'A check IRC planned' : 'A reminder the office set'
     : c.source === 'appointment' ? 'Appointment check-in' : 'From an email'
   const since = [...review, ...flag].sort((x, y) => x.at.localeCompare(y.at)).map(ch => `   - ${changeLine(ch)}`).join('\n')
   return `card_id: ${c.id}
-${kind}, written ${perth(c.checked_at ?? c.updated_at)}${c.starred_by ? ' (the user starred it themselves)' : ''}
+${kind}, written ${perth(c.checked_at ?? c.updated_at)}${isPersonsOwn(c) ? ' (the office\'s own — say done only if it clearly happened)' : ''}
 Title: ${c.title}
 ${c.description ? `Summary: ${clip(c.description.replace(/\s+/g, ' '), 600)}\n` : ''}${c.follow_up?.note ? `Reminder: "${clip(c.follow_up.note, 300)}"\n` : ''}Steps:
 ${steps}
@@ -343,8 +344,8 @@ async function applyDecision(db: SupabaseClient, card: ActionCard, verdict: Deci
   const checked = { checked_at: at.toISOString() }
   // Steps already run (a reply sent from the card): the rest are the office's call
   const partDone = card.steps.some(s => s.ran_at)
-  // A card the user starred stays until they clear it: it just says so
-  if ((verdict === 'done' || verdict === 'duplicate') && (card.starred_by || partDone)) {
+  // A card the user starred, or a to-do or reminder they set, stays until they clear it: it just says so
+  if ((verdict === 'done' || verdict === 'duplicate') && (isPersonsOwn(card) || partDone)) {
     const note = verdict === 'done' ? `IRC thinks this may be done: ${reason}` : `IRC thinks this is the same as "${keep?.title ?? 'another card'}".`
     await db.from('action_queue').update({ ...checked, description: [note, card.description].filter(Boolean).join('\n\n') })
       .eq('id', card.id).in('status', ['pending', 'failed'])
@@ -365,7 +366,7 @@ async function applyDecision(db: SupabaseClient, card: ActionCard, verdict: Deci
     }
     return data ? 'closed' : 'kept'
   }
-  if (verdict === 'update' && !partDone) {
+  if (verdict === 'update' && !partDone && card.follow_up?.kind !== 'todo') {
     // Made again from the job as it is now, with what's changed in front of it
     const { data: won } = await db.from('action_queue').update({ status: 'generating', updated_at: now() })
       .eq('id', card.id).in('status', ['pending', 'failed']).select(CARD_COLUMNS).maybeSingle()

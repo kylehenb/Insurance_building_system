@@ -79,11 +79,19 @@ export type FollowUp = {
   from_card_id: string | null
   /** Who it's for: who set it, or who sent the email a waiting-on follow-up came from */
   created_by: string | null
-  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts); watch: a check IRC planned reviewing the job (lib/jobs/review.ts) */
-  kind?: 'waiting_on' | 'watch'
+  /** waiting_on: set by IRC from an email the office sent (lib/actions/waiting-on.ts); watch: a check IRC planned reviewing the job (lib/jobs/review.ts); todo: a to-do a person added (lib/actions/followups.ts) */
+  kind?: 'waiting_on' | 'watch' | 'todo'
+  /** A to-do: remind (on the list in their words, no AI) or do (the AI drafts the steps that do it) */
+  todo?: { mode: TodoMode }
   waiting?: WaitingOn
   watch?: { why: string; planned_at: string }
 }
+
+export type TodoMode = 'remind' | 'do'
+
+/** A to-do or reminder a person set: theirs to clear — IRC never closes it by itself */
+export const isPersonsOwn = (c: Pick<ActionCard, 'source' | 'follow_up' | 'starred_by'>): boolean =>
+  !!c.starred_by || (c.source === 'followup' && (!c.follow_up?.kind || c.follow_up.kind === 'todo'))
 
 /** A waiting-on follow-up: who was asked for what, and why the chase is when it is */
 export type WaitingOn = {

@@ -211,6 +211,10 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             <div className="ac-followup">
               ⏳ Waiting on {f.waiting.name} for <b>{f.waiting.asked}</b> since {setOn(f.waiting.sent_at)}{card.follow_up_for ? ` (for ${card.follow_up_for}${f.waiting.pinned === 'job_owner' ? ', the job owner' : ''})` : ''}. {f.waiting.on_behalf_of ? `${f.waiting.on_behalf_of}. ` : ''}{f.waiting.reason}
             </div>
+          ) : f?.kind === 'todo' ? (
+            <div className="ac-followup">
+              📝 To-do {card.follow_up_for ? `${card.follow_up_for} added` : 'added'} {setOn(card.created_at)}{card.due_at && card.due_at > card.created_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.todo?.mode === 'do' ? ' — IRC drafted the steps' : ''}
+            </div>
           ) : f && (
             <div className="ac-followup">
               ⏰ Follow-up you set {setOn(card.created_at)}{card.due_at ? ` for ${spokenDue(card.due_at)}` : ''}{f.who ? `, with ${f.who}` : ''}: <b>{f.note}</b>

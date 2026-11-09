@@ -39,7 +39,7 @@ const card = (extra: Row = {}): Row => ({
 /** A model that answers decide_cards with these decisions */
 function client(decisions: Row[]) {
   const create = vi.fn(async () => ({ content: [{ type: 'tool_use', id: 'x', name: 'decide_cards', input: { decisions } }], usage: { input_tokens: 10, output_tokens: 5 }, model: 'claude-haiku-5-5' }))
-  return { beta: { messages: { create } }, create }
+  return { beta: { messages: { create } }, create } as unknown as { beta: never; create: typeof create }
 }
 
 beforeEach(() => {
@@ -118,6 +118,14 @@ describe('recheckJob', () => {
     await recheckJob(db as never, 't1', 'j1', { client: client([{ card_id: 'k1', verdict: 'done', reason: 'A note says the BAR was sent.' }]) })
     expect(tables.action_queue[0].status).toBe('pending')
     expect(tables.action_queue[0].description).toMatch(/^IRC thinks this may be done: A note says the BAR was sent\./)
+  })
+
+  it('never closes a to-do or reminder the office set itself', async () => {
+    tables.action_queue = [card({ source: 'followup', source_ref: null, steps: [], follow_up: { note: 'Ring Brett', kind: 'todo', todo: { mode: 'remind' } } })]
+    tables.communications = [{ id: 'n1', tenant_id: 't1', job_id: 'j1', type: 'note', content: 'Rang Brett', created_at: LATER, created_by: 'u1' }]
+    await recheckJob(db as never, 't1', 'j1', { client: client([{ card_id: 'k1', verdict: 'done', reason: 'A note says Brett was rung.' }]) })
+    expect(tables.action_queue[0].status).toBe('pending')
+    expect(tables.action_queue[0].description).toMatch(/^IRC thinks this may be done/)
   })
 
   it('closes a duplicate in favour of the other card, and remakes a card whose steps are out of date', async () => {
