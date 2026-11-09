@@ -249,3 +249,26 @@
   .mc-export-wrap{padding:16px}
 }
 @media (max-width: 600px){.rp-add{margin:12px 16px;width:calc(100% - 32px)}}
+
+/* Text boxes grow with their text (MidcityFieldApp sizes them; field-sizing where the browser has it) */
+.fa-ta,.fa-ai-dark-ta{field-sizing:content;overflow:hidden;resize:none}
+
+/* ROOF REPORT REVIEW: "To review" shows only the marked fields; "All fields" shows every one
+   (lib/reports/roof-review.ts). Markers: orange = empty, purple = AI guessed, blue = always checked */
+.mc-rrf-viewbar{padding:14px 16px 4px;background:white;border-bottom:1px solid var(--hairline)}
+.mc-rrf-legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:10px 0 8px}
+.rv-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:6px}
+.rv-dot:first-child{margin-left:0}
+.rv-dot.empty{background:#ff9500}
+.rv-dot.check{background:var(--indigo)}
+.rv-dot.always{background:var(--blue)}
+.mc-rrf-review .fa-fg:not(.rv-on),.mc-rrf-review .mc-rrf-sub{display:none}
+.mc-rrf-review .fa-fg.rv-on{padding-top:16px}
+.fa-fg[data-flag]{box-shadow:inset 4px 0 0 var(--rv)}
+.fa-fg[data-flag="empty"]{--rv:#ff9500}
+.fa-fg[data-flag="check"]{--rv:var(--indigo)}
+.fa-fg[data-flag="always"]{--rv:var(--blue)}
+.fa-fg[data-flag] > .fa-fl::after{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;vertical-align:2px;color:white;background:var(--rv)}
+.fa-fg[data-flag="empty"] > .fa-fl::after{content:'Empty'}
+.fa-fg[data-flag="check"] > .fa-fl::after{content:'AI guessed'}
+.fa-fg[data-flag="always"] > .fa-fl::after{content:'Check'}
