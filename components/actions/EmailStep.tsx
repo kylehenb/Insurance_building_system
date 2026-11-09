@@ -158,7 +158,8 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
     setBusy(true)
     try {
       await saving.current
-      const { card: updated } = await post(`/api/actions/${card.id}/confirm`, { steps: [{ id: step.id, args }], only: true })
+      const { card: updated } = await post(`/api/actions/${card.id}/confirm`, // Sent from the composer, with the card's "Since this was written" in view
+      { steps: [{ id: step.id, args }], only: true, still_do: true })
       onComposing(false)
       onRan(updated)
     } catch (err) {

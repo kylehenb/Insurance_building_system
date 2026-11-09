@@ -13,6 +13,7 @@ export const AI_FEATURES: Record<string, { label: string; what: string }> = {
   'email-job-match': { label: 'Matching emails to jobs', what: 'pulls claim and job numbers out of emails that don\'t match a job' },
   'email-summary': { label: 'Email summaries', what: 'summarises a job\'s emails when asked' },
   'attachment-read': { label: 'Reading attachments', what: 'reads PDFs and images attached to emails' },
+  'card-recheck': { label: 'Out-of-date cards', what: 'when a job with open cards changes and goes quiet, checks whether its cards are still needed' },
   'waiting-on': { label: 'Waiting on', what: 'reads each sent email for what it asks and when to chase' },
   'job-review': { label: 'Morning job review', what: 'reads each changed open job every morning and plans dated checks' },
   'calendar-link': { label: 'Calendar matching', what: 'matches calendar events to jobs' },

@@ -65,7 +65,9 @@ vi.mock('@/lib/actions/propose', () => ({
   resuggestStep: (...a: unknown[]) => (resuggestStep as (...x: unknown[]) => unknown)(...a),
 }))
 vi.mock('@/lib/actions/confirm', () => {
-  class CardError extends Error {}
+  class CardError extends Error {
+    constructor(message: string, readonly status = 400, readonly code?: string, readonly changes?: string[]) { super(message) }
+  }
   return { CardError, confirmCard: (...a: unknown[]) => (confirmCard as (...x: unknown[]) => unknown)(...a) }
 })
 
@@ -129,6 +131,23 @@ describe('confirm_action_card', () => {
     await confirmActionCard.run({ card_id: CARD_ID, step_ids: ['s1'], changes: [{ step_id: 's1', body: 'Hi Casey, 10am instead.', mode: 'forward' }] }, { ...ctx, via: 'chat' })
     expect(confirmCard.mock.calls[0][3]).toEqual([{ id: 's1', args: { body: 'Hi Casey, 10am instead.' } }])
     expect((confirmCard.mock.calls[0] as unknown[])[4]).toMatchObject({ via: 'chat' })
+  })
+
+  it('stops when the job moved on since the card was written, and goes ahead with still_do', async () => {
+    const { CardError } = await import('@/lib/actions/confirm')
+    confirmCard.mockImplementationOnce(async () => { throw new (CardError as unknown as new (...a: unknown[]) => Error)('Since this card was written: Thu 6 Nov — Kyle: Sent the BAR. Is it still to do?', 409, 'changed_since', ['Thu 6 Nov — Kyle: Sent the BAR']) })
+    const out = await confirmActionCard.run({ card_id: CARD_ID }, ctx)
+    expect(out.isError).toBe(true)
+    expect(out.text).toContain('Sent the BAR')
+    expect(out.text).toContain('still_do')
+    expect(out.data).toMatchObject({ changed_since: ['Thu 6 Nov — Kyle: Sent the BAR'] })
+    await confirmActionCard.run({ card_id: CARD_ID, still_do: true }, ctx)
+    expect((confirmCard.mock.calls[1] as unknown[])[4]).toMatchObject({ stillDo: true })
+  })
+
+  it('reads out what has happened since the card was written', async () => {
+    stored = card({ changed_since: [{ at: '2026-11-06T06:00:00Z', line: 'Thu 6 Nov — Kyle: Sent the BAR' }] })
+    expect((await readActionCard.run({ card_id: CARD_ID }, ctx)).text).toContain('Since this was written (check it\'s still to do): Thu 6 Nov — Kyle: Sent the BAR')
   })
 
   it('refuses steps that are not on the card, or a card with none', async () => {

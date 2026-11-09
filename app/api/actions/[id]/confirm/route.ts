@@ -11,13 +11,15 @@ type Params = { params: Promise<{ id: string }> }
 // POST /api/actions/[id]/confirm { steps: [{ id, args? }], only? } — run the
 // chosen steps (args: the user's edits, e.g. the reply text). Each step goes
 // through the user's own permissions and is logged. only: run just these and
-// leave the rest on the card (Send in an email step's composer).
+// leave the rest on the card (Send in an email step's composer). If the job
+// has moved on since the card was written, it answers 409 with code
+// 'changed_since' and what happened; still_do: true goes ahead anyway.
 export async function POST(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const access = await cardAccess(true)
   if (access instanceof NextResponse) return access
   const { id } = await params
   if (!isUuid(id)) return NextResponse.json({ error: 'Invalid card' }, { status: 400 })
-  let body: { steps?: unknown; only?: unknown }
+  let body: { steps?: unknown; only?: unknown; still_do?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -27,10 +29,10 @@ export async function POST(req: NextRequest, { params }: Params): Promise<NextRe
     ? body.steps.filter((s): s is StepChoice => !!s && typeof s === 'object' && typeof (s as StepChoice).id === 'string')
     : []
   try {
-    const card = await confirmCard(access.tenantId, access.userId, id, choices, { only: body.only === true })
+    const card = await confirmCard(access.tenantId, access.userId, id, choices, { only: body.only === true, stillDo: body.still_do === true })
     return NextResponse.json({ card: (await withContext(mailDb(), access.tenantId, [card]))[0] })
   } catch (err) {
-    if (err instanceof CardError) return NextResponse.json({ error: err.message }, { status: err.status })
+    if (err instanceof CardError) return NextResponse.json({ error: err.message, ...(err.code ? { code: err.code, changes: err.changes } : {}) }, { status: err.status })
     console.error('[actions] confirm failed:', err)
     return NextResponse.json({ error: 'Could not run the steps' }, { status: 502 })
   }
