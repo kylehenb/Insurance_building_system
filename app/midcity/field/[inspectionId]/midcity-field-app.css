@@ -272,3 +272,12 @@
 .fa-fg[data-flag="empty"] > .fa-fl::after{content:'Empty'}
 .fa-fg[data-flag="check"] > .fa-fl::after{content:'AI guessed'}
 .fa-fg[data-flag="always"] > .fa-fl::after{content:'Check'}
+
+/* PROBLEM KEY: what (A), (B)… are, along the bottom while tagging photos; and on the full-screen buttons */
+.rp-keybar{position:fixed;left:0;right:0;bottom:0;z-index:250;display:flex;gap:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:10px 16px calc(env(safe-area-inset-bottom) + 10px);background:rgba(255,255,255,.94);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--hairline);font-size:15px;white-space:nowrap}
+.rp-keybar::-webkit-scrollbar{display:none}
+.rp-key{flex-shrink:0;color:var(--text)}
+.rp-named{max-width:100%;padding:0 14px}
+.rp-name{font-weight:600;font-size:15px}
+.rp-list{scroll-margin-bottom:60px}
+.fa-root{padding-bottom:88px}
