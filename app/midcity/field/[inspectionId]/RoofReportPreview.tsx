@@ -268,8 +268,6 @@ export function RoofReportPreview({
               fields={fields}
               job={{ address: jobInfo.address, insuredName: jobInfo.insuredName, claimNumber: jobInfo.claimNumber, jobNumber: jobInfo.jobNumber }}
               overview={overview}
-              rooferName={ROOFER_NAME}
-              rooferQual={ROOFER_QUAL}
             />
             <div className="mc-rrp-page-gap" style={{ height: 18, background: '#edebe7' }} />
 
