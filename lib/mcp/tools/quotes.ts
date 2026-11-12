@@ -2,6 +2,7 @@ import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { money, spokenDate } from '@/lib/mcp/tools/work-orders'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { quoteDocumentTotal } from '@/lib/documents/send/documents'
+import { describePhase } from '@/lib/jobs/phase-labels'
 import {
   QuoteEditError,
   addScopeItem,
@@ -413,6 +414,7 @@ export const updateQuoteTool: McpTool = {
     '"ready" (Mark as Ready — locks it), "draft" (Unlock to edit), "approved" (the insurer approved it all), "partially_approved" (give approved_item_ids — every other item is declined), "rejected" (give a reason).',
     'Approving locks the quote, records the approved amount, creates the job\'s work orders from it and updates the job\'s stage. "Sent" happens by sending it with send_documents.',
     'A locked quote\'s margin and notes can only be changed after unlocking (status "draft").',
+    'To record an insurer\'s approval by quote number, approve_quote is simpler.',
     'Read back the change and get a clear yes first.',
   ].join(' '),
   inputSchema: {
@@ -478,18 +480,144 @@ export const updateQuoteTool: McpTool = {
     if ('markup_pct' in details) done.push(`builder's margin set to ${pct(details.markup_pct as number)}`)
     if ('notes' in details) done.push(details.notes ? 'notes updated' : 'notes cleared')
     if (change) done.push(`marked ${change.status.replace('_', ' ')}${change.status === 'rejected' && change.reason ? ` (${change.reason})` : ''}`)
-    const extra: string[] = []
-    if (change?.status.includes('approved')) {
-      const now = await workOrderTrades(quote.job_id, ctx)
-      const made = now.filter(w => !before.some(b => b.id === w.id))
-      extra.push(made.length
-        ? `Created ${made.length} work order${made.length === 1 ? '' : 's'}: ${made.map(w => w.trade_name ?? 'unnamed trade').join(', ')}.`
-        : 'No new work orders were needed — every trade on it already has one.')
-      if (view?.approved_amount) extra.push(`Approved amount ${money(view.approved_amount)}.`)
-    }
+    const extra = change?.status.includes('approved') ? await approvalFollowUp(quote.job_id, before, view, ctx) : []
     return {
       text: [`${quote.quote_ref ?? 'Quote'}: ${done.join(', ')}.`, ...(view ? [`Total ${money(view.total_inc_gst)} inc GST.`] : []), ...extra].join(' '),
       data: { quote: view ? { ...view, items: undefined } : null },
+    }
+  },
+}
+
+/** After an approval: the work orders it made, the approved amount and where the job is now */
+async function approvalFollowUp(jobId: string, before: { id: string }[], view: QuoteView | null, ctx: McpContext): Promise<string[]> {
+  const extra: string[] = []
+  const now = await workOrderTrades(jobId, ctx)
+  const made = now.filter(w => !before.some(b => b.id === w.id))
+  extra.push(made.length
+    ? `Created ${made.length} work order${made.length === 1 ? '' : 's'}: ${made.map(w => w.trade_name ?? 'unnamed trade').join(', ')}.`
+    : 'No new work orders were needed — every trade on it already has one.')
+  if (view?.approved_amount) extra.push(`Approved amount ${money(view.approved_amount)}.`)
+  const { data: job } = await ctx.supabase.from('jobs')
+    .select('phase, phase_step, closed_reason, override_stage').eq('tenant_id', ctx.tenantId).eq('id', jobId).maybeSingle()
+  // phase* aren't in database.types.ts yet
+  if (job) extra.push(`The job is now at ${describePhase(job as unknown as Parameters<typeof describePhase>[0])}.`)
+  return extra
+}
+
+const APPROVED = ['approved', 'partially_approved']
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const refKey = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+type QuoteRow = { id: string; quote_ref: string | null; status: string | null; job_id: string; is_active_version: boolean | null; created_at: string | null }
+
+/**
+ * The quote to approve: a quote number as said ("IRC1074-Q01", "irc 1074 q1"),
+ * a quote_id, or the job's one quote still waiting on the insurer.
+ */
+async function quoteToApprove(args: Record<string, unknown>, ctx: McpContext): Promise<QuoteRow | McpToolResult> {
+  const cols = 'id, quote_ref, status, job_id, is_active_version, created_at'
+  const given = str(args.quote)
+  if (given && UUID_RE.test(given)) {
+    const { data } = await ctx.supabase.from('quotes').select(cols).eq('tenant_id', ctx.tenantId).eq('id', given).maybeSingle()
+    return (data as QuoteRow | null) ?? quoteNotFound()
+  }
+  if (given) {
+    const digits = given.match(/\d{3,}/)?.[0]
+    if (!digits) return { text: `"${given}" isn't a quote number I recognise — give it like IRC1074-Q01, or the job number.`, isError: true }
+    const { data } = await ctx.supabase.from('quotes').select(cols).eq('tenant_id', ctx.tenantId).ilike('quote_ref', `%${digits}%`)
+    const rows = (data ?? []) as QuoteRow[]
+    const want = refKey(given)
+    // "Q01" and "Q1" are the same quote
+    const loose = (v: string) => refKey(v).replace(/Q0+(\d)/g, 'Q$1')
+    const hits = rows.filter(q => q.quote_ref && refKey(q.quote_ref) === want)
+    const found = hits.length ? hits : rows.filter(q => q.quote_ref && loose(q.quote_ref) === loose(given))
+    const best = found.find(q => q.is_active_version !== false) ?? found[0]
+    if (best) return best
+    const near = rows.map(q => q.quote_ref).filter(Boolean)
+    return { text: `No quote ${given}.${near.length ? ` Did you mean ${near.slice(0, 5).join(', ')}?` : ''}`, isError: true }
+  }
+
+  if (!str(args.job_number)) return { text: 'Which quote? Give the quote number (e.g. IRC1074-Q01) or the job number.', isError: true }
+  const job = await jobFromArgs(args, ctx)
+  if (isToolResult(job)) return job
+  const { data } = await ctx.supabase.from('quotes').select(cols)
+    .eq('tenant_id', ctx.tenantId).eq('job_id', job.id).eq('is_active_version', true).order('created_at', { ascending: true })
+  const quotes = (data ?? []) as QuoteRow[]
+  if (!quotes.length) return { text: `${job.job_number} has no quotes.`, isError: true }
+  const open = quotes.filter(q => !APPROVED.includes(q.status ?? '') && q.status !== 'rejected')
+  if (open.length === 1) return open[0]
+  if (!open.length && quotes.length === 1) return quotes[0]
+  const list = (open.length ? open : quotes).map(q => `${q.quote_ref ?? 'unnumbered quote'} (${q.status ?? 'no status'})`).join(', ')
+  return { text: `${job.job_number} has ${open.length || quotes.length} quotes: ${list}. Which one did the insurer approve?`, isError: true }
+}
+
+export const approveQuoteTool: McpTool = {
+  name: 'approve_quote',
+  title: 'Approve quote',
+  description: [
+    'Records that the insurer approved a quote, like Approve on the Quotes tab: the quote becomes approved and locked, the approved amount is recorded,',
+    'the job\'s work orders are created from it, and the job moves on to getting the homeowner\'s signature (it can then go for signature with send_for_signature).',
+    'Give the quote number as said (e.g. "IRC1074-Q01") or the job number (its one quote waiting on the insurer).',
+    'If the insurer approved only some items, get them with get_quote and pass approved_item_ids — every other item is marked declined.',
+    'Before calling, read back the job, quote number, total and whether it is all or part, and get a clear yes.',
+    'To unapprove, use update_quote. If a call returns an error, tell the user what it says.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      quote: { type: 'string', description: 'The quote number, e.g. IRC1074-Q01 (or a quote_id).' },
+      job_number: { type: 'string', description: 'Job number, e.g. IRC1074 — when no quote is given: approves its one quote still waiting on the insurer.' },
+      approved_item_ids: {
+        type: 'array', items: { type: 'string' },
+        description: 'Only when the insurer approved part of it: the item_ids they approved (from get_quote). Leave out for the whole quote.',
+      },
+    },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  permission: 'jobs.edit',
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const found = await quoteToApprove(args, ctx)
+    if (isToolResult(found)) return found
+    const loaded = await loadQuote(found.id, ctx)
+    if (!loaded) return quoteNotFound()
+    const { quote } = loaded
+    const ref = quote.quote_ref ?? 'The quote'
+    const where = loaded.job?.job_number ? ` on ${loaded.job.job_number}` : ''
+
+    const ids = Array.isArray(args.approved_item_ids) ? args.approved_item_ids.filter((x): x is string => typeof x === 'string' && !!x.trim()) : []
+    if (APPROVED.includes(quote.status ?? '') && !ids.length) {
+      const v = quoteView(loaded)
+      return {
+        text: `${ref}${where} is already ${quote.status === 'approved' ? 'approved' : 'partly approved'}${v.approved_amount ? ` (${money(v.approved_amount)})` : ''} — nothing to change. It can go for signature with send_for_signature.`,
+        data: { quote: { ...v, items: undefined }, already_approved: true },
+      }
+    }
+    const change: QuoteStatusChange = ids.length ? { status: 'partially_approved', approvedItemIds: ids } : { status: 'approved' }
+    const was = quote.status
+
+    const before = await workOrderTrades(quote.job_id, ctx)
+    try {
+      await setQuoteStatus(ctx.supabase, ctx.tenantId, quote.id, change)
+    } catch (err) {
+      return errorResult(err)
+    }
+
+    const after = await loadQuote(quote.id, ctx)
+    const view = after ? quoteView(after) : null
+    const declined = ids.length && after ? after.items.filter(i => i.approval_status === 'declined').length : 0
+    const notes: string[] = []
+    if (was === 'draft' || was === 'ready') notes.push(`(It was still ${was} — it hadn't been sent to the insurer from here.)`)
+    if (was === 'rejected') notes.push('(It had been marked rejected.)')
+    return {
+      text: [
+        `${ref}${where} approved${ids.length ? ` in part: ${ids.length} item${ids.length === 1 ? '' : 's'} approved, ${declined} declined` : ''}.`,
+        ...(view ? [`Total ${money(view.total_inc_gst)} inc GST.`] : []),
+        ...await approvalFollowUp(quote.job_id, before, view, ctx),
+        ...notes,
+      ].join(' '),
+      data: { quote: view ? { ...view, items: undefined } : null, previous_status: was },
     }
   },
 }

@@ -2,7 +2,7 @@ import type { McpTool } from '@/lib/mcp/server'
 import { findWorkOrders } from '@/lib/mcp/tools/work-orders'
 import { getWorkOrderEmail, sendWorkOrder } from '@/lib/mcp/tools/work-order-send'
 import { createWorkOrderTool, createWorkOrdersFromQuote, editWorkOrderItems, getWorkOrder, updateWorkOrderTool } from '@/lib/mcp/tools/work-order-edit'
-import { createQuoteTool, editQuoteItems, findLineItemsTool, getQuote, updateQuoteTool } from '@/lib/mcp/tools/quotes'
+import { approveQuoteTool, createQuoteTool, editQuoteItems, findLineItemsTool, getQuote, updateQuoteTool } from '@/lib/mcp/tools/quotes'
 import { createInvoiceTool, editInvoiceItems, getInvoice, updateInvoiceTool, voidInvoiceTool } from '@/lib/mcp/tools/invoices'
 import { createReportTool, getReport, updateReportTool } from '@/lib/mcp/tools/reports'
 import { getDocumentEmail, listJobDocumentsTool, sendDocuments } from '@/lib/mcp/tools/documents'
@@ -53,6 +53,7 @@ export const MCP_TOOLS: McpTool[] = [
   findLineItemsTool,
   createQuoteTool,
   updateQuoteTool,
+  approveQuoteTool,
   editQuoteItems,
   getInvoice,
   createInvoiceTool,

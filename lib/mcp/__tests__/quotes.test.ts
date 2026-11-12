@@ -9,7 +9,7 @@ import { fakeSupabase, type Row } from './fake-supabase'
 const recompute = vi.fn(async (..._a: unknown[]) => 'approved_awaiting_signoff')
 vi.mock('@/lib/jobs/recomputeStage', () => ({ recomputeAndSaveStage: (...a: unknown[]) => recompute(...a) }))
 
-const { getQuote, findLineItemsTool, createQuoteTool, updateQuoteTool, editQuoteItems } = await import('../tools/quotes')
+const { getQuote, findLineItemsTool, createQuoteTool, updateQuoteTool, approveQuoteTool, editQuoteItems } = await import('../tools/quotes')
 
 const db: Record<string, Row[]> = {}
 const ctx = { supabase: fakeSupabase(db) as never, tenantId: 't1', userId: 'u1' }
@@ -123,6 +123,56 @@ describe('edit_quote_items', () => {
     const foreign = await editQuoteItems.run({ quote_id: 'q1', remove: ['s3'] }, ctx)
     expect(foreign.isError).toBe(true)
     expect(db.scope_items.some(i => i.id === 's3')).toBe(true)
+  })
+})
+
+describe('approve_quote', () => {
+  it('approves a quote by its number as said, records the amount, makes the work orders and says where the job is', async () => {
+    db.quotes[1].quote_ref = 'IRC1002-Q01'
+    db.jobs[1].phase = 'in_repair'
+    db.jobs[1].phase_step = 'get_signed'
+    const res = await approveQuoteTool.run({ quote: 'irc 1002 q1' }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(db.quotes[1]).toMatchObject({ status: 'approved', is_locked: true })
+    expect(recompute).toHaveBeenCalledWith('j2')
+    expect(db.work_orders.map(w => w.trade_name)).toEqual(['Plasterer'])
+    expect(res.text).toMatch(/^IRC1002-Q01 on IRC1002 approved\. Total \$\S+ inc GST\. Created 1 work order: Plasterer\. Approved amount \$\S+\. The job is now at In repair · Get the homeowner to sign\.$/)
+  })
+
+  it("approves the job's one quote waiting on the insurer", async () => {
+    const res = await approveQuoteTool.run({ job_number: 'IRC1002' }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(db.quotes[1].status).toBe('approved')
+  })
+
+  it('asks which when the job has several open quotes', async () => {
+    db.quotes.push({ ...db.quotes[1], id: 'q3', quote_ref: 'Q-IRC1002-2' })
+    const res = await approveQuoteTool.run({ job_number: 'IRC1002' }, ctx)
+    expect(res).toMatchObject({ isError: true, text: expect.stringContaining('Which one did the insurer approve?') })
+    expect(db.quotes[1].status).toBe('sent')
+  })
+
+  it('approves in part with the chosen items, the rest declined', async () => {
+    const res = await approveQuoteTool.run({ quote: 'Q-IRC1001-1', approved_item_ids: ['s2'] }, ctx)
+    expect(db.quotes[0]).toMatchObject({ status: 'partially_approved', is_locked: true })
+    expect(db.scope_items.find(i => i.id === 's1')!.approval_status).toBe('declined')
+    expect(res.text).toContain('approved in part: 1 item approved, 1 declined.')
+    expect(res.text).toContain("(It was still draft — it hadn't been sent to the insurer from here.)")
+  })
+
+  it('leaves an approved quote alone, and never finds another tenant\'s quote', async () => {
+    db.quotes[1].status = 'approved'
+    const res = await approveQuoteTool.run({ quote: 'Q-IRC1002-1' }, ctx)
+    expect(res.text).toContain('is already approved')
+    expect(recompute).not.toHaveBeenCalled()
+    const other = await approveQuoteTool.run({ quote: 'Q-IRC9999-1' }, ctx)
+    expect(other.isError).toBe(true)
+    expect(db.quotes[2].status).toBe('draft')
+  })
+
+  it('says when there is no such quote', async () => {
+    const res = await approveQuoteTool.run({ quote: 'IRC1002-Q07' }, ctx)
+    expect(res).toMatchObject({ isError: true, text: 'No quote IRC1002-Q07. Did you mean Q-IRC1002-1?' })
   })
 })
 
