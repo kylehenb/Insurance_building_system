@@ -10,6 +10,7 @@ import { woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import { buildWorkOrderPdf, tradeLabelFor, type WorkOrderPdfContext } from '@/lib/work-orders/work-order-pdf'
 import { buildPhotosPdf, photosPdfFilename } from '@/lib/documents/print-document-pdfs'
 import { ExtraFileError, loadExtraFiles, type ExtraFileRef } from '@/lib/email/extra-files'
+import type { EmailAttachment } from '@/lib/email/build-raw'
 
 // Send & Lock: emails the work order PDF to the trade, then locks the work
 // order (hands it to Gary). The draft is built from the tenant's
@@ -59,6 +60,8 @@ export interface WorkOrderEmailOverrides {
   includePhotos?: boolean
   /** The job's files and photos, or files uploaded from the computer, added in Customise send */
   files?: ExtraFileRef[]
+  /** Other files already read (the voice connector's job photos and files) */
+  extraAttachments?: EmailAttachment[]
 }
 
 /** Splits a comma/semicolon separated address list and validates each one. */
@@ -161,7 +164,7 @@ export async function sendWorkOrderEmail(
     }
   }
   try {
-    files.push(...await loadExtraFiles(overrides.files, tenantId, draft.jobId))
+    files.push(...await loadExtraFiles(overrides.files, tenantId, draft.jobId), ...(overrides.extraAttachments ?? []))
   } catch (err) {
     if (err instanceof ExtraFileError) throw new WorkOrderEmailError(`${err.message}. Nothing was sent.`, err.status)
     throw err

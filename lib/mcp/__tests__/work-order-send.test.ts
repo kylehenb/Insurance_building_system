@@ -22,6 +22,14 @@ vi.mock('@/lib/work-orders/work-order-email', () => ({
   WorkOrderEmailError,
 }))
 vi.mock('@/lib/work-orders/work-order-pdf', () => ({ WorkOrderPdfError }))
+const loadJobAttachments = vi.fn()
+const fitJobAttachments = vi.fn()
+vi.mock('@/lib/mcp/tools/job-attachments', () => ({
+  ATTACH_PROPERTIES: { attach_photos: { type: 'array' }, attach_files: { type: 'array' } },
+  loadJobAttachments: (...a: unknown[]) => loadJobAttachments(...a),
+  fitJobAttachments: (...a: unknown[]) => fitJobAttachments(...a),
+  skippedText: () => 'Left out (over Gmail\'s 25 MB limit): photo 9 30.0 MB.',
+}))
 
 const { getWorkOrderEmail, sendWorkOrder } = await import('../tools/work-order-send')
 
@@ -89,6 +97,35 @@ describe('send_work_order', () => {
     const res = await sendWorkOrder.run({ work_order_id: ID, to: 'kyle@example.com', body: 'Custom body', include_photos: false }, ctx)
     expect(send).toHaveBeenCalledWith(ID, ctx, { to: 'kyle@example.com', subject: undefined, body: 'Custom body', includePhotos: false })
     expect(res.text).toContain('to kyle@example.com, without photos.')
+  })
+
+  it("adds the job's photos and files the user named", async () => {
+    buildDraft.mockResolvedValueOnce({ jobId: 'j1' })
+    const files = [{ label: 'photo 2 (Roof)', filename: 'Roof.jpg', mimeType: 'image/jpeg', content: Buffer.from('x') }, { label: 'Scope.pdf', filename: 'Scope.pdf', mimeType: 'application/pdf', content: Buffer.from('y') }]
+    loadJobAttachments.mockResolvedValueOnce(files)
+    fitJobAttachments.mockResolvedValueOnce({ kept: files, skipped: [], compressed: [] })
+    const res = await sendWorkOrder.run({ work_order_id: ID, to: 'kyle@example.com', attach_photos: ['2'], attach_files: ['Scope.pdf'] }, ctx)
+    expect(loadJobAttachments).toHaveBeenCalledWith({ attach_photos: ['2'], attach_files: ['Scope.pdf'] }, ctx, { id: 'j1', job_number: 'IRC1001' })
+    expect(send).toHaveBeenCalledWith(ID, ctx, expect.objectContaining({ extraAttachments: files }))
+    expect(res.text).toContain('to kyle@example.com, with photo 2 (Roof), Scope.pdf.')
+  })
+
+  it("sends nothing when the named photos don't fit in one email", async () => {
+    buildDraft.mockResolvedValueOnce({ jobId: 'j1' })
+    const big = { label: 'photo 9', filename: 'Big.jpg', mimeType: 'image/jpeg', content: Buffer.from('x') }
+    loadJobAttachments.mockResolvedValueOnce([big])
+    fitJobAttachments.mockResolvedValueOnce({ kept: [], skipped: [big], compressed: [] })
+    const res = await sendWorkOrder.run({ work_order_id: ID, to: 'kyle@example.com', attach_photos: ['9'] }, ctx)
+    expect(res).toMatchObject({ isError: true, text: expect.stringMatching(/^Not sent\. Left out/) })
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('passes on a photo that matches nothing', async () => {
+    buildDraft.mockResolvedValueOnce({ jobId: 'j1' })
+    loadJobAttachments.mockResolvedValueOnce({ text: 'No photo 99 on IRC1001.', isError: true })
+    const res = await sendWorkOrder.run({ work_order_id: ID, attach_photos: ['99'] }, ctx)
+    expect(res).toMatchObject({ text: 'No photo 99 on IRC1001.', isError: true })
+    expect(send).not.toHaveBeenCalled()
   })
 
   it('passes on the app’s refusal instead of retrying', async () => {
