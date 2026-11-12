@@ -10,12 +10,14 @@ import {
 import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
 import { permissionGate } from '@/lib/permissions/http'
 import { recordOperation } from '@/lib/activity/log'
+import { ExtraFileError, parseExtraFiles } from '@/lib/email/extra-files'
 
 // GET  → the pre-filled email (from the work_order template) for the send modal
 // POST → send to the trade and lock. Body { mode: 'auto' } sends the template
 //        as-is; { mode: 'custom', to, cc, subject, body, includePhotos } sends
 //        the edited copy. The job's photos PDF is attached unless includePhotos
-//        is false.
+//        is false; files adds the job's files/photos or uploads
+//        (lib/email/extra-files).
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -61,9 +63,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const parsed = await req.json() as Record<string, unknown>
     if (parsed.mode === 'custom') {
       const str = (k: string) => (typeof parsed[k] === 'string' ? parsed[k] as string : undefined)
+      let files
+      try {
+        files = parseExtraFiles(parsed.files, ctx.tenantId)
+      } catch (err) {
+        if (err instanceof ExtraFileError) return NextResponse.json({ error: err.message }, { status: err.status })
+        throw err
+      }
       overrides = {
         to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body'),
         includePhotos: parsed.includePhotos !== false,
+        ...(files.length ? { files } : {}),
       }
     } else if (parsed.mode !== 'auto') {
       return NextResponse.json({ error: "mode must be 'auto' or 'custom'" }, { status: 400 })

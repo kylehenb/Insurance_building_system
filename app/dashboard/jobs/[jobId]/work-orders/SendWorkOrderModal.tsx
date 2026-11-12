@@ -6,6 +6,7 @@ import { type WorkOrderWithDetails } from './types'
 import { RichTextEditor } from '@/components/email/RichTextEditor'
 import { isPendingApproval, responseError } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
+import { ExtraAttachments, extraFileRefs, type ExtraFile } from '@/components/email/ExtraAttachments'
 
 export interface SendWorkOrderModalProps {
   workOrder: WorkOrderWithDetails
@@ -14,6 +15,7 @@ export interface SendWorkOrderModalProps {
 }
 
 interface Draft {
+  jobId: string
   to: string
   cc: string
   subject: string
@@ -27,7 +29,8 @@ interface Draft {
 
 // Send & Lock: Auto send emails the template as-is; Customise send opens the
 // same pre-filled email for editing first. The job's photos PDF is attached by
-// default (Customise send can leave it off). Either way the work order locks
+// default (Customise send can leave it off, and add the job's files and
+// photos or files from the computer). Either way the work order locks
 // only once the email has gone. Backdrop, × and Escape close without sending.
 export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrderModalProps) {
   const [step, setStep]       = useState<'choose' | 'customise'>('choose')
@@ -42,6 +45,8 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
   const [subject, setSubject] = useState('')
   const [body, setBody]       = useState('')
   const [includePhotos, setIncludePhotos] = useState(true)
+  const [extraFiles, setExtraFiles] = useState<ExtraFile[]>([])
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -74,7 +79,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
       const res = await fetch(`/api/work-orders/${workOrder.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'auto' ? { mode } : { mode, to, cc, subject, body, includePhotos }),
+        body: JSON.stringify(mode === 'auto' ? { mode } : { mode, to, cc, subject, body, includePhotos, files: extraFileRefs(extraFiles) }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw responseError(data, 'Failed to send work order')
@@ -245,7 +250,7 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                 >
                   <div style={{ fontSize: 12, fontWeight: 600 }}>Customise send</div>
                   <div style={{ fontSize: 10, color: 'var(--body-soft)', marginTop: 2 }}>
-                    Review and edit the recipient, subject and message before sending.
+                    Review and edit the recipient, subject and message, or attach more files, before sending.
                   </div>
                 </button>
               </div>
@@ -308,6 +313,16 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
                   </div>
                 )}
               </div>
+              <div>
+                <label style={fieldLabel}>Other files</label>
+                <ExtraAttachments
+                  jobId={draft.jobId}
+                  files={extraFiles}
+                  onChange={setExtraFiles}
+                  disabled={sending}
+                  onUploadingChange={setUploading}
+                />
+              </div>
               <p style={{ fontSize: 10, color: 'var(--subtle-2)', lineHeight: 1.5 }}>
                 Changes here apply to this email only. Edit the standard wording in Settings → Email Templates.
               </p>
@@ -339,15 +354,16 @@ export function SendWorkOrderModal({ workOrder, onSent, onClose }: SendWorkOrder
               </button>
               <button
                 onClick={() => send('custom')}
-                disabled={sending || !to.trim() || !subject.trim()}
+                disabled={sending || uploading || !to.trim() || !subject.trim()}
+                title={uploading ? 'Waiting for files to finish uploading' : undefined}
                 style={{
                   ...footerBtn,
                   fontWeight: 600,
                   background: 'var(--info-dark)',
                   borderColor: 'var(--info-dark)',
                   color: 'var(--paper)',
-                  opacity: !to.trim() || !subject.trim() ? 0.45 : 1,
-                  cursor: sending || !to.trim() || !subject.trim() ? 'default' : 'pointer',
+                  opacity: uploading || !to.trim() || !subject.trim() ? 0.45 : 1,
+                  cursor: sending || uploading || !to.trim() || !subject.trim() ? 'default' : 'pointer',
                 }}
               >
                 {sending ? 'Sending…' : 'Send & Lock'}

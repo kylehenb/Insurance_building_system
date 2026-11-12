@@ -76,6 +76,11 @@ const replyQuote = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({
 vi.mock('@/lib/mail/compose', () => ({ replyQuote: (...a: unknown[]) => replyQuote(...a) }))
 const recordReportsLocked = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock('@/lib/reports/learning', () => ({ recordReportsLocked: (...a: unknown[]) => recordReportsLocked(...a) }))
+const loadExtraFiles = vi.fn(async (..._args: unknown[]): Promise<unknown[]> => [])
+vi.mock('@/lib/email/extra-files', async (orig) => ({
+  ...await orig<typeof import('@/lib/email/extra-files')>(),
+  loadExtraFiles: (...a: unknown[]) => loadExtraFiles(...a),
+}))
 
 const { buildDocumentEmailDraft, sendDocumentEmail, markDocumentsSentWithoutEmail, MAX_ATTACHMENT_BYTES } = await import('../email')
 const { parseDocumentRef, DocumentSendError, invoiceDueText } = await import('../documents')
@@ -202,6 +207,23 @@ describe('sendDocumentEmail', () => {
     await sendDocumentEmail([quoteRef], ctx, { to: 'a@x.com; b@x.com', cc: 'a@x.com, c@x.com', subject: ' Custom ', body: 'Hello' })
     const email = gmailSend.mock.calls[0][1] as Record<string, unknown>
     expect(email).toMatchObject({ to: 'a@x.com, b@x.com', cc: 'c@x.com', subject: 'Custom', text: 'Hello' })
+  })
+
+  it("adds the job's files and uploads chosen in Customise send after the PDFs", async () => {
+    const files = [{ source: 'file' as const, id: '00000000-0000-4000-8000-000000000901' }]
+    loadExtraFiles.mockResolvedValueOnce([{ filename: 'Scope.pdf', mimeType: 'application/pdf', content: Buffer.from('scope') }])
+    await sendDocumentEmail([quoteRef], ctx, { files })
+    expect(loadExtraFiles).toHaveBeenCalledWith(files, fx.TENANT_ID, expect.any(String))
+    const email = gmailSend.mock.calls[0][1] as { attachments: { filename: string }[] }
+    expect(email.attachments.map(f => f.filename).slice(-1)).toEqual(['Scope.pdf'])
+  })
+
+  it("sends nothing when an extra file can't be read", async () => {
+    const { ExtraFileError } = await import('@/lib/email/extra-files')
+    loadExtraFiles.mockRejectedValueOnce(new ExtraFileError('File not found on this job', 404))
+    await expect(sendDocumentEmail([quoteRef], ctx, { files: [{ source: 'file', id: '00000000-0000-4000-8000-000000000901' }] }))
+      .rejects.toMatchObject({ status: 404, message: expect.stringMatching(/Nothing was sent/) })
+    expect(gmailSend).not.toHaveBeenCalled()
   })
 
   it('sends the formatted message as HTML alongside the plain text', async () => {

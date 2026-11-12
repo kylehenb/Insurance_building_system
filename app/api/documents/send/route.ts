@@ -11,12 +11,14 @@ import {
 } from '@/lib/documents/send/email'
 import { permissionGate } from '@/lib/permissions/http'
 import { recordOperation } from '@/lib/activity/log'
+import { ExtraFileError, parseExtraFiles } from '@/lib/email/extra-files'
 
 // Email quotes, reports, invoices, TCCs and photos from a job.
 // POST { documents: DocumentRef[], mode }
 //   mode 'draft'     → the pre-filled email for the send dialog (nothing sent)
 //   mode 'auto'      → send the template as-is
-//   mode 'custom'    → send with { to, cc, subject, body } as edited
+//   mode 'custom'    → send with { to, cc, subject, body } as edited, plus
+//                      files: the job's files/photos or uploads (lib/email/extra-files)
 //   mode 'mark_sent' → no email; mark the documents sent (sent another way)
 // Any mode may add replyToOrder: true (reply in the job's insurer order email
 // thread) and inspectionId (the inspection package: mark it Sent and Locked).
@@ -61,7 +63,8 @@ export async function POST(req: NextRequest) {
       ...(inspectionId ? { inspectionId } : {}),
     }
     if (mode === 'custom') {
-      overrides = { ...overrides, to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body') }
+      const files = parseExtraFiles(parsed.files, ctx.tenantId)
+      overrides = { ...overrides, to: str('to') ?? '', cc: str('cc') ?? '', subject: str('subject'), body: str('body'), ...(files.length ? { files } : {}) }
     } else if (mode !== 'auto' && mode !== 'mark_sent') {
       return NextResponse.json({ error: "mode must be 'draft', 'auto', 'custom' or 'mark_sent'" }, { status: 400 })
     }
@@ -76,6 +79,7 @@ export async function POST(req: NextRequest) {
     await recordOperation({ tenantId: ctx.tenantId, userId: ctx.actorId, action: 'send.documents', operation: 'documents.send', payload: { refs, mode, overrides } })
     return NextResponse.json({ ok: true, ...result })
   } catch (err) {
+    if (err instanceof ExtraFileError) return NextResponse.json({ error: err.message }, { status: err.status })
     if (err instanceof DocumentSendError) return NextResponse.json({ error: err.message }, { status: err.status })
     console.error(`[documents/send] ${String(mode)} failed:`, err)
     return NextResponse.json({ error: mode === 'draft' ? 'Failed to prepare the email' : 'Failed to send' }, { status: 500 })

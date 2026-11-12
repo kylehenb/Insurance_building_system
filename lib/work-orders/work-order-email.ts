@@ -9,12 +9,14 @@ import { composeStandardEmail } from '@/lib/email/compose'
 import { woIsSent } from '@/app/dashboard/jobs/[jobId]/work-orders/types'
 import { buildWorkOrderPdf, tradeLabelFor, type WorkOrderPdfContext } from '@/lib/work-orders/work-order-pdf'
 import { buildPhotosPdf, photosPdfFilename } from '@/lib/documents/print-document-pdfs'
+import { ExtraFileError, loadExtraFiles, type ExtraFileRef } from '@/lib/email/extra-files'
 
 // Send & Lock: emails the work order PDF to the trade, then locks the work
 // order (hands it to Gary). The draft is built from the tenant's
 // 'work_order' email template so Auto send and Customise send start from the
 // same content. The job's photos go with it as a second PDF (the Photos tab's
-// photo pages) unless Customise send leaves them off.
+// photo pages) unless Customise send leaves them off. Customise send can also
+// add the job's files and photos, or files from the computer.
 
 const FALLBACK_FROM = 'office@insurancerepairco.com.au'
 /** Gmail's limit is 25 MB including encoding overhead (~4/3) */
@@ -29,6 +31,8 @@ export class WorkOrderEmailError extends Error {
 }
 
 export interface WorkOrderEmailDraft {
+  /** The work order's job (its files and photos can be attached too) */
+  jobId: string
   to: string
   cc: string
   subject: string
@@ -53,6 +57,8 @@ export interface WorkOrderEmailOverrides {
   body?: string
   /** Attach the job's photos PDF (default true) */
   includePhotos?: boolean
+  /** The job's files and photos, or files uploaded from the computer, added in Customise send */
+  files?: ExtraFileRef[]
 }
 
 /** Splits a comma/semicolon separated address list and validates each one. */
@@ -103,6 +109,7 @@ export async function buildWorkOrderEmailDraft(
 
   const body = renderRichTemplate(template.body, vars)
   return {
+    jobId: job.id,
     to: trade?.contact_email?.trim() ?? '',
     cc: '',
     subject: renderTemplate(template.subject, vars),
@@ -143,20 +150,26 @@ export async function sendWorkOrderEmail(
   if (!subject) throw new WorkOrderEmailError('Subject is required', 400)
 
   const { pdf, filename } = await buildWorkOrderPdf(workOrderId, ctx, { asSent: true })
-  const files = [{ filename, pdf }]
+  const files: { filename: string; mimeType: string; content: Buffer }[] = [{ filename, mimeType: 'application/pdf', content: pdf }]
   if (draft.photos && overrides.includePhotos !== false) {
     try {
       const photos = await buildPhotosPdf(draft.photos.jobId, [], ctx)
-      files.push({ filename: photos.filename, pdf: photos.pdf })
+      files.push({ filename: photos.filename, mimeType: 'application/pdf', content: photos.pdf })
     } catch (err) {
       console.error(`[work-order-email] photos PDF failed for ${workOrderId}:`, err)
       throw new WorkOrderEmailError('Could not create the photos PDF — nothing was sent. Untick the photos in Customise send to send without them.', 500)
     }
   }
-  const totalBytes = files.reduce((sum, f) => sum + f.pdf.length, 0)
+  try {
+    files.push(...await loadExtraFiles(overrides.files, tenantId, draft.jobId))
+  } catch (err) {
+    if (err instanceof ExtraFileError) throw new WorkOrderEmailError(`${err.message}. Nothing was sent.`, err.status)
+    throw err
+  }
+  const totalBytes = files.reduce((sum, f) => sum + f.content.length, 0)
   if (totalBytes > MAX_ATTACHMENT_BYTES) {
     throw new WorkOrderEmailError(
-      `The attachments come to ${(totalBytes / 1024 / 1024).toFixed(1)} MB, more than email allows. Use Customise send and leave the photos off.`,
+      `The attachments come to ${(totalBytes / 1024 / 1024).toFixed(1)} MB, more than email allows. Use Customise send and leave the photos or some files off.`,
       422,
     )
   }
@@ -170,7 +183,7 @@ export async function sendWorkOrderEmail(
     subject,
     body,
     html,
-    attachments: files.map(f => ({ filename: f.filename, mimeType: 'application/pdf', content: f.pdf })),
+    attachments: files,
   })
 
   // Claim the work order before emailing, so two sends close together (a
@@ -241,9 +254,9 @@ export async function sendWorkOrderEmail(
     const storagePath = `tenants/${tenantId}/comms/${communicationId}/${Date.now()}-${i}-${f.filename.replace(/[^\w.,\- ]/g, '_')}`
     const { error: uploadErr } = await service.storage
       .from('job-files')
-      .upload(storagePath, f.pdf, { contentType: 'application/pdf' })
-    if (uploadErr) console.error(`[work-order-email] PDF copy upload failed for ${workOrderId}:`, uploadErr)
-    return { filename: f.filename, storage_path: uploadErr ? null : storagePath, mime_type: 'application/pdf', size_bytes: f.pdf.length }
+      .upload(storagePath, f.content, { contentType: f.mimeType })
+    if (uploadErr) console.error(`[work-order-email] copy upload failed for ${f.filename} (${workOrderId}):`, uploadErr)
+    return { filename: f.filename, storage_path: uploadErr ? null : storagePath, mime_type: f.mimeType, size_bytes: f.content.length }
   }))
 
   const { error: commErr } = await service.from('communications').insert({

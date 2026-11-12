@@ -51,6 +51,11 @@ vi.mock('@/lib/documents/print-document-pdfs', () => ({
   photosPdfFilename: () => 'Photos - IRC1 - 1 Example St.pdf',
 }))
 
+const loadExtraFiles = vi.fn(async (..._args: unknown[]): Promise<unknown[]> => [])
+vi.mock('@/lib/email/extra-files', async (orig) => ({
+  ...await orig<typeof import('@/lib/email/extra-files')>(),
+  loadExtraFiles: (...a: unknown[]) => loadExtraFiles(...a),
+}))
 const { buildWorkOrderEmailDraft, sendWorkOrderEmail } = await import('../work-order-email')
 const ctx = { supabase: client as never, tenantId: 't1' }
 
@@ -91,6 +96,15 @@ describe('work order email photos', () => {
     await sendWorkOrderEmail('wo1', ctx)
     expect(buildPhotos).not.toHaveBeenCalled()
     expect(attachmentNames()).toEqual(['WO-1 - Plaster Co - 1 Example St.pdf'])
+  })
+
+  it("adds the job's files and uploads chosen in Customise send, and keeps a copy of each", async () => {
+    const files = [{ source: 'upload' as const, path: 't1/u/Plan.pdf', filename: 'Plan.pdf', mimeType: 'application/pdf' }]
+    loadExtraFiles.mockResolvedValueOnce([{ filename: 'Plan.pdf', mimeType: 'application/pdf', content: Buffer.from('plan') }])
+    await sendWorkOrderEmail('wo1', ctx, { includePhotos: false, files })
+    expect(loadExtraFiles).toHaveBeenCalledWith(files, 't1', 'j1')
+    expect(attachmentNames()).toEqual(['WO-1 - Plaster Co - 1 Example St.pdf', 'Plan.pdf'])
+    expect((inserts[0].attachments as unknown[]).length).toBe(2)
   })
 
   it('sends nothing if the photos PDF fails', async () => {

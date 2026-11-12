@@ -6,10 +6,12 @@ import type { DocumentRef } from '@/lib/documents/send/documents'
 import { RichTextEditor } from '@/components/email/RichTextEditor'
 import { isPendingApproval, responseError } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
+import { ExtraAttachments, extraFileRefs, type ExtraFile } from '@/components/email/ExtraAttachments'
 
 // Send a document (quote, report, invoice, TCC, photos) by email from the
 // job. Auto send emails the standard template as-is; Customise send opens the
-// same pre-filled email to edit, and can attach more of the job's documents.
+// same pre-filled email to edit, and can attach more of the job's documents,
+// the job's own files and photos, or files from the computer.
 // Mark as sent records it as sent without emailing (sent some other way).
 // replyToOrder sends it as a reply in the insurer order's email thread;
 // inspectionId marks that inspection Sent and Locked too (the package).
@@ -45,6 +47,7 @@ interface Attachment {
 }
 
 interface Draft {
+  jobId: string
   to: string
   cc: string
   subject: string
@@ -92,6 +95,8 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
   const [subject, setSubject] = useState('')
   const [body, setBody]       = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [extraFiles, setExtraFiles] = useState<ExtraFile[]>([])
+  const [uploading, setUploading] = useState(false)
 
   // The documents prop is usually built inline; key the load on its contents
   const docsKey = JSON.stringify(documents)
@@ -123,7 +128,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
       const refs = mode === 'custom' ? attachments.map(a => a.ref) : documents
       const pkg = { ...(replyToOrder ? { replyToOrder } : {}), ...(inspectionId ? { inspectionId } : {}) }
       const result = await post(mode === 'custom'
-        ? { mode, documents: refs, to, cc, subject, body, ...pkg }
+        ? { mode, documents: refs, to, cc, subject, body, files: extraFileRefs(extraFiles), ...pkg }
         : { mode, documents: refs, ...pkg })
       onDone({ emailed: mode !== 'mark_sent', statusChanges: result.statusChanges ?? [] })
     } catch (err) {
@@ -307,7 +312,7 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
                 >
                   <div style={{ fontSize: 12, fontWeight: 600 }}>Customise send</div>
                   <div style={{ fontSize: 10, color: '#5a5650', marginTop: 2 }}>
-                    Review and edit the recipients, subject and message, or attach more documents, before sending.
+                    Review and edit the recipients, subject and message, or attach more documents and files, before sending.
                   </div>
                 </button>
                 {allowMarkSent && (
@@ -397,6 +402,16 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
                   </select>
                 )}
               </div>
+              <div>
+                <label style={fieldLabel}>Other files</label>
+                <ExtraAttachments
+                  jobId={draft.jobId}
+                  files={extraFiles}
+                  onChange={setExtraFiles}
+                  disabled={sending}
+                  onUploadingChange={setUploading}
+                />
+              </div>
               <p style={{ fontSize: 10, color: '#9a9590', lineHeight: 1.5 }}>
                 Changes here apply to this email only. Edit the standard wording in Settings → Email Templates
                 {draft.usingBuiltInTemplate ? ' (this is the built-in default until you save one)' : ` (${draft.templateName})`}.
@@ -432,15 +447,16 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
               </button>
               <button
                 onClick={() => run('custom')}
-                disabled={sending || !to.trim() || !subject.trim()}
+                disabled={sending || uploading || !to.trim() || !subject.trim()}
+                title={uploading ? 'Waiting for files to finish uploading' : undefined}
                 style={{
                   ...footerBtn,
                   fontWeight: 600,
                   background: '#1e40af',
                   borderColor: '#1e40af',
                   color: '#fff',
-                  opacity: !to.trim() || !subject.trim() ? 0.45 : 1,
-                  cursor: sending || !to.trim() || !subject.trim() ? 'default' : 'pointer',
+                  opacity: uploading || !to.trim() || !subject.trim() ? 0.45 : 1,
+                  cursor: sending || uploading || !to.trim() || !subject.trim() ? 'default' : 'pointer',
                 }}
               >
                 {busy === 'custom' ? 'Sending…' : 'Send'}

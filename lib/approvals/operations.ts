@@ -4,6 +4,7 @@ import type { PermissionKey } from '@/lib/permissions/catalogue'
 import { sendWorkOrderEmail, type WorkOrderEmailOverrides } from '@/lib/work-orders/work-order-email'
 import { buildDocumentEmailDraft, markDocumentsSentWithoutEmail, sendDocumentEmail, type DocumentEmailOverrides } from '@/lib/documents/send/email'
 import type { DocumentRef } from '@/lib/documents/send/documents'
+import { extraFilesPhrase } from '@/lib/email/extra-files'
 import { sendForSignature } from '@/lib/signing/service'
 import type { CreateSigningRequestInput } from '@/lib/signing/provider'
 import { runSigningAction, type SigningAction, type SigningActionBody } from '@/lib/signing/actions'
@@ -65,7 +66,7 @@ const workOrderSend: Operation<{ workOrderId: string; overrides: WorkOrderEmailO
       : { data: null }
     const to = p.overrides.to || trade?.contact_email || 'no email on file'
     return {
-      summary: `Send the ${wo?.trade_name ?? 'work order'}${trade?.business_name ? ` (${trade.business_name})` : ''} work order on ${await jobNumber(ctx, wo?.job_id ?? null)} to ${to}${p.overrides.body ? ', with changed wording' : ''}`,
+      summary: `Send the ${wo?.trade_name ?? 'work order'}${trade?.business_name ? ` (${trade.business_name})` : ''} work order on ${await jobNumber(ctx, wo?.job_id ?? null)} to ${to}${p.overrides.body ? ', with changed wording' : ''}${extraFilesPhrase(p.overrides.files)}`,
       jobId: wo?.job_id ?? null,
     }
   },
@@ -83,7 +84,7 @@ const documentsSend: Operation<{ refs: DocumentRef[]; mode: 'auto' | 'custom' | 
     return {
       summary: p.mode === 'mark_sent'
         ? `Mark ${titles} as sent on ${await jobNumber(ctx, jobId)} (not emailed)`
-        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${draft.replyToOrder ? ', as a reply to the insurer order email' : ''}${p.overrides.body ? ', with changed wording' : ''}`,
+        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${draft.replyToOrder ? ', as a reply to the insurer order email' : ''}${p.overrides.body ? ', with changed wording' : ''}${extraFilesPhrase(p.overrides.files)}`,
       jobId,
     }
   },

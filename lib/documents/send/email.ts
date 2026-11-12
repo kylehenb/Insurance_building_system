@@ -13,6 +13,7 @@ import { reportDocumentName } from '@/lib/documents/print-document-pdfs'
 import { findOrderThread, type OrderThread } from '@/lib/documents/send/order-thread'
 import { inspectionForPackage, markInspectionPackageSent } from '@/lib/documents/send/inspection-package'
 import { PrintDataError } from '@/lib/documents/print-data'
+import { ExtraFileError, loadExtraFiles, type ExtraFileRef } from '@/lib/email/extra-files'
 import {
   documentRefKey,
   DocumentSendError,
@@ -52,6 +53,8 @@ export interface DocumentEmailAttachment {
 }
 
 export interface DocumentEmailDraft {
+  /** The documents' job (its files and photos can be attached too) */
+  jobId: string
   to: string
   cc: string
   subject: string
@@ -80,6 +83,8 @@ export interface DocumentEmailOverrides {
   body?: string
   /** Other files to go with the documents (the voice connector's job photos and files) */
   extraAttachments?: EmailAttachment[]
+  /** The job's files and photos, or files uploaded from the computer, added in Customise send */
+  files?: ExtraFileRef[]
   /** Reply in the job's insurer order email thread instead of starting a new email */
   replyToOrder?: boolean
   /** The documents are this inspection's package: mark it Sent and Locked once sent */
@@ -182,6 +187,7 @@ async function buildDraft(
 
   const body = renderRichTemplate(template.body, vars)
   return {
+    jobId: job.id,
     to: to.join(', '),
     cc: cc.join(', '),
     subject: thread?.subject ?? renderTemplate(template.subject, vars),
@@ -270,7 +276,14 @@ export async function sendDocumentEmail(
       throw new DocumentSendError(`Could not create the PDF for ${doc.title}. Nothing was sent.`, 500)
     }
   }
-  const extras = overrides.extraAttachments ?? []
+  let added: EmailAttachment[]
+  try {
+    added = await loadExtraFiles(overrides.files, ctx.tenantId, main.job.id)
+  } catch (err) {
+    if (err instanceof ExtraFileError) throw new DocumentSendError(`${err.message}. Nothing was sent.`, err.status)
+    throw err
+  }
+  const extras = [...(overrides.extraAttachments ?? []), ...added]
   const totalBytes = files.reduce((sum, f) => sum + f.pdf.length, 0) + extras.reduce((sum, f) => sum + f.content.length, 0)
   if (totalBytes > MAX_ATTACHMENT_BYTES) {
     throw new DocumentSendError(
