@@ -6,7 +6,7 @@ import { join } from 'path'
 // provider has to go through trackAi, or its spend and failures go missing
 // from the health check.
 
-const CALL = /\.(messages\.create|generateContent|embeddings\.create|chat\.completions\.create|responses\.create)\(/
+const CALL = /\.(messages\.create|generateContent|embeddings\.create|chat\.completions\.create|responses\.create|transcriptions\.create)\(/
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {

@@ -29,6 +29,15 @@ Stormwater entry through the roof cover at the enclosed patio from 3 defects:
 
 ${PAGE_ONE_FORMAT}`
 
+// Notes recorded on site as a running commentary (the field app's voice notes,
+// lib/audio/voice-timeline.ts): thinking out loud, corrected as it goes, often
+// with a recap at the end. Guesses mustn't end up in the report as fact.
+const COMMENTARY = `RUNNING COMMENTARY — the notes may be recorded on site as the inspector works, in sections starting with the time ("[10:42am] …"), often ending with a recap. Read them as the inspector thinking out loud:
+- Later statements and the recap override earlier ones. A correction ("actually", "no, it's…", "scratch that") replaces what it corrects.
+- A remark the inspector marks as unsure ("might be", "I think", "not sure", "possibly", "could be") is never written as fact. If later notes or the recap confirm it, write it as fact. If it stays unresolved and matters to the cause, give it as a tentative opinion (the report states which opinions are tentative and which are firm). Otherwise leave it out.
+- Never make a problem letter for something the inspector later dismissed or left as a passing guess.
+- Leave the times out of the report.`
+
 export async function POST(req: NextRequest) {
   const me = await sessionUser()
   if (!me) return unauthorized()
@@ -80,6 +89,8 @@ FIXED DEFAULTS — use these exact values unless the raw notes explicitly state 
 - rooferQualification: "Roof Plumber, Registered Builder BP103432"
 - timeOnSite: "30 mins" (only override if raw notes state a specific different duration)
 - scopeOfAssessment: "Carry out roof inspection and provide a roof report relating to the claim" (only override if explicitly different)
+
+${COMMENTARY}
 
 ${CAUSE_FORMAT}`,
       messages: [{

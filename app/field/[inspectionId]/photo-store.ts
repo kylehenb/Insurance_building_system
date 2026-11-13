@@ -19,6 +19,8 @@ export interface StoredPhoto {
   labelSource: LabelSource
   uploaded: boolean
   serverId: string | null
+  /** When it was taken with the app's own camera (Bindi Co), to line it up with the voice notes */
+  takenAt?: number | null
 }
 
 const DB_NAME = 'irc-field-photos'

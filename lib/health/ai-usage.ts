@@ -41,6 +41,13 @@ export function usageOf(reply: unknown): TokenCounts {
   if (usage && 'prompt_tokens' in usage) {
     return { input: num(usage.prompt_tokens), output: num(usage.completion_tokens), cacheRead: 0, cacheWrite: 0 }
   }
+  // OpenAI speech to text (whisper-1): billed by the second of audio, counted as input (priced per million seconds)
+  if (usage && usage.type === 'duration') {
+    return { input: Math.round(num(usage.seconds)), output: 0, cacheRead: 0, cacheWrite: 0 }
+  }
+  if (!usage && typeof r.duration === 'number' && Array.isArray(r.segments)) {
+    return { input: Math.round(num(r.duration)), output: 0, cacheRead: 0, cacheWrite: 0 }
+  }
   // Google: @google/genai puts usageMetadata on the result, @google/generative-ai on result.response.
   // promptTokenCount includes cached tokens; thinking is billed as output.
   const meta = (r.usageMetadata ?? (r.response as Record<string, unknown> | undefined)?.usageMetadata) as Record<string, unknown> | undefined

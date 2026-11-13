@@ -32,6 +32,8 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'gemini-3.6-flash': { input: 0.75, output: 3.75, cacheRead: 0.075 },
   // OpenAI (embeddings have no output tokens)
   'text-embedding-3-small': { input: 0.02, output: 0 },
+  // Speech to text, US$0.006 a minute of audio: its usage is seconds, counted as input (lib/health/ai-usage.ts)
+  'whisper-1': { input: 100, output: 0 },
 }
 
 export interface TokenCounts {

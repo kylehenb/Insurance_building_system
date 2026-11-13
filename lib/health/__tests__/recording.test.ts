@@ -58,6 +58,12 @@ describe('reading token counts off a reply', () => {
   it('OpenAI embeddings', () => {
     expect(usageOf({ usage: { prompt_tokens: 42, total_tokens: 42 } })).toEqual({ input: 42, output: 0, cacheRead: 0, cacheWrite: 0 })
   })
+  it('OpenAI speech to text: seconds of audio, counted as input', () => {
+    expect(usageOf({ usage: { type: 'duration', seconds: 61.6 } })).toEqual({ input: 62, output: 0, cacheRead: 0, cacheWrite: 0 })
+    expect(usageOf({ text: 'x', duration: 30.2, segments: [] }).input).toBe(30)
+    // whisper-1 at US$0.006 a minute: 10 minutes is 6 cents
+    expect(costUsd('whisper-1', { input: 600, output: 0, cacheRead: 0, cacheWrite: 0 })).toBeCloseTo(0.06)
+  })
   it('anything else counts as nothing', () => {
     expect(usageOf(undefined)).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
   })

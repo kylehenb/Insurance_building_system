@@ -32,6 +32,8 @@ export interface FieldPhoto {
   ai: AiPhotoLabel | null
   aiStatus: string | null
   attempts: number
+  /** When it was taken with the app's own camera (Bindi Co): lines it up with the voice notes */
+  takenAt?: number | null
 }
 
 const CONVERT_AT_ONCE = 2
@@ -108,6 +110,7 @@ export function useFieldPhotos({ base, inspectionId, active, set = 'main' }: {
           label: s.label, labelSource: s.labelSource,
           status: uploaded ? 'uploaded' : s.file ? 'queued' : 'failed',
           serverId: row?.id ?? s.serverId, ai: row?.ai ?? null, aiStatus: row?.aiStatus ?? null, attempts: 0,
+          takenAt: s.takenAt ?? null,
         }
       })
       // Uploaded from this inspection but not saved on this phone (another device, or storage was cleared)
@@ -150,7 +153,7 @@ export function useFieldPhotos({ base, inspectionId, active, set = 'main' }: {
       if (removed.current.has(p.id)) return
       await putPhoto({
         id: p.id, inspectionId, order: p.order, name: file.name, file, thumb,
-        label: p.label, labelSource: p.labelSource, uploaded: false, serverId: null,
+        label: p.label, labelSource: p.labelSource, uploaded: false, serverId: null, takenAt: p.takenAt ?? null,
       })
       update(p.id, { status: 'queued', file, original: null, previewUrl: thumb ? URL.createObjectURL(thumb) : URL.createObjectURL(file) })
     } catch {
@@ -268,10 +271,12 @@ export function useFieldPhotos({ base, inspectionId, active, set = 'main' }: {
   }, [busy, visible])
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const addFiles = useCallback((files: FileList | File[]) => {
+  /** Photos to add. `captured`: just taken with the app's own camera, so the file's time is when it was taken */
+  const addFiles = useCallback((files: FileList | File[], opts: { captured?: boolean } = {}) => {
     const added: FieldPhoto[] = Array.from(files).map(original => ({
       id: newId(set), order: nextOrder.current++, original, file: null, previewUrl: null,
       label: '', labelSource: 'none', status: 'waiting', serverId: null, ai: null, aiStatus: null, attempts: 0,
+      takenAt: opts.captured ? original.lastModified : null,
     }))
     setPhotos(prev => [...prev, ...added])
   }, [set])

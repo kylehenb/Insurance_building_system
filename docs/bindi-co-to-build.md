@@ -37,3 +37,8 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - The green "all uploaded" bar goes by itself after 2.5 seconds
 - Problem key along the bottom of the roof photos wraps onto more lines so every problem shows
 - Roof photo notes keep their spaces while typing
+- Voice notes: Record / Pause by the job notes and on the camera screen. Each stretch is saved on the phone every few seconds, turned into text by OpenAI (whisper-1, with roof trade words) and added to the notes with its time. Long stretches go in 3 minute sections. Locking the phone keeps what was said and carries on recording on unlock (switchable). Audio kept in the private voice-notes bucket (migration 20261114_voice_notes_bucket.sql)
+- The app's own camera: rapid-fire photos with no prompt, saved and uploaded as they're taken, back on by itself after unlocking. Add Photos stays for dark roof spaces (night mode, flash)
+- Photos taken while recording are matched to what was said around them, and the photo sorting uses it to pick the problem letters
+- The report prompt reads a running commentary: later statements and the recap win, unsure remarks aren't written as fact
+- Fixed: the draft saved the notes as they were one edit ago (and nothing when the page was hidden), so the last change before stopping could be lost

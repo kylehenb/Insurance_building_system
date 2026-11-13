@@ -5,6 +5,7 @@ import { labelPhotos, relabelWithNotes, type PhotoLabelContext } from './ai-labe
 import { photoLearning } from './learning'
 import { isFieldAppJob } from '@/lib/jobs/field-app'
 import { issuePoints } from './roof-tags'
+import { cleanPhotoTimes, cleanVoiceSections, speechAround } from '@/lib/audio/voice-timeline'
 import { AI_LABEL_BATCH_SIZE, applyAiLabels, groupPhotosForReport, roomOfLabel, type AiPhotoLabel, type PhotoKind } from './report-order'
 
 // Server side of field photo labelling (tech spec "AI photo labels"):
@@ -23,7 +24,19 @@ type PhotoRow = Database['public']['Tables']['photos']['Row']
 const AI_IMAGE_EDGE = 768
 const PARALLEL_BATCHES = 3
 
-interface DraftShape { raw_report_notes?: unknown; dictationNotes?: unknown; scopeRooms?: unknown; roofReportFields?: { specificCause?: unknown } }
+interface DraftShape { raw_report_notes?: unknown; dictationNotes?: unknown; scopeRooms?: unknown; roofReportFields?: { specificCause?: unknown }; voiceSections?: unknown; photoTimes?: unknown }
+
+/** What was said around each photo taken with Bindi Co's camera while recording, by the photo's client id */
+export function speechByPhoto(draft: { voiceSections?: unknown; photoTimes?: unknown }): Record<string, string> {
+  const sections = cleanVoiceSections(draft.voiceSections)
+  if (!sections.length) return {}
+  const out: Record<string, string> = {}
+  for (const [clientId, takenAt] of Object.entries(cleanPhotoTimes(draft.photoTimes))) {
+    const said = speechAround(takenAt, sections)
+    if (said) out[clientId] = said
+  }
+  return out
+}
 
 interface ScopeRoomLike { name?: unknown; room?: unknown; items?: unknown }
 
@@ -38,6 +51,12 @@ export function scopeFromRooms(rooms: unknown): { scopeRooms: string[]; scopeTex
     scopeRooms: [...new Set(named.map(r => r.name).filter(Boolean))],
     scopeText: named.map(r => `${r.name || 'Room'}: ${r.items.join('; ')}`).join('\n'),
   }
+}
+
+function roofContext(draft: DraftShape): NonNullable<PhotoLabelContext['roof']> {
+  const issues = issuePoints(typeof draft.roofReportFields?.specificCause === 'string' ? draft.roofReportFields.specificCause : '')
+  const speech = speechByPhoto(draft)
+  return Object.keys(speech).length ? { issues, speech } : { issues }
 }
 
 /** Notes, scope, job and company guidance for labelling this inspection's photos (from the saved field draft). */
@@ -67,7 +86,8 @@ export async function loadLabelContext(
     job: { lossType: job?.loss_type, insurer: job?.insurer, address: job?.property_address },
     guidance: prompt?.system_prompt,
     // Midcity's roof photos are sorted into fixed types and the problems (A), (B)… of the cause of damage
-    ...(roof ? { roof: { issues: issuePoints(typeof draft.roofReportFields?.specificCause === 'string' ? draft.roofReportFields.specificCause : '') } } : {}),
+    // and, with voice notes, what was said as each photo was taken
+    ...(roof ? { roof: roofContext(draft) } : {}),
     corrections,
     lessons,
   }
@@ -82,7 +102,8 @@ async function labelBatch(service: Service, batch: PhotoRow[], ctx: PhotoLabelCo
   }))
   const usable = batch.filter((_, i) => images[i])
   try {
-    const { labels, model } = await labelPhotos(images.filter((x): x is NonNullable<typeof x> => !!x), ctx)
+    const said = usable.map(p => (p.client_id ? ctx.roof?.speech?.[p.client_id] : undefined))
+    const { labels, model } = await labelPhotos(images.filter((x): x is NonNullable<typeof x> => !!x), ctx, said)
     const now = new Date().toISOString()
     await Promise.all(batch.map(p => {
       const a = labels[usable.indexOf(p)] ?? null

@@ -220,6 +220,39 @@
 .rp-note:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
 .rp-add{width:100%;min-height:96px;aspect-ratio:auto}
 
+/* The app's own camera (CameraScreen.tsx) */
+.cam-screen{position:fixed;inset:0;z-index:1100;background:#000;display:flex;flex-direction:column;color:white}
+.cam-top{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;font-size:17px;font-weight:600}
+.cam-view{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cam-video{width:100%;height:100%;object-fit:contain;background:#000}
+.cam-flash{position:absolute;inset:0;background:#fff;opacity:.6;pointer-events:none}
+.cam-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:17px;line-height:1.4}
+.cam-rec{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#d70015;color:#fff;font-weight:700;font-size:15px;padding:6px 14px;border-radius:999px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cam-rec.paused{background:rgba(0,0,0,.75);border:1px solid #d70015}
+.cam-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px calc(env(safe-area-inset-bottom) + 18px)}
+.cam-side{width:72px;height:72px;display:flex;align-items:center;justify-content:center}
+.cam-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:2px solid #fff}
+.cam-shutter{width:78px;height:78px;border-radius:50%;background:#fff;border:5px solid #000;box-shadow:0 0 0 3px #fff;cursor:pointer}
+.cam-shutter:active{transform:scale(.94)}
+.cam-shutter:disabled{opacity:.4}
+.cam-mic{width:68px;height:68px;border-radius:50%;border:2px solid #fff;background:rgba(255,255,255,.12);color:#ff453a;font-size:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+.cam-mic span{font-size:11px;color:#fff;font-weight:600}
+.cam-mic.on{background:#d70015;color:#fff;border-color:#d70015}
+
+/* Voice notes: the Record button by the notes, and the bar while recording */
+.vn-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0}
+.vn-btn{min-height:48px;border-radius:999px;border:none;padding:0 20px;font-family:var(--font-dm-sans);font-size:17px;font-weight:700;cursor:pointer;background:#d70015;color:#fff;display:inline-flex;align-items:center;gap:8px}
+.vn-btn.on{background:#1c1c1e}
+.vn-btn:disabled{opacity:.5}
+.vn-status{font-size:14px;color:var(--muted)}
+.vn-auto{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:8px}
+.vn-bar{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:50%;transform:translateX(-50%);z-index:900;background:#d70015;color:#fff;border-radius:999px;padding:6px 6px 6px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.25);font-variant-numeric:tabular-nums}
+.vn-bar button{background:#fff;color:#d70015;border:none;border-radius:999px;font-weight:700;font-size:14px;padding:6px 12px;cursor:pointer}
+.vn-bar.paused{background:#1c1c1e}
+.vn-bar.paused button{color:#1c1c1e}
+.cam-open{display:flex;gap:8px;margin:0 0 10px}
+.cam-open .fa-upload-slot{flex:1}
+
 /* A roof photo full screen */
 .rp-viewer{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column}
 .rp-viewer-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;color:white;font-size:17px;font-weight:600}

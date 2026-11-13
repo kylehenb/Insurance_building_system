@@ -69,6 +69,13 @@ describe('Midcity report routes', () => {
     expect(body.reportData).toEqual({ roofType: 'Tile', roofPitch: '20' })
   })
 
+  it('reads notes recorded as a running commentary: later and recap win, unsure remarks are not facts', async () => {
+    me = { tenantId: 't1', userId: 'u1' }
+    await post(roof, { rawNotes: '[10:42am] might be the valley' })
+    expect(aiCalls[0].system).toContain('RUNNING COMMENTARY')
+    expect(aiCalls[0].system).toContain('tentative')
+  })
+
   it('asks for every separate defect to get its own letter, with no limit', async () => {
     me = { tenantId: 't1', userId: 'u1' }
     await post(roof, { rawNotes: 'Six defects' })

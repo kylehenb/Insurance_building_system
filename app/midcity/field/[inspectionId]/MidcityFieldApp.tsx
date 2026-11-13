@@ -7,6 +7,9 @@ import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
 import { ROOF_TAGS, composeRoofLabel, issueColour, issuePoints, pageOneOutOfStep, parseRoofLabel, problemNames, reportLetters, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { cleanMarks, cleanPhotoMarks, type OverviewMark } from '@/lib/photos/overview-marks'
 import { MAKE_SAFE_STAGES, composeMakeSafeLabel, parseMakeSafeLabel } from '@/lib/photos/photo-sets'
+import { addVoiceNote, cleanPhotoTimes, cleanVoiceSections, type VoiceSection } from '@/lib/audio/voice-timeline'
+import { CameraScreen } from './CameraScreen'
+import { useVoiceNotes, type VoiceStatus } from './useVoiceNotes'
 import { MarkupTool } from './MarkupTool'
 import { PhotoWithMarkup } from './OverviewMarkup'
 import { reviewFlags, type ReviewFlag } from '@/lib/reports/roof-review'
@@ -546,6 +549,45 @@ export function PhotoViewer({ url, title, marks, letters, startLetter, onMarks, 
   )
 }
 
+// How long the current recording has been going, ticking each second
+function RecordingClock({ since }: { since: number | null }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  if (!since) return null
+  const s = Math.max(0, Math.floor((now - since) / 1000))
+  return <>{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}</>
+}
+
+// Record / Pause under the job notes: what's said is turned into text and added to the
+// notes as each stretch ends (useVoiceNotes.ts). Also on the camera screen.
+function VoiceControls({ voice }: { voice: { status: VoiceStatus; startedAt: number | null; waiting: number; failed: number; autoResume: boolean; setAutoResume: (on: boolean) => void; record: () => void; pause: () => void } }) {
+  if (voice.status === 'unsupported') {
+    return <p className="vn-status" style={{ margin: '10px 0 0' }}>Recording isn&apos;t available in this browser. Use the keyboard&apos;s microphone instead.</p>
+  }
+  const recording = voice.status === 'recording'
+  return (
+    <>
+      <div className="vn-row">
+        <button type="button" className={`vn-btn${recording ? ' on' : ''}`} onClick={recording ? voice.pause : voice.record} disabled={voice.status === 'starting'}>
+          {recording ? <>❚❚ Pause <RecordingClock since={voice.startedAt} /></> : voice.status === 'needs-tap' ? '● Carry on recording' : '● Record'}
+        </button>
+        <span className="vn-status">
+          {voice.status === 'denied' ? 'Safari isn’t allowed to use the microphone: allow it for this site in Safari’s settings.'
+            : voice.waiting ? `Turning ${voice.waiting} recording${voice.waiting === 1 ? '' : 's'} into text…${voice.failed ? ' (no connection, trying again)' : ''}`
+            : recording ? 'Talk as you go. Pause whenever: the text lands here.' : ''}
+        </span>
+      </div>
+      <label className="vn-auto">
+        <input type="checkbox" checked={voice.autoResume} onChange={e => voice.setAutoResume(e.target.checked)} />
+        Carry on recording by itself after unlocking the phone
+      </label>
+    </>
+  )
+}
+
 // A make safe photo, in the roof photos' style: the photo (tap to see it full
 // screen and mark it up), Before / After as one-tap buttons, a note when wanted.
 // Uploaded like the roof photos (red bar until up), but not AI sorted. Labels: lib/photos/photo-sets.ts
@@ -746,6 +788,14 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // Markup on the other report photos, by photo: a roof photo's own id, an older
   // or make safe photo's saved id (photoMarkKey)
   const [photoMarks, setPhotoMarks] = useState<Record<string, OverviewMark[]>>({})
+  // Voice notes (useVoiceNotes): each recorded section's text and timing, and when each photo
+  // was taken with the app's camera, so the photo sorting knows what was said as it was taken
+  const [voiceSections, setVoiceSections] = useState<VoiceSection[]>([])
+  const [photoTimes, setPhotoTimes] = useState<Record<string, number>>({})
+  // The saved draft has been read in: voice sections can be handed over without doubling up
+  const [draftReady, setDraftReady] = useState(false)
+  // The app's camera, open for the roof photos or the make safe photos
+  const [cameraFor, setCameraFor] = useState<'roof' | 'makesafe' | null>(null)
   // An older roof photo or a make safe photo open full screen (by its saved id)
   const [viewingEntry, setViewingEntry] = useState<{ list: 'roof' | 'makeSafe'; photoId: string } | null>(null)
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
@@ -842,35 +892,61 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
     roofReportFields, roofFieldsOpen, overviewMarks, photoMarks, pageOneBasis, roofUncertain, roofView, reviewKeys,
+    voiceSections, photoTimes,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, photoMarks, pageOneBasis, roofUncertain, roofView, reviewKeys, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, photoMarks, pageOneBasis, roofUncertain, roofView, reviewKeys, voiceSections, photoTimes, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+
+  // The draft as it is when the save runs, not when it was armed: an edit arms the save
+  // in the same moment it changes state, so the arming render hasn't seen the edit yet
+  const collectDraftRef = useRef(collectDraft)
+  useEffect(() => { collectDraftRef.current = collectDraft }, [collectDraft])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(async () => {
+      draftTimerRef.current = null
       try {
-        await fetch(`${base}/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: collectDraft() }) })
+        await fetch(`${base}/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: collectDraftRef.current() }) })
         setSaveStatus('Saved')
         setTimeout(() => setSaveStatus(''), 2000)
       } catch { setSaveStatus('Save failed') }
     }, 3000)
-  }, [base, collectDraft])
+  }, [base])
 
+  // Leaving with a save still waiting: send it now. iPhone Safari rarely says the page is
+  // closing, but it does say when it's hidden (locked, another app), so save then too.
+  // Only a waiting save is sent, so a page hidden before its draft loaded can't save a blank one.
   useEffect(() => {
     const flush = () => {
-      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      if (!draftTimerRef.current) return
+      clearTimeout(draftTimerRef.current)
+      draftTimerRef.current = null
       const blob = new Blob([JSON.stringify({ draft: collectDraft() })], { type: 'application/json' })
       navigator.sendBeacon(`${base}/draft`, blob)
     }
+    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     window.addEventListener('beforeunload', flush)
-    return () => window.removeEventListener('beforeunload', flush)
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHide)
+    }
   }, [base, collectDraft])
 
   useEffect(() => {
     const d = initialData.fieldDraft as Record<string, unknown> | null
+    setDraftReady(true)
     if (!d) return
     if (d.dictationNotes) setDictationNotes(d.dictationNotes as string)
+    if (d.voiceSections) {
+      const sections = cleanVoiceSections(d.voiceSections)
+      sections.forEach(v => voiceIdsRef.current.add(v.id))
+      setVoiceSections(sections)
+    }
+    if (d.photoTimes) setPhotoTimes(cleanPhotoTimes(d.photoTimes))
     if (d.barEnabled) setBarEnabled(d.barEnabled as boolean)
     if (d.makeSafeEnabled) setMakeSafeEnabled(d.makeSafeEnabled as boolean)
     if (typeof d.roofEnabled === 'boolean') setRoofEnabled(d.roofEnabled)
@@ -1242,6 +1318,28 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     }
   }
 
+  // ─── Voice notes ──────────────────────────────────────────────────────────
+  // A section's text goes on the end of the notes, with its time; its timing is kept
+  // for lining photos up with what was said. Each section once, however often it's handed over.
+  const voiceIdsRef = useRef(new Set<string>())
+  const onVoiceSection = (section: VoiceSection) => {
+    if (voiceIdsRef.current.has(section.id)) return
+    voiceIdsRef.current.add(section.id)
+    setVoiceSections(prev => [...prev, section].sort((a, b) => a.startedAt - b.startedAt))
+    if (section.text.trim()) setDictationNotes(n => addVoiceNote(n, section))
+    armDraft()
+  }
+  const voice = useVoiceNotes({ inspectionId: initialData.inspectionId, enabled: draftReady, onSection: onVoiceSection })
+
+  // When each photo was taken with the app's camera, kept with the job
+  useEffect(() => {
+    const fresh = [...fieldPhotos.photos, ...makeSafeUploads.photos].filter(p => p.takenAt && photoTimes[p.id] !== p.takenAt)
+    if (!fresh.length) return
+    setPhotoTimes(prev => ({ ...prev, ...Object.fromEntries(fresh.map(p => [p.id, p.takenAt as number])) }))
+    armDraft()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldPhotos.photos, makeSafeUploads.photos])
+
   const handleExportRoof = async () => {
     const needsPageOne = !!roofReportFields.specificCause?.trim() && (!pageOneWritten || pageOneBehind)
     if (needsPageOne) {
@@ -1319,6 +1417,20 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           ))}
         </div>
       )}
+      {!cameraFor && (voice.status === 'recording' || voice.status === 'needs-tap') && (
+        <div className={`vn-bar${voice.status === 'needs-tap' ? ' paused' : ''}`} role="status" aria-live="polite">
+          {voice.status === 'recording' ? <>● Recording <RecordingClock since={voice.startedAt} /></> : 'Recording paused'}
+          <button type="button" onClick={voice.status === 'recording' ? voice.pause : voice.record}>{voice.status === 'recording' ? 'Pause' : 'Carry on'}</button>
+        </div>
+      )}
+      {cameraFor && (
+        <CameraScreen
+          title={cameraFor === 'roof' ? 'Roof photos' : 'Make safe photos'}
+          onCapture={file => (cameraFor === 'roof' ? fieldPhotos : makeSafeUploads).addFiles([file], { captured: true })}
+          onClose={() => setCameraFor(null)}
+          voice={{ status: voice.status, startedAt: voice.startedAt, record: voice.record, pause: voice.pause }}
+        />
+      )}
       <UploadBanner
         total={photoCounts.total}
         saved={photoCounts.saved}
@@ -1380,6 +1492,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   value={dictationNotes}
                   onChange={e => { setDictationNotes(e.target.value); armDraft() }}
                 />
+                <VoiceControls voice={voice} />
               </div>
             </div>
 
@@ -2029,10 +2142,16 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         onView={() => setViewingPhotoId(photo.id)}
                       />
                     ))}
-                    <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
-                      <span style={{ fontSize: 24 }}>📷</span>
-                      <span>Add Photos</span>
-                    </button>
+                    <div className="cam-open">
+                      <button type="button" onClick={() => setCameraFor('roof')} className="fa-upload-slot rp-add">
+                        <span style={{ fontSize: 24 }}>📸</span>
+                        <span>Camera</span>
+                      </button>
+                      <button type="button" onClick={() => roofPhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
+                        <span style={{ fontSize: 24 }}>🖼️</span>
+                        <span>Add Photos</span>
+                      </button>
+                    </div>
                     <input
                       ref={roofPhotoInputRef}
                       type="file"
@@ -2184,10 +2303,16 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         onView={() => setViewingMakeSafeId(photo.id)}
                       />
                     ))}
-                    <button type="button" onClick={() => makeSafePhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
-                      <span style={{ fontSize: 24 }}>📷</span>
-                      <span>Add Make Safe Photos</span>
-                    </button>
+                    <div className="cam-open">
+                      <button type="button" onClick={() => setCameraFor('makesafe')} className="fa-upload-slot rp-add">
+                        <span style={{ fontSize: 24 }}>📸</span>
+                        <span>Camera</span>
+                      </button>
+                      <button type="button" onClick={() => makeSafePhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
+                        <span style={{ fontSize: 24 }}>🖼️</span>
+                        <span>Add Photos</span>
+                      </button>
+                    </div>
                     <input
                       ref={makeSafePhotoInputRef}
                       type="file"
