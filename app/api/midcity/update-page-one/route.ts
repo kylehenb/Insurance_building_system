@@ -8,8 +8,9 @@ import { PAGE_ONE_FORMAT, readPageOne } from '@/lib/reports/page-one'
 export const dynamic = 'force-dynamic'
 
 // Brings the roof report's page one (short cause and problem lines) back in step
-// with the cause of damage after the inspector edited it, without rewriting the
-// rest of the report: problems added get a line, problems taken out lose theirs,
+// with the cause of damage after the inspector edited it. The field app calls it
+// on Export when the cause has changed since page one was written (page one isn't
+// edited by hand). It never rewrites the rest of the report: problems added get a line, problems taken out lose theirs,
 // and everything still right stays word for word. Nothing is saved here: the
 // field app puts the result in its draft like any edit.
 
@@ -33,7 +34,7 @@ ${PAGE_ONE_FORMAT}
 
 RULES FOR THIS UPDATE:
 - The cause of damage is the source. Every problem letter in it gets a line in problemSummaries and a mention in causeSummary; a letter no longer in it is taken out of both.
-- Change as little as possible. The inspector may have polished page one by hand: keep every line and phrase that still matches the cause word for word, and only add, remove or fix what the cause no longer supports.
+- Change as little as possible: keep every line and phrase that still matches the cause word for word, and only add, remove or fix what the cause no longer supports. When page one is empty, write it fresh from the cause.
 - When the cause of damage as it was when page one was last written is given, compare it with the current one: that is exactly what the inspector changed. A problem whose points were reworded gets its page one wording brought in line with the new points (location, defect, numbers); a change that's only grammar or tidying needs no change on page one.
 - Update any count in causeSummary ("from 3 defects") to match.
 - Return ONLY JSON: {"causeSummary": "...", "problemSummaries": "..."}`,

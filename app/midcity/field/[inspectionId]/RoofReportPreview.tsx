@@ -461,7 +461,8 @@ export function RoofReportPreview({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                   {orderedPhotos.map((photo, idx) => {
-                    const { tag, note } = parseRoofLabel(photo.label)
+                    const { tag, note: rawNote } = parseRoofLabel(photo.label)
+                    const note = rawNote.trim()
                     const colour = tag.kind === 'issue' ? issueColour(tag.letter) : null
                     const text = tag.kind === 'issue'
                       ? [`(${tag.letter})`, note].filter(Boolean).join(' ')

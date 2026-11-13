@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { applyAiLabels, MUD_MAP_LABEL, photoKindOfLabel, VIEW_OF_PROPERTY_LABEL, type AiPhotoLabel } from '@/lib/photos/report-order'
 import { processPhoto } from './photo-convert'
 import { clearInspection, deletePhoto, listPhotos, patchPhoto, putPhoto, type LabelSource } from './photo-store'
+import { inPhotoSet, MAKE_SAFE_ID_PREFIX, type PhotoSet } from '@/lib/photos/photo-sets'
 
 // The field app's inspection photos, from picking to uploaded:
 //   waiting → converting (2 at a time, so Safari doesn't run out of memory)
@@ -38,8 +39,8 @@ const UPLOAD_AT_ONCE = 3
 const POLL_MS = 5000
 const RETRY_MS = [2000, 5000, 15000, 30000]
 
-function newId() {
-  return `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+function newId(set: PhotoSet) {
+  return `${set === 'makesafe' ? MAKE_SAFE_ID_PREFIX : 'p'}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
 }
 
 /** Labels for the photos the AI owns: one View of Property, the mud maps, the rest as the AI said. */
@@ -59,7 +60,13 @@ interface ServerPhoto {
   aiStatus: string | null
 }
 
-export function useFieldPhotos({ base, inspectionId, active }: { base: string; inspectionId: string; active: boolean }) {
+export function useFieldPhotos({ base, inspectionId, active, set = 'main' }: {
+  base: string
+  inspectionId: string
+  active: boolean
+  /** Bindi Co's make safe photos are a set of their own, not AI sorted (lib/photos/photo-sets.ts) */
+  set?: PhotoSet
+}) {
   const [photos, setPhotos] = useState<FieldPhoto[]>([])
   const [restored, setRestored] = useState(false)
   const [online, setOnline] = useState(true)
@@ -89,8 +96,8 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
         fetch(`${base}/photos?pending=1`).then(r => (r.ok ? r.json() : { photos: [] })).then(d => (d.photos ?? []) as ServerPhoto[]).catch(() => [] as ServerPhoto[]),
       ])
       if (cancelled) return
-      const byClient = new Map(server.filter(s => s.clientId).map(s => [s.clientId!, s]))
-      const list: FieldPhoto[] = stored.map(s => {
+      const byClient = new Map(server.filter(s => s.clientId && inPhotoSet(s.clientId, set)).map(s => [s.clientId!, s]))
+      const list: FieldPhoto[] = stored.filter(s => inPhotoSet(s.id, set)).map(s => {
         const row = byClient.get(s.id)
         byClient.delete(s.id)
         const uploaded = s.uploaded || !!row
@@ -117,7 +124,7 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
       setRestored(true)
     })()
     return () => { cancelled = true }
-  }, [active, base, inspectionId])
+  }, [active, base, inspectionId, set])
 
   // ── Connection and visibility: the queue pauses while either is lost ───────
   useEffect(() => {
@@ -176,7 +183,7 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
       }
       retryAt.current.delete(p.id)
       await patchPhoto(p.id, { uploaded: true, serverId: data.id, file: null })
-      update(p.id, { status: 'uploaded', serverId: data.id, file: null, aiStatus: 'pending' })
+      update(p.id, { status: 'uploaded', serverId: data.id, file: null, aiStatus: set === 'makesafe' ? null : 'pending' })
     } catch {
       const attempts = p.attempts + 1
       if (permanent) {
@@ -189,7 +196,7 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
     } finally {
       uploading.current.delete(p.id)
     }
-  }, [base, update])
+  }, [base, update, set])
 
   // ── The queue: start conversions and uploads as slots free up ──────────────
   useEffect(() => {
@@ -232,14 +239,14 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
         lastFlush.current = Date.now()
         fetch(`${base}/ai-label`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
       }
-      const byClient = new Map(rows.filter(r => r.clientId).map(r => [r.clientId!, r]))
+      const byClient = new Map(rows.filter(r => r.clientId && inPhotoSet(r.clientId, set)).map(r => [r.clientId!, r]))
       setPhotos(prev => withAiLabels(prev.map(p => {
         const row = byClient.get(p.id)
         if (!row || p.status !== 'uploaded') return p
         return { ...p, serverId: row.id, aiStatus: row.aiStatus, ai: row.ai ?? p.ai, previewUrl: p.previewUrl ?? row.url }
       })))
     } catch { /* next poll tries again */ }
-  }, [base])
+  }, [base, set])
 
   useEffect(() => {
     if (!active || !visible || !awaitingLabels) return
@@ -263,11 +270,11 @@ export function useFieldPhotos({ base, inspectionId, active }: { base: string; i
   // ── Actions ────────────────────────────────────────────────────────────────
   const addFiles = useCallback((files: FileList | File[]) => {
     const added: FieldPhoto[] = Array.from(files).map(original => ({
-      id: newId(), order: nextOrder.current++, original, file: null, previewUrl: null,
+      id: newId(set), order: nextOrder.current++, original, file: null, previewUrl: null,
       label: '', labelSource: 'none', status: 'waiting', serverId: null, ai: null, aiStatus: null, attempts: 0,
     }))
     setPhotos(prev => [...prev, ...added])
-  }, [])
+  }, [set])
 
   /** The inspector's label. An empty one hands the photo back to the AI, unless `chosen` (Midcity's "no tag" chip). */
   const setLabel = useCallback((id: string, label: string, chosen = false) => {

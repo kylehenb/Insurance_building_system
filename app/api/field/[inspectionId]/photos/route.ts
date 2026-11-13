@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import { isMakeSafePhotoId } from '@/lib/photos/photo-sets'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { labelPendingPhotos } from '@/lib/photos/server-labels'
 
@@ -103,6 +104,8 @@ export async function POST(
   const clientIdRaw = formData.get('clientId')
   const clientId = typeof clientIdRaw === 'string' && /^[A-Za-z0-9_-]{4,64}$/.test(clientIdRaw) ? clientIdRaw : null
   const earlyUpload = !!clientId && !isRoofPhoto
+  // Bindi Co's make safe photos: uploaded early like the rest, but never AI sorted (lib/photos/photo-sets.ts)
+  const aiSorted = earlyUpload && !isMakeSafePhotoId(clientId)
 
   const existingUpload = async () => {
     if (!clientId) return null
@@ -168,7 +171,7 @@ export async function POST(
       size_bytes: file.size,
       label: label || null,
       sequence_number: sequenceNumber,
-      ...(earlyUpload ? { report_id: null, client_id: clientId, ai_status: 'pending' } : {}),
+      ...(earlyUpload ? { report_id: null, client_id: clientId, ai_status: aiSorted ? 'pending' : null } : {}),
     })
     .select()
     .single()
@@ -183,7 +186,7 @@ export async function POST(
     return NextResponse.json({ error: dbErr.message }, { status: 500 })
   }
 
-  if (earlyUpload) {
+  if (aiSorted) {
     // Label once a full batch is waiting, so photos are seen with their neighbours
     after(() => labelPendingPhotos(service, tenantId, inspectionId).catch(err => console.error('[photo-labels] after upload:', err)))
   }

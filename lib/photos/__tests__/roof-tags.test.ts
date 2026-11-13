@@ -13,7 +13,8 @@ describe('parseRoofLabel / composeRoofLabel', () => {
     expect(parseRoofLabel('Rear - loose screw')).toEqual({ tag: { kind: 'none' }, note: 'Rear - loose screw' })
     expect(parseRoofLabel('')).toEqual({ tag: { kind: 'none' }, note: '' })
 
-    expect(composeRoofLabel({ kind: 'issue', letter: 'C' }, ' tile slipped ')).toBe('(C) tile slipped')
+    // Only leading space goes: a trailing one is the space before the next word being typed (the report trims it)
+    expect(composeRoofLabel({ kind: 'issue', letter: 'C' }, ' tile slipped ')).toBe('(C) tile slipped ')
     expect(composeRoofLabel({ kind: 'type', key: 'ladder_setup' })).toBe('Ladder Setup')
     expect(composeRoofLabel({ kind: 'type', key: 'downpipe_profile' }, '100x50')).toBe('Downpipe Profile - 100x50')
     expect(composeRoofLabel({ kind: 'none' })).toBe('')
@@ -23,6 +24,16 @@ describe('parseRoofLabel / composeRoofLabel', () => {
     for (const label of ['(A)', '(H) note', 'Roof Overview', 'Safety Apparatus - anchor point', 'just a note', '']) {
       const { tag, note } = parseRoofLabel(label)
       expect(composeRoofLabel(tag, note)).toBe(label)
+    }
+  })
+})
+
+describe('notes being typed', () => {
+  it('keeps the space before the next word (the note box is filled from the label on every key)', () => {
+    for (const tag of [{ kind: 'issue', letter: 'A' }, { kind: 'type', key: 'gutter_profile' }, { kind: 'none' }] as const) {
+      let label = composeRoofLabel(tag, '')
+      for (const ch of 'cracked ridge tile') label = composeRoofLabel(tag, parseRoofLabel(label).note + ch)
+      expect(parseRoofLabel(label)).toEqual({ tag, note: 'cracked ridge tile' })
     }
   })
 })

@@ -54,26 +54,28 @@ const ISSUE_AT_START = /^\s*\(([A-Z])\)\s*/
 
 /** The tag and note in a roof photo label. */
 export function parseRoofLabel(label: string | null | undefined): { tag: RoofPhotoTag; note: string } {
-  const text = (label ?? '').trim()
+  // Only leading space is dropped, so a note being typed keeps the space before its next word
+  const text = (label ?? '').replace(/^\s+/, '')
   const issue = text.match(ISSUE_AT_START)
-  if (issue) return { tag: { kind: 'issue', letter: issue[1] }, note: text.slice(issue[0].length).trim() }
+  if (issue) return { tag: { kind: 'issue', letter: issue[1] }, note: text.slice(issue[0].length) }
   for (const t of ROOF_TAGS) {
     // "Gutter Profile", or "Gutter Profile - note"
-    const m = text.match(/^(.+?)(?:\s+[-–—]\s+(.*))?$/)
-    if (m && squash(m[1]) === squash(t.label)) return { tag: { kind: 'type', key: t.key }, note: (m[2] ?? '').trim() }
+    const m = text.match(/^(.+?)(?:\s+[-–—]\s+([\s\S]*))?$/)
+    if (m && squash(m[1]) === squash(t.label)) return { tag: { kind: 'type', key: t.key }, note: (m[2] ?? '').replace(/^\s+/, '') }
   }
   return { tag: { kind: 'none' }, note: text }
 }
 
 /** The label for a tag and note. */
 export function composeRoofLabel(tag: RoofPhotoTag, note = ''): string {
-  const n = note.trim()
-  if (tag.kind === 'issue') return n ? `(${tag.letter}) ${n}` : `(${tag.letter})`
+  const n = note.replace(/^\s+/, '')
+  const has = !!n.trim()
+  if (tag.kind === 'issue') return has ? `(${tag.letter}) ${n}` : `(${tag.letter})`
   if (tag.kind === 'type') {
     const t = ROOF_TAGS.find(x => x.key === tag.key)!
-    return n ? `${t.label} - ${n}` : t.label
+    return has ? `${t.label} - ${n}` : t.label
   }
-  return n
+  return has ? n : ''
 }
 
 export const sameTag = (a: RoofPhotoTag, b: RoofPhotoTag): boolean =>

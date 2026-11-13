@@ -31,3 +31,9 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - Markup on any report photo: open it full screen, then Mark up (same tools; starts in the photo's own letter). Make safe photos too, in White
 - Problem letters past (C): the AI gives each separate defect its own letter with no limit, and letters run A–Z (colours repeat after L)
 - One letter list everywhere: a letter in the cause, page one, a photo tag or markup is offered on the photos and the overview at once, plus a spare. Page one lists a problem added to the cause straight away (its first point), and when page one falls behind the cause a note offers Update Page One, which rewrites only the short cause and problem lines. A copy of the cause is kept each time page one is written; any word change to a problem's points (not just capitals or punctuation) flags that problem, and the update is shown what changed. The button is always there under page one's fields
+- Page one isn't shown or edited: it's written with the report from the cause of damage, and rewritten on Export only if the cause has changed since (any word)
+- Make Safe Report is an add-on below the roof report: tick it only when we did the make safe. Its description and the roof report's "make safe works completed" are one text, mirrored both ways while it's on
+- Make safe photos: their own set through the roof photos' uploader (red/green bar, not AI sorted), Before / After tags, a note, markup
+- The green "all uploaded" bar goes by itself after 2.5 seconds
+- Problem key along the bottom of the roof photos wraps onto more lines so every problem shows
+- Roof photo notes keep their spaces while typing

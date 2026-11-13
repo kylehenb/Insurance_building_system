@@ -4,8 +4,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { ROOF_TAGS, composeRoofLabel, issueColour, issuePoints, pageOneOutOfStep, parseRoofLabel, type PageOneStep, problemNames, reportLetters, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, composeRoofLabel, issueColour, issuePoints, pageOneOutOfStep, parseRoofLabel, problemNames, reportLetters, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { cleanMarks, cleanPhotoMarks, type OverviewMark } from '@/lib/photos/overview-marks'
+import { MAKE_SAFE_STAGES, composeMakeSafeLabel, parseMakeSafeLabel } from '@/lib/photos/photo-sets'
 import { MarkupTool } from './MarkupTool'
 import { PhotoWithMarkup } from './OverviewMarkup'
 import { reviewFlags, type ReviewFlag } from '@/lib/reports/roof-review'
@@ -351,6 +352,9 @@ function InsuranceTemplateRenderer({
 
 function uid() { return Math.random().toString(36).slice(2) }
 
+/** Some words, not just dot point markers (an empty make safe description is "• ") */
+const hasWords = (text: string | null | undefined): boolean => !!(text ?? '').replace(/[•\s]/g, '')
+
 // — Photo card used in both roof and make safe photo grids ——————————————————
 function MidcityPhotoCard({
   photo,
@@ -493,34 +497,6 @@ export function RoofPhotoCard({ photo, number, letters, marked, onTag, onNote, o
   )
 }
 
-// Page one against the cause of damage. When it has fallen behind (a problem
-// added, taken out or reworded since page one was written; found by plain text
-// matching, lib/photos/roof-tags.ts) it says what, with one tap to bring just
-// page one up to date. Otherwise just the button, for any time it's wanted.
-export function PageOneNotice({ step, busy, onUpdate }: { step: PageOneStep; busy: boolean; onUpdate: () => void }) {
-  const list = (ls: string[]) => ls.map(l => `(${l})`).join(', ')
-  const { missing, gone, changed, otherChanged } = step
-  const behind = missing.length > 0 || gone.length > 0 || changed.length > 0 || otherChanged
-  const button = (
-    <button type="button" className={behind ? 'fa-ai-label-btn' : 'rp-link'} onClick={onUpdate} disabled={busy} style={behind ? undefined : { alignSelf: 'flex-start' }}>
-      {busy ? <><span className="fa-spinner" /> Updating…</> : behind ? '✦ Update Page One' : '✦ Update page one from the cause of damage'}
-    </button>
-  )
-  if (!behind) return <div style={{ display: 'flex', margin: '0 0 8px' }}>{button}</div>
-  return (
-    <div className="mc-pageone-note" role="status">
-      <span>
-        {missing.length > 0 && <>Page one doesn&apos;t mention {list(missing)} from the cause of damage. </>}
-        {gone.length > 0 && <>Page one still mentions {list(gone)}, which is no longer in the cause of damage. </>}
-        {changed.length > 0 && <>{list(changed)} {changed.length > 1 ? 'have' : 'has'} been reworded in the cause of damage since page one was written. </>}
-        {otherChanged && <>The cause of damage&apos;s opening line or general points have changed since page one was written. </>}
-        Updating rewrites only page one&apos;s short cause and problem lines; the rest of the report stays as it is.
-      </span>
-      {button}
-    </div>
-  )
-}
-
 // A report photo full screen, with its markup; "Mark up" opens the markup tool
 // on it (the same tools as the roof overview, lib/photos/overview-marks.ts).
 // Whatever's below it (a roof photo's one-tap letters) shows while not marking up.
@@ -570,6 +546,67 @@ export function PhotoViewer({ url, title, marks, letters, startLetter, onMarks, 
   )
 }
 
+// A make safe photo, in the roof photos' style: the photo (tap to see it full
+// screen and mark it up), Before / After as one-tap buttons, a note when wanted.
+// Uploaded like the roof photos (red bar until up), but not AI sorted. Labels: lib/photos/photo-sets.ts
+function MakeSafePhotoCard({ photo, number, marked, onLabel, onDelete, onView }: {
+  photo: FieldPhoto
+  number: number
+  marked?: boolean
+  onLabel: (label: string) => void
+  onDelete: () => void
+  onView: () => void
+}) {
+  const preparing = photo.status === 'waiting' || photo.status === 'converting'
+  const { stage, note } = parseMakeSafeLabel(photo.label)
+  const [noteOpen, setNoteOpen] = useState(false)
+  return (
+    <div className="rp-card">
+      <div className="rp-row">
+        <button type="button" className="rp-thumb" onClick={onView} disabled={!photo.previewUrl} aria-label={`View make safe photo ${number}`}>
+          {photo.previewUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={photo.previewUrl} alt="" draggable={false} loading="lazy" />
+            : <span style={{ fontSize: 22 }}>📷</span>}
+          {preparing && (
+            <div className="fa-photo-status">
+              <span className="fa-spinner" style={{ borderColor: 'white', borderTopColor: 'transparent', width: 20, height: 20 }} />
+              <span>{photo.status === 'converting' ? 'Preparing…' : 'Waiting…'}</span>
+            </div>
+          )}
+          <span className="rp-num">{number}</span>
+          {marked && <span className="rp-marked" aria-label="Marked up">✎</span>}
+          {!preparing && photo.status !== 'uploaded' && (
+            <span className="fa-photo-badge">{photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}</span>
+          )}
+          {stage && <span className="rp-thumb-tag" style={{ background: 'var(--black)' }}>{stage}</span>}
+        </button>
+        <div className="rp-controls">
+          <div className="rp-letters">
+            {MAKE_SAFE_STAGES.map(st => (
+              <button key={st} type="button" className={`rp-chip rp-type${stage === st ? ' on' : ''}`} disabled={preparing} aria-pressed={stage === st}
+                onClick={() => onLabel(composeMakeSafeLabel(stage === st ? null : st, note))}>
+                {st}
+              </button>
+            ))}
+          </div>
+          <div className="rp-foot">
+            <span className="rp-status" />
+            {!noteOpen && !note && (
+              <button type="button" className="rp-link" disabled={preparing} onClick={() => setNoteOpen(true)}>+ Note</button>
+            )}
+            {!preparing && <button type="button" className="rp-link rp-del" onClick={onDelete} aria-label={`Delete make safe photo ${number}`}>Delete</button>}
+          </div>
+        </div>
+      </div>
+      {(noteOpen || !!note) && (
+        <input className="rp-note" type="text" placeholder="Note (optional)" value={note} disabled={preparing} autoFocus={noteOpen && !note}
+          onChange={e => onLabel(composeMakeSafeLabel(stage, e.target.value))} onBlur={() => { if (!note) setNoteOpen(false) }} />
+      )}
+    </div>
+  )
+}
+
 // A roof photo full screen, with the same one-tap letters, to check what's in it, and its markup
 function RoofPhotoViewer({ photo, number, letters, names, marks, onMarks, onTag, onClose }: {
   photo: FieldPhoto
@@ -602,43 +639,6 @@ function RoofPhotoViewer({ photo, number, letters, names, marks, onMarks, onTag,
       </div>
     </PhotoViewer>
   )
-}
-
-async function processPhotoForUpload(file: File): Promise<File> {
-  const TARGET_BYTES = 62 * 1024
-  const MAX_DIM = 1200
-
-  return new Promise(resolve => {
-    const img = new Image()
-    const objUrl = URL.createObjectURL(file)
-
-    img.onload = () => {
-      URL.revokeObjectURL(objUrl)
-      let w = img.naturalWidth
-      let h = img.naturalHeight
-      if (w > MAX_DIM || h > MAX_DIM) {
-        const scale = Math.min(MAX_DIM / w, MAX_DIM / h)
-        w = Math.round(w * scale)
-        h = Math.round(h * scale)
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = w; canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      const compress = (quality: number) => {
-        canvas.toBlob(blob => {
-          if (!blob) { resolve(file); return }
-          if (blob.size > TARGET_BYTES && quality > 0.40) { compress(Math.round((quality - 0.08) * 100) / 100); return }
-          const baseName = file.name.replace(/\.(heic|heif)$/i, '')
-          const jpegName = baseName.match(/\.(jpe?g)$/i) ? file.name : `${baseName}.jpg`
-          resolve(new File([blob], jpegName, { type: 'image/jpeg', lastModified: Date.now() }))
-        }, 'image/jpeg', quality)
-      }
-      compress(0.82)
-    }
-    img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file) }
-    img.src = objUrl
-  })
 }
 
 function formatDate(d: string | null) {
@@ -688,7 +688,20 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // Roof photos, as in IRC's field app: saved on the phone, uploaded as they're
   // added (red bar until all are up, then green) and labelled by the AI on the server
   const fieldPhotos = useFieldPhotos({ base, inspectionId: initialData.inspectionId, active: true })
-  const { counts: photoCounts, busy: photosBusy } = fieldPhotos
+  const { busy: photosBusy } = fieldPhotos
+  // The make safe report's own photos: the same uploader, kept apart and not AI sorted (lib/photos/photo-sets.ts)
+  const makeSafeUploads = useFieldPhotos({ base, inspectionId: initialData.inspectionId, active: true, set: 'makesafe' })
+  // A make safe photo open full screen (by its id)
+  const [viewingMakeSafeId, setViewingMakeSafeId] = useState<string | null>(null)
+  // The red / green upload bar covers both sets
+  const anyPhotosBusy = photosBusy || makeSafeUploads.busy
+  const photoCounts = {
+    total: fieldPhotos.counts.total + makeSafeUploads.counts.total,
+    saved: fieldPhotos.counts.saved + makeSafeUploads.counts.saved,
+    uploaded: fieldPhotos.counts.uploaded + makeSafeUploads.counts.uploaded,
+    failed: fieldPhotos.counts.failed + makeSafeUploads.counts.failed,
+    labelled: fieldPhotos.counts.labelled,
+  }
   // On the phone, the order taken (so photos don't jump while tagging); the report sorts them
   const newRoofPhotos = fieldPhotos.photos
   const [uploadDoneShown, setUploadDoneShown] = useState(false)
@@ -707,16 +720,16 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [relabelling, setRelabelling] = useState(false)
   const wasBusy = useRef(false)
   useEffect(() => {
-    if (photosBusy) { wasBusy.current = true; setUploadDoneShown(false) }
+    if (anyPhotosBusy) { wasBusy.current = true; setUploadDoneShown(false) }
     else if (wasBusy.current) { wasBusy.current = false; setUploadDoneShown(true) }
-  }, [photosBusy])
+  }, [anyPhotosBusy])
   // Leaving mid-upload: browsers that honour it warn first (iOS mostly doesn't — hence the bar)
   useEffect(() => {
-    if (!photosBusy) return
+    if (!anyPhotosBusy) return
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [photosBusy])
+  }, [anyPhotosBusy])
   // The label is kept on the server too, so the report has it on any device.
   // A tag tapped by the inspector stays theirs (the AI won't change it), "None" included.
   const setRoofPhotoLabel = (photo: FieldPhoto, label: string, chosen = true) => {
@@ -761,7 +774,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const pageOneStep = pageOneOutOfStep(roofReportFields.specificCause, roofReportFields.causeSummary, roofReportFields.problemSummaries, pageOneBasis)
   const pageOneBehind = pageOneStep.missing.length > 0 || pageOneStep.gone.length > 0 || pageOneStep.changed.length > 0 || pageOneStep.otherChanged
   const pageOneWritten = !!(roofReportFields.causeSummary?.trim() || roofReportFields.problemSummaries?.trim())
-  const [pageOneUpdating, setPageOneUpdating] = useState(false)
 
   // What each problem is ("(A) Rear roof"), so the letters make sense while tagging photos
   const problemKey = problemNames(roofReportFields.problemSummaries, roofReportFields.specificCause)
@@ -986,6 +998,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     // Edited by the inspector: no longer the AI's guess
     setRoofUncertain(prev => (prev.includes(key) ? prev.filter(k => k !== key) : prev))
     if (key === 'claimDetails') setMakeSafeFields(prev => ({ ...prev, claimDetails: value }))
+    // With a make safe report on, its description is the roof report's make safe works, both ways
+    if (key === 'makeSafeCompletedDetails' && makeSafeEnabled) setMakeSafeFields(prev => ({ ...prev, description: value }))
     armDraft()
   }
 
@@ -993,42 +1007,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const setMakeSafeField = (key: keyof MakeSafeData, value: string) => {
     setMakeSafeFields(prev => ({ ...prev, [key]: value }))
     if (key === 'claimDetails') setRoofReportFields(prev => ({ ...prev, claimDetails: value }))
+    if (key === 'description') setRoofReportFields(prev => ({ ...prev, makeSafeCompleted: 'Yes', makeSafeCompletedDetails: value }))
     armDraft()
   }
 
   // ─── Make Safe photo helpers ──────────────────────────────────────────────
-  const handleMakeSafePhotos = (files: FileList | null) => {
-    if (!files) return
-    Array.from(files).forEach(file => {
-      const id = uid()
-      const rawPreview = URL.createObjectURL(file)
-      setMakeSafePhotos(prev => [...prev, { id, photoId: null, file, previewUrl: rawPreview, label: '', processing: true, uploading: false, cropX: 0, cropY: 0, cropScale: 1 }])
-      processPhotoForUpload(file).then(async processed => {
-        const processedPreview = URL.createObjectURL(processed)
-        setMakeSafePhotos(prev => prev.map(p => {
-          if (p.id !== id) return p
-          URL.revokeObjectURL(p.previewUrl)
-          return { ...p, file: processed, previewUrl: processedPreview, processing: false, uploading: true }
-        }))
-        try {
-          const fd = new FormData()
-          fd.append('file', processed)
-          const res = await fetch(`${base}/photos`, { method: 'POST', body: fd })
-          const data = await res.json()
-          if (data.id) {
-            makeSafePhotoIdsRef.current.add(data.id)
-            setMakeSafePhotos(prev => prev.map(p => p.id !== id ? p : { ...p, photoId: data.id, previewUrl: data.url ?? p.previewUrl, file: null, uploading: false }))
-            armDraft()
-          } else {
-            setMakeSafePhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
-          }
-        } catch {
-          setMakeSafePhotos(prev => prev.map(p => p.id === id ? { ...p, uploading: false } : p))
-        }
-      })
-    })
-  }
-
   const removeMakeSafePhoto = (id: string) => {
     setMakeSafePhotos(prev => {
       const p = prev.find(x => x.id === id)
@@ -1045,9 +1028,24 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   }
 
   // ─── Make Safe toggle (records conducted-on timestamp on first enable) ────
+  // Turning the make safe report on joins its description to the roof report's
+  // "Make safe works completed" (mirrored both ways from then on): the roof
+  // report's wording is used if it has any, otherwise the description's. With
+  // it off, the roof report's make safe answer can say anything ("completed by
+  // others") without making a make safe report.
   const handleMakeSafeToggle = () => {
     const isEnabling = !makeSafeEnabled
     setMakeSafeEnabled(isEnabling)
+    if (isEnabling) {
+      const roofWords = roofReportFields.makeSafeCompletedDetails?.trim() ? roofReportFields.makeSafeCompletedDetails : ''
+      const works = roofWords || (hasWords(makeSafeFields.description) ? makeSafeFields.description : '')
+      if (works) {
+        setMakeSafeFields(prev => ({ ...prev, description: works }))
+        setRoofReportFields(prev => ({ ...prev, makeSafeCompleted: 'Yes', makeSafeCompletedDetails: works }))
+      } else {
+        setRoofReportFields(prev => ({ ...prev, makeSafeCompleted: 'Yes' }))
+      }
+    }
     if (isEnabling && !makeSafeFields.conductedOn) {
       const now = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
@@ -1088,9 +1086,15 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       const data = await res.json()
       if (data.ok && data.reportData) {
         const rd = data.reportData as Record<string, string>
+        // A make safe report that's on keeps its description in step with the make safe works
+        const makeSafeWorks = makeSafeEnabled
+          ? (rd.makeSafeCompletedDetails?.trim() ? rd.makeSafeCompletedDetails : hasWords(makeSafeFields.description) ? makeSafeFields.description : '')
+          : ''
+        if (makeSafeWorks) setMakeSafeFields(prev => ({ ...prev, description: makeSafeWorks }))
         setRoofReportFields(prev => ({
           ...prev,
           ...rd,
+          ...(makeSafeEnabled ? { makeSafeCompleted: 'Yes', makeSafeCompletedDetails: makeSafeWorks } : {}),
           attendanceDate: attendanceDateFormatted,
           timeAttended: timeAttendedFormatted,
           rooferName: '',
@@ -1216,29 +1220,36 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     armDraft()
   }
 
-  // Page one brought back in step with an edited cause of damage: only its two fields are
-  // rewritten (anything still right stays word for word), never the rest of the report
-  const updatePageOne = async () => {
-    setPageOneUpdating(true)
+  // Page one (its short cause and problem lines) is a summary of the cause of damage, never
+  // edited by hand: written with the report, and rewritten on Export only if the cause has
+  // changed since (any word, lib/photos/roof-tags.ts pageOneOutOfStep). Only those two fields
+  // change; anything still right stays word for word. True when page one is up to date.
+  const updatePageOne = async (): Promise<boolean> => {
     const sentCause = roofReportFields.specificCause
     try {
       const res = await fetch('/api/midcity/update-page-one', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ specificCause: roofReportFields.specificCause, previousCause: pageOneBasis, causeSummary: roofReportFields.causeSummary, problemSummaries: roofReportFields.problemSummaries }),
+        body: JSON.stringify({ specificCause: sentCause, previousCause: pageOneBasis, causeSummary: roofReportFields.causeSummary, problemSummaries: roofReportFields.problemSummaries }),
       })
       const data = await res.json()
-      if (data.ok) {
-        setRoofReportFields(prev => ({ ...prev, causeSummary: data.causeSummary, problemSummaries: data.problemSummaries }))
-        setPageOneBasis(sentCause)
-        armDraft()
-      } else alert('Could not update page one. Please try again.')
+      if (!data.ok) return false
+      setRoofReportFields(prev => ({ ...prev, causeSummary: data.causeSummary, problemSummaries: data.problemSummaries }))
+      setPageOneBasis(sentCause)
+      armDraft()
+      return true
     } catch {
-      alert('Could not update page one. Check your connection.')
+      return false
     }
-    setPageOneUpdating(false)
   }
 
-  const handleExportRoof = () => {
+  const handleExportRoof = async () => {
+    const needsPageOne = !!roofReportFields.specificCause?.trim() && (!pageOneWritten || pageOneBehind)
+    if (needsPageOne) {
+      setRoofExporting(true)
+      const ok = await updatePageOne()
+      setRoofExporting(false)
+      if (!ok) alert("Page one couldn't be brought up to date with the cause of damage (check your connection). It shows as last written; Export again to retry.")
+    }
     setRoofPreviewOpen(true)
   }
 
@@ -1264,6 +1275,22 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         )
       })()}
       {(() => {
+        const i = makeSafeUploads.photos.findIndex(p => p.id === viewingMakeSafeId)
+        const photo = makeSafeUploads.photos[i]
+        if (!photo?.previewUrl) return null
+        return (
+          <PhotoViewer
+            url={photo.previewUrl}
+            title={`Make safe photo ${makeSafePhotos.length + i + 1}`}
+            marks={photoMarks[photo.id] ?? []}
+            letters={[]}
+            startLetter={null}
+            onMarks={marks => setMarksFor(photo.id, marks)}
+            onClose={() => setViewingMakeSafeId(null)}
+          />
+        )
+      })()}
+      {(() => {
         if (!viewingEntry) return null
         const list = viewingEntry.list === 'roof' ? roofPhotos : makeSafePhotos
         const i = list.findIndex(p => p.photoId === viewingEntry.photoId)
@@ -1284,6 +1311,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       })()}
       {photoListInView && !viewingPhotoId && problemKeyLetters.length > 0 && (
         <div className="rp-keybar" aria-label="Problem key">
+          <span className="rp-keybar-title">Problem key</span>
           {problemKeyLetters.map(l => (
             <span key={l} className="rp-key">
               <b style={{ color: issueColour(l) }}>({l})</b> {problemKey[l]}
@@ -1296,11 +1324,12 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         saved={photoCounts.saved}
         uploaded={photoCounts.uploaded}
         failed={photoCounts.failed}
-        busy={photosBusy}
+        busy={anyPhotosBusy}
         online={fieldPhotos.online}
         done={uploadDoneShown}
         onDismissDone={() => setUploadDoneShown(false)}
-        onRetry={fieldPhotos.retryFailed}
+        onRetry={() => { fieldPhotos.retryFailed(); makeSafeUploads.retryFailed() }}
+        autoHideMs={2500}
       />
 
       {/* HEADER */}
@@ -1554,134 +1583,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
             </div>
             )}
 
-            {/* ── MAKE SAFE ────────────────────────────────────────────────── */}
-            <div className={`mc-pill${makeSafeEnabled ? ' enabled' : ''}`}>
-              <div className="mc-pill-header" onClick={handleMakeSafeToggle}>
-                <div className="mc-pill-check">{makeSafeEnabled ? '✓' : ''}</div>
-                <div className="mc-pill-info">
-                  <div className="mc-pill-name">Make Safe</div>
-                  <div className="mc-pill-sub">Emergency works completed on site</div>
-                </div>
-                <div className="mc-pill-arrow">{makeSafeEnabled ? '▾' : '›'}</div>
-              </div>
-
-              {makeSafeEnabled && (
-                <div className="mc-pill-body">
-                  <div className="mc-section-head">Make Safe Report</div>
-
-                  {/* Make Safe Fields Accordion */}
-                  <div className="mc-rrf-accordion">
-                    <div className="mc-rrf-head" onClick={() => setMakeSafeFieldsOpen(p => !p)}>
-                      <span className="mc-rrf-head-label">📋 Make Safe Report Fields</span>
-                      <span className="mc-rrf-arrow">{makeSafeFieldsOpen ? '▾' : '›'}</span>
-                    </div>
-                    {makeSafeFieldsOpen && (
-                      <div className="mc-rrf-body">
-
-                        {/* Claim Details */}
-                        <div className="mc-rrf-sub">Claim Details</div>
-                        <div className="fa-fg">
-                          <label className="fa-fl">Customer Name, Loss Address, Insurer, Claim Number</label>
-                          <input
-                            className="fa-input"
-                            type="text"
-                            placeholder="e.g. Mr & Mrs Smith · 123 Example St · IAG · Claim #123456"
-                            value={makeSafeFields.claimDetails}
-                            onChange={e => setMakeSafeField('claimDetails', e.target.value)}
-                          />
-                        </div>
-
-                        {/* Make Safe Details */}
-                        <div className="mc-rrf-sub">Make Safe Details</div>
-                        <div className="fa-fg">
-                          <label className="fa-fl">Contractor</label>
-                          <input
-                            className="fa-input"
-                            type="text"
-                            value="Bindi Co"
-                            readOnly
-                            style={{ background: '#f5f5f5', color: '#666' }}
-                          />
-                        </div>
-                        <div className="fa-fg">
-                          <label className="fa-fl">Conducted On</label>
-                          <input
-                            className="fa-input"
-                            type="text"
-                            placeholder="Date and time"
-                            value={makeSafeFields.conductedOn}
-                            onChange={e => setMakeSafeField('conductedOn', e.target.value)}
-                          />
-                        </div>
-
-                        {/* Description */}
-                        <div className="mc-rrf-sub">Make Safe Description</div>
-                        <div className="fa-fg" style={{ paddingBottom: 16 }}>
-                          <label className="fa-fl">Description of Works</label>
-                          <textarea
-                            className="fa-ta"
-                            style={{ minHeight: 180 }}
-                            value={makeSafeFields.description}
-                            onChange={e => setMakeSafeField('description', e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                const ta = e.currentTarget
-                                const pos = ta.selectionStart ?? makeSafeFields.description.length
-                                const newVal = makeSafeFields.description.slice(0, pos) + '\n• ' + makeSafeFields.description.slice(pos)
-                                setMakeSafeField('description', newVal)
-                                setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + 3 }, 0)
-                              }
-                            }}
-                          />
-                        </div>
-
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Make Safe Photos */}
-                  <div className="fa-photo-grid">
-                    {makeSafePhotos.map(photo => (
-                      <MidcityPhotoCard
-                        key={photo.id}
-                        photo={photo}
-                        marked={!!photo.photoId && !!photoMarks[photo.photoId]}
-                        onView={photo.photoId ? () => setViewingEntry({ list: 'makeSafe', photoId: photo.photoId! }) : undefined}
-                        onDelete={() => removeMakeSafePhoto(photo.id)}
-                        onLabelChange={(label) => {
-                          setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
-                          if (photo.photoId) {
-                            fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label }) }).catch(() => {})
-                          }
-                          armDraft()
-                        }}
-                      />
-                    ))}
-                    <button type="button" onClick={() => makeSafePhotoInputRef.current?.click()} className="fa-upload-slot">
-                      <span style={{ fontSize: 24 }}>📷</span>
-                      <span>Add Photo</span>
-                    </button>
-                    <input
-                      ref={makeSafePhotoInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      style={{ display: 'none' }}
-                      onChange={e => handleMakeSafePhotos(e.target.files)}
-                    />
-                  </div>
-
-                  {/* Export */}
-                  <div className="mc-export-wrap">
-                    <button className="mc-export-btn" onClick={() => setMakeSafePreviewOpen(true)}>
-                      Export Report
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* ── ROOF REPORT ──────────────────────────────────────────────── */}
             <div className={`mc-pill${roofEnabled ? ' enabled' : ''}`} style={{ marginBottom: 8 }}>
               <div className="mc-pill-header" onClick={() => { setRoofEnabled(p => !p); armDraft() }}>
@@ -1914,17 +1815,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           <label className="fa-fl">Specific Cause</label>
                           <textarea className="fa-ta" style={{ minHeight: 100 }} placeholder="Describe the specific cause and water entry points…" value={roofReportFields.specificCause} onChange={e => setRoofField('specificCause', e.target.value)} />
                         </div>
-                        <div className={fg('causeSummary')} data-flag={flagOf('causeSummary')}>
-                          <label className="fa-fl">Page One · Short Cause</label>
-                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="One or two sentences with the letters, e.g. Stormwater entry from 2 defects: (A) … (B) …" value={roofReportFields.causeSummary} onChange={e => setRoofField('causeSummary', e.target.value)} />
-                        </div>
-                        <div className={fg('problemSummaries')} data-flag={flagOf('problemSummaries')}>
-                          <label className="fa-fl">Page One · Problems (one per line)</label>
-                          <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="(A) Enclosed patio - Roof tiles stop short of the gutter" value={roofReportFields.problemSummaries} onChange={e => setRoofField('problemSummaries', e.target.value)} />
-                        </div>
-                        {pageOneWritten && !!roofReportFields.specificCause?.trim() && (
-                          <PageOneNotice step={pageOneStep} busy={pageOneUpdating} onUpdate={updatePageOne} />
-                        )}
+                        {/* Page one's short cause and problem lines aren't shown: they're written from the
+                            cause of damage, and brought up to date by themselves on Export (updatePageOne) */}
 
                         {/* ── Client Discussion ── */}
                         <div className="mc-rrf-sub">Client Discussion</div>
@@ -2087,9 +1979,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   {/* Page one: pin the problems on the roof overview */}
                   <div className="mc-section-head">Roof Overview Markup · Page One</div>
                   <div style={{ padding: '12px 16px 4px' }}>
-                    {pageOneBehind && (
-                      <PageOneNotice step={pageOneStep} busy={pageOneUpdating} onUpdate={updatePageOne} />
-                    )}
                     {overviewPhoto
                       ? <MarkupTool url={overviewPhoto.url} alt="Roof overview" marks={overviewMarks} letters={problemLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
                       : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin and mark up the problems on it here.</p>}
@@ -2161,7 +2050,158 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       onClick={handleExportRoof}
                       disabled={roofExporting}
                     >
-                      {roofExporting ? <><span className="fa-spinner" /> Exporting…</> : 'Export Report'}
+                      {roofExporting ? <><span className="fa-spinner" /> Writing page one…</> : 'Export Report'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── MAKE SAFE ────────────────────────────────────────────────── */}
+            {/* An add-on to the roof report: tick it only when we did a make safe. Its description is
+                the roof report's "Make safe works completed" (mirrored both ways); its photos are its own */}
+            <div className={`mc-pill${makeSafeEnabled ? ' enabled' : ''}`} style={{ marginBottom: 8 }}>
+              <div className="mc-pill-header" onClick={handleMakeSafeToggle}>
+                <div className="mc-pill-check">{makeSafeEnabled ? '✓' : ''}</div>
+                <div className="mc-pill-info">
+                  <div className="mc-pill-name">Make Safe Report</div>
+                  <div className="mc-pill-sub">Add-on: only when we did the make safe. Shares the roof report&apos;s make safe works</div>
+                </div>
+                <div className="mc-pill-arrow">{makeSafeEnabled ? '▾' : '›'}</div>
+              </div>
+
+              {makeSafeEnabled && (
+                <div className="mc-pill-body">
+                  <div className="mc-section-head">Make Safe Report</div>
+
+                  {/* Make Safe Fields Accordion */}
+                  <div className="mc-rrf-accordion">
+                    <div className="mc-rrf-head" onClick={() => setMakeSafeFieldsOpen(p => !p)}>
+                      <span className="mc-rrf-head-label">📋 Make Safe Report Fields</span>
+                      <span className="mc-rrf-arrow">{makeSafeFieldsOpen ? '▾' : '›'}</span>
+                    </div>
+                    {makeSafeFieldsOpen && (
+                      <div className="mc-rrf-body">
+
+                        {/* Claim Details */}
+                        <div className="mc-rrf-sub">Claim Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Customer Name, Loss Address, Insurer, Claim Number</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            placeholder="e.g. Mr & Mrs Smith · 123 Example St · IAG · Claim #123456"
+                            value={makeSafeFields.claimDetails}
+                            onChange={e => setMakeSafeField('claimDetails', e.target.value)}
+                          />
+                        </div>
+
+                        {/* Make Safe Details */}
+                        <div className="mc-rrf-sub">Make Safe Details</div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Contractor</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            value="Bindi Co"
+                            readOnly
+                            style={{ background: '#f5f5f5', color: '#666' }}
+                          />
+                        </div>
+                        <div className="fa-fg">
+                          <label className="fa-fl">Conducted On</label>
+                          <input
+                            className="fa-input"
+                            type="text"
+                            placeholder="Date and time"
+                            value={makeSafeFields.conductedOn}
+                            onChange={e => setMakeSafeField('conductedOn', e.target.value)}
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div className="mc-rrf-sub">Make Safe Description</div>
+                        <div className="fa-fg" style={{ paddingBottom: 16 }}>
+                          <label className="fa-fl">Description of Works · same as the roof report&apos;s make safe works</label>
+                          <textarea
+                            className="fa-ta"
+                            style={{ minHeight: 180 }}
+                            value={makeSafeFields.description}
+                            onChange={e => setMakeSafeField('description', e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const ta = e.currentTarget
+                                const pos = ta.selectionStart ?? makeSafeFields.description.length
+                                const newVal = makeSafeFields.description.slice(0, pos) + '\n• ' + makeSafeFields.description.slice(pos)
+                                setMakeSafeField('description', newVal)
+                                setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + 3 }, 0)
+                              }
+                            }}
+                          />
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Make Safe Photos: older ones (before the uploader) as they were, then the make safe set */}
+                  <div className="mc-section-head">Make Safe Photos</div>
+                  {makeSafePhotos.length > 0 && (
+                    <div className="fa-photo-grid">
+                      {makeSafePhotos.map(photo => (
+                        <MidcityPhotoCard
+                          key={photo.id}
+                          photo={photo}
+                          marked={!!photo.photoId && !!photoMarks[photo.photoId]}
+                          onView={photo.photoId ? () => setViewingEntry({ list: 'makeSafe', photoId: photo.photoId! }) : undefined}
+                          onDelete={() => removeMakeSafePhoto(photo.id)}
+                          onLabelChange={(label) => {
+                            setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
+                            if (photo.photoId) {
+                              fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.photoId, label }) }).catch(() => {})
+                            }
+                            armDraft()
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="rp-list">
+                    {makeSafeUploads.photos.map((photo, i) => (
+                      <MakeSafePhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        number={makeSafePhotos.length + i + 1}
+                        marked={!!photoMarks[photo.id]}
+                        onLabel={label => {
+                          makeSafeUploads.setLabel(photo.id, label, true)
+                          if (photo.serverId) {
+                            fetch(`${base}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: photo.serverId, label }) }).catch(() => {})
+                          }
+                        }}
+                        onDelete={() => { if (window.confirm(`Delete make safe photo ${makeSafePhotos.length + i + 1}?`)) makeSafeUploads.remove(photo.id) }}
+                        onView={() => setViewingMakeSafeId(photo.id)}
+                      />
+                    ))}
+                    <button type="button" onClick={() => makeSafePhotoInputRef.current?.click()} className="fa-upload-slot rp-add">
+                      <span style={{ fontSize: 24 }}>📷</span>
+                      <span>Add Make Safe Photos</span>
+                    </button>
+                    <input
+                      ref={makeSafePhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={e => { if (e.target.files?.length) makeSafeUploads.addFiles(e.target.files); e.target.value = '' }}
+                    />
+                  </div>
+
+                  {/* Export */}
+                  <div className="mc-export-wrap">
+                    <button className="mc-export-btn" onClick={() => setMakeSafePreviewOpen(true)}>
+                      Export Report
                     </button>
                   </div>
                 </div>
@@ -2197,7 +2237,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     {makeSafePreviewOpen && (
       <MakeSafeReportPreview
         fields={makeSafeFields}
-        photos={makeSafePhotos.map(p => ({ ...p, marks: p.photoId ? photoMarks[p.photoId] : undefined }))}
+        photos={[
+          ...makeSafePhotos.map(p => ({ ...p, marks: p.photoId ? photoMarks[p.photoId] : undefined })),
+          ...makeSafeUploads.photos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label.trim(), marks: photoMarks[p.id] })),
+        ]}
         jobInfo={{
           address: initialData.address,
           insuredName: initialData.insuredName,

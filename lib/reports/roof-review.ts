@@ -10,8 +10,8 @@ export type ReviewFlag = 'empty' | 'check' | 'always'
 /** Always reviewed, whatever's in them */
 export const ALWAYS_REVIEW = ['specificCause', 'requiredMaintenanceDetails', 'recommendedMaintenanceDetails'] as const
 
-/** Filled in by the report itself, not by the inspector — never flagged */
-const NOT_REVIEWED = new Set(['claimDetails', 'rooferName', 'rooferQualification', 'attendanceDate', 'timeAttended'])
+/** Filled in by the report itself, not by the inspector — never flagged (page one's summary is written from the cause of damage) */
+const NOT_REVIEWED = new Set(['claimDetails', 'rooferName', 'rooferQualification', 'attendanceDate', 'timeAttended', 'causeSummary', 'problemSummaries'])
 
 /** Detail boxes only needed for one answer of their question (e.g. gutter notes when the gutters aren't compliant) */
 const DETAIL_FOR: Record<string, { field: string; when: string }> = {
