@@ -10,6 +10,7 @@ import { pruneOldEvents } from '@/lib/calendar/sync'
 import { isFieldAppJob } from './field-app'
 import { runLapses } from './lapse'
 import { trackAi } from '@/lib/health/ai-usage'
+import { isSetAsideKind, SET_ASIDE_KINDS, SET_ASIDE_RULE } from '@/lib/actions/set-aside'
 
 // The daily job review (tech spec §23.14): IRC's own initiative. Each morning
 // it reads the open jobs that changed since it last read them — and, once a
@@ -104,8 +105,9 @@ const REVIEW_TOOL: Anthropic.Beta.BetaTool = {
             what: { type: 'string', description: 'The check, as the office would put it: "Did the painter go on Saturday? If so, close the job and invoice."' },
             who: { type: 'string', description: 'Who it\'s about, if anyone: "Great Lengths Painting".' },
             why: { type: 'string', description: 'Why then, in a line.' },
+            about: { type: 'string', enum: [...SET_ASIDE_KINDS, 'other'], description: 'What it chases: quote_decision (a decision on a quote or variation), payment (an invoice IRC sent being paid), signature (a scope of works or contract being signed), or other. Only other comes onto the action cards.' },
           },
-          required: ['when', 'what', 'why'],
+          required: ['when', 'what', 'why', 'about'],
         },
       },
       cancel: { type: 'array', items: { type: 'string' }, description: 'IRC\'s own checks (kind check) listed below that are no longer needed, by id.' },
@@ -121,7 +123,7 @@ export const REVIEW_PROMPT = `You look over one open job of Insurance Repair Co 
   - Something was due to happen and nothing shows it did: a trade attending ("the painter was going Saturday" → check the next working day: did they go? then close and invoice), a quote, report or booking someone promised.
   - Something important is coming up that needs confirming: an install or booking (especially one that took long to arrange or has had problems — check about a week before that it's still on track), an appointment.
   - A KPI (in the job file) is close or overdue with nothing under way, or the job has stalled with nothing pending and no one waiting: when "now".
-- Never plan a check to chase an insurer's (or homeowner's) decision on a quote or variation, however long it's been: the office follows quotes up only when they ask to, and a job that waits too long lapses by itself. A job waiting on a quote decision needs nothing.
+- ${SET_ASIDE_RULE} A job only waiting on one of those needs nothing (one waiting on a quote decision lapses by itself).
 - Don't double up: the job's open follow-ups, waits and cards are listed. If one already covers it, plan nothing. At most ${MAX_NEW_CHECKS}.
 - cancel: IRC's own checks listed that are no longer needed (it happened, or the job moved on).
 - A job that is simply waiting on someone with a follow-up already set needs nothing. Planning nothing is the usual right answer — the office should only hear from you when it matters.
@@ -172,7 +174,9 @@ export async function reviewJob(db: SupabaseClient, tenantId: string, job: JobRo
     const planned: string[] = []
     if (room) {
       const owner = await pinnedTo(db, tenantId, null, job.id)
-      for (const c of (Array.isArray(out.checks) ? out.checks : []).slice(0, room) as Record<string, unknown>[]) {
+      // Kept off the action cards for now: quote decisions, payments, signatures
+      const wanted = ((Array.isArray(out.checks) ? out.checks : []) as Record<string, unknown>[]).filter(c => !isSetAsideKind(c?.about))
+      for (const c of wanted.slice(0, room)) {
         const what = str(c.what)
         if (!what) continue
         const when = str(c.when).toLowerCase()

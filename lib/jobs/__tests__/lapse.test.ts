@@ -4,7 +4,8 @@ import { runLapses } from '../lapse'
 
 // The safety net for insurers who never decide: no warning beforehand, just
 // "no decision" once the insurer's lapse time has passed — but only with
-// everything paid; with money owed, a check to invoice or chase it instead.
+// everything paid; with something not yet invoiced, a check to invoice it.
+// Unpaid invoices already sent are never chased from here (set aside for now).
 
 const tables: Record<string, Row[]> = {}
 const db = fakeSupabase(tables) as never
@@ -23,28 +24,30 @@ beforeEach(() => {
   const job = (id: string, client: string, since: string): Row => ({ id, tenant_id: 't1', job_number: id.toUpperCase(), insurer: 'Castle Insurance', client_id: client, phase: 'awaiting_decision', phase_since: since, lapsed_at: null, closed_by_hand: null, override_stage: null, assigned_to: null })
   tables.jobs = [
     job('irc1', 'castle', daysAgo(200)), // lapsed, all paid → closes
-    job('irc2', 'castle', daysAgo(190)), // lapsed, invoice unpaid → check
+    job('irc2', 'castle', daysAgo(190)), // lapsed, invoice not sent → check
     job('irc3', 'castle', daysAgo(170)), // two weeks out → nothing (no warning)
     job('irc4', 'castle', daysAgo(30)), // fine
     job('irc5', 'never', daysAgo(900)), // never lapses
     job('irc6', 'quick', daysAgo(40)), // past its insurer's 30 days, nothing invoiced → check
+    job('irc7', 'castle', daysAgo(195)), // lapsed, invoice sent but unpaid → nothing (payments aren't chased)
   ]
   tables.invoices = [
     { job_id: 'irc1', direction: 'outbound', invoice_type: 'assessment', status: 'paid' },
-    { job_id: 'irc2', direction: 'outbound', invoice_type: 'assessment', status: 'sent' },
+    { job_id: 'irc2', direction: 'outbound', invoice_type: 'assessment', status: 'draft' },
+    { job_id: 'irc7', direction: 'outbound', invoice_type: 'assessment', status: 'sent' },
   ]
 })
 
 describe('the lapse safety net', () => {
-  it('closes the paid-up, flags money owed, and leaves the rest — with no warning before', async () => {
+  it('closes the paid-up, flags what is still to invoice, and leaves the rest — with no warning before', async () => {
     const out = await runLapses(db, AT)
     expect(out).toEqual({ lapsed: ['IRC1'], blocked: ['IRC2', 'IRC6'] })
     expect(tables.jobs.find(j => j.id === 'irc1')!.lapsed_at).toBe(AT.toISOString())
     const note = (c: Row) => (c.follow_up as { note: string }).note
     expect(tables.action_queue.map(c => [c.job_id, c.rule_key])).toEqual([['irc2', 'lapse_blocked'], ['irc6', 'lapse_blocked']])
-    expect(note(tables.action_queue[0])).toMatch(/^Castle Insurance hasn't decided on IRC2 in over 6 months\. It can close as "no decision" once everything on it is paid/)
+    expect(note(tables.action_queue[0])).toMatch(/^Castle Insurance hasn't decided on IRC2 in over 6 months\. It can close as "no decision" once everything on it is invoiced and paid/)
     expect(note(tables.action_queue[1])).toMatch(/in over 30 days\./)
-    expect((tables.action_queue[0].follow_up as { note: string }).note).toContain('1 invoice is still unpaid')
+    expect((tables.action_queue[0].follow_up as { note: string }).note).toContain('1 invoice hasn\'t been sent')
     expect((tables.action_queue[1].follow_up as { note: string }).note).toContain('nothing has been invoiced on it yet')
     // Once each per wait
     expect(await runLapses(db, AT)).toEqual({ lapsed: [], blocked: [] })

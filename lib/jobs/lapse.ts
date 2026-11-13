@@ -8,8 +8,11 @@ import { isFieldAppJob } from './field-app'
 // (clients.decision_lapse_days, the Clients page; 180 days by default) closes
 // as "no decision" — but only once every invoice on it is paid. There's no
 // warning beforehand: a job that lapses just closes. Only if it's due to lapse
-// with money still owed does the office get one check, to invoice or chase the
-// payment. An approval that comes later reopens the job (lib/jobs/phase.ts).
+// with something still to invoice (nothing invoiced, or an invoice not sent)
+// does the office get one check, to invoice it. Waiting on payment of an
+// invoice already sent makes no check: chasing payments is set aside for now
+// (lib/actions/set-aside.ts) — the job just stays open until it's paid. An
+// approval that comes later reopens the job (lib/jobs/phase.ts).
 
 const DEFAULT_LAPSE_DAYS = 180
 /** New checks per company a day: a backlog of old waits comes through a few at a time, not all at once */
@@ -57,8 +60,11 @@ export async function runLapses(db: SupabaseClient, at = new Date()): Promise<{ 
         await db.from('jobs').update({ lapsed_at: at.toISOString() }).eq('id', job.id).is('lapsed_at', null)
         out.lapsed.push(job.job_number)
       } else if (room(job.tenant_id)) {
-        const owed = !invoices.length ? 'nothing has been invoiced on it yet' : `${unpaid.length} invoice${unpaid.length === 1 ? ' is' : 's are'} still ${unpaid.some(i => i.status === 'draft') ? 'not sent or ' : ''}unpaid`
-        if (await checkOnce(db, job, 'lapse_blocked', `${who} hasn't decided on ${job.job_number} in over ${howLong}. It can close as "no decision" once everything on it is paid, but ${owed}. Invoice or chase payment.`, 'The decision lapse time has passed', at)) { out.blocked.push(job.job_number); made(job.tenant_id) }
+        // Only unpaid invoices already sent: nothing to do on the cards for now
+        const unsent = unpaid.filter(i => i.status === 'draft').length
+        if (invoices.length && !unsent) continue
+        const owed = !invoices.length ? 'nothing has been invoiced on it yet' : `${unsent} invoice${unsent === 1 ? ' hasn\'t' : 's haven\'t'} been sent`
+        if (await checkOnce(db, job, 'lapse_blocked', `${who} hasn't decided on ${job.job_number} in over ${howLong}. It can close as "no decision" once everything on it is invoiced and paid, but ${owed}. Invoice it.`, 'The decision lapse time has passed', at)) { out.blocked.push(job.job_number); made(job.tenant_id) }
       }
     }
   }

@@ -151,6 +151,24 @@ describe('reading a sent email', () => {
     expect(tables.action_queue ?? []).toHaveLength(0)
   })
 
+  it('never chases a homeowner\'s quote decision, a payment or a signature (set aside for now)', async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ waiting_on_name: 'Brett Jones', role: 'insured', asked: 'acceptance of the quote', ask_kind: 'approval' }, 'Asked Brett Jones for acceptance of the quote — a decision, not chased'],
+      [{ waiting_on_name: 'Castle Insurance', role: 'insurer', asked: 'payment of INV-IRC1010-3', ask_kind: 'payment' }, 'Asked Castle Insurance for payment of INV-IRC1010-3 — a payment, not chased'],
+      [{ waiting_on_name: 'Brett Jones', role: 'insured', asked: 'the signed scope of works', ask_kind: 'signature' }, 'Asked Brett Jones for the signed scope of works — a signature, not chased'],
+    ]
+    for (const [ask, outcome] of cases) {
+      const { client } = model({ asks: true, waiting_on_email: 'x@example.com', chase_after_working_days: 3, reason: 'r', ...ask })
+      expect(await readSentEmail(sentRow() as never, { db, client, at: THU })).toMatchObject({ status: 'done', outcome })
+    }
+    expect(tables.action_queue ?? []).toHaveLength(0)
+  })
+
+  it('still waits on a trade for their invoice', async () => {
+    const { client } = model({ asks: true, waiting_on_name: 'Sparky Bros', waiting_on_email: 'jobs@sparkybros.com.au', role: 'trade', asked: 'their invoice', ask_kind: 'invoice', chase_after_working_days: 2, reason: 'r' })
+    expect((await readSentEmail(sentRow() as never, { db, client, at: THU })).outcome).toMatch(/^Asked Sparky Bros for their invoice — chase /)
+  })
+
   it('replaces the reminder when the office asks again in the same conversation', async () => {
     tables.action_queue = [{ id: 'old', tenant_id: 't1', source: 'followup', rule_key: 'waiting_on', status: 'scheduled', follow_up: { thread_id: 'abc1', waiting: { name: 'Sparky Bros', asked: 'photos', sent_at: '2026-10-26T02:00:00.000Z' } }, due_at: '2026-10-30T00:00:00.000Z' }]
     const { client } = model({ asks: true, waiting_on_name: 'Sparky Bros', waiting_on_email: 'jobs@sparkybros.com.au', role: 'trade', asked: 'the photos', ask_kind: 'photos', chase_after_working_days: 2, reason: 'Second ask.' })

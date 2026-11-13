@@ -73,6 +73,24 @@ describe('reviewing a job', () => {
     expect((create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content).toContain('painter booked for Sat 31 Oct')
   })
 
+  it('never plans a check for a quote decision, a payment or a signature (set aside for now)', async () => {
+    const { client, create } = model({
+      state: 's',
+      checks: [
+        { when: 'now', what: 'Chase Castle for a decision on the quote', why: 'x', about: 'quote_decision' },
+        { when: 'now', what: 'Chase Castle for payment of INV-IRC1033-1', why: 'x', about: 'payment' },
+        { when: 'now', what: 'Chase Brett for the signed scope of works', why: 'x', about: 'signature' },
+        { when: 'now', what: 'Did the painter go?', why: 'x', about: 'other' },
+      ],
+    })
+    const out = await reviewJob(db, 't1', tables.jobs[0] as never, { client, at: MON })
+    expect(out.checks).toEqual([expect.stringContaining('Did the painter go?')])
+    expect(tables.action_queue).toHaveLength(1)
+    const system = (create.mock.calls[0] as unknown as [{ system: { text: string }[] }])[0].system[0].text
+    expect(system).toContain('payment of an invoice IRC sent')
+    expect(system).toContain('a signature on a scope of works, building contract')
+  })
+
   it('cancels its own checks no longer needed, and adds none while three are open', async () => {
     const watch = (id: string): Row => ({ id, tenant_id: 't1', job_id: 'j33', source: 'followup', rule_key: 'job_watch', status: 'scheduled', title: `Check ${id}`, due_at: '2099-01-01T00:00:00Z', steps: [], follow_up: { kind: 'watch', note: id } })
     tables.action_queue = [watch('w1'), watch('w2'), watch('w3'), { id: 'f1', tenant_id: 't1', job_id: 'j33', source: 'followup', status: 'scheduled', title: 'Mine', steps: [], follow_up: { note: 'mine' } }]
