@@ -18,7 +18,7 @@ const MODEL = 'claude-sonnet-4-6'
 export async function POST(req: NextRequest) {
   const me = await sessionUser()
   if (!me) return unauthorized()
-  const { specificCause, causeSummary, problemSummaries } = await req.json() as Record<string, unknown>
+  const { specificCause, previousCause, causeSummary, problemSummaries } = await req.json() as Record<string, unknown>
   if (typeof specificCause !== 'string' || !specificCause.trim()) {
     return NextResponse.json({ error: 'specificCause is required' }, { status: 400 })
   }
@@ -34,11 +34,12 @@ ${PAGE_ONE_FORMAT}
 RULES FOR THIS UPDATE:
 - The cause of damage is the source. Every problem letter in it gets a line in problemSummaries and a mention in causeSummary; a letter no longer in it is taken out of both.
 - Change as little as possible. The inspector may have polished page one by hand: keep every line and phrase that still matches the cause word for word, and only add, remove or fix what the cause no longer supports.
+- When the cause of damage as it was when page one was last written is given, compare it with the current one: that is exactly what the inspector changed. A problem whose points were reworded gets its page one wording brought in line with the new points (location, defect, numbers); a change that's only grammar or tidying needs no change on page one.
 - Update any count in causeSummary ("from 3 defects") to match.
 - Return ONLY JSON: {"causeSummary": "...", "problemSummaries": "..."}`,
       messages: [{
         role: 'user',
-        content: `Cause of damage (current):\n${specificCause}\n\nPage one short cause (current):\n${typeof causeSummary === 'string' && causeSummary.trim() ? causeSummary : '(empty)'}\n\nPage one problem lines (current):\n${typeof problemSummaries === 'string' && problemSummaries.trim() ? problemSummaries : '(empty)'}`,
+        content: `Cause of damage (current):\n${specificCause}\n\n${typeof previousCause === 'string' && previousCause.trim() && previousCause !== specificCause ? `Cause of damage when page one was last written:\n${previousCause}\n\n` : ''}Page one short cause (current):\n${typeof causeSummary === 'string' && causeSummary.trim() ? causeSummary : '(empty)'}\n\nPage one problem lines (current):\n${typeof problemSummaries === 'string' && problemSummaries.trim() ? problemSummaries : '(empty)'}`,
       }],
     }))
     const block = message.content[0]

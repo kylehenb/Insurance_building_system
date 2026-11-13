@@ -65,14 +65,34 @@ describe('reportLetters', () => {
 })
 
 describe('pageOneOutOfStep', () => {
+  const written = ['From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z'] as const
+  const basis = 'Stormwater entry from 3 defects:\n• (A) Tiles short of the gutter.\n• (B) Gutter falls the wrong way.\n• (B) Staining on the fascia.\n• (C) 17 broken tiles.'
+
+  it('flags a problem whose words changed since page one was written, in any of its points', () => {
+    const step = (cause: string) => pageOneOutOfStep(cause, ...written, basis)
+    expect(step(basis.replace('17 broken', '12 broken'))).toMatchObject({ changed: ['C'], otherChanged: false })
+    expect(step(basis.replace('Staining on the fascia', 'Staining on the soffit'))).toMatchObject({ changed: ['B'] })
+    expect(step(basis.replace('Tiles short of the gutter.', 'The valley iron has rusted through.'))).toMatchObject({ changed: ['A'] })
+    expect(step(basis.replace('Stormwater entry', 'Water entry'))).toMatchObject({ changed: [], otherChanged: true })
+  })
+
+  it("doesn't flag changes only to capitals, punctuation or spacing, or a cause it has no copy of", () => {
+    expect(pageOneOutOfStep(basis.replace('Tiles short of the gutter.', 'tiles  short of the gutter'), ...written, basis)).toMatchObject({ changed: [], otherChanged: false })
+    expect(pageOneOutOfStep(basis.replace('17', '12'), ...written, null)).toMatchObject({ changed: [] })
+  })
+
+  it("leaves a new problem to 'missing' rather than 'changed'", () => {
+    expect(pageOneOutOfStep(basis + '\n• (D) Valley.', ...written, basis)).toMatchObject({ missing: ['D'], changed: [] })
+  })
+
   const cause = '• (A) Tiles short.\n• (B) Gutter falls.\n• (C) Broken tiles.'
   it('is in step when page one mentions exactly the cause of damage\'s letters, or isn\'t written yet', () => {
-    expect(pageOneOutOfStep(cause, 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: [] })
-    expect(pageOneOutOfStep(cause, '', '')).toEqual({ missing: [], gone: [] })
+    expect(pageOneOutOfStep(cause, 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: [], changed: [], otherChanged: false })
+    expect(pageOneOutOfStep(cause, '', '')).toEqual({ missing: [], gone: [], changed: [], otherChanged: false })
   })
   it('says which problems were added to or taken out of the cause since page one was written', () => {
-    expect(pageOneOutOfStep(cause + '\n• (D) Valley.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: ['D'], gone: [] })
-    expect(pageOneOutOfStep('• (A) Tiles short.\n• (C) Broken tiles.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: ['B'] })
+    expect(pageOneOutOfStep(cause + '\n• (D) Valley.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: ['D'], gone: [], changed: [], otherChanged: false })
+    expect(pageOneOutOfStep('• (A) Tiles short.\n• (C) Broken tiles.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: ['B'], changed: [], otherChanged: false })
   })
 })
 

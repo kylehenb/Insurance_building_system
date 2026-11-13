@@ -94,6 +94,14 @@ describe('Update page one', () => {
     expect(JSON.stringify(aiCalls[0])).toContain('(D) Valley.')
   })
 
+  it('sends the cause as it was when page one was last written, so the AI sees what changed', async () => {
+    me = { tenantId: 't1', userId: 'u1' }
+    aiReply = JSON.stringify({ causeSummary: 'x', problemSummaries: 'y' })
+    await post(pageOne, { ...body, previousCause: '• (A) Tiles well short.' })
+    expect(JSON.stringify(aiCalls[0])).toContain('when page one was last written')
+    expect(JSON.stringify(aiCalls[0])).toContain('Tiles well short.')
+  })
+
   it('needs a cause of damage, and says so when the AI reply can\'t be read', async () => {
     me = { tenantId: 't1', userId: 'u1' }
     expect((await post(pageOne, { specificCause: ' ' })).status).toBe(400)

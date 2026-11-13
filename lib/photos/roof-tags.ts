@@ -123,13 +123,46 @@ export function reportLetters({ cause, causeSummary, problemLines, photoLabels =
   ])
 }
 
+/** The words of some text, for telling a real change from capitals, punctuation or spacing */
+const wordsOf = (text: string): string => text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean).join(' ')
+
+/**
+ * The cause of damage by problem: each letter's points (all of them, in order), and the
+ * lead line with the points that aren't about one problem under "", each as its words only.
+ */
+export function causeByProblem(cause: string | null | undefined): Map<string, string> {
+  const parts = new Map<string, string[]>()
+  for (const line of (cause ?? '').split('\n')) {
+    const body = line.trim().replace(/^[•\-*–]\s*/, '')
+    if (!body) continue
+    const m = body.match(ISSUE_AT_START)
+    const key = m ? m[1] : ''
+    parts.set(key, [...(parts.get(key) ?? []), wordsOf(m ? body.slice(m[0].length) : body)])
+  }
+  return new Map([...parts].map(([k, v]) => [k, v.filter(Boolean).join(' | ')]))
+}
+
+export interface PageOneStep {
+  /** Problems in the cause that page one doesn't mention */
+  missing: string[]
+  /** Letters on page one no longer in the cause */
+  gone: string[]
+  /** Problems whose wording in the cause has changed since page one was written */
+  changed: string[]
+  /** The cause's lead line, or its points that aren't about one problem, have changed */
+  otherChanged: boolean
+}
+
 /**
  * Where page one has fallen out of step with the cause of damage (after the cause
- * was edited): problems in the cause that page one's short cause or problem lines
- * don't mention, and letters on page one that are no longer in the cause.
- * Nothing when page one hasn't been written.
+ * was edited). No AI: plain text matching on the "(A)" letters, and, given the cause
+ * as it was when page one was last written (`basis`), a word-by-word comparison of
+ * each problem's points. Any change to the words counts; changes only to capitals,
+ * punctuation or spacing don't. Nothing when page one hasn't been written.
  */
-export function pageOneOutOfStep(cause: string | null | undefined, causeSummary: string | null | undefined, problemLines: string | null | undefined): { missing: string[]; gone: string[] } {
+export function pageOneOutOfStep(cause: string | null | undefined, causeSummary: string | null | undefined, problemLines: string | null | undefined, basis?: string | null): PageOneStep {
+  const none: PageOneStep = { missing: [], gone: [], changed: [], otherChanged: false }
+  if (!causeSummary?.trim() && !problemLines?.trim()) return none
   const inCause = issuePoints(cause).map(i => i.letter)
   const summary = lettersIn(causeSummary)
   const lines = problemSummaries(problemLines, '').map(p => p.letter)
@@ -137,7 +170,14 @@ export function pageOneOutOfStep(cause: string | null | undefined, causeSummary:
   if (causeSummary?.trim()) for (const l of inCause) if (!summary.includes(l)) missing.add(l)
   if (problemLines?.trim()) for (const l of inCause) if (!lines.includes(l)) missing.add(l)
   const gone = [...new Set([...summary, ...lines])].filter(l => inCause.length && !inCause.includes(l))
-  return { missing: [...missing].sort(), gone: gone.sort() }
+  const changed: string[] = []
+  let otherChanged = false
+  if (typeof basis === 'string') {
+    const then = causeByProblem(basis), now = causeByProblem(cause)
+    for (const l of inCause) if (then.has(l) && !missing.has(l) && then.get(l) !== now.get(l)) changed.push(l)
+    otherChanged = (then.get('') ?? '') !== (now.get('') ?? '')
+  }
+  return { missing: [...missing].sort(), gone: gone.sort(), changed: changed.sort(), otherChanged }
 }
 
 /**
