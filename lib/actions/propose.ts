@@ -14,6 +14,7 @@ import { CATEGORIES, CardError, cardActor, claimQueued, getCard, isCategory, PRI
 import { cardLearning, cardSituation, recordCardInstruction } from './learning'
 import { orderUpdateBrief } from '@/lib/insurer-orders/order-update'
 import { trackAi } from '@/lib/health/ai-usage'
+import { SET_ASIDE_RULE } from './set-aside'
 
 // Making an action card: Claude (Haiku) reads the conversation and the whole
 // job file, checks what it needs with the read-only tools, and proposes the
@@ -110,7 +111,8 @@ How it works:
   - Nothing recorded since it started: call finish_card with needs_action true, title "What happened at <the place>?", a summary of what the appointment was, and propose add_job_note with a [placeholder] for the office to fill in (the one job note a card proposes by itself: the office writes it).
 - A TO-DO is something the office added for itself (someone rang, an idea, a job to remember). Propose the steps that do it, from the job file; if it's a call or a visit, say who, the number or address, and propose nothing. Never decide it isn't needed: it's theirs to clear.
 - A FOLLOW-UP is a reminder the office set for itself (instead of an email). First check whether it's still needed: look for a reply, a quote, a report or whatever was being waited on (list_job_emails, the conversation, the job file). If it's still outstanding, propose the chase — usually send_email to that person (a reply in the conversation it came from, or a new email to them on the job) written as a polite follow-up; if it has been done or answered, say so plainly in the summary (with when) and propose nothing. Either way it stays on the office's list. A phone call can't be made for them: if one is wanted, say who and the number from the job file in the summary.
-- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question. Never propose set_follow_up (or a chase) for an insurer's or homeowner's decision on a quote or variation: the office follows quotes up only when they ask to.
+- set_follow_up reminds the office later: propose it when something will need chasing if nothing arrives (e.g. a trade said "quote by Friday" — follow up the Monday after). Emails the office sends that ask someone for something get a reminder by themselves, so don't propose set_follow_up just because a step's email asks a question. ${SET_ASIDE_RULE} So never propose set_follow_up (or a chase) for one of those: the office follows them up only when they ask to.
+- A WAITING-ON follow-up or a CHECK IRC PLANNED that only chases one of those three (a quote decision, payment of IRC's invoice, a signature): call finish_card with needs_action false and say it's set aside for now. A follow-up or to-do the office set themselves is different — do it as asked.
 - A WAITING-ON follow-up was set by IRC when the office emailed someone asking for something, and nothing has come back. Check the same way that it's still outstanding, then draft the chase: a short, polite reply in that conversation asking again for exactly what was asked (and by when, if someone is waiting on the office for it). If it has come in some other way (another conversation, a note, a phone call) or no longer matters, call finish_card with needs_action false and say so: it comes off the list.
 - Always end by calling finish_card.
 

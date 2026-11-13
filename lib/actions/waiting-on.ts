@@ -10,6 +10,7 @@ import { cardActor, CARD_COLUMNS, type ActionCard, type WaitingOn } from './card
 import { chaseDue, createFollowUp, spokenDue } from './followups'
 import { adoptFollowUp, days, openWaits, personFollowUpFor, pinnedTo, sentOn, waitLearning, waitLine, waitSituation } from './waits'
 import { trackAi } from '@/lib/health/ai-usage'
+import { SET_ASIDE_RULE } from './set-aside'
 
 // Waiting on (tech spec §23.12): what the office has asked of other people.
 // Every email the office sends is read once (sent_emails, filled by the send
@@ -34,15 +35,19 @@ const SETTLE_MS = 45_000
 const MAX_DAYS = 20
 
 export const ROLES = ['trade', 'insurer', 'assessor', 'insured', 'supplier', 'other'] as const
-export const ASK_KINDS = ['information', 'photos', 'quote', 'invoice', 'report', 'booking', 'approval', 'documents', 'other'] as const
+export const ASK_KINDS = ['information', 'photos', 'quote', 'invoice', 'report', 'booking', 'approval', 'documents', 'payment', 'signature', 'other'] as const
 
 const now = () => new Date().toISOString()
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 const isOwn = (email: string | null | undefined) => !!email && email.toLowerCase().endsWith(`@${OWN_DOMAIN}`)
 
-/** An insurer asked to approve or decide (on a quote, variation or scope): never chased by itself */
-export const isQuoteDecision = (role: string, askKind: string) => role === 'insurer' && askKind === 'approval'
+/** An insurer or homeowner asked to approve or decide (on a quote, variation or scope): never chased by itself */
+export const isQuoteDecision = (role: string, askKind: string) => (role === 'insurer' || role === 'insured') && askKind === 'approval'
+
+/** Set aside for now (§23.11): quote decisions, paying IRC's invoices, signing a scope or contract — never waits */
+export const isSetAsideWait = (role: string, askKind: string) =>
+  isQuoteDecision(role, askKind) || askKind === 'payment' || askKind === 'signature'
 
 // ── Reading sent emails ──
 
@@ -59,7 +64,7 @@ const RECORD: Anthropic.Beta.BetaTool = {
       waiting_on_email: { type: 'string', description: 'Their email address, from the recipients.' },
       role: { type: 'string', enum: [...ROLES], description: 'trade (incl. subcontractors), insurer (claims staff), assessor (loss adjuster), insured (the homeowner or tenant), supplier, other.' },
       asked: { type: 'string', description: 'What they were asked for, in a few words: "the switchboard photos", "a quote for the roof", "a time to inspect".' },
-      ask_kind: { type: 'string', enum: [...ASK_KINDS] },
+      ask_kind: { type: 'string', enum: [...ASK_KINDS], description: 'invoice: asking someone to send IRC their invoice. payment: asking someone to pay an invoice IRC sent. signature: asking someone to sign a scope of works, contract or other document.' },
       on_behalf_of: { type: 'string', description: 'Who is waiting on the office for this, if anyone, briefly: "Suncorp asked for it on 28 Oct". Empty if no one.' },
       chase_after_working_days: { type: 'integer', minimum: 0, maximum: MAX_DAYS, description: 'Working days after this email to chase if nothing comes back. 0 = later today.' },
       urgent: { type: 'boolean', description: 'Urgent: safety, a make safe, an escalation, an insurer deadline.' },
@@ -72,7 +77,7 @@ const RECORD: Anthropic.Beta.BetaTool = {
 export const WAIT_SYSTEM_PROMPT = `You keep track of what Insurance Repair Co (building insurance repairs in Perth: storm and water damage, make safes, quotes, reports, trades) is waiting on from other people. Someone in the office has just sent the email marked THE EMAIL JUST SENT. Decide whether it asks someone outside the office for something the office needs back — information, photos, a quote, an invoice, a report, a booking or a time, an approval, documents — and if so, who, what, and when to chase it if nothing comes back. Call record_wait once.
 
 - Asks for nothing (asks false): answers, confirmations, thank-yous, FYIs, sending a report, quote or documents without asking anything back, booking confirmations, automatic notices and acknowledgements, emails only to the office itself.
-- Quote decisions are never chased (asks false): sending a quote, variation or revised scope to an insurer, or asking an insurer (or the insured) to approve, accept or decide on one. The office follows a quote up only when they ask to, by setting a reminder themselves. Asking a trade or supplier for a quote IS a wait. A work order sent to a trade counts only if it asks them to reply (a booking date, a quote, to confirm).
+- Never chased (asks false): sending a quote, variation or revised scope to an insurer, or asking an insurer (or the insured) to approve, accept or decide on one; sending an invoice or asking for one IRC sent to be paid; sending a scope of works, building contract or other document to be signed, or asking for it to be signed. ${SET_ASIDE_RULE} The office follows these up only when they ask to, by setting a reminder themselves. Asking a trade or supplier for a quote IS a wait, and so is asking a trade for their invoice. A work order sent to a trade counts only if it asks them to reply (a booking date, a quote, to confirm).
 - One wait per email: if it asks several people, pick the one the office most needs to hear from.
 - If the office was already waiting on something in this conversation and this email asks again or chases, it's the same wait: answer for this email (it replaces the earlier reminder).
 - When to chase, in working days after this email (0 = later today):
@@ -164,8 +169,11 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     const asked = clip(str(out.asked) || 'a reply', 200)
     const role = (ROLES as readonly string[]).includes(str(out.role)) ? str(out.role) : 'other'
     const askKind = (ASK_KINDS as readonly string[]).includes(str(out.ask_kind)) ? str(out.ask_kind) : 'other'
-    // The office doesn't chase insurers for decisions on its quotes — only when they set a reminder themselves
-    if (isQuoteDecision(role, askKind)) return save({ status: 'done', outcome: `Asked ${name} for ${asked} — a decision, not chased` })
+    // Set aside for now: quote decisions, payments, signatures — chased only when the office sets a reminder themselves
+    if (isSetAsideWait(role, askKind)) {
+      const what = askKind === 'payment' ? 'a payment' : askKind === 'signature' ? 'a signature' : 'a decision'
+      return save({ status: 'done', outcome: `Asked ${name} for ${asked} — ${what}, not chased` })
+    }
     const n = Number(out.chase_after_working_days)
     const aiDays = Number.isFinite(n) ? Math.min(MAX_DAYS, Math.max(0, Math.round(n))) : 2
     const due = chaseDue(aiDays, at)
