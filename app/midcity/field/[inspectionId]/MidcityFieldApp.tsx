@@ -5,8 +5,9 @@ import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
 import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemNames, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
-import { cleanMarks, type OverviewMark } from '@/lib/photos/overview-marks'
-import { OverviewPinTool } from './OverviewPinTool'
+import { cleanMarks, cleanPhotoMarks, type OverviewMark } from '@/lib/photos/overview-marks'
+import { MarkupTool } from './MarkupTool'
+import { PhotoWithMarkup } from './OverviewMarkup'
 import { reviewFlags, type ReviewFlag } from '@/lib/reports/roof-review'
 import { useFieldPhotos, type FieldPhoto } from '@/app/field/[inspectionId]/useFieldPhotos'
 import { UploadBanner } from '@/app/field/[inspectionId]/UploadBanner'
@@ -353,12 +354,18 @@ function uid() { return Math.random().toString(36).slice(2) }
 // — Photo card used in both roof and make safe photo grids ——————————————————
 function MidcityPhotoCard({
   photo,
+  marked,
   onDelete,
   onLabelChange,
+  onView,
 }: {
   photo: PhotoEntry
+  /** Has markup drawn on it */
+  marked?: boolean
   onDelete: () => void
   onLabelChange: (label: string) => void
+  /** Open it full screen to mark it up (once it's saved) */
+  onView?: () => void
 }) {
   const busy = photo.processing || photo.uploading
 
@@ -371,7 +378,10 @@ function MidcityPhotoCard({
           src={photo.previewUrl}
           alt="photo"
           draggable={false}
+          onClick={!busy && onView ? onView : undefined}
+          style={!busy && onView ? { cursor: 'zoom-in' } : undefined}
         />
+        {marked && <span className="rp-marked" aria-label="Marked up">✎</span>}
         {busy && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(74,24,32,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span className="fa-spinner" style={{ borderColor: 'var(--beige)', borderTopColor: 'transparent', width: 22, height: 22 }} />
@@ -402,10 +412,12 @@ function MidcityPhotoCard({
 // one-tap buttons beside it (colours match the report), the rarer fixed types
 // (Front, Overview, Ladder…) in a dropdown, and a note only when wanted.
 // Tags: lib/photos/roof-tags.ts
-export function RoofPhotoCard({ photo, number, letters, onTag, onNote, onDelete, onView }: {
+export function RoofPhotoCard({ photo, number, letters, marked, onTag, onNote, onDelete, onView }: {
   photo: FieldPhoto
   number: number
   letters: string[]
+  /** Has markup drawn on it (open it full screen to change it) */
+  marked?: boolean
   onTag: (tag: RoofPhotoTag) => void
   onNote: (note: string) => void
   onDelete: () => void
@@ -434,6 +446,7 @@ export function RoofPhotoCard({ photo, number, letters, onTag, onNote, onDelete,
             </div>
           )}
           <span className="rp-num">{number}</span>
+          {marked && <span className="rp-marked" aria-label="Marked up">✎</span>}
           {!preparing && photo.status !== 'uploaded' && (
             <span className="fa-photo-badge">{photo.status === 'failed' ? 'Not uploaded' : 'Uploading'}</span>
           )}
@@ -480,30 +493,72 @@ export function RoofPhotoCard({ photo, number, letters, onTag, onNote, onDelete,
   )
 }
 
-// A roof photo full screen, with the same one-tap letters, to check what's in it
-function RoofPhotoViewer({ photo, number, letters, names, onTag, onClose }: {
-  photo: FieldPhoto
-  number: number
+// A report photo full screen, with its markup; "Mark up" opens the markup tool
+// on it (the same tools as the roof overview, lib/photos/overview-marks.ts).
+// Whatever's below it (a roof photo's one-tap letters) shows while not marking up.
+export function PhotoViewer({ url, title, marks, letters, startLetter, onMarks, onClose, children }: {
+  url: string
+  title: string
+  marks: OverviewMark[]
+  /** Problem letters to mark with; none = White marks only */
   letters: string[]
-  /** What each problem is ("Rear roof"), shown on its button */
-  names: Record<string, string>
-  onTag: (tag: RoofPhotoTag) => void
+  /** The colour to start marking with: the photo's own problem letter, or White */
+  startLetter: string | null
+  onMarks: (marks: OverviewMark[]) => void
   onClose: () => void
+  children?: React.ReactNode
 }) {
-  const { tag } = parseRoofLabel(photo.label)
+  const [marking, setMarking] = useState(false)
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
   }, [])
   return (
-    <div className="rp-viewer" role="dialog" aria-label={`Photo ${number}`}>
+    <div className="rp-viewer" role="dialog" aria-label={title}>
       <div className="rp-viewer-bar">
-        <span>Photo {number}</span>
-        <button type="button" className="rp-viewer-close" onClick={onClose}>Done</button>
+        <span>{title}</span>
+        <span style={{ display: 'flex', gap: 14 }}>
+          <button type="button" className="rp-viewer-close" onClick={() => setMarking(m => !m)}>
+            {marking ? 'Stop marking' : marks.length ? 'Edit markup' : 'Mark up'}
+          </button>
+          <button type="button" className="rp-viewer-close" onClick={onClose}>Done</button>
+        </span>
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {photo.previewUrl && <img src={photo.previewUrl} alt={`Photo ${number}`} className="rp-viewer-img" />}
+      {marking ? (
+        <div className="rp-viewer-markup">
+          <MarkupTool url={url} alt={title} marks={marks} letters={letters} onChange={onMarks} dark
+            startLetter={startLetter} startTool="area" maxHeight="calc(100dvh - 380px)" />
+        </div>
+      ) : (
+        <>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <PhotoWithMarkup url={url} alt={title} marks={marks} />
+          </div>
+          {children}
+        </>
+      )}
+    </div>
+  )
+}
+
+// A roof photo full screen, with the same one-tap letters, to check what's in it, and its markup
+function RoofPhotoViewer({ photo, number, letters, names, marks, onMarks, onTag, onClose }: {
+  photo: FieldPhoto
+  number: number
+  letters: string[]
+  /** What each problem is ("Rear roof"), shown on its button */
+  names: Record<string, string>
+  marks: OverviewMark[]
+  onMarks: (marks: OverviewMark[]) => void
+  onTag: (tag: RoofPhotoTag) => void
+  onClose: () => void
+}) {
+  const { tag } = parseRoofLabel(photo.label)
+  if (!photo.previewUrl) return null
+  return (
+    <PhotoViewer url={photo.previewUrl} title={`Photo ${number}`} marks={marks} letters={letters}
+      startLetter={tag.kind === 'issue' ? tag.letter : null} onMarks={onMarks} onClose={onClose}>
       <div className="rp-viewer-tags">
         {letters.map(l => {
           const on = tag.kind === 'issue' && tag.letter === l
@@ -517,7 +572,7 @@ function RoofPhotoViewer({ photo, number, letters, names, onTag, onClose }: {
           )
         })}
       </div>
-    </div>
+    </PhotoViewer>
   )
 }
 
@@ -647,6 +702,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [roofReportFields, setRoofReportFields] = useState<RoofReportData>(emptyRoofReport)
   // Markup on the roof overview (problem pins, areas, arrows, labels), for the report's first page
   const [overviewMarks, setOverviewMarks] = useState<OverviewMark[]>([])
+  // Markup on the other report photos, by photo: a roof photo's own id, an older
+  // or make safe photo's saved id (photoMarkKey)
+  const [photoMarks, setPhotoMarks] = useState<Record<string, OverviewMark[]>>({})
+  // An older roof photo or a make safe photo open full screen (by its saved id)
+  const [viewingEntry, setViewingEntry] = useState<{ list: 'roof' | 'makeSafe'; photoId: string } | null>(null)
   const [roofFieldsOpen, setRoofFieldsOpen] = useState(false)
   // Review list: after the AI writes the report, only the fields worth a look show first
   // (lib/reports/roof-review.ts). The list is fixed when it's shown, so a field doesn't
@@ -732,10 +792,10 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     barEnabled, makeSafeEnabled, roofEnabled,
     scopeRooms: scopeRooms.map(r => ({ ...r, items: r.items.map(i => i.text) })),
     insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen,
-    roofReportFields, roofFieldsOpen, overviewMarks, roofUncertain, roofView, reviewKeys,
+    roofReportFields, roofFieldsOpen, overviewMarks, photoMarks, roofUncertain, roofView, reviewKeys,
     makeSafeFields, makeSafeFieldsOpen,
     makeSafePhotoIds: makeSafePhotos.map(p => p.photoId).filter(Boolean),
-  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, roofUncertain, roofView, reviewKeys, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
+  }), [dictationNotes, barEnabled, makeSafeEnabled, roofEnabled, scopeRooms, insuranceTemplate, insuranceFields, insuranceFieldsOpen, autofillScript, autofillScriptOpen, roofReportFields, roofFieldsOpen, overviewMarks, photoMarks, roofUncertain, roofView, reviewKeys, makeSafeFields, makeSafeFieldsOpen, makeSafePhotos])
 
   const armDraft = useCallback(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -777,6 +837,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     if (d.roofView === 'review' || d.roofView === 'all') setRoofView(d.roofView)
     if (Array.isArray(d.reviewKeys)) setReviewKeys((d.reviewKeys as unknown[]).filter((k): k is string => typeof k === 'string'))
     if (d.overviewMarks || d.overviewPins) setOverviewMarks(cleanMarks(d.overviewMarks ?? d.overviewPins))
+    if (d.photoMarks) setPhotoMarks(cleanPhotoMarks(d.photoMarks))
     if (d.makeSafeFields) setMakeSafeFields(prev => ({ ...prev, ...(d.makeSafeFields as MakeSafeData) }))
     if (d.makeSafeFieldsOpen !== undefined) setMakeSafeFieldsOpen(d.makeSafeFieldsOpen as boolean)
     if (d.makeSafePhotoIds) makeSafePhotoIdsRef.current = new Set(d.makeSafePhotoIds as string[])
@@ -1100,6 +1161,17 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     setBarExporting(false)
   }
 
+  // A photo's markup changed (an empty list takes it out)
+  const setMarksFor = (key: string, marks: OverviewMark[]) => {
+    setPhotoMarks(prev => {
+      const next = { ...prev }
+      if (marks.length) next[key] = marks
+      else delete next[key]
+      return next
+    })
+    armDraft()
+  }
+
   const handleExportRoof = () => {
     setRoofPreviewOpen(true)
   }
@@ -1118,8 +1190,29 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
             number={roofPhotos.length + i + 1}
             letters={problemLetters}
             names={problemKey}
+            marks={photoMarks[photo.id] ?? []}
+            onMarks={marks => setMarksFor(photo.id, marks)}
             onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
             onClose={() => setViewingPhotoId(null)}
+          />
+        )
+      })()}
+      {(() => {
+        if (!viewingEntry) return null
+        const list = viewingEntry.list === 'roof' ? roofPhotos : makeSafePhotos
+        const i = list.findIndex(p => p.photoId === viewingEntry.photoId)
+        if (i < 0 || !list[i].previewUrl) return null
+        const key = viewingEntry.photoId
+        return (
+          <PhotoViewer
+            url={list[i].previewUrl}
+            title={`Photo ${i + 1}`}
+            marks={photoMarks[key] ?? []}
+            // A make safe report has no problem letters: White marks only
+            letters={viewingEntry.list === 'roof' ? problemLetters : []}
+            startLetter={null}
+            onMarks={marks => setMarksFor(key, marks)}
+            onClose={() => setViewingEntry(null)}
           />
         )
       })()}
@@ -1487,6 +1580,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <MidcityPhotoCard
                         key={photo.id}
                         photo={photo}
+                        marked={!!photo.photoId && !!photoMarks[photo.photoId]}
+                        onView={photo.photoId ? () => setViewingEntry({ list: 'makeSafe', photoId: photo.photoId! }) : undefined}
                         onDelete={() => removeMakeSafePhoto(photo.id)}
                         onLabelChange={(label) => {
                           setMakeSafePhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
@@ -1924,7 +2019,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   <div className="mc-section-head">Roof Overview Markup · Page One</div>
                   <div style={{ padding: '12px 16px 4px' }}>
                     {overviewPhoto
-                      ? <OverviewPinTool url={overviewPhoto.url} marks={overviewMarks} letters={pinLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
+                      ? <MarkupTool url={overviewPhoto.url} alt="Roof overview" marks={overviewMarks} letters={pinLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
                       : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin and mark up the problems on it here.</p>}
                   </div>
 
@@ -1946,6 +2041,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                       <MidcityPhotoCard
                         key={photo.id}
                         photo={photo}
+                        marked={!!photo.photoId && !!photoMarks[photo.photoId]}
+                        onView={photo.photoId ? () => setViewingEntry({ list: 'roof', photoId: photo.photoId! }) : undefined}
                         onDelete={() => removeRoofPhoto(photo.id)}
                         onLabelChange={(label) => {
                           setRoofPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, label } : p))
@@ -1964,6 +2061,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                         photo={photo}
                         number={roofPhotos.length + i + 1}
                         letters={problemLetters}
+                        marked={!!photoMarks[photo.id]}
                         onTag={tag => setRoofPhotoLabel(photo, composeRoofLabel(tag, parseRoofLabel(photo.label).note))}
                         onNote={note => setRoofPhotoLabel(photo, composeRoofLabel(parseRoofLabel(photo.label).tag, note), photo.labelSource === 'inspector')}
                         onDelete={() => { if (window.confirm(`Delete photo ${roofPhotos.length + i + 1}?`)) fieldPhotos.remove(photo.id) }}
@@ -2009,8 +2107,8 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       <RoofReportPreview
         fields={roofReportFields}
         photos={[
-          ...roofPhotos,
-          ...newRoofPhotos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label })),
+          ...roofPhotos.map(p => ({ ...p, marks: p.photoId ? photoMarks[p.photoId] : undefined })),
+          ...newRoofPhotos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label, marks: photoMarks[p.id] })),
         ]}
         overview={overviewPhoto ? { url: overviewPhoto.url, marks: overviewMarks } : null}
         jobInfo={{
@@ -2027,7 +2125,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     {makeSafePreviewOpen && (
       <MakeSafeReportPreview
         fields={makeSafeFields}
-        photos={makeSafePhotos}
+        photos={makeSafePhotos.map(p => ({ ...p, marks: p.photoId ? photoMarks[p.photoId] : undefined }))}
         jobInfo={{
           address: initialData.address,
           insuredName: initialData.insuredName,

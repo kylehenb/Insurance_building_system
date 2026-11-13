@@ -27,3 +27,5 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - Roof photos: IRC uploader, one-tap tags (letters, fixed types, none), AI sorting
 - Page one: roof overview with pins, problems, short cause, maintenance
 - Overview markup: several pins per letter, area circles, arrows, text labels, move, undo, delete
+- Area outlines (tap each corner, e.g. round the building) beside the circles, with the problem letter inside both
+- Markup on any report photo: open it full screen, then Mark up (same tools; starts in the photo's own letter). Make safe photos too, in White

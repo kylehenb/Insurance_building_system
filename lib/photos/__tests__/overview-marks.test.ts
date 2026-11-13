@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { cleanMarks, markColour, moveMark } from '../overview-marks'
+import { cleanMarks, cleanPhotoMarks, markAnchor, markColour, moveMark, shapeCentre, MAX_SHAPE_POINTS } from '../overview-marks'
 
-// Roof overview markup: pins, areas, arrows and labels, kept as fractions of the image.
+// Photo markup (the roof overview and any report photo): pins, circles, outlines, arrows and labels, kept as fractions of the image.
 
 describe('cleanMarks', () => {
   it('keeps well-formed marks of each kind, inside the image', () => {
@@ -48,5 +48,43 @@ describe('moveMark / markColour', () => {
   it('colours a mark by its problem letter, white without one', () => {
     expect(markColour('A')).toBe('#1f5fa8')
     expect(markColour(null)).toBe('#ffffff')
+  })
+})
+
+describe('outlines', () => {
+  const square = [{ x: 0.2, y: 0.2 }, { x: 0.6, y: 0.2 }, { x: 0.6, y: 0.6 }, { x: 0.2, y: 0.6 }]
+
+  it('keeps an outline of 3 or more corners, inside the image, and drops one with fewer', () => {
+    expect(cleanMarks([{ id: 's', kind: 'shape', letter: 'A', points: [{ x: -1, y: 0.5 }, { x: 0.5, y: 2 }, { x: 0.5, y: 0.5 }, { x: 'x', y: 0 }] }]))
+      .toEqual([{ id: 's', kind: 'shape', letter: 'A', points: [{ x: 0, y: 0.5 }, { x: 0.5, y: 1 }, { x: 0.5, y: 0.5 }] }])
+    expect(cleanMarks([{ kind: 'shape', letter: 'A', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }, { kind: 'shape', letter: null }])).toEqual([])
+    const many = Array.from({ length: 60 }, (_, i) => ({ x: i / 60, y: (i % 2) / 2 }))
+    expect((cleanMarks([{ kind: 'shape', letter: null, points: many }])[0] as { points: unknown[] }).points).toHaveLength(MAX_SHAPE_POINTS)
+  })
+
+  it('puts the letter and the grab spot in the middle of the outline', () => {
+    expect(shapeCentre(square)).toEqual({ x: expect.closeTo(0.4), y: expect.closeTo(0.4) })
+    // An L shape's middle sits towards its bigger part
+    const l = shapeCentre([{ x: 0, y: 0 }, { x: 0.6, y: 0 }, { x: 0.6, y: 0.2 }, { x: 0.2, y: 0.2 }, { x: 0.2, y: 0.6 }, { x: 0, y: 0.6 }])
+    expect(l.x).toBeLessThan(0.3)
+    expect(markAnchor({ id: 's', kind: 'shape', letter: 'A', points: square })).toEqual({ x: expect.closeTo(0.4), y: expect.closeTo(0.4) })
+    expect(markAnchor({ id: 'a', kind: 'arrow', letter: null, x1: 0, y1: 0, x2: 0.4, y2: 0.2 })).toEqual({ x: 0.2, y: 0.1 })
+  })
+
+  it('moves an outline whole, stopping at the edge instead of squashing it', () => {
+    const moved = moveMark({ id: 's', kind: 'shape', letter: 'A', points: square }, 0.7, -0.1)
+    expect(moved).toMatchObject({ points: [{ x: 0.6, y: 0.1 }, { x: 1, y: 0.1 }, { x: 1, y: 0.5 }, { x: 0.6, y: 0.5 }].map(p => ({ x: expect.closeTo(p.x), y: expect.closeTo(p.y) })) })
+  })
+})
+
+describe('cleanPhotoMarks', () => {
+  it("keeps each photo's well-formed marks and leaves out photos with none", () => {
+    expect(cleanPhotoMarks({
+      p1: [{ id: 'a', kind: 'area', letter: 'B', x: 0.5, y: 0.5, rx: 0.1, ry: 0.1 }],
+      p2: [{ kind: 'pin', letter: null, x: 0, y: 0 }],
+      p3: 'nope',
+    })).toEqual({ p1: [{ id: 'a', kind: 'area', letter: 'B', x: 0.5, y: 0.5, rx: 0.1, ry: 0.1 }] })
+    expect(cleanPhotoMarks(null)).toEqual({})
+    expect(cleanPhotoMarks([1, 2])).toEqual({})
   })
 })

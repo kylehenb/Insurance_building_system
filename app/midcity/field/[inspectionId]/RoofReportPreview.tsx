@@ -3,6 +3,7 @@
 import { Fragment, useEffect } from 'react'
 import { splitDotPoints } from '@/lib/reports/dot-points'
 import { RoofReportPageOne } from './RoofReportPageOne'
+import { PhotoWithMarkup } from './OverviewMarkup'
 import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '@/lib/photos/roof-tags'
 import type { OverviewMark } from '@/lib/photos/overview-marks'
 
@@ -34,7 +35,7 @@ type Fields = {
   makeSafeCompleted: string; makeSafeCompletedDetails: string; makeSafeRequired: string
 }
 
-type Photo = { id: string; previewUrl: string; label: string; cropX?: number; cropY?: number; cropScale?: number }
+type Photo = { id: string; previewUrl: string; label: string; cropX?: number; cropY?: number; cropScale?: number; marks?: OverviewMark[] }
 
 type JobInfo = {
   address: string | null
@@ -488,16 +489,8 @@ export function RoofReportPreview({
                         )}
                         <div style={{ breakInside: 'avoid' as const }}>
                           <div style={{ position: 'relative', height: 260, overflow: 'hidden', background: '#f2f2f7', borderRadius: 8, border: colour ? `2px solid ${colour}` : `1px solid ${LINE}` }}>
-                            <img
-                              src={photo.previewUrl}
-                              alt={photo.label || `Photo ${idx + 1}`}
-                              style={{
-                                position: 'absolute', width: '100%', height: '100%',
-                                objectFit: 'contain' as const,
-                                transformOrigin: 'center center',
-                                transform: `translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`,
-                              }}
-                            />
+                            <PhotoWithMarkup url={photo.previewUrl} alt={photo.label || `Photo ${idx + 1}`} marks={photo.marks}
+                              transform={`translate(${photo.cropX ?? 0}%, ${photo.cropY ?? 0}%) scale(${photo.cropScale ?? 1})`} />
                             {/* Number and label in a pill on the photo; a problem's pill is in its colour */}
                             <div style={{ ...PHOTO_PILL, ...(colour ? { background: colour } : {}) }}>
                               <span style={{ ...PHOTO_CHIP, ...(colour ? { background: 'white', color: colour } : {}) }}>{idx + 1}</span>
