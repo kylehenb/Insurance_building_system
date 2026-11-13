@@ -220,6 +220,10 @@
 .rp-note:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
 .rp-add{width:100%;min-height:96px;aspect-ratio:auto}
 
+/* Page one behind the cause of damage */
+.mc-pageone-note{display:flex;flex-direction:column;gap:10px;margin:8px 0 12px;padding:12px 14px;border-radius:var(--radius-sm);background:#fff6e5;border:1px solid #f0c36d;font-size:15px;line-height:1.4;color:var(--text)}
+.mc-pageone-note .fa-ai-label-btn{margin:0}
+
 /* A roof photo full screen */
 .rp-viewer{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column}
 .rp-viewer-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;color:white;font-size:17px;font-weight:600}

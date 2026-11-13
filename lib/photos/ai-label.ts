@@ -269,7 +269,7 @@ function asRoofLabel(o: Record<string, unknown>, issues: { letter: string }[]): 
   const seen = str(o.seen, 300)
   const letter = str(o.issue, 3).replace(/[()]/g, '').toUpperCase()
   let label = ''
-  if (tag === 'issue' && (ISSUE_LETTERS as readonly string[]).includes(letter) && issues.some(i => i.letter === letter)) {
+  if (tag === 'issue' && ISSUE_LETTERS.includes(letter) && issues.some(i => i.letter === letter)) {
     label = composeRoofLabel({ kind: 'issue', letter })
   } else if (ROOF_TAGS.some(t => t.key === tag)) {
     label = composeRoofLabel({ kind: 'type', key: tag as RoofTagKey })

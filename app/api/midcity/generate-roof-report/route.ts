@@ -4,6 +4,7 @@ import { trackAi } from '@/lib/health/ai-usage'
 import { sessionUser, unauthorized } from '@/lib/auth/session'
 import { toDotPoints } from '@/lib/reports/dot-points'
 import { cleanUncertain } from '@/lib/reports/roof-review'
+import { PAGE_ONE_FORMAT } from '@/lib/reports/page-one'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic'
 const CAUSE_FORMAT = `CAUSE OF DAMAGE FORMAT (specificCause) — this is the most important field. The builder's assessor copies it straight into their own report, so it must be short and scannable:
 - Line 1: one short lead sentence stating the conclusion. Examples: "Stormwater entry through a failed box gutter joint above the living room." / "Multiple causes of stormwater entry were identified:" / "In my opinion, the ceiling damage has not been caused by issues relating to the roof cover."
 - Then dot points, each on its own line starting with "• ". One fact per point: an entry point, a defect, or the evidence for it (staining, water tracking, the hose test result). One sentence per point, ideally under 25 words.
-- Give each separate problem (a defect or water entry point at one location) a letter in brackets at the start of its point: (A), (B), (C)… in the order written. A point that adds evidence for the same problem starts with that problem's letter again. A point that isn't about one problem (e.g. "No other breaches were found") has no letter. When the damage isn't caused by the roof, there are no problems and no letters. The letters match the photos of each problem, so keep to one letter per location.
+- Give each separate problem (a defect or water entry point) a letter in brackets at the start of its point: (A), (B), (C), (D), (E)… in the order written. There is no limit: if the notes describe 6 separate defects, use (A) to (F). Two different defects are two letters, even in the same area of the roof (e.g. broken tiles and a failed valley on the rear roof are (A) and (B)). A point that adds evidence for the same problem (staining under it, the hose test result) starts with that problem's letter again. A point that isn't about one problem (e.g. "No other breaches were found") has no letter. When the damage isn't caused by the roof, there are no problems and no letters. Each letter matches that problem's photos.
 - Never a single long paragraph. No "(1)", "1." or dashes — only "• ".
 - Keep to the inspector's facts and their order. Don't add causes or evidence that aren't in the notes, and don't pad with general statements.
 - Leave out the client's statement and maintenance items here — they have their own fields.
@@ -26,9 +27,7 @@ Stormwater entry through the roof cover at the enclosed patio from 3 defects:
 • (C) Approximately 17 broken roof tiles allow stormwater entry.
 • No other breaches were found in the roof cover.
 
-PAGE ONE SUMMARY (causeSummary, problemSummaries) — the report's first page shows the roof from above with the problem letters pinned on it. Write both from the cause of damage, using the same letters:
-- causeSummary: the short version of the cause of damage, one or two sentences (under 45 words), with each problem's letter in brackets where it's mentioned. The assessor may paste it straight into their report. Example: "Stormwater entry through the roof cover at the enclosed patio from 3 defects: (A) roof tiles stop short of the gutter; (B) the gutter falls the wrong way and overflows; (C) 17 broken tiles over the rear roof."
-- problemSummaries: one line per problem letter, in letter order: "(A) <where, 2–4 words> - <the problem, under 10 words>". Example: "(A) Enclosed patio - Roof tiles stop short of the gutter". Empty when there are no problems.`
+${PAGE_ONE_FORMAT}`
 
 export async function POST(req: NextRequest) {
   const me = await sessionUser()

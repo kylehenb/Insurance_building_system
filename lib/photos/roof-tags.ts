@@ -20,21 +20,29 @@ export const ROOF_TAGS = [
 
 export type RoofTagKey = (typeof ROOF_TAGS)[number]['key']
 
-export const ISSUE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const
+/** Problem letters: as many as there are problems, A to Z */
+export const ISSUE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-/** Strong colours that read on white and carry white text, kept apart from each other */
-const ISSUE_COLOURS: Record<string, string> = {
-  A: '#1f5fa8', // blue
-  B: '#c62828', // red
-  C: '#2e7d32', // green
-  D: '#b8600b', // orange
-  E: '#6a3d9a', // purple
-  F: '#00838f', // teal
-  G: '#ad1457', // pink
-  H: '#5d4037', // brown
+/** Strong colours that read on white and carry white text, kept apart from each other; they repeat after L */
+const ISSUE_COLOURS = [
+  '#1f5fa8', // A blue
+  '#c62828', // B red
+  '#2e7d32', // C green
+  '#b8600b', // D orange
+  '#6a3d9a', // E purple
+  '#00838f', // F teal
+  '#ad1457', // G pink
+  '#5d4037', // H brown
+  '#283593', // I indigo
+  '#6b7a1f', // J olive
+  '#455a64', // K slate
+  '#8d6e00', // L mustard
+]
+
+export const issueColour = (letter: string): string => {
+  const i = ISSUE_LETTERS.indexOf(letter)
+  return i < 0 ? '#555555' : ISSUE_COLOURS[i % ISSUE_COLOURS.length]
 }
-
-export const issueColour = (letter: string): string => ISSUE_COLOURS[letter] ?? '#555555'
 
 export type RoofPhotoTag =
   | { kind: 'issue'; letter: string }
@@ -42,7 +50,7 @@ export type RoofPhotoTag =
   | { kind: 'none' }
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-const ISSUE_AT_START = /^\s*\(([A-H])\)\s*/
+const ISSUE_AT_START = /^\s*\(([A-Z])\)\s*/
 
 /** The tag and note in a roof photo label. */
 export function parseRoofLabel(label: string | null | undefined): { tag: RoofPhotoTag; note: string } {
@@ -84,8 +92,52 @@ export function issuePoints(cause: string | null | undefined): { letter: string;
 
 /** The letters to offer on the phone: the ones in use, one spare, and always at least A–C. */
 export function issueLettersToOffer(used: string[]): string[] {
-  const highest = Math.max(2, ...used.map(l => ISSUE_LETTERS.indexOf(l as (typeof ISSUE_LETTERS)[number])).filter(i => i >= 0).map(i => i + 1))
+  const highest = Math.max(2, ...used.map(l => ISSUE_LETTERS.indexOf(l)).filter(i => i >= 0).map(i => i + 1))
   return ISSUE_LETTERS.slice(0, Math.min(ISSUE_LETTERS.length, highest + 1))
+}
+
+/** Every problem letter in "(A)" form anywhere in some text */
+export const lettersIn = (text: string | null | undefined): string[] =>
+  [...new Set([...(text ?? '').matchAll(/\(([A-Z])\)/g)].map(m => m[1]))].sort()
+
+/**
+ * The one list of problem letters, offered everywhere (photo tags, the overview,
+ * a photo's markup): every letter in use anywhere in the report, plus one spare.
+ * So a problem added to the cause of damage, or a letter tapped on a photo, shows
+ * up everywhere straight away.
+ */
+export function reportLetters({ cause, causeSummary, problemLines, photoLabels = [], marked = [] }: {
+  cause?: string | null
+  causeSummary?: string | null
+  problemLines?: string | null
+  photoLabels?: (string | null | undefined)[]
+  /** Letters used in markup */
+  marked?: (string | null)[]
+}): string[] {
+  return issueLettersToOffer([
+    ...issuePoints(cause).map(i => i.letter),
+    ...lettersIn(causeSummary),
+    ...problemSummaries(problemLines, '').map(p => p.letter),
+    ...photoLabels.map(l => parseRoofLabel(l).tag).flatMap(t => (t.kind === 'issue' ? [t.letter] : [])),
+    ...marked.filter((l): l is string => !!l),
+  ])
+}
+
+/**
+ * Where page one has fallen out of step with the cause of damage (after the cause
+ * was edited): problems in the cause that page one's short cause or problem lines
+ * don't mention, and letters on page one that are no longer in the cause.
+ * Nothing when page one hasn't been written.
+ */
+export function pageOneOutOfStep(cause: string | null | undefined, causeSummary: string | null | undefined, problemLines: string | null | undefined): { missing: string[]; gone: string[] } {
+  const inCause = issuePoints(cause).map(i => i.letter)
+  const summary = lettersIn(causeSummary)
+  const lines = problemSummaries(problemLines, '').map(p => p.letter)
+  const missing = new Set<string>()
+  if (causeSummary?.trim()) for (const l of inCause) if (!summary.includes(l)) missing.add(l)
+  if (problemLines?.trim()) for (const l of inCause) if (!lines.includes(l)) missing.add(l)
+  const gone = [...new Set([...summary, ...lines])].filter(l => inCause.length && !inCause.includes(l))
+  return { missing: [...missing].sort(), gone: gone.sort() }
 }
 
 /**
@@ -97,7 +149,7 @@ export function orderRoofPhotos<T extends { label: string | null }>(photos: T[])
     const { tag } = parseRoofLabel(p.label)
     if (tag.kind === 'type' && tag.key === 'view_of_property') return 0
     if (tag.kind === 'type' && tag.key === 'roof_overview') return 1
-    if (tag.kind === 'issue') return 2 + ISSUE_LETTERS.indexOf(tag.letter as (typeof ISSUE_LETTERS)[number])
+    if (tag.kind === 'issue') return 2 + ISSUE_LETTERS.indexOf(tag.letter)
     return 100
   }
   return photos.map((p, i) => ({ p, i, r: rank(p) })).sort((a, b) => a.r - b.r || a.i - b.i).map(x => x.p)
@@ -107,7 +159,7 @@ export function orderRoofPhotos<T extends { label: string | null }>(photos: T[])
 export function splitIssueLetters(text: string): Array<{ letter: string | null; text: string }> {
   const out: Array<{ letter: string | null; text: string }> = []
   let last = 0
-  for (const m of text.matchAll(/\(([A-H])\)/g)) {
+  for (const m of text.matchAll(/\(([A-Z])\)/g)) {
     if (m.index! > last) out.push({ letter: null, text: text.slice(last, m.index) })
     out.push({ letter: m[1], text: m[0] })
     last = m.index! + m[0].length
@@ -120,8 +172,8 @@ export function splitIssueLetters(text: string): Array<{ letter: string | null; 
 
 /**
  * Page one's problem list: "(A) Enclosed patio - Roof tiles stop short of the gutter", one per
- * line (the AI writes it, the inspector can edit it). Without one, the first point of each problem
- * in the cause of damage is used.
+ * line (the AI writes it, the inspector can edit it). A problem in the cause of damage without
+ * a line of its own (none written yet, or added to the cause since) shows its first point there.
  */
 export function problemSummaries(summaryText: string | null | undefined, cause: string | null | undefined): { letter: string; location: string; text: string }[] {
   const out = new Map<string, { letter: string; location: string; text: string }>()
@@ -133,7 +185,7 @@ export function problemSummaries(summaryText: string | null | undefined, cause: 
     const parts = rest.match(/^(.+?)\s+[-–—]\s+(.+)$/)
     out.set(m[1], parts ? { letter: m[1], location: parts[1].trim(), text: parts[2].trim() } : { letter: m[1], location: '', text: rest })
   }
-  if (!out.size) for (const p of issuePoints(cause)) out.set(p.letter, { letter: p.letter, location: '', text: p.text })
+  for (const p of issuePoints(cause)) if (!out.has(p.letter)) out.set(p.letter, { letter: p.letter, location: '', text: p.text })
   return [...out.values()].sort((a, b) => a.letter.localeCompare(b.letter))
 }
 

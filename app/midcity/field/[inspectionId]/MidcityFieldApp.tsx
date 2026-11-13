@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RoofReportPreview } from './RoofReportPreview'
 import { MakeSafeReportPreview } from './MakeSafeReportPreview'
 import { FIELD_APP_BAR_REPORTS } from '@/lib/jobs/field-app'
-import { ROOF_TAGS, composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, parseRoofLabel, problemNames, problemSummaries, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
+import { ROOF_TAGS, composeRoofLabel, issueColour, issuePoints, pageOneOutOfStep, parseRoofLabel, problemNames, reportLetters, sameTag, type RoofPhotoTag } from '@/lib/photos/roof-tags'
 import { cleanMarks, cleanPhotoMarks, type OverviewMark } from '@/lib/photos/overview-marks'
 import { MarkupTool } from './MarkupTool'
 import { PhotoWithMarkup } from './OverviewMarkup'
@@ -493,6 +493,25 @@ export function RoofPhotoCard({ photo, number, letters, marked, onTag, onNote, o
   )
 }
 
+// Page one has fallen behind the cause of damage (a problem added or taken out
+// after the report was written): says what, with one tap to bring just page one
+// up to date. Shown under page one's fields and above the overview markup.
+function PageOneNotice({ missing, gone, busy, onUpdate }: { missing: string[]; gone: string[]; busy: boolean; onUpdate: () => void }) {
+  const list = (ls: string[]) => ls.map(l => `(${l})`).join(', ')
+  return (
+    <div className="mc-pageone-note" role="status">
+      <span>
+        {missing.length > 0 && <>Page one doesn&apos;t mention {list(missing)} from the cause of damage. </>}
+        {gone.length > 0 && <>Page one still mentions {list(gone)}, which is no longer in the cause of damage. </>}
+        Only page one&apos;s short cause and problem lines are rewritten; the rest of the report stays as it is.
+      </span>
+      <button type="button" className="fa-ai-label-btn" onClick={onUpdate} disabled={busy}>
+        {busy ? <><span className="fa-spinner" /> Updating…</> : '✦ Update Page One'}
+      </button>
+    </div>
+  )
+}
+
 // A report photo full screen, with its markup; "Mark up" opens the markup tool
 // on it (the same tools as the roof overview, lib/photos/overview-marks.ts).
 // Whatever's below it (a roof photo's one-tap letters) shows while not marking up.
@@ -716,11 +735,20 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   const [reviewKeys, setReviewKeys] = useState<string[]>([])
   const [roofReportGenerating, setRoofReportGenerating] = useState(false)
 
-  // Problem letters to offer on each photo: those in the cause of damage or already on a photo, plus a spare
-  const problemLetters = issueLettersToOffer([
-    ...issuePoints(roofReportFields.specificCause).map(i => i.letter),
-    ...fieldPhotos.photos.map(p => parseRoofLabel(p.label).tag).flatMap(t => (t.kind === 'issue' ? [t.letter] : [])),
-  ])
+  // The problem letters, offered everywhere (photo tags, the overview, a photo's markup): every
+  // letter in use anywhere (cause of damage, page one, photos, markup) plus a spare, so a problem
+  // added in one place can be used in all of them straight away (lib/photos/roof-tags.ts)
+  const problemLetters = reportLetters({
+    cause: roofReportFields.specificCause,
+    causeSummary: roofReportFields.causeSummary,
+    problemLines: roofReportFields.problemSummaries,
+    photoLabels: [...fieldPhotos.photos.map(p => p.label), ...roofPhotos.map(p => p.label)],
+    marked: [...overviewMarks, ...Object.values(photoMarks).flat()].map(m => m.letter),
+  })
+  // Page one's short cause and problem lines, when the cause of damage has moved on since they were written
+  const pageOneStep = pageOneOutOfStep(roofReportFields.specificCause, roofReportFields.causeSummary, roofReportFields.problemSummaries)
+  const pageOneBehind = pageOneStep.missing.length > 0 || pageOneStep.gone.length > 0
+  const [pageOneUpdating, setPageOneUpdating] = useState(false)
 
   // What each problem is ("(A) Rear roof"), so the letters make sense while tagging photos
   const problemKey = problemNames(roofReportFields.problemSummaries, roofReportFields.specificCause)
@@ -731,10 +759,6 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
     const tagged = [...fieldPhotos.photos.map(p => ({ label: p.label, url: p.previewUrl })), ...roofPhotos.map(p => ({ label: p.label, url: p.previewUrl }))]
       .find(p => { const t = parseRoofLabel(p.label).tag; return t.kind === 'type' && t.key === 'roof_overview' && !!p.url })
     return tagged ? { url: tagged.url! } : null
-  })()
-  const pinLetters = (() => {
-    const fromReport = problemSummaries(roofReportFields.problemSummaries, roofReportFields.specificCause).map(p => p.letter)
-    return fromReport.length ? fromReport : issueLettersToOffer([])
   })()
 
   // Review list (lib/reports/roof-review.ts): live markers, and the fields shown in "To review"
@@ -1170,6 +1194,26 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       return next
     })
     armDraft()
+  }
+
+  // Page one brought back in step with an edited cause of damage: only its two fields are
+  // rewritten (anything still right stays word for word), never the rest of the report
+  const updatePageOne = async () => {
+    setPageOneUpdating(true)
+    try {
+      const res = await fetch('/api/midcity/update-page-one', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specificCause: roofReportFields.specificCause, causeSummary: roofReportFields.causeSummary, problemSummaries: roofReportFields.problemSummaries }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setRoofReportFields(prev => ({ ...prev, causeSummary: data.causeSummary, problemSummaries: data.problemSummaries }))
+        armDraft()
+      } else alert('Could not update page one. Please try again.')
+    } catch {
+      alert('Could not update page one. Check your connection.')
+    }
+    setPageOneUpdating(false)
   }
 
   const handleExportRoof = () => {
@@ -1856,6 +1900,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                           <label className="fa-fl">Page One · Problems (one per line)</label>
                           <textarea className="fa-ta" style={{ minHeight: 70 }} placeholder="(A) Enclosed patio - Roof tiles stop short of the gutter" value={roofReportFields.problemSummaries} onChange={e => setRoofField('problemSummaries', e.target.value)} />
                         </div>
+                        {pageOneBehind && (
+                          <PageOneNotice missing={pageOneStep.missing} gone={pageOneStep.gone} busy={pageOneUpdating} onUpdate={updatePageOne} />
+                        )}
 
                         {/* ── Client Discussion ── */}
                         <div className="mc-rrf-sub">Client Discussion</div>
@@ -2018,8 +2065,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
                   {/* Page one: pin the problems on the roof overview */}
                   <div className="mc-section-head">Roof Overview Markup · Page One</div>
                   <div style={{ padding: '12px 16px 4px' }}>
+                    {pageOneBehind && (
+                      <PageOneNotice missing={pageOneStep.missing} gone={pageOneStep.gone} busy={pageOneUpdating} onUpdate={updatePageOne} />
+                    )}
                     {overviewPhoto
-                      ? <MarkupTool url={overviewPhoto.url} alt="Roof overview" marks={overviewMarks} letters={pinLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
+                      ? <MarkupTool url={overviewPhoto.url} alt="Roof overview" marks={overviewMarks} letters={problemLetters} onChange={marks => { setOverviewMarks(marks); armDraft() }} />
                       : <p className="fa-ai-status" style={{ margin: 0 }}>Add your roof screenshot below and tag it Overview, then pin and mark up the problems on it here.</p>}
                   </div>
 

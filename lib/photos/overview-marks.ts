@@ -30,7 +30,7 @@ const unit = (n: unknown): number | null => {
   const v = Number(n)
   return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null
 }
-const letterOf = (v: unknown): string | null => (typeof v === 'string' && (ISSUE_LETTERS as readonly string[]).includes(v) ? v : null)
+const letterOf = (v: unknown): string | null => (typeof v === 'string' && ISSUE_LETTERS.includes(v) ? v : null)
 
 /**
  * Marks from a saved draft: well-formed ones only, positions kept inside the image.

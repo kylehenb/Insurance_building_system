@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '../roof-tags'
+import { composeRoofLabel, issueColour, issueLettersToOffer, issuePoints, orderRoofPhotos, pageOneOutOfStep, parseRoofLabel, reportLetters, splitIssueLetters } from '../roof-tags'
 
 // Roof photo labels are a tag (problem letter, fixed type or nothing) and a note.
 
@@ -41,7 +41,38 @@ describe('issuePoints / issueLettersToOffer', () => {
     expect(issueLettersToOffer([])).toEqual(['A', 'B', 'C'])
     expect(issueLettersToOffer(['A', 'B'])).toEqual(['A', 'B', 'C'])
     expect(issueLettersToOffer(['A', 'C'])).toEqual(['A', 'B', 'C', 'D'])
-    expect(issueLettersToOffer(['H'])).toHaveLength(8)
+    expect(issueLettersToOffer(['H'])).toHaveLength(9)
+  })
+
+  it('keeps going past H: as many problems as the report has, up to Z', () => {
+    const cause = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].map(l => `• (${l}) Defect ${l}.`).join('\n')
+    expect(issuePoints(cause).map(i => i.letter)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'])
+    expect(issueLettersToOffer(['J'])).toHaveLength(11)
+    expect(issueLettersToOffer(['Z'])).toHaveLength(26)
+    expect(parseRoofLabel('(K) cracked valley')).toEqual({ tag: { kind: 'issue', letter: 'K' }, note: 'cracked valley' })
+  })
+})
+
+describe('reportLetters', () => {
+  it('offers every letter in use anywhere in the report, plus a spare', () => {
+    // (D) added to the cause after page one was written with A–C
+    expect(reportLetters({ cause: '• (A) a\n• (B) b\n• (C) c\n• (D) d', causeSummary: '(A) a; (B) b; (C) c', problemLines: '(A) x - a\n(B) y - b\n(C) z - c' }))
+      .toEqual(['A', 'B', 'C', 'D', 'E'])
+    expect(reportLetters({ photoLabels: ['(E) loose screw', 'Gutter Profile', null] })).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
+    expect(reportLetters({ marked: [null, 'D'] })).toEqual(['A', 'B', 'C', 'D', 'E'])
+    expect(reportLetters({})).toEqual(['A', 'B', 'C'])
+  })
+})
+
+describe('pageOneOutOfStep', () => {
+  const cause = '• (A) Tiles short.\n• (B) Gutter falls.\n• (C) Broken tiles.'
+  it('is in step when page one mentions exactly the cause of damage\'s letters, or isn\'t written yet', () => {
+    expect(pageOneOutOfStep(cause, 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: [] })
+    expect(pageOneOutOfStep(cause, '', '')).toEqual({ missing: [], gone: [] })
+  })
+  it('says which problems were added to or taken out of the cause since page one was written', () => {
+    expect(pageOneOutOfStep(cause + '\n• (D) Valley.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: ['D'], gone: [] })
+    expect(pageOneOutOfStep('• (A) Tiles short.\n• (C) Broken tiles.', 'From 3 defects: (A) x; (B) y; (C) z.', '(A) a - x\n(B) b - y\n(C) c - z')).toEqual({ missing: [], gone: ['B'] })
   })
 })
 
@@ -56,7 +87,9 @@ describe('orderRoofPhotos', () => {
 
 describe('colours', () => {
   it('gives each letter its own colour, and splits text around the letters', () => {
-    expect(new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(issueColour)).size).toBe(8)
+    expect(new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(issueColour)).size).toBe(12)
+    expect(issueColour('M')).toBe(issueColour('A'))
+    expect(issueColour('?')).toBe('#555555')
     expect(splitIssueLetters('See (A) and (B).')).toEqual([
       { letter: null, text: 'See ' }, { letter: 'A', text: '(A)' }, { letter: null, text: ' and ' }, { letter: 'B', text: '(B)' }, { letter: null, text: '.' },
     ])
@@ -71,6 +104,14 @@ describe('page one helpers', () => {
       { letter: 'B', location: 'Rear gutter', text: 'Falls the wrong way' },
     ])
     expect(problemSummaries('', '• (A) 17 broken tiles.')).toEqual([{ letter: 'A', location: '', text: '17 broken tiles.' }])
+  })
+
+  it('adds a problem from the cause of damage that page one has no line for yet', async () => {
+    const { problemSummaries } = await import('../roof-tags')
+    expect(problemSummaries('(A) Enclosed patio - Tiles short of gutter', '• (A) Tiles short.\n• (D) Failed valley iron on the rear roof.')).toEqual([
+      { letter: 'A', location: 'Enclosed patio', text: 'Tiles short of gutter' },
+      { letter: 'D', location: '', text: 'Failed valley iron on the rear roof.' },
+    ])
   })
 
   it('treats only clearly wide screenshots as wide', async () => {

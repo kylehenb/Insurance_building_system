@@ -29,3 +29,5 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - Overview markup: several pins per letter, area circles, arrows, text labels, move, undo, delete
 - Area outlines (tap each corner, e.g. round the building) beside the circles, with the problem letter inside both
 - Markup on any report photo: open it full screen, then Mark up (same tools; starts in the photo's own letter). Make safe photos too, in White
+- Problem letters past (C): the AI gives each separate defect its own letter with no limit, and letters run A–Z (colours repeat after L)
+- One letter list everywhere: a letter in the cause, page one, a photo tag or markup is offered on the photos and the overview at once, plus a spare. Page one lists a problem added to the cause straight away (its first point), and when page one falls behind the cause a note offers Update Page One, which rewrites only the short cause and problem lines
