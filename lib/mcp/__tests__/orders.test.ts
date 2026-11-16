@@ -37,7 +37,11 @@ vi.mock('@/lib/gmail/messages', () => ({
 }))
 vi.mock('@/lib/email/order-parser', () => ({ parseInsurerOrder: (...a: unknown[]) => parse(...a) }))
 vi.mock('@/lib/email/order-writer', () => ({ writeInsurerOrder: (...a: unknown[]) => write(...a) }))
-vi.mock('@/lib/insurer-orders/lodge', () => ({ LodgeError, lodgeInsurerOrder: (...a: unknown[]) => lodge(...a) }))
+vi.mock('@/lib/insurer-orders/lodge', () => ({
+  LodgeError,
+  lodgeInsurerOrder: (...a: unknown[]) => lodge(...a),
+  describeSameAddressJobs: (jobs: { jobNumber: string; claimNumber: string | null }[]) => jobs.map(j => `job ${j.jobNumber} (claim ${j.claimNumber ?? 'none'})`).join(', '),
+}))
 vi.mock('@/lib/supabase/server', () => ({ createServiceClient: () => ({ from: query }) }))
 // Permissions are tested in lib/permissions; here the user is allowed
 vi.mock('@/lib/permissions/http', () => ({ permissionDenied: async () => null, permissionGate: async () => null }))
@@ -144,12 +148,14 @@ describe('lodge_order', () => {
     })
   })
 
-  it('reports a link to the existing job, and the same-address warning', async () => {
+  it('reports a link to the existing job, and earlier jobs at the same address', async () => {
     lodge.mockResolvedValueOnce({ jobNumber: 'IRC1001', jobId: 'j1', linkedToExisting: true })
     expect((await lodgeOrder.run({ order_id: ORDER_ID }, ctx)).text).toBe('That claim already has job IRC1001, so the order was linked to it.')
-    lodge.mockRejectedValueOnce(new LodgeError('Address already exists in system', 409, { warning: true, matchingJobs: [{ jobNumber: 'IRC1050', claimNumber: 'CHCCLM1' }] }))
+    lodge.mockResolvedValueOnce({ jobNumber: 'IRC1080', jobId: 'j80', sameAddressJobs: [{ jobNumber: 'IRC1050', claimNumber: 'CHCCLM1' }] })
     const res = await lodgeOrder.run({ order_id: ORDER_ID }, ctx)
-    expect(res).toMatchObject({ isError: true, text: expect.stringContaining('job IRC1050 (claim CHCCLM1)') })
+    expect(res.isError).toBeUndefined()
+    expect(res.text).toBe('Lodged as job IRC1080. Same address as job IRC1050 (claim CHCCLM1); noted on the job.')
+    expect(res.data).toMatchObject({ same_address_jobs: [{ jobNumber: 'IRC1050', claimNumber: 'CHCCLM1' }] })
   })
   it('says whether the acknowledgement went to the order’s sender', async () => {
     lodge.mockResolvedValueOnce({ jobNumber: 'IRC1080', jobId: 'j80', acknowledgement: { sent: true, to: 'claims@castle.com.au' } })
@@ -164,14 +170,14 @@ describe('lodge_order', () => {
 describe('Lodge button route', () => {
   const post = (body: unknown) => lodgeRoute(new NextRequest('https://app.test/api/insurer-orders/lodge', { method: 'POST', body: JSON.stringify(body) }))
 
-  it('answers as before: the job, the address warning with its fields, and errors', async () => {
+  it('answers as before: the job, a lodge error with its fields, and errors', async () => {
     expect(await (await post({ orderId: ORDER_ID })).json()).toEqual({ jobNumber: 'IRC1080', jobId: 'j80' })
     expect(lodge).toHaveBeenCalledWith(expect.anything(), ORDER_ID, { tenantId: 't1', userId: null, skipAcknowledgement: false })
 
-    lodge.mockRejectedValueOnce(new LodgeError('Address already exists in system', 409, { warning: true, matchingJobs: [], message: 'Found 1…' }))
-    const warn = await post({ orderId: ORDER_ID })
-    expect(warn.status).toBe(409)
-    expect(await warn.json()).toEqual({ error: 'Address already exists in system', warning: true, matchingJobs: [], message: 'Found 1…' })
+    lodge.mockRejectedValueOnce(new LodgeError('Claim number is required', 400, { hint: 'Add it on the order' }))
+    const bad = await post({ orderId: ORDER_ID })
+    expect(bad.status).toBe(400)
+    expect(await bad.json()).toEqual({ error: 'Claim number is required', hint: 'Add it on the order' })
 
     expect((await post({})).status).toBe(400)
     vi.spyOn(console, 'error').mockImplementation(() => {})

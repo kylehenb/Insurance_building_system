@@ -140,4 +140,16 @@ describe('lodgeInsurerOrder', () => {
     expect(ack).not.toHaveBeenCalled()
     expect(inserted.communications).toBeUndefined()
   })
+
+  it('lodges a new claim at an address with an earlier job, noting the earlier job on the new one', async () => {
+    db.jobs = [{ id: 'j1', tenant_id: 't1', job_number: 'IRC1037', claim_number: 'CLM0', property_address: '45 Randell Cres' }]
+    const result = await lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
+    expect(result).toMatchObject({ jobNumber: 'IRC1080', sameAddressJobs: [{ jobNumber: 'IRC1037', claimNumber: 'CLM0' }] })
+    expect(inserted.jobs).toHaveLength(1)
+    expect(ack).toHaveBeenCalled()
+    expect(inserted.communications).toEqual([expect.objectContaining({
+      job_id: result.jobId, type: 'note', source: 'order_same_address',
+      content: 'Same address as job IRC1037 (claim CLM0).',
+    })])
+  })
 })

@@ -44,13 +44,20 @@ export interface LodgeResult {
   message?: string
   /** The acknowledgement reply to the order's sender (new jobs only) */
   acknowledgement?: OrderAcknowledgementResult
+  /** Earlier jobs at the same address under other claims (new jobs only; never blocks the lodge) */
+  sameAddressJobs?: { jobNumber: string; claimNumber: string | null }[]
+}
+
+/** "job IRC1037 (claim CHC123)" for each earlier job at the address */
+export function describeSameAddressJobs(jobs: { jobNumber: string; claimNumber: string | null }[]): string {
+  return jobs.map(j => `job ${j.jobNumber} (claim ${j.claimNumber ?? 'none'})`).join(', ')
 }
 
 export class LodgeError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    /** Extra response fields, e.g. the address-match warning's matchingJobs */
+    /** Extra response fields returned to the Lodge button */
     public readonly details: Record<string, unknown> = {},
   ) {
     super(message)
@@ -163,9 +170,12 @@ export async function lodgeInsurerOrder(
     }
   }
 
-  // Step 4b: Check for existing jobs with same address (different claim number)
+  // Step 4b: Other jobs at the same address. The claim number decides whether
+  // it's the same job (above) — a new claim at an address we've worked at
+  // before is still a new job, so this never stops the lodge. The jobs found
+  // are noted on the new job and returned so the office can see the history.
+  let sameAddressJobs: { jobNumber: string; claimNumber: string | null }[] = []
   if (order.property_address) {
-    console.log('[lodge] checking for existing jobs with same address')
     const { data: jobsByAddress, error: addressCheckError } = await supabase
       .from('jobs')
       .select('id, job_number, claim_number, property_address')
@@ -175,20 +185,8 @@ export async function lodgeInsurerOrder(
 
     if (addressCheckError) {
       console.error('[lodge] address check error:', addressCheckError)
-      throw new LodgeError('Failed to check for address duplicates', 500)
-    }
-
-    if (jobsByAddress && jobsByAddress.length > 0) {
-      console.log('[lodge] found existing jobs with same address:', jobsByAddress.length)
-      const matchingJobs = jobsByAddress.map(j => ({
-        jobNumber: j.job_number,
-        claimNumber: j.claim_number
-      }))
-      throw new LodgeError('Address already exists in system', 409, {
-        warning: true,
-        matchingJobs,
-        message: `Found ${jobsByAddress.length} existing job(s) with same property address but different claim number. Please review before proceeding.`
-      })
+    } else {
+      sameAddressJobs = (jobsByAddress ?? []).map(j => ({ jobNumber: j.job_number, claimNumber: j.claim_number }))
     }
   }
 
@@ -504,8 +502,15 @@ export async function lodgeInsurerOrder(
     await noteOnJob(supabase, { tenantId, jobId, userId, source: 'order_checks', content: lines.join('\n') })
   }
 
+  if (sameAddressJobs.length) {
+    await noteOnJob(supabase, {
+      tenantId, jobId, userId, source: 'order_same_address',
+      content: `Same address as ${describeSameAddressJobs(sameAddressJobs)}.`,
+    })
+  }
+
   console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
-  return { jobNumber, jobId, acknowledgement }
+  return { jobNumber, jobId, acknowledgement, ...(sameAddressJobs.length ? { sameAddressJobs } : {}) }
 }
 
 // A note on the job's Comms feed (signed by whoever lodged it): why the

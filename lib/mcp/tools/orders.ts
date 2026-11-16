@@ -2,7 +2,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { money, spokenDate } from '@/lib/mcp/tools/work-orders'
 import { getGmailClient } from '@/lib/gmail/client'
-import { LodgeError, lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
+import { LodgeError, describeSameAddressJobs, lodgeInsurerOrder } from '@/lib/insurer-orders/lodge'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } from '@/lib/insurer-orders/from-email'
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
@@ -218,7 +218,7 @@ export const lodgeOrder: McpTool = {
   description: [
     'Lodges an insurer order as a job, exactly like the Lodge button: creates the job with the next job number and KPI due dates,',
     'plus the inspection, report, quote and invoice its work type needs, notifies the office, and emails the order\'s sender an acknowledgement (Settings → Email Templates → Order acknowledgement).',
-    'If a job already has the claim number, the order is linked to that job instead. If another job has the same address with a different claim, nothing is created and the matching jobs are listed.',
+    'If a job already has the claim number, the order is linked to that job instead. A different claim at the same address as an earlier job is still lodged as a new job; the earlier jobs are noted on it and named in the reply.',
     'When the order has no phone number for the insured, the acknowledgement asks the sender for one. It isn\'t sent when the office has already replied to the sender about the order; a note on the job says so.',
     'With skip_acknowledgement, everything else happens the same but no acknowledgement is emailed, and a note on the job says it was skipped on purpose.',
     'Read back the claim number, insured and address, say whether the sender will be emailed an acknowledgement, and get a clear yes first. Pass on it if the acknowledgement wasn\'t sent.',
@@ -250,22 +250,15 @@ export const lodgeOrder: McpTool = {
       return {
         text: result.linkedToExisting
           ? `That claim already has job ${result.jobNumber}, so the order was linked to it.`
-          : `Lodged as job ${result.jobNumber}.${ackText}`,
+          : `Lodged as job ${result.jobNumber}.${ackText}${result.sameAddressJobs?.length ? ` Same address as ${describeSameAddressJobs(result.sameAddressJobs)}; noted on the job.` : ''}`,
         data: {
           job_number: result.jobNumber, job_id: result.jobId, linked_to_existing: !!result.linkedToExisting,
+          ...(result.sameAddressJobs?.length ? { same_address_jobs: result.sameAddressJobs } : {}),
           ...(ack ? { acknowledgement_sent: ack.sent, acknowledgement_to: ack.to ?? null, acknowledgement_skipped: ack.skipped ?? null } : {}),
         },
       }
     } catch (err) {
       if (!(err instanceof LodgeError)) throw err
-      if (err.status === 409 && Array.isArray(err.details.matchingJobs)) {
-        const jobs = err.details.matchingJobs as { jobNumber: string; claimNumber: string | null }[]
-        return {
-          text: `Not lodged: the same address already has ${jobs.map(j => `job ${j.jobNumber} (claim ${j.claimNumber ?? 'none'})`).join(', ')}. Check in the app whether it belongs to that job.`,
-          data: { matching_jobs: jobs },
-          isError: true,
-        }
-      }
       return { text: err.message, data: { status: err.status }, isError: true }
     }
   },
