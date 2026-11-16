@@ -549,6 +549,50 @@ export function PhotoViewer({ url, title, marks, letters, startLetter, onMarks, 
   )
 }
 
+// The job's builder/insurer reference and address, set when the job was made, changed
+// here (PATCH /api/midcity/jobs, lib/jobs/field-job-details.ts). The reports use the new ones.
+function JobDetailsSheet({ jobId, details, onSaved, onClose }: {
+  jobId: string | null
+  details: { reference: string; address: string }
+  onSaved: (d: { reference: string; address: string }) => void
+  onClose: () => void
+}) {
+  const [reference, setReference] = useState(details.reference)
+  const [address, setAddress] = useState(details.address)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const save = async () => {
+    if (!jobId) return
+    if (!reference.trim() || !address.trim()) { setError('Both are needed.'); return }
+    setSaving(true); setError('')
+    try {
+      const res = await fetch('/api/midcity/jobs', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, reference, address }) })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) onSaved({ reference: data.reference, address: data.address })
+      else setError(data.error ?? 'Could not save. Please try again.')
+    } catch {
+      setError('Could not save. Check your connection.')
+    }
+    setSaving(false)
+  }
+  return (
+    <div className="mc-sheet-back" onClick={onClose}>
+      <div className="mc-sheet" role="dialog" aria-label="Job details" onClick={e => e.stopPropagation()}>
+        <div className="mc-sheet-title">Job details</div>
+        <label className="fa-fl">Builder/Insurer Reference</label>
+        <input className="fa-input" type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. MC1001" autoFocus />
+        <label className="fa-fl" style={{ marginTop: 12 }}>Property Address</label>
+        <input className="fa-input" type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="123 Example St, Suburb WA 6000" />
+        {error && <p className="mc-sheet-error">{error}</p>}
+        <div className="mc-sheet-actions">
+          <button type="button" className="rp-chip rp-type" onClick={onClose}>Cancel</button>
+          <button type="button" className="rp-chip rp-type on" onClick={save} disabled={saving || !jobId}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // How long the current recording has been going, ticking each second
 function RecordingClock({ since }: { since: number | null }) {
   const [now, setNow] = useState(() => Date.now())
@@ -697,6 +741,9 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
   // ─── Report enable states ─────────────────────────────────────────────────
   const [barEnabled, setBarEnabled] = useState(false)
   const [makeSafeEnabled, setMakeSafeEnabled] = useState(false)
+  // The builder's/insurer's reference (the job number) and the address, changeable from the header
+  const [jobDetails, setJobDetails] = useState({ reference: initialData.jobNumber ?? '', address: initialData.address ?? '' })
+  const [editingJob, setEditingJob] = useState(false)
   // Roof-only mode (no BAR) starts with the roof report ticked
   const [roofEnabled, setRoofEnabled] = useState(!FIELD_APP_BAR_REPORTS)
 
@@ -1149,7 +1196,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         body: JSON.stringify({
           rawNotes: dictationNotes,
           inspectorName: initialData.inspector,
-          address: initialData.address,
+          address: jobDetails.address || null,
           insuredName: initialData.insuredName,
           claimNumber: initialData.claimNumber,
           insurer: initialData.insurer,
@@ -1254,7 +1301,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           template: insuranceTemplate,
           claimNumber: initialData.claimNumber,
           insuredName: initialData.insuredName,
-          address: initialData.address,
+          address: jobDetails.address || null,
           insurer: initialData.insurer,
           dateOfLoss: initialData.dateOfLoss,
           inspector: initialData.inspector,
@@ -1448,17 +1495,26 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
       <div className="fa-header">
         <a href="/midcity" className="mc-home-btn">← Home</a>
         <div className="mc-hdr-body">
-          <div className="mc-hdr-address">{initialData.address ?? '—'}</div>
+          <div className="mc-hdr-address">{jobDetails.address || '—'}</div>
           <div className="mc-hdr-sub">
             {[
-              initialData.jobNumber,
+              jobDetails.reference,
               initialData.lossType,
               initialData.dateOfLoss ? formatDate(initialData.dateOfLoss) : null,
             ].filter(Boolean).join(' · ')}
           </div>
         </div>
         {saveStatus && <div className="fa-save-indicator">{saveStatus}</div>}
+        <button type="button" className="mc-hdr-edit" onClick={() => setEditingJob(true)} aria-label="Edit the reference and address">Edit</button>
       </div>
+      {editingJob && (
+        <JobDetailsSheet
+          jobId={initialData.jobId}
+          details={jobDetails}
+          onSaved={d => { setJobDetails(d); setEditingJob(false) }}
+          onClose={() => setEditingJob(false)}
+        />
+      )}
 
       {/* ── 01 NOTES & SCOPE ──────────────────────────────────────────────── */}
       <div className="fa-sc" id="sec-details">
@@ -2349,11 +2405,11 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
         ]}
         overview={overviewPhoto ? { url: overviewPhoto.url, marks: overviewMarks } : null}
         jobInfo={{
-          address: initialData.address,
+          address: jobDetails.address || null,
           insuredName: initialData.insuredName,
           insurer: initialData.insurer,
           claimNumber: initialData.claimNumber,
-          jobNumber: initialData.jobNumber,
+          jobNumber: jobDetails.reference || null,
         }}
         onClose={() => setRoofPreviewOpen(false)}
       />
@@ -2367,7 +2423,7 @@ export default function MidcityFieldApp({ initialData }: { initialData: InitialD
           ...makeSafeUploads.photos.filter(p => p.previewUrl).map(p => ({ id: p.id, previewUrl: p.previewUrl!, label: p.label.trim(), marks: photoMarks[p.id] })),
         ]}
         jobInfo={{
-          address: initialData.address,
+          address: jobDetails.address || null,
           insuredName: initialData.insuredName,
           insurer: initialData.insurer,
           claimNumber: initialData.claimNumber,

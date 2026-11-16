@@ -93,7 +93,7 @@ export function RoofReportPageOne({ fields, job, overview, imageSize = null }: {
         <div style={{ fontSize: 13, lineHeight: 1.5, color: '#6b5f5d', flexGrow: 1, minWidth: 0 }}>
           <div>
             {job.claimNumber && <><b style={{ color: INK }}>Claim:</b> {job.claimNumber} · </>}
-            <b style={{ color: INK }}>Job:</b> {job.jobNumber || '—'}
+            <b style={{ color: INK }}>Builder/Insurer Reference:</b> {job.jobNumber || '—'}
           </div>
           {job.insuredName && <div><b style={{ color: INK }}>Insured:</b> {job.insuredName}</div>}
           <div><b style={{ color: INK }}>Address:</b> {job.address || '—'}</div>

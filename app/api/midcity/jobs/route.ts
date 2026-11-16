@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionUser, unauthorized } from '@/lib/auth/session'
+import { permissionDenied } from '@/lib/permissions/http'
+import { recordOperation } from '@/lib/activity/log'
+import { FieldJobDetailsError, updateFieldJobDetails } from '@/lib/jobs/field-job-details'
 import { FIELD_APP_INSURER } from '@/lib/jobs/field-app'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getUser } from '@/lib/supabase/get-user'
@@ -17,7 +21,7 @@ export async function POST(req: NextRequest) {
     const { job_number, property_address, start_time } = body
 
     if (!job_number?.trim() || !property_address?.trim()) {
-      return NextResponse.json({ error: 'Job number and address are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Builder/insurer reference and address are required' }, { status: 400 })
     }
 
     const { data: newJob, error: jobError } = await supabase
@@ -63,5 +67,27 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[midcity/jobs] unexpected error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// A job's builder/insurer reference and address, changed from the field app's header
+export async function PATCH(req: NextRequest) {
+  const me = await sessionUser()
+  if (!me) return unauthorized()
+  const denied = await permissionDenied(me.tenantId, me.userId, 'jobs.edit')
+  if (denied) return denied
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+  const { jobId, reference, address } = body
+  if (typeof jobId !== 'string' || typeof reference !== 'string' || typeof address !== 'string') {
+    return NextResponse.json({ error: 'jobId, reference and address are required' }, { status: 400 })
+  }
+  try {
+    const saved = await updateFieldJobDetails(createServiceClient(), me.tenantId, jobId, { reference, address })
+    await recordOperation({ tenantId: me.tenantId, userId: me.userId, action: 'jobs.edit', operation: 'job.details', payload: { jobId, ...saved } })
+    return NextResponse.json({ ok: true, ...saved })
+  } catch (err) {
+    if (err instanceof FieldJobDetailsError) return NextResponse.json({ error: err.message }, { status: err.status })
+    console.error('[midcity/jobs] update details error:', err)
+    return NextResponse.json({ error: 'Could not save the job details' }, { status: 500 })
   }
 }

@@ -25,6 +25,7 @@ import { getMailbox } from '@/lib/mail/sync'
 import { getLesson, setLessonActive } from '@/lib/learning/lessons'
 import { setAutoConfirm } from '@/lib/learning/auto-confirm'
 import { closeJobs, reopenJob } from '@/lib/jobs/close'
+import { updateFieldJobDetails } from '@/lib/jobs/field-job-details'
 import { CLOSED_LABELS, type ClosedReason } from '@/lib/jobs/phase'
 import { decideSuggestion, type Decision } from '@/lib/health/suggestions'
 
@@ -196,6 +197,17 @@ const jobsReopen: Operation<{ jobId: string }> = {
   },
   async run(p, ctx) {
     return `Reopened ${await reopenJob(ctx.service as unknown as SupabaseClient, ctx.tenantId, p.jobId)}.`
+  },
+}
+
+// Bindi Co: a job's builder/insurer reference and address, changed from the field app
+const jobDetails: Operation<{ jobId: string; reference: string; address: string }> = {
+  async describe(p, ctx) {
+    return { summary: `Change ${await jobNumber(ctx, p.jobId)} to reference "${clip(p.reference, 80)}", address "${clip(p.address, 120)}"`, jobId: p.jobId }
+  },
+  async run(p, ctx) {
+    const saved = await updateFieldJobDetails(ctx.service, ctx.tenantId, p.jobId, p)
+    return `Saved reference ${saved.reference}, ${saved.address}.`
   },
 }
 
@@ -386,6 +398,7 @@ export const OPERATIONS = {
   'job.stage': jobStage,
   'jobs.close': jobsClose,
   'jobs.reopen': jobsReopen,
+  'job.details': jobDetails,
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
   'invoice.void': invoiceVoid,
@@ -415,6 +428,7 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'job.stage': 'jobs.change_stage',
   'jobs.close': 'jobs.change_stage',
   'jobs.reopen': 'jobs.change_stage',
+  'job.details': 'jobs.edit',
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
   'invoice.void': 'invoices.manage',

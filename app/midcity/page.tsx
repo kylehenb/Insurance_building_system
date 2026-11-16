@@ -394,7 +394,7 @@ export default function MidcityDashboard() {
                   fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--grey-500)',
                   marginBottom: 7,
                 }}>
-                  Job Number <span style={{ color: '#c0622a' }}>*</span>
+                  Builder/Insurer Reference <span style={{ color: '#c0622a' }}>*</span>
                 </label>
                 <input
                   ref={jobNumberRef}
@@ -629,7 +629,7 @@ export default function MidcityDashboard() {
                           type="text"
                           value={job.job_number}
                           onChange={e => updateBulkJob(i, 'job_number', e.target.value)}
-                          placeholder="Job #"
+                          placeholder="Reference"
                           style={{
                             flex: '0 0 100px', padding: '8px 10px',
                             border: '1px solid var(--line-tan-2)', borderRadius: 6,
