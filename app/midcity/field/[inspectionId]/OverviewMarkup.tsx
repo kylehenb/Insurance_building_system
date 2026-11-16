@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { markColour, shapeCentre, type OverviewMark, type Point } from '@/lib/photos/overview-marks'
+import { GRID_EDGE, OVERVIEW_EDGE, usePrintSrc } from './print-images'
 
 // Draws a photo's markup (lib/photos/overview-marks.ts) on top of it: areas
 // (circles and outlines, each with its problem letter inside), arrows, text
@@ -124,11 +125,14 @@ export function MarkupLayer({ marks, w, h, selectedId, drawing }: {
  */
 export function PhotoWithMarkup({ url, alt, marks, transform }: { url: string; alt: string; marks?: OverviewMark[]; transform?: string }) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  // In a report, a print-size copy (print-images.tsx); the markup is in fractions, so it fits either
+  const src = usePrintSrc(url, GRID_EDGE)
   const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', transformOrigin: 'center center', transform }
+  if (!src) return null
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={alt} style={{ ...fill, objectFit: 'contain' }}
+      <img src={src} alt={alt} style={{ ...fill, objectFit: 'contain' }}
         onLoad={e => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
       {size && !!marks?.length && <div style={fill}><MarkupLayer marks={marks} w={size.w} h={size.h} /></div>}
     </>
@@ -145,10 +149,12 @@ export function OverviewWithMarkup({ url, marks, maxHeight, size, onSize }: {
   onSize?: (w: number, h: number) => void
 }) {
   const [loaded, setLoaded] = useState<{ w: number; h: number } | null>(size ?? null)
+  const src = usePrintSrc(url, OVERVIEW_EDGE)
+  if (!src) return <div style={{ height: Math.min(maxHeight, 300) }} />
   return (
     <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', lineHeight: 0 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="Roof overview" style={{ display: 'block', maxWidth: '100%', maxHeight, height: 'auto', width: 'auto' }}
+      <img src={src} alt="Roof overview" style={{ display: 'block', maxWidth: '100%', maxHeight, height: 'auto', width: 'auto' }}
         onLoad={e => { const w = e.currentTarget.naturalWidth, h = e.currentTarget.naturalHeight; setLoaded({ w, h }); onSize?.(w, h) }} />
       {loaded && <MarkupLayer marks={marks} w={loaded.w} h={loaded.h} />}
     </div>

@@ -43,3 +43,4 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - The report prompt reads a running commentary: later statements and the recap win, unsure remarks aren't written as fact
 - Fixed: the draft saved the notes as they were one edit ago (and nothing when the page was hidden), so the last change before stopping could be lost
 - The job number is the "Builder/Insurer Reference" (on the report and when making a job). The reference and address can be changed from the field app's header (Edit), using the jobs.edit permission and logged as job.details
+- Smaller report PDFs: the browser puts each photo into the PDF as uploaded (50 photos at ~320 KB = a 16 MB PDF), so inside a report each photo is first redrawn at print size (800 px, about 240 dpi at its printed 8.5 cm; the overview at 1600 px). Print waits until they're ready (print-images.tsx); a photo that can't be read back prints as it is. About 75% smaller

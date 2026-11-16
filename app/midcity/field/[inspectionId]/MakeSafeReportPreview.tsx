@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import type { OverviewMark } from '@/lib/photos/overview-marks'
 import { PhotoWithMarkup } from './OverviewMarkup'
+import { usePrintImagesProvider } from './print-images'
 
 type MakeSafeFields = {
   claimDetails: string
@@ -85,6 +86,9 @@ export function MakeSafeReportPreview({
     jobInfo.claimNumber ? `Claim #${jobInfo.claimNumber}` : null,
   ].filter(Boolean).join(' · ')
 
+  // Photos sized for printing first (print-images.tsx): Print waits for them
+  const printImages = usePrintImagesProvider()
+
   const handlePrint = () => {
     const prevOverflow = document.body.style.overflow
     const prevTitle = document.title
@@ -98,7 +102,7 @@ export function MakeSafeReportPreview({
   }
 
   return (
-    <>
+    <printImages.Provider>
       <style>{`
         @page { margin: 15mm 18mm; size: A4 portrait; }
         @media print {
@@ -146,9 +150,10 @@ export function MakeSafeReportPreview({
           <span style={{ flex: 1 }} />
           <button
             onClick={handlePrint}
-            style={{ background: '#007aff', border: 'none', color: 'white', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
+            disabled={!printImages.ready}
+            style={{ background: '#007aff', border: 'none', color: 'white', padding: '8px 20px', borderRadius: 4, cursor: printImages.ready ? 'pointer' : 'default', fontSize: 13, fontWeight: 700, opacity: printImages.ready ? 1 : 0.6 }}
           >
-            Print / Download PDF
+            {printImages.ready ? 'Print / Download PDF' : `Preparing photos ${printImages.done} of ${printImages.total}…`}
           </button>
         </div>
 
@@ -234,6 +239,6 @@ export function MakeSafeReportPreview({
           </div>
         </div>
       </div>
-    </>
+    </printImages.Provider>
   )
 }

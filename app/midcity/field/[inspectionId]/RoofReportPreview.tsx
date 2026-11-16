@@ -6,6 +6,7 @@ import { RoofReportPageOne } from './RoofReportPageOne'
 import { PhotoWithMarkup } from './OverviewMarkup'
 import { ROOF_TAGS, issueColour, issuePoints, orderRoofPhotos, parseRoofLabel, splitIssueLetters } from '@/lib/photos/roof-tags'
 import type { OverviewMark } from '@/lib/photos/overview-marks'
+import { usePrintImagesProvider } from './print-images'
 
 type Fields = {
   claimDetails: string
@@ -191,6 +192,9 @@ export function RoofReportPreview({
     jobInfo.claimNumber ? `Claim #${jobInfo.claimNumber}` : null,
   ].filter(Boolean).join(' · ')
 
+  // Photos sized for printing first (print-images.tsx): Print waits for them
+  const printImages = usePrintImagesProvider()
+
   const handlePrint = () => {
     const prevOverflow = document.body.style.overflow
     const prevTitle = document.title
@@ -209,7 +213,7 @@ export function RoofReportPreview({
   ].filter(Boolean).join('\n\n') || undefined
 
   return (
-    <>
+    <printImages.Provider>
       <style>{`
         @page { margin: 15mm 18mm; size: A4 portrait; }
         @media print {
@@ -263,9 +267,10 @@ export function RoofReportPreview({
           <span style={{ flex: 1 }} />
           <button
             onClick={handlePrint}
-            style={{ background: '#007aff', border: 'none', color: 'white', padding: '8px 20px', borderRadius: 4, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}
+            disabled={!printImages.ready}
+            style={{ background: '#007aff', border: 'none', color: 'white', padding: '8px 20px', borderRadius: 4, cursor: printImages.ready ? 'pointer' : 'default', fontSize: 13, fontWeight: 700, opacity: printImages.ready ? 1 : 0.6 }}
           >
-            Print / Download PDF
+            {printImages.ready ? 'Print / Download PDF' : `Preparing photos ${printImages.done} of ${printImages.total}…`}
           </button>
         </div>
 
@@ -518,6 +523,6 @@ export function RoofReportPreview({
           </div>
         </div>
       </div>
-    </>
+    </printImages.Provider>
   )
 }
