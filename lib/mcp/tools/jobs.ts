@@ -12,6 +12,7 @@ import { listSigningRequestsForJob } from '@/lib/signing/service'
 import { JobNoteError, addJobNote as saveJobNote, listJobNotes } from '@/lib/communications/notes'
 import { searchJobs, type JobMatch } from '@/lib/jobs/search'
 import { jobLedger } from '@/lib/communications/ledger'
+import { describeContact, jobContacts } from '@/lib/jobs/details'
 
 // Finding a job, a job at a glance, and adding a note to it. The summary is assembled from
 // the job's phase and next step (lib/jobs/phase.ts), the dashboard's pending actions,
@@ -61,7 +62,7 @@ export const getJobSummary: McpTool = {
     const jobArgs = { job_number: job.job_number }
 
     const { data: full, error } = await ctx.supabase
-      .from('jobs').select('insured_name, insured_phone, insurer, claim_number, loss_type, created_at, notes')
+      .from('jobs').select('insured_name, insured_phone, insured_email, contacts, insurer, claim_number, loss_type, created_at, notes')
       .eq('tenant_id', ctx.tenantId).eq('id', job.id).maybeSingle()
     if (error) throw error
 
@@ -77,6 +78,7 @@ export const getJobSummary: McpTool = {
           ph.review_note ? `This morning's review: ${ph.review_note}` : null,
         ].filter(Boolean).join(' ')
       }),
+      section('Contacts', async () => full ? jobContacts(full).map(c => `- ${c.slot}: ${describeContact(c)}`).join('\n') : null),
       section('Waiting on you', async () => {
         const { data } = await ctx.supabase
           .from('action_queue').select('title, description, priority')
