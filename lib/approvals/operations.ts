@@ -26,6 +26,7 @@ import { getLesson, setLessonActive } from '@/lib/learning/lessons'
 import { setAutoConfirm } from '@/lib/learning/auto-confirm'
 import { closeJobs, reopenJob } from '@/lib/jobs/close'
 import { updateFieldJobDetails } from '@/lib/jobs/field-job-details'
+import { describeJobEdit, saveJobEdit, type JobEdit } from '@/lib/jobs/details'
 import { CLOSED_LABELS, type ClosedReason } from '@/lib/jobs/phase'
 import { decideSuggestion, type Decision } from '@/lib/health/suggestions'
 
@@ -208,6 +209,19 @@ const jobDetails: Operation<{ jobId: string; reference: string; address: string 
   async run(p, ctx) {
     const saved = await updateFieldJobDetails(ctx.service, ctx.tenantId, p.jobId, p)
     return `Saved reference ${saved.reference}, ${saved.address}.`
+  },
+}
+
+// The Job Details panel's Save (PATCH /api/jobs/[jobId]/details). jobs.edit has
+// no approval level, so this is only replayed if that ever changes.
+const jobEdit: Operation<{ jobId: string; edit: JobEdit; changed?: string[] }> = {
+  async describe(p, ctx) {
+    const job = await jobNumber(ctx, p.jobId)
+    return { summary: p.changed ? `Changed the ${describeJobEdit(p.changed)} on ${job}` : `Change the details on ${job}`, jobId: p.jobId }
+  },
+  async run(p, ctx) {
+    const { changed } = await saveJobEdit(ctx.service as never, ctx.tenantId, p.jobId, p.edit)
+    return changed.length ? `Changed the ${describeJobEdit(changed)}.` : 'Nothing to change.'
   },
 }
 
@@ -399,6 +413,7 @@ export const OPERATIONS = {
   'jobs.close': jobsClose,
   'jobs.reopen': jobsReopen,
   'job.details': jobDetails,
+  'job.edit': jobEdit,
   'excess.decide': excessDecide,
   'invoice.generate': invoiceGenerate,
   'invoice.void': invoiceVoid,
@@ -429,6 +444,7 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'jobs.close': 'jobs.change_stage',
   'jobs.reopen': 'jobs.change_stage',
   'job.details': 'jobs.edit',
+  'job.edit': 'jobs.edit',
   'excess.decide': 'excess.decide',
   'invoice.generate': 'invoices.manage',
   'invoice.void': 'invoices.manage',

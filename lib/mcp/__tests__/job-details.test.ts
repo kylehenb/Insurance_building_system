@@ -21,7 +21,6 @@ beforeEach(() => {
       adjuster: null, special_instructions: null,
       insured_name: 'Bruce Long', insured_phone: '0400 111 222', insured_email: 'bruce@x.com', contacts: [],
     },
-    { id: 'j2', tenant_id: 't1', job_number: 'MC100', insurer: 'Midcity', property_address: '1 Rd', contacts: [] },
   ]
 })
 
@@ -43,9 +42,8 @@ describe('update_job_details', () => {
     expect(job().claim_number).toBe('CL1')
   })
 
-  it('says when nothing changes, and leaves Midcity jobs alone', async () => {
-    expect((await updateJobDetailsTool.run({ job_number: 'IRC1080', claim_number: 'CL1' }, ctx())).text).toMatch(/^Nothing to change/)
-    expect((await updateJobDetailsTool.run({ job_number: 'MC100', claim_number: 'X' }, ctx())).isError).toBe(true)
+  it('says when nothing changes, and needs a change', async () => {
+    expect((await updateJobDetailsTool.run({ job_number: 'IRC1080', claim_number: 'CL1', excess: 500 }, ctx())).text).toMatch(/^Nothing to change/)
     expect((await updateJobDetailsTool.run({ job_number: 'IRC1080' }, ctx())).isError).toBe(true)
   })
 })

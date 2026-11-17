@@ -144,14 +144,10 @@ function JobDetailsAccordion({
   jobId: string
   tenantId: string
 }) {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [vals, setVals] = useState<EditFields>(() => jobToEditFields(job))
   const [saved, setSaved] = useState<JobDetails>(job)
 
@@ -161,38 +157,57 @@ function JobDetailsAccordion({
 
   function cancelEdit() {
     setVals(jobToEditFields(saved))
+    setSaveError(null)
     setEditing(false)
   }
 
+  // Saved through PATCH /api/jobs/[jobId]/details (lib/jobs/details.ts saveJobEdit),
+  // the same checks and contact rules as the voice tools
   async function saveEdit() {
     setSaving(true)
-    const patch = {
-      insurer: vals.insurer || null,
-      client_id: vals.client_id,
-      claim_number: vals.claim_number || null,
-      loss_type: vals.loss_type || null,
-      date_of_loss: vals.date_of_loss || null,
-      adjuster: vals.adjuster || null,
-      sum_insured: vals.sum_insured !== '' ? parseFloat(vals.sum_insured) : null,
-      excess: vals.excess !== '' ? parseFloat(vals.excess) : null,
-      assigned_to: vals.assigned_to || null,
-      claim_description: vals.claim_description || null,
-      special_instructions: vals.special_instructions || null,
-      insured_name: vals.insured_name || null,
-      insured_phone: vals.insured_phone || null,
-      insured_email: vals.insured_email || null,
-      property_address: vals.property_address || null,
-      notes: vals.notes || null,
-      adjuster_reference: vals.adjuster_reference || null,
-      order_sender_name: vals.order_sender_name || null,
-      order_sender_email: vals.order_sender_email || null,
-      invoice_to: vals.invoice_to || null,
-      contacts: vals.contacts as unknown as JobDetails['contacts'],
+    setSaveError(null)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/details`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          details: {
+            insurer: vals.insurer,
+            client_id: vals.client_id,
+            claim_number: vals.claim_number,
+            loss_type: vals.loss_type,
+            date_of_loss: vals.date_of_loss,
+            adjuster: vals.adjuster,
+            sum_insured: vals.sum_insured,
+            excess: vals.excess,
+            assigned_to: vals.assigned_to,
+            claim_description: vals.claim_description,
+            special_instructions: vals.special_instructions,
+            property_address: vals.property_address,
+            notes: vals.notes,
+            adjuster_reference: vals.adjuster_reference,
+            order_sender_name: vals.order_sender_name,
+            order_sender_email: vals.order_sender_email,
+            invoice_to: vals.invoice_to,
+          },
+          insured: { name: vals.insured_name, phone: vals.insured_phone, email: vals.insured_email },
+          contacts: vals.contacts,
+        }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSaveError(out.error ?? 'Could not save the job details')
+        return
+      }
+      const next = { ...saved, ...(out.saved as Partial<JobDetails>) }
+      setSaved(next)
+      setVals(jobToEditFields(next))
+      setEditing(false)
+    } catch {
+      setSaveError('Could not save the job details — check your connection')
+    } finally {
+      setSaving(false)
     }
-    await supabase.from('jobs').update(patch).eq('id', jobId).eq('tenant_id', tenantId)
-    setSaved(prev => ({ ...prev, ...patch }))
-    setEditing(false)
-    setSaving(false)
   }
 
   // Shared sub-section label style
@@ -281,6 +296,9 @@ function JobDetailsAccordion({
           )}
           {open && editing && (
             <>
+              {saveError && (
+                <span role="alert" style={{ fontSize: 11, color: 'var(--danger)', maxWidth: 320 }}>{saveError}</span>
+              )}
               <button
                 onClick={saveEdit}
                 disabled={saving}

@@ -10,8 +10,8 @@ import { LOSS_TYPES } from '@/lib/loss-types'
 import { money } from '@/lib/mcp/tools/work-orders'
 
 // Changing a job's details and its contacts by voice — the same fields and
-// contacts as the job's Overview → Job Details panel, through
-// lib/jobs/details.ts.
+// contacts as the job's Overview → Job Details panel, checked and saved by the
+// same lib/jobs/details.ts as its Save (PATCH /api/jobs/[jobId]/details).
 
 const db = (ctx: { supabase: unknown }) => ctx.supabase as SupabaseClient
 
@@ -37,7 +37,7 @@ export const updateJobDetailsTool: McpTool = {
     'Changes a job\'s details, as the Job Details panel on the job\'s Overview does: claim number, property address, adjuster, adjuster reference,',
     'loss type, date of loss, sum insured, excess, claim description, special instructions, and who sent the order (name and email).',
     'Give only the fields that change; put a field in "clear" to blank it. Not for people\'s phone numbers or emails — use update_job_contact for the insured, tenant, agent and the like.',
-    'Not the insurer or the job number. Read back the job and each change and get a clear yes before calling.',
+    'Not the insurer, who the job is assigned to or the job number (change those in the app). Read back the job and each change and get a clear yes before calling.',
   ].join(' '),
   inputSchema: {
     type: 'object',
