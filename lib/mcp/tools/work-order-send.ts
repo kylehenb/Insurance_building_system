@@ -50,7 +50,7 @@ export const getWorkOrderEmail: McpTool = {
     'and the attachments (the work order PDF, plus the job\'s photos PDF when the job has photos).',
     'Individual job photos and files can be added in send_work_order (attach_photos / attach_files; list_job_files lists them).',
     'Use it before send_work_order: read back the trade, recipient, amount and warnings, and ask whether to send the standard email or change it.',
-    'Does not send anything.',
+    'Does not send anything. To let the user see the work order PDF itself, use preview_document.',
   ].join(' '),
   inputSchema: {
     type: 'object',

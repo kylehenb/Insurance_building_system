@@ -212,7 +212,7 @@ export const getDocumentEmail: McpTool = {
   description: [
     'Shows the email Send would produce for one or more documents of a job: recipients (the insurer\'s routing, or the insured for an excess invoice),',
     'subject, the standard body from the tenant\'s template, attachments, warnings (draft documents, no recipient on file, already emailed before),',
-    'and other documents on the job that could go in the same email. Renders no PDFs and sends nothing.',
+    'and other documents on the job that could go in the same email. Renders no PDFs and sends nothing (preview_document gives the user the PDF itself).',
     'Use it before send_documents, then read back the recipients, documents and warnings.',
   ].join(' '),
   inputSchema: {

@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
     // Quotes, reports, invoices, TCC and photos emailed from a job, and their preview
     "/api/documents/send": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     "/api/documents/pdf": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
+    // Preview links the voice connector hands out (any document, work orders too)
+    "/api/preview/\\[token\\]": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES],
     // Voice connector: work order, document and signing PDFs (signing also runs pdf.js)
     "/api/mcp": [...CHROMIUM_FILES, ...DOCUMENT_IMAGES, ...PDFJS_FILES],
   },
@@ -44,6 +46,7 @@ const nextConfig: NextConfig = {
     "/api/signing/requests/\\[id\\]/\\[action\\]": NO_FULL_PUPPETEER,
     "/api/documents/send": NO_FULL_PUPPETEER,
     "/api/documents/pdf": NO_FULL_PUPPETEER,
+    "/api/preview/\\[token\\]": NO_FULL_PUPPETEER,
     "/api/mcp": NO_FULL_PUPPETEER,
   },
   async headers() {
@@ -57,6 +60,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/sign/:path*", headers: signingHeaders },
       { source: "/api/sign/:path*", headers: signingHeaders },
+      { source: "/api/preview/:path*", headers: signingHeaders },
     ];
   },
 };

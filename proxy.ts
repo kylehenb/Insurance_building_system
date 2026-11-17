@@ -57,7 +57,10 @@ export async function proxy(request: NextRequest) {
     // E-signing: homeowners sign by link, with no account. These routes look
     // up the link token themselves and expose only that one document.
     pathname.startsWith("/sign/") ||
-    pathname.startsWith("/api/sign/");
+    pathname.startsWith("/api/sign/") ||
+    // Document preview links from the voice connector: a signed, day-long
+    // token for one document (lib/documents/preview.ts)
+    pathname.startsWith("/api/preview/");
 
   // Redirect unauthenticated users to login
   if (!user && !isPublicRoute) {
