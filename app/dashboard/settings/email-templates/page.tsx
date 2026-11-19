@@ -8,6 +8,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import {
   BUILT_IN_TEMPLATES,
   EMAIL_SEND_TYPES,
+  MISSING_TOKEN_NOTES,
   REQUIRED_TOKENS,
   TEMPLATE_TOKENS,
   documentTemplateVars,
@@ -20,6 +21,9 @@ import { toRichHtml } from '@/lib/email/rich-text'
 import { renderTemplatePreviewHtml } from '@/lib/email/preview'
 import { RichTextEditor, type RichTextEditorHandle } from '@/components/email/RichTextEditor'
 import { SignatureSettings } from './SignatureSettings'
+import { DEFAULT_WORK_TYPE_LINES, mergeWorkTypeLines, workTypeVars } from '@/lib/insurer-orders/acknowledgement-lines'
+import { WORK_TYPES, WORK_TYPE_LABELS, type WorkType } from '@/lib/insurer-orders/work-order-type'
+import { WorkTypeCheckboxes } from '@/components/insurer-orders/WorkTypes'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,6 +69,21 @@ function baselineFrom(rows: TemplateRow[], sel: Selection) {
   return { subject: row?.subject_template ?? builtIn.subject, body: toRichHtml(row?.body_template ?? builtIn.body) }
 }
 
+type Lines = Record<WorkType, string>
+
+// The order acknowledgement's line for each work type, for a version: its own
+// saved lines over what it inherits (a client version: the standard version's;
+// the standard version: the defaults).
+function inheritedLines(rows: TemplateRow[], sel: Selection): Lines {
+  if (sel.sendType !== 'order_acknowledgement') return { ...DEFAULT_WORK_TYPE_LINES }
+  return sel.clientId ? mergeWorkTypeLines(findRow(rows, { ...sel, clientId: null })?.work_type_lines) : { ...DEFAULT_WORK_TYPE_LINES }
+}
+function linesFrom(rows: TemplateRow[], sel: Selection): Lines {
+  if (sel.sendType !== 'order_acknowledgement') return { ...DEFAULT_WORK_TYPE_LINES }
+  return mergeWorkTypeLines(findRow(rows, sel)?.work_type_lines, sel.clientId ? findRow(rows, { ...sel, clientId: null })?.work_type_lines : null)
+}
+const sameLines = (a: Lines, b: Lines) => WORK_TYPES.every(t => (a[t] ?? '').trim() === (b[t] ?? '').trim())
+
 // One template per email type, plus optional per-client versions. The send
 // code picks the client's version when the job's client has one, else the
 // standard version, else the built-in default from lib/email/templates.ts.
@@ -87,6 +106,9 @@ export default function EmailTemplatesSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
+  // Order acknowledgement: the line for each work type, and which types the preview shows
+  const [lines, setLines] = useState<Lines>({ ...DEFAULT_WORK_TYPE_LINES })
+  const [previewTypes, setPreviewTypes] = useState<string[]>(['make_safe', 'BAR'])
 
   const subjectRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<RichTextEditorHandle>(null)
@@ -124,8 +146,10 @@ export default function EmailTemplatesSettingsPage() {
 
   const currentRow = findRow(rows, selection)
   const baseline = baselineFrom(rows, selection)
-  const dirty = !currentRow || subject !== baseline.subject || body !== baseline.body
-  const hasChanges = subject !== baseline.subject || body !== baseline.body
+  const baselineLines = linesFrom(rows, selection)
+  const linesChanged = selection.sendType === 'order_acknowledgement' && !sameLines(lines, baselineLines)
+  const dirty = !currentRow || subject !== baseline.subject || body !== baseline.body || linesChanged
+  const hasChanges = subject !== baseline.subject || body !== baseline.body || linesChanged
 
   // Switch the editor to a version, loading its text
   const openVersion = (sel: Selection, fromRows: TemplateRow[] = rows) => {
@@ -133,6 +157,7 @@ export default function EmailTemplatesSettingsPage() {
     setSelection(sel)
     setSubject(b.subject)
     setBody(b.body)
+    setLines(linesFrom(fromRows, sel))
     setSaveError(null)
     setSaved(false)
   }
@@ -278,7 +303,14 @@ export default function EmailTemplatesSettingsPage() {
     setSaveError(null)
     const typeLabel = EMAIL_SEND_TYPES.find(t => t.sendType === selection.sendType)?.label ?? selection.sendType
     const name = selection.clientId ? `${typeLabel} — ${clientName(selection.clientId)}` : `${typeLabel} — standard`
-    const fields = { subject_template: subject, body_template: body, name, updated_at: new Date().toISOString() }
+    // Only the lines that differ from what this version inherits, so a change
+    // to the standard version still reaches client versions that didn't change that line
+    const inherited = inheritedLines(rows, selection)
+    const ownLines = Object.fromEntries(WORK_TYPES.filter(t => lines[t].trim() && lines[t].trim() !== inherited[t].trim()).map(t => [t, lines[t].trim()]))
+    const fields = {
+      subject_template: subject, body_template: body, name, updated_at: new Date().toISOString(),
+      ...(selection.sendType === 'order_acknowledgement' ? { work_type_lines: Object.keys(ownLines).length ? ownLines : null } : {}),
+    }
 
     const res = currentRow
       ? await supabase.from('email_templates').update(fields).eq('id', currentRow.id).eq('tenant_id', tenantId).select().single()
@@ -331,6 +363,7 @@ export default function EmailTemplatesSettingsPage() {
     if (!currentRow && selection.clientId) { handleRemove(); return }
     setSubject(baseline.subject)
     setBody(baseline.body)
+    setLines(baselineLines)
     setSaveError(null)
   }
 
@@ -356,10 +389,13 @@ export default function EmailTemplatesSettingsPage() {
 
   const usingBuiltIn = !currentRow && selection.clientId === null
   const isUnsavedClientVersion = !currentRow && selection.clientId !== null
-  const rendered = preview && tenant
+  const previewVars = preview && selection.sendType === 'order_acknowledgement'
+    ? { ...preview.vars, ...workTypeVars(previewTypes, lines, preview.vars) }
+    : preview?.vars
+  const rendered = preview && previewVars && tenant
     ? {
-        subject: renderTemplate(subject, preview.vars),
-        html: renderTemplatePreviewHtml({ sendType: selection.sendType, body, vars: preview.vars, tenant }),
+        subject: renderTemplate(subject, previewVars),
+        html: renderTemplatePreviewHtml({ sendType: selection.sendType, body, vars: previewVars, tenant }),
       }
     : null
   const labelCls = 'block text-[10px] uppercase tracking-wider text-subtle font-semibold mb-2'
@@ -489,7 +525,7 @@ export default function EmailTemplatesSettingsPage() {
                 </div>
                 {missingTokens.length > 0 && (
                   <p className="text-xs text-warning mt-2">
-                    This email needs {missingTokens.map(k => `{${k}}`).join(', ')}. If it’s missing, the link is added at the end automatically.
+                    This email needs {missingTokens.map(k => `{${k}}`).join(', ')}. {MISSING_TOKEN_NOTES[selection.sendType] ?? ''}
                   </p>
                 )}
                 {unknownTokens.length > 0 && (
@@ -498,6 +534,31 @@ export default function EmailTemplatesSettingsPage() {
                   </p>
                 )}
               </div>
+
+              {selection.sendType === 'order_acknowledgement' && (
+                <div className="mb-4 border-t border-line-3 pt-4">
+                  <label className={labelCls}>What we&apos;ll do — a line for each work type</label>
+                  <p className="text-xs text-subtle mb-3 leading-relaxed">
+                    {'{work_type_lines}'} becomes the line for each thing the order asks for, make safe first — e.g. a make safe and a BAR gets both lines.
+                    Write them so they&apos;re true whether we do the work or a trade does. Placeholders such as {'{property_address}'} work here too.
+                    {selection.clientId ? ' Lines left as they are follow the standard version.' : ''}
+                  </p>
+                  <div className="space-y-2.5">
+                    {WORK_TYPES.map(t => (
+                      <div key={t}>
+                        <div className="text-xs font-medium text-body-soft mb-1">{WORK_TYPE_LABELS[t]}</div>
+                        <textarea
+                          value={lines[t]}
+                          onChange={e => setLines(prev => ({ ...prev, [t]: e.target.value }))}
+                          rows={2}
+                          className="w-full p-2 border border-line-3 rounded-md bg-surface-5 text-sm text-ink focus:outline-none focus:border-gold"
+                        />
+                        {!lines[t].trim() && <p className="text-[11px] text-warning mt-0.5">Empty — the default line will be used.</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3 flex-wrap">
                 {(currentRow || selection.clientId) && (
@@ -529,6 +590,11 @@ export default function EmailTemplatesSettingsPage() {
               <p className="text-xs text-subtle mb-4">
                 {preview?.source ? <>Filled in from {preview.source}</> : <>Filled in with example details</>}
               </p>
+              {selection.sendType === 'order_acknowledgement' && (
+                <div className="mb-4">
+                  <WorkTypeCheckboxes label="Preview an order that asks for" value={previewTypes} onChange={setPreviewTypes} />
+                </div>
+              )}
               {rendered ? (
                 <div className="border border-line-3 rounded-md overflow-hidden">
                   <div className="px-4 py-3 border-b border-line-3 bg-surface-5">

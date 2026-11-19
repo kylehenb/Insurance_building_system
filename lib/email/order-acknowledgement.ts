@@ -7,11 +7,16 @@ import { composeStandardEmail } from './compose'
 import { ensureAngleBrackets } from './build-raw'
 import { isValidEmail, sendEmailViaGmail } from '@/lib/signing/email/gmail'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
+import { mergeWorkTypeLines, workTypeVars } from '@/lib/insurer-orders/acknowledgement-lines'
+import { orderWorkTypes } from '@/lib/insurer-orders/work-order-type'
 
 // The automatic reply to whoever sent an insurer order, sent when the order
 // is lodged as a new job (lib/insurer-orders/lodge). It replies in the order
 // email's Gmail thread using the 'order_acknowledgement' template
 // (Settings → Email Templates), and is recorded on the job's comms log.
+// It says what we'll do for each thing the order asks for — a line per work
+// type ({work_type_lines}, lib/insurer-orders/acknowledgement-lines.ts) — and
+// is held when the order's work types are missing or unknown.
 // The order's checks (lib/insurer-orders/checks.ts) can add a paragraph — e.g.
 // asking for the insured's phone number — or hold it back. It isn't sent
 // when someone in the office has already emailed the sender about the order.
@@ -40,7 +45,7 @@ export async function sendOrderAcknowledgement(
   const { tenantId, orderId, jobId } = params
   try {
     const [{ data: order }, { data: job }, { data: tenant }, { data: orderComms }] = await Promise.all([
-      supabase.from('insurer_orders').select('order_sender_email, order_sender_name, raw_email_subject, created_at, insured_phone, insured_name, property_address, insurer').eq('id', orderId).single(),
+      supabase.from('insurer_orders').select('order_sender_email, order_sender_name, raw_email_subject, created_at, insured_phone, insured_name, property_address, insurer, wo_types, wo_type').eq('id', orderId).single(),
       supabase.from('jobs').select('*').eq('id', jobId).single(),
       supabase.from('tenants').select('*').eq('id', tenantId).single(),
       supabase.from('communications').select('thread_id, gmail_message_id, subject')
@@ -68,15 +73,22 @@ export async function sendOrderAcknowledgement(
     if (replied) return { sent: false, alreadyReplied: true, skipped: `The office already replied to ${to} about this order${replied}` }
     const messageId = orderComm?.gmail_message_id || thread[0]?.messageId || null
 
-    const template = await resolveEmailTemplate(supabase, tenantId, 'order_acknowledgement', job.client_id)
-    const vars = {
+    const [template, lines] = await Promise.all([
+      resolveEmailTemplate(supabase, tenantId, 'order_acknowledgement', job.client_id),
+      resolveWorkTypeLines(supabase, tenantId, job.client_id),
+    ])
+    const baseVars = {
       ...documentTemplateVars({ job, tenant, contactName: order.order_sender_name?.trim().split(/\s+/)[0] || null }),
       order_subject: orderComm?.subject || order.raw_email_subject || '',
     }
+    const workVars = workTypeVars(orderWorkTypes(order), lines, baseVars)
+    const vars = { ...baseVars, ...workVars }
     const subject = renderTemplate(template.subject, vars).replace(/^(re:\s*)+/i, 'Re: ').trim()
     const fallbackSubject = `Order received – ${[job.property_address, job.claim_number && `Claim ${job.claim_number}`].filter(Boolean).join(' – ')}`
     const finalSubject = !subject || /^re:$/i.test(subject) ? fallbackSubject : subject
-    const body = withOrderLines(template.body, checks.flatMap(c => c.acknowledgementLine ? [c.acknowledgementLine] : []))
+    // A template without {work_type_lines} (written before it) still says what we'll do
+    const workLine = template.body.includes('{work_type_lines}') || !workVars.work_type_lines ? [] : [workVars.work_type_lines]
+    const body = withOrderLines(template.body, [...workLine, ...checks.flatMap(c => c.acknowledgementLine ? [c.acknowledgementLine] : [])])
     const { html, text } = composeStandardEmail(renderRichTemplate(body, vars), tenant)
 
     const sent = await sendEmailViaGmail(supabase, {
@@ -113,6 +125,22 @@ export async function sendOrderAcknowledgement(
     console.error(`[order-ack] send failed for order ${orderId}:`, err)
     return { sent: false, skipped: 'The email could not be sent' }
   }
+}
+
+/**
+ * The acknowledgement's line for each work type: the client's version of the
+ * template, else the standard version, else the defaults — per type.
+ */
+export async function resolveWorkTypeLines(supabase: SupabaseClient<Database>, tenantId: string, clientId: string | null) {
+  const { data, error } = await supabase.from('email_templates')
+    .select('client_id, work_type_lines, is_default, updated_at')
+    .eq('tenant_id', tenantId).eq('send_type', 'order_acknowledgement')
+  if (error) console.error('[order-ack] work type lines lookup failed:', error)
+  const rows = (data ?? []) as { client_id: string | null; work_type_lines: unknown; is_default: boolean | null; updated_at: string | null }[]
+  const newest = (a: typeof rows[number], b: typeof rows[number]) => Number(!!b.is_default) - Number(!!a.is_default) || (b.updated_at ?? '').localeCompare(a.updated_at ?? '')
+  const standard = rows.filter(r => r.client_id === null).sort(newest)[0]
+  const client = clientId ? rows.filter(r => r.client_id === clientId).sort(newest)[0] : undefined
+  return mergeWorkTypeLines(client?.work_type_lines, standard?.work_type_lines)
 }
 
 /**

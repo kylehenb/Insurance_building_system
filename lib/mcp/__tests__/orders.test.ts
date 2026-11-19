@@ -91,8 +91,8 @@ describe('list_insurer_orders', () => {
     ]
     const res = await listInsurerOrders.run({}, ctx)
     expect(res.text).toContain('asks for a make safe and a building assessment report')
-    expect(res.text).toContain('No work type — say what the order asks for')
-    expect(res.text).toContain('Work type "variation" isn\'t one the app knows')
+    expect(res.text).toContain('The order has no work type, so the acknowledgement wouldn\'t say what we\'ll do — tick what the order asks for.')
+    expect(res.text).toContain('The order\'s work type "variation" isn\'t one the app knows')
     expect((res.data as { orders: { work_types: string[] }[] }).orders[0].work_types).toEqual(['make_safe', 'BAR'])
   })
 })

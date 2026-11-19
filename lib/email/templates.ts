@@ -124,7 +124,8 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       'Insured: {insured_name}',
       'Our ref: {job_number}',
       '',
-      'We will contact the insured to arrange an inspection and let you know once the appointment is booked.',
+      // One line for each thing the order asks for (lib/insurer-orders/acknowledgement-lines.ts)
+      '{work_type_lines}',
       '',
       'Kind regards,',
       '{signature}',
@@ -328,6 +329,9 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
   ],
   order_acknowledgement: [
     { key: 'order_subject',    label: 'Order email subject', example: 'New BAR instruction – CLM-558213' },
+    // What we'll do: a line for each work type on the order, edited below the message (lib/insurer-orders/acknowledgement-lines.ts)
+    { key: 'work_type_lines',  label: 'What we\'ll do (a line per work type)', example: 'We will contact the insured to arrange an appointment and will update you once it has been scheduled.' },
+    { key: 'work_types',       label: 'What was asked for', example: 'a building assessment report' },
     // Filled by the order's checks (lib/insurer-orders/checks.ts); placed above the sign-off when the template has no {order_notes}
     { key: 'order_notes',      label: 'Order notes (e.g. asking for a phone number)', example: 'There was no contact number for the insured on the order. Could you please send through the best phone number to reach them?' },
     ...INSURER_DOCUMENT_TOKENS,
@@ -356,6 +360,14 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
 export const REQUIRED_TOKENS: Partial<Record<EmailSendType, string[]>> = {
   signing_request: ['signing_link'],
   signing_request_excess: ['signing_link'],
+  order_acknowledgement: ['work_type_lines'],
+}
+
+/** What happens when a required placeholder is missing from the template */
+export const MISSING_TOKEN_NOTES: Partial<Record<EmailSendType, string>> = {
+  signing_request: 'If it’s missing, the link is added at the end automatically.',
+  signing_request_excess: 'If it’s missing, the link is added at the end automatically.',
+  order_acknowledgement: 'If it’s missing, the lines are added above the sign-off automatically.',
 }
 
 /** Email types listed in Settings → Email Templates, in display order. */
@@ -383,7 +395,7 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
   {
     sendType: 'order_acknowledgement',
     label: 'Order acknowledgement',
-    description: 'Sent automatically to whoever sent the order when it is lodged as a new job, as a reply in the same email thread. Keep the subject as "Re: {order_subject}" so it stays in that thread. When the order needs something (e.g. no phone number for the insured), a request is added where {order_notes} is, or above the sign-off. Not sent if the office has already replied to the sender.',
+    description: 'Sent automatically to whoever sent the order when it is lodged as a new job, as a reply in the same email thread. Keep the subject as "Re: {order_subject}" so it stays in that thread. {work_type_lines} says what we\'ll do, with a line for each thing the order asks for (make safe, BAR, roof report…), edited below the message. When the order needs something (e.g. no phone number for the insured), a request is added where {order_notes} is, or above the sign-off. Not sent if the office has already replied to the sender, or while the order\'s work types are missing or unknown.',
   },
   {
     sendType: 'quote',

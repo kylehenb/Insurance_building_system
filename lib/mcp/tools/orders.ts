@@ -8,7 +8,7 @@ import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } f
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
-import { WORK_TYPES, WORK_TYPE_LABELS, isWorkType, mapWorkOrderTypes, orderWorkTypes, unknownWorkTypes, workTypesPhrase } from '@/lib/insurer-orders/work-order-type'
+import { WORK_TYPES, WORK_TYPE_LABELS, isWorkType, mapWorkOrderTypes, orderWorkTypes, workTypesPhrase } from '@/lib/insurer-orders/work-order-type'
 
 // Insurer orders by voice: the orders waiting to be lodged, finding an order
 // email the auto job lodger missed and turning it into an order, and lodging
@@ -33,10 +33,6 @@ function orderWarnings(o: OrderSummaryRow): string[] {
   if (!o.claim_number) warnings.push('No claim number — it can\'t be lodged until one is added in the app.')
   if (!o.property_address) warnings.push('No property address.')
   if (!o.insured_name) warnings.push('No insured name.')
-  const types = orderWorkTypes(o)
-  if (!types.length) warnings.push('No work type — say what the order asks for (update_insurer_order work_types); it can\'t be lodged until then.')
-  const unknown = unknownWorkTypes(types)
-  if (unknown.length) warnings.push(`Work type "${unknown.join('", "')}" isn't one the app knows — correct it before lodging.`)
   if (o.parse_status === 'needs_review') warnings.push('Marked "needs review" — check the details.')
   // The order's checks: no phone number, landline only… (lib/insurer-orders/checks.ts)
   for (const check of runOrderChecks(o)) warnings.push(check.acknowledgementLine ? `${check.message} The acknowledgement will ask the sender about it.` : check.message)

@@ -849,6 +849,7 @@ export type Database = {
           subject_template: string | null
           tenant_id: string
           updated_at: string | null
+          work_type_lines: Json | null
         }
         Insert: {
           body_template?: string | null
@@ -861,6 +862,7 @@ export type Database = {
           subject_template?: string | null
           tenant_id: string
           updated_at?: string | null
+          work_type_lines?: Json | null
         }
         Update: {
           body_template?: string | null
@@ -873,6 +875,7 @@ export type Database = {
           subject_template?: string | null
           tenant_id?: string
           updated_at?: string | null
+          work_type_lines?: Json | null
         }
         Relationships: [
           {

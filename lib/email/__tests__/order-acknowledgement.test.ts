@@ -143,3 +143,83 @@ describe('withOrderLines', () => {
     expect(withOrderLines('<p>Hi,</p><p>{signature}</p>', [])).toBe('<p>Hi,</p><p>{signature}</p>')
   })
 })
+
+const { DEFAULT_WORK_TYPE_LINES } = await import('@/lib/insurer-orders/acknowledgement-lines')
+const { WORK_TYPES } = await import('@/lib/insurer-orders/work-order-type')
+
+describe('what the acknowledgement says we\'ll do, for each work type the order asks for', () => {
+  const LIVE_BODY = '<p>Hi {contact_name},</p><p></p><p>Thanks for sending this through. {work_type_lines}</p><p></p><p>{signature}</p>'
+  const standard = (over: Row = {}) => ({ id: 'et1', tenant_id: 't1', send_type: 'order_acknowledgement', client_id: null, is_default: true, name: 'Standard', subject_template: 'Re: {order_subject}', body_template: LIVE_BODY, work_type_lines: null, ...over })
+  const count = (text: string, needle: string) => text.split(needle).length - 1
+  const sentText = () => String(inserted.communications.at(-1)?.content ?? '')
+
+  // Every combination of the six types: 63 orders
+  const combos: string[][] = []
+  for (let mask = 1; mask < 1 << WORK_TYPES.length; mask++) combos.push(WORK_TYPES.filter((_, i) => mask & (1 << i)))
+
+  it('says each requested type\'s line exactly once, make safe first, and nothing for types not asked for — every combination', async () => {
+    db.email_templates = [standard()]
+    for (const types of combos) {
+      // Stored in any order: the email always follows the app's order
+      db.insurer_orders[0].wo_types = [...types].reverse()
+      for (const k of Object.keys(inserted)) delete inserted[k]
+      expect((await sendOrderAcknowledgement(supabase, params)).sent).toBe(true)
+      const text = sentText()
+      const positions = types.map(t => text.indexOf(DEFAULT_WORK_TYPE_LINES[t]))
+      for (const t of types) expect(count(text, DEFAULT_WORK_TYPE_LINES[t]), `${types.join('+')}: ${t}`).toBe(1)
+      expect(positions, types.join('+')).toEqual([...positions].sort((a, b) => a - b))
+      for (const t of WORK_TYPES.filter(t => !types.includes(t))) expect(text, `${types.join('+')} mentions ${t}`).not.toContain(DEFAULT_WORK_TYPE_LINES[t])
+      // The BAR's appointment wording only ever comes with a BAR
+      if (!types.includes('BAR')) expect(text).not.toMatch(/arrange an appointment|inspection/i)
+      expect(text).not.toContain('{work_type_lines}')
+    }
+  })
+
+  it('reads as one paragraph in the office\'s template: make safe and BAR', async () => {
+    db.email_templates = [standard()]
+    db.insurer_orders[0].wo_types = ['BAR', 'make_safe']
+    await sendOrderAcknowledgement(supabase, params)
+    expect(sentText()).toContain(`Thanks for sending this through. ${DEFAULT_WORK_TYPE_LINES.make_safe} ${DEFAULT_WORK_TYPE_LINES.BAR}`)
+  })
+
+  it('uses the lines edited in Settings: the client\'s version over the standard version over the defaults', async () => {
+    db.jobs[0].client_id = 'c1'
+    db.email_templates = [
+      standard({ work_type_lines: { make_safe: 'Standard make safe line for {property_address}.', quote_only: 'Standard quote line.' } }),
+      standard({ id: 'et2', client_id: 'c1', name: 'Castle', work_type_lines: { quote_only: 'Castle quote line.' } }),
+    ]
+    db.insurer_orders[0].wo_types = ['make_safe', 'BAR', 'quote_only']
+    await sendOrderAcknowledgement(supabase, params)
+    const text = sentText()
+    expect(text).toContain('Standard make safe line for 45 Randell Cres.')
+    expect(text).toContain(DEFAULT_WORK_TYPE_LINES.BAR)
+    expect(text).toContain('Castle quote line.')
+    expect(text).not.toContain('Standard quote line.')
+  })
+
+  it('adds the lines above the sign-off of a template written without {work_type_lines}', async () => {
+    db.email_templates = [standard({ body_template: '<p>Hi {contact_name},</p><p></p><p>Thanks for sending this through.</p><p></p><p>Kind regards,</p><p>{signature}</p>' })]
+    db.insurer_orders[0].wo_types = ['roof_report']
+    await sendOrderAcknowledgement(supabase, params)
+    expect(sentText()).toMatch(new RegExp(`Thanks for sending this through\\.\\s+${DEFAULT_WORK_TYPE_LINES.roof_report.replace(/\./g, '\\.')}\\s+Kind regards,`))
+  })
+
+  it('is held, not sent with the wrong wording, when the order has no work type or one the app doesn\'t know', async () => {
+    db.email_templates = [standard()]
+    for (const types of [[], ['variation'], ['BAR', 'Combination']]) {
+      db.insurer_orders[0].wo_types = types
+      const res = await sendOrderAcknowledgement(supabase, params)
+      expect(res.sent).toBe(false)
+      expect(res.skipped).toMatch(/work type/)
+    }
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('reads an older order\'s single work type', async () => {
+    db.email_templates = [standard()]
+    db.insurer_orders[0].wo_types = []
+    db.insurer_orders[0].wo_type = 'make_safe'
+    await sendOrderAcknowledgement(supabase, params)
+    expect(sentText()).toContain(DEFAULT_WORK_TYPE_LINES.make_safe)
+  })
+})

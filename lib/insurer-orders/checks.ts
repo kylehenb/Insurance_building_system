@@ -8,12 +8,17 @@
 // check to ORDER_CHECKS. Nothing else needs to change. Client-safe: the
 // Insurer Orders page runs the same checks.
 
+import { workTypesProblem } from './acknowledgement-lines'
+import { orderWorkTypes } from './work-order-type'
+
 /** The order fields the checks read */
 export interface OrderFacts {
   insured_phone?: string | null
   insured_name?: string | null
   property_address?: string | null
   insurer?: string | null
+  wo_types?: string[] | null
+  wo_type?: string | null
 }
 
 export interface OrderCheckResult {
@@ -46,6 +51,17 @@ export function phoneKind(phone: string | null | undefined): PhoneKind {
 }
 
 export const ORDER_CHECKS: OrderCheck[] = [
+  {
+    // The acknowledgement says what we'll do for each thing asked for, so it
+    // can't go without knowing what that is. (Only checked once the order's
+    // types are known to the caller: wo_types/wo_type given.)
+    key: 'work_types',
+    run: o => {
+      if (!('wo_types' in o) && !('wo_type' in o)) return null
+      const problem = workTypesProblem(orderWorkTypes(o))
+      return problem ? { key: 'work_types', message: `${problem}.`, holdAcknowledgement: problem } : null
+    },
+  },
   {
     key: 'no_phone',
     run: o => phoneKind(o.insured_phone) === 'none'
