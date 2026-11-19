@@ -819,6 +819,26 @@ CREATE TABLE work_orders (
 );
 ```
 
+### 4.14d job_services
+Requested services — a make safe, roof report, leak detection or specialist report an insurer asked for, tracked until its report and invoice have gone (WF-2, `lib/jobs/services.ts`). Read in the browser; written only through the API (`services.manage`).
+
+```sql
+CREATE TABLE job_services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL,
+  job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  insurer_order_id UUID REFERENCES insurer_orders(id), -- the order that asked for it (null when added by hand)
+  service_type TEXT NOT NULL,          -- 'make_safe' | 'roof_report' | 'leak_detection' | 'specialist'
+  status TEXT NOT NULL DEFAULT 'unassigned', -- 'unassigned' | 'in_house' | 'trade' | 'done' | 'cancelled'
+  work_order_id UUID REFERENCES work_orders(id), -- when a trade does it
+  report_id UUID REFERENCES reports(id),
+  invoice_id UUID REFERENCES invoices(id),
+  notes TEXT,                          -- why it wasn't needed
+  assigned_at TIMESTAMPTZ, assigned_by UUID, closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
 ### 4.14a work_order_visits
 ```sql
 -- One record per visit per work order.
@@ -1032,6 +1052,7 @@ CREATE TABLE email_templates (
   body_template TEXT,
   is_default BOOLEAN DEFAULT false,    -- one default per send_type
   persona TEXT DEFAULT 'human',        -- 'human' | 'gary' | 'client_comms_bot'
+  work_type_lines JSONB,               -- order_acknowledgement only: { "make_safe": "...", "BAR": "..." } for {work_type_lines} (WF-1)
   updated_at TIMESTAMPTZ DEFAULT now(),
   created_at TIMESTAMPTZ DEFAULT now()
 );
