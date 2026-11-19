@@ -28,6 +28,7 @@ import { closeJobs, reopenJob } from '@/lib/jobs/close'
 import { updateFieldJobDetails } from '@/lib/jobs/field-job-details'
 import { describeJobEdit, saveJobEdit, type JobEdit } from '@/lib/jobs/details'
 import { CLOSED_LABELS, type ClosedReason } from '@/lib/jobs/phase'
+import { describeServiceAction, runServiceAction, type ServiceAction } from '@/lib/jobs/services'
 import { decideSuggestion, type Decision } from '@/lib/health/suggestions'
 
 // What an approval request does once approved. Each operation calls the same
@@ -86,7 +87,7 @@ const documentsSend: Operation<{ refs: DocumentRef[]; mode: 'auto' | 'custom' | 
     return {
       summary: p.mode === 'mark_sent'
         ? `Mark ${titles} as sent on ${await jobNumber(ctx, jobId)} (not emailed)`
-        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${draft.replyToOrder ? ', as a reply to the insurer order email' : ''}${p.overrides.body ? ', with changed wording' : ''}${extraFilesPhrase(p.overrides.files)}`,
+        : `Email ${titles} on ${await jobNumber(ctx, jobId)} to ${p.overrides.to || draft.to || 'no address on file'}${draft.replyToOrder ? ', as a reply to the insurer order email' : ''}${p.overrides.body ? ', with changed wording' : ''}${extraFilesPhrase(p.overrides.files)}${p.overrides.sendWithoutInvoice ? ` — without its invoice (${p.overrides.sendWithoutInvoice.reason})` : ''}`,
       jobId,
     }
   },
@@ -232,6 +233,16 @@ const excessDecide: Operation<{ jobId: string; decision: ExcessDecision; note: s
   async run(p, ctx) {
     await recordExcessDecision(ctx.service, { tenantId: ctx.tenantId, jobId: p.jobId, userId: ctx.requesterId, decision: p.decision, note: p.note })
     return 'Excess decision recorded.'
+  },
+}
+
+const serviceArrange: Operation<{ action: ServiceAction }> = {
+  async describe(p, ctx) {
+    return describeServiceAction(ctx.service, ctx.tenantId, p.action)
+  },
+  async run(p, ctx) {
+    const result = await runServiceAction(ctx.service, ctx.tenantId, ctx.requesterId, p.action)
+    return [result.message, ...result.warnings].join(' ')
   },
 }
 
@@ -415,6 +426,7 @@ export const OPERATIONS = {
   'job.details': jobDetails,
   'job.edit': jobEdit,
   'excess.decide': excessDecide,
+  'service.arrange': serviceArrange,
   'invoice.generate': invoiceGenerate,
   'invoice.void': invoiceVoid,
   'mail.send': mailSend,
@@ -446,6 +458,7 @@ export const OPERATION_ACTIONS: Record<Exclude<OperationKey, 'voice.tool'>, Perm
   'job.details': 'jobs.edit',
   'job.edit': 'jobs.edit',
   'excess.decide': 'excess.decide',
+  'service.arrange': 'services.manage',
   'invoice.generate': 'invoices.manage',
   'invoice.void': 'invoices.manage',
   'mail.send': 'mail.send',

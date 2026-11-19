@@ -42,8 +42,8 @@ async function findContractors(name: string, ctx: McpContext) {
   return all.filter(t => [t.business_name, t.primary_contact, t.primary_trade].some(v => v?.toLowerCase().includes(needle)))
 }
 
-type ContractorPick = { id: string; business_name: string | null } | McpToolResult
-async function pickContractor(name: string, ctx: McpContext): Promise<ContractorPick> {
+export type ContractorPick = { id: string; business_name: string | null } | McpToolResult
+export async function pickContractor(name: string, ctx: McpContext): Promise<ContractorPick> {
   const matches = await findContractors(name, ctx)
   if (matches.length === 1) return matches[0]
   if (!matches.length) return { text: `No contractor matching "${name}".`, isError: true }

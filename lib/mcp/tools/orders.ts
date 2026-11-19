@@ -8,7 +8,7 @@ import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } f
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
-import { WORK_TYPES, WORK_TYPE_LABELS, isWorkType, mapWorkOrderTypes, orderWorkTypes, workTypesPhrase } from '@/lib/insurer-orders/work-order-type'
+import { WORK_TYPES, WORK_TYPE_LABELS, isServiceWorkType, isWorkType, mapWorkOrderTypes, orderWorkTypes, workTypesPhrase } from '@/lib/insurer-orders/work-order-type'
 
 // Insurer orders by voice: the orders waiting to be lodged, finding an order
 // email the auto job lodger missed and turning it into an order, and lodging
@@ -247,12 +247,16 @@ export const lodgeOrder: McpTool = {
         : skipAcknowledgement
           ? ' No acknowledgement was emailed, as asked; a note on the job says so.'
           : ` The acknowledgement wasn't sent: ${ack.skipped}.`
+      const services = (result.workTypes ?? []).filter(isServiceWorkType)
+      const servicesText = services.length
+        ? ` The ${workTypesPhrase(services).replace(/^an? /, '').replace(/ and an? /g, ' and ').replace(/, an? /g, ', ')} ${services.length > 1 ? 'are' : 'is'} on the job to arrange — in-house or a trade (arrange_service).`
+        : ''
       return {
         text: result.linkedToExisting
-          ? `That claim already has job ${result.jobNumber}, so the order was linked to it.`
-          : `Lodged as job ${result.jobNumber}.${ackText}${result.sameAddressJobs?.length ? ` Same address as ${describeSameAddressJobs(result.sameAddressJobs)}; noted on the job.` : ''}`,
+          ? `That claim already has job ${result.jobNumber}, so the order was linked to it.${servicesText}`
+          : `Lodged as job ${result.jobNumber}.${ackText}${servicesText}${result.sameAddressJobs?.length ? ` Same address as ${describeSameAddressJobs(result.sameAddressJobs)}; noted on the job.` : ''}`,
         data: {
-          job_number: result.jobNumber, job_id: result.jobId, linked_to_existing: !!result.linkedToExisting,
+          job_number: result.jobNumber, job_id: result.jobId, linked_to_existing: !!result.linkedToExisting, work_types: result.workTypes ?? [],
           ...(result.sameAddressJobs?.length ? { same_address_jobs: result.sameAddressJobs } : {}),
           ...(ack ? { acknowledgement_sent: ack.sent, acknowledgement_to: ack.to ?? null, acknowledgement_skipped: ack.skipped ?? null } : {}),
         },

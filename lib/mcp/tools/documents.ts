@@ -1,4 +1,5 @@
 import type { Json } from '@/lib/supabase/database.types'
+import { ReportWithoutInvoiceError } from '@/lib/documents/send/invoice-check'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { findJob, money, normaliseJobNumber, spokenDate } from '@/lib/mcp/tools/work-orders'
 import {
@@ -90,6 +91,9 @@ function parseDocuments(args: Record<string, unknown>): DocumentRef[] | McpToolR
 const isResult = (v: unknown): v is McpToolResult => !!v && typeof v === 'object' && 'text' in v
 
 function errorResult(err: unknown): McpToolResult {
+  if (err instanceof ReportWithoutInvoiceError) {
+    return { text: `Not sent: ${err.message} To send it anyway, the user gives a reason (without_invoice_reason).`, data: { status: err.status, code: err.code, missing: err.missing }, isError: true }
+  }
   if (err instanceof DocumentSendError) return { text: err.message, data: { status: err.status }, isError: true }
   throw err
 }
@@ -285,12 +289,15 @@ export const sendDocuments: McpTool = {
     'Leave out to, cc, subject and body to send the standard email. If there is no recipient on file, ask the user for one and pass it as to.',
     'attach_photos ("2", "45-47", a label) / attach_files add the job\'s photos and uploaded files as they are (the "photos" document is all photos as one PDF).',
     'The same documents to the same people within 10 minutes are refused as a likely repeat; pass resend: true only if the user confirms they want it sent again.',
+    'A report goes to the insurer with its invoice: if its invoice isn\'t attached (or not raised yet) the send is refused and says so — attach the invoice,',
+    'or, only if the user says to send it anyway, call again with without_invoice_reason (their reason, noted on the job; it needs its own permission).',
     'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       documents: DOCUMENTS_SCHEMA,
+      without_invoice_reason: { type: 'string', description: 'Send a report without its invoice — only when the user says to, with their reason (e.g. "invoice going through the portal").' },
       to: { type: 'string', description: 'Send to these addresses instead of the default (comma-separate several). Only when the user gave them.' },
       cc: { type: 'string', description: 'Replace the default Cc. Empty string for no Cc.' },
       subject: { type: 'string', description: 'Replacement subject. Leave out for the standard subject.' },
@@ -304,6 +311,7 @@ export const sendDocuments: McpTool = {
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   permission: 'send.documents',
+  argsPermission: args => (typeof args.without_invoice_reason === 'string' && args.without_invoice_reason.trim() ? 'send.report_without_invoice' : null),
 
   async run(args, ctx): Promise<McpToolResult> {
     const refs = parseDocuments(args)
@@ -311,7 +319,12 @@ export const sendDocuments: McpTool = {
 
     const str = (k: string) => (typeof args[k] === 'string' ? args[k] as string : undefined)
     const nonEmpty = (k: string) => (str(k)?.trim() ? str(k) : undefined)
-    const overrides: DocumentEmailOverrides = { to: nonEmpty('to'), cc: str('cc'), subject: nonEmpty('subject'), body: nonEmpty('body') }
+    const withoutReason = nonEmpty('without_invoice_reason')?.trim()
+    if (withoutReason !== undefined && withoutReason.length < 3) return { text: 'Say why the report is going without its invoice.', isError: true }
+    const overrides: DocumentEmailOverrides = {
+      to: nonEmpty('to'), cc: str('cc'), subject: nonEmpty('subject'), body: nonEmpty('body'),
+      ...(withoutReason ? { sendWithoutInvoice: { reason: withoutReason.slice(0, 500) } } : {}),
+    }
     const ectx = emailContext(ctx)
 
     try {
@@ -355,8 +368,9 @@ export const sendDocuments: McpTool = {
 
       const result = await sendDocumentEmail(refs, ectx, overrides)
       const changes = result.statusChanges.map(c => c.description)
+      const without = withoutReason && draft.missingInvoices.length ? ' It went without its invoice; that and the reason are noted on the job.' : ''
       return {
-        text: `Emailed ${[titles, ...extraNames].join(', ')} to ${sentTo}.${changes.length ? ` ${changes.join('. ')}.` : ''}`,
+        text: `Emailed ${[titles, ...extraNames].join(', ')} to ${sentTo}.${changes.length ? ` ${changes.join('. ')}.` : ''}${without}`,
         data: { sent_to: sentTo, communication_id: result.communicationId, status_changes: changes, ...(extraNames.length ? { extra_attachments: extraNames } : {}) },
       }
     } catch (err) {

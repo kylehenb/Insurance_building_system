@@ -45,6 +45,11 @@ export interface McpTool {
    * approval" the call is queued for approval instead of run.
    */
   permission?: PermissionKey
+  /**
+   * A further permission these particular arguments need (e.g. sending a
+   * report without its invoice), checked the same way after `permission`.
+   */
+  argsPermission?: (args: Record<string, unknown>) => PermissionKey | null
   /** The tool checks the caller's permission itself (e.g. deciding approvals) */
   checksOwnPermission?: true
   /**
@@ -80,12 +85,16 @@ export async function callTool(tool: McpTool, args: Record<string, unknown>, ctx
   let ran = false
   let failed = false
   try {
-    const level = tool.permission ? await permissionLevel(ctx.tenantId, ctx.userId, tool.permission, ctx.supabase) : 'allowed'
-    if (level === 'blocked' && tool.permission) {
-      out = { text: refusalMessage(tool.permission, 'blocked'), isError: true }
-    } else if (level === 'approval' && tool.permission && !tool.runsAtApproval) {
+    // The tool's permission, then any the arguments add: the strictest decides
+    const keys = [tool.permission, tool.argsPermission?.(args)].filter((k): k is PermissionKey => !!k)
+    const levels = await Promise.all(keys.map(k => permissionLevel(ctx.tenantId, ctx.userId, k, ctx.supabase)))
+    const blockedKey = keys.find((_, i) => levels[i] === 'blocked')
+    const approvalKey = keys.find((_, i) => levels[i] === 'approval')
+    if (blockedKey) {
+      out = { text: refusalMessage(blockedKey, 'blocked'), isError: true }
+    } else if (approvalKey && !tool.runsAtApproval) {
       const requested = await requestApproval({
-        tenantId: ctx.tenantId, userId: ctx.userId, action: tool.permission,
+        tenantId: ctx.tenantId, userId: ctx.userId, action: approvalKey,
         operation: 'voice.tool', payload: chat ? { tool: tool.name, args, via: 'chat' } : { tool: tool.name, args },
         via: chat ? 'app' : 'voice', voiceKeyId: ctx.voiceKeyId, service: ctx.supabase,
       })

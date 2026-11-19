@@ -27,6 +27,7 @@ import { addJobAppointment } from '@/lib/mcp/tools/calendar'
 import { closeJobTool, reopenJobTool } from '@/lib/mcp/tools/close-jobs'
 import { updateJobContactTool, updateJobDetailsTool } from '@/lib/mcp/tools/job-details'
 import { decideHealthSuggestion, getAiCosts, getHealthCheck, listHealthSuggestions } from '@/lib/mcp/tools/health'
+import { arrangeService, listRequestedServices, prepareServiceInvoice } from '@/lib/mcp/tools/services'
 
 // Every tool the voice connector offers. Add new tools here and to the
 // "Voice connector" section of the tech spec.
@@ -79,6 +80,9 @@ export const MCP_TOOLS: McpTool[] = [
   lodgeOrder,
   updateInsurerOrder,
   linkOrderToJob,
+  listRequestedServices,
+  arrangeService,
+  prepareServiceInvoice,
   listJobEmails,
   getEmail,
   replyToEmailTool,

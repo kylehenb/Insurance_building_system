@@ -23,6 +23,14 @@ import {
   type PreparedDocument,
   type StatusChange,
 } from '@/lib/documents/send/documents'
+import {
+  describeMissingInvoice,
+  ReportWithoutInvoiceError,
+  reportsMissingInvoices,
+  type MissingInvoice,
+  type SendWithoutInvoice,
+} from '@/lib/documents/send/invoice-check'
+import { refreshJobServices } from '@/lib/jobs/services'
 
 // Emailing documents from a job (quotes, reports, invoices, TCC, photos).
 // The first document picks the email template and the recipients; any others
@@ -32,6 +40,9 @@ import {
 // thread (the inspection package does this). With inspectionId the
 // inspection is marked Sent and Locked once the email has gone.
 // Nothing changes on the documents until Gmail has accepted the email.
+// A report goes to the insurer with its invoice: without it the send stops
+// (lib/documents/send/invoice-check.ts) unless sendWithoutInvoice gives a
+// reason, which is noted on the job.
 
 type Job = Database['public']['Tables']['jobs']['Row']
 
@@ -73,6 +84,8 @@ export interface DocumentEmailDraft {
   otherDocuments: DocumentEmailAttachment[]
   /** Set when it will go as a reply in the insurer order's email thread */
   replyToOrder: { subject: string } | null
+  /** Reports in it that would go without their invoice (sending asks for a reason) */
+  missingInvoices: MissingInvoice[]
 }
 
 export interface DocumentEmailOverrides {
@@ -89,6 +102,8 @@ export interface DocumentEmailOverrides {
   replyToOrder?: boolean
   /** The documents are this inspection's package: mark it Sent and Locked once sent */
   inspectionId?: string
+  /** Send a report without its invoice, and why (needs the send.report_without_invoice permission) */
+  sendWithoutInvoice?: SendWithoutInvoice
 }
 
 /** What shapes the email itself (no edits): used by the draft and the send alike */
@@ -172,6 +187,10 @@ async function buildDraft(
   const vars = { ...documentTemplateVars({ job, tenant, contactName }), ...main.vars }
 
   const warnings = docs.flatMap(d => d.warnings)
+  const missingInvoices = await reportsMissingInvoices(ctx, docs)
+  for (const m of missingInvoices) {
+    warnings.push(`${describeMissingInvoice(m)}. Reports go with their invoice — attach it${m.reason === 'none' ? ' once it\'s raised' : ''}, or you'll be asked why it's going without.`)
+  }
   if (to.length === 0) {
     warnings.unshift(main.audience === 'insured'
       ? 'The insured has no email address on the job. Use Customise send to enter one.'
@@ -200,7 +219,27 @@ async function buildDraft(
     warnings,
     otherDocuments: (await listJobDocuments(ctx, job.id)).filter(o => !docs.some(d => documentRefKey(d.ref) === documentRefKey(o.ref))),
     replyToOrder: thread ? { subject: thread.subject } : null,
+    missingInvoices,
   }
+}
+
+/** Stops a report going without its invoice unless a reason was given; the reports it lets through */
+async function checkInvoices(ctx: PrintDataContext, docs: PreparedDocument[], without: SendWithoutInvoice | undefined): Promise<MissingInvoice[]> {
+  const missing = await reportsMissingInvoices(ctx, docs)
+  if (missing.length && !without?.reason) throw new ReportWithoutInvoiceError(missing)
+  return missing
+}
+
+/** The note on the job when a report went without its invoice (its requested service stays open: "invoice to send") */
+async function noteSentWithoutInvoice(ctx: DocumentEmailContext, jobId: string, missing: MissingInvoice[], without: SendWithoutInvoice | undefined, how: string) {
+  if (!missing.length || !without) return
+  const service = createServiceClient()
+  const content = `${how} without its invoice: ${missing.map(describeMissingInvoice).join('; ')}. Reason: ${without.reason}`
+  const { error } = await service.from('communications').insert({
+    tenant_id: ctx.tenantId, job_id: jobId, type: 'note', content, contact_name: 'Note',
+    source: 'report_without_invoice', created_by: ctx.actorId,
+  })
+  if (error) console.error('[document-send] without-invoice note insert failed:', error)
 }
 
 /** The job's quotes, reports and invoices, for "Attach another document" (and the voice connector's document list). */
@@ -251,6 +290,7 @@ export async function sendDocumentEmail(
   const docs = await prepareAll(refs, ctx)
   const main = docs[0]
   const inspection = overrides.inspectionId ? await inspectionForPackage(ctx, overrides.inspectionId, main.job.id) : null
+  const missingInvoices = await checkInvoices(ctx, docs, overrides.sendWithoutInvoice)
   const orderThread = overrides.replyToOrder && main.audience === 'insurer'
     ? await findOrderThread(ctx.supabase, ctx.tenantId, main.job.id, { withQuote: true })
     : null
@@ -360,6 +400,9 @@ export async function sendDocumentEmail(
     const change = await markInspectionPackageSent(service, ctx, inspection, docs)
     if (change) statusChanges.push(change)
   }
+  await noteSentWithoutInvoice(ctx, main.job.id, missingInvoices, overrides.sendWithoutInvoice, `Emailed ${missingInvoices.length > 1 ? 'reports' : 'the report'}`)
+  // A requested service is done once its report and invoice have gone (lib/jobs/services.ts)
+  if (statusChanges.length) await refreshJobServices(service, ctx.tenantId, main.job.id)
   return { communicationId: commErr ? null : communicationId, statusChanges }
 }
 
@@ -370,9 +413,10 @@ export async function sendDocumentEmail(
 export async function markDocumentsSentWithoutEmail(
   refs: DocumentRef[],
   ctx: DocumentEmailContext,
-  options: Pick<DocumentEmailOverrides, 'inspectionId'> = {},
+  options: Pick<DocumentEmailOverrides, 'inspectionId' | 'sendWithoutInvoice'> = {},
 ): Promise<DocumentSendResult> {
   const docs = await prepareAll(refs, ctx)
+  const missingInvoices = await checkInvoices(ctx, docs, options.sendWithoutInvoice)
   const inspection = options.inspectionId ? await inspectionForPackage(ctx, options.inspectionId, docs[0].job.id) : null
   const service = createServiceClient()
   const statusChanges: StatusChange[] = []
@@ -399,6 +443,8 @@ export async function markDocumentsSentWithoutEmail(
     })
     if (error) console.error('[document-send] mark-sent note insert failed:', error)
   }
+  await noteSentWithoutInvoice(ctx, docs[0].job.id, missingInvoices, options.sendWithoutInvoice, `Marked ${missingInvoices.length > 1 ? 'reports' : 'the report'} sent`)
+  if (statusChanges.length) await refreshJobServices(service, ctx.tenantId, docs[0].job.id)
   return { communicationId: null, statusChanges }
 }
 

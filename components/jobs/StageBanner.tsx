@@ -7,6 +7,7 @@ import { STAGE_CONFIG } from '@/lib/jobs/stageConfig'
 import type { JobStageKey } from '@/lib/jobs/getJobStage'
 import { CLOSED_LABELS, phaseLabel, STEP_LABELS, type ClosedReason, type PhaseStep } from '@/lib/jobs/phase-labels'
 import { OPEN_LOOP_CONFIG, type OpenLoop } from '@/lib/jobs/openLoops'
+import { WORK_TYPE_LABELS, isServiceWorkType } from '@/lib/insurer-orders/work-order-type'
 import { excessNeedsConfirming } from '@/lib/excess/decision'
 import { SendForSignatureDialog } from '@/app/dashboard/jobs/[jobId]/signing/SendForSignatureDialog'
 import { SigningStageCard } from '@/app/dashboard/jobs/[jobId]/signing/SigningStageCard'
@@ -72,6 +73,8 @@ type StageBannerProps = { jobId: string; tenantId: string }
 export default function StageBanner({ jobId }: StageBannerProps) {
   const [row, setRow] = useState<JobStageRow | null>(null)
   const [sendForSignatureVisible, setSendForSignatureVisible] = useState(false)
+  // Requested services still open (lib/jobs/services.ts), as open loops
+  const [services, setServices] = useState<{ id: string; service_type: string; status: string }[]>([])
 
   // Fetch job data client-side
   const fetchJobData = useCallback(async () => {
@@ -90,6 +93,18 @@ export default function StageBanner({ jobId }: StageBannerProps) {
   useEffect(() => {
     fetchJobData()
   }, [fetchJobData])
+
+  // Re-read when the job changes (arranging a service recomputes its stage)
+  const stageStamp = row?.current_stage_updated_at ?? null
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    supabase.from('job_services').select('id, service_type, status')
+      .eq('job_id', jobId).in('status', ['unassigned', 'in_house', 'trade'])
+      .then(({ data }: { data: { id: string; service_type: string; status: string }[] | null }) => setServices(data ?? []))
+  }, [jobId, stageStamp])
 
   // Live stage updates via Realtime — replaces the previous 3-second poll.
   // `jobs` is enabled in the supabase_realtime publication (see
@@ -186,9 +201,20 @@ export default function StageBanner({ jobId }: StageBannerProps) {
 
   const config = STAGE_CONFIG[effectiveKey]
 
-  // Open loops are not yet populated from the database, apart from the
-  // excess check, which reads straight off the job row (kept live by Realtime)
-  const openLoops: OpenLoop[] = []
+  // Open loops: the requested services still open (a make safe nobody's
+  // doing is urgent), and the excess check, which reads straight off the job
+  // row (kept live by Realtime)
+  const openLoops: OpenLoop[] = isCancelledKey(effectiveKey) ? [] : services.map(s => {
+    const type = s.service_type === 'make_safe' ? 'make_safe_required' as const : 'specialist_report_required' as const
+    const label = isServiceWorkType(s.service_type) ? WORK_TYPE_LABELS[s.service_type] : s.service_type
+    return {
+      ...OPEN_LOOP_CONFIG[type],
+      type,
+      entityId: s.id,
+      label: s.status === 'unassigned' ? `${label} — not yet arranged` : `${label} — ${s.status === 'trade' ? 'with a trade' : 'in-house'}, report and invoice to send`,
+      urgency: s.status === 'unassigned' && s.service_type === 'make_safe' ? 'urgent' as const : 'normal' as const,
+    }
+  })
   if (
     !isCancelledKey(effectiveKey) &&
     excessNeedsConfirming({
@@ -473,7 +499,7 @@ export default function StageBanner({ jobId }: StageBannerProps) {
                 const isUrgent = loop.urgency === 'urgent'
                 return (
                   <div
-                    key={loop.type}
+                    key={`${loop.type}:${loop.entityId ?? ''}`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

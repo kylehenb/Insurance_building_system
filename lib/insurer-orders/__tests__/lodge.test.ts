@@ -54,6 +54,8 @@ vi.mock('@/lib/invoices/report-to-invoice', () => ({ createInvoiceForReport: (..
 vi.mock('@/lib/jobs/recomputeStage', () => ({ recomputeAndSaveStage: async () => {} }))
 vi.mock('@/lib/communications/thread-link', () => ({ linkOrderThreadsToJob: async () => {} }))
 vi.mock('@/lib/clients/resolve-insurer', () => ({ resolveInsurerClient: async () => null }))
+const services = vi.fn()
+vi.mock('@/lib/jobs/services', () => ({ createServicesForOrder: (...a: unknown[]) => services(...a) }))
 
 const { lodgeInsurerOrder } = await import('../lodge')
 const supabase = { from: query } as never
@@ -72,6 +74,7 @@ beforeEach(() => {
   db.users = [{ id: 'u1', tenant_id: 't1', name: 'Kyle' }]
   ack.mockResolvedValue({ sent: true, to: 'claims@castle.com.au' })
   invoice.mockResolvedValue({ invoiceRef: 'INV-1' })
+  services.mockResolvedValue([])
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })
 
@@ -151,5 +154,66 @@ describe('lodgeInsurerOrder', () => {
       job_id: result.jobId, type: 'note', source: 'order_same_address',
       content: 'Same address as job IRC1037 (claim CLM0).',
     })])
+  })
+
+  describe('what each work type creates', () => {
+    const lodge = async (wo_types: string[]) => {
+      db.insurer_orders[0].wo_types = wo_types
+      return lodgeInsurerOrder(supabase, 'o1', { tenantId: 't1' })
+    }
+
+    it('BAR + make safe: the BAR\'s inspection, report, quote and invoice, and the make safe as a service to arrange', async () => {
+      const result = await lodge(['make_safe', 'BAR'])
+      expect(result.workTypes).toEqual(['make_safe', 'BAR'])
+      expect(inserted.inspections).toHaveLength(1)
+      expect(inserted.reports).toEqual([expect.objectContaining({ report_type: 'BAR', report_ref: 'BAR-IRC1080-1' })])
+      expect(inserted.quotes).toEqual([expect.objectContaining({ inspection_id: inserted.inspections[0].id, report_id: inserted.reports[0].id })])
+      expect(invoice).toHaveBeenCalledTimes(1)
+      expect(invoice).toHaveBeenCalledWith(supabase, expect.objectContaining({ reportType: 'BAR' }))
+      expect(services).toHaveBeenCalledWith(supabase, { tenantId: 't1', jobId: result.jobId, orderId: 'o1', types: ['make_safe', 'BAR'] })
+    })
+
+    it('make safe alone: no report or invoice made up front — just the service', async () => {
+      await lodge(['make_safe'])
+      expect(inserted.inspections).toBeUndefined()
+      expect(inserted.reports).toBeUndefined()
+      expect(inserted.quotes).toBeUndefined()
+      expect(invoice).not.toHaveBeenCalled()
+      expect(services).toHaveBeenCalledWith(supabase, expect.objectContaining({ types: ['make_safe'] }))
+    })
+
+    it('make safe + quote only: a quote and the make safe service', async () => {
+      await lodge(['make_safe', 'quote_only'])
+      expect(inserted.quotes).toEqual([expect.objectContaining({ inspection_id: null, report_id: null })])
+      expect(inserted.reports).toBeUndefined()
+      expect(services).toHaveBeenCalledWith(supabase, expect.objectContaining({ types: ['make_safe', 'quote_only'] }))
+    })
+
+    it('BAR + roof report: the BAR\'s records and a roof report service', async () => {
+      await lodge(['BAR', 'roof_report'])
+      expect(inserted.reports).toHaveLength(1)
+      expect(services).toHaveBeenCalledWith(supabase, expect.objectContaining({ types: ['BAR', 'roof_report'] }))
+    })
+
+    it('reads an older order\'s single type, including "Quote Only" as it was once saved', async () => {
+      db.insurer_orders[0].wo_type = 'Quote Only'
+      await lodge([])
+      expect(inserted.quotes).toHaveLength(1)
+      expect(inserted.reports).toBeUndefined()
+    })
+
+    it('won\'t lodge an order with no work type, or one the app doesn\'t know', async () => {
+      db.insurer_orders[0].wo_type = null
+      await expect(lodge([])).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/work types/) })
+      await expect(lodge(['variation'])).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/"variation"/) })
+      expect(inserted.jobs).toBeUndefined()
+    })
+
+    it('a second order on a claim that has a job adds what\'s new to that job', async () => {
+      db.jobs = [{ id: 'j1', tenant_id: 't1', job_number: 'IRC1001', claim_number: 'CLM1' }]
+      const result = await lodge(['make_safe'])
+      expect(result).toMatchObject({ jobNumber: 'IRC1001', linkedToExisting: true })
+      expect(services).toHaveBeenCalledWith(supabase, { tenantId: 't1', jobId: 'j1', orderId: 'o1', types: ['make_safe'] })
+    })
   })
 })

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { JobDetailShell } from './components/JobDetailShell'
 import StageBanner from '@/components/jobs/StageBanner'
+import RequestedServices from '@/components/jobs/RequestedServices'
 
 type JobRow = Omit<Database['public']['Tables']['jobs']['Row'], 'status'> & {
   override_stage: 'on_hold' | 'cancelled' | null
@@ -73,7 +74,7 @@ async function JobDetailPage({ params }: JobDetailPageProps) {
   return (
     <Suspense>
       <JobDetailShell
-        stageBanner={<StageBanner jobId={jobId} tenantId={tenant_id!} />}
+        stageBanner={<><StageBanner jobId={jobId} tenantId={tenant_id!} /><RequestedServices jobId={jobId} /></>}
         job={{
           id: job.id,
           job_number: job.job_number,

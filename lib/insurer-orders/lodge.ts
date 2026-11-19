@@ -11,9 +11,14 @@ import { normaliseLossType } from '@/lib/loss-types'
 import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { recordOrderLodged } from './learning'
 import { runOrderChecks } from './checks'
+import { orderWorkTypes, unknownWorkTypes, workTypesPhrase } from './work-order-type'
+import { createServicesForOrder } from '@/lib/jobs/services'
 
 // Lodging an insurer order: creates the job (next job number, KPI due dates,
-// client), the inspection/report/quote/invoice its work order type needs, links
+// client) and what each of its work types needs — a BAR the inspection,
+// report, quote and invoice; quote only a quote; a make safe, roof report,
+// leak detection or specialist report a requested service to arrange later
+// (lib/jobs/services.ts) — links
 // the order's email thread, notifies the office and replies to the order's
 // sender acknowledging it (template 'order_acknowledgement') — or links the order to the
 // job that already has its claim number. Used by the Lodge button
@@ -44,6 +49,8 @@ export interface LodgeResult {
   message?: string
   /** The acknowledgement reply to the order's sender (new jobs only) */
   acknowledgement?: OrderAcknowledgementResult
+  /** What the order asked for (insurer_orders.wo_types) */
+  workTypes?: string[]
   /** Earlier jobs at the same address under other claims (new jobs only; never blocks the lodge) */
   sameAddressJobs?: { jobNumber: string; claimNumber: string | null }[]
 }
@@ -98,6 +105,13 @@ export async function lodgeInsurerOrder(
   if (order.job_id) {
     throw new LodgeError('Order already lodged', 400)
   }
+
+  // Step 3a: What it asks for must be known — it decides what's created and
+  // what the acknowledgement says
+  const types = orderWorkTypes(order)
+  if (!types.length) throw new LodgeError('Tick what the order asks for (its work types) before lodging', 400)
+  const unknown = unknownWorkTypes(types)
+  if (unknown.length) throw new LodgeError(`Work type "${unknown.join('", "')}" isn't one the app knows — correct it before lodging`, 400)
 
   const tenantId = order.tenant_id
 
@@ -160,13 +174,16 @@ export async function lodgeInsurerOrder(
     }
 
     console.log('[lodge] order linked to existing job')
+    // Anything new it asks for (a make safe on a job that had a BAR, say)
+    await addRequestedServices(supabase, tenantId, existingJobByClaim.id, orderId, types)
     await linkOrderThreadsToJob(supabase, tenantId, orderId, existingJobByClaim.id)
     await recomputeAndSaveStage(existingJobByClaim.id)
     return {
       jobNumber: existingJobByClaim.job_number,
       jobId: existingJobByClaim.id,
       linkedToExisting: true,
-      message: 'Order linked to existing job with same claim number'
+      message: 'Order linked to existing job with same claim number',
+      workTypes: types,
     }
   }
 
@@ -297,12 +314,15 @@ export async function lodgeInsurerOrder(
     .update({ job_sequence: nextNum } as unknown as Database['public']['Tables']['tenants']['Update'])
     .eq('id', tenantId)
 
-  // Step 6: Conditionally create inspection based on wo_type
+  // Step 6: What the order asks for. A BAR gets the inspection, its report,
+  // invoice and quote; quote only a quote; a make safe, roof report, leak
+  // detection or specialist report becomes a requested service on the job,
+  // done in-house or by a trade later (lib/jobs/services.ts).
   let inspectionId: string | null = null
-  const wo_type = order.wo_type
+  let reportId: string | null = null
+  let quoteId: string | null = null
 
-  if (wo_type === 'BAR') {
-    console.log('[lodge] creating inspection for wo_type:', wo_type)
+  if (types.includes('BAR')) {
     const { data: newInspection, error: inspError } = await supabase
       .from('inspections')
       .insert({
@@ -318,27 +338,16 @@ export async function lodgeInsurerOrder(
       console.error('[lodge] inspection create error:', inspError)
       throw new LodgeError('Failed to create inspection', 500)
     }
-
     inspectionId = newInspection.id
-    console.log('[lodge] inspection created:', inspectionId)
-  } else {
-    console.log('[lodge] skipping inspection creation for wo_type:', wo_type)
-  }
 
-  // Step 7: Conditionally create report based on wo_type
-  let reportId: string | null = null
-
-  if (wo_type === 'BAR' || wo_type === 'make_safe' || wo_type === 'roof_report' || wo_type === 'specialist') {
-    console.log('[lodge] creating report for wo_type:', wo_type)
-    const prefix = REPORT_TYPE_PREFIXES[wo_type] || 'RPT'
     const { data: newReport, error: reportError } = await supabase
       .from('reports')
       .insert({
         tenant_id: tenantId,
         job_id: jobId,
-        inspection_id: wo_type === 'BAR' ? inspectionId : null,
-        report_type: wo_type,
-        report_ref: `${prefix}-${jobNumber}-1`,
+        inspection_id: inspectionId,
+        report_type: 'BAR',
+        report_ref: `${REPORT_TYPE_PREFIXES.BAR}-${jobNumber}-1`,
         version: 1,
         is_locked: false,
         status: 'draft',
@@ -355,61 +364,40 @@ export async function lodgeInsurerOrder(
       console.error('[lodge] report create error:', reportError)
       throw new LodgeError('Failed to create report', 500)
     }
-
     reportId = newReport.id
-    console.log('[lodge] report created:', reportId)
 
-    // Step 7b: Auto-create invoice for the report
-    // Fetch property_details from job (may be null at this point, invoice will use default pricing)
+    // The BAR's invoice, so it's never missed (property details may be null yet: default pricing)
     const { data: jobWithProperty } = await supabase
       .from('jobs')
       .select('property_details')
       .eq('id', jobId)
       .single()
-
-    // Extract storeys from property_details JSONB if available
     const propertyDetails = jobWithProperty?.property_details as Record<string, unknown> | null
     const storeys = propertyDetails?.storeys as string | null
-    let propertyType: string | null = null
-    if (storeys === '2' || storeys === 'double') {
-      propertyType = 'double_storey'
-    } else if (storeys === '1' || storeys === 'single') {
-      propertyType = 'single_storey'
-    }
+    const propertyType = storeys === '2' || storeys === 'double' ? 'double_storey' : storeys === '1' || storeys === 'single' ? 'single_storey' : null
 
     const invoiceResult = await createInvoiceForReport(supabase, {
       tenantId,
       jobId,
       reportId,
-      inspectionId: wo_type === 'BAR' ? inspectionId : null,
-      reportType: wo_type,
+      inspectionId,
+      reportType: 'BAR',
       propertyType,
       propertyAddress: order.property_address,
       claimNumber: order.claim_number,
       jobNumber,
     })
-
-    if (invoiceResult) {
-      console.log('[lodge] auto-created invoice:', invoiceResult.invoiceRef)
-    } else {
-      console.warn('[lodge] failed to auto-create invoice for report')
-    }
-  } else {
-    console.log('[lodge] skipping report creation for wo_type:', wo_type)
+    if (!invoiceResult) console.warn('[lodge] failed to auto-create invoice for the BAR')
   }
 
-  // Step 8: Conditionally create quote based on wo_type
-  let quoteId: string | null = null
-
-  if (wo_type === 'BAR' || wo_type === 'quote_only') {
-    console.log('[lodge] creating quote for wo_type:', wo_type)
+  if (types.includes('BAR') || types.includes('quote_only')) {
     const { data: newQuote, error: quoteError } = await supabase
       .from('quotes')
       .insert({
         tenant_id: tenantId,
         job_id: jobId,
-        inspection_id: wo_type === 'BAR' ? inspectionId : null,
-        report_id: wo_type === 'BAR' ? reportId : null,
+        inspection_id: inspectionId,
+        report_id: reportId,
         quote_ref: `${jobNumber}-Q01`,
         quote_type: 'inspection',
         version: 1,
@@ -427,14 +415,10 @@ export async function lodgeInsurerOrder(
     }
 
     quoteId = newQuote.id
-    console.log('[lodge] quote created:', quoteId)
-  } else {
-    console.log('[lodge] skipping quote creation for wo_type:', wo_type)
   }
 
-  // Step 9: Update inspection with report_id and quote_id for BAR inspections
-  if (wo_type === 'BAR' && inspectionId && reportId && quoteId) {
-    console.log('[lodge] linking inspection to report and quote')
+  // Step 8: Link the BAR inspection to its report and quote
+  if (inspectionId && reportId && quoteId) {
     const { error: updateError } = await supabase
       .from('inspections')
       .update({ report_id: reportId, quote_id: quoteId })
@@ -444,8 +428,10 @@ export async function lodgeInsurerOrder(
       console.error('[lodge] inspection update error:', updateError)
       throw new LodgeError('Failed to link inspection to report and quote', 500)
     }
-    console.log('[lodge] inspection linked to report and quote')
   }
+
+  // Step 8b: The other things asked for, to arrange later
+  await addRequestedServices(supabase, tenantId, jobId, orderId, types)
 
   // Step 9: Update insurer_order
   console.log('[lodge] updating insurer_order')
@@ -510,7 +496,22 @@ export async function lodgeInsurerOrder(
   }
 
   console.log('[lodge] done — jobNumber:', jobNumber, 'jobId:', jobId)
-  return { jobNumber, jobId, acknowledgement, ...(sameAddressJobs.length ? { sameAddressJobs } : {}) }
+  return { jobNumber, jobId, acknowledgement, workTypes: types, ...(sameAddressJobs.length ? { sameAddressJobs } : {}) }
+}
+
+/** The make safe / roof report / leak detection / specialist services an order asks for, on the job */
+async function addRequestedServices(supabase: SupabaseClient<Database>, tenantId: string, jobId: string, orderId: string, types: string[]): Promise<void> {
+  try {
+    await createServicesForOrder(supabase, { tenantId, jobId, orderId, types })
+  } catch (err) {
+    console.error('[lodge] requested services create error:', err)
+    throw new LodgeError('Failed to add the requested services', 500)
+  }
+}
+
+/** "a make safe and a building assessment report" — what an order asked for */
+export function describeLodgedWork(types: readonly string[] | undefined): string {
+  return types?.length ? workTypesPhrase(types) : ''
 }
 
 // A note on the job's Comms feed (signed by whoever lodged it): why the

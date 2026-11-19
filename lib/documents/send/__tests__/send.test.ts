@@ -179,9 +179,14 @@ describe('buildDocumentEmailDraft', () => {
   })
 })
 
+/** An earlier invoice for the fixture report, already sent */
+const sentReportInvoice = () => fx.printInvoice({ id: '00000000-0000-4000-8000-000000000499', invoice_ref: 'INV-IRC1234-0', report_id: fx.printReport().id, status: 'sent' } as never)
+
 describe('sendDocumentEmail', () => {
   it('emails every attachment, records it on the job and marks the documents sent', async () => {
     const reportRef = { kind: 'report' as const, id: fx.printReport().id }
+    // The report's invoice went earlier, so the report can go on its own
+    db.invoices.push(sentReportInvoice())
     const result = await sendDocumentEmail([quoteRef, reportRef], ctx)
 
     expect(gmailSend).toHaveBeenCalledTimes(1)
@@ -301,6 +306,9 @@ describe('inspection package: reply in the insurer order thread', () => {
   const header = (name: string, value: string) => ({ name, value })
 
   beforeEach(() => {
+    // The package's invoice is the report's; tests sending the report alone have its invoice already gone
+    db.invoices[0].report_id = fx.printReport().id
+    db.invoices.push(sentReportInvoice())
     db.inspections = [{ id: INSPECTION_ID, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, inspection_ref: 'INS-1', status: 'submitted' }]
     db.insurer_orders = [{ id: ORDER_ID, tenant_id: fx.TENANT_ID, job_id: fx.JOB_ID, raw_email_subject: 'New order CLM-555' }]
     db.communications = [
@@ -456,3 +464,53 @@ describe('inspectionPackage', () => {
     await expect(inspectionPackage({ ...ctx, tenantId: 'other' }, INSPECTION_ID)).rejects.toThrow('Inspection not found')
   })
 })
+
+describe('a report goes with its invoice', () => {
+  const reportRef = { kind: 'report' as const, id: fx.printReport().id }
+  const invoiceRef = { kind: 'invoice' as const, id: fx.INVOICE_ID }
+  beforeEach(() => { db.invoices[0].report_id = fx.printReport().id })
+
+  it('stops a report going without its draft invoice, saying which, before rendering or sending anything', async () => {
+    await expect(sendDocumentEmail([reportRef], ctx)).rejects.toMatchObject({
+      status: 409, code: 'report_without_invoice',
+      message: "Building Assessment Report R-IRC1234-BAR's invoice INV-IRC1234-1 isn't attached. Reports go to the insurer with their invoice — attach it, or send anyway with a reason.",
+      missing: [expect.objectContaining({ reason: 'not_attached', invoiceRef: 'INV-IRC1234-1' })],
+    })
+    expect(renderPdf).not.toHaveBeenCalled()
+    expect(gmailSend).not.toHaveBeenCalled()
+  })
+
+  it('says so when the report has no invoice at all, and warns in the draft', async () => {
+    db.invoices = []
+    await expect(sendDocumentEmail([reportRef], ctx)).rejects.toThrow('has no invoice yet')
+    const draft = await buildDocumentEmailDraft([reportRef], ctx)
+    expect(draft.missingInvoices).toEqual([expect.objectContaining({ reason: 'none' })])
+    expect(draft.warnings.join(' ')).toMatch(/has no invoice yet\. Reports go with their invoice/)
+  })
+
+  it('sends with its invoice attached', async () => {
+    await sendDocumentEmail([reportRef, invoiceRef], ctx)
+    expect(gmailSend).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends anyway with a reason, noting it on the job', async () => {
+    await sendDocumentEmail([reportRef], ctx, { sendWithoutInvoice: { reason: 'Invoice through the portal' } })
+    expect(gmailSend).toHaveBeenCalledTimes(1)
+    expect(inserts.filter(i => i.table === 'communications').map(i => i.row)).toContainEqual(expect.objectContaining({
+      type: 'note', source: 'report_without_invoice',
+      content: "Emailed the report without its invoice: Building Assessment Report R-IRC1234-BAR's invoice INV-IRC1234-1 isn't attached. Reason: Invoice through the portal",
+    }))
+  })
+
+  it('checks Mark as sent too', async () => {
+    await expect(markDocumentsSentWithoutEmail([reportRef], ctx)).rejects.toMatchObject({ status: 409 })
+    await markDocumentsSentWithoutEmail([reportRef], ctx, { sendWithoutInvoice: { reason: 'Sent through the portal' } })
+    expect(db.reports[0].status).toBe('sent')
+  })
+
+  it('doesn\'t apply to quotes', async () => {
+    await sendDocumentEmail([{ kind: 'quote' as const, id: fx.printQuote().id }], ctx)
+    expect(gmailSend).toHaveBeenCalledTimes(1)
+  })
+})
+

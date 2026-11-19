@@ -2019,6 +2019,60 @@ export type Database = {
           },
         ]
       }
+      job_services: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          closed_at: string | null
+          created_at: string
+          id: string
+          insurer_order_id: string | null
+          invoice_id: string | null
+          job_id: string
+          notes: string | null
+          report_id: string | null
+          service_type: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          work_order_id: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          insurer_order_id?: string | null
+          invoice_id?: string | null
+          job_id: string
+          notes?: string | null
+          report_id?: string | null
+          service_type: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          work_order_id?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          insurer_order_id?: string | null
+          invoice_id?: string | null
+          job_id?: string
+          notes?: string | null
+          report_id?: string | null
+          service_type?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          work_order_id?: string | null
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
           adjuster: string | null

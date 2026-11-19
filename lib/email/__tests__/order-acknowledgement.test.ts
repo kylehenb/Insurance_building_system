@@ -154,7 +154,7 @@ describe('what the acknowledgement says we\'ll do, for each work type the order 
   const sentText = () => String(inserted.communications.at(-1)?.content ?? '')
 
   // Every combination of the six types: 63 orders
-  const combos: string[][] = []
+  const combos: (typeof WORK_TYPES[number])[][] = []
   for (let mask = 1; mask < 1 << WORK_TYPES.length; mask++) combos.push(WORK_TYPES.filter((_, i) => mask & (1 << i)))
 
   it('says each requested type\'s line exactly once, make safe first, and nothing for types not asked for — every combination', async () => {

@@ -91,6 +91,7 @@ describe('mcp route', () => {
       'get_signing', 'send_for_signature', 'resend_signing_request',
       'list_insurer_orders', 'find_order_emails', 'create_order_from_email', 'lodge_order',
       'update_insurer_order', 'link_order_to_job',
+      'list_requested_services', 'arrange_service', 'prepare_service_invoice',
       'list_job_emails', 'get_email', 'reply_to_email',
       'read_email_attachment', 'save_email', 'link_email_to_job',
       'recover_dropped_emails',

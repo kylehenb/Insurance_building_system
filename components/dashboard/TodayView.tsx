@@ -9,6 +9,7 @@ import { useCurrentUser } from '@/components/layout/current-user'
 import { ApprovalsPanel } from '@/components/approvals/approvals-panel'
 import { describePhase } from '@/lib/jobs/phase-labels'
 import { HealthPanel } from '@/components/health/HealthPanel'
+import { OpenServicesPanel } from '@/components/dashboard/OpenServicesPanel'
 
 const supabase = createBrowserClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -494,6 +495,9 @@ export function TodayView() {
         </div>
 
         <ApprovalsPanel />
+
+        {/* ── Requested services still open (make safes nobody's doing first) ── */}
+        <OpenServicesPanel />
 
         {/* ── TWO COL: flagged + weather ── */}
         <div className="two-col">

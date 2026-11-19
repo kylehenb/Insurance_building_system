@@ -59,7 +59,12 @@ interface Draft {
   warnings: string[]
   otherDocuments: Attachment[]
   replyToOrder: { subject: string } | null
+  /** Reports that would go without their invoice */
+  missingInvoices: { reportId: string; title: string }[]
 }
+
+/** The send stopped because a report would go without its invoice (409 report_without_invoice) */
+class WithoutInvoiceError extends Error {}
 
 /** The emailed PDF, rendered live, for the attachment link. */
 export function documentPdfUrl(ref: DocumentRef): string {
@@ -78,6 +83,7 @@ async function post(body: Record<string, unknown>) {
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
+  if (res.status === 409 && data?.code === 'report_without_invoice') throw new WithoutInvoiceError(data.error)
   if (!res.ok) throw responseError(data, 'Something went wrong')
   return data
 }
@@ -89,6 +95,9 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
   const [busy, setBusy]       = useState<null | 'auto' | 'custom' | 'mark_sent'>(null)
   const [sendError, setSendError] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
+  // A report going without its invoice: what was stopped, and the reason to send anyway
+  const [withoutInvoice, setWithoutInvoice] = useState<{ mode: 'auto' | 'custom' | 'mark_sent'; message: string } | null>(null)
+  const [withoutReason, setWithoutReason] = useState('')
 
   const [to, setTo]           = useState('')
   const [cc, setCc]           = useState('')
@@ -120,19 +129,24 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose, sending])
 
-  async function run(mode: 'auto' | 'custom' | 'mark_sent') {
+  async function run(mode: 'auto' | 'custom' | 'mark_sent', reason?: string) {
     setBusy(mode)
     setSendError(null)
     setPending(null)
     try {
       const refs = mode === 'custom' ? attachments.map(a => a.ref) : documents
-      const pkg = { ...(replyToOrder ? { replyToOrder } : {}), ...(inspectionId ? { inspectionId } : {}) }
+      const pkg = {
+        ...(replyToOrder ? { replyToOrder } : {}),
+        ...(inspectionId ? { inspectionId } : {}),
+        ...(reason ? { sendWithoutInvoice: { reason } } : {}),
+      }
       const result = await post(mode === 'custom'
         ? { mode, documents: refs, to, cc, subject, body, files: extraFileRefs(extraFiles), ...pkg }
         : { mode, documents: refs, ...pkg })
       onDone({ emailed: mode !== 'mark_sent', statusChanges: result.statusChanges ?? [] })
     } catch (err) {
-      if (isPendingApproval(err)) setPending(err.message)
+      if (err instanceof WithoutInvoiceError) setWithoutInvoice({ mode, message: err.message })
+      else if (isPendingApproval(err)) setPending(err.message)
       else setSendError(err instanceof Error ? err.message : String(err))
       setBusy(null)
     }
@@ -420,6 +434,32 @@ export function SendDocumentModal({ documents, title, allowMarkSent, markSentDes
           )}
 
           {pending && <ApprovalNotice message={pending} style={{ marginTop: 12 }} />}
+          {withoutInvoice && (
+            <div style={{ fontSize: 11, color: '#92400e', background: '#fef3e2', border: '1px solid #fcd38d', borderRadius: 6, padding: '10px', marginTop: 12, lineHeight: 1.5 }}>
+              <div style={{ marginBottom: 8 }}>{withoutInvoice.message}</div>
+              <label style={fieldLabel}>Why is it going without its invoice?</label>
+              <input
+                value={withoutReason}
+                onChange={e => setWithoutReason(e.target.value)}
+                placeholder="e.g. Invoice submitted through the insurer portal"
+                disabled={sending}
+                style={{ ...input, marginBottom: 8 }}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => { setWithoutInvoice(null); setWithoutReason('') }} disabled={sending} style={footerBtn}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => run(withoutInvoice.mode, withoutReason.trim())}
+                  disabled={sending || withoutReason.trim().length < 3}
+                  style={{ ...footerBtn, background: '#92400e', borderColor: '#92400e', color: '#fff', opacity: withoutReason.trim().length < 3 ? 0.5 : 1 }}
+                >
+                  {withoutInvoice.mode === 'mark_sent' ? 'Mark sent anyway' : 'Send anyway'}
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: '#9a9590', marginTop: 6 }}>The reason is noted on the job.</div>
+            </div>
+          )}
           {sendError && (
             <p style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, padding: '8px 10px', marginTop: 12, lineHeight: 1.5 }}>
               {sendError}

@@ -54,7 +54,8 @@ export async function buildQuotePdf(quoteId: string, ctx: PrintDataContext): Pro
 /** The title the report prints under (matches the report's own heading). */
 export function reportDocumentName(reportType: string): string {
   if (reportType === 'LDR') return 'Leak Detection Report'
-  if (reportType === 'roof') return 'Roof Report'
+  if (reportType === 'roof' || reportType === 'roof_report') return 'Roof Report'
+  if (reportType === 'specialist') return 'Specialist Report'
   if (reportType === 'make_safe') return 'Make Safe Report'
   return 'Building Assessment Report'
 }

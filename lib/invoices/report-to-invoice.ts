@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { generateInvoiceRef } from './ref'
 
 /**
  * Maps report types to invoice types
@@ -12,6 +13,7 @@ export function mapReportTypeToInvoiceType(reportType: string): string {
     roof_report: 'roof',
     specialist: 'specialist_passthrough',
     LDR: 'leak_detection',
+    leak_detection: 'leak_detection',
   }
   
   return mapping[reportType] || 'assessment'
@@ -33,6 +35,7 @@ export function getInvoiceTemplateCode(
     roof_report: 'single_storey_roof',
     specialist: 'specialist',
     LDR: 'leak_detection',
+    leak_detection: 'leak_detection',
   }
 
   let templateCode = baseMapping[reportType] || 'bar'
@@ -96,6 +99,7 @@ export async function getReportInvoicePrice(
       }
       break
     case 'LDR':
+    case 'leak_detection':
       price = client.leak_detection_report_amount || 0
       break
     case 'specialist':
@@ -195,16 +199,9 @@ export async function createInvoiceForReport(
   const gst = Math.round(amountExGst * DEFAULT_GST_PCT * 100) / 100
   const amountIncGst = Math.round((amountExGst + gst) * 100) / 100
 
-  // Generate invoice ref
-  const { data: existingInvoices } = await supabase
-    .from('invoices')
-    .select('*', { count: 'exact', head: true })
-    .eq('tenant_id', tenantId)
-    .eq('job_id', jobId)
-    .eq('direction', 'outbound')
-
-  const sequence = String((existingInvoices?.length ?? 0) + 1)
-  const invoiceRef = `INV-${jobNumber || jobId}-${sequence}`
+  // The job's next invoice number (a head-only count returned no rows, so
+  // every report invoice on a job was once numbered -1)
+  const invoiceRef = await generateInvoiceRef(supabase, tenantId, jobId, jobNumber || jobId)
 
   // Create invoice
   const { data: invoice, error: insertError } = await supabase

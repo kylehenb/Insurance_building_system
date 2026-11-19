@@ -152,7 +152,7 @@ export async function syncWorkOrdersFromQuote(supabase: Client, tenantId: string
 export async function createWorkOrder(
   supabase: Client,
   tenantId: string,
-  input: { jobId: string; tradeName: string; quoteId?: string | null; tradeId?: string | null },
+  input: { jobId: string; tradeName: string; quoteId?: string | null; tradeId?: string | null; workType?: string },
 ): Promise<WorkOrder> {
   const { data: job } = await supabase.from('jobs').select('id').eq('id', input.jobId).eq('tenant_id', tenantId).maybeSingle()
   if (!job) throw new WorkOrderEditError('Job not found', 404)
@@ -160,7 +160,7 @@ export async function createWorkOrder(
     .from('work_orders')
     .insert({
       tenant_id: tenantId, job_id: input.jobId, quote_id: input.quoteId ?? null, trade_name: input.tradeName, trade_id: input.tradeId ?? null,
-      work_type: 'repair', status: 'pending', gary_state: 'not_started', total_visits: 1, current_visit: 1,
+      work_type: input.workType ?? 'repair', status: 'pending', gary_state: 'not_started', total_visits: 1, current_visit: 1,
     })
     .select('*').single()
   if (error || !data) throw new WorkOrderEditError(error?.message ?? 'Could not create the work order', 500)
