@@ -3,7 +3,7 @@ import type { Part } from '@google/genai'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
 import type { Database } from '@/lib/supabase/database.types'
 import { orderLearning, orderSituation } from '@/lib/insurer-orders/learning'
-import { mapWorkOrderType } from '@/lib/insurer-orders/work-order-type'
+import { mapWorkOrderTypes } from '@/lib/insurer-orders/work-order-type'
 import { createServiceClient } from '@/lib/supabase/server'
 import { LOSS_TYPES_PROMPT_LIST, normaliseLossType } from '@/lib/loss-types'
 import { GEMINI_FLASH_MODEL } from '@/lib/ai/gemini'
@@ -88,7 +88,7 @@ const FALLBACK_PROMPT = [
   '  special_instructions, sum_insured_building (numeric, strip $ and commas),',
   '  excess_building (numeric, strip $ and commas), order_sender_name, order_sender_email,',
   '  adjuster_reference, portal_url (any URL linking to an external portal),',
-  '  work_order_type (one of: BAR | Make Safe | Roof Report | Specialist Report | Combination),',
+  '  work_order_types (array — every task the order asks for, see WORK ORDER TYPES below),',
   '  insurer (extract the actual insurer name from the email content, e.g., "Castle", "Allianz", "Suncorp"),',
   '  confidence (0.0–1.0 decimal — rate extraction quality, not classification confidence),',
   '  missing_fields (array of field names you could not find or that are null).',
@@ -131,6 +131,21 @@ const FALLBACK_PROMPT = [
   '     instruction. No reply prefix or prior thread content." }',
 ].join('\n')
 
+// Always appended: one order can ask for several things, and a prompt saved in
+// the prompts table may still ask for a single work_order_type.
+export const WORK_TYPES_INSTRUCTION = [
+  '',
+  '--- WORK ORDER TYPES (this overrides any work_order_type instruction above) ---',
+  'Return work_order_types: an array with EVERY task this order asks for, each one of:',
+  '  "BAR" (building assessment report / building inspection and report / assess and quote),',
+  '  "Make Safe", "Roof Report", "Leak Detection", "Specialist Report",',
+  '  "Quote Only" (a quote with no report or assessment).',
+  'One email often asks for more than one — e.g. "please attend to make safe and complete a building',
+  'assessment report" → ["Make Safe", "BAR"]; "BAR and roof report" → ["BAR", "Roof Report"];',
+  '"make safe and provide a quote" → ["Make Safe", "Quote Only"]. Read the subject, the body and the PDF.',
+  'Do not return "Combination". Use [] when the order does not say what is wanted.',
+].join('\n')
+
 // Appended after any DB-fetched custom prompt to enforce is_new_order classification
 // even if the stored prompt pre-dates this field being added.
 const CLASSIFICATION_ENFORCEMENT = [
@@ -169,6 +184,8 @@ export type GeminiRawResult = {
   order_sender_email?: string | null
   adjuster_reference?: string | null
   portal_url?: string | null
+  work_order_types?: string[] | string | null
+  /** What older prompts return: one type */
   work_order_type?: string | null
   insurer?: string | null
   confidence?: number | null
@@ -234,6 +251,8 @@ export async function parseInsurerOrder(
       systemInstruction += `\n\nParsing notes: ${clientConfig.custom_parsing_notes}`
     }
   }
+
+  systemInstruction += WORK_TYPES_INSTRUCTION
 
   // Extract insurer name from content, not from the client hint
   systemInstruction += '\n\nIMPORTANT: Extract the actual insurer name from the email content (e.g., "Castle", "Allianz", "Suncorp"). Do NOT use the client context/hint text as the insurer name.'
@@ -301,11 +320,7 @@ export async function parseInsurerOrder(
   const confidence = typeof raw.confidence === 'number' ? Math.min(1, Math.max(0, raw.confidence)) : 0
   const missingFields: string[] = Array.isArray(raw.missing_fields) ? raw.missing_fields : []
 
-  const mappedWoType = mapWorkOrderType(raw.work_order_type)
-  const wo_type =
-    mappedWoType === null && clientConfig?.default_work_order_type
-      ? clientConfig.default_work_order_type
-      : mappedWoType
+  const wo_types = parsedWorkTypes(raw, clientConfig?.default_work_order_type ?? null)
 
   const data: Partial<InsurerOrderInsert> = {
     claim_number: raw.claim_number ?? null,
@@ -322,8 +337,11 @@ export async function parseInsurerOrder(
     order_sender_name: raw.order_sender_name ?? message.fromName ?? null,
     order_sender_email: raw.order_sender_email ?? message.fromEmail ?? null,
     adjuster_reference: raw.adjuster_reference ?? null,
-    wo_type,
-    insurer: raw.insurer ?? clientConfig?.insurer_hint ?? null,
+    wo_types,
+    // Only what the email says. The client's hint is parsing context (often a
+    // paragraph about how they send orders), never the insurer's name; the
+    // order writer matches the sender to the client and uses its name.
+    insurer: raw.insurer ?? null,
   }
 
   const keyFields = [data.claim_number, data.insured_name, data.property_address]
@@ -339,7 +357,7 @@ export async function parseInsurerOrder(
     missingFields,
     parseStatus,
     rawEmailLink: raw.portal_url ?? null,
-    insurerDetected: raw.insurer ?? clientConfig?.insurer_hint ?? null,
+    insurerDetected: raw.insurer ?? null,
     rawEmailBody: message.bodyText || null,
     emailAttachments: message.attachments.map(a => ({
       filename: a.filename,
@@ -348,4 +366,14 @@ export async function parseInsurerOrder(
     })),
     rawGeminiOutput: raw,
   }
+}
+
+/**
+ * The order's work types from the parse: the list (or an older prompt's single
+ * work_order_type), mapped to the app's types. The client's default type is
+ * used only when the email names none.
+ */
+export function parsedWorkTypes(raw: Pick<GeminiRawResult, 'work_order_types' | 'work_order_type'>, defaultType: string | null): string[] {
+  const types = mapWorkOrderTypes(raw.work_order_types ?? raw.work_order_type ?? null)
+  return types.length ? types : mapWorkOrderTypes(defaultType)
 }

@@ -3,6 +3,7 @@ import { getGmailClient } from '@/lib/gmail/client'
 import { buildEmailRaw } from './build-raw'
 import type { ParsedOrderResult } from './order-parser'
 import type { ExtractedMessage } from '@/lib/gmail/messages'
+import { workTypesLabel } from '@/lib/insurer-orders/work-order-type'
 
 const OFFICE_EMAIL = 'office@insurancerepairco.com.au'
 const DEFAULT_APP_URL = 'https://insurance-building-system.vercel.app'
@@ -113,7 +114,7 @@ export async function sendOrderNotification(
       '{claim_number}': data.claim_number || 'No claim number',
       '{insured_name}': data.insured_name || 'Unknown',
       '{property_address}': data.property_address ?? '—',
-      '{work_order_type}': data.wo_type ?? '—',
+      '{work_order_type}': workTypesLabel(data.wo_types ?? []) || '—',
       '{confidence}': Math.round(parsed.confidence * 100).toString(),
       '{parse_status}': parsed.parseStatus,
       '{missing_fields}': parsed.missingFields.length > 0 ? parsed.missingFields.join(', ') : 'None',
@@ -152,7 +153,7 @@ export async function sendOrderNotification(
     '{claim_number}': claimNum,
     '{insured_name}': insuredName,
     '{property_address}': data.property_address ?? '—',
-    '{work_order_type}': data.wo_type ?? '—',
+    '{work_order_type}': workTypesLabel(data.wo_types ?? []) || '—',
     '{confidence}': Math.round(parsed.confidence * 100).toString(),
     '{parse_status}': parsed.parseStatus,
     '{missing_fields}': parsed.missingFields.length > 0 ? parsed.missingFields.join(', ') : 'None',

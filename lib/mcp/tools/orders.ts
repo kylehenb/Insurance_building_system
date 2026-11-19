@@ -8,6 +8,7 @@ import { createOrderFromEmail as createOrderFromEmailFn, OrderFromEmailError } f
 import { recomputeAndSaveStage } from '@/lib/jobs/recomputeStage'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
+import { WORK_TYPES, WORK_TYPE_LABELS, isWorkType, mapWorkOrderTypes, orderWorkTypes, unknownWorkTypes, workTypesPhrase } from '@/lib/insurer-orders/work-order-type'
 
 // Insurer orders by voice: the orders waiting to be lodged, finding an order
 // email the auto job lodger missed and turning it into an order, and lodging
@@ -22,12 +23,9 @@ const EMAIL_SEARCH_DAYS = 90
 const MAX_EMAILS = 10
 const MAX_ORDERS = 20
 
-const ORDER_COLUMNS = 'id, created_at, status, parse_status, entry_method, claim_number, insurer, wo_type, property_address, insured_name, insured_phone, insured_email, special_instructions, date_of_loss, loss_type, excess_building, job_id, raw_email_subject'
-type OrderSummaryRow = Pick<Order, 'id' | 'created_at' | 'status' | 'parse_status' | 'entry_method' | 'claim_number' | 'insurer' | 'wo_type' | 'property_address' | 'insured_name' | 'insured_phone' | 'insured_email' | 'special_instructions' | 'date_of_loss' | 'loss_type' | 'excess_building' | 'job_id' | 'raw_email_subject'>
+const ORDER_COLUMNS = 'id, created_at, status, parse_status, entry_method, claim_number, insurer, wo_type, wo_types, property_address, insured_name, insured_phone, insured_email, special_instructions, date_of_loss, loss_type, excess_building, job_id, raw_email_subject'
+type OrderSummaryRow = Pick<Order, 'id' | 'created_at' | 'status' | 'parse_status' | 'entry_method' | 'claim_number' | 'insurer' | 'wo_type' | 'wo_types' | 'property_address' | 'insured_name' | 'insured_phone' | 'insured_email' | 'special_instructions' | 'date_of_loss' | 'loss_type' | 'excess_building' | 'job_id' | 'raw_email_subject'>
 
-const WO_TYPE_LABELS: Record<string, string> = {
-  BAR: 'assessment (BAR)', make_safe: 'make safe', roof_report: 'roof report', specialist: 'specialist report', quote_only: 'quote only',
-}
 
 /** Missing details that stop or weaken a lodge, and what the order's checks found */
 function orderWarnings(o: OrderSummaryRow): string[] {
@@ -35,6 +33,10 @@ function orderWarnings(o: OrderSummaryRow): string[] {
   if (!o.claim_number) warnings.push('No claim number — it can\'t be lodged until one is added in the app.')
   if (!o.property_address) warnings.push('No property address.')
   if (!o.insured_name) warnings.push('No insured name.')
+  const types = orderWorkTypes(o)
+  if (!types.length) warnings.push('No work type — say what the order asks for (update_insurer_order work_types); it can\'t be lodged until then.')
+  const unknown = unknownWorkTypes(types)
+  if (unknown.length) warnings.push(`Work type "${unknown.join('", "')}" isn't one the app knows — correct it before lodging.`)
   if (o.parse_status === 'needs_review') warnings.push('Marked "needs review" — check the details.')
   // The order's checks: no phone number, landline only… (lib/insurer-orders/checks.ts)
   for (const check of runOrderChecks(o)) warnings.push(check.acknowledgementLine ? `${check.message} The acknowledgement will ask the sender about it.` : check.message)
@@ -45,7 +47,7 @@ function describeOrder(o: OrderSummaryRow): string {
   const parts = [
     o.claim_number ? `claim ${o.claim_number}` : 'no claim number',
     o.insurer,
-    o.wo_type ? WO_TYPE_LABELS[o.wo_type] ?? o.wo_type : null,
+    orderWorkTypes(o).length ? `asks for ${workTypesPhrase(orderWorkTypes(o))}` : null,
     o.insured_name,
     o.property_address,
     o.excess_building ? `excess ${money(Number(o.excess_building))}` : null,
@@ -55,13 +57,13 @@ function describeOrder(o: OrderSummaryRow): string {
   return `${parts.join(', ')}${when}.${warnings.length ? ' ' + warnings.join(' ') : ''}`
 }
 
-const orderData = (o: OrderSummaryRow) => ({ order_id: o.id, ...o, warnings: orderWarnings(o) })
+const orderData = (o: OrderSummaryRow) => ({ order_id: o.id, ...o, work_types: orderWorkTypes(o), warnings: orderWarnings(o) })
 
 export const listInsurerOrders: McpTool = {
   name: 'list_insurer_orders',
   title: 'List insurer orders',
   description: [
-    'Lists insurer orders waiting to be lodged as jobs (newest first), with claim number, insurer, work type, insured, address and anything missing or worth knowing (no phone number, landline only).',
+    'Lists insurer orders waiting to be lodged as jobs (newest first), with claim number, insurer, what it asks for (one order can ask for several: a make safe and a BAR), insured, address and anything missing or worth knowing (no phone number, landline only).',
     'If an order the user expects isn\'t here, it may not have been picked up from the email — use find_order_emails.',
   ].join(' '),
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
@@ -169,7 +171,7 @@ export const createOrderFromEmail: McpTool = {
   description: [
     'Turns an insurer\'s order email into an insurer order, using the auto job lodger\'s own reader — for an order email it missed.',
     'Use the message_id from find_order_emails, after the user confirms it\'s the right email. Nothing is lodged yet:',
-    'read back the claim number, insurer, work type, insured and address, then offer lodge_order.',
+    'read back the claim number, insurer, what it asks for (every work type), insured and address, then offer lodge_order.',
     'If an order already exists for the claim number, that order is returned instead of a new one — the email is more on that claim (new instructions or a re-send), so check what it asks for.',
   ].join(' '),
   inputSchema: {
@@ -217,7 +219,9 @@ export const lodgeOrder: McpTool = {
   title: 'Lodge order',
   description: [
     'Lodges an insurer order as a job, exactly like the Lodge button: creates the job with the next job number and KPI due dates,',
-    'plus the inspection, report, quote and invoice its work type needs, notifies the office, and emails the order\'s sender an acknowledgement (Settings → Email Templates → Order acknowledgement).',
+    'plus what each of its work types needs — a BAR gets the inspection, report, quote and invoice; quote only a quote; a make safe, roof report, leak detection or specialist report becomes a requested service on the job to do in-house or send to a trade later (assign_service) —',
+    'notifies the office, and emails the order\'s sender an acknowledgement with a line for each thing asked for (Settings → Email Templates → Order acknowledgement).',
+    'An order must have at least one work type the app knows.',
     'If a job already has the claim number, the order is linked to that job instead. A different claim at the same address as an earlier job is still lodged as a new job; the earlier jobs are noted on it and named in the reply.',
     'When the order has no phone number for the insured, the acknowledgement asks the sender for one. It isn\'t sent when the office has already replied to the sender about the order; a note on the job says so.',
     'With skip_acknowledgement, everything else happens the same but no acknowledgement is emailed, and a note on the job says it was skipped on purpose.',
@@ -272,13 +276,11 @@ const EDITABLE_FIELDS = {
   insured_name: 'Insured name',
   insured_phone: 'Insured phone',
   insured_email: 'Insured email',
-  wo_type: 'Work type',
   excess_building: 'Excess (building)',
   special_instructions: 'Special instructions',
 } as const
 type EditableField = keyof typeof EDITABLE_FIELDS
-/** The Insurer Orders page's work type options */
-const WO_TYPES = ['BAR', 'make_safe', 'roof_report', 'specialist', 'variation', 'quote_only']
+const WORK_TYPE_HELP = WORK_TYPES.map(t => `${t} (${WORK_TYPE_LABELS[t]})`).join(', ')
 
 async function pendingOrder(ctx: McpContext, args: Record<string, unknown>): Promise<OrderSummaryRow | McpToolResult> {
   const id = typeof args.order_id === 'string' ? args.order_id.trim() : ''
@@ -299,7 +301,8 @@ export const updateInsurerOrder: McpTool = {
   title: 'Correct insurer order',
   description: [
     'Corrects details on an order waiting to be lodged — e.g. adds a missing claim number so it can be lodged —',
-    `as on the Insurer Orders page. Fields: ${Object.keys(EDITABLE_FIELDS).join(', ')}. work type is one of ${WO_TYPES.join(', ')}.`,
+    `as on the Insurer Orders page. Fields: ${Object.keys(EDITABLE_FIELDS).join(', ')}, and work_types:`,
+    `the full list of what the order asks for (it replaces the list — include every type, e.g. ["make_safe", "BAR"]), each one of ${WORK_TYPE_HELP}.`,
     'Read back the change and get a yes first. Lodged orders can\'t be changed here.',
   ].join(' '),
   inputSchema: {
@@ -308,7 +311,8 @@ export const updateInsurerOrder: McpTool = {
       order_id: { type: 'string', description: 'order_id from list_insurer_orders.' },
       ...Object.fromEntries(Object.keys(EDITABLE_FIELDS).map(k => [k, k === 'excess_building'
         ? { type: 'number', description: 'Excess amount in dollars.' }
-        : k === 'wo_type' ? { type: 'string', enum: WO_TYPES } : { type: 'string' }])),
+        : { type: 'string' }])),
+      work_types: { type: 'array', items: { type: 'string', enum: [...WORK_TYPES] }, description: 'Everything the order asks for — replaces the list.' },
     },
     required: ['order_id'],
     additionalProperties: false,
@@ -320,7 +324,14 @@ export const updateInsurerOrder: McpTool = {
     const order = await pendingOrder(ctx, args)
     if (isOrderResult(order)) return order
 
-    const update: Partial<Record<EditableField, string | number | null>> = {}
+    const update: Partial<Record<EditableField | 'wo_types', string | number | string[] | null>> = {}
+    if ('work_types' in args) {
+      const raw = Array.isArray(args.work_types) ? args.work_types : []
+      const types = mapWorkOrderTypes(raw)
+      const bad = types.filter(t => !isWorkType(t))
+      if (!types.length || bad.length) return { text: `Work types must be a list of ${WORK_TYPE_HELP}.`, isError: true }
+      update.wo_types = types
+    }
     for (const field of Object.keys(EDITABLE_FIELDS) as EditableField[]) {
       if (!(field in args)) continue
       const v = args[field]
@@ -330,7 +341,6 @@ export const updateInsurerOrder: McpTool = {
         update[field] = Math.round(n * 100) / 100
       } else if (typeof v === 'string') {
         const s = field === 'claim_number' ? v.replace(/\s+/g, '').toUpperCase() : v.trim()
-        if (field === 'wo_type' && !WO_TYPES.includes(s)) return { text: `Work type must be one of ${WO_TYPES.join(', ')}.`, isError: true }
         update[field] = s || null
       }
     }
@@ -339,7 +349,9 @@ export const updateInsurerOrder: McpTool = {
     const { error } = await ctx.supabase
       .from('insurer_orders').update(update as never).eq('tenant_id', ctx.tenantId).eq('id', order.id)
     if (error) throw error
-    const changed = Object.entries(update).map(([k, v]) => `${EDITABLE_FIELDS[k as EditableField]}: ${v ?? 'cleared'}`).join(', ')
+    const changed = Object.entries(update).map(([k, v]) => k === 'wo_types'
+      ? `Work types: ${workTypesPhrase(v as string[])}`
+      : `${EDITABLE_FIELDS[k as EditableField]}: ${v ?? 'cleared'}`).join(', ')
     return orderResult(ctx, order.id, `Updated (${changed}).`)
   },
 }

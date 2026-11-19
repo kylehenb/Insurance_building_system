@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { activeLessons, formatLessons } from '@/lib/learning/lessons'
 import { formatCases, recordLearning, similarCases, type Likeness, type Situation } from '@/lib/learning/events'
 import { normaliseLossType } from '@/lib/loss-types'
-import { mapWorkOrderType } from './work-order-type'
+import { mapWorkOrderTypes, orderWorkTypes, workTypesLabel } from './work-order-type'
 
 // Order parsing on the learning module (tech spec §24.4): when an order is
 // lodged, the AI's parse (insurer_orders.gemini_output) is compared with the
@@ -18,7 +18,7 @@ export const ORDER_FIELDS = [
   'claim_number', 'insured_name', 'insured_phone', 'insured_email',
   'property_address', 'date_of_loss', 'loss_type', 'claim_description',
   'special_instructions', 'sum_insured_building', 'excess_building',
-  'adjuster_reference', 'wo_type', 'order_sender_name', 'order_sender_email',
+  'adjuster_reference', 'wo_types', 'order_sender_name', 'order_sender_email',
 ] as const
 
 const FREE_MAIL = /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|bigpond|iinet|optusnet|westnet|aol|protonmail)\./i
@@ -64,18 +64,29 @@ const shown = (v: unknown) => {
 /** Equal as the office would see them: case, spacing and number formatting aside */
 const norm = (v: unknown) => (v === undefined || v === null ? '' : String(v)).trim().replace(/\s+/g, ' ').toLowerCase().replace(/\.0+$/, '')
 
-const AI_NAMES: Partial<Record<string, string>> = { wo_type: 'work_order_type' }
+/** What the raw parse calls a field: the work types are work_order_types (older prompts: work_order_type) */
+function aiKey(parsed: Record<string, unknown>, f: string): string | undefined {
+  if (f in parsed) return f
+  if (f === 'wo_types') return ['work_order_types', 'work_order_type', 'wo_type'].find(k => k in parsed)
+  return undefined
+}
 
 /** Plain lines for each field the office corrected */
 export function compareOrder(parsed: Record<string, unknown>, lodged: Record<string, unknown>): string[] {
   const out: string[] = []
   for (const f of ORDER_FIELDS) {
-    // The raw parse calls the work type work_order_type
-    const key = f in parsed ? f : AI_NAMES[f]
+    const key = aiKey(parsed, f)
     // Only what the AI read (it returns every field it looked for, null when not found)
-    if (!key || !(key in parsed)) continue
-    // As the parser stored it: loss and work types mapped to the app's lists
-    const ai = f === 'loss_type' ? normaliseLossType(parsed[key]) ?? parsed[key] : f === 'wo_type' && typeof parsed[key] === 'string' ? mapWorkOrderType(parsed[key] as string) : parsed[key]
+    if (!key) continue
+    if (f === 'wo_types') {
+      // The same types in any order are the same; shown as "Make Safe + BAR"
+      const ai = workTypesLabel(mapWorkOrderTypes(parsed[key]))
+      const office = workTypesLabel(orderWorkTypes(lodged as { wo_types?: string[] | null; wo_type?: string | null }))
+      if (norm(ai) !== norm(office)) out.push(`work types: the AI read ${shown(ai)}, the office lodged ${shown(office)}`)
+      continue
+    }
+    // As the parser stored it: loss types mapped to the app's list
+    const ai = f === 'loss_type' ? normaliseLossType(parsed[key]) ?? parsed[key] : parsed[key]
     if (norm(ai) === norm(lodged[f])) continue
     out.push(`${f.replace(/_/g, ' ')}: the AI read ${shown(ai)}, the office lodged ${shown(lodged[f])}`)
   }
@@ -111,8 +122,8 @@ export async function recordOrderLodged(db: SupabaseClient, order: OrderRow, use
     sourceId: order.id,
     situation,
     situationText: orderSituationText(situation),
-    proposed: Object.fromEntries(ORDER_FIELDS.map(f => [f, f in parsed ? parsed[f] : parsed[AI_NAMES[f] ?? f]]).filter(([, v]) => v !== undefined)),
-    final: Object.fromEntries(ORDER_FIELDS.map(f => [f, order[f] ?? null])),
+    proposed: Object.fromEntries(ORDER_FIELDS.map(f => { const k = aiKey(parsed, f); return [f, k ? parsed[k] : undefined] }).filter(([, v]) => v !== undefined)),
+    final: Object.fromEntries(ORDER_FIELDS.map(f => [f, f === 'wo_types' ? orderWorkTypes(order as { wo_types?: string[] | null; wo_type?: string | null }) : order[f] ?? null])),
     changes,
     outcome: changes.length ? 'edited' : 'accepted',
     kind: order.insurer ?? null,

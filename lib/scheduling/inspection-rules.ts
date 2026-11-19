@@ -118,7 +118,7 @@ export function evaluateCandidate(
     priority_flags,
     suggested_time_preference: timeOfDayResult.preferredTimeOfDay,
     estimated_duration_minutes: timeOfDayResult.estimatedDurationMinutes,
-    requires_senior_inspector: candidate.wo_type === 'BAR_make_safe' || candidate.wo_type === 'roof_report' || candidate.wo_type === 'specialist',
+    requires_senior_inspector: ['BAR_make_safe', 'roof_report', 'specialist'].includes(candidateWorkType(candidate)),
     peak_hour_risk: peakHourRisk,
     overflow_eligible: overflowResult.overflowEligible,
     notes,
@@ -129,7 +129,19 @@ export function evaluateCandidate(
  * Check if candidate is a make safe job
  */
 export function isMakeSafe(candidate: SchedulingCandidate): boolean {
-  return candidate.is_make_safe === true
+  return candidate.is_make_safe === true || !!candidate.wo_types?.includes('make_safe')
+}
+
+/**
+ * The job type the rules go by. An order can ask for several things
+ * (wo_types); a BAR with a make safe is the complex 'BAR_make_safe', otherwise
+ * the BAR, else the main type.
+ */
+export function candidateWorkType(candidate: SchedulingCandidate): string {
+  const types = candidate.wo_types ?? []
+  if (types.includes('BAR') && types.includes('make_safe')) return 'BAR_make_safe'
+  if (types.includes('BAR')) return 'BAR'
+  return types[0] ?? candidate.wo_type
 }
 
 /**
@@ -387,12 +399,12 @@ export function evaluateTimeOfDay(
 
   // Complex job types prefer morning
   const complexJobTypes = ['BAR_make_safe', 'roof_report', 'leak_detection', 'specialist']
-  if (rules.morning_complex_jobs && complexJobTypes.includes(candidate.wo_type)) {
+  if (rules.morning_complex_jobs && complexJobTypes.includes(candidateWorkType(candidate))) {
     preferredTimeOfDay = 'morning'
   }
 
   // Simple BARs prefer afternoon
-  if (rules.afternoon_simple_jobs && candidate.wo_type === 'BAR') {
+  if (rules.afternoon_simple_jobs && candidateWorkType(candidate) === 'BAR') {
     preferredTimeOfDay = 'afternoon'
   }
 
@@ -594,7 +606,7 @@ export function evaluateOverflowEligibility(
   }
 
   // Make safes are always overflow-eligible if there's any slot
-  if (candidate.is_make_safe) {
+  if (isMakeSafe(candidate)) {
     return {
       overflowEligible: true,
       reason: 'Make safe — overflow eligible',
@@ -647,7 +659,7 @@ function toRad(degrees: number): number {
  * Get job duration from rules, with vulnerable person adjustment
  */
 function getJobDuration(candidate: SchedulingCandidate, rules: InspectionSchedulingRules): number {
-  const durationConfig = rules.job_type_durations.find(d => d.job_type === candidate.wo_type)
+  const durationConfig = rules.job_type_durations.find(d => d.job_type === candidateWorkType(candidate))
   let duration = durationConfig ? durationConfig.duration_minutes : 60
 
   if (candidate.vulnerable_person) {

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { orderWorkTypes, workTypesLabel } from '@/lib/insurer-orders/work-order-type'
 import { createBrowserClient } from '@supabase/ssr'
 import { AccordionList } from './shared/AccordionList'
 import { AccordionRow } from './shared/AccordionRow'
@@ -18,6 +19,7 @@ interface InsurerOrder {
   job_id: string | null
   order_ref: string | null
   wo_type: string | null
+  wo_types: string[] | null
   insurer: string | null
   status: string | null
   notes: string | null
@@ -292,7 +294,7 @@ export function InsurerOrdersTab({ jobId, tenantId }: InsurerOrdersTabProps) {
       setLoading(true)
       const { data } = await supabase
         .from('insurer_orders')
-        .select('id,tenant_id,job_id,order_ref,wo_type,insurer,status,notes,created_at,order_sender_name,order_sender_email,raw_email_body,email_attachments')
+        .select('id,tenant_id,job_id,order_ref,wo_type,wo_types,insurer,status,notes,created_at,order_sender_name,order_sender_email,raw_email_body,email_attachments')
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true })
@@ -332,8 +334,8 @@ export function InsurerOrdersTab({ jobId, tenantId }: InsurerOrdersTabProps) {
                 >
                   {order.order_ref ?? '—'}
                 </span>
-                {order.wo_type && (
-                  <span className="text-[13px] text-body">{order.wo_type}</span>
+                {orderWorkTypes(order).length > 0 && (
+                  <span className="text-[13px] text-body">{workTypesLabel(orderWorkTypes(order))}</span>
                 )}
                 {order.insurer && (
                   <span className="text-[12px] text-subtle">{order.insurer}</span>

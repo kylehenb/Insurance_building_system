@@ -135,8 +135,15 @@ describe('update_insurer_order', () => {
     expect(res.text).toMatch(/^Updated \(Claim number: CHCCLM010002035\)\./)
   })
 
-  it('checks the work type and excess, and won’t touch a lodged order', async () => {
-    expect((await updateInsurerOrder.run({ order_id: ORDER, wo_type: 'roof' }, ctx)).isError).toBe(true)
+  it('sets every work type the order asks for', async () => {
+    const res = await updateInsurerOrder.run({ order_id: ORDER, work_types: ['BAR', 'make_safe'] }, ctx)
+    expect(updates[0]).toEqual({ table: 'insurer_orders', patch: { wo_types: ['make_safe', 'BAR'] } })
+    expect(res.text).toMatch(/^Updated \(Work types: a make safe and a building assessment report\)\./)
+  })
+
+  it('checks the work types and excess, and won’t touch a lodged order', async () => {
+    expect((await updateInsurerOrder.run({ order_id: ORDER, work_types: ['variation'] }, ctx)).isError).toBe(true)
+    expect((await updateInsurerOrder.run({ order_id: ORDER, work_types: [] }, ctx)).isError).toBe(true)
     expect((await updateInsurerOrder.run({ order_id: ORDER, excess_building: -5 }, ctx)).isError).toBe(true)
     expect((await updateInsurerOrder.run({ order_id: ORDER }, ctx)).text).toBe('What should be changed on the order?')
     db.insurer_orders[0].job_id = 'j1'

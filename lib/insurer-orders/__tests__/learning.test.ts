@@ -33,9 +33,17 @@ describe('compareOrder', () => {
   it('lists the fields the office corrected, ignoring case, spacing and number formatting', () => {
     const o = order()
     expect(compareOrder(o.gemini_output as Row, o)).toEqual(['property address: the AI read "1 Main St", the office lodged "1 Main Street, Perth"'])
-    expect(compareOrder({ work_order_type: 'Make Safe' }, { wo_type: 'BAR' })).toEqual(['wo type: the AI read "make_safe", the office lodged "BAR"'])
+    expect(compareOrder({ work_order_type: 'Make Safe' }, { wo_type: 'BAR' })).toEqual(['work types: the AI read "Make Safe", the office lodged "BAR"'])
     // The app's own mapping of the AI's wording isn't a correction
     expect(compareOrder({ loss_type: 'Storm', work_order_type: 'Make Safe' }, { loss_type: 'Storm or Rainwater', wo_type: 'make_safe' })).toEqual([])
+  })
+
+  it('compares work type lists as sets, and names one the office added', () => {
+    expect(compareOrder({ work_order_types: ['BAR', 'Make Safe'] }, { wo_types: ['make_safe', 'BAR'] })).toEqual([])
+    expect(compareOrder({ work_order_types: ['BAR'] }, { wo_types: ['BAR', 'make_safe'] }))
+      .toEqual(['work types: the AI read "BAR", the office lodged "Make Safe + BAR"'])
+    expect(compareOrder({ work_order_types: [] }, { wo_types: ['quote_only'] }))
+      .toEqual(['work types: the AI read (nothing), the office lodged "Quote Only"'])
   })
 })
 

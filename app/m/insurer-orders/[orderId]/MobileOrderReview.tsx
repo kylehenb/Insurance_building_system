@@ -8,6 +8,8 @@ import { linkOrderThreadsToJob } from '@/lib/communications/thread-link'
 import { pendingApprovalFrom } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
+import { orderWorkTypes, primaryWorkType } from '@/lib/insurer-orders/work-order-type'
+import { WorkTypeBadges, WorkTypeCheckboxes } from '@/components/insurer-orders/WorkTypes'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type JobHit = {
@@ -163,6 +165,14 @@ export default function MobileOrderReview({
     setBusy(false)
   }
 
+  // The database keeps wo_type and is_make_safe in step with the list
+  async function saveWorkTypes(types: string[]) {
+    setError(null)
+    const { error: updateError } = await supabase.from('insurer_orders').update({ wo_types: types }).eq('id', order.id)
+    if (updateError) setError(updateError.message)
+    else setOrder(o => ({ ...o, wo_types: types, wo_type: primaryWorkType(types), is_make_safe: types.includes('make_safe') }))
+  }
+
   async function handleReject() {
     setBusy(true); setError(null)
     const reason = rejectReason.trim()
@@ -252,7 +262,9 @@ export default function MobileOrderReview({
 
         <Card title="Claim">
           <Row label="Insurer">{order.insurer}</Row>
-          <Row label="Work order type">{order.wo_type}</Row>
+          {canAct && !order.job_id
+            ? <div style={{ marginBottom: 12 }}><WorkTypeCheckboxes large label="Work types" value={orderWorkTypes(order)} onChange={saveWorkTypes} /></div>
+            : <Row label="Work types"><WorkTypeBadges types={orderWorkTypes(order)} size={13} /></Row>}
           <Row label="Claim number"><span style={{ fontFamily: mono }}>{order.claim_number || '—'}</span></Row>
           <Row label="Loss">{[order.loss_type, order.date_of_loss ? formatDate(order.date_of_loss) : null].filter(Boolean).join(' · ') || '—'}</Row>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

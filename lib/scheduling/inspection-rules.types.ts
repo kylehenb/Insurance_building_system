@@ -134,6 +134,8 @@ export interface SchedulingCandidate {
   lng: number
   postcode: string
   wo_type: string              // 'BAR' | 'make_safe' | 'roof_report' | 'BAR_make_safe' etc.
+  /** Everything the order asks for (insurer_orders.wo_types); a BAR with a make safe counts as BAR_make_safe */
+  wo_types?: string[]
   is_make_safe: boolean
   insurer: string
   client_id: string

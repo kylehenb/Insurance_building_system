@@ -79,8 +79,21 @@ describe('list_insurer_orders', () => {
     db.insurer_orders = [order(), order({ id: 'o2', claim_number: null, parse_status: 'needs_review' }), order({ id: 'o3', job_id: 'j1', status: 'lodged' })]
     const res = await listInsurerOrders.run({}, ctx)
     expect(res.text).toMatch(/^2 orders waiting to be lodged:/)
-    expect(res.text).toContain('claim CHCCLM010002035, Castle, assessment (BAR), Peter Laundy, 45 Randell Crescent, Ocean Reef, excess $500')
+    expect(res.text).toContain('claim CHCCLM010002035, Castle, asks for a building assessment report, Peter Laundy, 45 Randell Crescent, Ocean Reef, excess $500')
     expect(res.text).toContain('No claim number — it can\'t be lodged until one is added in the app.')
+  })
+
+  it('names everything an order asks for, and warns when it says nothing or something unknown', async () => {
+    db.insurer_orders = [
+      order({ wo_types: ['make_safe', 'BAR'] }),
+      order({ id: 'o2', wo_type: null, wo_types: [] }),
+      order({ id: 'o3', wo_type: 'variation', wo_types: ['variation'] }),
+    ]
+    const res = await listInsurerOrders.run({}, ctx)
+    expect(res.text).toContain('asks for a make safe and a building assessment report')
+    expect(res.text).toContain('No work type — say what the order asks for')
+    expect(res.text).toContain('Work type "variation" isn\'t one the app knows')
+    expect((res.data as { orders: { work_types: string[] }[] }).orders[0].work_types).toEqual(['make_safe', 'BAR'])
   })
 })
 

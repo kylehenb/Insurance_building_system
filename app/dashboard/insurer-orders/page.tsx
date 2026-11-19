@@ -16,6 +16,8 @@ import { useCurrentUser } from '@/components/layout/current-user'
 import { pendingApprovalFrom } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
 import { runOrderChecks } from '@/lib/insurer-orders/checks'
+import { orderWorkTypes, primaryWorkType, workTypesLabel } from '@/lib/insurer-orders/work-order-type'
+import { WorkTypeBadges, WorkTypeCheckboxes } from '@/components/insurer-orders/WorkTypes'
 
 type InsurerOrder = Database['public']['Tables']['insurer_orders']['Row']
 type FilterStatus = 'all' | 'pending' | 'lodged' | 'rejected'
@@ -51,22 +53,9 @@ function fuzzyMatch(order: InsurerOrder, query: string): boolean {
   if (!query.trim()) return true
   const haystack = [
     order.order_ref, order.claim_number, order.insured_name,
-    order.property_address, order.insurer, order.loss_type, order.wo_type,
+    order.property_address, order.insurer, order.loss_type, workTypesLabel(orderWorkTypes(order)),
   ].join(' ').toLowerCase()
   return query.trim().toLowerCase().split(/\s+/).every(t => haystack.includes(t))
-}
-
-function WoTypeBadge({ type }: { type: string | null }) {
-  const lower = type?.toLowerCase()
-  if (lower === 'make safe')
-    return <span style={{ background: 'var(--danger-bg-2)', color: 'var(--danger-strong)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Make Safe</span>
-  if (lower === 'bar')
-    return <span style={{ background: 'var(--info-bg)', color: '#1a56db', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>BAR</span>
-  if (lower === 'roof report')
-    return <span style={{ background: '#f0eef8', color: '#4a42a0', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Roof Report</span>
-  if (lower === 'quote only')
-    return <span style={{ background: '#fef3c7', color: 'var(--warning-dark)', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>Quote Only</span>
-  return <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4 }}>{type ?? 'Other'}</span>
 }
 
 function ParseStatusBadge({ parseStatus, entryMethod }: { parseStatus: string | null; entryMethod: string | null }) {
@@ -197,39 +186,6 @@ function LossTypeSelect({ label, value, onSave }: { label: string; value: string
   )
 }
 
-// Editable select dropdown for wo_type
-function WoTypeSelect({ label, value, onSave }: { label: string; value: string | null; onSave: (val: string) => void }) {
-  const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => { setDraft(value ?? '') }, [value])
-  
-  const options = [
-    { value: 'BAR', label: 'BAR' },
-    { value: 'make_safe', label: 'Make Safe' },
-    { value: 'roof_report', label: 'Roof Report' },
-    { value: 'specialist', label: 'Specialist' },
-    { value: 'variation', label: 'Variation' },
-    { value: 'quote_only', label: 'Quote Only' },
-  ]
-  
-  return (
-    <div>
-      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
-        {label}
-      </div>
-      <select
-        value={draft}
-        onChange={e => { setDraft(e.target.value); onSave(e.target.value) }}
-        style={{ ...inputStyle, cursor: 'pointer' }}
-      >
-        <option value="">— Select —</option>
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
 const ghostBtn: React.CSSProperties = {
   border: '1px solid #d4cfc8', borderRadius: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600,
   cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", background: 'transparent', color: '#7a6a58',
@@ -280,7 +236,7 @@ function InsurerOrdersPageContent() {
   const [newOrderForm, setNewOrderForm] = useState({
     claim_number: '',
     insurer: '',
-    wo_type: '',
+    wo_types: [] as string[],
     property_address: '',
     insured_name: '',
     insured_phone: '',
@@ -457,6 +413,14 @@ function InsurerOrdersPageContent() {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o))
   }
 
+  // Work types: the database keeps wo_type and is_make_safe in step with the list
+  async function saveWorkTypes(orderId: string, types: string[]) {
+    await supabase.from('insurer_orders').update({ wo_types: types }).eq('id', orderId)
+    setOrders(prev => prev.map(o => o.id === orderId
+      ? { ...o, wo_types: types, wo_type: primaryWorkType(types), is_make_safe: types.includes('make_safe') }
+      : o))
+  }
+
   // Save a numeric field on blur
   async function saveNumberField(orderId: string, field: keyof InsurerOrder, raw: string) {
     const value = raw.trim() ? parseFloat(raw.trim()) : null
@@ -554,7 +518,7 @@ function InsurerOrdersPageContent() {
           tenant_id: tenantId,
           claim_number: (newOrderForm.claim_number.trim() || null) as string | null,
           insurer: newOrderForm.insurer.trim() || null,
-          wo_type: newOrderForm.wo_type || null,
+          wo_types: newOrderForm.wo_types,
           property_address: newOrderForm.property_address.trim() || null,
           insured_name: newOrderForm.insured_name.trim() || null,
           insured_phone: newOrderForm.insured_phone.trim() || null,
@@ -579,7 +543,7 @@ function InsurerOrdersPageContent() {
       setNewOrderForm({
         claim_number: '',
         insurer: '',
-        wo_type: '',
+        wo_types: [],
         property_address: '',
         insured_name: '',
         insured_phone: '',
@@ -845,7 +809,7 @@ function InsurerOrdersPageContent() {
                                   !order.claim_number && 'claim #',
                                   !order.insured_name && 'insured',
                                   !order.property_address && 'address',
-                                  !order.wo_type && 'type',
+                                  !orderWorkTypes(order).length && 'type',
                                 ].filter(Boolean) as string[]
                                 if (missing.length === 0) return null
                                 return (
@@ -865,7 +829,7 @@ function InsurerOrdersPageContent() {
                             {order.insurer ?? '—'}
                           </td>
                           <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', overflow: 'hidden', background: rowBg }}>
-                            <WoTypeBadge type={order.wo_type} />
+                            <WorkTypeBadges types={orderWorkTypes(order)} />
                           </td>
                           <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--faint)', background: rowBg }}>
                             {formatDate(order.date_of_loss)}
@@ -943,10 +907,14 @@ function InsurerOrdersPageContent() {
                                           ))
                                       }}
                                     />
-                                    <WoTypeSelect
-                                      label="WO Type" value={order.wo_type}
-                                      onSave={v => saveField(order.id, 'wo_type', v)}
-                                    />
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                      <WorkTypeCheckboxes
+                                        label="Work types (tick everything the order asks for)"
+                                        value={orderWorkTypes(order)}
+                                        disabled={!!order.job_id}
+                                        onChange={types => saveWorkTypes(order.id, types)}
+                                      />
+                                    </div>
                                     <FEdit
                                       label="Date of Loss" value={order.date_of_loss?.slice(0, 10) ?? ''}
                                       type="date"
@@ -1313,24 +1281,11 @@ function InsurerOrdersPageContent() {
                 }}
               />
 
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                  Work Order Type
-                </div>
-                <select
-                  value={newOrderForm.wo_type}
-                  onChange={e => setNewOrderForm(f => ({ ...f, wo_type: e.target.value }))}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                >
-                  <option value="">— Select —</option>
-                  <option value="BAR">BAR</option>
-                  <option value="make_safe">Make Safe</option>
-                  <option value="roof_report">Roof Report</option>
-                  <option value="specialist">Specialist</option>
-                  <option value="variation">Variation</option>
-                  <option value="quote_only">Quote Only</option>
-                </select>
-              </div>
+              <WorkTypeCheckboxes
+                label="Work types"
+                value={newOrderForm.wo_types}
+                onChange={types => setNewOrderForm(f => ({ ...f, wo_types: types }))}
+              />
 
               <div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
@@ -1464,7 +1419,7 @@ function InsurerOrdersPageContent() {
                     setNewOrderForm({
                       claim_number: '',
                       insurer: '',
-                      wo_type: '',
+                      wo_types: [],
                       property_address: '',
                       insured_name: '',
                       insured_phone: '',

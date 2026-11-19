@@ -1279,6 +1279,7 @@ export type Database = {
           sum_insured_building: number | null
           tenant_id: string
           wo_type: string | null
+          wo_types: string[]
         }
         Insert: {
           adjuster?: string | null
@@ -1316,6 +1317,7 @@ export type Database = {
           sum_insured_building?: number | null
           tenant_id: string
           wo_type?: string | null
+          wo_types?: string[]
         }
         Update: {
           adjuster?: string | null
@@ -1353,6 +1355,7 @@ export type Database = {
           sum_insured_building?: number | null
           tenant_id?: string
           wo_type?: string | null
+          wo_types?: string[]
         }
         Relationships: [
           {
