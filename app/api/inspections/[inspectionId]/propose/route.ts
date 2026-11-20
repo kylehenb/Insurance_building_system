@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCalendarClient, CALENDAR_ID } from '@/lib/calendar/client'
+import { inspectionEventDetails, type BookingJob } from '@/lib/inspections/booking'
+import { listJobNotes } from '@/lib/communications/notes'
 
 export async function POST(
   req: NextRequest,
@@ -31,10 +33,10 @@ export async function POST(
       .from('inspections')
       .select(`
         id, inspection_ref, status, scheduled_date, start_time, finish_time, duration_minutes,
-        job_id, inspector_id,
+        job_id, inspector_id, access_notes, calendar_event_id,
         jobs!job_id (
           id, job_number, property_address, insured_name, insured_phone,
-          insurer, loss_type, claim_number, claim_description
+          insurer, loss_type, claim_number, claim_description, special_instructions
         ),
         users!inspector_id (name)
       `)
@@ -57,25 +59,12 @@ export async function POST(
       )
     }
 
-    const job = (inspection as any).jobs
-    const inspector = (inspection as any).users
+    const job = (inspection as unknown as { jobs: BookingJob }).jobs
 
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.insurancerepairco.com.au'
-    const fieldAppUrl = `${appBaseUrl}/field/${inspectionId}`
-
-    // Build calendar event description
-    const descriptionLines = [
-      `Job: ${job?.job_number ?? '-'}`,
-      `Insured: ${job?.insured_name ?? '-'}`,
-      job?.insured_phone ? `Contact: ${job.insured_phone}` : null,
-      `Insurer: ${job?.insurer ?? '-'}`,
-      `Loss Type: ${job?.loss_type ?? '-'}`,
-      job?.claim_number ? `Claim #: ${job.claim_number}` : null,
-      job?.claim_description ? `Claim Description: ${job.claim_description}` : null,
-      `Inspector: ${inspector?.name ?? userRow.name}`,
-      '',
-      `Field App: ${fieldAppUrl}`,
-    ].filter(Boolean).join('\n')
+    // The same event as a booking by voice (lib/inspections/booking.ts):
+    // directions, the field app link, who to meet and what's happened
+    const notes = await listJobNotes(supabase, { tenantId: userRow.tenant_id, jobId: inspection.job_id, limit: 3 }).catch(() => [])
+    const details = inspectionEventDetails({ job, inspection, notes })
 
     // Ensure HH:MM times get :00 seconds appended — Google Calendar requires full RFC3339
     const toFullTime = (t: string) => t.length === 5 ? `${t}:00` : t
@@ -100,12 +89,6 @@ export async function POST(
     const [startH, startM] = toFullTime(start).split(':').map(Number)
     const alarmMinutesBefore = startH * 60 + startM - 7 * 60
 
-    const title = [
-      'Inspection',
-      inspection.inspection_ref,
-      job?.property_address,
-    ].filter(Boolean).join(' – ')
-
     // Create Google Calendar event
     let calendarEventId: string | null = null
     try {
@@ -113,9 +96,7 @@ export async function POST(
       const event = await calendar.events.insert({
         calendarId: CALENDAR_ID,
         requestBody: {
-          summary: title,
-          description: descriptionLines,
-          location: job?.property_address ?? undefined,
+          ...details,
           start: {
             dateTime: startDateTime,
             timeZone: 'Australia/Perth',

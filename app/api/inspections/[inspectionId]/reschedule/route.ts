@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCalendarClient, CALENDAR_ID } from '@/lib/calendar/client'
+import { calendarOfEvent } from '@/lib/inspections/booking'
 
 export async function POST(
   _req: NextRequest,
@@ -37,8 +38,10 @@ export async function POST(
     if (inspection?.calendar_event_id) {
       try {
         const calendar = getCalendarClient()
+        // A booking by voice is on the owner's (watched) calendar
+        const calendarId = (await calendarOfEvent(supabase, userRow.tenant_id, inspection.calendar_event_id)) ?? CALENDAR_ID
         await calendar.events.delete({
-          calendarId: CALENDAR_ID,
+          calendarId,
           eventId: inspection.calendar_event_id,
         })
       } catch (calErr) {
