@@ -51,6 +51,9 @@ export default function MidcityDashboard() {
   const [creating, setCreating] = useState(false)
   const [formError, setFormError] = useState('')
   const jobNumberRef = useRef<HTMLInputElement>(null)
+  // A builder's work order (PDF) read into a new job
+  const [readingWorkOrder, setReadingWorkOrder] = useState(false)
+  const workOrderInputRef = useRef<HTMLInputElement>(null)
 
   // Bulk import modal
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -136,8 +139,33 @@ export default function MidcityDashboard() {
     }
   }
 
+  async function handleWorkOrderSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setReadingWorkOrder(true)
+    setFormError('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/midcity/work-order', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setFormError(data.error || 'Couldn\'t read the work order')
+        setReadingWorkOrder(false)
+        return
+      }
+      setShowModal(false)
+      setReadingWorkOrder(false)
+      router.push(`/midcity/field/${data.inspectionId}`)
+    } catch {
+      setFormError('Network error — please try again')
+      setReadingWorkOrder(false)
+    }
+  }
+
   function closeModal() {
-    if (creating) return
+    if (creating || readingWorkOrder) return
     setShowModal(false)
     setFormError('')
   }
@@ -384,6 +412,33 @@ export default function MidcityDashboard() {
               >
                 ✕
               </button>
+            </div>
+
+            {/* From the builder's work order: the AI fills in everything */}
+            <input
+              ref={workOrderInputRef}
+              type="file"
+              accept="application/pdf,.pdf,image/jpeg,image/png,image/webp"
+              onChange={handleWorkOrderSelected}
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => workOrderInputRef.current?.click()}
+              disabled={readingWorkOrder || creating}
+              style={{
+                width: '100%', padding: '14px', marginBottom: 8,
+                background: '#e8f1ff', color: 'var(--tan)',
+                border: '1.5px dashed var(--tan)', borderRadius: 10,
+                fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
+                cursor: readingWorkOrder ? 'default' : 'pointer',
+                opacity: creating ? 0.5 : 1,
+              }}
+            >
+              {readingWorkOrder ? 'Reading work order…' : 'From work order PDF'}
+            </button>
+            <div style={{ fontSize: 12, color: 'var(--grey-500)', textAlign: 'center', marginBottom: 20 }}>
+              {readingWorkOrder ? 'Getting the reference, address and insured — about 10 seconds' : 'or type it in'}
             </div>
 
             <form onSubmit={handleCreate}>

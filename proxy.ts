@@ -54,6 +54,9 @@ export async function proxy(request: NextRequest) {
     CRON_ROUTES.has(pathname) ||
     // Claude voice connector: authorised by its own key header (lib/mcp/auth.ts)
     pathname === "/api/mcp" ||
+    // Bindi Co work orders from the iPhone share-sheet Shortcut: the route
+    // takes a personal voice key, or the session when sent from the app
+    pathname === "/api/midcity/work-order" ||
     // E-signing: homeowners sign by link, with no account. These routes look
     // up the link token themselves and expose only that one document.
     pathname.startsWith("/sign/") ||

@@ -20,6 +20,35 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - [ ] **Booking by text** with the insured, and work orders in by email.
 - [ ] **Builder portal scripts (Playwright):** accept the job, upload the report, complete it and invoice.
 
+## Work orders from the share sheet
+
+A builder's work order (the PDF on their email) makes the job: the AI reads the
+builder's reference, the address, the insured's name, phone and email, the
+claim number, date of loss, what happened and any instructions
+(`lib/jobs/field-work-order.ts`, AI feature `midcity-work-order`). The PDF is
+kept in the job's files. Sharing the same work order again opens the job
+already made from it. Needs the "Lodge insurer orders" permission.
+
+Two ways in, both `POST /api/midcity/work-order`:
+
+- **In the app:** + → **From work order PDF**, then pick the PDF (save it from
+  the email to Files first: tap the attachment → Share → Save to Files).
+- **From the email, via an iPhone Shortcut** (one-time setup):
+  1. Settings → Voice connector → make a personal key (`irc_vk_…`) and copy it.
+  2. Shortcuts app → + → name it **New Bindi job**. Tap the (i) → turn on
+     **Show in Share Sheet**, and set the input to **PDFs** and **Images**.
+  3. Add **Get Contents of URL**: `https://<app address>/api/midcity/work-order`,
+     Method **POST**, Header `Authorization` = `Bearer irc_vk_…`,
+     Request Body **Form**, a **File** field named `file` = **Shortcut Input**.
+  4. Add **Get Dictionary Value**: key `url` from **Contents of URL**.
+  5. Add **Open URLs** with that **Dictionary Value**.
+  6. Optional: an **If** before step 4 — if the dictionary has `error`, **Show
+     Alert** with it (e.g. "Couldn't find the property address").
+
+  Then in Zoho Mail: tap the PDF → Share → **New Bindi job**. About 10 seconds
+  later Safari opens the new job in the field app (Safari needs to be signed in
+  to the app).
+
 ## Done
 
 - Roof-only mode, and sign-in on the report AI routes
@@ -44,3 +73,4 @@ The roof-report side of the system (the Midcity field app, `app/midcity`). Done 
 - Fixed: the draft saved the notes as they were one edit ago (and nothing when the page was hidden), so the last change before stopping could be lost
 - The job number is the "Builder/Insurer Reference" (on the report and when making a job). The reference and address can be changed from the field app's header (Edit), using the jobs.edit permission and logged as job.details
 - Smaller report PDFs: the browser puts each photo into the PDF as uploaded (50 photos at ~320 KB = a 16 MB PDF), so inside a report each photo is first redrawn at print size (800 px, about 240 dpi at its printed 8.5 cm; the overview at 1600 px). Print waits until they're ready (print-images.tsx); a photo that can't be read back prints as it is. About 75% smaller
+- New job from the builder's work order PDF: in the app (+ → From work order PDF) or from the email's share sheet with an iPhone Shortcut (see "Work orders from the share sheet")
