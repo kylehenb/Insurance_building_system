@@ -59,6 +59,14 @@ describe('preview_document', () => {
     expect(rendered).toEqual([Q])
   })
 
+  it('links to a scope of works covering several quotes, keeping the quotes in the link', async () => {
+    const Q2 = '88888888-2222-3333-4444-555555555555'
+    const res = await previewDocument.run({ document: { kind: 'scope', id: Q, quoteIds: [Q2] } }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(readPreviewToken(tokenOf(res.data!.link as string))).toEqual({ tenantId: 't1', target: { kind: 'scope', id: Q, quoteIds: [Q2] } })
+    expect(rendered).toEqual([])
+  })
+
   it('says so for a missing document or no document', async () => {
     expect(await previewDocument.run({ work_order_id: '22222222-2222-3333-4444-555555555555' }, ctx)).toMatchObject({ isError: true, text: expect.stringContaining('Work order not found') })
     expect(await previewDocument.run({ document: { kind: 'quote', id: WO } }, ctx)).toMatchObject({ isError: true, text: 'Quote not found' })

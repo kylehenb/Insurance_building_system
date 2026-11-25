@@ -7,10 +7,13 @@ type ScopeItem = Database['public']['Tables']['scope_items']['Row']
  * Groups scope items by room for one or more quotes, merging each quote's
  * saved room_order in the order the quotes are given (falls back to
  * first-appearance order when no quote has a saved room_order — matches the
- * quote editor's own fallback, do NOT alphabetize).
+ * quote editor's own fallback, do NOT alphabetize). Within a room, each
+ * quote's items stay together, in the quotes' order (sort_order is per quote).
  */
 export function groupScopeItemsAcrossQuotes(quotes: Quote[], scopeItems: ScopeItem[]) {
-  const items = [...scopeItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const quoteIndex = new Map(quotes.map((q, i) => [q.id, i]))
+  const items = [...scopeItems].sort((a, b) =>
+    (quoteIndex.get(a.quote_id) ?? 0) - (quoteIndex.get(b.quote_id) ?? 0) || (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   const groupedByRoom = items.reduce((acc, item) => {
     const room = item.room || 'Unassigned'

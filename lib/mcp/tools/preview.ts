@@ -17,7 +17,7 @@ export const previewDocument: McpTool = {
   name: 'preview_document',
   title: 'Preview document',
   description: [
-    'Gives the user a link to open the actual PDF of a work order, quote, report, invoice, TCC or the job\'s photos — exactly as it would be sent — so they can look at it before it goes out.',
+    'Gives the user a link to open the actual PDF of a work order, quote, report, invoice, TCC, scope of works or the job\'s photos — exactly as it would be sent — so they can look at it before it goes out.',
     'Nothing is emailed and nothing is marked sent. Use it for "show me the quote", "let me see the work order", "send me the invoice to look at".',
     'Pass work_order_id (from find_work_orders) for a work order, or document (from list_job_documents) for the rest.',
     `Always give the user the link as it is (it opens without signing in and stops working after ${PREVIEW_LINK_HOURS} hours).`,
@@ -29,10 +29,11 @@ export const previewDocument: McpTool = {
       work_order_id: { type: 'string', description: 'For a work order: its work_order_id from find_work_orders.' },
       document: {
         type: 'object',
-        description: 'For a quote, report, invoice, TCC or photos: the "document" from list_job_documents.',
+        description: 'For a quote, report, invoice, TCC, scope of works or photos: the "document" from list_job_documents.',
         properties: {
-          kind: { type: 'string', enum: ['quote', 'report', 'invoice', 'tcc', 'photos'] },
+          kind: { type: 'string', enum: ['quote', 'report', 'invoice', 'tcc', 'photos', 'scope'] },
           id: { type: 'string' },
+          quoteIds: { type: 'array', items: { type: 'string' }, maxItems: 9, description: 'Scope of works only: the other quotes it covers.' },
           tcc: {
             type: 'object',
             properties: { date: { type: 'string' }, time: { type: 'string' }, completedBy: { type: 'string' }, method: { type: 'string' } },

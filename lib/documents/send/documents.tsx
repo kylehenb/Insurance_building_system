@@ -4,6 +4,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import type { DocumentSendType } from '@/lib/email/templates'
 import { QuoteDocument } from '@/components/documents/QuoteDocument'
 import { TccDocument } from '@/components/documents/TccDocument'
+import { ScopeDocument } from '@/components/documents/ScopeDocument'
 import { InvoiceDocument } from '@/components/documents/InvoiceDocument'
 import { renderPrintDocumentPdf } from '@/lib/documents/render-print-document'
 import {
@@ -11,6 +12,7 @@ import {
   loadPhotosPrintData,
   loadQuotePrintData,
   loadReportPrintData,
+  loadScopePrintData,
   loadTccPrintData,
   tccCallDetails,
   type PrintDataContext,
@@ -19,6 +21,9 @@ import {
 import {
   photosPdfFilename,
   quotePdfFilename,
+  scopePdfFilename,
+  scopeQuoteIds,
+  scopeTitle,
   renderPhotoPagesPdf,
   renderReportPdf,
   reportDocumentName,
@@ -42,20 +47,26 @@ type ScopeItem = Database['public']['Tables']['scope_items']['Row']
 type Invoice = Database['public']['Tables']['invoices']['Row']
 type Service = SupabaseClient<Database>
 
-export const DOCUMENT_KINDS = ['quote', 'invoice', 'report', 'tcc', 'photos'] as const
+export const DOCUMENT_KINDS = ['quote', 'invoice', 'report', 'tcc', 'photos', 'scope'] as const
 export type DocumentKind = typeof DOCUMENT_KINDS[number]
 
 /**
  * One document to attach. id is the quote/invoice/report id; for the TCC it
  * is the quote id (as the print page) plus the call details; for photos it is
- * the job id plus the chosen photo ids (none = all of the job's photos).
+ * the job id plus the chosen photo ids (none = all of the job's photos); for
+ * the uncosted scope of works it is the first quote's id, plus the other
+ * quotes of the same job it covers (none = that quote alone).
  */
 export interface DocumentRef {
   kind: DocumentKind
   id: string
   tcc?: TccCallDetails
   photoIds?: string[]
+  quoteIds?: string[]
 }
+
+/** Most quotes one scope of works can combine */
+export const MAX_SCOPE_QUOTES = 10
 
 export class DocumentSendError extends Error {
   constructor(message: string, public readonly status: 400 | 404 | 409 | 413 | 422 | 500 | 502) {
@@ -91,6 +102,15 @@ export function parseDocumentRef(input: unknown): DocumentRef {
     }
     ref.photoIds = ids as string[]
   }
+  if (o.kind === 'scope' && o.quoteIds !== undefined) {
+    const ids = Array.isArray(o.quoteIds) ? o.quoteIds : null
+    if (!ids || ids.some(id => typeof id !== 'string' || !UUID_RE.test(id))) {
+      throw new DocumentSendError('Invalid quote selection', 400)
+    }
+    const others = [...new Set(ids as string[])].filter(id => id !== o.id)
+    if (others.length + 1 > MAX_SCOPE_QUOTES) throw new DocumentSendError(`A scope of works can cover at most ${MAX_SCOPE_QUOTES} quotes`, 400)
+    if (others.length) ref.quoteIds = others
+  }
   return ref
 }
 
@@ -98,6 +118,7 @@ export function parseDocumentRef(input: unknown): DocumentRef {
 export function documentRefKey(ref: DocumentRef): string {
   if (ref.kind === 'tcc') return `tcc:${ref.id}:${JSON.stringify(ref.tcc ?? {})}`
   if (ref.kind === 'photos') return `photos:${ref.id}:${(ref.photoIds ?? []).join(',')}`
+  if (ref.kind === 'scope') return `scope:${scopeQuoteIds(ref).join(',')}`
   return `${ref.kind}:${ref.id}`
 }
 
@@ -228,6 +249,27 @@ export async function prepareDocument(ref: DocumentRef, ctx: PrintDataContext): 
         vars: {},
         warnings,
         render: () => renderPrintDocumentPdf(<TccDocument {...data} />, `TCC-${data.job.job_number}`),
+      }
+    }
+    case 'scope': {
+      const data = await loadScopePrintData(scopeQuoteIds(ref), ctx)
+      const warnings: string[] = []
+      for (const q of data.quotes) {
+        if (q.status === 'draft') warnings.push(`Quote ${q.quote_ref ?? ''} is still a draft`.replace('  ', ' '))
+        if (q.status === 'rejected') warnings.push(`Quote ${q.quote_ref ?? ''} was rejected`.replace('  ', ' '))
+        if (!data.scopeItems.some(i => i.quote_id === q.id)) warnings.push(`Quote ${q.quote_ref ?? 'Draft'} has no items`)
+      }
+      const refs = data.quotes.map(q => q.quote_ref || 'Draft').join(', ')
+      return {
+        ref, job: data.job, tenant: data.tenant,
+        filename: scopePdfFilename(data),
+        title: scopeTitle(data.quotes),
+        // Nothing to mark sent: the quotes themselves haven't been sent
+        sendType: 'scope',
+        audience: 'insurer',
+        vars: { quote_refs: refs },
+        warnings,
+        render: () => renderPrintDocumentPdf(<ScopeDocument {...data} />, `Scope of Works ${data.job.job_number}`),
       }
     }
     case 'photos': {

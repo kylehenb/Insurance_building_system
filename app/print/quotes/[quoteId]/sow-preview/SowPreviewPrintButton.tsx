@@ -3,7 +3,7 @@
 export function SowPreviewPrintButton({ quoteRef }: { quoteRef?: string | null }) {
   const handlePrint = () => {
     const originalTitle = document.title
-    document.title = quoteRef ? `${quoteRef}-Auth` : 'SOW-Auth'
+    document.title = quoteRef ? `Scope of Works ${quoteRef}` : 'Scope of Works'
     window.print()
     document.title = originalTitle
   }

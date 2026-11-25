@@ -33,9 +33,9 @@ const buildDraft = vi.fn()
 const send = vi.fn()
 vi.mock('@/lib/documents/send/documents', () => ({
   DocumentSendError,
-  parseDocumentRef: (o: { kind?: string; id?: string }) => {
-    if (!['quote', 'report', 'invoice', 'tcc', 'photos'].includes(o?.kind ?? '')) throw new DocumentSendError('Unknown document type', 400)
-    return { kind: o.kind, id: o.id }
+  parseDocumentRef: (o: { kind?: string; id?: string; quoteIds?: string[] }) => {
+    if (!['quote', 'report', 'invoice', 'tcc', 'photos', 'scope'].includes(o?.kind ?? '')) throw new DocumentSendError('Unknown document type', 400)
+    return { kind: o.kind, id: o.id, ...(o.quoteIds ? { quoteIds: o.quoteIds } : {}) }
   },
   quoteDocumentTotal: (_q: unknown, items: unknown[]) => items.length * 1100,
 }))
@@ -46,6 +46,7 @@ vi.mock('@/lib/documents/send/email', () => ({
     { ref: { kind: 'quote', id: 'q1' }, title: 'Quote Q-IRC1001-7', filename: '' },
     { ref: { kind: 'report', id: 'r1' }, title: 'Building Assessment Report BAR-IRC1001-5', filename: '' },
     { ref: { kind: 'invoice', id: 'i1' }, title: 'Excess invoice INV-IRC1001-1', filename: '' },
+    { ref: { kind: 'scope', id: 'q1', quoteIds: ['q2'] }, title: 'Scope of Works Q-IRC1001-7 + Q-IRC1001-8', filename: '' },
   ],
 }))
 
@@ -90,6 +91,15 @@ describe('list_job_documents', () => {
     expect(res.data).toMatchObject({ photos: { document: { kind: 'photos', id: 'j1' }, count: 2 } })
   })
 
+  it('lists the uncosted scope of works of all current quotes, with no amount', async () => {
+    const res = await listJobDocumentsTool.run({ job_number: 'IRC1001' }, ctx)
+    expect(res.text).toContain('- Scope of Works Q-IRC1001-7 + Q-IRC1001-8 (uncosted, no prices)')
+    const docs = (res.data as { documents: { document: unknown; amount: unknown }[] }).documents
+    expect(docs.find(d => (d.document as { kind: string }).kind === 'scope')).toMatchObject({
+      document: { kind: 'scope', id: 'q1', quoteIds: ['q2'] }, amount: null,
+    })
+  })
+
   it('suggests close job numbers', async () => {
     const res = await listJobDocumentsTool.run({ job_number: 'IRC9999' }, ctx)
     expect(res.isError).toBe(true)
@@ -121,6 +131,27 @@ describe('send_documents', () => {
     expect(send).toHaveBeenCalledWith([REPORT, QUOTE], { supabase: ctx.supabase, tenantId: 't1', actorId: 'u1' },
       { to: undefined, cc: undefined, subject: undefined, body: undefined })
     expect(res.text).toBe('Emailed Building Assessment Report BAR-IRC1001-5, Quote Q-IRC1001-7 to claims@insurer.example. Quote Q-IRC1001-7 marked sent.')
+  })
+
+  it('sends a scope of works covering both quotes as one document', async () => {
+    const SCOPE = { kind: 'scope', id: 'q1', quoteIds: ['q2'] }
+    buildDraft.mockResolvedValueOnce({
+      to: 'claims@insurer.example', cc: '', subject: 'Scope of Works', body: '', bodyText: '',
+      attachments: [{ ref: SCOPE, title: 'Scope of Works Q-IRC1001-7 + Q-IRC1001-8', filename: 'Scope of Works - Q-IRC1001-7, Q-IRC1001-8.pdf' }],
+      audience: 'insurer', templateName: 'Scope of works — default', usingBuiltInTemplate: true, warnings: [], otherDocuments: [],
+    })
+    send.mockResolvedValueOnce({ communicationId: 'c2', statusChanges: [] })
+    const res = await sendDocuments.run({ documents: [SCOPE] }, ctx)
+    expect(send).toHaveBeenCalledWith([SCOPE], expect.anything(), expect.anything())
+    expect(res.text).toBe('Emailed Scope of Works Q-IRC1001-7 + Q-IRC1001-8 to claims@insurer.example.')
+  })
+
+  it('offers the scope of works in every document schema', () => {
+    for (const tool of [getDocumentEmail, sendDocuments]) {
+      const items = (tool.inputSchema.properties as Record<string, { items: { properties: Record<string, { enum?: string[] }> } }>).documents.items
+      expect(items.properties.kind.enum).toContain('scope')
+      expect(items.properties.quoteIds).toBeDefined()
+    }
   })
 
   it('passes the user’s recipients and wording', async () => {

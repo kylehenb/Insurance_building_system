@@ -168,7 +168,7 @@ describe('buildDocumentEmailDraft', () => {
     const draft = await buildDocumentEmailDraft([quoteRef], ctx)
     expect(draft.to).toBe('')
     expect(draft.warnings[0]).toMatch(/No insurer email/)
-    expect(draft.otherDocuments.map(d => d.title)).toEqual(['Building Assessment Report R-IRC1234-BAR', 'Invoice INV-IRC1234-1'])
+    expect(draft.otherDocuments.map(d => d.title)).toEqual(['Scope of Works Q-IRC1234-1', 'Building Assessment Report R-IRC1234-BAR', 'Invoice INV-IRC1234-1'])
   })
 
   it('refuses documents from different jobs in one email', async () => {
@@ -271,6 +271,64 @@ describe('sendDocumentEmail', () => {
     await expect(sendDocumentEmail([{ kind: 'invoice', id: fx.INVOICE_ID }], ctx)).rejects.toMatchObject({ status: 422 })
     db.invoices = [fx.printInvoice({ status: 'voided' })]
     await expect(sendDocumentEmail([{ kind: 'invoice', id: fx.INVOICE_ID }], ctx)).rejects.toMatchObject({ status: 409 })
+  })
+})
+
+describe('scope of works (uncosted)', () => {
+  const Q2 = '00000000-0000-4000-8000-0000000000a2'
+  const scopeRef = { kind: 'scope' as const, id: fx.QUOTE_ID, quoteIds: [Q2] }
+  const OTHER_JOB = '00000000-0000-4000-8000-000000000999'
+
+  beforeEach(() => {
+    db.quotes.push(fx.printQuote({ id: Q2, quote_ref: 'Q-IRC1234-2', status: 'draft', notes: null, room_order: ['Laundry'], created_at: '2026-11-01T02:00:00Z' }))
+    db.scope_items.push(
+      { ...fx.printScopeItems()[1], id: 'si-q2-1', quote_id: Q2, room: 'Laundry', item_description: 'Replace laundry trough', sort_order: 1 },
+      { ...fx.printScopeItems()[1], id: 'si-q2-2', quote_id: Q2, room: 'Kitchen', item_description: 'Replace kitchen kickboards', sort_order: 2 },
+    )
+  })
+
+  it('takes the other quotes, leaving out the first one and repeats', () => {
+    expect(parseDocumentRef({ kind: 'scope', id: fx.QUOTE_ID, quoteIds: [Q2, fx.QUOTE_ID, Q2] })).toEqual(scopeRef)
+    expect(parseDocumentRef({ kind: 'scope', id: fx.QUOTE_ID, quoteIds: [] })).toEqual({ kind: 'scope', id: fx.QUOTE_ID })
+    expect(() => parseDocumentRef({ kind: 'scope', id: fx.QUOTE_ID, quoteIds: ['nope'] })).toThrow('Invalid quote selection')
+    expect(() => parseDocumentRef({ kind: 'scope', id: fx.QUOTE_ID, quoteIds: 'x' })).toThrow('Invalid quote selection')
+  })
+
+  it("lists one scope of works for the job's current quotes, not rejected ones or old versions", async () => {
+    db.quotes.push(
+      fx.printQuote({ id: '00000000-0000-4000-8000-0000000000a3', quote_ref: 'Q-IRC1234-3', status: 'rejected' }),
+      fx.printQuote({ id: '00000000-0000-4000-8000-0000000000a4', quote_ref: 'Q-IRC1234-1', is_active_version: false }),
+    )
+    const draft = await buildDocumentEmailDraft([{ kind: 'report', id: fx.printReport().id }], ctx)
+    const scope = draft.otherDocuments.find(d => d.ref.kind === 'scope')
+    expect(scope).toEqual({ ref: scopeRef, title: 'Scope of Works Q-IRC1234-1 + Q-IRC1234-2', filename: '' })
+  })
+
+  it('emails both quotes in one PDF with the scope template, without marking the quotes sent', async () => {
+    const draft = await buildDocumentEmailDraft([scopeRef], ctx)
+    expect(draft.subject).toBe('Scope of Works - Claim CLM-555 <A&B> - Alex Example - 1 Example Street, Sampleton WA 6000')
+    expect(draft.bodyText).toContain('(Q-IRC1234-1, Q-IRC1234-2)')
+    expect(draft.warnings).toContain('Quote Q-IRC1234-2 is still a draft')
+
+    const result = await sendDocumentEmail([scopeRef], ctx)
+    const email = gmailSend.mock.calls[0][1] as { attachments: { filename: string }[] }
+    expect(email.attachments.map(a => a.filename)).toEqual(['Scope of Works - Q-IRC1234-1, Q-IRC1234-2 - 1 Example Street, Sampleton WA 6000.pdf'])
+
+    // The scope document got both quotes, in order, and all their items
+    const element = renderPdf.mock.calls[0][0] as { props: { quotes: { id: string }[]; scopeItems: unknown[] } }
+    expect(element.props.quotes.map(q => q.id)).toEqual([fx.QUOTE_ID, Q2])
+    expect(element.props.scopeItems).toHaveLength(fx.printScopeItems().length + 2)
+
+    expect(result.statusChanges).toEqual([])
+    expect(db.quotes.map(q => q.status)).toEqual(['ready', 'draft'])
+    expect(updates.filter(u => u.table === 'quotes')).toEqual([])
+  })
+
+  it("refuses a quote from another job, or one that doesn't exist", async () => {
+    db.jobs.push(fx.printJob({ id: OTHER_JOB }))
+    db.quotes[1].job_id = OTHER_JOB
+    await expect(buildDocumentEmailDraft([scopeRef], ctx)).rejects.toThrow('Quote not found')
+    await expect(buildDocumentEmailDraft([{ kind: 'scope', id: fx.QUOTE_ID, quoteIds: ['00000000-0000-4000-8000-0000000000ff'] }], ctx)).rejects.toThrow('Quote not found')
   })
 })
 

@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { QuoteEditorClient } from './QuoteEditorClient'
 import { TccModal } from './TccModal'
 import { SendDocumentModal } from '@/components/documents/SendDocumentModal'
+import type { DocumentRef } from '@/lib/documents/send/documents'
 import { pendingApprovalFrom } from '@/lib/approvals/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,6 +36,11 @@ interface QuoteListItem {
   item_count: number
   room_summary: Record<string, RoomSummary>
   approval_notes: string | null
+}
+
+/** The quotes an uncosted scope of works can cover: all but rejected ones, oldest first. */
+function scopeQuotes(quotes: QuoteListItem[]): QuoteListItem[] {
+  return quotes.filter(q => q.status !== 'rejected').sort((a, b) => a.created_at.localeCompare(b.created_at))
 }
 
 interface ActionConfig {
@@ -137,7 +143,10 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
   const [partialApproveDialogQuoteId, setPartialApproveDialogQuoteId] = useState<string | null>(null)
   const [selectedLineItems, setSelectedLineItems] = useState<string[]>([])
   const [quoteLineItems, setQuoteLineItems] = useState<any[]>([])
-  const [quotePicker, setQuotePicker] = useState<{ docType: 'sow' | 'building-contract'; selectedIds: string[] } | null>(null)
+  // sow / building-contract: the signed documents (approved quotes). scope / scope-email: the uncosted
+  // scope of works to view or email (any quote that wasn't rejected).
+  const [quotePicker, setQuotePicker] = useState<{ docType: 'sow' | 'building-contract' | 'scope' | 'scope-email'; selectedIds: string[] } | null>(null)
+  const [scopeSendRef, setScopeSendRef] = useState<DocumentRef | null>(null)
   const [sendForSignatureQuoteId, setSendForSignatureQuoteId] = useState<string | null>(null)
   const [receiveSignOffVisible, setReceiveSignOffVisible] = useState(false)
   const [currentJobStage, setCurrentJobStage] = useState<string | null>(null)
@@ -937,6 +946,16 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
         />
       )}
 
+      {/* Email the uncosted scope of works (one or more quotes). Changes no quote's status. */}
+      {scopeSendRef && (
+        <SendDocumentModal
+          documents={[scopeSendRef]}
+          title="Send scope of works"
+          onClose={() => setScopeSendRef(null)}
+          onDone={() => setScopeSendRef(null)}
+        />
+      )}
+
       {/* Decline dialog */}
       {declineDialogQuoteId && (
         <div
@@ -1529,10 +1548,12 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
       )}
 
       {quotePicker && (() => {
-        const approvedQuotes = quotes.filter(
-          aq => aq.status === 'approved' || aq.status === 'partially_approved'
-        )
-        const docLabel = quotePicker.docType === 'sow' ? 'Scope of Works Authorisation' : 'Building Contract'
+        const isScope = quotePicker.docType === 'scope' || quotePicker.docType === 'scope-email'
+        const approvedQuotes = isScope
+          ? scopeQuotes(quotes)
+          : quotes.filter(aq => aq.status === 'approved' || aq.status === 'partially_approved')
+        const docLabel = quotePicker.docType === 'sow' ? 'Scope of Works Authorisation'
+          : quotePicker.docType === 'building-contract' ? 'Building Contract' : 'Scope of Works (no prices)'
         return (
           <div
             style={{
@@ -1565,7 +1586,7 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 Select quotes for {docLabel}
               </div>
               <p style={{ fontSize: 13, color: 'var(--subtle)', lineHeight: 1.5, marginBottom: 20 }}>
-                This job has more than one approved quote. Choose which ones this document should cover.
+                This job has more than one {isScope ? '' : 'approved '}quote. Choose which ones this document should cover.
               </p>
 
               <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -1672,7 +1693,19 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                 <button
                   onClick={() => {
                     if (quotePicker.selectedIds.length === 0) return
-                    const primaryId = quotePicker.selectedIds[0]
+                    // In the list's order, so the document reads quote by quote
+                    const ids = approvedQuotes.map(aq => aq.id).filter(id => quotePicker.selectedIds.includes(id))
+                    const [primaryId, ...rest] = isScope ? ids : quotePicker.selectedIds
+                    if (quotePicker.docType === 'scope-email') {
+                      setScopeSendRef({ kind: 'scope', id: primaryId, ...(rest.length ? { quoteIds: rest } : {}) })
+                      setQuotePicker(null)
+                      return
+                    }
+                    if (quotePicker.docType === 'scope') {
+                      window.open(`/print/quotes/${primaryId}/sow-preview${rest.length ? `?with=${rest.join(',')}` : ''}`, '_blank')
+                      setQuotePicker(null)
+                      return
+                    }
                     setSowLoading(primaryId)
                     window.open(`/print/quotes/${primaryId}/${quotePicker.docType}?quoteIds=${quotePicker.selectedIds.join(',')}`, '_blank')
                     setTimeout(() => setSowLoading(null), 500)
@@ -2123,6 +2156,11 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                         onClick={e => {
                           e.stopPropagation()
                           setMenuDropdownId(null)
+                          const candidates = scopeQuotes(quotes)
+                          if (candidates.length > 1 && candidates.some(c => c.id === q.id)) {
+                            setQuotePicker({ docType: 'scope', selectedIds: candidates.map(c => c.id) })
+                            return
+                          }
                           window.open(`/print/quotes/${q.id}/sow-preview`, '_blank')
                         }}
                         style={{
@@ -2146,6 +2184,39 @@ export function QuotesList({ jobId, tenantId, insurer, job, onQuoteUpdated }: Qu
                       >
                         <span style={{ fontSize: 10, color: 'var(--tan)' }}>📃</span>
                         <span>SOW</span>
+                      </button>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setMenuDropdownId(null)
+                          const candidates = scopeQuotes(quotes)
+                          if (candidates.length > 1 && candidates.some(c => c.id === q.id)) {
+                            setQuotePicker({ docType: 'scope-email', selectedIds: candidates.map(c => c.id) })
+                            return
+                          }
+                          setScopeSendRef({ kind: 'scope', id: q.id })
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 14px',
+                          fontSize: 12,
+                          color: 'var(--body)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 400,
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+                      >
+                        <span style={{ fontSize: 10, color: 'var(--tan)' }}>✉</span>
+                        <span>Email SOW…</span>
                       </button>
                       <button
                         onClick={e => {

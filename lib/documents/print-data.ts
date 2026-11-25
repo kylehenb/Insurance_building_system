@@ -67,6 +67,42 @@ export async function loadQuotePrintData(quoteId: string, ctx: PrintDataContext)
   return { quote, scopeItems: scopeItems ?? [], job, tenant }
 }
 
+// ── Scope of works (uncosted) ────────────────────────────────────────────
+
+export interface ScopePrintData {
+  /** In the order asked for */
+  quotes: Quote[]
+  scopeItems: ScopeItem[]
+  job: Job
+  tenant: Tenant
+}
+
+/** One or more quotes of the same job, for the uncosted scope of works. */
+export async function loadScopePrintData(quoteIds: string[], ctx: PrintDataContext): Promise<ScopePrintData> {
+  const { supabase, tenantId } = ctx
+  const ids = [...new Set(quoteIds)]
+  if (ids.length === 0) throw new PrintDataError('Quote not found', 404)
+
+  const { data: rows, error: quoteError } = await supabase
+    .from('quotes').select('*').in('id', ids).eq('tenant_id', tenantId)
+  if (quoteError) throw new PrintDataError('Error fetching quotes', 500)
+  const byId = new Map((rows ?? []).map(q => [q.id, q]))
+  const quotes = ids.map(id => byId.get(id))
+  if (quotes.some(q => !q)) throw new PrintDataError('Quote not found', 404)
+  const found = quotes as Quote[]
+  if (found.some(q => q.job_id !== found[0].job_id)) {
+    throw new PrintDataError('Quote not found', 404)
+  }
+
+  const { data: scopeItems, error: itemsError } = await supabase
+    .from('scope_items').select('*').in('quote_id', ids).eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: true })
+  if (itemsError) throw new PrintDataError('Error fetching scope items', 500)
+
+  const { job, tenant } = await loadJobAndTenant(ctx, found[0].job_id)
+  return { quotes: found, scopeItems: scopeItems ?? [], job, tenant }
+}
+
 // ── Invoice ──────────────────────────────────────────────────────────────
 
 export interface InvoicePrintData {

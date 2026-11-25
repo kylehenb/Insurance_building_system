@@ -6,7 +6,7 @@ import { PrintDataError } from '@/lib/documents/print-data'
 
 // The PDF exactly as it would be emailed, rendered live and never stored.
 // Always inline. Query: kind, id; TCC adds date, time, completedBy, method;
-// photos adds ids (comma-separated).
+// photos adds ids, the scope of works quotes (both comma-separated).
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       id: q.get('id'),
       tcc: { date: q.get('date') ?? '', time: q.get('time') ?? '', completedBy: q.get('completedBy') ?? '', method: q.get('method') ?? '' },
       photoIds: (q.get('ids') ?? '').split(',').filter(Boolean),
+      quoteIds: (q.get('quotes') ?? '').split(',').filter(Boolean),
     })
     const doc = await prepareDocument(ref, ctx)
     const pdf = await doc.render()

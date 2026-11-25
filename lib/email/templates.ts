@@ -19,9 +19,11 @@ export type EmailSendType =
   | 'excess_invoice'
   | 'tcc'
   | 'photos'
+  // The uncosted scope of works (one or more quotes, no prices)
+  | 'scope'
 
 /** The send types for documents emailed from the job (lib/documents/send). */
-export type DocumentSendType = Extract<EmailSendType, 'quote' | 'report' | 'invoice' | 'excess_invoice' | 'tcc' | 'photos'>
+export type DocumentSendType = Extract<EmailSendType, 'quote' | 'report' | 'invoice' | 'excess_invoice' | 'tcc' | 'photos' | 'scope'>
 
 export interface EmailTemplateContent {
   subject: string
@@ -216,6 +218,22 @@ export const BUILT_IN_TEMPLATES: Record<EmailSendType, EmailTemplateContent & { 
       '{signature}',
     ].join('\n'),
   },
+  scope: {
+    name: 'Scope of works — default',
+    subject: 'Scope of Works - Claim {claim_number} - {insured_name} - {property_address}',
+    body: [
+      'Hi {contact_name},',
+      '',
+      'Please find attached the scope of works for {property_address} ({quote_refs}).',
+      '',
+      'Claim: {claim_number}',
+      'Insured: {insured_name}',
+      'Our ref: {job_number}',
+      '',
+      'Kind regards,',
+      '{signature}',
+    ].join('\n'),
+  },
   photos: {
     name: 'Photos — default',
     subject: 'Photos - Claim {claim_number} - {insured_name} - {property_address}',
@@ -350,6 +368,10 @@ export const TEMPLATE_TOKENS: Record<EmailSendType, TemplateToken[]> = {
   ],
   tcc: [...INSURER_DOCUMENT_TOKENS],
   photos: [...INSURER_DOCUMENT_TOKENS],
+  scope: [
+    { key: 'quote_refs',       label: 'Quote numbers',    example: 'Q-IRC1042-1, Q-IRC1042-2' },
+    ...INSURER_DOCUMENT_TOKENS,
+  ],
 }
 
 /** Placeholders a send type can't work without (the editor warns if one is missing). */
@@ -414,6 +436,11 @@ export const EMAIL_SEND_TYPES: { sendType: EmailSendType; label: string; descrip
     sendType: 'photos',
     label: 'Photos',
     description: 'Sent to the insurer/adjuster with the selected photos as a PDF.',
+  },
+  {
+    sendType: 'scope',
+    label: 'Scope of works (uncosted)',
+    description: "Sent to the insurer/adjuster with the scope of works PDF: one or more quotes' items with no prices.",
   },
 ]
 

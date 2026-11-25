@@ -8,7 +8,7 @@ import { isPendingApproval, responseError } from '@/lib/approvals/client'
 import { ApprovalNotice } from '@/components/approvals/approval-notice'
 import { ExtraAttachments, extraFileRefs, type ExtraFile } from '@/components/email/ExtraAttachments'
 
-// Send a document (quote, report, invoice, TCC, photos) by email from the
+// Send a document (quote, report, invoice, TCC, photos, scope of works) by email from the
 // job. Auto send emails the standard template as-is; Customise send opens the
 // same pre-filled email to edit, and can attach more of the job's documents,
 // the job's own files and photos, or files from the computer.
@@ -66,10 +66,11 @@ export function documentPdfUrl(ref: DocumentRef): string {
   const q = new URLSearchParams({ kind: ref.kind, id: ref.id })
   if (ref.tcc) for (const [k, v] of Object.entries(ref.tcc)) q.set(k, v)
   if (ref.photoIds?.length) q.set('ids', ref.photoIds.join(','))
+  if (ref.quoteIds?.length) q.set('quotes', ref.quoteIds.join(','))
   return `/api/documents/pdf?${q.toString()}`
 }
 
-const refKey = (ref: DocumentRef) => `${ref.kind}:${ref.id}`
+const refKey = (ref: DocumentRef) => `${ref.kind}:${ref.id}${ref.quoteIds?.length ? `:${ref.quoteIds.join(',')}` : ''}`
 
 async function post(body: Record<string, unknown>) {
   const res = await fetch('/api/documents/send', {

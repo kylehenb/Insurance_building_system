@@ -9,7 +9,7 @@ import { resolveInsurerEmailRecipients } from '@/lib/contacts/email-routing'
 import { sendEmailViaGmail } from '@/lib/signing/email/gmail'
 import type { EmailAttachment } from '@/lib/email/build-raw'
 import type { PrintDataContext } from '@/lib/documents/print-data'
-import { reportDocumentName } from '@/lib/documents/print-document-pdfs'
+import { reportDocumentName, scopeTitle } from '@/lib/documents/print-document-pdfs'
 import { findOrderThread, type OrderThread } from '@/lib/documents/send/order-thread'
 import { inspectionForPackage, markInspectionPackageSent } from '@/lib/documents/send/inspection-package'
 import { PrintDataError } from '@/lib/documents/print-data'
@@ -17,6 +17,7 @@ import { ExtraFileError, loadExtraFiles, type ExtraFileRef } from '@/lib/email/e
 import {
   documentRefKey,
   DocumentSendError,
+  MAX_SCOPE_QUOTES,
   markDocumentSent,
   prepareDocument,
   type DocumentRef,
@@ -203,11 +204,15 @@ async function buildDraft(
   }
 }
 
-/** The job's quotes, reports and invoices, for "Attach another document" (and the voice connector's document list). */
+/**
+ * The job's quotes, reports and invoices, for "Attach another document" (and
+ * the voice connector's document list), and the uncosted scope of works of
+ * all its current quotes (not old versions or rejected ones) in one PDF.
+ */
 export async function listJobDocuments(ctx: PrintDataContext, jobId: string): Promise<DocumentEmailAttachment[]> {
   const { supabase, tenantId } = ctx
   const [quotes, reports, invoices] = await Promise.all([
-    supabase.from('quotes').select('id, quote_ref, is_active_version, created_at')
+    supabase.from('quotes').select('id, quote_ref, is_active_version, status, created_at')
       .eq('job_id', jobId).eq('tenant_id', tenantId).order('created_at', { ascending: true }),
     supabase.from('reports').select('id, report_ref, report_type, deleted_at, created_at')
       .eq('job_id', jobId).eq('tenant_id', tenantId).is('deleted_at', null).order('created_at', { ascending: true }),
@@ -218,6 +223,15 @@ export async function listJobDocuments(ctx: PrintDataContext, jobId: string): Pr
   for (const q of quotes.data ?? []) {
     if (q.is_active_version === false) continue
     list.push({ ref: { kind: 'quote', id: q.id }, title: `Quote ${q.quote_ref || 'Draft'}`, filename: '' })
+  }
+  const scopeQuotes = (quotes.data ?? []).filter(q => q.is_active_version !== false && q.status !== 'rejected').slice(0, MAX_SCOPE_QUOTES)
+  if (scopeQuotes.length) {
+    const [first, ...rest] = scopeQuotes
+    list.push({
+      ref: { kind: 'scope', id: first.id, ...(rest.length ? { quoteIds: rest.map(q => q.id) } : {}) },
+      title: scopeTitle(scopeQuotes),
+      filename: '',
+    })
   }
   for (const r of reports.data ?? []) {
     list.push({ ref: { kind: 'report', id: r.id }, title: `${reportDocumentName(r.report_type)}${r.report_ref ? ` ${r.report_ref}` : ''}`, filename: '' })

@@ -17,7 +17,7 @@ import {
 import { ATTACH_PROPERTIES, fitJobAttachments, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
 
 // Emailing a job's documents by voice: quotes, reports, invoices (incl.
-// excess), TCC and photos. The list is the send dialog's own
+// excess), TCC, photos and the uncosted scope of works (one or more quotes). The list is the send dialog's own
 // listJobDocuments, and preview/send are the dialog's buildDocumentEmailDraft
 // and sendDocumentEmail, so recipients (insurer routing, or the insured for an
 // excess invoice), templates, the comms record and "marked sent" all match
@@ -102,8 +102,14 @@ const DOCUMENTS_SCHEMA = {
   items: {
     type: 'object',
     properties: {
-      kind: { type: 'string', enum: ['quote', 'report', 'invoice', 'tcc', 'photos'] },
-      id: { type: 'string', description: 'Quote/report/invoice id; for photos the job id; for a TCC the quote id.' },
+      kind: { type: 'string', enum: ['quote', 'report', 'invoice', 'tcc', 'photos', 'scope'] },
+      id: { type: 'string', description: 'Quote/report/invoice id; for photos the job id; for a TCC the quote id; for a scope of works the first quote\'s id.' },
+      quoteIds: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 9,
+        description: 'Scope of works only: the other quotes of the job it covers, after the first (none = that quote alone).',
+      },
       tcc: {
         type: 'object',
         description: 'TCC only: the clearance call — ask the user for these.',
@@ -129,6 +135,9 @@ export const listJobDocumentsTool: McpTool = {
     'Each has a "document" value to pass to get_document_email / send_documents.',
     'Several documents can share a name (e.g. old report versions): give their dates and ask which one.',
     'A TCC (telephone clearance certificate) is made from a quote: use kind "tcc" with that quote\'s id and ask for the call details.',
+    'The "Scope of Works" document (kind "scope") is the uncosted scope: the quotes\' items by room with no prices, for when the insurer or homeowner asks for the scope of works.',
+    'The listed one covers all the job\'s current quotes in one PDF; for only some of them, use the first one\'s id with the others in quoteIds.',
+    'Sending it doesn\'t mark the quotes sent.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -174,6 +183,10 @@ export const listJobDocumentsTool: McpTool = {
         const total = q ? quoteDocumentTotal(q, (items.data ?? []).filter(i => i.quote_id === q.id)) : null
         return { document: ref, title, status: q?.status ?? null, amount: total, created_at: q?.created_at ?? null }
       }
+      if (ref.kind === 'scope') {
+        const q = quoteRows.get(ref.id)
+        return { document: ref, title, status: null, amount: null, created_at: q?.created_at ?? null }
+      }
       if (ref.kind === 'report') {
         const r = reportRows.get(ref.id)
         return { document: ref, title, status: r?.status ?? null, amount: null, created_at: r?.created_at ?? null }
@@ -189,7 +202,7 @@ export const listJobDocumentsTool: McpTool = {
     return {
       text: [
         `${job.job_number}, ${job.property_address ?? 'no address'}:`,
-        ...(documents.length ? documents.map(line) : ['- No quotes, reports or invoices.']),
+        ...(documents.length ? documents.map(d => d.document.kind === 'scope' ? `- ${d.title} (uncosted, no prices)` : line(d)) : ['- No quotes, reports or invoices.']),
         `- Photos: ${photoCount}.`,
         recent.length
           ? `Recent document emails: ${recent.map(e => `${spokenDate(e.at)} to ${e.to ?? 'unknown'} (${e.attachments.join(', ') || e.subject})`).join('; ')}.`
@@ -280,7 +293,7 @@ export const sendDocuments: McpTool = {
   name: 'send_documents',
   title: 'Send documents',
   description: [
-    'Emails one or more documents of a job as PDFs in one email, exactly like Send on the job, and marks them sent (quotes, reports, invoices — invoices also go to the accounting system).',
+    'Emails one or more documents of a job as PDFs in one email, exactly like Send on the job, and marks them sent (quotes, reports, invoices — invoices also go to the accounting system; a scope of works changes nothing).',
     'ONLY call this after get_document_email, once you have read back the recipients, the documents and any warnings and the user has clearly said yes.',
     'Leave out to, cc, subject and body to send the standard email. If there is no recipient on file, ask the user for one and pass it as to.',
     'attach_photos ("2", "45-47", a label) / attach_files add the job\'s photos and uploaded files as they are (the "photos" document is all photos as one PDF).',

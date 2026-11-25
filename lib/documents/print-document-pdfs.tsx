@@ -14,6 +14,7 @@ import {
   type PhotosPrintData,
   type QuotePrintData,
   type ReportPrintData,
+  type ScopePrintData,
   type TccCallDetails,
   type TccPrintData,
 } from '@/lib/documents/print-data'
@@ -47,6 +48,22 @@ export async function buildQuotePdf(quoteId: string, ctx: PrintDataContext): Pro
   const filename = quotePdfFilename(data)
   const pdf = await renderPrintDocumentPdf(<QuoteDocument {...data} />, data.quote.quote_ref || 'Quote')
   return { pdf, filename, data }
+}
+
+// ── Scope of works (uncosted) ─────────────────────────────────────────────
+
+/** Every quote a scope of works covers, the first one first. */
+export function scopeQuoteIds(ref: { id: string; quoteIds?: string[] }): string[] {
+  return [ref.id, ...(ref.quoteIds ?? []).filter(id => id !== ref.id)]
+}
+
+/** "Scope of Works Q-IRC1001-1" or "Scope of Works Q-IRC1001-1 + Q-IRC1001-2" */
+export function scopeTitle(quotes: Pick<ScopePrintData['quotes'][number], 'quote_ref'>[]): string {
+  return `Scope of Works ${quotes.map(q => q.quote_ref || 'Draft').join(' + ')}`
+}
+
+export function scopePdfFilename(data: Pick<ScopePrintData, 'quotes' | 'job'>): string {
+  return pdfFilename('Scope of Works', data.quotes.map(q => q.quote_ref || 'Draft').join(', '), address(data.job.property_address))
 }
 
 // ── Report ───────────────────────────────────────────────────────────────
