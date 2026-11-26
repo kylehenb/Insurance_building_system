@@ -107,7 +107,7 @@ export function AutoConfirmSettings() {
         Turn it on for a kind of card (by its star) or a kind of step. A new card runs by itself when its kind is on, or when every step on it is a kind
         that&apos;s on. When it runs, it does all of its steps straight away — emails included — as the person who turned it on, with their permissions
         (a step that needs approval still waits for it). Cards you starred yourself and follow-ups are never auto-confirmed. You&apos;ll be asked once a kind
-        (or step) has been confirmed untouched for 98% of its last 20. Comments you make don&apos;t count against it — only changes and skips do.
+        (or step) has been confirmed untouched for 19 of its last 20. Comments you make don&apos;t count against it — only changes and skips do.
       </p>
       {error && <p className="text-sm text-[#9f1239] mb-2">{error}</p>}
       <div className="bg-white border border-line-3 rounded-lg divide-y divide-line-3">

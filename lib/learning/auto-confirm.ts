@@ -3,10 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Auto-confirm (tech spec §24.7): a kind of proposal (an action card's
 // category) can be set to run without a person confirming it. It's off
 // until someone turns it on. Once a kind has been confirmed untouched for
-// 98% of its last 20 decisions, the office is asked whether to turn it on
+// 19 of its last 20 decisions (95%), the office is asked whether to turn it on
 // (a banner); "Not now" asks again 30 days later if it's still that good.
 
-export const AUTO_CONFIRM = { last: 20, accuracy: 98, askAgainDays: 30 } as const
+export const AUTO_CONFIRM = { last: 20, accuracy: 95, askAgainDays: 30 } as const
 
 export type Readiness = { decided: number; accepted: number; pct: number | null; ready: boolean }
 

@@ -3,7 +3,7 @@ import { fakeSupabase, type Row } from '@/lib/mcp/__tests__/fake-supabase'
 import { autoConfirmFor, dismissAutoConfirm, pendingAutoConfirm, readiness, refreshAutoConfirmSuggestions, setAutoConfirm } from '../auto-confirm'
 
 // Auto-confirm is off until someone turns it on; the office is asked once a
-// kind has been confirmed untouched for 98% of its last 20 decisions.
+// kind has been confirmed untouched for 19 of its last 20 decisions.
 
 const tables: Record<string, Row[]> = {}
 const db = fakeSupabase(tables)
@@ -22,15 +22,17 @@ beforeEach(() => {
 })
 
 describe('readiness', () => {
-  it('needs 20 decisions, at least 98% untouched — instructions don\'t count', async () => {
+  it('needs 20 decisions, at least 19 untouched — instructions don\'t count', async () => {
     decisions(20)
     tables.learning_events.push({ tenant_id: 't1', feature: 'action_card', kind: 'invoice', outcome: 'instructed', created_at: NOW.toISOString() })
     expect(await readiness(db as never, 't1', 'action_card', 'invoice')).toEqual({ decided: 20, accepted: 20, pct: 100, ready: true })
   })
 
-  it('isn\'t ready with one of the last 20 changed, or with fewer than 20', async () => {
+  it('is ready with one of the last 20 changed, not two, and not with fewer than 20', async () => {
     decisions(25, 'invoice', 1)
-    expect(await readiness(db as never, 't1', 'action_card', 'invoice')).toMatchObject({ decided: 20, accepted: 19, pct: 95, ready: false })
+    expect(await readiness(db as never, 't1', 'action_card', 'invoice')).toMatchObject({ decided: 20, accepted: 19, pct: 95, ready: true })
+    decisions(25, 'attend_submit', 2)
+    expect(await readiness(db as never, 't1', 'action_card', 'attend_submit')).toMatchObject({ decided: 20, accepted: 18, pct: 90, ready: false })
     decisions(19, 'other')
     expect((await readiness(db as never, 't1', 'action_card', 'other')).ready).toBe(false)
   })
@@ -60,7 +62,11 @@ describe('asking the office', () => {
   it('stops asking when a kind is no longer good enough, and never asks about one that\'s on', async () => {
     decisions(20)
     await refreshAutoConfirmSuggestions(db as never, 't1', 'action_card', ['invoice'], NOW)
+    // One change in the last 20 is still good enough; a second isn't
     tables.learning_events.push({ tenant_id: 't1', feature: 'action_card', kind: 'invoice', outcome: 'edited', created_at: NOW.toISOString() })
+    await refreshAutoConfirmSuggestions(db as never, 't1', 'action_card', ['invoice'], NOW)
+    expect(await pendingAutoConfirm(db as never, 't1')).toHaveLength(1)
+    tables.learning_events.push({ tenant_id: 't1', feature: 'action_card', kind: 'invoice', outcome: 'edited', created_at: new Date(NOW.getTime() + 1000).toISOString() })
     await refreshAutoConfirmSuggestions(db as never, 't1', 'action_card', ['invoice'], NOW)
     expect(await pendingAutoConfirm(db as never, 't1')).toEqual([])
     decisions(20, 'other')
