@@ -5,6 +5,7 @@ import type { McpContext } from '@/lib/mcp/server'
 import { getJobSummary } from '@/lib/mcp/tools/jobs'
 import { readConversation } from '@/lib/mcp/tools/mailbox'
 import { applyEmailBookings, bookingLearning, type FoundBooking } from '@/lib/automation/auto-bookings'
+import { addPromiseTodos, promiseLearning, type FoundPromise } from './promises'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
 import { cardActor, CARD_COLUMNS, type ActionCard, type WaitingOn } from './cards'
@@ -85,6 +86,20 @@ const RECORD: Anthropic.Beta.BetaTool = {
           required: ['trade', 'start_date', 'evidence'],
         },
       },
+      promises: {
+        type: 'array',
+        description: 'Things this email says the OFFICE will do itself (see PROMISES). Empty when none.',
+        items: {
+          type: 'object',
+          properties: {
+            what: { type: 'string', description: 'What the office will do, as a to-do: "chase Brush Bros for the painting booking date", "send Suncorp the report".' },
+            who: { type: 'string', description: 'Who it involves (who to chase or send to), if anyone.' },
+            due_date: { type: 'string', description: 'The day it was promised for, "2026-12-04", only when the email gives one.' },
+            evidence: { type: 'string', description: 'The words that promise it, quoted.' },
+          },
+          required: ['what', 'evidence'],
+        },
+      },
     },
     required: ['asks'],
   },
@@ -109,6 +124,11 @@ BOOKINGS (separate from the wait — an email can have both, either or neither).
 - Firm days only: work the date out from today and the conversation; if you can't tell exactly which day, leave it out. A start time only when one is given. A last day only for work over several days.
 - PAST BOOKINGS TAKEN FROM SENT EMAILS, if shown, say how the office treated bookings like this before (an undo means it shouldn't have been one): follow them.
 
+PROMISES (separate again). List what this email says the office will do itself, so it doesn't slip: "I'll chase the painter for a booking date", "I'll send the report through on Friday", "we'll get the quote to you by Wednesday", "I'll check with the insurer and come back to you".
+- Not a promise: what the email asks someone else to do (that's the wait); something done in this very email ("attached is the report"); pleasantries and vague offers ("let us know if you need anything", "we'll keep you posted", "talk soon"); a booking that's just a trade's day on site (that's BOOKINGS).
+- what: the to-do in a few words, naming who it involves. due_date only when the email promises a day ("Friday" → that date; "tomorrow" → tomorrow's date).
+- PROMISES lessons, if shown, say what the office skips (shouldn't have been one) — follow them.
+
 Today is given in the first message. Times are Perth time (AWST).`
 
 /** Who sent it, by name, for the AI and the card */
@@ -130,10 +150,10 @@ type Read = { status: 'done' | 'new' | 'failed'; outcome: string; follow_up_id?:
 export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; client?: Pick<Anthropic, 'beta'>; at?: Date } = {}): Promise<Read> {
   const db = opts.db ?? mailDb()
   const at = opts.at ?? new Date()
-  // Bookings put on the schedule from this email, added to whatever the read concludes
+  // Bookings put on the schedule (and promises made to-dos) from this email, added to whatever the read concludes
   let booked: string[] = []
   const save = async (r: Read) => {
-    if (booked.length) r = { ...r, outcome: `${r.outcome}. Schedule: ${booked.join('; ')}` }
+    if (booked.length) r = { ...r, outcome: `${r.outcome}. Also: ${booked.join('; ')}` }
     await db.from('sent_emails').update({ status: r.status, outcome: r.outcome, follow_up_id: r.follow_up_id ?? null, updated_at: now() }).eq('id', row.id)
     return r
   }
@@ -164,9 +184,10 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     // recipient — stands in for them
     const guess = outside[0]
     const situation = await waitSituation(db, row.tenant_id, { email: guess.email, name: guess.name || guess.email, role: '', ask_kind: '' }, jobId, row.sent_by)
-    const [learning, pastBookings] = await Promise.all([
+    const [learning, pastBookings, pastPromises] = await Promise.all([
       waitLearning(db, row.tenant_id, situation),
       detail.job ? bookingLearning(db, row.tenant_id, guess) : Promise.resolve(''),
+      promiseLearning(db, row.tenant_id),
     ])
 
     const intro = [
@@ -178,6 +199,7 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
       others.length ? `ALSO WAITING ON THIS JOB\n${others.map(c => `- ${waitLine(c)}`).join('\n')}` : '',
       learning,
       pastBookings,
+      pastPromises,
     ].filter(Boolean).join('\n\n')
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -196,6 +218,13 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     const found = Array.isArray(out.bookings) ? (out.bookings as FoundBooking[]).filter(b => b && typeof b === 'object') : []
     if (found.length && detail.job) {
       booked = await applyEmailBookings(db, { tenantId: row.tenant_id, jobId: detail.job.id, jobNumber: detail.job.job_number, messageId: row.gmail_message_id, to: guess, bookings: found })
+    }
+    // The office's own promises: on the sender's list as to-dos, the AI drafting what keeps each
+    const promised = Array.isArray(out.promises) ? (out.promises as FoundPromise[]).filter(p => p && typeof p === 'object') : []
+    if (promised.length) {
+      const owner = row.sent_by ?? await cardActor(db, row.tenant_id)
+      const added = await addPromiseTodos(db, { tenantId: row.tenant_id, userId: owner, jobId, threadId: row.thread_id, messageId: row.gmail_message_id, to: guess.email, promises: promised })
+      if (added.length) booked = [...booked, ...added.map(a => `to-do: ${a}`)]
     }
     if (out.asks !== true) return save({ status: 'done', outcome: 'Asks for nothing' })
 

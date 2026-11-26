@@ -140,6 +140,8 @@ export type NewFollowUp = {
   urgent?: boolean
   /** A to-do a person added: dueAt may be empty (now) */
   todo?: { mode: TodoMode; category?: CardCategory }
+  /** A to-do IRC made from the office's own promise in a sent email (lib/actions/promises.ts) */
+  promise?: { evidence: string | null; message_id: string }
 }
 
 /** A follow-up's title: what it's for, and with whom */
@@ -183,6 +185,7 @@ export async function createFollowUp(db: SupabaseClient, tenantId: string, userI
     ...(waiting ? { kind: 'waiting_on' as const, waiting } : {}),
     ...(input.watch ? { kind: 'watch' as const, watch: { why: input.watch.why, planned_at: now() } } : {}),
     ...(input.todo ? { kind: 'todo' as const, todo: { mode: input.todo.mode } } : {}),
+    ...(input.promise ? { promise: input.promise } : {}),
   }
   // A to-do for now: a reminder is on the list as it is; one to do is read by the AI first
   const status = now_ ? (input.todo!.mode === 'remind' ? 'pending' : 'queued') : 'scheduled'

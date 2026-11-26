@@ -309,7 +309,7 @@ describe('bookings in a sent email', () => {
     detail = sentDetail({ messages: [{ ...(sentDetail().messages as Row[])[0], text: 'Hi Dan, yes Tuesday works — see you there at 7.' }] })
     const { client, create } = model({ asks: false, bookings: [{ trade: 'Sparky Bros', start_date: '2026-11-03', start_time: '07:00', evidence: 'yes Tuesday works — see you there at 7' }] })
     const out = await readSentEmail(sentRow(), { db, client, at: THU })
-    expect(out).toMatchObject({ status: 'done', outcome: 'Asks for nothing. Schedule: Booked the Electrician (Sparky Bros Electrical) on IRC1001 for Tue 3 Nov at 07:00' })
+    expect(out).toMatchObject({ status: 'done', outcome: 'Asks for nothing. Also: Booked the Electrician (Sparky Bros Electrical) on IRC1001 for Tue 3 Nov at 07:00' })
     expect(tables.work_order_visits[0]).toMatchObject({ work_order_id: 'we', scheduled_date: '2026-11-03', start_time: '07:00', status: 'confirmed' })
     expect(tables.auto_actions[0]).toMatchObject({ source: 'sent_email', source_ref: 'm9', evidence: 'yes Tuesday works — see you there at 7' })
     // The prompt says whose words count
@@ -322,5 +322,38 @@ describe('bookings in a sent email', () => {
     const { client } = model({ asks: false, bookings: [{ trade: 'electrician', start_date: '2026-11-03', evidence: 'Tuesday' }] })
     await readSentEmail(sentRow(), { db, client, at: THU })
     expect(tables.auto_actions ?? []).toHaveLength(0)
+  })
+})
+
+describe('promises in a sent email', () => {
+  it('puts what the office said it would do on the sender\'s list, due now or on the day promised, once', async () => {
+    const { client } = model({ asks: false, promises: [
+      { what: 'chase Brush Bros for the painting booking date', who: 'Brush Bros', evidence: 'I\'ll chase the painter for a date and come back to you' },
+      { what: 'send Suncorp the report', who: 'Suncorp', due_date: '2027-01-08', evidence: 'We\'ll have the report to you Friday' },
+    ] })
+    const out = await readSentEmail(sentRow(), { db, client, at: THU })
+    expect(out.outcome).toContain('Also: to-do: You said you\'d chase Brush Bros for the painting booking date; to-do: You said you\'d send Suncorp the report (due 2027-01-08)')
+    const todos = tables.action_queue.filter(c => (c.follow_up as Row)?.kind === 'todo')
+    expect(todos.map(c => [c.title, c.status])).toEqual([
+      ['You said you\'d chase Brush Bros for the painting booking date', 'queued'],
+      ['You said you\'d send Suncorp the report', 'scheduled'],
+    ])
+    expect(todos[0]).toMatchObject({ job_id: 'j1', follow_up: { created_by: 'u2', thread_id: 'abc1', promise: { message_id: 'm9' } } })
+    expect(todos[1].due_at).toBe('2027-01-08T00:00:00.000Z')
+    expect(tables.learning_events.filter(e => e.feature === 'promise')).toHaveLength(2)
+
+    // Read again (another email saying the same): not twice
+    await readSentEmail(sentRow({ id: 's2', gmail_message_id: 'm10' }), { db, client, at: THU })
+    expect(tables.action_queue.filter(c => (c.follow_up as Row)?.kind === 'todo')).toHaveLength(2)
+  })
+
+  it('learns from a promise to-do being skipped', async () => {
+    const { skipCard } = await import('../cards')
+    const { client } = model({ asks: false, promises: [{ what: 'keep the homeowner posted', evidence: 'we\'ll keep you posted' }] })
+    await readSentEmail(sentRow(), { db, client, at: THU })
+    const card = tables.action_queue.find(c => (c.follow_up as Row)?.promise)!
+    card.status = 'pending'
+    await skipCard(db, 't1', card.id as string, 'u2')
+    expect(tables.learning_events.filter(e => e.feature === 'promise').map(e => e.outcome)).toEqual(['accepted', 'skipped'])
   })
 })

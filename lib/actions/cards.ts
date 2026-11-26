@@ -85,6 +85,8 @@ export type FollowUp = {
   todo?: { mode: TodoMode }
   waiting?: WaitingOn
   watch?: { why: string; planned_at: string }
+  /** A to-do IRC made from the office's own promise in an email it sent (lib/actions/promises.ts): the words, and the email */
+  promise?: { evidence: string | null; message_id: string }
 }
 
 export type TodoMode = 'remind' | 'do'
@@ -406,6 +408,8 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
     .select(CARD_COLUMNS).maybeSingle()
   if (data) {
     await recordCardDecision(db, data as ActionCard, userId, 'skipped')
+    const { recordPromiseSkipped } = await import('./promises')
+    await recordPromiseSkipped(db, data as ActionCard, userId)
     const { recordChaseDecision } = await import('./waits')
     await recordChaseDecision(db, data as ActionCard, userId, 'skipped')
   }
