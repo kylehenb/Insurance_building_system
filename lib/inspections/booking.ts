@@ -112,9 +112,14 @@ const INSPECTION_COLUMNS = 'id, inspection_ref, access_notes, calendar_event_id,
  * The job's inspection to book: the one named by its ref, else the only one
  * not yet submitted. Null when the job has none (the event is still made).
  */
-async function inspectionToBook(db: SupabaseClient, tenantId: string, jobId: string, ref?: string): Promise<BookingInspection | null> {
+async function inspectionToBook(db: SupabaseClient, tenantId: string, jobId: string, ref?: string, id?: string): Promise<BookingInspection | null> {
   const { data } = await db.from('inspections').select(INSPECTION_COLUMNS).eq('tenant_id', tenantId).eq('job_id', jobId).order('created_at', { ascending: false })
   const all = (data as (BookingInspection & { form_submitted_at: string | null })[] | null) ?? []
+  if (id) {
+    const hit = all.find(i => i.id === id)
+    if (!hit) throw new InspectionBookingError('That inspection isn\'t on this job.')
+    return hit
+  }
   if (ref) {
     const hit = all.find(i => (i.inspection_ref ?? '').toLowerCase() === ref.toLowerCase())
     if (!hit) throw new InspectionBookingError(`No inspection ${ref} on this job${all.length ? ` — it has ${all.map(i => i.inspection_ref ?? 'one without a ref').join(', ')}` : ''}.`)
@@ -152,6 +157,8 @@ export async function bookInspection(db: SupabaseClient, params: {
   start: string
   minutes: number
   inspectionRef?: string
+  /** Or the inspection itself (moving one on the Calendar page) */
+  inspectionId?: string
   /** What was agreed with the homeowner — shown in the event */
   bookingNote?: string
 }): Promise<InspectionBooking> {
@@ -159,7 +166,7 @@ export async function bookInspection(db: SupabaseClient, params: {
   const { data: jobRow } = await db.from('jobs').select(JOB_COLUMNS).eq('tenant_id', tenantId).eq('id', jobId).maybeSingle()
   const job = jobRow as BookingJob | null
   if (!job) throw new InspectionBookingError('Job not found.')
-  const inspection = await inspectionToBook(db, tenantId, jobId, params.inspectionRef)
+  const inspection = await inspectionToBook(db, tenantId, jobId, params.inspectionRef, params.inspectionId)
 
   const [watched] = await watchedCalendars(db, tenantId)
   if (!watched) throw new InspectionBookingError('No calendar is set up for appointments yet (watch_calendar_ids in the automation settings).')

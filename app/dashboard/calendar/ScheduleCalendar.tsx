@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { KIND_LABELS, SCHEDULE_KINDS, addDays, perthDate, type ScheduleEntry, type ScheduleKind } from '@/lib/schedule/schedule'
 import { mapsLink } from '@/lib/maps'
 import UnbookedPanel from './UnbookedPanel'
+import BookingDialog, { type BookingTarget } from './BookingDialog'
 import { KIND_COLOURS } from './colours'
 
 // The Calendar page (tech spec §23.18): everything on IRC's jobs — inspections
@@ -54,8 +55,13 @@ function entryTitle(e: ScheduleEntry): string {
   return `${e.title}${e.who ? ` · ${e.who}` : ''}`
 }
 
+/** Move or take off an entry (trade visits and inspections) */
+const ActionsContext = createContext<{ move: (e: ScheduleEntry) => void; remove: (e: ScheduleEntry) => void } | null>(null)
+const canMove = (e: ScheduleEntry) => (e.kind === 'repair' && !!e.work_order_id) || e.source.type === 'inspection'
+
 /** One thing on a day, as a card: what, when, where, and the links */
 function EntryCard({ e, me }: { e: DayEntry; me: string }) {
+  const actions = useContext(ActionsContext)
   const colour = KIND_COLOURS[e.kind]
   return (
     <div className="flex gap-3 rounded-lg border border-ink/10 bg-white p-3 shadow-sm">
@@ -72,11 +78,11 @@ function EntryCard({ e, me }: { e: DayEntry; me: string }) {
           <Link href={`/dashboard/jobs/${e.job_id}`} className="font-medium text-ink hover:underline">{e.job_number}</Link>
           {e.address ? ` · ${shortAddress(e.address)}` : ''}
         </div>
-        {e.address && (
-          <a href={mapsLink(e.address)} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-ink/60 underline-offset-2 hover:underline">
-            Directions
-          </a>
-        )}
+        <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-ink/60">
+          {e.address && <a href={mapsLink(e.address)} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">Directions</a>}
+          {actions && canMove(e) && <button type="button" onClick={() => actions.move(e)} className="underline-offset-2 hover:underline">Move</button>}
+          {actions && e.kind === 'repair' && e.work_order_id && <button type="button" onClick={() => actions.remove(e)} className="underline-offset-2 hover:underline">Remove</button>}
+        </div>
       </div>
     </div>
   )
@@ -213,6 +219,8 @@ export default function ScheduleCalendar() {
   const [me, setMe] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [booking, setBooking] = useState<BookingTarget | null>(null)
+  const [refresh, setRefresh] = useState(0)
 
   // The view and filters are remembered on this device
   useEffect(() => {
@@ -253,10 +261,23 @@ export default function ScheduleCalendar() {
       setLoading(false)
     }
   }, [from, to, person, kinds, trade])
-  useEffect(() => { void load() }, [load])
+  // Again after a booking (refresh)
+  useEffect(() => { void load() }, [load, refresh])
 
   const step = (n: number) => setAnchor(a => view === 'day' ? addDays(a, n) : view === 'week' ? addDays(a, 7 * n) : `${addDays(`${a.slice(0, 8)}01`, n > 0 ? 32 : -1).slice(0, 8)}01`)
   const openDay = (d: string) => { setAnchor(d); setView('day') }
+  const actions = useMemo(() => ({
+    move: (e: ScheduleEntry) => setBooking(e.kind === 'repair'
+      ? { mode: 'trade', work_order_id: e.work_order_id!, visit_number: e.visit_number, label: `the ${e.title}${e.who ? ` (${e.who})` : ''}`, job_number: e.job_number, start_date: e.start_date, end_date: e.end_date !== e.start_date ? e.end_date : null, start_time: e.time }
+      : { mode: 'inspection', job_id: e.job_id, inspection_id: e.source.id, label: `the ${e.title.toLowerCase()}`, job_number: e.job_number, start_date: e.start_date, start_time: e.time }),
+    remove: async (e: ScheduleEntry) => {
+      if (!window.confirm(`Take the ${e.title} on ${e.job_number} off the schedule?`)) return
+      const res = await fetch('/api/schedule/trade-visit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ work_order_id: e.work_order_id, visit_number: e.visit_number, clear: true }) })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) { window.alert(out.error ?? 'Couldn\'t take it off'); return }
+      setRefresh(r => r + 1)
+    },
+  }), [])
   const toggleKind = (k: ScheduleKind) => setKinds(ks => (ks.includes(k) ? ks.filter(x => x !== k) : [...ks, k]))
 
   const title = view === 'day'
@@ -267,6 +288,7 @@ export default function ScheduleCalendar() {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(from, i))
 
   return (
+    <ActionsContext.Provider value={actions}>
     <div className="p-4 lg:p-8">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -308,7 +330,7 @@ export default function ScheduleCalendar() {
         </div>
 
         {/* What still needs a date, for the same person */}
-        <div className="mt-4"><UnbookedPanel person={person} me={me} /></div>
+        <div className="mt-4"><UnbookedPanel person={person} me={me} refresh={refresh} onBook={setBooking} /></div>
 
         {/* Where we are */}
         <div className="mt-5 flex items-center gap-2">
@@ -337,5 +359,7 @@ export default function ScheduleCalendar() {
         </div>
       </div>
     </div>
+    {booking && <BookingDialog target={booking} onClose={() => setBooking(null)} onDone={() => { setBooking(null); setRefresh(r => r + 1) }} />}
+    </ActionsContext.Provider>
   )
 }

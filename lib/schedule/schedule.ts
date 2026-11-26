@@ -53,6 +53,9 @@ export type ScheduleEntry = {
   status: string | null
   source: { type: 'inspection' | 'visit' | 'appointment'; id: string }
   visit?: { number: number; total: number }
+  /** A trade visit's work order and visit number (to move or clear it) */
+  work_order_id?: string
+  visit_number?: number
 }
 
 export type ScheduleFilters = {
@@ -168,6 +171,7 @@ export async function loadSchedule(db: SupabaseClient, tenantId: string, f: Sche
       ...base(job, job.assigned_to), kind: 'repair', start_date: v.scheduled_date, end_date: v.scheduled_end_date ?? v.scheduled_date,
       time: hhmm(v.start_time), end_time: null, title: wo.trade_name ?? 'Trade', who: wo.trade_id ? tradeName.get(wo.trade_id) ?? null : null, status: v.status,
       source: { type: 'visit', id: v.id }, ...(total > 1 ? { visit: { number: v.visit_number, total } } : {}),
+      work_order_id: wo.id, visit_number: v.visit_number,
     })
   }
   for (const e of events) {
@@ -202,3 +206,7 @@ export function scheduleByDay(entries: ScheduleEntry[], from: string, to: string
   }
   return days
 }
+
+/** "Tue 1 Dec" for a Perth date */
+export const dayLabel = (date: string) =>
+  new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${date}T00:00:00Z`)).replace(/,/g, '')

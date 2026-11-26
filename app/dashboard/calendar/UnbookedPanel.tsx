@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { Unbooked, UnbookedTrade } from '@/lib/schedule/unbooked'
+import type { BookingTarget } from './BookingDialog'
 import { KIND_COLOURS } from './colours'
 
 // "Not booked yet" on the Calendar page (tech spec §23.18): inspections and
@@ -15,7 +16,7 @@ const due = (iso: string) => new Intl.DateTimeFormat('en-AU', { timeZone: 'Austr
 const tradeText = (t: UnbookedTrade) =>
   `${t.trade}${t.business ? ` (${t.business})` : ''}${t.total_visits > 1 ? ` · visit${t.visits.length > 1 ? 's' : ''} ${t.visits.join(', ')} of ${t.total_visits}` : ''}`
 
-export default function UnbookedPanel({ person, me }: { person: string; me: string }) {
+export default function UnbookedPanel({ person, me, refresh, onBook }: { person: string; me: string; refresh: number; onBook: (t: BookingTarget) => void }) {
   const [data, setData] = useState<Unbooked | null>(null)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
@@ -39,7 +40,7 @@ export default function UnbookedPanel({ person, me }: { person: string; me: stri
       })
       .catch(err => { if (live) setError(err instanceof Error ? err.message : 'Couldn\'t load what needs booking') })
     return () => { live = false }
-  }, [person])
+  }, [person, refresh])
 
   if (error) return <p className="rounded-lg border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{error}</p>
   if (!data) return null
@@ -78,6 +79,7 @@ export default function UnbookedPanel({ person, me }: { person: string; me: stri
                     <Link href={`/dashboard/jobs/${i.job_id}`} className="font-medium text-ink hover:underline">{i.job_number}</Link>
                     <span className="text-ink/70"> · {shortAddress(i.address) || 'No address'}</span>
                     {owner(i)}
+                    <button type="button" onClick={() => onBook({ mode: 'inspection', job_id: i.job_id, label: 'the inspection', job_number: i.job_number })} className="ml-2 rounded-md border border-ink/15 px-2 py-0.5 text-xs text-ink hover:bg-cream">Book</button>
                     {i.booking_due && (
                       <div className={`text-xs ${i.overdue ? 'font-medium text-danger' : 'text-ink/50'}`}>
                         Book by {due(i.booking_due)}{i.overdue ? ' — overdue' : ''}
@@ -104,6 +106,7 @@ export default function UnbookedPanel({ person, me }: { person: string; me: stri
                       {j.trades.map(t => (
                         <li key={t.work_order_id} className="text-xs text-ink/70">
                           {tradeText(t)}{!t.sent && <span className="ml-1 text-warning-dark">· not sent yet</span>}
+                          <button type="button" onClick={() => onBook({ mode: 'trade', work_order_id: t.work_order_id, visit_number: t.visits[0], label: `the ${t.trade}${t.total_visits > 1 ? ` (visit ${t.visits[0]})` : ''}`, job_number: j.job_number })} className="ml-2 rounded-md border border-ink/15 px-2 py-0.5 text-ink hover:bg-cream">Book</button>
                         </li>
                       ))}
                     </ul>
