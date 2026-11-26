@@ -151,3 +151,34 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
     previous: visit.scheduled_date ? { start_date: visit.scheduled_date, end_date: visit.scheduled_end_date, start_time: hhmm(visit.start_time) } : null,
   }
 }
+
+export type TradeWorkOrder = { id: string; trade_name: string | null; trade_id: string | null; label: string }
+
+/**
+ * A job's work order for a trade as people say it — the trade ("painter"),
+ * the business ("Brush Bros") or the contact. One match, several (ask which),
+ * or none (with what the job has). Said nothing: the job's only work order.
+ */
+export async function findTradeWorkOrder(db: SupabaseClient, tenantId: string, jobId: string, said: string):
+  Promise<{ match: TradeWorkOrder } | { several: TradeWorkOrder[] } | { none: TradeWorkOrder[] }> {
+  const { data } = await db.from('work_orders').select('id, trade_name, trade_id, status').eq('tenant_id', tenantId).eq('job_id', jobId)
+  const rows = ((data as { id: string; trade_name: string | null; trade_id: string | null; status: string | null }[] | null) ?? []).filter(w => w.status !== 'cancelled')
+  const tradeIds = [...new Set(rows.map(w => w.trade_id).filter((v): v is string => !!v))]
+  const { data: tradeRows } = tradeIds.length ? await db.from('trades').select('id, business_name, primary_contact').eq('tenant_id', tenantId).in('id', tradeIds) : { data: [] }
+  const trades = new Map(((tradeRows as { id: string; business_name: string | null; primary_contact: string | null }[] | null) ?? []).map(t => [t.id, t]))
+  const all: (TradeWorkOrder & { names: string[] })[] = rows.map(w => {
+    const t = w.trade_id ? trades.get(w.trade_id) : undefined
+    return {
+      id: w.id, trade_name: w.trade_name, trade_id: w.trade_id,
+      label: `${w.trade_name ?? 'Trade'}${t?.business_name ? ` (${t.business_name})` : ''}`,
+      names: [w.trade_name, t?.business_name, t?.primary_contact].filter((v): v is string => !!v).map(v => v.toLowerCase()),
+    }
+  })
+  const strip = (w: TradeWorkOrder & { names: string[] }): TradeWorkOrder => ({ id: w.id, trade_name: w.trade_name, trade_id: w.trade_id, label: w.label })
+  const needle = said.trim().toLowerCase()
+  if (!needle) return all.length === 1 ? { match: strip(all[0]) } : { none: all.map(strip) }
+  const hits = all.filter(w => w.names.some(n => n.includes(needle) || needle.includes(n)))
+  if (hits.length === 1) return { match: strip(hits[0]) }
+  if (hits.length > 1) return { several: hits.map(strip) }
+  return { none: all.map(strip) }
+}

@@ -301,3 +301,26 @@ describe('what happens to a wait', () => {
     expect((await listWaits(db, 't1')).map(c => c.id)).toEqual([wait().id, 'w2'])
   })
 })
+
+describe('bookings in a sent email', () => {
+  it('puts a trade\'s day the office stated on the schedule, even when the email asks for nothing', async () => {
+    tables.work_orders = [{ id: 'we', tenant_id: 't1', job_id: 'j1', trade_name: 'Electrician', trade_id: 'tr1', total_visits: 1, status: 'engaged' }]
+    tables.work_order_visits = []
+    detail = sentDetail({ messages: [{ ...(sentDetail().messages as Row[])[0], text: 'Hi Dan, yes Tuesday works — see you there at 7.' }] })
+    const { client, create } = model({ asks: false, bookings: [{ trade: 'Sparky Bros', start_date: '2026-11-03', start_time: '07:00', evidence: 'yes Tuesday works — see you there at 7' }] })
+    const out = await readSentEmail(sentRow(), { db, client, at: THU })
+    expect(out).toMatchObject({ status: 'done', outcome: 'Asks for nothing. Schedule: Booked the Electrician (Sparky Bros Electrical) on IRC1001 for Tue 3 Nov at 07:00' })
+    expect(tables.work_order_visits[0]).toMatchObject({ work_order_id: 'we', scheduled_date: '2026-11-03', start_time: '07:00', status: 'confirmed' })
+    expect(tables.auto_actions[0]).toMatchObject({ source: 'sent_email', source_ref: 'm9', evidence: 'yes Tuesday works — see you there at 7' })
+    // The prompt says whose words count
+    const call = (create.mock.calls[0] as unknown[])[0] as { system: string }
+    expect(call.system).toContain('The office agrees to a day someone proposed')
+  })
+
+  it('books nothing for a conversation that isn\'t on a job', async () => {
+    detail = sentDetail({ job: null })
+    const { client } = model({ asks: false, bookings: [{ trade: 'electrician', start_date: '2026-11-03', evidence: 'Tuesday' }] })
+    await readSentEmail(sentRow(), { db, client, at: THU })
+    expect(tables.auto_actions ?? []).toHaveLength(0)
+  })
+})

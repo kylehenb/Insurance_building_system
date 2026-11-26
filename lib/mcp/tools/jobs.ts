@@ -179,6 +179,7 @@ export const addJobNote: McpTool = {
   description: [
     'Adds a note to the job\'s Comms feed (the communications list on the job\'s Overview tab), dated and marked as added by voice (or by the assistant, in the app\'s chat).',
     'Write the note in the user\'s words; read it back and get a yes first.',
+    'If the note gives a firm day for a trade on site or an inspection ("painter\'s going Tuesday"), offer to put it on the schedule too (book_trade_visit or book_inspection).',
   ].join(' '),
   inputSchema: {
     type: 'object',

@@ -61,6 +61,7 @@ export async function recordActivity(entry: ActivityEntry): Promise<void> {
 export const SYSTEM_EVENTS = {
   'job.phase': 'Job phase changed',
   'invoice.paid': 'Invoice paid',
+  'schedule.auto': 'Put on the schedule from your email',
 } as const
 export type SystemEvent = keyof typeof SYSTEM_EVENTS
 

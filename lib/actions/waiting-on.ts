@@ -4,6 +4,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import type { McpContext } from '@/lib/mcp/server'
 import { getJobSummary } from '@/lib/mcp/tools/jobs'
 import { readConversation } from '@/lib/mcp/tools/mailbox'
+import { applyEmailBookings, bookingLearning, type FoundBooking } from '@/lib/automation/auto-bookings'
 import { getThreadDetail } from '@/lib/mail/list'
 import { getMailbox, mailDb } from '@/lib/mail/sync'
 import { cardActor, CARD_COLUMNS, type ActionCard, type WaitingOn } from './cards'
@@ -69,6 +70,21 @@ const RECORD: Anthropic.Beta.BetaTool = {
       chase_after_working_days: { type: 'integer', minimum: 0, maximum: MAX_DAYS, description: 'Working days after this email to chase if nothing comes back. 0 = later today.' },
       urgent: { type: 'boolean', description: 'Urgent: safety, a make safe, an escalation, an insurer deadline.' },
       reason: { type: 'string', description: 'One plain sentence on why the chase is then, naming what decided it.' },
+      bookings: {
+        type: 'array',
+        description: 'Trades\' days on site this email STATES or AGREES TO for this job (see BOOKINGS). Empty when none.',
+        items: {
+          type: 'object',
+          properties: {
+            trade: { type: 'string', description: 'The trade or business as the email names it: "painter", "Brush Bros".' },
+            start_date: { type: 'string', description: 'First day, "2026-12-03".' },
+            end_date: { type: 'string', description: 'Last day, only for work over several days.' },
+            start_time: { type: 'string', description: 'Start time "07:00", only when the email gives one.' },
+            evidence: { type: 'string', description: 'The words in the email that set it, quoted.' },
+          },
+          required: ['trade', 'start_date', 'evidence'],
+        },
+      },
     },
     required: ['asks'],
   },
@@ -85,6 +101,13 @@ export const WAIT_SYSTEM_PROMPT = `You keep track of what Insurance Repair Co (b
   2. Then read the job and the conversation, and let anything that makes this one more or less urgent win: an insurer or homeowner already waiting on the office for it (say so in on_behalf_of), an insurer that has chased before, a homeowner who has complained or escalated, things gone wrong on the job, a make safe or anything unsafe, a deadline or SLA, or the person saying when they'll reply ("I'll have it to you Thursday" — chase the working day after).
   3. With no past cases: 2 working days for most asks, 1 when someone is waiting on the office for it, 0 for urgent safety work, about 5 for a full quote or report.
 - reason: one plain sentence the office reads on the reminder, naming what decided it — e.g. "You usually give Sparky Bros a week, but the homeowner complained on Monday and Suncorp is waiting, so tomorrow."
+
+BOOKINGS (separate from the wait — an email can have both, either or neither). List a trade's day on site for this job only when the office's email itself settles it:
+- The office states it: "the painter will be there Tuesday 1 December", "Brush Bros are booked for the 3rd to the 5th", "electrician 7am Thursday to disconnect".
+- The office agrees to a day someone proposed earlier in the conversation: they wrote "can we do Thursday the 3rd?" and this email says "yes, that works". The agreed day is the booking.
+- Not a booking: a day someone else proposes that this email doesn't agree to; the office proposing or asking ("would Tuesday suit?", "can you do next week?"); anything tentative ("hopefully", "should be", "sometime next week", "early next week"); a day that has passed; inspections, meetings and the office's own visits (only trades' days on site).
+- Firm days only: work the date out from today and the conversation; if you can't tell exactly which day, leave it out. A start time only when one is given. A last day only for work over several days.
+- PAST BOOKINGS TAKEN FROM SENT EMAILS, if shown, say how the office treated bookings like this before (an undo means it shouldn't have been one): follow them.
 
 Today is given in the first message. Times are Perth time (AWST).`
 
@@ -107,7 +130,10 @@ type Read = { status: 'done' | 'new' | 'failed'; outcome: string; follow_up_id?:
 export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; client?: Pick<Anthropic, 'beta'>; at?: Date } = {}): Promise<Read> {
   const db = opts.db ?? mailDb()
   const at = opts.at ?? new Date()
+  // Bookings put on the schedule from this email, added to whatever the read concludes
+  let booked: string[] = []
   const save = async (r: Read) => {
+    if (booked.length) r = { ...r, outcome: `${r.outcome}. Schedule: ${booked.join('; ')}` }
     await db.from('sent_emails').update({ status: r.status, outcome: r.outcome, follow_up_id: r.follow_up_id ?? null, updated_at: now() }).eq('id', row.id)
     return r
   }
@@ -138,7 +164,10 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     // recipient — stands in for them
     const guess = outside[0]
     const situation = await waitSituation(db, row.tenant_id, { email: guess.email, name: guess.name || guess.email, role: '', ask_kind: '' }, jobId, row.sent_by)
-    const learning = await waitLearning(db, row.tenant_id, situation)
+    const [learning, pastBookings] = await Promise.all([
+      waitLearning(db, row.tenant_id, situation),
+      detail.job ? bookingLearning(db, row.tenant_id, guess) : Promise.resolve(''),
+    ])
 
     const intro = [
       `Today: ${today()}.`,
@@ -148,6 +177,7 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
       earlier.length ? `ALREADY WAITING IN THIS CONVERSATION\n${earlier.map(c => `- ${waitLine(c)}`).join('\n')}` : '',
       others.length ? `ALSO WAITING ON THIS JOB\n${others.map(c => `- ${waitLine(c)}`).join('\n')}` : '',
       learning,
+      pastBookings,
     ].filter(Boolean).join('\n\n')
 
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -162,6 +192,11 @@ export async function readSentEmail(row: SentRow, opts: { db?: SupabaseClient; c
     const call = response.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === RECORD.name)
     if (!call) throw new Error('The AI didn\'t say what the email asks for')
     const out = (call.input ?? {}) as Record<string, unknown>
+    // The office's own words set a trade's day: on the schedule now (done for you, undoable)
+    const found = Array.isArray(out.bookings) ? (out.bookings as FoundBooking[]).filter(b => b && typeof b === 'object') : []
+    if (found.length && detail.job) {
+      booked = await applyEmailBookings(db, { tenantId: row.tenant_id, jobId: detail.job.id, jobNumber: detail.job.job_number, messageId: row.gmail_message_id, to: guess, bookings: found })
+    }
     if (out.asks !== true) return save({ status: 'done', outcome: 'Asks for nothing' })
 
     const email = str(out.waiting_on_email).toLowerCase() || null

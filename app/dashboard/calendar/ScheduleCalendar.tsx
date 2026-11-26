@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { KIND_LABELS, SCHEDULE_KINDS, addDays, perthDate, type ScheduleEntry, type ScheduleKind } from '@/lib/schedule/schedule'
 import { mapsLink } from '@/lib/maps'
 import UnbookedPanel from './UnbookedPanel'
+import DoneForYouPanel from './DoneForYouPanel'
 import BookingDialog, { type BookingTarget } from './BookingDialog'
 import { KIND_COLOURS } from './colours'
 
@@ -331,6 +332,7 @@ export default function ScheduleCalendar() {
 
         {/* What still needs a date, for the same person */}
         <div className="mt-4"><UnbookedPanel person={person} me={me} refresh={refresh} onBook={setBooking} /></div>
+        <div className="mt-3"><DoneForYouPanel refresh={refresh} onChanged={() => setRefresh(r => r + 1)} /></div>
 
         {/* Where we are */}
         <div className="mt-5 flex items-center gap-2">

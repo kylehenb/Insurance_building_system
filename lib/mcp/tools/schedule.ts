@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
-import { VisitScheduleError, scheduleTradeVisit } from '@/lib/work-orders/visits'
+import { VisitScheduleError, findTradeWorkOrder, scheduleTradeVisit, type TradeWorkOrder } from '@/lib/work-orders/visits'
 import { loadUnbooked } from '@/lib/schedule/unbooked'
 import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { KIND_LABELS, SCHEDULE_KINDS, addDays, loadSchedule, perthDate, scheduleByDay, type ScheduleEntry, type ScheduleKind } from '@/lib/schedule/schedule'
@@ -44,7 +44,6 @@ async function whoseFrom(value: unknown, ctx: McpContext): Promise<{ personId?: 
   return { personId: users[0].id, includeUnassigned: users[0].id === ctx.userId, personName: `${users[0].name}'s` }
 }
 
-type WoRow = { id: string; trade_name: string | null; trade_id: string | null; status: string | null }
 
 export const bookTradeVisit: McpTool = {
   name: 'book_trade_visit',
@@ -84,32 +83,21 @@ export const bookTradeVisit: McpTool = {
     const found = await jobFromArgs(args, ctx)
     if (isToolResult(found)) return found
 
-    const { data } = await db(ctx).from('work_orders').select('id, trade_name, trade_id, status').eq('tenant_id', ctx.tenantId).eq('job_id', found.id)
-    const workOrders = (data as WoRow[] | null) ?? []
-    if (!workOrders.length) return { text: `${found.job_number} has no work orders yet — make one for the trade first.`, isError: true }
-    const tradeIds = [...new Set(workOrders.map(w => w.trade_id).filter((v): v is string => !!v))]
-    const { data: tradeRows } = tradeIds.length ? await db(ctx).from('trades').select('id, business_name, primary_contact').eq('tenant_id', ctx.tenantId).in('id', tradeIds) : { data: [] }
-    const trades = new Map(((tradeRows as { id: string; business_name: string | null; primary_contact: string | null }[] | null) ?? []).map(t => [t.id, t]))
-    const label = (w: WoRow) => {
-      const business = w.trade_id ? trades.get(w.trade_id)?.business_name : null
-      return `${w.trade_name ?? 'Trade'}${business ? ` (${business})` : ''}`
-    }
-
-    let wo: WoRow | undefined
+    let wo: TradeWorkOrder | undefined
     const id = str(args.work_order_id)
-    const said = str(args.trade).toLowerCase()
-    if (id) wo = workOrders.find(w => w.id === id)
-    else if (said) {
-      const matches = workOrders.filter(w => {
-        const t = w.trade_id ? trades.get(w.trade_id) : undefined
-        return [w.trade_name, t?.business_name, t?.primary_contact].some(v => v && (v.toLowerCase().includes(said) || said.includes(v.toLowerCase())))
-      })
-      if (matches.length > 1) return { text: `${found.job_number} has ${matches.length} work orders matching "${str(args.trade)}": ${matches.map(label).join(', ')}. Which one?`, data: { work_orders: matches.map(w => ({ work_order_id: w.id, trade: label(w) })) }, isError: true }
-      wo = matches[0]
-    } else if (workOrders.length === 1) wo = workOrders[0]
-    if (!wo) {
-      return { text: `Which trade on ${found.job_number}? It has: ${workOrders.map(label).join(', ')}.`, data: { work_orders: workOrders.map(w => ({ work_order_id: w.id, trade: label(w) })) }, isError: true }
+    if (id) {
+      const { data } = await db(ctx).from('work_orders').select('id, trade_name, trade_id').eq('tenant_id', ctx.tenantId).eq('job_id', found.id).eq('id', id).maybeSingle()
+      const row = data as { id: string; trade_name: string | null; trade_id: string | null } | null
+      if (row) wo = { ...row, label: row.trade_name ?? 'Trade' }
+    } else {
+      const pick = await findTradeWorkOrder(db(ctx), ctx.tenantId, found.id, str(args.trade))
+      if ('match' in pick) wo = pick.match
+      else if ('several' in pick) return { text: `${found.job_number} has ${pick.several.length} work orders matching "${str(args.trade)}": ${pick.several.map(w => w.label).join(', ')}. Which one?`, data: { work_orders: pick.several.map(w => ({ work_order_id: w.id, trade: w.label })) }, isError: true }
+      else if (!pick.none.length) return { text: `${found.job_number} has no work orders yet — make one for the trade first.`, isError: true }
+      else return { text: `Which trade on ${found.job_number}? It has: ${pick.none.map(w => w.label).join(', ')}.`, data: { work_orders: pick.none.map(w => ({ work_order_id: w.id, trade: w.label })) }, isError: true }
     }
+    if (!wo) return { text: `That work order isn't on ${found.job_number}.`, isError: true }
+    const label = (w: TradeWorkOrder) => w.label
 
     try {
       const v = await scheduleTradeVisit(db(ctx), {
