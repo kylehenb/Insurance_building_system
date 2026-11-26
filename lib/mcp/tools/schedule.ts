@@ -17,11 +17,15 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 export function spokenDay(date: string): string {
   return new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${date}T00:00:00Z`)).replace(/,/g, '')
 }
-const spokenDays = (start: string, end: string | null) => (end && end !== start ? `${spokenDay(start)} to ${spokenDay(end)} (${Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1} days)` : spokenDay(start))
 /** "8:00 am" */
 const spokenTime = (t: string) => {
   const [h, m] = t.split(':').map(Number)
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
+}
+/** "Thu 3 Dec at 7:00 am", "Tue 1 Dec to Thu 3 Dec (3 days)" (all day) */
+const spokenDays = (start: string, end: string | null, time?: string | null) => {
+  const days = end && end !== start ? `${spokenDay(start)} to ${spokenDay(end)} (${Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1} days)` : spokenDay(start)
+  return time ? `${days}${end && end !== start ? ', starting' : ''} at ${spokenTime(time)}` : days
 }
 /** "187C Leake Street, Belmont" — without the state and postcode */
 const shortAddress = (a: string | null) => (a ?? '').replace(/,?\s*(WA|NSW|VIC|QLD|SA|TAS|NT|ACT)\s*\d{4}\s*$/i, '').trim()
@@ -33,6 +37,7 @@ export const bookTradeVisit: McpTool = {
   title: 'Book trade visit',
   description: [
     'Records the firm day(s) a trade is on site for a job — "the painter\'s going to IRC1079 on Tuesday", "carpenter at the Belmont job Monday to Wednesday", "move the plumber to Friday", "the electrician cancelled". It\'s what puts trades on the schedule (get_schedule).',
+    'All day unless a start time is given — "plumber and electrician 7am Thursday to disconnect, cabinet maker 10am" is start_time "07:00" and "10:00". No end time. Moving a visit to another day keeps its time unless a new start_time (or all_day) is given.',
     'trade is the trade or contractor as said ("painter", "Bob\'s Painting"); it picks that work order on the job. start_date and end_date are Perth dates "2026-12-03"; end_date only for work over several days. Only firm days: if the trade said "sometime next week", don\'t book it — say a firm day is needed.',
     'A work order with several visits (an electrician\'s disconnect and reconnect) books the next one not yet booked; give visit_number to move a particular one. clear takes the date off.',
     'IRC doesn\'t tell the trade or homeowner — this records what was agreed. Read back the trade, job, day(s) and get a yes first.',
@@ -45,6 +50,8 @@ export const bookTradeVisit: McpTool = {
       work_order_id: { type: 'string', description: 'Instead of trade, when known (from find_work_orders).' },
       start_date: { type: 'string', description: 'First day on site, Perth date "2026-12-03".' },
       end_date: { type: 'string', description: 'Last day, for work over several days.' },
+      start_time: { type: 'string', description: 'Perth start time "07:00", when one was given. Leave out for all day.' },
+      all_day: { type: 'boolean', description: 'Make it all day (take a time off).' },
       visit_number: { type: 'number', description: 'Which visit, when the work order has several.' },
       note: { type: 'string', description: 'Anything agreed, e.g. "7am start, key in lockbox".' },
       clear: { type: 'boolean', description: 'Take the booking off (the trade cancelled, or it isn\'t firm any more).' },
@@ -94,12 +101,13 @@ export const bookTradeVisit: McpTool = {
       const v = await scheduleTradeVisit(db(ctx), {
         tenantId: ctx.tenantId, workOrderId: wo.id, startDate: start || undefined, endDate: end || undefined,
         visitNumber: Number(args.visit_number) || undefined, note: str(args.note) || undefined, clear,
+        startTime: str(args.start_time) || undefined, allDay: args.all_day === true,
       })
       const which = v.total_visits > 1 ? ` visit ${v.visit_number} of ${v.total_visits}` : ''
-      const was = v.previous ? ` (was ${spokenDays(v.previous.start_date, v.previous.end_date)})` : ''
+      const was = v.previous ? ` (was ${spokenDays(v.previous.start_date, v.previous.end_date, v.previous.start_time)})` : ''
       const text = clear
         ? `Took the ${label(wo)}${which} off the schedule for ${found.job_number}${was}.`
-        : `${v.previous ? 'Moved' : 'Booked'} the ${label(wo)}${which} on ${found.job_number} for ${spokenDays(v.start_date!, v.end_date)}${was}.`
+        : `${v.previous ? 'Moved' : 'Booked'} the ${label(wo)}${which} on ${found.job_number} for ${spokenDays(v.start_date!, v.end_date, v.start_time)}${was}.`
       return { text, data: { job_number: found.job_number, trade: label(wo), ...v } }
     } catch (err) {
       if (err instanceof VisitScheduleError) return { text: err.message, isError: true }

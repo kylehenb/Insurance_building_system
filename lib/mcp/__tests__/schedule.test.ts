@@ -63,6 +63,23 @@ describe('book_trade_visit', () => {
     expect(tables.work_order_visits.find(v => v.id === 've2')).toMatchObject({ scheduled_date: '2026-12-09', scheduled_end_date: null })
   })
 
+  it('is all day unless a time is given; a moved visit keeps its time', async () => {
+    // Cabinets: electrician disconnects at 7, painter all day, reconnect first thing next morning
+    expect((await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'electrician', start_date: '2026-12-03', start_time: '7:00' }, ctx())).text).toBe('Booked the Electrician (Sparky Co) visit 1 of 2 on IRC1079 for Thu 3 Dec at 7:00 am.')
+    expect((await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'painter', start_date: '2026-12-03' }, ctx())).text).toBe('Booked the Painter (Brush Bros) on IRC1079 for Thu 3 Dec.')
+    await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'electrician', start_date: '2026-12-04', start_time: '07:00' }, ctx())
+    expect(tables.work_order_visits.find(v => v.id === 've1')).toMatchObject({ start_time: '07:00' })
+    expect(tables.work_order_visits.find(v => v.work_order_id === 'wp')).toMatchObject({ start_time: null })
+    // Moved to another day: keeps 7am; then made all day
+    expect((await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'electrician', visit_number: 2, start_date: '2026-12-07' }, ctx())).text).toBe('Moved the Electrician (Sparky Co) visit 2 of 2 on IRC1079 for Mon 7 Dec at 7:00 am (was Fri 4 Dec at 7:00 am).')
+    await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'electrician', visit_number: 2, start_date: '2026-12-07', all_day: true }, ctx())
+    expect(tables.work_order_visits.find(v => v.id === 've2')).toMatchObject({ start_time: null })
+    expect(await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'painter', start_date: '2026-12-03', start_time: 'early' }, ctx())).toMatchObject({ isError: true })
+    // On the schedule: all-day first, then by time
+    const day = await getSchedule.run({ from: '2026-12-03' }, ctx())
+    expect(day.text).toBe(['Thu 3 Dec:', '- Painter (Brush Bros) — IRC1079, 187C Leake Street, Belmont', '- 7:00 am Electrician (Sparky Co), visit 1 of 2 — IRC1079, 187C Leake Street, Belmont'].join('\n'))
+  })
+
   it('clears a booking back to unscheduled', async () => {
     await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'painter', start_date: '2026-12-01' }, ctx())
     const out = await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'painter', clear: true }, ctx())

@@ -39,7 +39,7 @@ export type ScheduleEntry = {
   start_date: string
   /** Last day, for work over several days (else the same as start_date) */
   end_date: string
-  /** Perth "08:00" — null for a trade's day on site */
+  /** Perth "08:00" — null: all day (a trade's day on site with no time given) */
   time: string | null
   end_time: string | null
   title: string
@@ -94,7 +94,7 @@ export async function loadSchedule(db: SupabaseClient, tenantId: string, f: Sche
           .eq('tenant_id', tenantId).gte('scheduled_date', f.from).lte('scheduled_date', to)
       : Promise.resolve({ data: [] }),
     wants('repair')
-      ? db.from('work_order_visits').select('id, job_id, work_order_id, visit_number, status, scheduled_date, scheduled_end_date')
+      ? db.from('work_order_visits').select('id, job_id, work_order_id, visit_number, status, scheduled_date, scheduled_end_date, start_time')
           .eq('tenant_id', tenantId).lte('scheduled_date', to).or(`scheduled_end_date.gte.${f.from},scheduled_date.gte.${f.from}`)
       : Promise.resolve({ data: [] }),
     wants('appointment')
@@ -105,7 +105,7 @@ export async function loadSchedule(db: SupabaseClient, tenantId: string, f: Sche
     db.from('users').select('id, name').eq('tenant_id', tenantId),
   ])
   type Insp = { id: string; job_id: string; report_id: string | null; inspector_id: string | null; inspection_ref: string | null; scheduled_date: string; start_time: string | null; finish_time: string | null; status: string | null; calendar_event_id: string | null }
-  type Visit = { id: string; job_id: string; work_order_id: string; visit_number: number; status: string | null; scheduled_date: string; scheduled_end_date: string | null }
+  type Visit = { id: string; job_id: string; work_order_id: string; visit_number: number; status: string | null; scheduled_date: string; scheduled_end_date: string | null; start_time: string | null }
   type Event = { id: string; google_event_id: string; job_id: string; summary: string | null; start_at: string; end_at: string | null; all_day: boolean | null; status: string | null }
   const forJob = (r: { job_id: string }) => !f.jobId || r.job_id === f.jobId
   const inspections = ((inspRes.data as Insp[] | null) ?? []).filter(i => forJob(i) && i.status !== 'reschedule_required' && i.status !== 'cancelled')
@@ -166,7 +166,7 @@ export async function loadSchedule(db: SupabaseClient, tenantId: string, f: Sche
     const total = Math.max(visitCount.get(wo.id) ?? 1, wo.total_visits ?? 1)
     out.push({
       ...base(job, job.assigned_to), kind: 'repair', start_date: v.scheduled_date, end_date: v.scheduled_end_date ?? v.scheduled_date,
-      time: null, end_time: null, title: wo.trade_name ?? 'Trade', who: wo.trade_id ? tradeName.get(wo.trade_id) ?? null : null, status: v.status,
+      time: hhmm(v.start_time), end_time: null, title: wo.trade_name ?? 'Trade', who: wo.trade_id ? tradeName.get(wo.trade_id) ?? null : null, status: v.status,
       source: { type: 'visit', id: v.id }, ...(total > 1 ? { visit: { number: v.visit_number, total } } : {}),
     })
   }

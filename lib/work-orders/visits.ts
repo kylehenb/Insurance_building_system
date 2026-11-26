@@ -6,13 +6,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // "sometime next week" isn't a booking. Setting a day confirms the visit
 // (status 'confirmed'); the job's phase trigger moves it from "book trades"
 // to "works underway" by itself. Clearing goes back to 'unscheduled'.
+// A visit is all day unless a start time is given ("electrician 7am") —
+// like an all-day or timed event in a calendar. There's no end time. Moving a
+// timed visit to another day keeps its time unless a new one (or all day) is said.
 
 export class VisitScheduleError extends Error {}
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+const TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/
 const MAX_DAYS = 31
 
-type VisitRow = { id: string; visit_number: number; status: string | null; scheduled_date: string | null; scheduled_end_date: string | null }
+type VisitRow = { id: string; visit_number: number; status: string | null; scheduled_date: string | null; scheduled_end_date: string | null; start_time: string | null }
 
 export type ScheduledVisit = {
   work_order_id: string
@@ -21,8 +25,18 @@ export type ScheduledVisit = {
   total_visits: number
   start_date: string | null
   end_date: string | null
+  /** Perth "07:00", or null: all day */
+  start_time: string | null
   /** The day(s) it had before, when it was moved or cleared */
-  previous: { start_date: string; end_date: string | null } | null
+  previous: { start_date: string; end_date: string | null; start_time: string | null } | null
+}
+
+const hhmm = (t: string | null | undefined) => (t ? t.slice(0, 5) : null)
+
+/** "7:00", "07:00" or "7:00:00" → "07:00"; null when it isn't a time */
+export function normaliseTime(value: string): string | null {
+  const m = value.trim().slice(0, 5).replace(/:$/, '').match(TIME)
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : null
 }
 
 const dayCount = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1
@@ -57,6 +71,10 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
   endDate?: string
   visitNumber?: number
   note?: string
+  /** Perth start time "07:00" — leave out for all day (or to keep a moved visit's time) */
+  startTime?: string
+  /** All day: take a time off */
+  allDay?: boolean
   /** Take the date off: the trade cancelled or it's not firm any more */
   clear?: boolean
 }): Promise<ScheduledVisit> {
@@ -72,9 +90,10 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
     if (end && !DATE.test(end)) throw new VisitScheduleError('The last day should be a date like "2026-12-05".')
     if (end && end < start) throw new VisitScheduleError('The last day is before the first.')
     if (end && dayCount(start, end) > MAX_DAYS) throw new VisitScheduleError(`That's more than ${MAX_DAYS} days on site — check the dates.`)
+    if (params.startTime && !normaliseTime(params.startTime)) throw new VisitScheduleError('The start time should be like "07:00".')
   }
 
-  const { data: rows } = await db.from('work_order_visits').select('id, visit_number, status, scheduled_date, scheduled_end_date')
+  const { data: rows } = await db.from('work_order_visits').select('id, visit_number, status, scheduled_date, scheduled_end_date, start_time')
     .eq('tenant_id', tenantId).eq('work_order_id', workOrderId).order('visit_number', { ascending: true })
   // Copies, so what each had before is kept for the reply
   const visits = ((rows as VisitRow[] | null) ?? []).map(v => ({ ...v }))
@@ -86,19 +105,24 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
       throw new VisitScheduleError(booked.length ? `Which visit? ${booked.map(v => `visit ${v.visit_number}: ${v.scheduled_date}`).join(', ')}.` : 'Nothing is booked on this work order.')
     }
     const { error } = await db.from('work_order_visits').update({
-      scheduled_date: null, scheduled_end_date: null, confirmed_date: null, trade_confirmed_at: null, status: 'unscheduled',
+      scheduled_date: null, scheduled_end_date: null, start_time: null, confirmed_date: null, trade_confirmed_at: null, status: 'unscheduled',
       ...(params.note ? { notes: params.note } : {}),
     }).eq('tenant_id', tenantId).eq('id', target.id)
     if (error) throw error
     return {
       work_order_id: workOrderId, visit_id: target.id, visit_number: target.visit_number, total_visits: Math.max(visits.length, workOrder.total_visits ?? 1),
-      start_date: null, end_date: null,
-      previous: target.scheduled_date ? { start_date: target.scheduled_date, end_date: target.scheduled_end_date } : null,
+      start_date: null, end_date: null, start_time: null,
+      previous: target.scheduled_date ? { start_date: target.scheduled_date, end_date: target.scheduled_end_date, start_time: hhmm(target.start_time) } : null,
     }
   }
 
   const picked = pickVisit(visits, params.visitNumber)
+  // A time given; else all day if asked or new; else a moved visit keeps its time
+  const time = params.startTime ? normaliseTime(params.startTime)
+    : params.allDay || 'create' in picked ? null
+    : hhmm(picked.start_time)
   const fields = {
+    start_time: time,
     scheduled_date: start!,
     scheduled_end_date: end && end !== start ? end : null,
     confirmed_date: start!,
@@ -111,9 +135,9 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
   if ('create' in picked) {
     const { data, error } = await db.from('work_order_visits')
       .insert({ tenant_id: tenantId, work_order_id: workOrderId, job_id: workOrder.job_id, visit_number: picked.create, ...fields })
-      .select('id, visit_number, status, scheduled_date, scheduled_end_date').single()
+      .select('id, visit_number, status, scheduled_date, scheduled_end_date, start_time').single()
     if (error) throw error
-    visit = { ...(data as VisitRow), scheduled_date: null, scheduled_end_date: null }
+    visit = { ...(data as VisitRow), scheduled_date: null, scheduled_end_date: null, start_time: null }
   } else {
     const { error } = await db.from('work_order_visits').update(fields).eq('tenant_id', tenantId).eq('id', picked.id)
     if (error) throw error
@@ -123,7 +147,7 @@ export async function scheduleTradeVisit(db: SupabaseClient, params: {
   const total = Math.max(visits.length + ('create' in picked ? 1 : 0), workOrder.total_visits ?? 1)
   return {
     work_order_id: workOrderId, visit_id: visit.id, visit_number: visit.visit_number, total_visits: total,
-    start_date: fields.scheduled_date, end_date: fields.scheduled_end_date,
-    previous: visit.scheduled_date ? { start_date: visit.scheduled_date, end_date: visit.scheduled_end_date } : null,
+    start_date: fields.scheduled_date, end_date: fields.scheduled_end_date, start_time: time,
+    previous: visit.scheduled_date ? { start_date: visit.scheduled_date, end_date: visit.scheduled_end_date, start_time: hhmm(visit.start_time) } : null,
   }
 }
