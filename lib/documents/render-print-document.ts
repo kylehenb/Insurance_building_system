@@ -3,6 +3,7 @@ import { renderHtmlToPdf, getBrowser } from '@/lib/pdf/render-html-to-pdf'
 import { loadPrintPageFontCss } from '@/lib/pdf/fonts'
 import { PRINT_PAGE_CSS } from '@/lib/pdf/print-page-css.generated'
 import { loadPublicImageDataUri } from '@/lib/documents/document-assets'
+import { shrinkPhotoForPrint } from '@/lib/images/print-photo'
 
 // PDFs of the documents that are also browser print pages (quote, report,
 // TCC, photo pages). The same React component the print page renders is
@@ -25,9 +26,10 @@ const DEFAULT_FONT_CSS = 'html { font-family: \'Times New Roman\'; }'
 const HTML_CLASS = 'h-full antialiased'
 const BODY_CLASS = 'min-h-full flex flex-col'
 
-/** Photos are re-encoded no larger than this on their longest side. */
-const MAX_PHOTO_PX = 1600
-const PHOTO_JPEG_QUALITY = 0.85
+// Photos are shrunk to print size (lib/images/print-photo.ts); Chromium only
+// handles the odd photo sharp can't open, at the same size.
+const FALLBACK_MAX_PX = 800
+const FALLBACK_JPEG_QUALITY = 0.6
 
 function decodeAttr(value: string): string {
   return value.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
@@ -59,13 +61,32 @@ export interface PreparedPhoto {
 }
 
 /**
- * Shrinks large photos in a scratch Chromium page (no network, nothing but
- * this canvas code runs) and measures them. Orientation is applied as the
- * browser shows it, so width/height are the photo as seen. A photo that
- * can't be decoded is returned as-is with no size (0 × 0).
+ * Every photo shrunk to print size and measured (orientation applied, so
+ * width/height are the photo as seen). Done with sharp; a photo sharp can't
+ * open goes through Chromium instead, and one neither can decode is returned
+ * as-is with no size (0 × 0).
  */
 async function preparePhotos(dataUris: string[]): Promise<PreparedPhoto[]> {
-  if (dataUris.length === 0) return []
+  const results: (PreparedPhoto | null)[] = []
+  for (const src of dataUris) {
+    const comma = src.indexOf(',')
+    const small = comma > 0 && src.slice(0, comma).endsWith(';base64')
+      ? await shrinkPhotoForPrint(Buffer.from(src.slice(comma + 1), 'base64')).catch(() => null)
+      : null
+    results.push(small && { src: `data:image/jpeg;base64,${small.data.toString('base64')}`, width: small.width, height: small.height })
+  }
+  const leftOver = dataUris.filter((_, i) => !results[i])
+  if (leftOver.length === 0) return results as PreparedPhoto[]
+  const viaBrowser = await preparePhotosInBrowser(leftOver)
+  let next = 0
+  return results.map(r => r ?? viaBrowser[next++])
+}
+
+/**
+ * The fallback: shrinks photos in a scratch Chromium page (no network,
+ * nothing but this canvas code runs) and measures them.
+ */
+async function preparePhotosInBrowser(dataUris: string[]): Promise<PreparedPhoto[]> {
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
@@ -81,7 +102,6 @@ async function preparePhotos(dataUris: string[]): Promise<PreparedPhoto[]> {
         img.src = s
         await img.decode()
         const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight))
-        if (scale === 1 && s.length < 1_500_000) return { src: s, width: img.naturalWidth, height: img.naturalHeight }
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(img.naturalWidth * scale)
         canvas.height = Math.round(img.naturalHeight * scale)
@@ -90,7 +110,7 @@ async function preparePhotos(dataUris: string[]): Promise<PreparedPhoto[]> {
         g.fillRect(0, 0, canvas.width, canvas.height)
         g.drawImage(img, 0, 0, canvas.width, canvas.height)
         return { src: canvas.toDataURL('image/jpeg', quality), width: canvas.width, height: canvas.height }
-      }, src, MAX_PHOTO_PX, PHOTO_JPEG_QUALITY).catch(err => {
+      }, src, FALLBACK_MAX_PX, FALLBACK_JPEG_QUALITY).catch(err => {
         console.error('[print-document] photo resize failed, using the original', err)
         return { src, width: 0, height: 0 }
       })
