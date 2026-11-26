@@ -71,3 +71,14 @@ describe('autoConfirmCard', () => {
     expect(mayAutoConfirm(card({ status: 'no_action' }) as never)).toBe(false)
   })
 })
+
+describe('auto-confirm by kind of step', () => {
+  it('runs a card when every kind of step on it is on, and not when one isn\'t', async () => {
+    tables.learning_auto_confirm = [{ tenant_id: 't1', feature: 'action_step', kind: 'add_job_note', enabled: true, changed_by: 'u7' }]
+    tables.action_queue = [card({ category: 'other', steps: [{ id: 's1', tool: 'add_job_note', args: { job_number: 'IRC1', note: 'x' }, summary: 'Note' }] })]
+    expect(await autoConfirmCard(db as never, 't1', tables.action_queue[0].id as string)).not.toBeNull()
+
+    tables.action_queue = [card({ category: 'other', steps: [{ id: 's1', tool: 'add_job_note', args: {}, summary: 'Note' }, { id: 's2', tool: 'file_conversation', args: {}, summary: 'File' }] })]
+    expect(await autoConfirmCard(db as never, 't1', tables.action_queue[0].id as string)).toBeNull()
+  })
+})

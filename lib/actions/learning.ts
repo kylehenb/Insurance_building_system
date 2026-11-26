@@ -163,7 +163,16 @@ const records = (steps: CardStep[]) => steps.map(s => ({ ...asDone(s), status: s
  * (all its steps run or skipped) or skipped. Cards made before the learning
  * module (no ai_steps) aren't recorded. Never throws.
  */
-export async function recordCardDecision(db: SupabaseClient, card: ActionCard, userId: string | null, ended: 'confirmed' | 'skipped'): Promise<void> {
+/** Why a card was skipped, when the office says (§24.7): not now isn't the AI being wrong */
+export type SkipReason = 'not_now' | 'not_needed' | 'wrong'
+export const SKIP_REASONS: Record<SkipReason, string> = {
+  not_now: 'Skipped for now — the proposal was fine, just not needed today',
+  not_needed: 'Skipped — this kind of card isn\'t wanted',
+  wrong: 'Skipped — the AI got it wrong',
+}
+export const isSkipReason = (v: unknown): v is SkipReason => typeof v === 'string' && v in SKIP_REASONS
+
+export async function recordCardDecision(db: SupabaseClient, card: ActionCard, userId: string | null, ended: 'confirmed' | 'skipped', reason?: SkipReason): Promise<void> {
   if (!card.ai_steps) return
   const { changes, outcome } = compareCard(card.ai_steps, card.steps, ended)
   const situation = card.situation ?? {}
@@ -180,7 +189,29 @@ export async function recordCardDecision(db: SupabaseClient, card: ActionCard, u
     outcome,
     kind: card.category,
     userId,
+    ...(reason ? { instruction: SKIP_REASONS[reason] } : {}),
   })
+  // "Not now" says nothing about the steps: their record (and any auto-confirm streak) stays as it was
+  if (reason !== 'not_now') await recordStepDecisions(db, card, userId, ended)
+}
+
+/** Each step's own record, for auto-confirm by step type (§24.7): statistics only, not reviewed for lessons */
+export const STEP_FEATURE = 'action_step'
+
+/**
+ * How each step the AI proposed went: run unchanged (accepted), changed
+ * (edited) or not run (skipped). Readiness for a step type is counted from these.
+ */
+async function recordStepDecisions(db: SupabaseClient, card: ActionCard, userId: string | null, ended: 'confirmed' | 'skipped'): Promise<void> {
+  const now = new Map(card.steps.map(s => [s.id, s]))
+  for (const p of card.ai_steps ?? []) {
+    const s = now.get(p.id)
+    const outcome: LearningOutcome = ended === 'skipped' || !s || !ran(s) ? 'skipped' : stepChanges(asProposed(p), asDone(s)).length ? 'edited' : 'accepted'
+    await recordLearning(db, {
+      tenantId: card.tenant_id, feature: STEP_FEATURE, sourceTable: 'action_queue', sourceId: card.id,
+      situation: card.situation ?? {}, situationText: p.summary, outcome, kind: p.tool, userId,
+    })
+  }
 }
 
 /** Records the office sending a card (or one step) back with instructions. Never throws */

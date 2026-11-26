@@ -164,8 +164,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     const { card: updated } = await post(`/api/actions/${card.id}/reopen`)
     onChanged(updated, 'Back on the list.')
   })
-  const skip = () => run('skip', async () => {
-    await post(`/api/actions/${card.id}/skip`)
+  // Skip asks why in one tap (not now / not needed / wrong) — or just skip
+  const [skipping, setSkipping] = useState(false)
+  const skip = (reason?: 'not_now' | 'not_needed' | 'wrong') => run('skip', async () => {
+    setSkipping(false)
+    await post(`/api/actions/${card.id}/skip`, reason ? { reason } : undefined)
     const learned = await teachAlong()
     onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, `Card skipped.${learned}`)
   })
@@ -405,7 +408,16 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                 {busy === 'confirm' ? 'Working…' : toDo === 1 ? 'Do this step' : `Do ${toDo} steps`}
               </button>
             )}
-            {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
+            {open && !skipping && <button className="ac-btn" disabled={!!busy} onClick={() => (card.steps.length ? setSkipping(true) : skip())}>{card.steps.length ? 'Skip' : 'Done'}</button>}
+            {open && skipping && (
+              <span className="ac-skip">
+                <span className="ac-skip-q">Why?</span>
+                <button className="ac-btn" disabled={!!busy} onClick={() => skip('not_now')} title="It's right, just not now — doesn't count against the AI">Not now</button>
+                <button className="ac-btn" disabled={!!busy} onClick={() => skip('not_needed')} title="This kind of card isn't wanted">Not needed</button>
+                <button className="ac-btn" disabled={!!busy} onClick={() => skip('wrong')} title="The AI got it wrong">Wrong</button>
+                <button className="ac-btn ghost" disabled={!!busy} onClick={() => skip()}>Just skip</button>
+              </span>
+            )}
             {card.status !== 'running' && (
               <span className="ac-foot-right">
                 {!teaching && (
@@ -492,4 +504,6 @@ const CARD_CSS = `
   .ac-btn.ghost { border-color: transparent; color: var(--grey-600); }
   .ac-foot-right { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
   .ac-btn:disabled { opacity: .55; cursor: default; }
+  .ac-skip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .ac-skip-q { font-size: 12px; color: var(--subtle); }
 `

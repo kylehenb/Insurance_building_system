@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { teachFromCard } from '@/lib/actions/teach'
+import { isSkipReason } from '@/lib/actions/learning'
 import { MAX_SAID, spokenTakeaways } from '@/lib/learning/debrief'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
@@ -249,12 +250,13 @@ export const skipActionCard: McpTool = {
   title: 'Skip action card',
   description: [
     'Takes a card off the to-do list (its star comes off): nothing to do, or done another way. It moves to Done.',
-    'Confirm which card first. Pass on what the user says about why as comment — it\'s how IRC learns; read back the takeaways it returns.',
+    'Confirm which card first. reason, if they say: not_now (right, just not today — doesn\'t count against the AI), not_needed (this kind of card isn\'t wanted), wrong (the AI got it wrong). Pass on what the user says about why as comment — it\'s how IRC learns; read back the takeaways it returns.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       card_id: { type: 'string', description: 'card_id from list_action_cards.' },
+      reason: { type: 'string', enum: ['not_now', 'not_needed', 'wrong'], description: 'Why, if the user says.' },
       comment: { type: 'string', description: 'Anything the user says about this card — why it was right or wrong, how they work, what to do next time — in their words, in full. IRC learns from it (read back the takeaways it returns).' },
     },
     required: ['card_id'],
@@ -266,7 +268,8 @@ export const skipActionCard: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
-    if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
+    const reason = isSkipReason(args.reason) ? args.reason : undefined
+    if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId, reason))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
     const learned = spokenTakeaways(await teachFromCard(db(ctx), ctx.tenantId, ctx.userId, card.id, str(args.comment)))
     return { text: `Skipped "${card.title}".${learned ? `\n${learned}` : ''}`, data: { card_id: card.id, status: 'skipped' } }
   },

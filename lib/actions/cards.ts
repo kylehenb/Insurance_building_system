@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Situation } from '@/lib/learning/events'
 import type { Arrivals } from '@/lib/mail/summary'
-import { recordCardDecision } from './learning'
+import { recordCardDecision, type SkipReason } from './learning'
 import { orderUpdateThreads } from '@/lib/insurer-orders/order-update'
 
 // Action cards (tech spec §19, §23.11): the AI's suggested next steps,
@@ -401,13 +401,13 @@ export async function cardForThread(db: SupabaseClient, tenantId: string, thread
   return ((data as ActionCard[] | null) ?? [])[0] ?? null
 }
 
-export async function skipCard(db: SupabaseClient, tenantId: string, id: string, userId: string): Promise<boolean> {
+export async function skipCard(db: SupabaseClient, tenantId: string, id: string, userId: string, reason?: SkipReason): Promise<boolean> {
   const { data } = await db.from('action_queue')
-    .update({ status: 'skipped', outcome: 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
+    .update({ status: 'skipped', outcome: reason === 'not_now' ? 'Skipped for now' : reason === 'not_needed' ? 'Skipped — not needed' : reason === 'wrong' ? 'Skipped — wrong' : 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
     .select(CARD_COLUMNS).maybeSingle()
   if (data) {
-    await recordCardDecision(db, data as ActionCard, userId, 'skipped')
+    await recordCardDecision(db, data as ActionCard, userId, 'skipped', reason)
     const { recordPromiseSkipped } = await import('./promises')
     await recordPromiseSkipped(db, data as ActionCard, userId)
     const { recordWatchDecision } = await import('@/lib/jobs/watch-learning')

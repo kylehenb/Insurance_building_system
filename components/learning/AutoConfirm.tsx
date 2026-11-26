@@ -10,11 +10,16 @@ import type { AutoConfirmState, Readiness } from '@/lib/learning/auto-confirm'
 interface AutoConfirmData {
   state: (AutoConfirmState & { changed_by_name: string | null })[]
   pending: { feature: string; kind: string; readiness: Readiness }[]
+  /** Kinds of step, by name: what the office reads */
+  labels?: Record<string, string>
   canChange: boolean
 }
 
 export const KIND_LABEL: Record<string, string> = { invoice: 'Invoices to pay', attend_submit: 'Attend and Submit', other: 'Everything else' }
-const kindName = (k: string) => KIND_LABEL[k] ?? k
+const STEP_FEATURE = 'action_step'
+const kindName = (k: string, data?: AutoConfirmData | null) => KIND_LABEL[k] ?? data?.labels?.[k] ?? k
+/** "Invoices to pay" cards, or "Send email" steps */
+const kindPhrase = (feature: string, k: string, data: AutoConfirmData) => `\u201c${kindName(k, data)}\u201d ${feature === STEP_FEATURE ? 'steps' : 'cards'}`
 
 function useAutoConfirm() {
   const [data, setData] = useState<AutoConfirmData | null>(null)
@@ -65,7 +70,7 @@ export function AutoConfirmBanner() {
       {data.pending.map(p => (
         <div key={`${p.feature}:${p.kind}`} className="acb-row">
           <div className="acb-text">
-            <strong>You haven&apos;t been changing &ldquo;{kindName(p.kind)}&rdquo; cards.</strong>{' '}
+            <strong>You haven&apos;t been changing {kindPhrase(p.feature, p.kind, data)}.</strong>{' '}
             {p.readiness.accepted} of the last {p.readiness.decided} were confirmed exactly as the AI suggested.
             Turn on auto-confirm so new ones run by themselves?
           </div>
@@ -99,16 +104,17 @@ export function AutoConfirmSettings() {
   return (
     <div>
       <p className="text-xs text-subtle mb-2">
-        When it&apos;s on, a new card of that kind runs all of its steps straight away — emails included — as the person who turned it on, with their permissions
+        Turn it on for a kind of card (by its star) or a kind of step. A new card runs by itself when its kind is on, or when every step on it is a kind
+        that&apos;s on. When it runs, it does all of its steps straight away — emails included — as the person who turned it on, with their permissions
         (a step that needs approval still waits for it). Cards you starred yourself and follow-ups are never auto-confirmed. You&apos;ll be asked once a kind
-        has been confirmed untouched for 98% of its last 20 cards.
+        (or step) has been confirmed untouched for 98% of its last 20. Comments you make don&apos;t count against it — only changes and skips do.
       </p>
       {error && <p className="text-sm text-[#9f1239] mb-2">{error}</p>}
       <div className="bg-white border border-line-3 rounded-lg divide-y divide-line-3">
         {data.state.map(s => (
-          <div key={s.kind} className="px-4 py-3 flex items-center gap-4">
+          <div key={`${s.feature}:${s.kind}`} className="px-4 py-3 flex items-center gap-4">
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-ink">{kindName(s.kind)}</div>
+              <div className="text-sm text-ink">{s.feature === STEP_FEATURE ? `Step: ${kindName(s.kind, data)}` : `Card: ${kindName(s.kind, data)}`}</div>
               <div className="text-xs text-subtle mt-0.5">
                 {s.readiness.decided
                   ? `${s.readiness.accepted} of the last ${s.readiness.decided} confirmed untouched (${s.readiness.pct}%)`

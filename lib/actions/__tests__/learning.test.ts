@@ -127,8 +127,28 @@ describe('recording decisions', () => {
   it('records a skipped card, as the person who skipped it', async () => {
     tables.action_queue = [card()]
     expect(await skipCard(db as never, 't1', 'k1', 'u1')).toBe(true)
-    expect(tables.learning_events).toHaveLength(1)
+    expect(tables.learning_events.filter(e => e.feature === 'action_card')).toHaveLength(1)
     expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', source_id: 'k1', outcome: 'skipped', kind: 'other', user_id: 'u1', situation_text: 'Email from jane@allianz.com.au — "Access" — not on a job' })
+  })
+
+  it('records each step for auto-confirm by step type, and a skip reason — "not now" leaving the steps alone', async () => {
+    tables.action_queue = [card()]
+    await skipCard(db as never, 't1', 'k1', 'u1', 'wrong')
+    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', instruction: 'Skipped — the AI got it wrong' })
+    expect(tables.learning_events.filter(e => e.feature === 'action_step').map(e => [e.kind, e.outcome])).toEqual([['send_email', 'skipped'], ['add_job_note', 'skipped']])
+    expect(tables.action_queue[0].outcome).toBe('Skipped — wrong')
+
+    tables.learning_events = []
+    tables.action_queue = [card({ id: 'k2' })]
+    await skipCard(db as never, 't1', 'k2', 'u1', 'not_now')
+    expect(tables.learning_events.map(e => e.feature)).toEqual(['action_card'])
+    expect(tables.learning_events[0].instruction).toMatch(/just not needed today/)
+  })
+
+  it('records a step run as proposed as accepted, and a changed one as edited', async () => {
+    const done = card({ status: 'done', steps: structuredClone(AI).map((s: Row, i: number) => ({ ...s, status: 'done', ...(i === 1 ? { args: { ...(s.args as Row), note: 'Changed' } } : {}) })) })
+    await recordCardDecision(db as never, done as never, 'u1', 'confirmed')
+    expect(tables.learning_events.filter(e => e.feature === 'action_step').map(e => [e.kind, e.outcome])).toEqual([['send_email', 'accepted'], ['add_job_note', 'edited']])
   })
 
   it('doesn\'t record cards made before the learning module', async () => {

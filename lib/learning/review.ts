@@ -293,6 +293,9 @@ export async function reviewFeature(
   return result
 }
 
+/** Features recorded only to count (auto-confirm by step type, §24.7): never reviewed for lessons */
+const STATS_ONLY = new Set(['action_step'])
+
 /** Days back the nightly run looks for companies and features with new decisions */
 const ACTIVE_DAYS = 14
 
@@ -313,7 +316,10 @@ export async function reviewAll(db: SupabaseClient, opts: { client?: Pick<Anthro
   for (const p of pairs.values()) {
     let result: ReviewResult & { tenantId: string; error?: string; askAutoConfirm?: string[] }
     try {
-      result = { tenantId: p.tenant_id, ...(await reviewFeature(db, { tenantId: p.tenant_id, feature: p.feature, client: opts.client, now })) }
+      // Step records are counts for auto-confirm only: no lessons, no model call
+      result = STATS_ONLY.has(p.feature)
+        ? { tenantId: p.tenant_id, feature: p.feature, reviewed: 0, added: 0, supported: 0, contradicted: 0, refined: 0, retired: 0 }
+        : { tenantId: p.tenant_id, ...(await reviewFeature(db, { tenantId: p.tenant_id, feature: p.feature, client: opts.client, now })) }
     } catch (err) {
       console.error(`[learning] review of ${p.feature} for ${p.tenant_id} failed:`, err)
       result = { tenantId: p.tenant_id, feature: p.feature, reviewed: 0, added: 0, supported: 0, contradicted: 0, refined: 0, retired: 0, error: err instanceof Error ? err.message : String(err) }
