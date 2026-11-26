@@ -24,6 +24,7 @@ import { fileConversation, listJobFiles, listMailbox, organiseEmails, readConver
 import { getJobPhoto } from '@/lib/mcp/tools/job-attachments'
 import { addTodo, changeFollowUp, listFollowUps, listWaitingOn, setFollowUp } from '@/lib/mcp/tools/follow-ups'
 import { addJobAppointment, bookInspection } from '@/lib/mcp/tools/calendar'
+import { bookTradeVisit, getSchedule } from '@/lib/mcp/tools/schedule'
 import { closeJobTool, reopenJobTool } from '@/lib/mcp/tools/close-jobs'
 import { updateJobContactTool, updateJobDetailsTool } from '@/lib/mcp/tools/job-details'
 import { decideHealthSuggestion, getAiCosts, getHealthCheck, listHealthSuggestions } from '@/lib/mcp/tools/health'
@@ -37,6 +38,8 @@ export const MCP_TOOLS: McpTool[] = [
   addJobNote,
   addJobAppointment,
   bookInspection,
+  bookTradeVisit,
+  getSchedule,
   closeJobTool,
   reopenJobTool,
   updateJobDetailsTool,
