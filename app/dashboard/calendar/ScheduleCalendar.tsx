@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { KIND_LABELS, SCHEDULE_KINDS, addDays, perthDate, type ScheduleEntry, type ScheduleKind } from '@/lib/schedule/schedule'
 import { mapsLink } from '@/lib/maps'
+import UnbookedPanel from './UnbookedPanel'
+import { KIND_COLOURS } from './colours'
 
 // The Calendar page (tech spec §23.18): everything on IRC's jobs — inspections
 // by kind, trades on site, job appointments — by day, week or month, from
@@ -14,15 +16,6 @@ type View = 'day' | 'week' | 'month'
 type Person = { id: string; name: string | null }
 type DayEntry = ScheduleEntry & { day_of?: { day: number; days: number } }
 
-export const KIND_COLOURS: Record<ScheduleKind, string> = {
-  inspection: '#2f5d8a',
-  make_safe: '#b4532a',
-  roof: '#6b4c9a',
-  leak_detection: '#1f8a87',
-  specialist: '#8a7a2a',
-  repair: '#3f7a4a',
-  appointment: '#7a7268',
-}
 const SHORT_LABELS: Record<ScheduleKind, string> = { ...KIND_LABELS, repair: 'Trades on site', appointment: 'Meetings' }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -313,6 +306,9 @@ export default function ScheduleCalendar() {
           </select>
           <input value={tradeInput} onChange={e => setTradeInput(e.target.value)} placeholder="Trade or contractor…" className="w-48 rounded-lg border border-ink/10 bg-white px-3 py-1.5 text-sm text-ink placeholder:text-ink/40" aria-label="Trade or contractor" />
         </div>
+
+        {/* What still needs a date, for the same person */}
+        <div className="mt-4"><UnbookedPanel person={person} me={me} /></div>
 
         {/* Where we are */}
         <div className="mt-5 flex items-center gap-2">

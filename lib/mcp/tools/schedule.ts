@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { isToolResult, jobFromArgs } from '@/lib/mcp/tools/excess'
 import { VisitScheduleError, scheduleTradeVisit } from '@/lib/work-orders/visits'
+import { loadUnbooked } from '@/lib/schedule/unbooked'
+import { spokenSendAt } from '@/lib/mail/schedule-rules'
 import { KIND_LABELS, SCHEDULE_KINDS, addDays, loadSchedule, perthDate, scheduleByDay, type ScheduleEntry, type ScheduleKind } from '@/lib/schedule/schedule'
 
 // The schedule by voice and chat (tech spec §23.18): "painter's going to
@@ -29,6 +31,18 @@ const spokenDays = (start: string, end: string | null, time?: string | null) => 
 }
 /** "187C Leake Street, Belmont" — without the state and postcode */
 const shortAddress = (a: string | null) => (a ?? '').replace(/,?\s*(WA|NSW|VIC|QLD|SA|TAS|NT|ACT)\s*\d{4}\s*$/i, '').trim()
+
+/** "me", a colleague's name, or everyone (nothing said) */
+async function whoseFrom(value: unknown, ctx: McpContext): Promise<{ personId?: string; includeUnassigned: boolean; personName: string } | McpToolResult> {
+  const person = str(value)
+  if (!person || /^(everyone|everybody|all|anyone)$/i.test(person)) return { includeUnassigned: false, personName: '' }
+  // A job nobody's been given counts as the asker's own
+  if (/^(me|mine|my|myself|i)$/i.test(person)) return { personId: ctx.userId, includeUnassigned: true, personName: 'yours' }
+  const { data } = await db(ctx).from('users').select('id, name').eq('tenant_id', ctx.tenantId)
+  const users = ((data as { id: string; name: string | null }[] | null) ?? []).filter(u => u.name?.toLowerCase().includes(person.toLowerCase()))
+  if (users.length !== 1) return { text: users.length ? `Which ${person}: ${users.map(u => u.name).join(', ')}?` : `No one called ${person} in IRC.`, isError: true }
+  return { personId: users[0].id, includeUnassigned: users[0].id === ctx.userId, personName: `${users[0].name}'s` }
+}
 
 type WoRow = { id: string; trade_name: string | null; trade_id: string | null; status: string | null }
 
@@ -158,24 +172,9 @@ export const getSchedule: McpTool = {
     const last = to > addDays(from, 62) ? addDays(from, 62) : to
     const kinds = Array.isArray(args.kinds) ? (args.kinds as unknown[]).filter((k): k is ScheduleKind => SCHEDULE_KINDS.includes(k as ScheduleKind)) : undefined
 
-    let personId: string | undefined
-    let includeUnassigned = false
-    let personName = ''
-    const person = str(args.person)
-    if (person && !/^(everyone|everybody|all|anyone)$/i.test(person)) {
-      if (/^(me|mine|my|myself|i)$/i.test(person)) {
-        personId = ctx.userId
-        includeUnassigned = true
-        personName = 'yours'
-      } else {
-        const { data } = await db(ctx).from('users').select('id, name').eq('tenant_id', ctx.tenantId)
-        const users = ((data as { id: string; name: string | null }[] | null) ?? []).filter(u => u.name?.toLowerCase().includes(person.toLowerCase()))
-        if (users.length !== 1) return { text: users.length ? `Which ${person}: ${users.map(u => u.name).join(', ')}?` : `No one called ${person} in IRC.`, isError: true }
-        personId = users[0].id
-        personName = `${users[0].name}'s`
-        if (personId === ctx.userId) includeUnassigned = true
-      }
-    }
+    const whose = await whoseFrom(args.person, ctx)
+    if (isToolResult(whose)) return whose
+    const { personId, includeUnassigned, personName } = whose
 
     let jobId: string | undefined
     if (str(args.job_number)) {
@@ -199,5 +198,57 @@ export const getSchedule: McpTool = {
       ? [header, ...days[0].entries.map(e => entryLine(e, ctx.userId))].join('\n')
       : [header, ...days.map(d => [`${spokenDay(d.date)}:`, ...d.entries.map(e => entryLine(e, ctx.userId))].join('\n'))].join('\n')
     return { text, data: { from, to: last, entries } }
+  },
+}
+
+export const listUnbooked: McpTool = {
+  name: 'list_unbooked',
+  title: 'List what needs booking',
+  description: [
+    'What still needs a date — "what still needs booking?", "which inspections haven\'t I booked?", "what trades are still to book?". Inspections on jobs at "book the inspection" (with the insurer\'s booking deadline, and whether it\'s passed), and trades on jobs in repair whose visits have no date yet — jobs ready for trades first, then those still waiting on the homeowner\'s signature.',
+    'what: "inspections", "trades" or leave out for both. person: "me", a colleague\'s name, or leave out for everyone.',
+    'Book them with book_inspection and book_trade_visit. Read it back briefly, most urgent first.',
+  ].join(' '),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      what: { type: 'string', enum: ['inspections', 'trades', 'both'], description: 'Default both.' },
+      person: { type: 'string', description: '"me", or a colleague\'s name. Leave out for everyone.' },
+    },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
+  async run(args, ctx): Promise<McpToolResult> {
+    const whose = await whoseFrom(args.person, ctx)
+    if (isToolResult(whose)) return whose
+    const what = str(args.what) || 'both'
+    const all = await loadUnbooked(db(ctx), ctx.tenantId, { personId: whose.personId, includeUnassigned: whose.includeUnassigned })
+    const inspections = what === 'trades' ? [] : all.inspections
+    const tradeJobs = what === 'inspections' ? [] : all.trade_jobs
+    const ready = tradeJobs.filter(j => j.ready)
+    const waiting = tradeJobs.filter(j => !j.ready)
+    const tag = (j: { owner_id: string | null; owner_name: string | null }) => (j.owner_id && j.owner_id !== ctx.userId && j.owner_name ? ` [${j.owner_name}]` : '')
+    const trade = (t: { trade: string; business: string | null; visits: number[]; total_visits: number; sent: boolean }) =>
+      `${t.trade}${t.business ? ` (${t.business})` : ''}${t.total_visits > 1 ? `, visit${t.visits.length > 1 ? 's' : ''} ${t.visits.join(' and ')} of ${t.total_visits}` : ''}${t.sent ? '' : ' — not sent yet'}`
+
+    const lines: string[] = []
+    if (what !== 'trades') {
+      lines.push(inspections.length ? `Inspections to book (${inspections.length}):` : 'No inspections to book.')
+      for (const i of inspections) {
+        const due = i.booking_due ? ` — booking ${i.overdue ? 'was ' : ''}due ${spokenSendAt(i.booking_due)}${i.overdue ? ' (overdue)' : ''}` : ''
+        lines.push(`- ${i.job_number}, ${shortAddress(i.address) || 'no address'}${i.insured_name ? ` (${i.insured_name})` : ''}${due}${tag(i)}`)
+      }
+    }
+    if (what !== 'inspections') {
+      lines.push(ready.length ? `Trades to book on ${ready.length} job${ready.length === 1 ? '' : 's'} ready for work:` : 'No trades to book on jobs ready for work.')
+      for (const j of ready) lines.push(`- ${j.job_number}, ${shortAddress(j.address) || 'no address'}${tag(j)}: ${j.trades.map(trade).join('; ')}`)
+      if (waiting.length) lines.push(`Still waiting on the homeowner's signature before trades (${waiting.length}): ${waiting.map(j => `${j.job_number}${tag(j)}`).join(', ')}.`)
+    }
+    const narrowed = whose.personName ? ` (${whose.personName})` : ''
+    return {
+      text: `Not booked yet${narrowed}:\n${lines.join('\n')}`,
+      data: { inspections, trade_jobs: tradeJobs },
+    }
   },
 }

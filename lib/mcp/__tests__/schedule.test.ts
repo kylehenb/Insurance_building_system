@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fakeSupabase, type Row } from './fake-supabase'
 
 // book_trade_visit and get_schedule: a trade's firm day(s) on site go on the
@@ -14,7 +14,7 @@ vi.mock('@/lib/mcp/tools/excess', () => ({
   },
 }))
 
-const { bookTradeVisit, getSchedule } = await import('../tools/schedule')
+const { bookTradeVisit, getSchedule, listUnbooked } = await import('../tools/schedule')
 const { inspectionKind, scheduleByDay } = await import('@/lib/schedule/schedule')
 const ctx = (userId = 'u1') => ({ supabase: fakeSupabase(tables) as never, tenantId: 't1', userId })
 
@@ -151,5 +151,47 @@ describe('schedule helpers', () => {
   it('puts work over several days on each of its days', () => {
     const e = { kind: 'repair', start_date: '2026-12-01', end_date: '2026-12-02' } as never
     expect(scheduleByDay([e], '2026-11-30', '2026-12-02').map(d => d.entries.length)).toEqual([0, 1, 1])
+  })
+})
+
+describe('list_unbooked', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-26T02:00:00Z'))
+    Object.assign(tables.jobs[0], { phase: 'in_repair', phase_step: 'book_trades', phase_since: '2026-11-01T00:00:00Z', insured_name: 'Jane Smith' })
+    Object.assign(tables.jobs[1], { phase: 'in_repair', phase_step: 'awaiting_signature', phase_since: '2026-11-10T00:00:00Z' })
+    tables.jobs.push(
+      { id: 'j90', tenant_id: 't1', job_number: 'IRC1090', property_address: '12 Smith Street, Bayswater, WA 6053', insured_name: 'Pat Lee', insurer: 'Suncorp', assigned_to: null, phase: 'assessment', phase_step: 'book_inspection', kpi_booking_due: '2026-11-25T07:00:00Z' },
+      { id: 'j91', tenant_id: 't1', job_number: 'IRC1091', property_address: '9 Hill Road, Maylands, WA 6051', insured_name: null, insurer: 'AAI', assigned_to: 'u2', phase: 'assessment', phase_step: 'book_inspection', kpi_booking_due: '2026-11-30T07:00:00Z' },
+      { id: 'j92', tenant_id: 't1', job_number: 'IRC1092', property_address: '1 On Hold St', insurer: 'AAI', assigned_to: null, phase: 'assessment', phase_step: 'book_inspection', override_stage: 'on_hold' },
+    )
+    Object.assign(tables.work_orders[0], { gary_state: 'waiting_reply' }) // painter sent
+    Object.assign(tables.work_orders[1], { gary_state: 'not_started' }) // electrician not sent
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('lists inspections by deadline (overdue said), trades by job, and jobs still waiting on a signature', async () => {
+    const out = await listUnbooked.run({}, ctx())
+    expect(out.text).toBe([
+      'Not booked yet:',
+      'Inspections to book (2):',
+      '- IRC1090, 12 Smith Street, Bayswater (Pat Lee) — booking was due Wed 25 Nov, 3:00 pm (overdue)',
+      '- IRC1091, 9 Hill Road, Maylands — booking due Mon 30 Nov, 3:00 pm [Sam Lee]',
+      'Trades to book on 1 job ready for work:',
+      '- IRC1079, 187C Leake Street, Belmont: Painter (Brush Bros); Electrician (Sparky Co), visits 1 and 2 of 2 — not sent yet',
+      'Still waiting on the homeowner\'s signature before trades (1): IRC1081 [Sam Lee].',
+    ].join('\n'))
+  })
+
+  it('drops a visit once it has a date, and narrows to a person or to trades', async () => {
+    await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'painter', start_date: '2026-12-01' }, ctx())
+    await bookTradeVisit.run({ job_number: 'IRC1079', trade: 'electrician', start_date: '2026-12-01' }, ctx())
+    const trades = await listUnbooked.run({ what: 'trades' }, ctx())
+    expect(trades.text).toContain('- IRC1079, 187C Leake Street, Belmont: Electrician (Sparky Co), visit 2 of 2 — not sent yet')
+    expect(trades.text).not.toContain('Inspections')
+    const sams = await listUnbooked.run({ person: 'Sam' }, ctx())
+    expect((sams.data as { inspections: { job_number: string }[] }).inspections.map(i => i.job_number)).toEqual(['IRC1091'])
+    const mine = await listUnbooked.run({ person: 'me', what: 'inspections' }, ctx())
+    expect((mine.data as { inspections: { job_number: string }[] }).inspections.map(i => i.job_number)).toEqual(['IRC1090'])
   })
 })
