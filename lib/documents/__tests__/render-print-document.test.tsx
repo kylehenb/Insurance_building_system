@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import sharp from 'sharp'
 import * as fx from '@/lib/__tests__/print-documents.fixture'
 
 // The page is printed by Chromium elsewhere; here: the HTML it is given.
@@ -48,6 +49,22 @@ describe('embedImages', () => {
     expect(srcs[3]).toBe('')
     expect(srcs[4]).toBe('')
     expect(out).not.toContain('http')
+  })
+})
+
+describe('photos', () => {
+  it('shrinks photos to print size with sharp; Chromium only for what sharp can\'t open', async () => {
+    const big = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#8a7' } }).jpeg().toBuffer()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(
+      new Uint8Array(url.includes('odd') ? [1, 2, 3] : big), { headers: { 'content-type': 'image/jpeg' } })))
+    const { loadPhotoImages } = await import('../render-print-document')
+    const [photo, odd] = await loadPhotoImages(['j/1.jpg', 'j/odd.heic'])
+
+    expect(photo).toMatchObject({ width: 800, height: 600 })
+    expect(photo!.src).toMatch(/^data:image\/jpeg;base64,/)
+    expect((await sharp(Buffer.from(photo!.src.split(',')[1], 'base64')).metadata()).width).toBe(800)
+    expect(odd!.src).toMatch(/#shrunk$/)
+    expect(evaluate).toHaveBeenCalledTimes(1)
   })
 })
 
