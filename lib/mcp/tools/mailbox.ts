@@ -256,7 +256,7 @@ export const sendEmailTool: McpTool = {
     'Write the body as plain text in the user\'s words (a short greeting and sign-off are fine; don\'t add commitments they didn\'t make).',
     'send_at (Perth time, e.g. "2026-10-26T08:00") schedules it instead. To leave it for the user to review and send, use save_draft instead.',
     'ONLY call this after reading back who it goes to, the subject, the whole text, the attachments and when it will send, and the user has clearly said yes.',
-    'job_number files the email on that job (a new email\'s subject defaults to "job number - address"). attach_photos / attach_files / attach_documents attach that job\'s photos ("2", "45-47", a label), files, and quotes/reports/invoices as PDFs; photos are compressed if the total is over Gmail\'s 25 MB.',
+    'job_number files the email on that job (a new email\'s subject defaults to "job number - address"). attach_photos_pdf: ["all"] attaches all that job\'s photos laid out as ONE photos PDF (the job\'s Export photos document) — use it whenever someone wants "the photos" sent, never every photo one by one; with numbers or labels it\'s a PDF of just those. attach_photos / attach_files / attach_documents attach a few photos ("2", "45-47", a label) as separate files, uploaded files, and quotes/reports/invoices as PDFs; photos are compressed if the total is over Gmail\'s 25 MB.',
     'draft_id sends a draft saved earlier (e.g. an action card\'s email edited in the app) exactly as it is, or schedules it with send_at; leave out body then.',
     'To email quotes, reports and invoices to the insurer with the standard template (and mark them sent) use send_documents instead.',
     'The same text to the same person within 10 minutes is refused as a likely repeat unless send_anyway: true. If a call returns an error, tell the user what it says instead of retrying.',
@@ -385,7 +385,7 @@ export const saveDraftTool: McpTool = {
   description: [
     'Creates or edits a draft in the office Gmail Drafts for the user to check and send themselves — nothing is sent. Use when the user says "draft" or wants to review first.',
     'New: like send_email (mode, message_id / conversation_id, to, subject, body). Edit: pass draft_id (from save_draft or read_conversation); only the fields given change and its attachments are kept unless named in remove_attachments.',
-    'job_number plus attach_photos ("2", "45-47", a label) / attach_files / attach_documents (quotes, reports, invoices as PDFs) adds the job\'s files; photos are compressed if over Gmail\'s 25 MB.',
+    'job_number plus attach_photos_pdf (["all"] = all the job\'s photos as one photos PDF; or numbers/labels for some), attach_photos (a few photos as separate files: "2", "45-47", a label) / attach_files / attach_documents (quotes, reports, invoices as PDFs) adds the job\'s files; photos are compressed if over Gmail\'s 25 MB.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -547,7 +547,7 @@ export const listJobFiles: McpTool = {
   name: 'list_job_files',
   title: 'List job photos and files',
   description: [
-    'Lists a job\'s photos (numbered, with labels) and uploaded files. Use the numbers or ids with get_job_photo (to look at one) and attach_photos / attach_files (send_email, save_draft, reply_to_email, send_documents).',
+    'Lists a job\'s photos (numbered, with labels) and uploaded files. Use the numbers or ids with get_job_photo (to look at one) and attach_photos / attach_photos_pdf / attach_files (send_email, save_draft, reply_to_email, send_documents). To send all the photos, use attach_photos_pdf: ["all"] (one PDF) — no need to list them first.',
     'For quotes, reports and invoices use list_job_documents.',
   ].join(' '),
   inputSchema: {

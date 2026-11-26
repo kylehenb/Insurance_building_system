@@ -40,7 +40,9 @@ vi.mock('@/lib/mail/job-files', () => ({
   }),
 }))
 vi.mock('@/lib/mail/job-documents', () => ({
-  renderJobDocument: spy('renderJobDocument', (_t, _j, ref) => ({ filename: 'Quote Q-IRC1055-1.pdf', mimeType: 'application/pdf', content: PDF, title: `Quote ${(ref as { id: string }).id}`, warnings: [] })),
+  renderJobDocument: spy('renderJobDocument', (_t, _j, ref) => (ref as { kind: string }).kind === 'photos'
+    ? { filename: 'Photos IRC1055 - 12 Smith St.pdf', mimeType: 'application/pdf', content: PDF, title: 'Photos', warnings: [] }
+    : { filename: 'Quote Q-IRC1055-1.pdf', mimeType: 'application/pdf', content: PDF, title: `Quote ${(ref as { id: string }).id}`, warnings: [] }),
 }))
 vi.mock('@/lib/pdf/render-pdf-pages', () => ({
   renderPdfPages: spy('renderPdfPages', () => [1, 2, 3].map(() => ({ widthPt: 595, heightPt: 842, image: bigPhoto, contentType: 'image/jpeg' }))),
@@ -212,6 +214,49 @@ describe('send_email attachments', () => {
     expect(out).toMatchObject({ isError: true })
     expect(out.text).toMatch(/^Not on IRC1055: photo "photo 70". It has 65 photos and 1 file/)
     expect(calls.saveDraft).toBeUndefined()
+  })
+})
+
+describe('photos PDF (attach_photos_pdf)', () => {
+  it('sends all 65 photos as one PDF instead of 65 files', async () => {
+    const out = await sendEmailTool.run({ to: 'bob@trade.com', subject: 'Photos', body: 'Hi Bob', job_number: 'IRC1055', attach_photos_pdf: ['all'] }, ctx())
+    expect(out).toMatchObject({ text: 'Sent "Photos" to bob@trade.com with 1 attachment.' })
+    expect(calls.renderJobDocument.map(c => c.slice(1, 3))).toEqual([['j1055', { kind: 'photos', id: 'j1055', photoIds: [] }]])
+    expect(calls.readJobFile).toBeUndefined()
+  })
+
+  it('makes a PDF of only the photos named', async () => {
+    await sendEmailTool.run({ to: 'bob@trade.com', subject: 'Roof', body: 'Hi', job_number: 'IRC1055', attach_photos_pdf: ['45-47'] }, ctx())
+    expect(calls.renderJobDocument[0][2]).toEqual({ kind: 'photos', id: 'j1055', photoIds: [pid(45), pid(46), pid(47)] })
+  })
+
+  it('goes alongside a quote, labelled for the read-back', async () => {
+    const out = await replyToEmailTool.run({ email_id: EMAIL_ID, body: 'Photos and quote attached', attach_photos_pdf: ['all photos'], attach_documents: [{ kind: 'quote', id: QUOTE_ID }] }, ctx())
+    expect(out.text).toBe('Replied to casey@insurer.com: "Re: IRC1055 plans", attached Quote Q-IRC1055-1.pdf, Photos IRC1055 - 12 Smith St.pdf.')
+    expect(calls.renderJobDocument.map(c => (c[2] as { kind: string }).kind)).toEqual(['quote', 'photos'])
+  })
+
+  it('adds the photos PDF to send_documents', async () => {
+    const out = await sendDocuments.run({ documents: [{ kind: 'quote', id: QUOTE_ID }], attach_photos_pdf: ['all'] }, ctx())
+    expect(out.text).toBe('Emailed Quote Q-IRC1055-1, photos PDF (all 65 photos) to claims@insurer.com.')
+  })
+
+  it('refuses photos not on the job', async () => {
+    const out = await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', job_number: 'IRC1055', attach_photos_pdf: ['photo 70'] }, ctx())
+    expect(out.text).toMatch(/^Not on IRC1055: photo "photo 70"/)
+    expect(calls.renderJobDocument).toBeUndefined()
+  })
+
+  it('points to the photos PDF when too many photos are attached one by one', async () => {
+    const out = await sendEmailTool.run({ to: 'bob@trade.com', subject: 'x', body: 'Hi', job_number: 'IRC1055', attach_photos: ['all'] }, ctx())
+    expect(out).toMatchObject({ isError: true, text: 'That\'s 65 attachments — at most 30 in one email. For many photos, use attach_photos_pdf to send them as one photos PDF.' })
+    expect(calls.readJobFile).toBeUndefined()
+  })
+
+  it('is offered by every email tool', () => {
+    for (const t of [sendEmailTool, saveDraftTool, replyToEmailTool, sendDocuments]) {
+      expect(Object.keys((t.inputSchema as { properties: object }).properties)).toContain('attach_photos_pdf')
+    }
   })
 })
 

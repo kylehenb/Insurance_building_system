@@ -210,6 +210,7 @@ export function EmailStep({ card, step, editable, composing, onComposing, onCard
   const subject = d ? d.subject : str(a.subject) || (mode === 'new' ? '' : `Re: ${card.conversation?.subject ?? ''}`)
   const sendAt = str(a.send_at)
   const files = (Array.isArray(a.attach_photos) ? a.attach_photos.length : 0) + (Array.isArray(a.attach_files) ? a.attach_files.length : 0)
+    + (Array.isArray(a.attach_photos_pdf) && a.attach_photos_pdf.length ? 1 : 0)
 
   if (inPlace) {
     return (

@@ -25,7 +25,8 @@ vi.mock('@/lib/work-orders/work-order-pdf', () => ({ WorkOrderPdfError }))
 const loadJobAttachments = vi.fn()
 const fitJobAttachments = vi.fn()
 vi.mock('@/lib/mcp/tools/job-attachments', () => ({
-  ATTACH_PROPERTIES: { attach_photos: { type: 'array' }, attach_files: { type: 'array' } },
+  ATTACH_PROPERTIES: { attach_photos: { type: 'array' }, attach_photos_pdf: { type: 'array' }, attach_files: { type: 'array' } },
+  hasAttachArgs: (a: Record<string, unknown>) => Object.values(a).some(v => Array.isArray(v) && v.length > 0),
   loadJobAttachments: (...a: unknown[]) => loadJobAttachments(...a),
   fitJobAttachments: (...a: unknown[]) => fitJobAttachments(...a),
   skippedText: () => 'Left out (over Gmail\'s 25 MB limit): photo 9 30.0 MB.',
@@ -108,6 +109,17 @@ describe('send_work_order', () => {
     expect(loadJobAttachments).toHaveBeenCalledWith({ attach_photos: ['2'], attach_files: ['Scope.pdf'] }, ctx, { id: 'j1', job_number: 'IRC1001' })
     expect(send).toHaveBeenCalledWith(ID, ctx, expect.objectContaining({ extraAttachments: files }))
     expect(res.text).toContain('to kyle@example.com, with photo 2 (Roof), Scope.pdf.')
+  })
+
+  it('sends a PDF of only the chosen photos in place of the all-photos PDF', async () => {
+    buildDraft.mockResolvedValueOnce({ jobId: 'j1' })
+    const pdf = { label: 'photos PDF (3 photos)', filename: 'Photos IRC1001.pdf', mimeType: 'application/pdf', content: Buffer.from('%PDF') }
+    loadJobAttachments.mockResolvedValueOnce([pdf])
+    fitJobAttachments.mockResolvedValueOnce({ kept: [pdf], skipped: [], compressed: [] })
+    const res = await sendWorkOrder.run({ work_order_id: ID, to: 'kyle@example.com', attach_photos_pdf: ['roof'] }, ctx)
+    expect(loadJobAttachments).toHaveBeenCalledWith(expect.objectContaining({ attach_photos_pdf: ['roof'] }), ctx, { id: 'j1', job_number: 'IRC1001' })
+    expect(send).toHaveBeenCalledWith(ID, ctx, expect.objectContaining({ includePhotos: false, extraAttachments: [pdf] }))
+    expect(res.text).toContain('to kyle@example.com, with photos PDF (3 photos).')
   })
 
   it("sends nothing when the named photos don't fit in one email", async () => {
