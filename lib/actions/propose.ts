@@ -35,7 +35,7 @@ const OWN_DOMAIN = 'insurancerepairco.com.au'
 const LEFT_OUT = new Set([
   'list_approvals', 'decide_approval', 'list_activity', 'recover_dropped_emails',
   'reply_to_email', 'save_email', 'link_email_to_job',
-  'list_action_cards', 'read_action_card', 'confirm_action_card', 'skip_action_card', 'update_action_card', 'star_email', 'change_follow_up', 'add_todo',
+  'list_action_cards', 'read_action_card', 'confirm_action_card', 'clear_action_card', 'update_action_card', 'star_email', 'change_follow_up', 'add_todo',
 ])
 
 /**

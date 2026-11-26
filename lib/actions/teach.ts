@@ -8,7 +8,7 @@ import { compareCard, FEATURE, situationText } from './learning'
 // debriefed into takeaways that work from the next card on. Said nothing:
 // nothing to do (a plain confirm or skip is still recorded as it was).
 
-const STATUS_WORDS: Record<string, string> = { done: 'The office confirmed it', skipped: 'The office skipped it', pending: 'It\'s still on the list', failed: 'A step failed' }
+const STATUS_WORDS: Record<string, string> = { done: 'The office confirmed it', skipped: 'The office cleared it (took it off the list without doing it)', pending: 'It\'s still on the list', failed: 'A step failed' }
 
 /** What the AI proposed on the card and what the office did with it, in plain lines */
 export function cardHappened(card: { status: string; ai_steps: { id: string; summary: string }[] | null; steps: { id: string; summary: string; status?: string | null }[]; title: string }): string {

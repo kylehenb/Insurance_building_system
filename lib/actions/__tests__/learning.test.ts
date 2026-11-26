@@ -134,15 +134,15 @@ describe('recording decisions', () => {
   it('records each step for auto-confirm by step type, and a skip reason — "not now" leaving the steps alone', async () => {
     tables.action_queue = [card()]
     await skipCard(db as never, 't1', 'k1', 'u1', 'wrong')
-    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', instruction: 'Skipped — the AI got it wrong' })
+    expect(tables.learning_events[0]).toMatchObject({ feature: 'action_card', instruction: 'Cleared — the AI got it wrong' })
     expect(tables.learning_events.filter(e => e.feature === 'action_step').map(e => [e.kind, e.outcome])).toEqual([['send_email', 'skipped'], ['add_job_note', 'skipped']])
-    expect(tables.action_queue[0].outcome).toBe('Skipped — wrong')
+    expect(tables.action_queue[0].outcome).toBe('Cleared — wrong')
 
     tables.learning_events = []
     tables.action_queue = [card({ id: 'k2' })]
-    await skipCard(db as never, 't1', 'k2', 'u1', 'not_now')
+    await skipCard(db as never, 't1', 'k2', 'u1', 'done_elsewhere')
     expect(tables.learning_events.map(e => e.feature)).toEqual(['action_card'])
-    expect(tables.learning_events[0].instruction).toMatch(/just not needed today/)
+    expect(tables.learning_events[0].instruction).toMatch(/dealt with it another way/)
   })
 
   it('records a step run as proposed as accepted, and a changed one as edited', async () => {

@@ -403,7 +403,7 @@ export async function cardForThread(db: SupabaseClient, tenantId: string, thread
 
 export async function skipCard(db: SupabaseClient, tenantId: string, id: string, userId: string, reason?: SkipReason): Promise<boolean> {
   const { data } = await db.from('action_queue')
-    .update({ status: 'skipped', outcome: reason === 'not_now' ? 'Skipped for now' : reason === 'not_needed' ? 'Skipped — not needed' : reason === 'wrong' ? 'Skipped — wrong' : 'Skipped', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
+    .update({ status: 'skipped', outcome: reason === 'done_elsewhere' ? 'Cleared — done another way' : reason === 'not_needed' ? 'Cleared — not needed' : reason === 'wrong' ? 'Cleared — wrong' : 'Cleared', confirmed_by: userId, confirmed_at: now(), updated_at: now() })
     .eq('tenant_id', tenantId).eq('id', id).in('status', ['pending', 'failed', 'queued'])
     .select(CARD_COLUMNS).maybeSingle()
   if (data) {

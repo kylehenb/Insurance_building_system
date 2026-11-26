@@ -35,7 +35,7 @@ const STATE: Record<string, string> = {
   running: 'steps running now',
   failed: 'stopped — a step failed',
   done: 'done',
-  skipped: 'skipped',
+  skipped: 'cleared',
   no_action: 'nothing needed',
 }
 
@@ -85,7 +85,7 @@ export const listActionCards: McpTool = {
   description: [
     'The action cards — the to-do list of starred emails, most urgent first, as on the dashboard. The AI makes one for each incoming email that needs doing (from the email and its job file, with suggested steps — a reply, filing it on a job, a job note… — that only run when confirmed), and the user stars others themselves.',
     'Each has a category (its star): Invoices to pay (invoice), Attend and Submit (attend_submit — sites to attend, reports or quotes to submit), Everything else (other). category filters to one.',
-    'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, update_action_card to fix its title or steps, skip_action_card when it\'s dealt with.',
+    'view: pending (default — needs action) or done. Use read_action_card for a card\'s full steps and draft email, confirm_action_card to do them, update_action_card to fix its title or steps, clear_action_card when there\'s nothing more to do. Going through them: "next", "skip" or "move on" just means read the next card — nothing changes; "later" means remind_me / set a follow-up on it; "clear" (or "that\'s done", "get rid of it") is clear_action_card.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -208,7 +208,7 @@ export const confirmActionCard: McpTool = {
   async run(args, ctx): Promise<McpToolResult> {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
-    if (!card.steps.length) return { text: 'This card has no steps to do — use skip_action_card once it\'s dealt with.', isError: true }
+    if (!card.steps.length) return { text: 'This card has no steps to do — use clear_action_card once it\'s dealt with.', isError: true }
     const ids = Array.isArray(args.step_ids) && args.step_ids.length
       ? args.step_ids.map(str)
       : card.steps.filter(s => s.status !== 'done' && s.status !== 'skipped').map(s => s.id)
@@ -246,17 +246,17 @@ export const confirmActionCard: McpTool = {
 }
 
 export const skipActionCard: McpTool = {
-  name: 'skip_action_card',
-  title: 'Skip action card',
+  name: 'clear_action_card',
+  title: 'Clear action card',
   description: [
-    'Takes a card off the to-do list (its star comes off): nothing to do, or done another way. It moves to Done.',
-    'Confirm which card first. reason, if they say: not_now (right, just not today — doesn\'t count against the AI), not_needed (this kind of card isn\'t wanted), wrong (the AI got it wrong). Pass on what the user says about why as comment — it\'s how IRC learns; read back the takeaways it returns.',
+    'Clears a card — takes it off the to-do list (its star comes off) because there\'s nothing more to do. It moves to Done. Only when the user says to clear it ("clear", "that\'s done", "get rid of it", "close it"): "skip", "next" or "move on" mean go to the next card and leave this one where it is — never call this for those.',
+    'Confirm which card first. reason, if they say (ask briefly if they don\'t): done_elsewhere (they dealt with it another way — doesn\'t count against the AI), not_needed (this kind of card isn\'t wanted), wrong (the AI got it wrong). Pass on what the user says about why as comment — it\'s how IRC learns; read back the takeaways it returns.',
   ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
       card_id: { type: 'string', description: 'card_id from list_action_cards.' },
-      reason: { type: 'string', enum: ['not_now', 'not_needed', 'wrong'], description: 'Why, if the user says.' },
+      reason: { type: 'string', enum: ['done_elsewhere', 'not_needed', 'wrong'], description: 'Why, if the user says.' },
       comment: { type: 'string', description: 'Anything the user says about this card — why it was right or wrong, how they work, what to do next time — in their words, in full. IRC learns from it (read back the takeaways it returns).' },
     },
     required: ['card_id'],
@@ -269,9 +269,9 @@ export const skipActionCard: McpTool = {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
     const reason = isSkipReason(args.reason) ? args.reason : undefined
-    if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId, reason))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
+    if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId, reason))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be cleared now.`, isError: true }
     const learned = spokenTakeaways(await teachFromCard(db(ctx), ctx.tenantId, ctx.userId, card.id, str(args.comment)))
-    return { text: `Skipped "${card.title}".${learned ? `\n${learned}` : ''}`, data: { card_id: card.id, status: 'skipped' } }
+    return { text: `Cleared "${card.title}".${learned ? `\n${learned}` : ''}`, data: { card_id: card.id, status: 'skipped' } }
   },
 }
 
@@ -289,7 +289,7 @@ export const updateActionCard: McpTool = {
     'add_steps (a step is a call to one of the action tools, as the card\'s AI proposes them — e.g. { tool: "add_job_note", args: { job_number, note } } or { tool: "send_email", args: { mode: "reply", body } }; recorded, not run);',
     'redo_with (tell the AI what to change in your own words — it rewrites the card\'s title, summary and steps from the email and job file; takes up to a minute);',
     'redo_step (the same for one step: { step_id, with } — the AI replaces just that step, or takes it off if asked, and the other steps, edited emails included, stay as they are);',
-    'status: done (dealt with another way, steps not run), skipped (as skip_action_card), or pending (put a done or skipped card back on the list).',
+    'status: done (dealt with another way, steps not run), skipped (cleared, as clear_action_card), or pending (put a done or skipped card back on the list).',
     'Nothing is sent or changed on the job — confirm_action_card does the steps. Read back the change and get a yes first; read_action_card shows the result.',
   ].join(' '),
   inputSchema: {

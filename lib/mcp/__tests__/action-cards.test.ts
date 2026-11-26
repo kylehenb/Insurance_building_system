@@ -158,14 +158,14 @@ describe('confirm_action_card', () => {
   })
 })
 
-describe('skip_action_card', () => {
+describe('clear_action_card', () => {
   it('skips a card that can still change', async () => {
-    expect((await skipActionCard.run({ card_id: CARD_ID }, ctx)).text).toBe('Skipped "Reply to Casey — confirm Thursday access".')
+    expect((await skipActionCard.run({ card_id: CARD_ID }, ctx)).text).toBe('Cleared "Reply to Casey — confirm Thursday access".')
     expect(skipCard).toHaveBeenCalledWith(ctx.supabase, 't1', CARD_ID, 'u1', undefined)
-    await skipActionCard.run({ card_id: CARD_ID, reason: 'not_now' }, ctx)
-    expect(skipCard).toHaveBeenLastCalledWith(ctx.supabase, 't1', CARD_ID, 'u1', 'not_now')
+    await skipActionCard.run({ card_id: CARD_ID, reason: 'done_elsewhere' }, ctx)
+    expect(skipCard).toHaveBeenLastCalledWith(ctx.supabase, 't1', CARD_ID, 'u1', 'done_elsewhere')
     stored = card({ status: 'done' })
-    expect(await skipActionCard.run({ card_id: CARD_ID }, ctx)).toMatchObject({ isError: true, text: "That card is done — it can't be skipped now." })
+    expect(await skipActionCard.run({ card_id: CARD_ID }, ctx)).toMatchObject({ isError: true, text: "That card is done — it can't be cleared now." })
   })
 })
 

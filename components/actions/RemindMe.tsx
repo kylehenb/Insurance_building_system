@@ -12,6 +12,8 @@ import type { JobHit } from '@/lib/mail/job-context'
 // card's job and email, and can take the card off the list until then.
 
 interface Props {
+  /** The heading: "Remind me", or "Later — bring it back on" on a card */
+  title?: string
   note?: string
   who?: string | null
   /** The job it's about; without one (and no card) the person can pick one */
@@ -26,7 +28,7 @@ interface Props {
   onCancel(): void
 }
 
-export function RemindMe({ note: startNote = '', who: startWho = '', jobId, jobNumber, threadId, fromCardId, canClear, onDone, onError, onCancel }: Props) {
+export function RemindMe({ title = 'Remind me', note: startNote = '', who: startWho = '', jobId, jobNumber, threadId, fromCardId, canClear, onDone, onError, onCancel }: Props) {
   const presets = useMemo(() => followUpPresets(), [])
   const [note, setNote] = useState(startNote)
   const [who, setWho] = useState(startWho ?? '')
@@ -58,7 +60,7 @@ export function RemindMe({ note: startNote = '', who: startWho = '', jobId, jobN
 
   return (
     <div className="rm" onKeyDown={e => e.stopPropagation()}>
-      <div className="rm-title">Remind me</div>
+      <div className="rm-title">{title}</div>
       <textarea autoFocus value={note} rows={2} onChange={e => setNote(e.target.value)}
         placeholder="What to follow up, e.g. Chase the roof quote — they said Friday" />
       <div className="rm-row">

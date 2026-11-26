@@ -105,7 +105,7 @@ describe('mcp route', () => {
       'list_action_cards',
       'read_action_card',
       'confirm_action_card',
-      'skip_action_card',
+      'clear_action_card',
       'update_action_card',
       'star_email',
       'set_follow_up',

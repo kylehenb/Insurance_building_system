@@ -164,13 +164,13 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     const { card: updated } = await post(`/api/actions/${card.id}/reopen`)
     onChanged(updated, 'Back on the list.')
   })
-  // Skip asks why in one tap (not now / not needed / wrong) — or just skip
+  // Clear (off the list, nothing more to do) asks why in one tap — done another way / not needed / wrong — or just clears
   const [skipping, setSkipping] = useState(false)
-  const skip = (reason?: 'not_now' | 'not_needed' | 'wrong') => run('skip', async () => {
+  const skip = (reason?: 'done_elsewhere' | 'not_needed' | 'wrong') => run('skip', async () => {
     setSkipping(false)
     await post(`/api/actions/${card.id}/skip`, reason ? { reason } : undefined)
     const learned = await teachAlong()
-    onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, `Card skipped.${learned}`)
+    onChanged({ ...card, status: 'skipped', outcome: 'Cleared' }, `Card cleared.${learned}`)
   })
   const recategorise = (category: CardCategory | null) => run('star', async () => {
     if (!category) return
@@ -381,6 +381,7 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
 
           {reminding && (
             <RemindMe
+              title="Later — bring it back on"
               note={f ? f.note : `Follow up: ${card.title}`}
               who={f ? f.who : card.conversation?.from ?? null}
               jobId={card.job_id}
@@ -408,14 +409,15 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                 {busy === 'confirm' ? 'Working…' : toDo === 1 ? 'Do this step' : `Do ${toDo} steps`}
               </button>
             )}
-            {open && !skipping && <button className="ac-btn" disabled={!!busy} onClick={() => (card.steps.length ? setSkipping(true) : skip())}>{card.steps.length ? 'Skip' : 'Done'}</button>}
+            {open && !skipping && <button className="ac-btn" disabled={!!busy} onClick={() => (card.steps.length ? setSkipping(true) : skip())} title="Nothing more to do: take it off the list">{card.steps.length ? 'Clear' : 'Done'}</button>}
             {open && skipping && (
               <span className="ac-skip">
                 <span className="ac-skip-q">Why?</span>
-                <button className="ac-btn" disabled={!!busy} onClick={() => skip('not_now')} title="It's right, just not now — doesn't count against the AI">Not now</button>
+                <button className="ac-btn" disabled={!!busy} onClick={() => skip('done_elsewhere')} title="You dealt with it yourself — doesn't count against the AI">Done another way</button>
                 <button className="ac-btn" disabled={!!busy} onClick={() => skip('not_needed')} title="This kind of card isn't wanted">Not needed</button>
                 <button className="ac-btn" disabled={!!busy} onClick={() => skip('wrong')} title="The AI got it wrong">Wrong</button>
-                <button className="ac-btn ghost" disabled={!!busy} onClick={() => skip()}>Just skip</button>
+                <button className="ac-btn ghost" disabled={!!busy} onClick={() => skip()}>Just clear</button>
+                <button className="ac-btn ghost" disabled={!!busy} onClick={() => setSkipping(false)}>Cancel</button>
               </span>
             )}
             {card.status !== 'running' && (
@@ -426,8 +428,8 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
                   </button>
                 )}
                 {!reminding && (
-                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => setReminding(true)} title="Have this come back on a day, with the chase drafted">
-                    ⏰ Remind me
+                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => setReminding(true)} title="Later: off the list until a day you pick, then back with the chase drafted">
+                    ⏰ Later
                   </button>
                 )}
                 {live && !asking && redoable && (

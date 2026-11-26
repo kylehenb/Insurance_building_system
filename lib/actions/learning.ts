@@ -163,12 +163,12 @@ const records = (steps: CardStep[]) => steps.map(s => ({ ...asDone(s), status: s
  * (all its steps run or skipped) or skipped. Cards made before the learning
  * module (no ai_steps) aren't recorded. Never throws.
  */
-/** Why a card was skipped, when the office says (§24.7): not now isn't the AI being wrong */
-export type SkipReason = 'not_now' | 'not_needed' | 'wrong'
+/** Why a card was cleared (Clear on the card, status 'skipped'), when the office says (§24.7): done another way isn't the AI being wrong */
+export type SkipReason = 'done_elsewhere' | 'not_needed' | 'wrong'
 export const SKIP_REASONS: Record<SkipReason, string> = {
-  not_now: 'Skipped for now — the proposal was fine, just not needed today',
-  not_needed: 'Skipped — this kind of card isn\'t wanted',
-  wrong: 'Skipped — the AI got it wrong',
+  done_elsewhere: 'Cleared — the office dealt with it another way; the proposal wasn\'t wrong',
+  not_needed: 'Cleared — this kind of card isn\'t wanted',
+  wrong: 'Cleared — the AI got it wrong',
 }
 export const isSkipReason = (v: unknown): v is SkipReason => typeof v === 'string' && v in SKIP_REASONS
 
@@ -191,8 +191,8 @@ export async function recordCardDecision(db: SupabaseClient, card: ActionCard, u
     userId,
     ...(reason ? { instruction: SKIP_REASONS[reason] } : {}),
   })
-  // "Not now" says nothing about the steps: their record (and any auto-confirm streak) stays as it was
-  if (reason !== 'not_now') await recordStepDecisions(db, card, userId, ended)
+  // "Done another way" says nothing about the steps: their record (and any auto-confirm streak) stays as it was
+  if (reason !== 'done_elsewhere') await recordStepDecisions(db, card, userId, ended)
 }
 
 /** Each step's own record, for auto-confirm by step type (§24.7): statistics only, not reviewed for lessons */
