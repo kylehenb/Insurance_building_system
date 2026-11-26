@@ -4580,7 +4580,7 @@ Teaching IRC like a new assistant beside you: what the office says is taken away
 - **From a card:** `POST /api/actions/[id]/teach { comment }` (any time — confirming, editing, skipping, or after), and the instructions on Re-suggest (`/api/actions/suggest`, debriefed from the card as it was, before it's redone). By voice: `confirm_action_card` and `skip_action_card` take `comment`, `update_action_card`'s `redo_with` is debriefed too, and each reads back "Got it — from now on: …". The words are recorded as a learning event (`instructed`) for the nightly review.
 - **Anywhere:** `remember(what, about?)` by voice or chat — into the office memory.
 - **The nightly review** (§24.5) reads the office memory with each feature's lessons, marks taught ones, and treats them as the office's own words: refined only when later cases show the situation differs, retired only when the office has plainly gone against one more than once.
-- **Rewording or dropping a takeaway:** `rewordLesson`, and retiring as on the What the AI has learned page.
+- **On the card** (`components/actions/TeachIRC.tsx`): **💬 Tell IRC** opens a box for what to take from it — saved with **Teach IRC**, or left there to go with **Do steps** / **Skip** (the takeaways also show in the message as the card moves to Done). The takeaways show as **Got it — from now on:** with when each applies (and "everywhere IRC writes" for the office memory), each with **Reword** and **Remove** (`POST /api/learning/taught/[id]`, taught lessons only, `actions.review`). Re-suggest with instructions shows them too.
 
 ### 24.9 Next
 

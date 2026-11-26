@@ -9,6 +9,8 @@ import { EmailStep } from './EmailStep'
 import { OriginalEmail } from './OriginalEmail'
 import { StepPanel } from './StepPanel'
 import { RemindMe } from './RemindMe'
+import { GotIt, TellIRC, teachCard } from './TeachIRC'
+import type { DebriefPoint } from '@/lib/learning/debrief'
 
 // One action card: its star (category — click to change), what the email
 // says (and the email itself, opened in place), the AI's suggested steps —
@@ -85,6 +87,10 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   const [asking, setAsking] = useState(false)
   const [reminding, setReminding] = useState(false)
   const [feedback, setFeedback] = useState('')
+  // Teaching IRC (§24.8): what's said goes with Do or Skip, or on its own; the takeaways show after
+  const [teaching, setTeaching] = useState(false)
+  const [teachText, setTeachText] = useState('')
+  const [takeaways, setTakeaways] = useState<DebriefPoint[]>([])
   // One step being changed by the AI, and what the office said
   const [changing, setChanging] = useState<string | null>(null)
   const [stepFeedback, setStepFeedback] = useState('')
@@ -142,15 +148,26 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
     }
     setAskChanged(null)
     const failed = (updated as CardWithContext).steps.find(s => s.status === 'failed')
-    onChanged(updated, failed ? `Stopped: ${failed.summary} — ${failed.result ?? 'failed'}` : (updated as CardWithContext).outcome ?? 'Done.', !!failed)
+    const learned = failed ? '' : await teachAlong()
+    onChanged(updated, failed ? `Stopped: ${failed.summary} — ${failed.result ?? 'failed'}` : `${(updated as CardWithContext).outcome ?? 'Done.'}${learned}`, !!failed)
   })
+  // What was said in Tell IRC goes with Do or Skip: the takeaways show, and in the message as the card moves to Done
+  async function teachAlong(): Promise<string> {
+    if (!teachText.trim()) return ''
+    const points = await teachCard(card.id, teachText).catch(() => [] as DebriefPoint[])
+    setTeachText('')
+    setTeaching(false)
+    setTakeaways(points)
+    return points.length ? ` Got it — ${points.map(p => p.lesson).join(' · ')}` : ''
+  }
   const putBack = () => run('reopen', async () => {
     const { card: updated } = await post(`/api/actions/${card.id}/reopen`)
     onChanged(updated, 'Back on the list.')
   })
   const skip = () => run('skip', async () => {
     await post(`/api/actions/${card.id}/skip`)
-    onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, 'Card skipped.')
+    const learned = await teachAlong()
+    onChanged({ ...card, status: 'skipped', outcome: 'Skipped' }, `Card skipped.${learned}`)
   })
   const recategorise = (category: CardCategory | null) => run('star', async () => {
     if (!category) return
@@ -159,7 +176,8 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
   })
   const retry = (instructions?: string) => run(instructions ? 'ask' : 'retry', async () => {
     const which = card.source === 'followup' ? { cardId: card.id } : { threadId: card.source_ref }
-    const { card: updated } = await post('/api/actions/suggest', { ...which, ...(instructions ? { feedback: instructions } : {}) })
+    const { card: updated, takeaways: taken } = await post('/api/actions/suggest', { ...which, ...(instructions ? { feedback: instructions } : {}) })
+    if (Array.isArray(taken) && taken.length) setTakeaways(taken)
     setAsking(false)
     setFeedback('')
     onChanged(updated, instructions ? 'Steps re-suggested with your instructions.' : 'Suggestions updated.')
@@ -345,6 +363,19 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             </div>
           )}
 
+          {teaching && (
+            <TellIRC
+              cardId={card.id}
+              value={teachText}
+              onValue={setTeachText}
+              busy={!!busy}
+              onTaught={points => { setTakeaways(points); if (points.length) setTeaching(false) }}
+              onError={text => message(text, true)}
+              onClose={() => setTeaching(false)}
+            />
+          )}
+          <GotIt points={takeaways} onChange={setTakeaways} />
+
           {reminding && (
             <RemindMe
               note={f ? f.note : `Follow up: ${card.title}`}
@@ -377,6 +408,11 @@ export function ActionCardView({ card: given, compact, onChanged, onOpenConversa
             {open && <button className="ac-btn" disabled={!!busy} onClick={skip}>{card.steps.length ? 'Skip' : 'Done'}</button>}
             {card.status !== 'running' && (
               <span className="ac-foot-right">
+                {!teaching && (
+                  <button className="ac-btn ghost" disabled={!!busy} onClick={() => setTeaching(true)} title="Say why it was right or wrong, or how you work — IRC takes it in for next time">
+                    💬 Tell IRC
+                  </button>
+                )}
                 {!reminding && (
                   <button className="ac-btn ghost" disabled={!!busy} onClick={() => setReminding(true)} title="Have this come back on a day, with the chase drafted">
                     ⏰ Remind me

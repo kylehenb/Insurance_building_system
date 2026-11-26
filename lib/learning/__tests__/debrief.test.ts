@@ -73,3 +73,14 @@ describe('remember and get_office_memory', () => {
     expect(empty.isError).toBe(true)
   })
 })
+
+describe('what happened on a card, for the debrief', async () => {
+  const { cardHappened } = await import('@/lib/actions/teach')
+  it('says what the AI proposed and what the office changed', () => {
+    const ai = [{ id: 's1', summary: 'Reply to Dave', tool: 'send_email', args: { body: 'Dear Dave' } }]
+    const text = cardHappened({ title: 'Dave asks about Tuesday', status: 'done', ai_steps: ai as never, steps: [{ ...ai[0], status: 'done', args: { body: 'Hey Dave, Tuesday is good' } }] as never })
+    expect(text).toContain('The AI proposed:\n- Reply to Dave')
+    expect(text).toContain('The office confirmed it')
+    expect(text).toContain('the office rewrote the email')
+  })
+})
