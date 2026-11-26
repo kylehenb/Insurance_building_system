@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { teachFromCard } from '@/lib/actions/teach'
+import { MAX_SAID, spokenTakeaways } from '@/lib/learning/debrief'
 import type { McpContext, McpTool, McpToolResult } from '@/lib/mcp/server'
 import { CATEGORIES, cardForThread, cardsForThreads, getCard, isCategory, listCards, markCardDone, reopenCard, setCardCategory, skipCard, starThread, updateCardText, withContext, type ActionCard, type CardView, type CardWithContext } from '@/lib/actions/cards'
 import { addStep, removeSteps, saveStepEdits } from '@/lib/actions/steps'
@@ -194,6 +196,7 @@ export const confirmActionCard: McpTool = {
         },
       },
       still_do: { type: 'boolean', description: 'true only after the user heard what has happened on the job since the card was written and said to go ahead anyway.' },
+      comment: { type: 'string', description: 'Anything the user says about this card — why it was right or wrong, how they work, what to do next time — in their words, in full. IRC learns from it (read back the takeaways it returns).' },
     },
     required: ['card_id'],
     additionalProperties: false,
@@ -221,8 +224,9 @@ export const confirmActionCard: McpTool = {
       const done = await confirmCard(ctx.tenantId, ctx.userId, card.id, choices, { db: db(ctx), via: ctx.via === 'chat' ? 'chat' : 'voice', voiceKeyId: ctx.voiceKeyId, stillDo: args.still_do === true })
       const ran = done.steps.filter(s => ids.includes(s.id))
       const lines = ran.map(s => `- ${s.summary}: ${s.status === 'done' ? 'done' : s.status === 'waiting' ? 'sent for approval' : s.status === 'failed' ? `failed — ${s.result ?? 'no reason given'}` : 'not run'}`)
+      const learned = done.status !== 'failed' ? spokenTakeaways(await teachFromCard(db(ctx), ctx.tenantId, ctx.userId, done.id, str(args.comment))) : ''
       return {
-        text: [done.status === 'failed' ? `Stopped: ${done.error_log}` : `${done.outcome}.`, ...lines].join('\n'),
+        text: [done.status === 'failed' ? `Stopped: ${done.error_log}` : `${done.outcome}.`, ...lines, ...(learned ? [learned] : [])].join('\n'),
         data: { card_id: done.id, status: done.status, outcome: done.outcome, steps: ran.map(s => ({ step_id: s.id, summary: s.summary, status: s.status, result: s.result ?? null })) },
         isError: done.status === 'failed',
       }
@@ -245,11 +249,14 @@ export const skipActionCard: McpTool = {
   title: 'Skip action card',
   description: [
     'Takes a card off the to-do list (its star comes off): nothing to do, or done another way. It moves to Done.',
-    'Confirm which card first.',
+    'Confirm which card first. Pass on what the user says about why as comment — it\'s how IRC learns; read back the takeaways it returns.',
   ].join(' '),
   inputSchema: {
     type: 'object',
-    properties: { card_id: { type: 'string', description: 'card_id from list_action_cards.' } },
+    properties: {
+      card_id: { type: 'string', description: 'card_id from list_action_cards.' },
+      comment: { type: 'string', description: 'Anything the user says about this card — why it was right or wrong, how they work, what to do next time — in their words, in full. IRC learns from it (read back the takeaways it returns).' },
+    },
     required: ['card_id'],
     additionalProperties: false,
   },
@@ -260,12 +267,14 @@ export const skipActionCard: McpTool = {
     const card = await findCard({ card_id: args.card_id }, ctx)
     if (isResult(card)) return card
     if (!(await skipCard(db(ctx), ctx.tenantId, card.id, ctx.userId))) return { text: `That card is ${STATE[card.status] ?? card.status} — it can't be skipped now.`, isError: true }
-    return { text: `Skipped "${card.title}".`, data: { card_id: card.id, status: 'skipped' } }
+    const learned = spokenTakeaways(await teachFromCard(db(ctx), ctx.tenantId, ctx.userId, card.id, str(args.comment)))
+    return { text: `Skipped "${card.title}".${learned ? `\n${learned}` : ''}`, data: { card_id: card.id, status: 'skipped' } }
   },
 }
 
 const SET_STATUSES = ['pending', 'done', 'skipped'] as const
-const MAX_REDO = 2000
+// Up to ~10 minutes of talking (debriefed into takeaways, §24.8)
+const MAX_REDO = MAX_SAID
 
 export const updateActionCard: McpTool = {
   name: 'update_action_card',
@@ -328,6 +337,7 @@ export const updateActionCard: McpTool = {
     if (isResult(found)) return found
     const opts = { db: db(ctx) }
     const done: string[] = []
+    let learned = ''
     let card: ActionCard = found
     const objs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : [])
     const removes = Array.isArray(args.remove_steps) ? args.remove_steps.map(str).filter(Boolean) : []
@@ -356,6 +366,7 @@ export const updateActionCard: McpTool = {
       }
       if (redo) {
         if (!process.env.ANTHROPIC_API_KEY) return { text: 'The AI isn\'t set up (no API key), so it can\'t redo the card.', isError: true }
+        learned = spokenTakeaways(await teachFromCard(db(ctx), ctx.tenantId, ctx.userId, card.id, redo, { recordEvent: false }))
         const remade = await resuggestCard(db(ctx), ctx.tenantId, { cardId: card.id }, redo, ctx.userId)
         if (!remade) return { text: 'The card couldn\'t be remade — try again in the app.', isError: true }
         card = remade
@@ -402,7 +413,7 @@ export const updateActionCard: McpTool = {
 
     const after = (await withContext(db(ctx), ctx.tenantId, [(await getCard(db(ctx), ctx.tenantId, card.id)) ?? card]))[0]
     return {
-      text: `"${found.title}": ${done.join(', ')}.\nNow: ${cardLine(after, 0).replace(/^1\. /, '')}`,
+      text: `"${found.title}": ${done.join(', ')}.\nNow: ${cardLine(after, 0).replace(/^1\. /, '')}${learned ? `\n${learned}` : ''}`,
       data: cardData(after),
     }
   },

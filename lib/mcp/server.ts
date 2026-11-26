@@ -65,6 +65,8 @@ export const SERVER_INSTRUCTIONS = [
   'When a request is ambiguous (which job, which trade, several work orders for the same trade), ask before acting.',
   'Always pass on the warnings a tool returns (no email address, $0 amount, already sent).',
   'Before anything that sends an email or changes a record, read back what will happen and wait for a clear yes.',
+  'Before writing anything in the office\'s voice (an email, a reply, a message), read get_office_memory for who it\'s to and follow it.',
+  'When the owner tells you how they work or what to do next time ("remember…", "always…", "with Dave, keep it casual"), or explains why a card was right or wrong, pass it on in full — remember, or the comment on a card — and read back what IRC took from it.',
 ].join(' ')
 
 /**

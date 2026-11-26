@@ -14,14 +14,19 @@ export type Lesson = {
 }
 
 /** Lessons a feature works with, best supported first. Never throws */
+/** The shared office memory (§24.8): what the office taught about people and how it works — every feature reads it too */
+export const OFFICE = 'office'
+
+/** A feature's active lessons, and the office memory with them (taught ones count even before they've been borne out) */
 export async function activeLessons(db: SupabaseClient, tenantId: string, feature: string, limit = 20): Promise<Lesson[]> {
   try {
-    const { data, error } = await db.from('learning_lessons')
+    const read = (f: string, n: number) => db.from('learning_lessons')
       .select('id, applies_when, lesson, support_count, contradict_count')
-      .eq('tenant_id', tenantId).eq('feature', feature).eq('status', 'active')
-      .order('support_count', { ascending: false }).limit(limit)
-    if (error) throw new Error(error.message)
-    return (data ?? []) as Lesson[]
+      .eq('tenant_id', tenantId).eq('feature', f).eq('status', 'active')
+      .order('support_count', { ascending: false }).limit(n)
+    const [own, office] = await Promise.all([read(feature, limit), feature === OFFICE ? Promise.resolve({ data: [], error: null }) : read(OFFICE, limit)])
+    if (own.error) throw new Error(own.error.message)
+    return [...((own.data ?? []) as Lesson[]), ...((office.data ?? []) as Lesson[])]
   } catch (err) {
     console.error(`[learning] ${feature} lessons not read:`, err)
     return []

@@ -80,6 +80,8 @@ You get the current lessons (L1, L2…), the NEW cases since the last review (N1
 - add: a new lesson, only for a pattern the cases show more than once (cite at least two cases, NEW or EARLIER), or for an instruction the office gave that is plainly general ("always…", "never…", "for X, do Y"), not a one-off. Scope applies_when as narrowly as the cases show — sender, insurer, kind of email, job stage — and broaden only when cases across those differences agree. Don't add what an existing lesson already says (support or refine it instead), and don't re-add a retired lesson unless new cases clearly show it again. A lesson a person turned off ("Turned off by …") stays off: don't add it back in any wording unless several new cases plainly show the office doing it.
 - retire: a lesson that is wrong or no longer followed.
 
+Lessons marked TAUGHT are the office's own words, from what they said: support and contradict them as usual, refine one only when later cases or instructions show its situation is narrower or broader, and retire one only when the office has plainly gone against it more than once or said otherwise. Lessons marked office memory apply wherever IRC writes or acts, not just this feature: judge them by this feature's cases only where they apply. Don't add a lesson that repeats one already there.
+
 A case confirmed as proposed is evidence the proposal was right: it supports lessons the proposal followed. One edit on its own is not a pattern. Write lessons as plain instructions the feature can follow ("Copy in the assessor on the job"); applies_when names the situation ("Replies to Allianz on make safe jobs with an assessor named"). Leave every list empty when nothing calls for a change — that's the usual outcome.`
 
 const day = (iso: string) => iso.slice(0, 10)
@@ -93,7 +95,7 @@ function caseLine(ref: string, e: LearningEvent): string {
 }
 
 function lessonLine(ref: string, l: LessonRow): string {
-  const record = `${l.support_count} for, ${l.contradict_count} against`
+  const record = `${l.support_count} for, ${l.contradict_count} against${l.source === 'taught' ? ', TAUGHT by the office' : ''}${(l as { feature?: string }).feature === 'office' ? ', office memory' : ''}`
   return l.status === 'active'
     ? `${ref} [${record}] When: ${l.applies_when}\n   ${l.lesson.replace(/\n/g, '\n   ')}`
     : `${ref} [RETIRED: ${l.retired_reason ?? 'no reason'}] When: ${l.applies_when}\n   ${l.lesson.replace(/\n/g, '\n   ')}`
@@ -159,8 +161,9 @@ export async function reviewFeature(
   }
 
   const { data: lessonRows, error: lessonErr } = await db.from('learning_lessons')
-    .select('id, applies_when, lesson, status, source, support_count, contradict_count, evidence_ids, retired_reason')
-    .eq('tenant_id', tenantId).eq('feature', feature).order('created_at', { ascending: true })
+    .select('id, feature, applies_when, lesson, status, source, support_count, contradict_count, evidence_ids, retired_reason')
+    // The office memory (§24.8) is kept with each feature's own lessons
+    .eq('tenant_id', tenantId).in('feature', [...new Set([feature, 'office'])]).order('created_at', { ascending: true })
   if (lessonErr) throw new Error(lessonErr.message)
   const lessons = ((lessonRows ?? []) as LessonRow[]).map(l => ({ ...l, evidence_ids: l.evidence_ids ?? [] }))
 

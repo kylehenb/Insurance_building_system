@@ -2663,6 +2663,8 @@ The floating chat and the dashboard chat (`POST /api/ai/assistant`, `lib/ai/assi
 | `list_unbooked(what?, person?)` | read | `loadUnbooked` (`lib/schedule/unbooked.ts`, §23.18) | What still needs a date: inspections on jobs at "book the inspection" (insurer's booking deadline, overdue said), trades on jobs in repair with visits not yet booked (by job, ready ones first; "not sent yet" flagged), and the jobs still waiting on the homeowner's signature. `what`: inspections / trades / both; `person` as for `get_schedule` |
 | `list_done_for_you(days?)` | read | `listAutoActions` (`lib/automation/auto-bookings.ts`, §23.19) | What IRC did by itself from the office's own words (trades' days from sent emails), with the words it went on and whether it was undone |
 | `undo_done_for_you(id, reason?)` | change — permission `jobs.edit` | `undoAutoAction` (§23.19) | Puts the visit back to its earlier day(s), or off the schedule. The reason is recorded for the learning module |
+| `remember(what, about?)` | change (lessons) — permission `actions.review` | `debrief` (`lib/learning/debrief.ts`, §24.8) | Teaches IRC something to do from now on; turned into takeaways in the office memory and read back |
+| `get_office_memory(about?)` | read | `officeMemory` (§24.8) | What the office taught about people, companies and how it writes — read before writing anything in the office's voice |
 | `close_job(job_number, reason)` | change (`jobs.closed_by_hand`) — permission `jobs.change_stage` | `closeJobs` (`lib/jobs/close.ts`, §23.15) | Closes a job by hand as complete / declined / cancelled / no_decision; the phase shows Closed with that reason. Same as Jobs → Close Old Jobs |
 | `reopen_job(job_number)` | change (`jobs.closed_by_hand`) — permission `jobs.change_stage` | `reopenJob` (`lib/jobs/close.ts`) | Takes a hand close off (refuses a job that wasn't closed by hand); the phase comes from the records again. Same as the Reopen link on the job's banner |
 | `update_job_details(job_number, claim_number?, property_address?, adjuster?, adjuster_reference?, loss_type?, date_of_loss?, sum_insured?, excess?, claim_description?, special_instructions?, order_sender_name?, order_sender_email?, clear?)` | change (`jobs`) — permission `jobs.edit` | `updateJobDetails` (`lib/jobs/details.ts`) | The fields of the job's Overview → Job Details panel. Only fields given change; `clear` blanks fields. Every value is checked before anything is saved (loss type from `LOSS_TYPES` via `normaliseLossType`, date YYYY-MM-DD, amounts in dollars, email). Says each change from → to; nothing to change says so. Not the insurer, assigned to, overview notes or job number (panel-only fields, `voice: false` in `JOB_DETAIL_FIELDS`). The panel's Save goes through the same code: `PATCH /api/jobs/[jobId]/details` → `saveJobEdit`, permission `jobs.edit`, logged as `job.edit` |
@@ -4569,7 +4571,18 @@ Settings → **What the AI has learned**. Anyone signed in can read it; turning 
   - `POST /api/learning/auto-confirm { feature, kind, enabled }` changes a switch (`settings.edit`; operation `auto_confirm.set`, logged).
   - `POST /api/learning/auto-confirm { feature, kind, dismiss: true }` is "Not now".
 
-### 24.8 Next
+### 24.8 The debrief and the office memory (`lib/learning/debrief.ts`, `lib/actions/teach.ts`, migration `20261201_taught_lessons.sql`)
+
+Teaching IRC like a new assistant beside you: what the office says is taken away at once, shown back, and used from the next proposal on — not only after the nightly review sees a pattern twice.
+
+- **The debrief** (`debrief`, `AI_DEBRIEF_MODEL`, default `claude-haiku-5-5`, feature `learning-debrief`): what the office said (up to ~10 minutes of talking, `MAX_SAID`), what the AI did and what the office did with it, and the current lessons → at most 4 takeaways, each a plain instruction with when it applies, as narrow as was said (a person, a company, an insurer, a kind of job, or always), positive, neutral or negative. Saved straight away as lessons with source `taught`; a takeaway that corrects a current lesson updates it (`replaces`) instead of adding another. Nothing said: no model call — a plain confirm or skip is recorded as before (§24.3).
+- **The office memory** (feature `office`): takeaways about people, companies and how the office writes and works go here, and every feature reads them with its own lessons (`activeLessons`). Task takeaways stay with their feature. The voice connector and the in-app chat read it with `get_office_memory` before writing anything in the office's voice (their instructions say so).
+- **From a card:** `POST /api/actions/[id]/teach { comment }` (any time — confirming, editing, skipping, or after), and the instructions on Re-suggest (`/api/actions/suggest`, debriefed from the card as it was, before it's redone). By voice: `confirm_action_card` and `skip_action_card` take `comment`, `update_action_card`'s `redo_with` is debriefed too, and each reads back "Got it — from now on: …". The words are recorded as a learning event (`instructed`) for the nightly review.
+- **Anywhere:** `remember(what, about?)` by voice or chat — into the office memory.
+- **The nightly review** (§24.5) reads the office memory with each feature's lessons, marks taught ones, and treats them as the office's own words: refined only when later cases show the situation differs, retired only when the office has plainly gone against one more than once.
+- **Rewording or dropping a takeaway:** `rewordLesson`, and retiring as on the What the AI has learned page.
+
+### 24.9 Next
 
 - **More features:** order parsing (§24.4), then reports, quotes and scope, each recording their edits. They can use the same auto-confirm once they have kinds and a "confirm".
 

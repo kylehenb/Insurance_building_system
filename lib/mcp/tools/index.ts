@@ -26,6 +26,7 @@ import { addTodo, changeFollowUp, listFollowUps, listWaitingOn, setFollowUp } fr
 import { addJobAppointment, bookInspection } from '@/lib/mcp/tools/calendar'
 import { bookTradeVisit, getSchedule, listUnbooked } from '@/lib/mcp/tools/schedule'
 import { listDoneForYou, undoDoneForYou } from '@/lib/mcp/tools/auto-actions'
+import { getOfficeMemory, remember } from '@/lib/mcp/tools/memory'
 import { closeJobTool, reopenJobTool } from '@/lib/mcp/tools/close-jobs'
 import { updateJobContactTool, updateJobDetailsTool } from '@/lib/mcp/tools/job-details'
 import { decideHealthSuggestion, getAiCosts, getHealthCheck, listHealthSuggestions } from '@/lib/mcp/tools/health'
@@ -44,6 +45,8 @@ export const MCP_TOOLS: McpTool[] = [
   listUnbooked,
   listDoneForYou,
   undoDoneForYou,
+  remember,
+  getOfficeMemory,
   closeJobTool,
   reopenJobTool,
   updateJobDetailsTool,

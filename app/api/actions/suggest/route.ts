@@ -3,10 +3,13 @@ import { cardAccess, isUuid } from '@/lib/actions/access'
 import { CardError, withContext } from '@/lib/actions/cards'
 import { resuggestCard, resuggestStep } from '@/lib/actions/propose'
 import { mailDb } from '@/lib/mail/sync'
+import { teachFromCard } from '@/lib/actions/teach'
+import { MAX_SAID } from '@/lib/learning/debrief'
 
 export const maxDuration = 120
 
-const MAX_FEEDBACK = 2000
+// Up to ~10 minutes of talking (it's debriefed into takeaways, §24.8)
+const MAX_FEEDBACK = MAX_SAID
 
 // POST /api/actions/suggest { threadId | cardId, feedback? } — make (or
 // remake) the card for a conversation (or a follow-up card, by cardId) now: "Suggest next steps", "Try again" and
@@ -32,11 +35,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const db = mailDb()
+    // What the instruction teaches beyond this card, taken from the card as it was (already recorded as the instruction)
+    const takeaways = feedback && cardId ? await teachFromCard(db, access.tenantId, access.userId, cardId, feedback, { recordEvent: false }) : []
     const card = stepId
       ? await resuggestStep(db, access.tenantId, cardId!, stepId, feedback, access.userId)
       : await resuggestCard(db, access.tenantId, cardId ? { cardId } : { threadId: threadId! }, feedback, access.userId)
     if (!card && !cardId) return NextResponse.json({ error: 'Could not queue the card' }, { status: 502 })
-    return NextResponse.json({ card: card ? (await withContext(db, access.tenantId, [card]))[0] : null })
+    return NextResponse.json({ card: card ? (await withContext(db, access.tenantId, [card]))[0] : null, takeaways })
   } catch (err) {
     if (err instanceof CardError) return NextResponse.json({ error: err.status === 409 && !stepId ? 'That card can\'t be re-suggested now' : err.message }, { status: err.status })
     throw err
