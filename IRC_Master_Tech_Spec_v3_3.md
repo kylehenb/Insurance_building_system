@@ -4449,7 +4449,13 @@ Everything happening on IRC's jobs, day by day — inspections, trades on site a
 - **Trade dates** (`scheduleTradeVisit`): firm days only. Setting one sets `scheduled_date`, `scheduled_end_date` (several days), `confirmed_date`, `trade_confirmed_at` and status `confirmed`; clearing goes back to `unscheduled`.
   - **All day or a start time**, like a calendar event: no time means all day ("painter Thursday"); `start_time` (migration `20261129_visit_start_time.sql`, Perth) when one was given ("electrician 7am to disconnect, cabinet maker 10am"). No end time. Moving a visit to another day keeps its time unless a new time or all day is said. On a day, all-day visits come first, then by time. The visit's status change flags the job's phase (§23.15), so a booked trade moves it from "book trades" to "works underway". IRC doesn't message the trade or the homeowner — the day was agreed outside IRC.
 - **By voice and chat:** `book_trade_visit` and `get_schedule` (§10b). Inspections are booked with `book_inspection` (§23.13).
-- **Still to come:** the Calendar page (`/dashboard/calendar`) rebuilt on `loadSchedule` — day, week and month views, colour by kind, the same filters.
+- **The Calendar page** (`/dashboard/calendar`, `ScheduleCalendar.tsx`, data from `GET /api/schedule` — `loadSchedule`, the session's tenant, read only):
+  - **Day:** a list, all day first then by time, each with its kind, job (links to the job), address, Google Maps directions, "day 2 of 3" for work over several days, and the person's name when it's someone else's.
+  - **Week:** Monday to Sunday columns; work over several days as a bar across them; tap a day to open it. On a phone, the week is the days as lists.
+  - **Month:** counts per day in each kind's colour; tap a day to open it.
+  - **Filters,** the same as by voice: kinds (none ticked: everything), whose (Everyone, Mine, a person), a trade or contractor. The view and filters are remembered on the device. Default view: week, or day on a phone.
+  - **Colours** (`KIND_COLOURS`): inspection blue, make safe rust, roof report purple, leak detection teal, specialist olive, trades on site green, meetings grey.
+  - Replaces the old inspections-or-trades calendar (and its unused scheduling rules panel).
 
 ## 24. Learning module (`lib/learning`)
 

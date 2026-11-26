@@ -4,6 +4,7 @@ import { watchedCalendars } from '@/lib/calendar/sync'
 import { listJobNotes } from '@/lib/communications/notes'
 import { isFieldAppJob } from '@/lib/jobs/field-app'
 import { appBaseUrl } from '@/lib/signing/config'
+import { mapsLink } from '@/lib/maps'
 
 // Booking an inspection (tech spec §23.13 "Inspection bookings"). The time is
 // agreed with the homeowner outside IRC (a text from the owner's phone);
@@ -44,10 +45,7 @@ export type BookingInspection = {
   calendar_event_id: string | null
 }
 
-/** Google Maps directions to the address: on a phone it opens the Maps app with the route ready */
-export function mapsLink(address: string): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`
-}
+export { mapsLink }
 
 /** The field app page for an inspection (Midcity's jobs open Midcity's field app) */
 export function fieldAppLink(inspectionId: string, job: { insurer?: string | null }): string {
