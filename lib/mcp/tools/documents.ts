@@ -14,7 +14,7 @@ import {
   type DocumentEmailContext,
   type DocumentEmailOverrides,
 } from '@/lib/documents/send/email'
-import { ATTACH_PROPERTIES, fitJobAttachments, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
+import { ATTACH_PROPERTIES, fitJobAttachments, hasAttachArgs, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
 
 // Emailing a job's documents by voice: quotes, reports, invoices (incl.
 // excess), TCC, photos and the uncosted scope of works (one or more quotes). The list is the send dialog's own
@@ -296,7 +296,8 @@ export const sendDocuments: McpTool = {
     'Emails one or more documents of a job as PDFs in one email, exactly like Send on the job, and marks them sent (quotes, reports, invoices — invoices also go to the accounting system; a scope of works changes nothing).',
     'ONLY call this after get_document_email, once you have read back the recipients, the documents and any warnings and the user has clearly said yes.',
     'Leave out to, cc, subject and body to send the standard email. If there is no recipient on file, ask the user for one and pass it as to.',
-    'attach_photos ("2", "45-47", a label) / attach_files add the job\'s photos and uploaded files as they are (the "photos" document is all photos as one PDF).',
+    'The "photos" document (or attach_photos_pdf: ["all"]) is all the job\'s photos laid out as one PDF — use it when someone asks for the photos; attach_photos_pdf with numbers or labels makes a PDF of only those.',
+    'attach_photos ("2", "45-47", a label) / attach_files add a few of the job\'s photos and uploaded files as separate files.',
     'The same documents to the same people within 10 minutes are refused as a likely repeat; pass resend: true only if the user confirms they want it sent again.',
     'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
@@ -310,6 +311,7 @@ export const sendDocuments: McpTool = {
       body: { type: 'string', description: 'Full replacement email body (plain text; the standard email\'s formatting such as bold or colours is not kept). Keep the {signature} line where it is: it becomes the email signature. Start from the standard body from get_document_email and apply the user\'s changes.' },
       resend: { type: 'boolean', description: 'The user confirmed sending the same documents to the same people again within 10 minutes.' },
       attach_photos: ATTACH_PROPERTIES.attach_photos,
+      attach_photos_pdf: ATTACH_PROPERTIES.attach_photos_pdf,
       attach_files: ATTACH_PROPERTIES.attach_files,
     },
     required: ['documents'],
@@ -352,13 +354,13 @@ export const sendDocuments: McpTool = {
 
       // The job's own photos and files, alongside the PDFs
       const extraNames: string[] = []
-      if ((Array.isArray(args.attach_photos) && args.attach_photos.length) || (Array.isArray(args.attach_files) && args.attach_files.length)) {
+      if (hasAttachArgs({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files })) {
         const jobId = await jobIdOf(refs[0], ctx)
         const { data: job } = jobId
           ? await ctx.supabase.from('jobs').select('id, job_number').eq('tenant_id', ctx.tenantId).eq('id', jobId).maybeSingle()
           : { data: null }
         if (!job) return { text: 'Couldn\'t find the documents\' job for the photos.', isError: true }
-        const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_files: args.attach_files }, ctx, job)
+        const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files }, ctx, job)
         if (isResult(loaded)) return loaded
         const fit = await fitJobAttachments(loaded)
         if (fit.skipped.length) return { text: `Not sent. ${skippedText(fit)} Send them in a second email.`, isError: true }

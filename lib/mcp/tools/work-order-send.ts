@@ -7,7 +7,7 @@ import {
   type WorkOrderEmailOverrides,
 } from '@/lib/work-orders/work-order-email'
 import { WorkOrderPdfError } from '@/lib/work-orders/work-order-pdf'
-import { ATTACH_PROPERTIES, fitJobAttachments, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
+import { ATTACH_PROPERTIES, fitJobAttachments, hasAttachArgs, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
 
 // Sending a work order by voice. Both tools call the same functions as the
 // Work Orders tab's Auto send / Customise send (lib/work-orders/work-order-email.ts),
@@ -112,7 +112,8 @@ export const sendWorkOrder: McpTool = {
     'ONLY call this after get_work_order_email, once you have read back the trade, recipient, amount and any warnings',
     'and the user has clearly said yes. Leave out body and subject to send the standard email.',
     'If the trade has no email address, ask the user who to send it to and pass it as to.',
-    'attach_photos ("2", "45-47", a label) / attach_files add the job\'s own photos and uploaded files as they are, alongside the PDFs; read them back before sending.',
+    'All the job\'s photos already go as one photos PDF; for a PDF of only some photos, pass attach_photos_pdf with their numbers or labels (it replaces the all-photos PDF).',
+    'attach_photos ("2", "45-47", a label) / attach_files add a few of the job\'s own photos and uploaded files as separate files, alongside the PDFs; read them back before sending.',
     'One call sends one work order; to send several, read them all back together, get one yes, then call it once for each.',
     'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
@@ -125,6 +126,7 @@ export const sendWorkOrder: McpTool = {
       body: { type: 'string', description: 'Full replacement email body (plain text; the standard email\'s formatting such as bold or colours is not kept). Keep the {signature} line where it is: it becomes the email signature. Start from the standard body from get_work_order_email and apply the user\'s changes. Leave out for the standard body.' },
       include_photos: { type: 'boolean', description: 'Attach the job\'s photos PDF. Default true.' },
       attach_photos: ATTACH_PROPERTIES.attach_photos,
+      attach_photos_pdf: ATTACH_PROPERTIES.attach_photos_pdf,
       attach_files: ATTACH_PROPERTIES.attach_files,
     },
     required: ['work_order_id'],
@@ -142,13 +144,13 @@ export const sendWorkOrder: McpTool = {
       to: str('to'),
       subject: str('subject'),
       body: str('body'),
-      includePhotos: args.include_photos !== false,
+      // A PDF of chosen photos (attach_photos_pdf) replaces the all-photos one
+      includePhotos: args.include_photos !== false && !(Array.isArray(args.attach_photos_pdf) && args.attach_photos_pdf.length > 0),
     }
 
     // The job's own photos and files, alongside the PDFs
     const extraNames: string[] = []
-    const wantsFiles = (Array.isArray(args.attach_photos) && args.attach_photos.length > 0)
-      || (Array.isArray(args.attach_files) && args.attach_files.length > 0)
+    const wantsFiles = hasAttachArgs({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files })
     if (wantsFiles) {
       let jobId: string
       try {
@@ -156,7 +158,7 @@ export const sendWorkOrder: McpTool = {
       } catch (err) {
         return errorResult(err)
       }
-      const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_files: args.attach_files }, ctx, { id: jobId, job_number: wo.job_number })
+      const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files }, ctx, { id: jobId, job_number: wo.job_number })
       if (!Array.isArray(loaded)) return loaded
       const fit = await fitJobAttachments(loaded)
       if (fit.skipped.length) return { text: `Not sent. ${skippedText(fit)} Send them in a separate email.`, isError: true }
@@ -177,7 +179,7 @@ export const sendWorkOrder: McpTool = {
       ? 'Gary will contact them once the earlier trade is done.'
       : 'Gary is now waiting on their reply.'
     return {
-      text: `Sent the ${describeTrade(wo)} work order for ${wo.job_number} to ${recipient}${overrides.includePhotos ? '' : ', without photos'}${extraNames.length ? `, with ${extraNames.join(', ')}` : ''}. ${next}`,
+      text: `Sent the ${describeTrade(wo)} work order for ${wo.job_number} to ${recipient}${overrides.includePhotos || extraNames.length ? '' : ', without photos'}${extraNames.length ? `, with ${extraNames.join(', ')}` : ''}. ${next}`,
       data: { ...(after ?? wo), sent_to: recipient, communication_id: communicationId, ...(extraNames.length ? { extra_attachments: extraNames } : {}) },
     }
   },

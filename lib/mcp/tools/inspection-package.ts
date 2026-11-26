@@ -8,7 +8,7 @@ import {
   type DocumentEmailOverrides,
 } from '@/lib/documents/send/email'
 import { INSPECTION_SENT_STATUS, inspectionPackage } from '@/lib/documents/send/inspection-package'
-import { ATTACH_PROPERTIES, fitJobAttachments, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
+import { ATTACH_PROPERTIES, fitJobAttachments, hasAttachArgs, loadJobAttachments, skippedText } from '@/lib/mcp/tools/job-attachments'
 
 // The Inspections tab's Compile & Submit Package by voice: an inspection's
 // report, quote and invoice emailed to the insurer as a reply in the insurer
@@ -144,7 +144,7 @@ export const sendInspectionPackage: McpTool = {
     'as a reply in the insurer\'s original order email thread. Marks the documents sent and locked (the invoice also goes to the accounting system) and the inspection Sent and Locked.',
     'ONLY call this after get_inspection_package, once you have read back the recipients, the documents and any warnings and the user has clearly said yes.',
     'Leave out to, cc, subject and body to send the standard email. Keep the subject as it is so it stays in the order thread. If there is no recipient on file, ask the user for one and pass it as to.',
-    'attach_photos ("2", "45-47", a label) / attach_files add the job\'s photos and uploaded files as they are.',
+    'attach_photos_pdf (["all"], or numbers/labels) adds the job\'s photos as one photos PDF; attach_photos ("2", "45-47", a label) / attach_files add a few photos and uploaded files as separate files.',
     'A package that has already been sent is refused; pass resend: true only if the user confirms they want it sent again.',
     'If a call returns an error, tell the user what it says instead of retrying.',
   ].join(' '),
@@ -158,6 +158,7 @@ export const sendInspectionPackage: McpTool = {
       body: { type: 'string', description: 'Full replacement email body (plain text). Keep the {signature} line where it is: it becomes the email signature. Start from the body from get_inspection_package and apply the user\'s changes.' },
       resend: { type: 'boolean', description: 'The user confirmed sending a package that has already been sent.' },
       attach_photos: ATTACH_PROPERTIES.attach_photos,
+      attach_photos_pdf: ATTACH_PROPERTIES.attach_photos_pdf,
       attach_files: ATTACH_PROPERTIES.attach_files,
     },
     required: ['job_number'],
@@ -190,8 +191,8 @@ export const sendInspectionPackage: McpTool = {
       const draft = await buildDocumentEmailDraft(pkg.documents, ectx, { replyToOrder: true })
 
       const extraNames: string[] = []
-      if ((Array.isArray(args.attach_photos) && args.attach_photos.length) || (Array.isArray(args.attach_files) && args.attach_files.length)) {
-        const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_files: args.attach_files }, ctx, job)
+      if (hasAttachArgs({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files })) {
+        const loaded = await loadJobAttachments({ attach_photos: args.attach_photos, attach_photos_pdf: args.attach_photos_pdf, attach_files: args.attach_files }, ctx, job)
         if (isResult(loaded)) return loaded
         const fit = await fitJobAttachments(loaded)
         if (fit.skipped.length) return { text: `Not sent. ${skippedText(fit)} Send them in a second email.`, isError: true }

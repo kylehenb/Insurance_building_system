@@ -14,7 +14,9 @@ import { attachmentKind, AttachmentReadError, readAttachment } from '@/lib/attac
 
 // A job's photos, files and documents for the voice connector: attaching
 // them to emails and drafts (send_email, save_draft, reply_to_email,
-// send_documents), and looking at them (get_job_photo). Photos are picked as
+// send_documents, send_work_order, send_inspection_package), and looking at
+// them (get_job_photo). Many photos go as one photos PDF (attach_photos_pdf:
+// the Photos tab's export, via renderJobDocument) rather than one file each. Photos are picked as
 // people say them ("photo 2", "photos 45-47", a label) with lib/mail/job-refs,
 // read with the composer's own readJobFile / renderJobDocument, and fitted
 // under Gmail's limit with lib/mail/attachment-budget.
@@ -31,7 +33,11 @@ const strings = (v: unknown) => (Array.isArray(v) ? v : typeof v === 'string' ? 
 export const ATTACH_PROPERTIES = {
   attach_photos: {
     type: 'array', items: { type: 'string' }, maxItems: MAX_JOB_ATTACHMENTS,
-    description: 'Job photos: numbers from list_job_files ("2", "45-47"), a label ("floor plan"), photo_id values, or "all".',
+    description: `Job photos as separate image files, one per photo: numbers from list_job_files ("2", "45-47"), a label ("floor plan") or photo_id values. For a handful of photos only (at most ${MAX_JOB_ATTACHMENTS}); for all the job's photos, or many, use attach_photos_pdf instead.`,
+  },
+  attach_photos_pdf: {
+    type: 'array', items: { type: 'string' }, maxItems: MAX_JOB_ATTACHMENTS,
+    description: 'The job\'s photos laid out as ONE PDF — the same photos document as Export photos on the job. ["all"] for every photo on the job (the usual choice when someone asks for "the photos"); or numbers, ranges or labels ("45-47", "roof") for a PDF of only those. Use this rather than attach_photos whenever more than a few photos are wanted.',
   },
   attach_files: {
     type: 'array', items: { type: 'string' }, maxItems: MAX_JOB_ATTACHMENTS,
@@ -51,6 +57,7 @@ export const ATTACH_PROPERTIES = {
 
 export function hasAttachArgs(args: Record<string, unknown>): boolean {
   return strings(args.attach_photos).length > 0 || strings(args.attach_files).length > 0
+    || strings(args.attach_photos_pdf).length > 0
     || (Array.isArray(args.attach_documents) && args.attach_documents.length > 0)
 }
 
@@ -68,7 +75,8 @@ function readError(err: unknown): McpToolResult {
 
 /**
  * The job's photos, files and documents named in attach_photos /
- * attach_files / attach_documents, read and ready to attach. Anything that
+ * attach_files / attach_photos_pdf / attach_documents, read and ready to
+ * attach. attach_photos_pdf is one PDF of the photos ("all" = every photo). Anything that
  * matches nothing is an error and nothing is read.
  */
 export async function loadJobAttachments(
@@ -78,6 +86,8 @@ export async function loadJobAttachments(
 ): Promise<JobAttachment[] | McpToolResult> {
   const photoRefs = strings(args.attach_photos)
   const fileRefs = strings(args.attach_files)
+  const pdfRefs = strings(args.attach_photos_pdf)
+  const allPhotosPdf = pdfRefs.some(r => /^all(?: (?:the )?photos?)?$/i.test(r))
   let docRefs: DocumentRef[]
   try {
     docRefs = (Array.isArray(args.attach_documents) ? args.attach_documents : []).map(parseDocumentRef)
@@ -87,11 +97,13 @@ export async function loadJobAttachments(
   }
 
   const wanted: { label: string; load: () => Promise<JobFileContent> }[] = []
-  if (photoRefs.length || fileRefs.length) {
+  const photoPdfLabels = new Map<DocumentRef, string>()
+  if (photoRefs.length || fileRefs.length || pdfRefs.length) {
     const { photos, files } = await listJobAttachables(ctx.tenantId, job.id)
     const p = resolvePhotoRefs(photos, photoRefs)
     const f = resolveFileRefs(files, fileRefs)
-    const unmatched = [...p.unmatched.map(r => `photo "${r}"`), ...f.unmatched.map(r => `file "${r}"`)]
+    const inPdf = allPhotosPdf ? { items: photos, unmatched: photos.length ? [] : ['all'] } : resolvePhotoRefs(photos, pdfRefs)
+    const unmatched = [...p.unmatched.map(r => `photo "${r}"`), ...inPdf.unmatched.map(r => `photo "${r}"`), ...f.unmatched.map(r => `file "${r}"`)]
     if (unmatched.length) {
       return {
         text: `Not on ${job.job_number}: ${unmatched.join(', ')}. It has ${photos.length} photo${photos.length === 1 ? '' : 's'} and ${files.length} file${files.length === 1 ? '' : 's'} — see list_job_files.`,
@@ -103,9 +115,17 @@ export async function loadJobAttachments(
       wanted.push({ label: photoLabel(n, photo.label), load: () => readJobFile(ctx.tenantId, job.id, 'photo', photo.id) })
     }
     for (const file of f.items) wanted.push({ label: file.name, load: () => readJobFile(ctx.tenantId, job.id, 'file', file.id) })
+    if (pdfRefs.length) {
+      // No ids = every photo, in the job's photo order, as the Photos tab exports it
+      const ref: DocumentRef = { kind: 'photos', id: job.id, photoIds: allPhotosPdf ? [] : inPdf.items.map(x => x.id) }
+      const count = inPdf.items.length
+      docRefs.push(ref)
+      photoPdfLabels.set(ref, `photos PDF (${count === photos.length ? 'all ' : ''}${count} photo${count === 1 ? '' : 's'})`)
+    }
   }
   if (wanted.length + docRefs.length > MAX_JOB_ATTACHMENTS) {
-    return { text: `That's ${wanted.length + docRefs.length} attachments — at most ${MAX_JOB_ATTACHMENTS} in one email.`, isError: true }
+    const hint = photoRefs.length > 0 ? ' For many photos, use attach_photos_pdf to send them as one photos PDF.' : ''
+    return { text: `That's ${wanted.length + docRefs.length} attachments — at most ${MAX_JOB_ATTACHMENTS} in one email.${hint}`, isError: true }
   }
 
   const out: JobAttachment[] = []
@@ -114,7 +134,7 @@ export async function loadJobAttachments(
     // One at a time: PDFs share one headless browser
     for (const ref of docRefs) {
       const doc = await renderJobDocument(ctx.tenantId, job.id, ref)
-      out.push({ filename: doc.filename, mimeType: doc.mimeType, content: doc.content, label: doc.title })
+      out.push({ filename: doc.filename, mimeType: doc.mimeType, content: doc.content, label: photoPdfLabels.get(ref) ?? doc.title })
     }
   } catch (err) {
     return readError(err)
