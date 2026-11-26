@@ -410,6 +410,8 @@ export async function skipCard(db: SupabaseClient, tenantId: string, id: string,
     await recordCardDecision(db, data as ActionCard, userId, 'skipped')
     const { recordPromiseSkipped } = await import('./promises')
     await recordPromiseSkipped(db, data as ActionCard, userId)
+    const { recordWatchDecision } = await import('@/lib/jobs/watch-learning')
+    await recordWatchDecision(db, data as ActionCard, userId, 'skipped')
     const { recordChaseDecision } = await import('./waits')
     await recordChaseDecision(db, data as ActionCard, userId, 'skipped')
   }

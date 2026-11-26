@@ -4368,6 +4368,7 @@ IRC's own initiative: each morning it looks over the open jobs as a sharp office
   - Calendar matching (§23.13) reads a repeated event once: repeats of an event already decided take its decision, and one of each new series goes to the AI. It's capped at 150 AI reads per company per day.
 - **Clean-up** (`cleanUp`, after the review): calendar events that ended over 120 days ago, and sent-email reads finished over 60 days ago, are deleted.
 
+- **Learning from the office** (`lib/jobs/watch-learning.ts`, feature `job_watch`): a check of IRC's acted on (its card confirmed) or skipped is recorded; before planning, the review is shown its lessons (and the office memory) and the office's last 20 verdicts on its checks ("Acted on: …" / "Skipped: …", not ones IRC closed itself), and told not to plan the kinds the office skips. A check needs a specific date and a real cost if missed — never a general "check progress". At most one new check a review and two open per job (lowered from two and three: in November the office skipped 63 of IRC's checks and acted on 12).
 ### 23.15 Job phases (`lib/jobs/phase.ts`, `lib/jobs/lapse.ts`, migration `20261123_job_phases.sql`)
 
 Five phases the office thinks in replace the 17 stages, which went stale because they were only worked out on a few events.

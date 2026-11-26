@@ -62,8 +62,9 @@ describe('reviewing a job', () => {
     })
     const out = await reviewJob(db, 't1', tables.jobs[0] as never, { client, at: MON })
     expect(out).toMatchObject({ job: 'IRC1033', state: 'Painting due Sat 31 Oct; $30,000 invoice waiting on it', cancelled: 0 })
-    expect(out.checks).toEqual(['Mon 2 Nov: Did the painter go on Saturday? If so, close the job and invoice.', 'Mon 9 Nov: Second'])
-    expect(tables.action_queue).toHaveLength(2)
+    // One new check a review (the office skipped most when it was more)
+    expect(out.checks).toEqual(['Mon 2 Nov: Did the painter go on Saturday? If so, close the job and invoice.'])
+    expect(tables.action_queue).toHaveLength(1)
     expect(tables.action_queue[0]).toMatchObject({
       source: 'followup', rule_key: 'job_watch', status: 'scheduled', job_id: 'j33', due_at: '2026-11-02T00:00:00.000Z',
       title: 'Check: Did the painter go on Saturday? If so, close the job and invoice.',
@@ -91,19 +92,19 @@ describe('reviewing a job', () => {
     expect(system).toContain('a signature on a scope of works, building contract')
   })
 
-  it('cancels its own checks no longer needed, and adds none while three are open', async () => {
+  it('cancels its own checks no longer needed, and adds none while two are open', async () => {
     const watch = (id: string): Row => ({ id, tenant_id: 't1', job_id: 'j33', source: 'followup', rule_key: 'job_watch', status: 'scheduled', title: `Check ${id}`, due_at: '2099-01-01T00:00:00Z', steps: [], follow_up: { kind: 'watch', note: id } })
     tables.action_queue = [watch('w1'), watch('w2'), watch('w3'), { id: 'f1', tenant_id: 't1', job_id: 'j33', source: 'followup', status: 'scheduled', title: 'Mine', steps: [], follow_up: { note: 'mine' } }]
     const { client, create } = model({ state: 's', checks: [{ when: 'now', what: 'New', why: 'x' }], cancel: ['f1'] })
     const out = await reviewJob(db, 't1', tables.jobs[0] as never, { client, at: MON })
-    expect(out).toMatchObject({ checks: [], cancelled: 0 }) // the office's own follow-up can't be cancelled; three of IRC's are open
+    expect(out).toMatchObject({ checks: [], cancelled: 0 }) // the office's own follow-up can't be cancelled; IRC's are at the limit
     const prompt = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
     expect(prompt).toContain('- check w1: Check w1 (due ')
     expect(prompt).toContain('- follow-up f1: Mine')
 
-    const again = model({ state: 's', checks: [{ when: 'now', what: 'Chase it today', why: 'KPI overdue' }], cancel: ['w1'] })
+    const again = model({ state: 's', checks: [{ when: 'now', what: 'Chase it today', why: 'KPI overdue' }], cancel: ['w1', 'w2'] })
     const out2 = await reviewJob(db, 't1', tables.jobs[0] as never, { client: again.client, at: MON })
-    expect(out2.cancelled).toBe(1)
+    expect(out2.cancelled).toBe(2)
     expect(tables.action_queue.find(r => r.id === 'w1')!.status).toBe('skipped')
     expect(tables.action_queue.at(-1)).toMatchObject({ title: 'Check: Chase it today', due_at: new Date(MON.getTime() + 120_000).toISOString() })
   })
@@ -122,5 +123,24 @@ describe('clean-up', () => {
     await cleanUp(db, MON)
     expect(tables.calendar_events.map(e => e.id)).toEqual(['recent'])
     expect(tables.sent_emails.map(e => e.id)).toEqual(['s2', 's3'])
+  })
+})
+
+describe('learning from the office', () => {
+  it('shows the review what the office did with its recent checks, and records a skip', async () => {
+    const { recordWatchDecision } = await import('../watch-learning')
+    tables.action_queue = [
+      { id: 'd1', tenant_id: 't1', job_id: 'j33', source: 'followup', rule_key: 'job_watch', status: 'skipped', outcome: 'Skipped', title: 'Check: How is the painting going?', updated_at: '2026-11-02', steps: [], follow_up: { kind: 'watch', note: 'x', watch: { why: 'progress' } } },
+      { id: 'd2', tenant_id: 't1', job_id: 'j33', source: 'followup', rule_key: 'job_watch', status: 'done', outcome: '1 step done', title: 'Check: Did the painter go Saturday?', updated_at: '2026-11-01', steps: [], follow_up: { kind: 'watch', note: 'y' } },
+      { id: 'd3', tenant_id: 't1', job_id: 'j33', source: 'followup', rule_key: 'job_watch', status: 'skipped', outcome: 'No longer needed (job review)', title: 'Check: closed by IRC', updated_at: '2026-11-03', steps: [], follow_up: { kind: 'watch', note: 'z' } },
+    ]
+    const { client, create } = model({ state: 's', checks: [] })
+    await reviewJob(db, 't1', tables.jobs[0] as never, { client, at: MON })
+    const prompt = (create.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0].messages[0].content
+    expect(prompt).toContain('- Skipped: Check: How is the painting going?')
+    expect(prompt).toContain('- Acted on: Check: Did the painter go Saturday?')
+    expect(prompt).not.toContain('closed by IRC')
+    await recordWatchDecision(db, tables.action_queue[0] as never, 'u1', 'skipped')
+    expect((tables.learning_events ?? []).at(-1)).toMatchObject({ feature: 'job_watch', outcome: 'skipped', situation_text: expect.stringContaining('How is the painting going?') })
   })
 })

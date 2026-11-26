@@ -10,6 +10,7 @@ import { pruneOldEvents } from '@/lib/calendar/sync'
 import { isFieldAppJob } from './field-app'
 import { runLapses } from './lapse'
 import { trackAi } from '@/lib/health/ai-usage'
+import { watchLearning } from './watch-learning'
 import { isSetAsideKind, SET_ASIDE_KINDS, SET_ASIDE_RULE } from '@/lib/actions/set-aside'
 
 // The daily job review (tech spec §23.14): IRC's own initiative. Each morning
@@ -35,8 +36,9 @@ const DEFAULT_DAILY_LIMIT = 40
 const OPEN_DAYS = 60
 /** An unchanged open job is read again after this long: the weekly look at jobs gone quiet */
 const QUIET_DAYS = 7
-const MAX_NEW_CHECKS = 2
-const MAX_OPEN_CHECKS = 3
+// One new check a review, two open at most: the office skipped most when it was more (§23.14)
+const MAX_NEW_CHECKS = 1
+const MAX_OPEN_CHECKS = 2
 /** Done sent-email reads are let go after this long */
 const KEEP_SENT_DAYS = 60
 
@@ -119,7 +121,7 @@ const REVIEW_TOOL: Anthropic.Beta.BetaTool = {
 export const REVIEW_PROMPT = `You look over one open job of Insurance Repair Co (building insurance repairs in Perth) each morning, to use initiative the way a sharp office manager would: keep the job moving to completion and payment, and catch things before they slip. Call review_job once.
 
 - state: one line on where the job stands and what it's waiting on.
-- checks: dated checks for IRC to raise on their day — usually none. Plan one only when there's a real reason:
+- checks: dated checks for IRC to raise on their day — usually none. Plan one only when there's a real reason AND a specific date, AND missing it would cost something (a trade not turning up, an insurer KPI missed, a promise to the homeowner or insurer broken, money not invoiced). Never a general "check progress", "follow up on the status" or "see how it's going":
   - Something was due to happen and nothing shows it did: a trade attending ("the painter was going Saturday" → check the next working day: did they go? then close and invoice), a quote, report or booking someone promised.
   - Something important is coming up that needs confirming: an install or booking (especially one that took long to arrange or has had problems — check about a week before that it's still on track), an appointment.
   - A KPI (in the job file) is close or overdue with nothing under way, or the job has stalled with nothing pending and no one waiting: when "now".
@@ -127,6 +129,7 @@ export const REVIEW_PROMPT = `You look over one open job of Insurance Repair Co 
 - Don't double up: the job's open follow-ups, waits and cards are listed. If one already covers it, plan nothing. At most ${MAX_NEW_CHECKS}.
 - cancel: IRC's own checks listed that are no longer needed (it happened, or the job moved on).
 - A job that is simply waiting on someone with a follow-up already set needs nothing. Planning nothing is the usual right answer — the office should only hear from you when it matters.
+- HOW THE OFFICE TREATED IRC'S RECENT CHECKS and any LESSONS, if shown, are the office's verdict on your checks: don't plan the kinds they skip; the kinds they acted on are the ones worth raising.
 
 Today is given in the first message. Times are Perth time (AWST).`
 
@@ -148,6 +151,7 @@ export async function reviewJob(db: SupabaseClient, tenantId: string, job: JobRo
       return `- ${kind} ${c.id}: ${c.title}${c.status === 'scheduled' && c.due_at ? ` (due ${spokenDue(c.due_at)})` : ` (${c.status === 'scheduled' ? 'scheduled' : 'on the action cards now'})`}`
     })
 
+    const learned = await watchLearning(db, tenantId)
     const client = opts.client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const response = await trackAi({ feature: 'job-review', provider: 'anthropic', model: REVIEW_MODEL, tenantId: tenantId, jobId: job.id }, () => client.beta.messages.create({
       model: REVIEW_MODEL,
@@ -155,7 +159,7 @@ export async function reviewJob(db: SupabaseClient, tenantId: string, job: JobRo
       system: [{ type: 'text', text: REVIEW_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: [REVIEW_TOOL],
       tool_choice: { type: 'tool', name: REVIEW_TOOL.name },
-      messages: [{ role: 'user', content: `Today: ${today(at)}.\n\nTHE JOB FILE\n${jobFile}\n\nOPEN FOLLOW-UPS, WAITS, CHECKS AND CARDS ON THIS JOB\n${openLines.join('\n') || '(none)'}` }],
+      messages: [{ role: 'user', content: `Today: ${today(at)}.\n\nTHE JOB FILE\n${jobFile}\n\nOPEN FOLLOW-UPS, WAITS, CHECKS AND CARDS ON THIS JOB\n${openLines.join('\n') || '(none)'}${learned ? `\n\n${learned}` : ''}` }],
     } as Anthropic.Beta.MessageCreateParamsNonStreaming))
     const call = response.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === REVIEW_TOOL.name)
     if (!call) throw new Error('The AI didn\'t review the job')
